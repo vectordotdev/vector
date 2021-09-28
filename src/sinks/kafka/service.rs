@@ -18,7 +18,6 @@ use tokio::time::Sleep;
 use tower::Service;
 
 pub struct KafkaRequest {
-    pub topic: String,
     pub body: Vec<u8>,
     pub metadata: KafkaRequestMetadata,
 }
@@ -28,6 +27,7 @@ pub struct KafkaRequestMetadata {
     pub key: Option<Vec<u8>>,
     pub timestamp_millis: Option<i64>,
     pub headers: Option<OwnedHeaders>,
+    pub topic: String,
 }
 
 pub struct KafkaResponse {}
@@ -93,7 +93,7 @@ impl Service<KafkaRequest> for KafkaService {
         let current_in_flight = Arc::clone(&self.current_in_flight);
 
         Box::pin(async move {
-            let mut record = FutureRecord::to(&request.topic).payload(&request.body);
+            let mut record = FutureRecord::to(&request.metadata.topic).payload(&request.body);
             if let Some(key) = &request.metadata.key {
                 record = record.key(key);
             }

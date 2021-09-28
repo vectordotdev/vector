@@ -1,7 +1,7 @@
 #[cfg(feature = "kafka-integration-tests")]
 #[cfg(test)]
 mod integration_test {
-    use super::*;
+    use crate::sinks::kafka::*;
     use crate::{
         buffers::Acker,
         kafka::{KafkaAuthConfig, KafkaSaslConfig, KafkaTlsConfig},
@@ -18,8 +18,12 @@ mod integration_test {
     use std::{collections::BTreeMap, future::ready, thread, time::Duration};
     use vector_core::event::{BatchNotifier, BatchStatus};
     use crate::kafka::KafkaCompression;
-    use crate::sinks::util::BatchConfig;
+    use crate::sinks::util::{BatchConfig, StreamSink};
     use std::collections::HashMap;
+    use crate::sinks::kafka::config::{KafkaSinkConfig, Encoding, KafkaRole};
+    use crate::sinks::kafka::sink::KafkaSink;
+    use crate::event::Value;
+    use crate::sinks::util::encoding::EncodingConfig;
 
     #[tokio::test]
     async fn healthcheck() {
@@ -40,7 +44,7 @@ mod integration_test {
             headers_field: None,
         };
 
-        super::healthcheck(config).await.unwrap();
+        self::sink::healthcheck(config).await.unwrap();
     }
 
     #[tokio::test]
@@ -97,7 +101,7 @@ mod integration_test {
         let (acker, _ack_counter) = Acker::new_for_testing();
         config.clone().to_rdkafka(KafkaRole::Consumer)?;
         config.clone().to_rdkafka(KafkaRole::Producer)?;
-        super::healthcheck(config.clone()).await?;
+        self::sink::healthcheck(config.clone()).await?;
         KafkaSink::new(config, acker)
     }
 
@@ -247,8 +251,9 @@ mod integration_test {
             headers_field: Some(headers_key.clone()),
         };
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
+        println!("Topic name generated in test: {:?}", topic);
         let (acker, ack_counter) = Acker::new_for_testing();
-        let sink = KafkaSink::new(config, acker).unwrap();
+        let sink = Box::new(KafkaSink::new(config, acker).unwrap());
 
         let num_events = 1000;
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
@@ -256,7 +261,7 @@ mod integration_test {
 
         let header_1_key = "header-1-key";
         let header_1_value = "header-1-value";
-        events
+        let input_events = events
             .map(|mut event| {
                 let mut header_values = BTreeMap::new();
                 header_values.insert(
@@ -266,11 +271,9 @@ mod integration_test {
                 event
                     .as_mut_log()
                     .insert(headers_key.clone(), header_values);
-                Ok(event)
-            })
-            .forward(sink)
-            .await
-            .unwrap();
+                event
+            });
+        sink.run(Box::pin(input_events)).await.unwrap();
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         // read back everything from the beginning

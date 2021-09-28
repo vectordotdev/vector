@@ -4,9 +4,10 @@ use crate::internal_events::KafkaHeaderExtractionFailed;
 use crate::sinks::kafka::service::{KafkaRequest, KafkaRequestMetadata};
 use crate::sinks::util::RequestBuilder;
 use rdkafka::message::OwnedHeaders;
+use crate::template::{Template, TemplateRenderingError};
 
 pub struct KafkaRequestBuilder {
-    pub topic: String,
+    pub topic: Template,
     pub key_field: Option<String>,
     pub headers_field: Option<String>,
 }
@@ -18,11 +19,15 @@ impl RequestBuilder<Event> for KafkaRequestBuilder {
     type Request = KafkaRequest;
 
     fn split_input(&self, mut event: Event) -> (Self::Metadata, Self::Events) {
+
+        //TODO: error handling?
+        let topic = self.topic.render_string(&event).unwrap();
         let metadata = KafkaRequestMetadata {
             finalizers: event.take_finalizers(),
             key: get_key(&event, &self.key_field),
             timestamp_millis: get_timestamp_millis(&event),
             headers: get_headers(&event, &self.headers_field),
+            topic
         };
         let events = [event];
         (metadata, events)
@@ -30,7 +35,6 @@ impl RequestBuilder<Event> for KafkaRequestBuilder {
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
         KafkaRequest {
-            topic: self.topic.clone(),
             body: payload,
             metadata,
         }

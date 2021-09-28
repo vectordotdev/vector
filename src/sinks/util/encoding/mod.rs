@@ -35,7 +35,6 @@ mod config;
 pub use config::EncodingConfig;
 mod with_default;
 
-pub(crate) use codec::{DEFAULT_JSON_ENCODER, DEFAULT_TEXT_ENCODER};
 pub use with_default::EncodingConfigWithDefault;
 
 use crate::{

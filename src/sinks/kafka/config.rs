@@ -1,9 +1,9 @@
 use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
 use crate::kafka::{KafkaAuthConfig, KafkaCompression, KafkaStatisticsContext};
 use crate::serde::to_string;
-use crate::sinks::kafka::sink::KafkaSink;
+use crate::sinks::kafka::sink::{KafkaSink, healthcheck};
 use crate::sinks::util::encoding::{
-    Encoder, EncodingConfig, DEFAULT_JSON_ENCODER, DEFAULT_TEXT_ENCODER,
+    Encoder, EncodingConfig,
 };
 use crate::sinks::util::BatchConfig;
 use crate::sinks::{Healthcheck, VectorSink};
@@ -15,22 +15,13 @@ use rdkafka::error::KafkaError;
 use rdkafka::producer::FutureProducer;
 use rdkafka::ClientConfig;
 use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
-use std::convert::TryFrom;
 use std::io::Write;
 use tokio::time::Duration;
 use vector_core::event::Event;
+use vector_core::config::log_schema;
 
 pub(crate) const QUEUED_MIN_MESSAGES: u64 = 100000;
-
-#[derive(Debug, Snafu)]
-pub enum BuildError {
-    #[snafu(display("creating kafka producer failed: {}", source))]
-    KafkaCreateFailed { source: KafkaError },
-    #[snafu(display("invalid topic template: {}", source))]
-    TopicTemplate { source: TemplateParseError },
-}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct KafkaSinkConfig {
@@ -155,15 +146,6 @@ impl KafkaSinkConfig {
     }
 }
 
-pub fn create_producer(
-    client_config: ClientConfig,
-) -> crate::Result<FutureProducer<KafkaStatisticsContext>> {
-    let producer = client_config
-        .create_with_context(KafkaStatisticsContext)
-        .context(KafkaCreateFailed)?;
-    Ok(producer)
-}
-
 impl GenerateConfig for KafkaSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -193,12 +175,23 @@ pub enum Encoding {
 impl Encoder for Encoding {
     fn encode_event(&self, event: Event, writer: &mut dyn Write) -> std::io::Result<()> {
         match self {
-            Encoding::Json => DEFAULT_JSON_ENCODER.encode_event(event, writer),
+            Encoding::Json => {
+                match event {
+                    Event::Log(log) => serde_json::to_writer(writer, &log)?,
+                    Event::Metric(metric) => serde_json::to_writer(writer, &metric)?,
+                }
+                Ok(())
+            }
             Encoding::Text => match event {
-                Event::Log(log) => DEFAULT_TEXT_ENCODER.encode_event(Event::Log(log), writer),
+                Event::Log(log) => {
+                    let message = log
+                        .get(log_schema().message_key())
+                        .map(|v| v.as_bytes().to_vec())
+                        .unwrap_or_default();
+                    writer.write_all(&message)
+                },
                 Event::Metric(metric) => {
-                    metric.to_string().into_bytes();
-                    Ok(())
+                    writer.write_all(&metric.to_string().into_bytes())
                 }
             },
         }
@@ -221,36 +214,6 @@ impl SinkConfig for KafkaSinkConfig {
     fn sink_type(&self) -> &'static str {
         "kafka"
     }
-}
-
-async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
-    trace!("Healthcheck started.");
-    let client = config.to_rdkafka(KafkaRole::Consumer).unwrap();
-    let topic = match Template::try_from(config.topic)
-        .context(TopicTemplate)?
-        .render_string(&Event::from(""))
-    {
-        Ok(topic) => Some(topic),
-        Err(error) => {
-            warn!(
-                message = "Could not generate topic for healthcheck.",
-                %error,
-            );
-            None
-        }
-    };
-
-    tokio::task::spawn_blocking(move || {
-        let consumer: BaseConsumer = client.create().unwrap();
-        let topic = topic.as_ref().map(|topic| &topic[..]);
-
-        consumer
-            .fetch_metadata(topic, Duration::from_secs(3))
-            .map(|_| ())
-    })
-    .await??;
-    trace!("Healthcheck completed.");
-    Ok(())
 }
 
 #[cfg(test)]

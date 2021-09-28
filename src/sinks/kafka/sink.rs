@@ -1,7 +1,7 @@
 use super::config::KafkaRole;
 use super::config::KafkaSinkConfig;
 use crate::event::Event;
-use crate::sinks::kafka::config::{create_producer, Encoding};
+use crate::sinks::kafka::config::Encoding;
 use crate::sinks::kafka::request_builder::KafkaRequestBuilder;
 use crate::sinks::kafka::service::KafkaService;
 use crate::sinks::util::encoding::EncodingConfig;
@@ -11,14 +11,40 @@ use futures::stream::BoxStream;
 use futures::StreamExt;
 use std::num::NonZeroUsize;
 use vector_core::buffers::Acker;
+use crate::template::{Template, TemplateParseError};
+use std::convert::TryFrom;
+use snafu::{ResultExt, Snafu};
+use rdkafka::ClientConfig;
+use rdkafka::producer::FutureProducer;
+use crate::kafka::KafkaStatisticsContext;
+use rdkafka::consumer::{BaseConsumer, Consumer};
+use tokio::time::Duration;
+use rdkafka::error::KafkaError;
+
+#[derive(Debug, Snafu)]
+pub enum BuildError {
+    #[snafu(display("creating kafka producer failed: {}", source))]
+    KafkaCreateFailed { source: KafkaError },
+    #[snafu(display("invalid topic template: {}", source))]
+    TopicTemplate { source: TemplateParseError },
+}
 
 pub struct KafkaSink {
     encoding: EncodingConfig<Encoding>,
     acker: Acker,
     service: KafkaService,
-    topic: String,
+    topic: Template,
     key_field: Option<String>,
     headers_field: Option<String>,
+}
+
+pub fn create_producer(
+    client_config: ClientConfig,
+) -> crate::Result<FutureProducer<KafkaStatisticsContext>> {
+    let producer = client_config
+        .create_with_context(KafkaStatisticsContext)
+        .context(KafkaCreateFailed)?;
+    Ok(producer)
 }
 
 impl KafkaSink {
@@ -31,7 +57,7 @@ impl KafkaSink {
             encoding: config.encoding,
             acker,
             service: KafkaService::new(producer),
-            topic: config.topic,
+            topic: Template::try_from(config.topic).context(TopicTemplate)?,
             key_field: config.key_field,
         })
     }
@@ -65,6 +91,36 @@ impl KafkaSink {
             .into_driver(self.service, self.acker);
         sink.run().await
     }
+}
+
+pub(crate) async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
+    trace!("Healthcheck started.");
+    let client = config.to_rdkafka(KafkaRole::Consumer).unwrap();
+    let topic = match Template::try_from(config.topic)
+        .context(TopicTemplate)?
+        .render_string(&Event::from(""))
+    {
+        Ok(topic) => Some(topic),
+        Err(error) => {
+            warn!(
+                message = "Could not generate topic for healthcheck.",
+                %error,
+            );
+            None
+        }
+    };
+
+    tokio::task::spawn_blocking(move || {
+        let consumer: BaseConsumer = client.create().unwrap();
+        let topic = topic.as_ref().map(|topic| &topic[..]);
+
+        consumer
+            .fetch_metadata(topic, Duration::from_secs(3))
+            .map(|_| ())
+    })
+        .await??;
+    trace!("Healthcheck completed.");
+    Ok(())
 }
 
 #[async_trait]
