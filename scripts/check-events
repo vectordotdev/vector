@@ -76,13 +76,13 @@ class Event
     # Check EventsReceived events (common)
     if @name.end_with? 'EventsReceived'
       members_must_include(['count', 'byte_size'])
-      counters_must_include(['component_received_events_total', 'received_event_bytes_total'])
+      counters_must_include(['component_received_events_total', 'component_received_event_bytes_total'])
     end
 
     # Check EventsSent events (common)
     if @name.end_with? 'EventsSent'
       members_must_include(['count', 'bytes_sent'])
-      counters_must_include(['component_sent_events_total', 'sent_event_bytes_total'])
+      counters_must_include(['component_sent_events_total', 'component_sent_event_bytes_total'])
     end
 
     # Check BytesSent events (for sinks)
