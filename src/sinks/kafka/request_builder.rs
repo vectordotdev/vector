@@ -3,8 +3,8 @@ use crate::event::{Event, Finalizable, Value};
 use crate::internal_events::KafkaHeaderExtractionFailed;
 use crate::sinks::kafka::service::{KafkaRequest, KafkaRequestMetadata};
 use crate::sinks::util::RequestBuilder;
-use rdkafka::message::OwnedHeaders;
 use crate::template::{Template, TemplateRenderingError};
+use rdkafka::message::OwnedHeaders;
 
 pub struct KafkaRequestBuilder {
     pub topic: Template,
@@ -19,15 +19,17 @@ impl RequestBuilder<Event> for KafkaRequestBuilder {
     type Request = KafkaRequest;
     type SplitError = TemplateRenderingError;
 
-    fn split_input(&self, mut event: Event) -> Result<(Self::Metadata, Self::Events), Self::SplitError> {
-
+    fn split_input(
+        &self,
+        mut event: Event,
+    ) -> Result<(Self::Metadata, Self::Events), Self::SplitError> {
         let topic = self.topic.render_string(&event)?;
         let metadata = KafkaRequestMetadata {
             finalizers: event.take_finalizers(),
             key: get_key(&event, &self.key_field),
             timestamp_millis: get_timestamp_millis(&event),
             headers: get_headers(&event, &self.headers_field),
-            topic
+            topic,
         };
         let events = [event];
         Ok((metadata, events))
@@ -95,9 +97,9 @@ fn get_headers(event: &Event, headers_field: &Option<String>) -> Option<OwnedHea
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::BTreeMap;
     use bytes::Bytes;
     use rdkafka::message::Headers;
+    use std::collections::BTreeMap;
 
     #[test]
     fn kafka_get_headers() {

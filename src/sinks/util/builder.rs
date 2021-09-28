@@ -13,7 +13,7 @@ use vector_core::{
 };
 
 use super::{encoding::Encoder, Compression, Compressor, ConcurrentMap, RequestBuilder};
-use crate::sinks::util::request_builder::{RequestBuilderResult, RequestBuilderError};
+use crate::sinks::util::request_builder::{RequestBuilderError, RequestBuilderResult};
 
 impl<T: ?Sized> SinkBuilderExt for T where T: Stream {}
 
@@ -99,8 +99,9 @@ pub trait SinkBuilderExt: Stream {
 
             Box::pin(async move {
                 // Split the input into metadata and events.
-                let (metadata, events) = builder.split_input(input)
-                    .map_err(|e|RequestBuilderError::SplitError(e))?;
+                let (metadata, events) = builder
+                    .split_input(input)
+                    .map_err(|e| RequestBuilderError::SplitError(e))?;
 
                 // Encode/compress each event.
                 for event in events.into_iter() {
@@ -108,7 +109,8 @@ pub trait SinkBuilderExt: Stream {
                     // as the write target, but the `std::io::Write` interface _is_ fallible, and
                     // technically we might run out of memory when allocating for the vector, so we
                     // pass the error through.
-                    let _ = encoder.encode_event(event, &mut compressor)
+                    let _ = encoder
+                        .encode_event(event, &mut compressor)
                         .map_err(|e| RequestBuilderError::EncodingError(e))?;
                 }
 

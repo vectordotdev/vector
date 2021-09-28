@@ -1,8 +1,8 @@
-use crate::sinks::util::encoding::Encoder;
-use crate::event::Event;
-use std::io::Write;
-use serde::{Serialize, Deserialize};
 use crate::config::log_schema;
+use crate::event::Event;
+use crate::sinks::util::encoding::Encoder;
+use serde::{Deserialize, Serialize};
+use std::io::Write;
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -28,10 +28,8 @@ impl Encoder for Encoding {
                         .map(|v| v.as_bytes().to_vec())
                         .unwrap_or_default();
                     writer.write_all(&message)
-                },
-                Event::Metric(metric) => {
-                    writer.write_all(&metric.to_string().into_bytes())
                 }
+                Event::Metric(metric) => writer.write_all(&metric.to_string().into_bytes()),
             },
         }
     }
@@ -40,9 +38,9 @@ impl Encoder for Encoding {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::BTreeMap;
-    use crate::event::{Metric, MetricKind, MetricValue};
     use crate::config::log_schema;
+    use crate::event::{Metric, MetricKind, MetricValue};
+    use std::collections::BTreeMap;
 
     #[test]
     fn kafka_encode_event_log_text() {
@@ -99,5 +97,4 @@ mod tests {
             String::from_utf8_lossy(&bytes)
         );
     }
-
 }

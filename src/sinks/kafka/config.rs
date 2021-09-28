@@ -1,7 +1,8 @@
 use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
 use crate::kafka::{KafkaAuthConfig, KafkaCompression};
 use crate::serde::to_string;
-use crate::sinks::kafka::sink::{KafkaSink, healthcheck};
+use crate::sinks::kafka::encoder::Encoding;
+use crate::sinks::kafka::sink::{healthcheck, KafkaSink};
 use crate::sinks::util::encoding::EncodingConfig;
 use crate::sinks::util::BatchConfig;
 use crate::sinks::{Healthcheck, VectorSink};
@@ -9,7 +10,6 @@ use futures::FutureExt;
 use rdkafka::ClientConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::sinks::kafka::encoder::Encoding;
 
 pub(crate) const QUEUED_MIN_MESSAGES: u64 = 100000;
 
@@ -154,8 +154,6 @@ impl GenerateConfig for KafkaSinkConfig {
         .unwrap()
     }
 }
-
-
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "kafka")]

@@ -1,27 +1,27 @@
 use super::config::KafkaRole;
 use super::config::KafkaSinkConfig;
 use crate::event::Event;
+use crate::internal_events::TemplateRenderingFailed;
+use crate::kafka::KafkaStatisticsContext;
 use crate::sinks::kafka::encoder::Encoding;
 use crate::sinks::kafka::request_builder::KafkaRequestBuilder;
 use crate::sinks::kafka::service::KafkaService;
 use crate::sinks::util::encoding::EncodingConfig;
+use crate::sinks::util::request_builder::RequestBuilderError;
 use crate::sinks::util::{Compression, SinkBuilderExt, StreamSink};
+use crate::template::{Template, TemplateParseError};
 use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures::StreamExt;
-use std::num::NonZeroUsize;
-use vector_core::buffers::Acker;
-use crate::template::{Template, TemplateParseError};
-use std::convert::TryFrom;
-use snafu::{ResultExt, Snafu};
-use rdkafka::ClientConfig;
-use rdkafka::producer::FutureProducer;
-use crate::kafka::KafkaStatisticsContext;
 use rdkafka::consumer::{BaseConsumer, Consumer};
-use tokio::time::Duration;
 use rdkafka::error::KafkaError;
-use crate::sinks::util::request_builder::RequestBuilderError;
-use crate::internal_events::TemplateRenderingFailed;
+use rdkafka::producer::FutureProducer;
+use rdkafka::ClientConfig;
+use snafu::{ResultExt, Snafu};
+use std::convert::TryFrom;
+use std::num::NonZeroUsize;
+use tokio::time::Duration;
+use vector_core::buffers::Acker;
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
@@ -86,7 +86,7 @@ impl KafkaSink {
                     Err(RequestBuilderError::EncodingError(e)) => {
                         error!("failed to encode Kafka request: {:?}", e);
                         None
-                    },
+                    }
                     Err(RequestBuilderError::SplitError(error)) => {
                         emit!(&TemplateRenderingFailed {
                             error,
@@ -127,7 +127,7 @@ pub(crate) async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
             .fetch_metadata(topic, Duration::from_secs(3))
             .map(|_| ())
     })
-        .await??;
+    .await??;
     trace!("Healthcheck completed.");
     Ok(())
 }

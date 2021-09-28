@@ -1,7 +1,13 @@
 #[cfg(feature = "kafka-integration-tests")]
 #[cfg(test)]
 mod integration_test {
+    use crate::event::Value;
+    use crate::kafka::KafkaCompression;
+    use crate::sinks::kafka::config::{Encoding, KafkaRole, KafkaSinkConfig};
+    use crate::sinks::kafka::sink::KafkaSink;
     use crate::sinks::kafka::*;
+    use crate::sinks::util::encoding::EncodingConfig;
+    use crate::sinks::util::{BatchConfig, StreamSink};
     use crate::{
         buffers::Acker,
         kafka::{KafkaAuthConfig, KafkaSaslConfig, KafkaTlsConfig},
@@ -15,15 +21,9 @@ mod integration_test {
         message::Headers,
         Message, Offset, TopicPartitionList,
     };
+    use std::collections::HashMap;
     use std::{collections::BTreeMap, future::ready, thread, time::Duration};
     use vector_core::event::{BatchNotifier, BatchStatus};
-    use crate::kafka::KafkaCompression;
-    use crate::sinks::util::{BatchConfig, StreamSink};
-    use std::collections::HashMap;
-    use crate::sinks::kafka::config::{KafkaSinkConfig, Encoding, KafkaRole};
-    use crate::sinks::kafka::sink::KafkaSink;
-    use crate::event::Value;
-    use crate::sinks::util::encoding::EncodingConfig;
 
     #[tokio::test]
     async fn healthcheck() {
@@ -118,11 +118,11 @@ mod integration_test {
             indexmap::indexmap! {
                 "batch.size".to_string() => 1.to_string(),
             }
-                .into_iter()
-                .collect()
+            .into_iter()
+            .collect()
         )
-            .await
-            .is_err())
+        .await
+        .is_err())
     }
 
     #[tokio::test]
@@ -137,8 +137,8 @@ mod integration_test {
             },
             indexmap::indexmap! {}.into_iter().collect(),
         )
-            .await
-            .unwrap();
+        .await
+        .unwrap();
     }
 
     #[tokio::test]
@@ -154,11 +154,11 @@ mod integration_test {
             indexmap::indexmap! {
                 "batch.num.messages".to_string() => 1.to_string(),
             }
-                .into_iter()
-                .collect()
+            .into_iter()
+            .collect()
         )
-            .await
-            .is_err())
+        .await
+        .is_err())
     }
 
     #[tokio::test]
@@ -174,11 +174,11 @@ mod integration_test {
             indexmap::indexmap! {
                 "queue.buffering.max.ms".to_string() => 1.to_string(),
             }
-                .into_iter()
-                .collect()
+            .into_iter()
+            .collect()
         )
-            .await
-            .is_err())
+        .await
+        .is_err())
     }
 
     #[tokio::test]
@@ -193,7 +193,7 @@ mod integration_test {
             }),
             KafkaCompression::None,
         )
-            .await;
+        .await;
     }
 
     #[tokio::test]
@@ -208,7 +208,7 @@ mod integration_test {
             }),
             KafkaCompression::None,
         )
-            .await;
+        .await;
     }
 
     #[tokio::test]
@@ -225,7 +225,7 @@ mod integration_test {
             None,
             KafkaCompression::None,
         )
-            .await;
+        .await;
     }
 
     async fn kafka_happy_path(
@@ -261,18 +261,17 @@ mod integration_test {
 
         let header_1_key = "header-1-key";
         let header_1_value = "header-1-value";
-        let input_events = events
-            .map(|mut event| {
-                let mut header_values = BTreeMap::new();
-                header_values.insert(
-                    header_1_key.to_string(),
-                    Value::Bytes(Bytes::from(header_1_value)),
-                );
-                event
-                    .as_mut_log()
-                    .insert(headers_key.clone(), header_values);
-                event
-            });
+        let input_events = events.map(|mut event| {
+            let mut header_values = BTreeMap::new();
+            header_values.insert(
+                header_1_key.to_string(),
+                Value::Bytes(Bytes::from(header_1_value)),
+            );
+            event
+                .as_mut_log()
+                .insert(headers_key.clone(), header_values);
+            event
+        });
         sink.run(Box::pin(input_events)).await.unwrap();
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
@@ -301,7 +300,7 @@ mod integration_test {
                 }
             },
         )
-            .await;
+        .await;
 
         // check we have the expected number of messages in the topic
         let (low, high) = consumer

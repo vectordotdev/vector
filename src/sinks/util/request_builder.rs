@@ -10,7 +10,8 @@ pub trait RequestBuilder<Input> {
     ///
     /// The metadata should be any information that needs to be passed back to `build_request`
     /// as-is, such as event finalizers, while the events are the actual events to process.
-    fn split_input(&self, input: Input) -> Result<(Self::Metadata, Self::Events), Self::SplitError>;
+    fn split_input(&self, input: Input)
+        -> Result<(Self::Metadata, Self::Events), Self::SplitError>;
 
     /// Builds a request for the given metadata and payload.
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request;
@@ -21,5 +22,5 @@ pub type RequestBuilderResult<T, S> = Result<T, RequestBuilderError<S>>;
 #[derive(Debug)]
 pub enum RequestBuilderError<S> {
     SplitError(S),
-    EncodingError(std::io::Error)
+    EncodingError(std::io::Error),
 }
