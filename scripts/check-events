@@ -3,15 +3,6 @@
 
 require 'find'
 
-COMMON_EVENTS = ['EventsReceived', 'EventsSent']
-# Sources implicitly emit EventsSent in the common pipeline code
-SOURCE_EVENTS = ['BytesReceived'] + COMMON_EVENTS - ['EventsSent']
-# Sinks implicitly emit EventsReceived in the common pipeline code
-SINK_EVENTS = COMMON_EVENTS + ['BytesSent'] - ['EventsReceived']
-# Transforms implicitly emit the common events in the topology, and have
-# no other emit requirements.
-TRANSFORM_EVENTS = []
-
 # These members/tags are common to multiple events
 BYTE_SIZE_COUNT = ['byte_size', 'count']
 
