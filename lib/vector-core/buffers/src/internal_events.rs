@@ -7,8 +7,6 @@ pub struct BufferEventsReceived {
 }
 
 impl InternalEvent for BufferEventsReceived {
-    fn emit_logs(&self) {}
-
     fn emit_metrics(&self) {
         counter!("buffer_received_events_total", self.count as u64);
         counter!("buffer_received_bytes_total", self.byte_size as u64);
@@ -21,8 +19,6 @@ pub struct BufferEventsSent {
 }
 
 impl InternalEvent for BufferEventsSent {
-    fn emit_logs(&self) {}
-
     fn emit_metrics(&self) {
         counter!("buffer_sent_events_total", self.count as u64);
         counter!("buffer_sent_bytes_total", self.byte_size as u64);
@@ -34,8 +30,6 @@ pub struct EventsDropped {
 }
 
 impl InternalEvent for EventsDropped {
-    fn emit_logs(&self) {}
-
     fn emit_metrics(&self) {
         counter!("buffer_discarded_events_total", self.count as u64);
     }
