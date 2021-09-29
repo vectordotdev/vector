@@ -113,7 +113,7 @@ impl Expression for ToFloatFn {
             Integer(v) => Ok((v as f64).into()),
             Boolean(v) => Ok(NotNan::new(if v { 1.0 } else { 0.0 }).unwrap().into()),
             Null => Ok(0.0.into()),
-            Timestamp(v) => Ok((v.timestamp_nanos() as f64 / 1_000_000_000 as f64).into()),
+            Timestamp(v) => Ok((v.timestamp_nanos() as f64 / 1_000_000_000_f64).into()),
             Bytes(v) => Conversion::Float
                 .convert(v)
                 .map_err(|e| e.to_string().into()),
