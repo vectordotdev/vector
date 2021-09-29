@@ -89,7 +89,7 @@ where
                 let rx = rx.inspect(|item: &T| {
                     emit(&BufferEventsSent {
                         count: 1,
-                        byte_size: item.allocated_bytes(),
+                        byte_size: item.size_of(),
                     });
                 });
                 Ok((tx, Box::new(rx), Acker::Null))
@@ -262,7 +262,7 @@ impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for InstrumentMemoryBuffer<S> {
 
     fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
         let span = self.span.clone();
-        let byte_size = item.allocated_bytes();
+        let byte_size = item.size_of();
         self.project().inner.start_send(item).map(|()| {
             span.in_scope(|| {
                 emit(&BufferEventsReceived {
