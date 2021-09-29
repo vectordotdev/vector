@@ -32,16 +32,20 @@ The `throttle` transform can be used to rate limit specific subsets of your even
 You can enforce rate limits on events or their raw size, as well as excluding events based on a VRL condition to avoid dropping critical logs. Rate limits
 can be applied globally across all logs or by specifying a key to create buckets of events to rate limit more granularly.
 
+The initial implementation will shed load by dropping any events beyond the configured rate limit. This could be configured in the future to apply backpressure 
+or connected to Vector's dead-letter pipelines feature.
+
 ### Implementation
 
 The `throttle` transform will leverage the existing [Governor](https://docs.rs/governor/0.3.2/governor/index.html) crate. We will expose the bytes or events
-per second as using facing configuration (or expand to more time frames) and translate that into a `governor::Quota` for internal use. We should not expose
+per second as user-facing configuration (or expand to more time frames) and translate that into a `governor::Quota` for internal use. We should not expose
 the `Quota` directly to users to ensure ease of configuration for end users.
 
 Config:
 
 ```rust
 pub struct ThrottleConfig {
+    // One of events_* or bytes_* may be configured, but not both
     events_per_second: u32,
     bytes_per_second: u32,
     key_field: Option<String>,
@@ -76,18 +80,18 @@ impl TaskTransform for Throttle {
                         match maybe_event {
                             None => true,
                             Some(event) => {
-			    	if let Some(condition) = self.exclude_as_ref() {
-				    if condition.check(&event) {
-				        output.push(event);
-					false
-				    }
-				}
+                    if let Some(condition) = self.exclude_as_ref() {
+                    if condition.check(&event) {
+                        output.push(event);
+                    false
+                    }
+                }
 
-				let value = self
-				    .key_field
-				    .as_ref()
-				    .and_then(|key_field| event.get(key_field))
-				    .map(|v| v.to_string_lossy());
+                let value = self
+                    .key_field
+                    .as_ref()
+                    .and_then(|key_field| event.get(key_field))
+                    .map(|v| v.to_string_lossy());
 
                                 match lim.check_key_n(value, size) {
                                     Ok(()) => {
