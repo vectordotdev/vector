@@ -26,13 +26,14 @@ pub use acker::Acker;
 use core_common::byte_size_of::ByteSizeOf;
 use core_common::internal_event::emit;
 use futures::StreamExt;
+use futures::channel::mpsc::Receiver;
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
 use internal_events::{BufferEventsReceived, BufferEventsSent};
 use pin_project::pin_project;
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
-use tracing::Span;
+use tracing::{Instrument, Span};
 use std::fmt::{Debug, Display};
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -81,15 +82,19 @@ where
             span,
         } => {
             let (tx, rx) = mpsc::channel(max_events);
+            let span_disabled = span.is_disabled();
             let tx = BufferInputCloner::Memory(tx, when_full, span);
-            let rx = rx.inspect(|item: &T| {
-                emit(&BufferEventsSent {
-                    count: 1,
-                    byte_size: item.allocated_bytes(),
+            if span_disabled {
+                Ok((tx, Box::new(rx), Acker::Null))
+            } else {
+                let rx = rx.inspect(|item: &T| {
+                    emit(&BufferEventsSent {
+                        count: 1,
+                        byte_size: item.allocated_bytes(),
+                    });
                 });
-            });
-            let rx = Box::new(rx);
-            Ok((tx, rx, Acker::Null))
+                Ok((tx, Box::new(rx), Acker::Null))
+            }
         }
     }
 }
