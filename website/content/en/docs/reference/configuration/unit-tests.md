@@ -14,9 +14,8 @@ pipelines. Unit tests in Vector work just like unit tests in most programming la
 1. Provide expected **outputs** from the changes made by the transform (or multiple transforms)
 1. Receive directly actionable feedback on test failures
 
-If *any* of your unit tests fail, the Vector instance doesn't start up. This makes unit tests a
-useful guardrail for running in Vector in production settings where you need to ensure that your
-topology doesn't exhibit unexpected behavior.
+In general, unit tests can serve as a useful guardrail when running in Vector in production settings
+where you need to ensure that your topology doesn't exhibit unexpected behavior.
 
 This doc will begin with an [example](#example) unit test configuration and proceed to a more
 reference-style [guide](#configuring).
