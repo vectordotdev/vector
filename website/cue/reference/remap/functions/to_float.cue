@@ -41,7 +41,7 @@ remap: functions: to_float: {
 		{
 			title: "Coerce to a float (timestamp)"
 			source: """
-				to_int(t'2020-12-30T22:20:53.824727Z')
+				to_float(t'2020-12-30T22:20:53.824727Z')
 				"""
 			return: 1609366853.824727
 		},
