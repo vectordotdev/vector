@@ -14,9 +14,11 @@ remap: functions: parse_url: {
 			type: ["string"]
 		},
 		{
-			name:        "default_known_ports"
-			description: "Whether the port should be defaulted, when not in the input, if the scheme has a known default port. Known schemes are: `http`, `https`, `ws`, `wss`, and `ftp`"
-			required:    false
+			name: "default_known_ports"
+			description: """
+				If true and the port number is not specified in the input URL string, it will be populated from well-known ports for the following schemes: `http`, `https`, `ws`, `wss`, and `ftp`.
+				"""
+			required: false
 			type: ["boolean"]
 			default: false
 		},
