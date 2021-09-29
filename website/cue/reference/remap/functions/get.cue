@@ -1,14 +1,14 @@
 package metadata
 
-remap: functions: lookup: {
+remap: functions: get: {
 	category: "Path"
 	description: """
-		Dynamically lookup the value of a given path.
+		Dynamically get the value of a given path.
 
 		When you know the path you want to look up, you should use
 		static paths such as `.foo.bar[1]` to get the value of that
 		path. However, when you don't know the path names in advance,
-		you can use this dynamic lookup function to get at the requested
+		you can use this dynamic get function to get at the requested
 		value.
 		"""
 
@@ -35,21 +35,21 @@ remap: functions: lookup: {
 		{
 			title: "single-segment top-level field"
 			source: #"""
-				lookup!(value: { "foo": "bar" }, path: ["foo"])
+				get!(value: { "foo": "bar" }, path: ["foo"])
 				"""#
 			return: "bar"
 		},
 		{
 			title: "multi-segment nested field"
 			source: #"""
-				lookup!(value: { "foo": { "bar": "baz" } }, path: ["foo", "bar"])
+				get!(value: { "foo": { "bar": "baz" } }, path: ["foo", "bar"])
 				"""#
 			return: "baz"
 		},
 		{
 			title: "array indexing"
 			source: #"""
-				lookup!(value: ["foo", "bar", "baz"], path: [-2])
+				get!(value: ["foo", "bar", "baz"], path: [-2])
 				"""#
 			return: "bar"
 		},

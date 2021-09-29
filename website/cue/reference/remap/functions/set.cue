@@ -1,6 +1,6 @@
 package metadata
 
-remap: functions: insert: {
+remap: functions: set: {
 	category: "Path"
 	description: """
 		Dynamically insert data into the path of a given object or array.
@@ -48,14 +48,14 @@ remap: functions: insert: {
 		{
 			title: "multi-segment nested field"
 			source: #"""
-				insert!(value: { "foo": { "bar": "baz" } }, path: ["foo", "bar"], data: "qux")
+				set!(value: { "foo": { "bar": "baz" } }, path: ["foo", "bar"], data: "qux")
 				"""#
 			return: foo: bar: "qux"
 		},
 		{
 			title: "array"
 			source: #"""
-				insert!(value: ["foo", "bar", "baz"], path: [-2], data: 42)
+				set!(value: ["foo", "bar", "baz"], path: [-2], data: 42)
 				"""#
 			return: ["foo", 42, "baz"]
 		},
