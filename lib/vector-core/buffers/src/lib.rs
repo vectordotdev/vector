@@ -32,6 +32,7 @@ use pin_project::pin_project;
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
+use tracing::Span;
 use std::fmt::{Debug, Display};
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -65,22 +66,22 @@ where
             when_full,
             data_dir,
             id,
-            ..
+            span,
         } => {
             let buffer_dir = format!("{}_buffer", id);
 
             let (tx, rx, acker) =
                 disk::open(&data_dir, &buffer_dir, max_size).map_err(|error| error.to_string())?;
-            let tx = BufferInputCloner::Disk(tx, when_full);
+            let tx = BufferInputCloner::Disk(tx, when_full, span);
             Ok((tx, rx, acker))
         }
         Variant::Memory {
             max_events,
             when_full,
-            ..
+            span,
         } => {
             let (tx, rx) = mpsc::channel(max_events);
-            let tx = BufferInputCloner::Memory(tx, when_full);
+            let tx = BufferInputCloner::Memory(tx, when_full, span);
             let rx = rx.inspect(|item: &T| {
                 emit(&BufferEventsSent {
                     count: 1,
@@ -128,9 +129,9 @@ where
     <T as EncodeBytes<T>>::Error: Debug,
     <T as DecodeBytes<T>>::Error: Debug,
 {
-    Memory(mpsc::Sender<T>, WhenFull),
+    Memory(mpsc::Sender<T>, WhenFull, Span),
     #[cfg(feature = "disk-buffer")]
-    Disk(disk::Writer<T>, WhenFull),
+    Disk(disk::Writer<T>, WhenFull, Span),
 }
 
 impl<'a, T> BufferInputCloner<T>
@@ -142,19 +143,28 @@ where
     #[must_use]
     pub fn get(&self) -> Box<dyn Sink<T, Error = ()> + 'a + Send + Unpin> {
         match self {
-            BufferInputCloner::Memory(tx, when_full) => {
+            BufferInputCloner::Memory(tx, when_full, span) => {
                 let inner = tx
                     .clone()
                     .sink_map_err(|error| error!(message = "Sender error.", %error));
+                
                 if when_full == &WhenFull::DropNewest {
-                    Box::new(DropWhenFull::new(InstrumentMemoryBuffer::new(inner)))
+                    if span.is_disabled() {
+                        Box::new(DropWhenFull::new(inner))
+                    } else {
+                        Box::new(DropWhenFull::new(InstrumentMemoryBuffer::new(inner, span.clone())))
+                    }
                 } else {
-                    Box::new(InstrumentMemoryBuffer::new(inner))
+                    if span.is_disabled() {
+                        Box::new(inner)
+                    } else {
+                        Box::new(InstrumentMemoryBuffer::new(inner, span.clone()))
+                    }
                 }
             }
 
             #[cfg(feature = "disk-buffer")]
-            BufferInputCloner::Disk(writer, when_full) => {
+            BufferInputCloner::Disk(writer, when_full, ..) => {
                 let inner: disk::Writer<T> = (*writer).clone();
                 if when_full == &WhenFull::DropNewest {
                     Box::new(DropWhenFull::new(inner))
@@ -227,11 +237,12 @@ impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
 pub struct InstrumentMemoryBuffer<S> {
     #[pin]
     inner: S,
+    span: Span,
 }
 
 impl<S> InstrumentMemoryBuffer<S> {
-    pub fn new(inner: S) -> Self {
-        Self { inner }
+    pub fn new(inner: S, span: Span) -> Self {
+        Self { inner, span }
     }
 }
 
@@ -243,6 +254,8 @@ impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for InstrumentMemoryBuffer<S> {
     }
 
     fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+        let span = self.span.clone();
+        let _guard = span.enter();
         let byte_size = item.allocated_bytes();
         self.project().inner.start_send(item).map(|()| {
             emit(&BufferEventsReceived {

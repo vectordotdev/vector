@@ -154,7 +154,7 @@ impl BufferConfig {
         &self,
         data_dir: &Option<PathBuf>,
         sink_id: &ComponentKey,
-        span: Option<Span>,
+        span: Span,
     ) -> Result<(BufferInputCloner<Event>, EventStream, Acker), String> {
         let variant = match &self {
             BufferConfig::Memory {
