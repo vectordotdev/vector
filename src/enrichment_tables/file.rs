@@ -4,8 +4,10 @@ use enrichment::{Case, Condition, IndexHandle, Table};
 use serde::{Deserialize, Serialize};
 use shared::{conversion::Conversion, datetime::TimeZone};
 use std::collections::{BTreeMap, HashMap};
+use std::fs;
 use std::hash::Hasher;
 use std::path::PathBuf;
+use std::time::SystemTime;
 use tracing::trace;
 use vrl::Value;
 
@@ -47,7 +49,7 @@ enum SchemaType {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq)]
-struct FileConfig {
+pub struct FileConfig {
     file: FileC,
     #[serde(default)]
     schema: HashMap<String, SchemaType>,
@@ -94,15 +96,11 @@ impl FileConfig {
             Some(SchemaType::String) | None => value.into(),
         })
     }
-}
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "file")]
-impl EnrichmentTableConfig for FileConfig {
-    async fn build(
+    fn load_file(
         &self,
-        globals: &crate::config::GlobalOptions,
-    ) -> crate::Result<Box<dyn Table + Send + Sync>> {
+        timezone: TimeZone,
+    ) -> crate::Result<(Vec<String>, Vec<Vec<Value>>, SystemTime)> {
         let Encoding::Csv {
             include_headers,
             delimiter,
@@ -134,7 +132,7 @@ impl EnrichmentTableConfig for FileConfig {
                 Ok(row?
                     .iter()
                     .enumerate()
-                    .map(|(idx, col)| self.parse_column(globals.timezone, &headers[idx], idx, col))
+                    .map(|(idx, col)| self.parse_column(timezone, &headers[idx], idx, col))
                     .collect::<Result<Vec<_>, String>>()?)
             })
             .collect::<crate::Result<Vec<_>>>()?;
@@ -145,7 +143,28 @@ impl EnrichmentTableConfig for FileConfig {
             headers
         );
 
-        Ok(Box::new(File::new(data, headers)))
+        let modified = fs::metadata(&self.file.path)?.modified()?;
+
+        Ok((headers, data, modified))
+    }
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "file")]
+impl EnrichmentTableConfig for FileConfig {
+    async fn build(
+        &self,
+        globals: &crate::config::GlobalOptions,
+    ) -> crate::Result<Box<dyn Table + Send + Sync>> {
+        let (headers, data, modified) = self.load_file(globals.timezone)?;
+
+        Ok(Box::new(File::new(
+            self.clone(),
+            globals.timezone,
+            modified,
+            data,
+            headers,
+        )))
     }
 }
 
@@ -155,8 +174,10 @@ inventory::submit! {
 
 impl_generate_config_from_default!(FileConfig);
 
-#[derive(Clone)]
 pub struct File {
+    config: FileConfig,
+    timezone: TimeZone,
+    last_modified: SystemTime,
     data: Vec<Vec<Value>>,
     headers: Vec<String>,
     indexes: Vec<(
@@ -166,9 +187,106 @@ pub struct File {
     )>,
 }
 
+impl Clone for File {
+    /// The clone method also checks if the underlying file has been modified and then if it has
+    /// it reloads the data.
+    ///
+    /// This is a slightly unorthodox use of clone. A preferred alternative would have been to
+    /// create an explicit method that would take a `File` and return either the existing or a
+    /// reloaded version of the object. However, since tables are stored as dyn objects this
+    /// prevents them returning Self.
+    ///
+    /// So this piggybacks on the functionality provided by `dyn_clone` to enable the struct to
+    /// return Self and performing the reloading as needed.
+    ///
+    /// Due to the amount of data that is likely to be stored in `File` a clone would be expensive
+    /// anyway and so cloning should only occur when absolutely necessary (when Vector receives a
+    /// SIGHUP to tell it to reload the config and data).
+    fn clone(&self) -> Self {
+        let reloaded = match fs::metadata(&self.config.file.path)
+            .and_then(|metadata| metadata.modified())
+        {
+            Ok(modified) if modified > self.last_modified => {
+                // The underlying file has been modified, so we clone by reloading the data.
+                match self.config.load_file(self.timezone) {
+                    Ok((headers, data, modified)) => {
+                        let indexes = self.index_fields();
+                        let mut cloned = Self {
+                            config: self.config.clone(),
+                            timezone: self.timezone,
+                            headers,
+                            data,
+                            last_modified: modified,
+                            indexes: Vec::new(),
+                        };
+
+                        match indexes
+                            .into_iter()
+                            .map(|(case, fields)| cloned.add_index(case, &fields))
+                            .collect::<Result<Vec<IndexHandle>, String>>()
+                        {
+                            Err(error) => {
+                                error!(message = "Unable to add index to reloaded enrichment file",
+                                    file = ?self.config.file.path.to_str().unwrap_or("path with invalid utf"),
+                                    %error);
+                                None
+                            }
+                            Ok(_) => {
+                                // It is safe to ignore the returned index handle since that
+                                // represents the position of the index in the list, this will be
+                                // unchanged.
+                                trace!(
+                                    "Reloaded enrichment file {}.",
+                                    self.config
+                                        .file
+                                        .path
+                                        .to_str()
+                                        .unwrap_or("path with invalid utf"),
+                                );
+                                Some(cloned)
+                            }
+                        }
+                    }
+                    Err(error) => {
+                        error!(message = "Error reloading enrichment file.",
+                            file = ?self.config.file.path.to_str().unwrap_or("path with invalid utf"),
+                            %error);
+                        None
+                    }
+                }
+            }
+            Err(error) => {
+                error!(message = "Error fetching enrichment file metadata.",
+                    file = ?self.config.file.path.to_str().unwrap_or("path with invalid utf"),
+                    %error);
+                None
+            }
+            _ => None,
+        };
+
+        reloaded.unwrap_or_else(|| Self {
+            config: self.config.clone(),
+            timezone: self.timezone,
+            last_modified: self.last_modified,
+            data: self.data.clone(),
+            headers: self.headers.clone(),
+            indexes: self.indexes.clone(),
+        })
+    }
+}
+
 impl File {
-    pub fn new(data: Vec<Vec<Value>>, headers: Vec<String>) -> Self {
+    pub fn new(
+        config: FileConfig,
+        timezone: TimeZone,
+        last_modified: SystemTime,
+        data: Vec<Vec<Value>>,
+        headers: Vec<String>,
+    ) -> Self {
         Self {
+            config,
+            timezone,
+            last_modified,
             data,
             headers,
             indexes: Vec::new(),
@@ -330,6 +448,23 @@ impl File {
         let IndexHandle(handle) = handle;
         Ok(self.indexes[handle].2.get(&key))
     }
+
+    /// Returns a list of the field names that are in each index
+    fn index_fields(&self) -> Vec<(Case, Vec<&str>)> {
+        self.indexes
+            .iter()
+            .map(|index| {
+                let (case, fields, _) = index;
+                (
+                    *case,
+                    fields
+                        .iter()
+                        .map(|idx| self.headers[*idx].as_str())
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect::<Vec<_>>()
+    }
 }
 
 /// Adds the bytes from the given value to the hash.
@@ -484,6 +619,9 @@ mod tests {
     #[test]
     fn finds_row() {
         let file = File::new(
+            Default::default(),
+            shared::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],
@@ -508,6 +646,9 @@ mod tests {
     #[test]
     fn duplicate_indexes() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             Vec::new(),
             vec![
                 "field1".to_string(),
@@ -526,6 +667,9 @@ mod tests {
     #[test]
     fn errors_on_missing_columns() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             Vec::new(),
             vec![
                 "field1".to_string(),
@@ -544,6 +688,9 @@ mod tests {
     #[test]
     fn finds_row_with_index() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],
@@ -570,6 +717,9 @@ mod tests {
     #[test]
     fn finds_rows_with_index_case_sensitive() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],
@@ -619,6 +769,9 @@ mod tests {
     #[test]
     fn selects_columns() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into(), "zoop".into()],
                 vec!["zirp".into(), "zurp".into(), "zork".into()],
@@ -661,6 +814,9 @@ mod tests {
     #[test]
     fn finds_rows_with_index_case_insensitive() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],
@@ -719,6 +875,9 @@ mod tests {
     #[test]
     fn finds_row_with_dates() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec![
                     "zip".into(),
@@ -758,6 +917,9 @@ mod tests {
     #[test]
     fn doesnt_find_row() {
         let file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],
@@ -779,6 +941,9 @@ mod tests {
     #[test]
     fn doesnt_find_row_with_index() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],
