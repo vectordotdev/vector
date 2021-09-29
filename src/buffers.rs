@@ -163,7 +163,6 @@ impl BufferConfig {
             } => Variant::Memory {
                 max_events: *max_events,
                 when_full: *when_full,
-                span: span,
             },
             #[cfg(feature = "disk-buffer")]
             BufferConfig::Disk {
@@ -177,10 +176,9 @@ impl BufferConfig {
                     .ok_or_else(|| "Must set data_dir to use on-disk buffering.".to_string())?
                     .to_path_buf(),
                 id: sink_id.to_string(),
-                span: span,
             },
         };
-        build(variant)
+        build(variant, span)
     }
 
     /// Resources that the sink is using.

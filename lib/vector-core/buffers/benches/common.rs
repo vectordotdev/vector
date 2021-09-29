@@ -6,6 +6,7 @@ use futures::task::{noop_waker, Context, Poll};
 use futures::{Sink, Stream};
 use std::fmt;
 use std::pin::Pin;
+use tracing::Span;
 
 #[derive(Clone, Copy)]
 pub struct Message<const N: usize> {
@@ -88,7 +89,7 @@ pub fn setup<const N: usize>(
         messages.push(Message::new(i as u64));
     }
 
-    let (tx, rx, _) = buffers::build::<Message<N>>(variant).unwrap();
+    let (tx, rx, _) = buffers::build::<Message<N>>(variant, Span::none()).unwrap();
     (Pin::new(tx.get()), Box::pin(rx), messages)
 }
 

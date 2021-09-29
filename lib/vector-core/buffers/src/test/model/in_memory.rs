@@ -18,6 +18,7 @@ impl InMemory {
             Variant::Memory {
                 max_events,
                 when_full,
+                ..
             } => InMemory {
                 inner: VecDeque::with_capacity(*max_events),
                 capacity: *max_events,

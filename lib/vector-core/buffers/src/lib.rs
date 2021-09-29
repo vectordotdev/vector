@@ -46,6 +46,7 @@ pub use variant::*;
 /// legacy reasons the error is not a type but a `String`.
 pub fn build<'a, T>(
     variant: Variant,
+    span: Span,
 ) -> Result<
     (
         BufferInputCloner<T>,
@@ -66,7 +67,7 @@ where
             when_full,
             data_dir,
             id,
-            span,
+            ..
         } => {
             let buffer_dir = format!("{}_buffer", id);
 
@@ -78,7 +79,7 @@ where
         Variant::Memory {
             max_events,
             when_full,
-            span,
+            ..
         } => {
             let (tx, rx) = mpsc::channel(max_events);
             let is_span_disabled = span.is_disabled();
@@ -161,12 +162,10 @@ where
                             span.clone(),
                         )))
                     }
+                } else if span.is_disabled() {
+                    Box::new(inner)
                 } else {
-                    if span.is_disabled() {
-                        Box::new(inner)
-                    } else {
-                        Box::new(InstrumentMemoryBuffer::new(inner, span.clone()))
-                    }
+                    Box::new(InstrumentMemoryBuffer::new(inner, span.clone()))
                 }
             }
 

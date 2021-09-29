@@ -120,7 +120,7 @@ where
             max_size,
             current_size: Arc::clone(&current_size),
             slot: None,
-            span: span,
+            span,
         };
 
         let mut reader = Reader {

@@ -165,13 +165,14 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx, _) =
-            vector_core::buffers::build(vector_core::buffers::Variant::Memory {
+        let (input_tx, input_rx, _) = vector_core::buffers::build(
+            vector_core::buffers::Variant::Memory {
                 max_events: 100,
                 when_full: vector_core::buffers::WhenFull::Block,
-                span: tracing::span::Span::none(),
-            })
-            .unwrap();
+            },
+            tracing::Span::none(),
+        )
+        .unwrap();
         let input_rx = crate::utilization::wrap(Pin::new(input_rx));
 
         let (output, control) = Fanout::new();

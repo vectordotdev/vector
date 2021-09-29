@@ -2,7 +2,6 @@ use crate::WhenFull;
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use std::path::PathBuf;
-use tracing::Span;
 
 #[cfg(test)]
 const MAX_STR_SIZE: usize = 128;
@@ -17,14 +16,12 @@ pub enum Variant {
     Memory {
         max_events: usize,
         when_full: WhenFull,
-        span: Span,
     },
     Disk {
         max_size: usize,
         when_full: WhenFull,
         data_dir: PathBuf,
         id: String,
-        span: Span,
     },
 }
 
@@ -54,7 +51,6 @@ impl Arbitrary for Variant {
             Variant::Memory {
                 max_events: u16::arbitrary(g) as usize, // u16 avoids allocation failures
                 when_full: WhenFull::arbitrary(g),
-                span: Span::none(),
             }
         } else {
             Variant::Disk {
@@ -62,7 +58,6 @@ impl Arbitrary for Variant {
                 when_full: WhenFull::arbitrary(g),
                 id: Id::arbitrary(g).inner,
                 data_dir: PathBuf::arbitrary(g),
-                span: Span::none(),
             }
         }
     }
@@ -72,14 +67,12 @@ impl Arbitrary for Variant {
             Variant::Memory {
                 max_events,
                 when_full,
-                span,
+                ..
             } => {
                 let when_full = *when_full;
-                let span = *span;
                 Box::new(max_events.shrink().map(move |me| Variant::Memory {
                     max_events: me,
                     when_full,
-                    span,
                 }))
             }
             Variant::Disk {
@@ -87,11 +80,10 @@ impl Arbitrary for Variant {
                 when_full,
                 id,
                 data_dir,
-                span,
+                ..
             } => {
                 let max_size = *max_size;
                 let when_full = *when_full;
-                let span = *span;
                 let id = id.clone();
                 let data_dir = data_dir.clone();
                 Box::new(max_size.shrink().map(move |ms| Variant::Disk {
@@ -99,7 +91,6 @@ impl Arbitrary for Variant {
                     when_full,
                     id: id.clone(),
                     data_dir: data_dir.clone(),
-                    span,
                 }))
             }
         }
