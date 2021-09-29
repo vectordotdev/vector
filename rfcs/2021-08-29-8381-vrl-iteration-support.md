@@ -45,9 +45,9 @@ We add native, limited support for iteration to VRL in a way that fits the VRL
 
 ## Context
 
-- Magic *_keys and *_values Remap functions [#5785][]
-- feat(remap): add for-loop statement [#5875][]
-- Remap enumerating/looping RFC [#6031][]
+* Magic `*_keys` and *_values` Remap functions [#5785][]
+* feat(remap): add for-loop statement [#5875][]
+* Remap enumerating/looping RFC [#6031][]
 
 [#5785]: https://github.com/timberio/vector/issues/5785
 [#5875]: https://github.com/timberio/vector/issues/5875
@@ -55,11 +55,11 @@ We add native, limited support for iteration to VRL in a way that fits the VRL
 
 ## Cross cutting concerns
 
-- New replace_keys Remap function [#5377][]
-- New replace_values Remap function [#5783][]
-- New redact_values Remap function [#5784][]
-- Complex nested parsing with Remap (waninfo) [#5852][]
-- enhancement(vrl): add filter_array [#7908][]
+* New `replace_keys` Remap function [#5377][]
+* New `replace_values` Remap function [#5783][]
+* New `redact_values` Remap function [#5784][]
+* Complex nested parsing with Remap (waninfo) [#5852][]
+* enhancement(vrl): add filter_array [#7908][]
 
 [#5377]: https://github.com/timberio/vector/issues/5377
 [#5783]: https://github.com/timberio/vector/issues/5783
@@ -71,15 +71,15 @@ We add native, limited support for iteration to VRL in a way that fits the VRL
 
 ### In scope
 
-- Ability to iterate/map over objects and arrays.
-- Additional language constructs to support iteration.
+* Ability to iterate/map over objects and arrays.
+* Additional language constructs to support iteration.
 
 ### Out of scope
 
-- Specialized forms of iteration (reduce, filter, etc...).
-- Iterating any types other than objects or arrays.
-- Iteration control-flow (e.g. `break` or `return`)
-- Boundless iteration (e.g. `loop`).
+* Specialized forms of iteration (reduce, filter, etc...).
+* Iterating any types other than objects or arrays.
+* Iteration control-flow (e.g. `break` or `return`)
+* Boundless iteration (e.g. `loop`).
 
 ## Pain
 
@@ -210,19 +210,19 @@ map(value: OBJECT, recursive: BOOLEAN) { |<key variable>, <value variable>| [EXP
 
 Let's break this down:
 
-- The function name is `map`.
-- It takes two arguments, `value` and `recursive`.
-  - `value` has to be of type `object`, which is the object to be iterated over.
-  - `recursive` has to be of type `boolean`, determining whether to iterate over
+* The function name is `map`.
+* It takes two arguments, `value` and `recursive`.
+  * `value` has to be of type `object`, which is the object to be iterated over.
+  * `recursive` has to be of type `boolean`, determining whether to iterate over
     nested objects (_not_ arrays). It defaults to `false`.
-- A closure-like expression is expected as part of the function call, but after
+* A closure-like expression is expected as part of the function call, but after
   the closing `)`.
-  - This takes the form of `{ |...| expression }`.
-  - When iterating over an object, `|...|` has to represent two variables, one
+  * This takes the form of `{ |...| expression }`.
+  * When iterating over an object, `|...|` has to represent two variables, one
     for the key, and one for the value (f.e. `|key, value|`).
-  - The expression has to return a 2-element `array`
-  - the first element is the new `key` value, the second the `value` value
-- The function returns a new `object`, with the manipulated keys/values.
+  * The expression has to return a 2-element `array`
+  * the first element is the new `key` value, the second the `value` value
+* The function returns a new `object`, with the manipulated keys/values.
 
 Here's a simplified example on how to use the function:
 
@@ -306,8 +306,8 @@ Document][doc] and for improved future capabilities. See the
 For the chosen proposal to work, there are two separate concepts that need to
 be implemented:
 
-- closure-support for functions
-- lexical scoping
+* closure-support for functions
+* lexical scoping
 
 Let's discuss these one by one, before we arrive at the final part, implementing
 the `map` function that uses both concepts.
@@ -353,18 +353,18 @@ map(., my_closure)
 
 There are several reasons for rejecting this functionality:
 
-- It allows for slow or infinite recursion, violating the "Safety and
+* It allows for slow or infinite recursion, violating the "Safety and
   performance over ease of use" VRL design principle.
 
-- It can make reading (and writing) VRL programs more complex, and code can no
+* It can make reading (and writing) VRL programs more complex, and code can no
   longer be reasoned about by reading from top-to-bottom, violating the "design
   the feature for the intended target audience" design principle.
 
-- We cannot allow assigning closures to event fields, requiring us to make
+* We cannot allow assigning closures to event fields, requiring us to make
   a distinction between assigning to a _variable_ and an _event field_, one we
   haven't had to make before, and would like to avoid making.
 
-- In practice, we haven't seen any use-case from operators that couldn't be
+* In practice, we haven't seen any use-case from operators that couldn't be
   solved by the current RFC proposal, but would be solved by the above syntax.
 
 Instead, the closure-syntax is tied to a function call, and can only be added to
@@ -449,14 +449,14 @@ so we accept this change in VRL.
 
 In terms of exact rules, the following applies to lexical scoping in VRL:
 
-- A VRL program has a single "root" scope, to which any unnested code belongs.
-- A new scope is created by using the block (`{ ... }`) expression.
-- Nested block expressions result in nested scopes.
-- Function-closures also create a new scope.
-- Any variable defined in a higher-level scope is accessible in nested scopes.
-- Any variable defined in a lower-level scope _cannot_ be accessed in parent
+* A VRL program has a single "root" scope, to which any unnested code belongs.
+* A new scope is created by using the block (`{ ... }`) expression.
+* Nested block expressions result in nested scopes.
+* Function-closures also create a new scope.
+* Any variable defined in a higher-level scope is accessible in nested scopes.
+* Any variable defined in a lower-level scope _cannot_ be accessed in parent
   scopes.
-- If a variable with the same identifier is overwritten in a lower-level scope,
+* If a variable with the same identifier is overwritten in a lower-level scope,
   higher-level scopes will keep access to the original value assigned to that
   variable.
 
@@ -871,17 +871,17 @@ the future by introducing more iteration-based functions.
 
 ## Drawbacks
 
-- It adds more complexity to the language.
-- There are potential performance foot guns when iterating over large
+* It adds more complexity to the language.
+* There are potential performance foot guns when iterating over large
   collections.
-- The parser and compiler have to become more complex to support this use-case.
+* The parser and compiler have to become more complex to support this use-case.
 
 ## Prior Art
 
-- [Rust `Iterator` trait](https://doc.rust-lang.org/std/iter/trait.Iterator.html#)
-- [Nested data structure traversal examples](https://github.com/josevalim/nested-data-structure-traversal)
-- [Ruby blocks](https://www.tutorialspoint.com/ruby/ruby_blocks.htm)
-- [Rust closures](https://doc.rust-lang.org/book/ch13-01-closures.html)
+* [Rust `Iterator` trait](https://doc.rust-lang.org/std/iter/trait.Iterator.html#)
+* [Nested data structure traversal examples](https://github.com/josevalim/nested-data-structure-traversal)
+* [Ruby blocks](https://www.tutorialspoint.com/ruby/ruby_blocks.htm)
+* [Rust closures](https://doc.rust-lang.org/book/ch13-01-closures.html)
 
 ## Alternatives
 
@@ -964,24 +964,24 @@ object if you can't use `.`, and goes against the rules as laid out in the
 
 ---
 
-- What other approaches have been considered and why did you not choose them?
-- How about not doing this at all?
+* What other approaches have been considered and why did you not choose them?
+* How about not doing this at all?
 
 ## Outstanding Questions
 
-- Do we want to introduce any form of lexical-scoping in this RFC, or keep the
+* Do we want to introduce any form of lexical-scoping in this RFC, or keep the
   status-quo for now?
-- Do we want to introduce tuple-expressions or are we satisfied with using
+* Do we want to introduce tuple-expressions or are we satisfied with using
   a two-element array as the return value for `map`?
-- ...
+* ...
 
 ## Plan Of Attack
 
-- [ ] Add lexical scoping to VRL
-- [ ] Add support for parsing function-closure syntax
-- [ ] Add support for compiling function-closure syntax
-- [ ] Add new `map` function
-- [ ] Document new functionality
+* [ ] Add lexical scoping to VRL
+* [ ] Add support for parsing function-closure syntax
+* [ ] Add support for compiling function-closure syntax
+* [ ] Add new `map` function
+* [ ] Document new functionality
 
 ## Future Improvements
 
