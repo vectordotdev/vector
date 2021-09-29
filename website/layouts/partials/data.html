@@ -617,7 +617,7 @@
           {{ if $infallible }}
           {{ partial "badge.html" (dict "word" "infallible" "color" "blue") }}
           {{ else }}
-          {{ partial "badge.html" (dict "word" "fallible" "color" "red") }}
+          {{ partial "badge.html" (dict "word" "fallible" "color" "yellow") }}
           {{ end }}
         </span>
       </span>
@@ -1772,6 +1772,13 @@
     <code>{{ . }}</code>
     {{ end }}
   </td>
+  <td>
+    {{ if .required }}
+    <span>yes</span>
+    {{ else }}
+    <span>no</span>
+    {{ end }}
+  </td>
 </tr>
 {{ end }}
 
@@ -1792,6 +1799,9 @@
       </th>
       <th class="w-1/6">
         Default
+      </th>
+      <th>
+        Required?
       </th>
     </tr>
   </thead>
