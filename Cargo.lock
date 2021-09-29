@@ -3765,9 +3765,9 @@ dependencies = [
 
 [[package]]
 name = "mlua"
-version = "0.6.3"
+version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d3e21a11f1d1e955a1e9e766eb43e5295a066677dfc4428e296670369f429f8"
+checksum = "34a8d7d9e39238b946f1baf17e710739a07dbcb8339aaf801f8a2ad1c40e4a68"
 dependencies = [
  "bstr",
  "cc",
