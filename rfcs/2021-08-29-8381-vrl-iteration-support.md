@@ -45,7 +45,7 @@ We add native, limited support for iteration to VRL in a way that fits the VRL
 
 ## Context
 
-* Magic *_keys and*_values Remap functions [#5785][]
+* Magic `*_keys` and *_values` Remap functions [#5785][]
 * feat(remap): add for-loop statement [#5875][]
 * Remap enumerating/looping RFC [#6031][]
 
@@ -55,9 +55,9 @@ We add native, limited support for iteration to VRL in a way that fits the VRL
 
 ## Cross cutting concerns
 
-* New replace_keys Remap function [#5377][]
-* New replace_values Remap function [#5783][]
-* New redact_values Remap function [#5784][]
+* New `replace_keys` Remap function [#5377][]
+* New `replace_values` Remap function [#5783][]
+* New `redact_values` Remap function [#5784][]
 * Complex nested parsing with Remap (waninfo) [#5852][]
 * enhancement(vrl): add filter_array [#7908][]
 
