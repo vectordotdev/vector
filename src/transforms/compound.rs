@@ -1,24 +1,17 @@
 use crate::{
-    config::{
-        DataType, ExpandType, GenerateConfig, TransformConfig, TransformContext,
-        TransformDescription,
-    },
-    transforms::Transform,
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    event::Event,
+    internal_events::CompoundErrorEvents,
+    topology::builder::filter_event_type,
+    transforms::{TaskTransform, Transform},
 };
-use indexmap::IndexMap;
+use futures::{stream, Stream, StreamExt};
 use serde::{self, Deserialize, Serialize};
+use std::pin::Pin;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct CompoundConfig {
-    steps: Vec<TransformStep>,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct TransformStep {
-    id: Option<String>,
-
-    #[serde(flatten)]
-    transform: Box<dyn TransformConfig>,
+    steps: Vec<Box<dyn TransformConfig>>,
 }
 
 inventory::submit! {
@@ -31,42 +24,47 @@ impl GenerateConfig for CompoundConfig {
     }
 }
 
+impl CompoundConfig {
+    fn consistent_types(&self) -> bool {
+        let mut pairs = self.steps.windows(2).map(|items| match items {
+            [a, b] => (a.output_type(), b.input_type()),
+            _ => unreachable!(),
+        });
+
+        !pairs.any(|pair| {
+            matches!(
+                pair,
+                (DataType::Log, DataType::Metric) | (DataType::Metric, DataType::Log)
+            )
+        })
+    }
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "compound")]
 impl TransformConfig for CompoundConfig {
-    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Err("this transform must be expanded".into())
-    }
-
-    fn expand(
-        &mut self,
-    ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
-        let mut map: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
-        for (i, step) in self.steps.iter().enumerate() {
-            if map
-                .insert(
-                    step.id.as_ref().cloned().unwrap_or_else(|| i.to_string()),
-                    step.transform.to_owned(),
-                )
-                .is_some()
-            {
-                return Err("conflicting id found while expanding transform".into());
-            }
-        }
-
-        if !map.is_empty() {
-            Ok(Some((map, ExpandType::Serial { alias: false })))
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        if !self.consistent_types() {
+            Err("Inconsistent type in a compound transform".into())
         } else {
-            Err("must specify at least one transform".into())
+            Compound::new(self.clone(), context)
+                .await
+                .map(Transform::task)
         }
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Any
+        self.steps
+            .first()
+            .map(|t| t.input_type())
+            .unwrap_or(DataType::Any)
     }
 
     fn output_type(&self) -> DataType {
-        DataType::Any
+        self.steps
+            .last()
+            .map(|t| t.output_type())
+            .unwrap_or(DataType::Any)
     }
 
     fn transform_type(&self) -> &'static str {
@@ -74,39 +72,69 @@ impl TransformConfig for CompoundConfig {
     }
 }
 
+pub struct Compound {
+    transforms: Vec<(Transform, DataType)>,
+}
+
+impl Compound {
+    pub async fn new(config: CompoundConfig, context: &TransformContext) -> crate::Result<Self> {
+        let steps = &config.steps;
+        let mut transforms = vec![];
+        if !steps.is_empty() {
+            for transform_config in steps.iter() {
+                let transform = transform_config.build(context).await?;
+                transforms.push((transform, transform_config.input_type()));
+            }
+            Ok(Self { transforms })
+        } else {
+            Err("must specify at least one transform".into())
+        }
+    }
+}
+
+impl TaskTransform for Compound {
+    fn transform(
+        self: Box<Self>,
+        task: Pin<Box<dyn Stream<Item = Event> + Send>>,
+    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
+    where
+        Self: 'static,
+    {
+        let mut task = task;
+        for t in self.transforms {
+            task = filter_event_type(Box::pin(task), t.1);
+            match t.0 {
+                Transform::Task(t) => {
+                    task = t.transform(task);
+                }
+                Transform::Function(mut t) => {
+                    task = Box::pin(task.flat_map(move |v| {
+                        let mut output = Vec::<Event>::new();
+                        t.transform(&mut output, v);
+                        stream::iter(output)
+                    }));
+                }
+                Transform::FallibleFunction(mut t) => {
+                    task = Box::pin(task.flat_map(move |v| {
+                        let mut output = Vec::<Event>::new();
+                        let mut errors = Vec::<Event>::new();
+                        t.transform(&mut output, &mut errors, v);
+                        emit!(&CompoundErrorEvents {
+                            count: errors.len(),
+                        });
+                        stream::iter(output)
+                    }));
+                }
+            }
+        }
+        task
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use super::*;
-
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<super::CompoundConfig>();
-    }
-
-    #[test]
-    fn can_serialize_nested_transforms() {
-        // We need to serialize the config to check if a config has
-        // changed when reloading.
-        let config = toml::from_str::<CompoundConfig>(
-            r#"
-            [[steps]]
-            type = "mock"
-            suffix = "step1"
-
-            [[steps]]
-            type = "mock"
-            id = "foo"
-            suffix = "step1"
-        "#,
-        )
-        .unwrap()
-        .expand()
-        .unwrap()
-        .unwrap();
-
-        assert_eq!(
-            serde_json::to_string(&config).unwrap(),
-            r#"[{"0":{"type":"mock"},"foo":{"type":"mock"}},{"Serial":{"alias":false}}]"#
-        );
     }
 }

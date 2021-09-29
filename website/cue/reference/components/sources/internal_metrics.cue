@@ -1147,6 +1147,7 @@ components: sources: internal_metrics: {
 				"parse_failed":                "The parsing operation failed."
 				"read_failed":                 "The file read operation failed."
 				"render_error":                "The rendering operation failed."
+				"transform_failed":            "The transform failed."
 				"type_conversion_failed":      "The type conversion operating failed."
 				"type_field_does_not_exist":   "The type field does not exist."
 				"type_ip_address_parse_error": "The IP address did not parse."

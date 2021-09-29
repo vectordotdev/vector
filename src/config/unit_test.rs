@@ -1495,19 +1495,48 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn type_inconsistency_while_expanding_transform() {
+    async fn compound_transform() {
         let config: ConfigBuilder = toml::from_str(indoc! {r#"
-            [sources.input]
-              type = "generator"
-              format = "shuffle"
-              lines = ["one", "two"]
-              count = 5
+            [transforms.foo]
+              inputs = ["test_input"]
+              type = "compound"
+              [[transforms.foo.steps]]
+                type = "add_fields"
+                [transforms.foo.steps.fields]
+                  foo = "bar"
+                  bar = "baz"
+              [[transforms.foo.steps]]
+                type = "add_fields"
+                [transforms.foo.steps.fields]
+                  foo = "barbaz"
 
+            [[tests]]
+              name = "compound test"
+
+              [tests.input]
+                insert_at = "foo"
+                value = "lorem ipsum"
+
+              [[tests.outputs]]
+                extract_from = "foo"
+                [[tests.outputs.conditions]]
+                  type = "check_fields"
+                  "foo.equals" = "barbaz"
+                  "bar.equals" = "baz"
+        "#})
+        .unwrap();
+
+        let mut tests = build_unit_tests(config).await.unwrap();
+        assert_eq!(tests[0].run().1, Vec::<String>::new());
+    }
+
+    #[tokio::test]
+    async fn type_inconsistency_in_compound_transform() {
+        let config: ConfigBuilder = toml::from_str(indoc! {r#"
             [transforms.foo]
               inputs = ["input"]
               type = "compound"
               [[transforms.foo.steps]]
-                id = "step1"
                 type = "log_to_metric"
                 [[transforms.foo.steps.metrics]]
                   type = "counter"
@@ -1515,7 +1544,6 @@ mod tests {
                   name = "sum"
                   namespace = "ns"
               [[transforms.foo.steps]]
-                id = "step2"
                 type = "log_to_metric"
                 [[transforms.foo.steps.metrics]]
                   type = "counter"
@@ -1523,64 +1551,69 @@ mod tests {
                   name = "sum"
                   namespace = "ns"
 
-            [sinks.output]
-              type = "console"
-              inputs = [ "foo.step2" ]
-              encoding = "json"
-              target = "stdout"
+            [[tests]]
+              name = "broken test"
+
+              [tests.input]
+                insert_at = "foo"
+                value = "nah this doesnt matter"
+
+              [[tests.outputs]]
+                extract_from = "foo"
+                [[tests.outputs.conditions]]
+                  type = "check_fields"
         "#})
         .unwrap();
 
-        let err = crate::config::compiler::compile(config).err().unwrap();
+        let errs = build_unit_tests(config).await.err().unwrap();
         assert_eq!(
-            err,
-            vec!["Data type mismatch between foo.step1 (Metric) and foo.step2 (Log)".to_owned()]
+            errs,
+            vec![indoc! {r#"
+                Failed to build test 'broken test':
+                  failed to build transform 'foo': Inconsistent type in a compound transform"#}
+            .to_owned(),]
         );
     }
 
     #[tokio::test]
-    async fn invalid_name_in_expanded_transform() {
+    async fn type_inconsistency_at_runtime_in_compound_transform() {
         let config: ConfigBuilder = toml::from_str(indoc! {r#"
-            [sources.input]
-              type = "generator"
-              format = "shuffle"
-              lines = ["one", "two"]
-              count = 5
-
             [transforms.foo]
               inputs = ["input"]
               type = "compound"
               [[transforms.foo.steps]]
+                type = "add_fields"
+                [transforms.foo.steps.fields]
+                  foo = "bar"
+              [[transforms.foo.steps]]
                 type = "log_to_metric"
                 [[transforms.foo.steps.metrics]]
                   type = "counter"
-                  field = "c"
+                  field = "foo"
                   name = "sum"
                   namespace = "ns"
               [[transforms.foo.steps]]
-                id = "0"
+                type = "filter"
+                condition = 'true'
+              [[transforms.foo.steps]]
                 type = "log_to_metric"
                 [[transforms.foo.steps.metrics]]
                   type = "counter"
-                  field = "c"
+                  field = "foo"
                   name = "sum"
                   namespace = "ns"
 
-            [sinks.output]
-              type = "console"
-              inputs = [ "foo.0" ]
-              encoding = "json"
-              target = "stdout"
+            [[tests]]
+              name = "event dropped because of type inconsistency"
+              no_outputs_from = [ "foo" ]
+
+              [tests.input]
+                insert_at = "foo"
+                value = "nah this doesnt matter"
         "#})
         .unwrap();
 
-        let err = crate::config::compiler::compile(config).err().unwrap();
-        assert_eq!(
-            err,
-            vec![
-                "failed to expand transform 'foo': conflicting id found while expanding transform"
-                    .to_owned()
-            ]
-        );
+        let mut tests = build_unit_tests(config).await.unwrap();
+        assert_eq!(tests[0].run().1, Vec::<String>::new());
     }
 }

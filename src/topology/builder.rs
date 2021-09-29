@@ -10,6 +10,7 @@ use crate::{
     event::Event,
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
+    topology::EventStream,
     transforms::Transform,
     Pipeline,
 };
@@ -227,9 +228,8 @@ pub async fn build_pieces(
             Transform::Function(mut t) => {
                 let (mut output, control) = Fanout::new();
 
-                let mut input_rx = input_rx
-                    .filter(move |event| ready(filter_event_type(event, input_type)))
-                    .ready_chunks(128); // 128 is an arbitrary, smallish constant
+                let mut input_rx =
+                    filter_event_type(Box::pin(input_rx), input_type).ready_chunks(128); // 128 is an arbitrary, smallish constant
 
                 let mut timer = crate::utilization::Timer::new();
                 let mut last_report = Instant::now();
@@ -279,9 +279,8 @@ pub async fn build_pieces(
                 let (mut output, control) = Fanout::new();
                 let (mut errors_output, errors_control) = Fanout::new();
 
-                let mut input_rx = input_rx
-                    .filter(move |event| ready(filter_event_type(event, input_type)))
-                    .ready_chunks(128); // 128 is an arbitrary, smallish constant
+                let mut input_rx =
+                    filter_event_type(Box::pin(input_rx), input_type).ready_chunks(128); // 128 is an arbitrary, smallish constant
 
                 let mut timer = crate::utilization::Timer::new();
                 let mut last_report = Instant::now();
@@ -349,14 +348,12 @@ pub async fn build_pieces(
 
                 let input_rx = crate::utilization::wrap(Pin::new(input_rx));
 
-                let filtered = input_rx
-                    .filter(move |event| ready(filter_event_type(event, input_type)))
-                    .inspect(|event| {
-                        emit!(&EventsReceived {
-                            count: 1,
-                            byte_size: event.size_of(),
-                        })
-                    });
+                let filtered = filter_event_type(input_rx, input_type).inspect(|event| {
+                    emit!(&EventsReceived {
+                        count: 1,
+                        byte_size: event.size_of(),
+                    })
+                });
                 let transform = t
                     .transform(Box::pin(filtered))
                     .map(Ok)
@@ -455,11 +452,10 @@ pub async fn build_pieces(
                 .take()
                 .expect("Task started but input has been taken.");
 
-            let mut rx = crate::utilization::wrap(rx);
+            let mut rx = filter_event_type(crate::utilization::wrap(rx), input_type);
 
             sink.run(
                 rx.by_ref()
-                    .filter(|event| ready(filter_event_type(event, input_type)))
                     .inspect(|event| {
                         emit!(&EventsReceived {
                             count: 1,
@@ -556,7 +552,11 @@ pub async fn build_pieces(
     }
 }
 
-const fn filter_event_type(event: &Event, data_type: DataType) -> bool {
+pub(crate) fn filter_event_type(input: Pin<EventStream>, data_type: DataType) -> Pin<EventStream> {
+    Box::pin(input.filter(move |e| ready(event_type_compatible(e, data_type))))
+}
+
+const fn event_type_compatible(event: &Event, data_type: DataType) -> bool {
     match data_type {
         DataType::Any => true,
         DataType::Log => matches!(event, Event::Log(_)),

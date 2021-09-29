@@ -32,6 +32,8 @@ mod blackhole;
 #[cfg(feature = "transforms-coercer")]
 mod coercer;
 mod common;
+#[cfg(feature = "transforms-compound")]
+mod compound;
 #[cfg(feature = "transforms-concat")]
 mod concat;
 mod conditions;
@@ -182,6 +184,8 @@ pub use self::blackhole::*;
 #[cfg(feature = "transforms-coercer")]
 pub(crate) use self::coercer::*;
 pub use self::common::*;
+#[cfg(feature = "transforms-compound")]
+pub use self::compound::*;
 #[cfg(feature = "transforms-concat")]
 pub use self::concat::*;
 pub use self::conditions::*;
