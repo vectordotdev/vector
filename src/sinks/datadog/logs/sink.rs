@@ -291,12 +291,12 @@ where
                         }
                     }
                     Err(error) => {
-                        error!("Sink was unable to construct a payload body: {}", error);
+                        error!(message = "Sink was unable to construct a payload body.", %error);
                         return Err(());
                     }
                 },
                 Err(error) => {
-                    error!("Task failed to properly join: {}", error);
+                    error!(message = "Task failed to properly join.", %error);
                     return Err(());
                 }
             }

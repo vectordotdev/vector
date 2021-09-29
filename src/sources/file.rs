@@ -336,7 +336,7 @@ pub fn file_source(
             .map(move |mut line| {
                 emit!(&FileBytesReceived {
                     byte_size: line.text.len(),
-                    path: &line.filename,
+                    file: &line.filename,
                 });
                 // transcode each line from the file's encoding charset to utf8
                 line.text = match encoding_decoder.as_mut() {
@@ -454,6 +454,7 @@ fn create_event(
     file_key: &Option<String>,
 ) -> Event {
     emit!(&FileEventsReceived {
+        count: 1,
         file: &file,
         byte_size: line.len(),
     });
