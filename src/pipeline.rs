@@ -37,21 +37,20 @@ impl Pipeline {
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), <Self as Sink<Event>>::Error>> {
-        // We batch the updates to "events out" for efficiency, and do it here because
+        // We batch the updates to EventsSent for efficiency, and do it here because
         // it gives us a chance to allow the natural batching of `Pipeline` to kick in.
-        if self.events_outstanding > 0 {
-            emit!(&EventsSent {
-                count: self.events_outstanding,
-                byte_size: self.bytes_outstanding,
-            });
-            self.events_outstanding = 0;
-            self.bytes_outstanding = 0;
-        }
+        let mut sent = EventsSent {
+            count: 0,
+            byte_size: 0,
+        };
 
         while let Some(event) = self.enqueued.pop_front() {
             match self.inner.poll_ready(cx) {
                 Poll::Pending => {
                     self.enqueued.push_front(event);
+                    if sent.count > 0 {
+                        emit!(&sent);
+                    }
                     return Poll::Pending;
                 }
                 Poll::Ready(Ok(())) => {
@@ -60,9 +59,14 @@ impl Pipeline {
                 Poll::Ready(Err(_error)) => return Poll::Ready(Err(ClosedError)),
             }
 
+            let event_bytes = event.size_of();
             match self.inner.start_send(event) {
                 Ok(()) => {
                     // we good, keep looping
+                    self.events_outstanding -= 1;
+                    self.bytes_outstanding -= event_bytes;
+                    sent.count += 1;
+                    sent.byte_size += event_bytes;
                 }
                 Err(error) if error.is_full() => {
                     // We only try to send after a successful call to poll_ready, which reserves
@@ -71,10 +75,16 @@ impl Pipeline {
                     panic!("Channel was both ready and full; this is a bug.")
                 }
                 Err(error) if error.is_disconnected() => {
+                    if sent.count > 0 {
+                        emit!(&sent);
+                    }
                     return Poll::Ready(Err(ClosedError));
                 }
                 Err(_) => unreachable!(),
             }
+        }
+        if sent.count > 0 {
+            emit!(&sent);
         }
         Poll::Ready(Ok(()))
     }
