@@ -26,17 +26,16 @@ pub use acker::Acker;
 use core_common::byte_size_of::ByteSizeOf;
 use core_common::internal_event::emit;
 use futures::StreamExt;
-use futures::channel::mpsc::Receiver;
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
 use internal_events::{BufferEventsReceived, BufferEventsSent};
 use pin_project::pin_project;
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
-use tracing::{Instrument, Span};
 use std::fmt::{Debug, Display};
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use tracing::Span;
 pub use variant::*;
 
 /// Build a new buffer based on the passed `Variant`
@@ -71,9 +70,9 @@ where
         } => {
             let buffer_dir = format!("{}_buffer", id);
 
-            let (tx, rx, acker) =
-                disk::open(&data_dir, &buffer_dir, max_size).map_err(|error| error.to_string())?;
-            let tx = BufferInputCloner::Disk(tx, when_full, span);
+            let (tx, rx, acker) = disk::open(&data_dir, &buffer_dir, max_size, span)
+                .map_err(|error| error.to_string())?;
+            let tx = BufferInputCloner::Disk(tx, when_full);
             Ok((tx, rx, acker))
         }
         Variant::Memory {
@@ -82,9 +81,9 @@ where
             span,
         } => {
             let (tx, rx) = mpsc::channel(max_events);
-            let span_disabled = span.is_disabled();
+            let is_span_disabled = span.is_disabled();
             let tx = BufferInputCloner::Memory(tx, when_full, span);
-            if span_disabled {
+            if is_span_disabled {
                 Ok((tx, Box::new(rx), Acker::Null))
             } else {
                 let rx = rx.inspect(|item: &T| {
@@ -136,7 +135,7 @@ where
 {
     Memory(mpsc::Sender<T>, WhenFull, Span),
     #[cfg(feature = "disk-buffer")]
-    Disk(disk::Writer<T>, WhenFull, Span),
+    Disk(disk::Writer<T>, WhenFull),
 }
 
 impl<'a, T> BufferInputCloner<T>
@@ -152,12 +151,15 @@ where
                 let inner = tx
                     .clone()
                     .sink_map_err(|error| error!(message = "Sender error.", %error));
-                
+
                 if when_full == &WhenFull::DropNewest {
                     if span.is_disabled() {
                         Box::new(DropWhenFull::new(inner))
                     } else {
-                        Box::new(DropWhenFull::new(InstrumentMemoryBuffer::new(inner, span.clone())))
+                        Box::new(DropWhenFull::new(InstrumentMemoryBuffer::new(
+                            inner,
+                            span.clone(),
+                        )))
                     }
                 } else {
                     if span.is_disabled() {
@@ -169,7 +171,7 @@ where
             }
 
             #[cfg(feature = "disk-buffer")]
-            BufferInputCloner::Disk(writer, when_full, ..) => {
+            BufferInputCloner::Disk(writer, when_full) => {
                 let inner: disk::Writer<T> = (*writer).clone();
                 if when_full == &WhenFull::DropNewest {
                     Box::new(DropWhenFull::new(inner))
@@ -260,12 +262,13 @@ impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for InstrumentMemoryBuffer<S> {
 
     fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
         let span = self.span.clone();
-        let _guard = span.enter();
         let byte_size = item.allocated_bytes();
         self.project().inner.start_send(item).map(|()| {
-            emit(&BufferEventsReceived {
-                count: 1,
-                byte_size,
+            span.in_scope(|| {
+                emit(&BufferEventsReceived {
+                    count: 1,
+                    byte_size,
+                });
             });
         })
     }

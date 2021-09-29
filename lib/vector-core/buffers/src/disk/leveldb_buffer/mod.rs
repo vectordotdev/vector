@@ -23,6 +23,7 @@ use std::{
     sync::{atomic::AtomicUsize, Arc, Mutex},
     time::Instant,
 };
+use tracing::Span;
 pub use writer::Writer;
 
 /// How much of disk buffer needs to be deleted before we trigger compaction.
@@ -74,6 +75,7 @@ where
     pub fn build(
         path: &Path,
         max_size: usize,
+        span: Span,
     ) -> Result<(Writer<T>, Reader<T>, Acker), DataDirError> {
         // New `max_size` of the buffer is used for storing the unacked events.
         // The rest is used as a buffer which when filled triggers compaction.
@@ -118,6 +120,7 @@ where
             max_size,
             current_size: Arc::clone(&current_size),
             slot: None,
+            span: span,
         };
 
         let mut reader = Reader {

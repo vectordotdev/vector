@@ -258,9 +258,7 @@ pub async fn build_pieces(
                 component_type = typetag,
                 component_name = %key.id(),
             );
-            let buffer = sink
-                .buffer
-                .build(&config.global.data_dir, key, buffer_span);
+            let buffer = sink.buffer.build(&config.global.data_dir, key, buffer_span);
             match buffer {
                 Err(error) => {
                     errors.push(format!("Sink \"{}\": {}", key, error));

@@ -10,6 +10,7 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+use tracing::Span;
 
 pub mod leveldb_buffer;
 
@@ -77,6 +78,7 @@ pub fn open<'a, T>(
     data_dir: &Path,
     name: &str,
     max_size: usize,
+    span: Span,
 ) -> Result<
     (
         Writer<T>,
@@ -116,6 +118,6 @@ where
             }
         })?;
 
-    let (writer, reader, acker) = leveldb_buffer::Buffer::build(&path, max_size)?;
+    let (writer, reader, acker) = leveldb_buffer::Buffer::build(&path, max_size, span)?;
     Ok((Writer { inner: writer }, Box::new(reader), acker))
 }
