@@ -266,12 +266,10 @@ strongly recommend converting any existing `check_fields` tests to `vrl` conditi
 
 ### Event types
 
-There are currently three type event types in Vector:
+There are currently two event types that you can unit test in Vector:
 
 * [`log`](#logs) events
 * [`metric`](#metrics) events
-* [`raw`](#raw) events
-
 
 #### Logs
 
