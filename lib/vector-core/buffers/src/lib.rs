@@ -77,6 +77,7 @@ where
         Variant::Memory {
             max_events,
             when_full,
+            ..
         } => {
             let (tx, rx) = mpsc::channel(max_events);
             let tx = BufferInputCloner::Memory(tx, when_full);

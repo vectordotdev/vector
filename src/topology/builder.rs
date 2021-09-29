@@ -169,6 +169,7 @@ pub async fn build_pieces(
             vector_core::buffers::build(vector_core::buffers::Variant::Memory {
                 max_events: 100,
                 when_full: vector_core::buffers::WhenFull::Block,
+                span: None,
             })
             .unwrap();
         let input_rx = crate::utilization::wrap(Pin::new(input_rx));
@@ -249,7 +250,17 @@ pub async fn build_pieces(
         let (tx, rx, acker) = if let Some(buffer) = buffers.remove(key) {
             buffer
         } else {
-            let buffer = sink.buffer.build(&config.global.data_dir, key);
+            let buffer_span = error_span!(
+                "sink",
+                component_kind = "sink",
+                component_id = %key.id(),
+                component_scope = %key.scope(),
+                component_type = typetag,
+                component_name = %key.id(),
+            );
+            let buffer = sink
+                .buffer
+                .build(&config.global.data_dir, key, Some(buffer_span));
             match buffer {
                 Err(error) => {
                     errors.push(format!("Sink \"{}\": {}", key, error));

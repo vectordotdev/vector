@@ -6,6 +6,7 @@ use serde::{
     Deserialize, Serialize,
 };
 use std::path::PathBuf;
+use tracing::Span;
 pub use vector_core::buffers::*;
 
 #[derive(Deserialize)]
@@ -153,6 +154,7 @@ impl BufferConfig {
         &self,
         data_dir: &Option<PathBuf>,
         sink_id: &ComponentKey,
+        span: Option<Span>,
     ) -> Result<(BufferInputCloner<Event>, EventStream, Acker), String> {
         let variant = match &self {
             BufferConfig::Memory {
@@ -161,6 +163,7 @@ impl BufferConfig {
             } => Variant::Memory {
                 max_events: *max_events,
                 when_full: *when_full,
+                span: span,
             },
             #[cfg(feature = "disk-buffer")]
             BufferConfig::Disk {
@@ -174,6 +177,7 @@ impl BufferConfig {
                     .ok_or_else(|| "Must set data_dir to use on-disk buffering.".to_string())?
                     .to_path_buf(),
                 id: sink_id.to_string(),
+                span: span,
             },
         };
         build(variant)

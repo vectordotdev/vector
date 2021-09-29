@@ -2,6 +2,7 @@ use crate::WhenFull;
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use std::path::PathBuf;
+use tracing::Span;
 
 #[cfg(test)]
 const MAX_STR_SIZE: usize = 128;
@@ -16,12 +17,14 @@ pub enum Variant {
     Memory {
         max_events: usize,
         when_full: WhenFull,
+        span: Option<Span>,
     },
     Disk {
         max_size: usize,
         when_full: WhenFull,
         data_dir: PathBuf,
         id: String,
+        span: Option<Span>,
     },
 }
 
