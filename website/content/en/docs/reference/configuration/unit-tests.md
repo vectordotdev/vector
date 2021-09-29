@@ -355,5 +355,5 @@ source = '''
 [transforms]: /docs/reference/glossary/#transform
 [unit test]: https://en.wikipedia.org/wiki/Unit_testing
 [vector_test]: /docs/reference/cli#test
-[vector_tests]: https://github.com/timberio/vector/tree/master/tests/behavior/transforms
+[vector_tests]: https://github.com/vectordotdev/vector/tree/master/tests/behavior/transforms
 [vrl]: https://vrl.dev
