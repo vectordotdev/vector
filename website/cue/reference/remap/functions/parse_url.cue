@@ -4,6 +4,8 @@ remap: functions: parse_url: {
 	category:    "Parse"
 	description: """
 		Parses the `value` in [URL](\(urls.url)) format.
+
+		The port number will be defaulted if unspecified in the URL and the scheme is one of: `http`, `https`, `ws`, `wss`, and `ftp`, schemes.
 		"""
 
 	arguments: [

@@ -28,7 +28,7 @@ impl Function for ParseUrl {
                     "host": "vector.dev",
                     "password": "",
                     "path": "/",
-                    "port": null,
+                    "port": 443,
                     "query": {},
                     "scheme": "https",
                     "username": ""
@@ -83,7 +83,7 @@ fn url_to_value(url: Url) -> Value {
     );
     map.insert("path", url.path().to_owned().into());
     map.insert("host", url.host_str().map(ToOwned::to_owned).into());
-    map.insert("port", url.port().map(|v| v as i64).into());
+    map.insert("port", url.port_or_known_default().map(|v| v as i64).into());
     map.insert("fragment", url.fragment().map(ToOwned::to_owned).into());
     map.insert(
         "query",
@@ -106,7 +106,7 @@ fn type_def() -> BTreeMap<&'static str, TypeDef> {
         "password": Kind::Bytes,
         "path": Kind::Bytes | Kind::Null,
         "host": Kind::Bytes,
-        "port": Kind::Bytes,
+        "port": Kind::Integer,
         "fragment": Kind::Bytes | Kind::Null,
         "query": TypeDef::new().object::<(), Kind>(map! {
             (): Kind::Bytes,
@@ -128,7 +128,7 @@ mod tests {
                 host: "vector.dev",
                 password: "",
                 path: "/",
-                port: (),
+                port: 443,
                 query: {},
                 scheme: "https",
                 username: "",
