@@ -77,7 +77,7 @@ impl Function for Set {
                 title: "invalid segment type",
                 source: r#"set!({"foo": { "bar": [92, 42] }}, ["foo", true], "baz")"#,
                 result: Err(
-                    r#"function call error for "set" at (0:59): path segment must be either "string" or "integer", not "boolean""#,
+                    r#"function call error for "set" at (0:56): path segment must be either "string" or "integer", not "boolean""#,
                 ),
             },
         ]

@@ -81,7 +81,7 @@ impl Function for Get {
                 title: "invalid segment type",
                 source: r#"get!(value: {"foo": { "bar": [92, 42] }}, path: ["foo", true])"#,
                 result: Err(
-                    r#"function call error for "get" at (0:65): path segment must be either "string" or "integer", not "boolean""#,
+                    r#"function call error for "get" at (0:62): path segment must be either "string" or "integer", not "boolean""#,
                 ),
             },
         ]

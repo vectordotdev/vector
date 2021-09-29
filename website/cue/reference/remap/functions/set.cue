@@ -41,7 +41,7 @@ remap: functions: set: {
 		{
 			title: "single-segment top-level field"
 			source: #"""
-				insert!(value: { "foo": "bar" }, path: ["foo"], data: "baz")
+				set!(value: { "foo": "bar" }, path: ["foo"], data: "baz")
 				"""#
 			return: foo: "baz"
 		},
