@@ -1482,7 +1482,7 @@ bench_function! {
                         "username": "",
                         "password": "",
                         "host": "vector.dev",
-                        "port": 443,
+                        "port": null,
                         "path": "/",
                         "query": {},
                         "fragment": null,

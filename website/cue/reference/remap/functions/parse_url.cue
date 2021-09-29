@@ -4,8 +4,6 @@ remap: functions: parse_url: {
 	category:    "Parse"
 	description: """
 		Parses the `value` in [URL](\(urls.url)) format.
-
-		The port number will be defaulted if unspecified in the URL and the scheme is one of: `http`, `https`, `ws`, `wss`, and `ftp`, schemes.
 		"""
 
 	arguments: [
@@ -14,6 +12,13 @@ remap: functions: parse_url: {
 			description: "The text of the URL."
 			required:    true
 			type: ["string"]
+		},
+		{
+			name:        "default_known_ports"
+			description: "Whether the port should be defaulted, when not in the input, if the scheme has a known default port. Known schemes are: `http`, `https`, `ws`, `wss`, and `ftp`"
+			required:    false
+			type: ["boolean"]
+			default: false
 		},
 	]
 	internal_failure_reasons: [
@@ -36,6 +41,22 @@ remap: functions: parse_url: {
 				path:     "/foobar"
 				query: hello: "world"
 				fragment: "123"
+			}
+		},
+		{
+			title: "Parse URL with default port"
+			source: #"""
+				parse_url!("https://vector.dev", default_known_ports: true)
+				"""#
+			return: {
+				scheme:   "https"
+				username: ""
+				password: ""
+				host:     "vector.dev"
+				port:     443
+				path:     "/"
+				query: {}
+				fragment: null
 			}
 		},
 	]
