@@ -226,7 +226,7 @@ impl Clone for File {
                             .collect::<Result<Vec<IndexHandle>, String>>()
                         {
                             Err(error) => {
-                                error!(message = "Unable to add index to reloaded enrichment file",
+                                error!(message = "Unable to add index to reloaded enrichment file.",
                                     file = ?self.config.file.path.to_str().unwrap_or("path with invalid utf"),
                                     %error);
                                 None
