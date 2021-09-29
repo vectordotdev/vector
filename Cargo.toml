@@ -294,7 +294,7 @@ security-framework = "2.3.1"
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2.14"
-nix = "0.22.1"
+nix = "0.22.2"
 
 [build-dependencies]
 prost-build = { version = "0.8", optional = true }

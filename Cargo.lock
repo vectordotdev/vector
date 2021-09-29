@@ -3940,9 +3940,9 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.22.1"
+version = "0.22.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7555d6c7164cc913be1ce7f95cbecdabda61eb2ccd89008524af306fb7f5031"
+checksum = "d3bb9a13fa32bc5aeb64150cd3f32d6cf4c748f8f8a417cce5d2eb976a8370ba"
 dependencies = [
  "bitflags",
  "cc",
@@ -5723,7 +5723,7 @@ dependencies = [
  "libc",
  "log",
  "memchr",
- "nix 0.22.1",
+ "nix 0.22.2",
  "radix_trie",
  "scopeguard",
  "smallvec",
@@ -7593,7 +7593,7 @@ dependencies = [
  "metrics-util",
  "mlua",
  "mongodb",
- "nix 0.22.1",
+ "nix 0.22.2",
  "no-proxy",
  "nom 7.0.0",
  "notify",
