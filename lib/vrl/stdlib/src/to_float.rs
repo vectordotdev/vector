@@ -58,8 +58,8 @@ impl Function for ToFloat {
             },
             Example {
                 title: "timestamp",
-                source: "to_float!(t'2020-01-01T00:00:00Z')",
-                result: Ok("1577836800"),
+                source: "to_float!(t'2020-01-01T00:00:00.100Z')",
+                result: Ok("1577836800.1"),
             },
             Example {
                 title: "array",
