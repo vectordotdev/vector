@@ -38,6 +38,8 @@ pub struct GlobalOptions {
     pub timezone: TimeZone,
     #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
     pub proxy: ProxyConfig,
+    #[serde(skip)]
+    pub enterprise: bool,
 }
 
 impl GlobalOptions {
