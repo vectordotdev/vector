@@ -90,6 +90,7 @@ criterion_group!(
               push,
               redact,
               replace,
+              reverse_dns,
               round,
               sha1,
               sha2,
@@ -1732,6 +1733,15 @@ bench_function! {
             with: "o",
         ],
         want: Ok("I like opples ond bononos")
+    }
+}
+
+bench_function! {
+    reverse_dns => vrl_stdlib::ReverseDns;
+
+    google {
+        args: func_args![value: value!("8.8.8.8")],
+        want: Ok(value!("dns.google")),
     }
 }
 

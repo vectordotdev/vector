@@ -16,6 +16,7 @@ bytes = { version = "1.1.0", optional = true }
 chrono = { version = "0.4", optional = true }
 cidr-utils = { version = "0.5", optional = true }
 csv = { version = "1.1", optional = true }
+dns-lookup = { version = "1.0.8", optional = true }
 grok = { version = "1", optional = true }
 hex = { version = "0.4", optional = true }
 hostname = { version = "0.3", optional = true }
@@ -135,6 +136,7 @@ default = [
     "push",
     "redact",
     "replace",
+    "reverse_dns",
     "round",
     "sha1",
     "sha2",
@@ -252,6 +254,7 @@ parse_xml = ["roxmltree", "lazy_static", "regex"]
 push = []
 redact = ["lazy_static", "regex"]
 replace = []
+reverse_dns = ["dns-lookup"]
 round = []
 sha1 = ["sha-1", "hex"]
 sha2 = ["sha-2", "hex"]
