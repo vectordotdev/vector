@@ -2,11 +2,11 @@ use lookup_lib::{LookupBuf, SegmentBuf};
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
-pub struct Insert;
+pub struct Get;
 
-impl Function for Insert {
+impl Function for Get {
     fn identifier(&self) -> &'static str {
-        "insert"
+        "get"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -21,62 +21,67 @@ impl Function for Insert {
                 kind: kind::ARRAY,
                 required: true,
             },
-            Parameter {
-                keyword: "data",
-                kind: kind::ANY,
-                required: true,
-            },
         ]
     }
 
     fn examples(&self) -> &'static [Example] {
         &[
             Example {
-                title: "insert existing field",
-                source: r#"insert!(value: {"foo": "bar"}, path: ["foo"], data: "baz")"#,
-                result: Ok(r#"{ "foo": "baz" }"#),
+                title: "returns existing field",
+                source: r#"get!(value: {"foo": "bar"}, path: ["foo"])"#,
+                result: Ok(r#""bar""#),
             },
             Example {
-                title: "nested fields",
-                source: r#"insert!(value: {}, path: ["foo", "bar"], data: "baz")"#,
-                result: Ok(r#"{ "foo": { "bar" : "baz" } }"#),
+                title: "returns null for unknown field",
+                source: r#"get!(value: {"foo": "bar"}, path: ["baz"])"#,
+                result: Ok("null"),
+            },
+            Example {
+                title: "nested path",
+                source: r#"get!(value: {"foo": { "bar": true }}, path: ["foo", "bar"])"#,
+                result: Ok(r#"true"#),
             },
             Example {
                 title: "indexing",
-                source: r#"insert!(value: [{ "foo": "bar" }], path: [0, "foo", "bar"], data: "baz")"#,
-                result: Ok(r#"[{ "foo": { "bar": "baz" } }]"#),
+                source: r#"get!(value: [92, 42], path: [0])"#,
+                result: Ok("92"),
             },
             Example {
                 title: "nested indexing",
-                source: r#"insert!(value: {"foo": { "bar": [] }}, path: ["foo", "bar", 1], data: "baz")"#,
-                result: Ok(r#"{ "foo": { "bar": [null, "baz"] } }"#),
+                source: r#"get!(value: {"foo": { "bar": [92, 42] }}, path: ["foo", "bar", 1])"#,
+                result: Ok("42"),
             },
             Example {
                 title: "external target",
                 source: indoc! {r#"
                     . = { "foo": true }
-                    insert!(value: ., path: ["bar"], data: "baz")
+                    get!(value: ., path: ["foo"])
                 "#},
-                result: Ok(r#"{ "foo": true, "bar": "baz" }"#),
+                result: Ok("true"),
             },
             Example {
                 title: "variable",
                 source: indoc! {r#"
                     var = { "foo": true }
-                    insert!(value: var, path: ["bar"], data: "baz")
+                    get!(value: var, path: ["foo"])
                 "#},
-                result: Ok(r#"{ "foo": true, "bar": "baz" }"#),
+                result: Ok("true"),
+            },
+            Example {
+                title: "missing index",
+                source: r#"get!(value: {"foo": { "bar": [92, 42] }}, path: ["foo", "bar", 1, -1])"#,
+                result: Ok("null"),
             },
             Example {
                 title: "invalid indexing",
-                source: r#"insert!(value: [], path: ["foo"], data: "baz")"#,
-                result: Ok(r#"{ "foo": "baz" }"#),
+                source: r#"get!(value: [42], path: ["foo"])"#,
+                result: Ok("null"),
             },
             Example {
                 title: "invalid segment type",
-                source: r#"insert!({"foo": { "bar": [92, 42] }}, ["foo", true], "baz")"#,
+                source: r#"get!(value: {"foo": { "bar": [92, 42] }}, path: ["foo", true])"#,
                 result: Err(
-                    r#"function call error for "insert" at (0:59): path segment must be either "string" or "integer", not "boolean""#,
+                    r#"function call error for "get" at (0:65): path segment must be either "string" or "integer", not "boolean""#,
                 ),
             },
         ]
@@ -90,29 +95,27 @@ impl Function for Insert {
     ) -> Compiled {
         let value = arguments.required("value");
         let path = arguments.required("path");
-        let data = arguments.required("data");
 
-        Ok(Box::new(InsertFn { value, path, data }))
+        Ok(Box::new(GetFn { value, path }))
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct InsertFn {
+pub struct GetFn {
     value: Box<dyn Expression>,
     path: Box<dyn Expression>,
-    data: Box<dyn Expression>,
 }
 
-impl Expression for InsertFn {
+impl Expression for GetFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let path = match self.path.resolve(ctx)? {
-            Value::Array(segments) => {
-                let mut insert = LookupBuf::root();
+            Value::Array(path) => {
+                let mut get = LookupBuf::root();
 
-                for segment in segments {
+                for segment in path {
                     let segment = match segment {
-                        Value::Bytes(path) => {
-                            SegmentBuf::Field(String::from_utf8_lossy(&path).into_owned().into())
+                        Value::Bytes(field) => {
+                            SegmentBuf::Field(String::from_utf8_lossy(&field).into_owned().into())
                         }
                         Value::Integer(index) => SegmentBuf::Index(index as isize),
                         value => {
@@ -124,27 +127,39 @@ impl Expression for InsertFn {
                         }
                     };
 
-                    insert.push_back(segment)
+                    get.push_back(segment)
                 }
 
-                insert
+                get
             }
             value => {
                 return Err(value::Error::Expected {
                     got: value.kind(),
-                    expected: Kind::Array | Kind::Bytes,
+                    expected: Kind::Array,
                 }
                 .into())
             }
         };
 
-        let mut value = self.value.resolve(ctx)?;
-        value.insert(&path, self.data.resolve(ctx)?)?;
-
-        Ok(value)
+        Ok(self.value.resolve(ctx)?.get(&path)?.unwrap_or(Value::Null))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new().fallible().unknown()
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    test_function![
+        get => Get;
+
+        any {
+            args: func_args![value: value!([42]), path: value!([0])],
+            want: Ok(42),
+            tdef: TypeDef::new().fallible(),
+        }
+    ];
 }

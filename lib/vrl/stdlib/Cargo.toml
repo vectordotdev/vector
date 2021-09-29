@@ -61,7 +61,6 @@ default = [
     "decode_base64",
     "decode_percent",
     "del",
-    "lookup",
     "downcase",
     "encode_base64",
     "encode_json",
@@ -77,10 +76,10 @@ default = [
     "format_int",
     "format_number",
     "format_timestamp",
+    "get",
     "get_env_var",
     "get_hostname",
     "includes",
-    "insert",
     "integer",
     "ip_aton",
     "ip_cidr_contains",
@@ -141,6 +140,7 @@ default = [
     "replace",
     "reverse_dns",
     "round",
+    "set",
     "sha1",
     "sha2",
     "sha3",
@@ -181,7 +181,6 @@ contains = []
 decode_base64 = ["base64"]
 decode_percent = ["percent-encoding"]
 del = []
-lookup = []
 downcase = []
 encode_base64 = ["base64"]
 encode_json = ["serde_json"]
@@ -198,10 +197,10 @@ floor = []
 format_int = []
 format_number = ["rust_decimal"]
 format_timestamp = ["chrono"]
+get = []
 get_env_var = []
 get_hostname = ["hostname"]
 includes = []
-insert = []
 integer = []
 ip_aton = []
 ip_cidr_contains = ["cidr-utils"]
@@ -262,6 +261,7 @@ remove = []
 replace = []
 reverse_dns = ["dns-lookup"]
 round = []
+set = []
 sha1 = ["sha-1", "hex"]
 sha2 = ["sha-2", "hex"]
 sha3 = ["sha-3", "hex"]
@@ -271,14 +271,14 @@ starts_with = []
 string = []
 strip_ansi_escape_codes = ["bytes", "strip-ansi-escapes"]
 strip_whitespace = []
-tally = []
 tag_types_externally = ["shared/btreemap"]
+tally = []
 timestamp = []
 to_bool = ["shared/conversion"]
 to_float = ["shared/conversion"]
 to_int = ["shared/conversion"]
-to_string = ["chrono"]
 to_regex = ["tracing", "regex"]
+to_string = ["chrono"]
 to_syslog_facility = []
 to_syslog_level = []
 to_syslog_severity = []

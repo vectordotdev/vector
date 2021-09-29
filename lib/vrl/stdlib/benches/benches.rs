@@ -33,10 +33,10 @@ criterion_group!(
               format_int,
               format_number,
               format_timestamp,
+              get,
               get_env_var,
               get_hostname,
               includes,
-              insert,
               ip_aton,
               ip_cidr_contains,
               ip_ntoa,
@@ -56,7 +56,6 @@ criterion_group!(
               join,
               length,
               log,
-              lookup,
               r#match,
               match_any,
               match_array,
@@ -95,6 +94,7 @@ criterion_group!(
               replace,
               reverse_dns,
               round,
+              set,
               sha1,
               sha2,
               sha3,
@@ -467,7 +467,7 @@ bench_function! {
 }
 
 bench_function! {
-    insert => vrl_stdlib::Insert;
+    set => vrl_stdlib::Set;
 
     single {
         args: func_args![value: value!({ "foo": "bar" }), path: vec!["baz"], data: true],
@@ -476,7 +476,7 @@ bench_function! {
 
     nested {
         args: func_args![value: value!({ "foo": { "bar": "baz" } }), path: vec!["foo", "bar", "qux"], data: 42],
-        want: Ok(value!({ "foo": { "bar": "baz", "qux": 42 } })),
+        want: Ok(value!({ "foo": { "bar": { "qux": 42 } } })),
     }
 
     indexing {
@@ -758,7 +758,7 @@ bench_function! {
 }
 
 bench_function! {
-    lookup => vrl_stdlib::Lookup;
+    get => vrl_stdlib::Get;
 
     single {
         args: func_args![value: value!({ "foo": "bar" }), path: vec!["foo"]],

@@ -3,11 +3,11 @@ use shared::btreemap;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
-pub struct Remove;
+pub struct Set;
 
-impl Function for Remove {
+impl Function for Set {
     fn identifier(&self) -> &'static str {
-        "remove"
+        "set"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -23,9 +23,9 @@ impl Function for Remove {
                 required: true,
             },
             Parameter {
-                keyword: "compact",
-                kind: kind::BOOLEAN,
-                required: false,
+                keyword: "data",
+                kind: kind::ANY,
+                required: true,
             },
         ]
     }
@@ -33,71 +33,51 @@ impl Function for Remove {
     fn examples(&self) -> &'static [Example] {
         &[
             Example {
-                title: "remove existing field",
-                source: r#"remove!(value: {"foo": "bar"}, path: ["foo"])"#,
-                result: Ok("{}"),
+                title: "set existing field",
+                source: r#"set!(value: {"foo": "bar"}, path: ["foo"], data: "baz")"#,
+                result: Ok(r#"{ "foo": "baz" }"#),
             },
             Example {
-                title: "remove unknown field",
-                source: r#"remove!(value: {"foo": "bar"}, path: ["baz"])"#,
-                result: Ok(r#"{ "foo": "bar" }"#),
-            },
-            Example {
-                title: "nested path",
-                source: r#"remove!(value: {"foo": { "bar": true }}, path: ["foo", "bar"])"#,
-                result: Ok(r#"{ "foo": {} }"#),
-            },
-            Example {
-                title: "compact object",
-                source: r#"remove!(value: {"foo": { "bar": true }}, path: ["foo", "bar"], compact: true)"#,
-                result: Ok(r#"{}"#),
+                title: "nested fields",
+                source: r#"set!(value: {}, path: ["foo", "bar"], data: "baz")"#,
+                result: Ok(r#"{ "foo": { "bar" : "baz" } }"#),
             },
             Example {
                 title: "indexing",
-                source: r#"remove!(value: [92, 42], path: [0])"#,
-                result: Ok("[42]"),
+                source: r#"set!(value: [{ "foo": "bar" }], path: [0, "foo", "bar"], data: "baz")"#,
+                result: Ok(r#"[{ "foo": { "bar": "baz" } }]"#),
             },
             Example {
                 title: "nested indexing",
-                source: r#"remove!(value: {"foo": { "bar": [92, 42] }}, path: ["foo", "bar", 1])"#,
-                result: Ok(r#"{ "foo": { "bar": [92] } }"#),
-            },
-            Example {
-                title: "compact array",
-                source: r#"remove!(value: {"foo": [42], "bar": true }, path: ["foo", 0], compact: true)"#,
-                result: Ok(r#"{ "bar": true }"#),
+                source: r#"set!(value: {"foo": { "bar": [] }}, path: ["foo", "bar", 1], data: "baz")"#,
+                result: Ok(r#"{ "foo": { "bar": [null, "baz"] } }"#),
             },
             Example {
                 title: "external target",
                 source: indoc! {r#"
                     . = { "foo": true }
-                    remove!(value: ., path: ["foo"])
+                    set!(value: ., path: ["bar"], data: "baz")
                 "#},
-                result: Ok("{}"),
+                result: Ok(r#"{ "foo": true, "bar": "baz" }"#),
             },
             Example {
                 title: "variable",
                 source: indoc! {r#"
                     var = { "foo": true }
-                    remove!(value: var, path: ["foo"])
+                    set!(value: var, path: ["bar"], data: "baz")
                 "#},
-                result: Ok("{}"),
-            },
-            Example {
-                title: "missing index",
-                source: r#"remove!(value: {"foo": { "bar": [92, 42] }}, path: ["foo", "bar", 1, -1])"#,
-                result: Ok(r#"{ "foo": { "bar": [92, 42] } }"#),
+                result: Ok(r#"{ "foo": true, "bar": "baz" }"#),
             },
             Example {
                 title: "invalid indexing",
-                source: r#"remove!(value: [42], path: ["foo"])"#,
-                result: Ok("[42]"),
+                source: r#"set!(value: [], path: ["foo"], data: "baz")"#,
+                result: Ok(r#"{ "foo": "baz" }"#),
             },
             Example {
                 title: "invalid segment type",
-                source: r#"remove!(value: {"foo": { "bar": [92, 42] }}, path: ["foo", true])"#,
+                source: r#"set!({"foo": { "bar": [92, 42] }}, ["foo", true], "baz")"#,
                 result: Err(
-                    r#"function call error for "remove" at (0:65): path segment must be either "string" or "integer", not "boolean""#,
+                    r#"function call error for "set" at (0:59): path segment must be either "string" or "integer", not "boolean""#,
                 ),
             },
         ]
@@ -111,33 +91,29 @@ impl Function for Remove {
     ) -> Compiled {
         let value = arguments.required("value");
         let path = arguments.required("path");
-        let compact = arguments.optional("compact").unwrap_or(expr!(false));
+        let data = arguments.required("data");
 
-        Ok(Box::new(RemoveFn {
-            value,
-            path,
-            compact,
-        }))
+        Ok(Box::new(SetFn { value, path, data }))
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct RemoveFn {
+pub struct SetFn {
     value: Box<dyn Expression>,
     path: Box<dyn Expression>,
-    compact: Box<dyn Expression>,
+    data: Box<dyn Expression>,
 }
 
-impl Expression for RemoveFn {
+impl Expression for SetFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let path = match self.path.resolve(ctx)? {
-            Value::Array(path) => {
-                let mut lookup = LookupBuf::root();
+            Value::Array(segments) => {
+                let mut insert = LookupBuf::root();
 
-                for segment in path {
+                for segment in segments {
                     let segment = match segment {
-                        Value::Bytes(field) => {
-                            SegmentBuf::Field(String::from_utf8_lossy(&field).into_owned().into())
+                        Value::Bytes(path) => {
+                            SegmentBuf::Field(String::from_utf8_lossy(&path).into_owned().into())
                         }
                         Value::Integer(index) => SegmentBuf::Index(index as isize),
                         value => {
@@ -149,24 +125,22 @@ impl Expression for RemoveFn {
                         }
                     };
 
-                    lookup.push_back(segment)
+                    insert.push_back(segment)
                 }
 
-                lookup
+                insert
             }
             value => {
                 return Err(value::Error::Expected {
                     got: value.kind(),
-                    expected: Kind::Array,
+                    expected: Kind::Array | Kind::Bytes,
                 }
                 .into())
             }
         };
 
-        let compact = self.compact.resolve(ctx)?.try_boolean()?;
-
         let mut value = self.value.resolve(ctx)?;
-        value.remove(&path, compact)?;
+        value.insert(&path, self.data.resolve(ctx)?)?;
 
         Ok(value)
     }
@@ -192,17 +166,17 @@ mod tests {
     use super::*;
 
     test_function![
-        remove => Remove;
+        set => Set;
 
         array {
-            args: func_args![value: value!([42]), path: value!([0])],
-            want: Ok(value!([])),
+            args: func_args![value: value!([]), path: vec![0], data: true],
+            want: Ok(vec![true]),
             tdef: TypeDef::new().array::<Kind>(vec![]).fallible(),
         }
 
         object {
-            args: func_args![value: value!({ "foo": 42 }), path: value!(["foo"])],
-            want: Ok(value!({})),
+            args: func_args![value: value!({}), path: vec!["foo"], data: true],
+            want: Ok(value!({ "foo": true })),
             tdef: TypeDef::new().object::<(), Kind>(btreemap!{}).fallible(),
         }
     ];

@@ -52,14 +52,14 @@ mod format_int;
 mod format_number;
 #[cfg(feature = "format_timestamp")]
 mod format_timestamp;
+#[cfg(feature = "get")]
+mod get;
 #[cfg(feature = "get_env_var")]
 mod get_env_var;
 #[cfg(feature = "get_hostname")]
 mod get_hostname;
 #[cfg(feature = "includes")]
 mod includes;
-#[cfg(feature = "insert")]
-mod insert;
 #[cfg(feature = "integer")]
 mod integer;
 #[cfg(feature = "ip_aton")]
@@ -106,8 +106,6 @@ mod log;
     feature = "parse_nginx_log"
 ))]
 mod log_util;
-#[cfg(feature = "lookup")]
-mod lookup;
 #[cfg(feature = "match")]
 mod r#match;
 #[cfg(feature = "match_any")]
@@ -190,6 +188,8 @@ mod replace;
 mod reverse_dns;
 #[cfg(feature = "round")]
 mod round;
+#[cfg(feature = "set")]
+mod set;
 #[cfg(feature = "sha1")]
 mod sha1;
 #[cfg(feature = "sha2")]
@@ -303,14 +303,14 @@ pub use format_int::FormatInt;
 pub use format_number::FormatNumber;
 #[cfg(feature = "format_timestamp")]
 pub use format_timestamp::FormatTimestamp;
+#[cfg(feature = "get")]
+pub use get::Get;
 #[cfg(feature = "get_env_var")]
 pub use get_env_var::GetEnvVar;
 #[cfg(feature = "get_hostname")]
 pub use get_hostname::GetHostname;
 #[cfg(feature = "includes")]
 pub use includes::Includes;
-#[cfg(feature = "insert")]
-pub use insert::Insert;
 #[cfg(feature = "integer")]
 pub use integer::Integer;
 #[cfg(feature = "ip_aton")]
@@ -351,8 +351,6 @@ pub use join::Join;
 pub use length::Length;
 #[cfg(feature = "log")]
 pub use log::Log;
-#[cfg(feature = "lookup")]
-pub use lookup::Lookup;
 #[cfg(feature = "match_any")]
 pub use match_any::MatchAny;
 #[cfg(feature = "match_array")]
@@ -433,6 +431,8 @@ pub use replace::Replace;
 pub use reverse_dns::ReverseDns;
 #[cfg(feature = "round")]
 pub use round::Round;
+#[cfg(feature = "set")]
+pub use set::Set;
 #[cfg(feature = "sha2")]
 pub use sha2::Sha2;
 #[cfg(feature = "sha3")]
@@ -540,14 +540,14 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(FormatNumber),
         #[cfg(feature = "format_timestamp")]
         Box::new(FormatTimestamp),
+        #[cfg(feature = "get")]
+        Box::new(Get),
         #[cfg(feature = "get_env_var")]
         Box::new(GetEnvVar),
         #[cfg(feature = "get_hostname")]
         Box::new(GetHostname),
         #[cfg(feature = "includes")]
         Box::new(Includes),
-        #[cfg(feature = "insert")]
-        Box::new(Insert),
         #[cfg(feature = "integer")]
         Box::new(Integer),
         #[cfg(feature = "ip_aton")]
@@ -588,8 +588,6 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Length),
         #[cfg(feature = "log")]
         Box::new(Log),
-        #[cfg(feature = "lookup")]
-        Box::new(Lookup),
         #[cfg(feature = "match")]
         Box::new(Match),
         #[cfg(feature = "match_any")]
@@ -674,6 +672,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ReverseDns),
         #[cfg(feature = "round")]
         Box::new(Round),
+        #[cfg(feature = "set")]
+        Box::new(Set),
         #[cfg(feature = "sha1")]
         Box::new(Sha1),
         #[cfg(feature = "sha2")]
