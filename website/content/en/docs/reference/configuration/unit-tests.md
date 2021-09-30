@@ -2,7 +2,11 @@
 title: Unit testing Vector configurations
 short: Unit tests
 weight: 5
-aliases: ["/docs/reference/tests", "/docs/reference/configuration/tests"]
+aliases: [
+  "/docs/reference/tests",
+  "/docs/reference/configuration/tests",
+  "/guides/level-up/unit-testing"
+]
 ---
 
 Vector enables you to [unit test] the [transforms] in your processing [pipeline]. Unit tests can
@@ -21,6 +25,44 @@ This doc will begin with an [example](#example) unit test configuration and proc
 reference-style [guide](#configuring).
 
 ## Verifying output {#verifying}
+
+You can use [VRL assertions][assertions] to verify that the output of one or more transforms
+conforms to your expectations. VRL provides two assertion functions:
+
+* [`assert`][assert] takes a Boolean expression as its first argument. If the Boolean resolves to
+  `false`, the test fails and Vector logs an error.
+* [`assert_eq`][assert_eq] takes any two values as its first two arguments. If those two values
+  aren't equal, the test fails and Vector logs an error.
+
+With both functions, you can supply a custom log message to be emitted if the assertion fails:
+
+```ruby
+# Named arguments
+assert!(1 == 2, message: "the rules of arithmetic have been violated")
+assert_eq!(1, 2, message: "the rules of arithmetic have been violated")
+
+# Positional arguments are also valid
+assert!(1 == 2, "the rules of arithmetic have been violated")
+assert_eq!(1, 2, "the rules of arithmetic have been violated")
+```
+
+Because the (optional) message can be any string, you can use string concatenation:
+
+```ruby
+val1 = 1
+val2 = 2
+
+assert_eq!(val1, val2, val1 + " does not equal " + val2)
+```
+
+{{< info title="Make your assertions infallible" >}}
+We recommend making `assert` and `assert_eq` invocations in unit tests [infallible] by applying the
+`!` syntax. The `!` indicates that the VRL program should abort if the condition fails. This is
+indeed the preferred behavior for unit tests.
+
+[infallible]: https://vrl.dev/#fallibility
+{{< /info >}}
+
 
 You can use [Boolean expressions][boolean] written in [Vector Remap Language][vrl] (VRL) to verify
 that your test outputs are what you would expect given your test inputs. Here's an example:
@@ -344,6 +386,9 @@ source = '''
 '''
 ```
 
+[assert]: https://vrl.dev/functions/#assert
+[assert_eq]: https://vrl.dev/functions/#assert_eq
+[assertions]: https://vrl.dev/#assertions
 [boolean]: https://vrl.dev/#boolean-expressions
 [datadog_search]: https://docs.datadoghq.com/logs/explorer/search_syntax
 [filter]: /docs/reference/configuration/transforms/filter
