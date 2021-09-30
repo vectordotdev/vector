@@ -35,6 +35,23 @@ impl Graph {
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
     ) -> Result<Self, Vec<String>> {
+        Self::new_inner(sources, transforms, sinks, false)
+    }
+
+    pub fn new_unchecked(
+        sources: &IndexMap<ComponentKey, SourceOuter>,
+        transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
+        sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
+    ) -> Self {
+        Self::new_inner(sources, transforms, sinks, true).expect("errors ignored")
+    }
+
+    pub fn new_inner(
+        sources: &IndexMap<ComponentKey, SourceOuter>,
+        transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
+        sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
+        ignore_errors: bool,
+    ) -> Result<Self, Vec<String>> {
         let mut graph = Graph::default();
         let mut errors = Vec::new();
 
@@ -88,7 +105,7 @@ impl Graph {
             }
         }
 
-        if errors.is_empty() {
+        if errors.is_empty() || ignore_errors {
             Ok(graph)
         } else {
             Err(errors)

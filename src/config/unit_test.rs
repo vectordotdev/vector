@@ -30,7 +30,7 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
     let expansions = super::compiler::expand_macros(&mut builder)?;
 
     // Resolve inputs via the graph, even though we haven't fully validated everything here
-    let graph = Graph::new(&IndexMap::new(), &builder.transforms, &builder.sinks)?;
+    let graph = Graph::new_unchecked(&IndexMap::new(), &builder.transforms, &builder.sinks);
     let transforms = std::mem::take(&mut builder.transforms)
         .into_iter()
         .map(|(key, transform)| {
@@ -148,8 +148,16 @@ fn walk(
                 targets = target.next.clone();
                 transforms.insert(key, target);
             }
-            Transform::FallibleFunction(ref mut _t) => {
-                todo!()
+            Transform::FallibleFunction(ref mut t) => {
+                let mut err_buf = Vec::new();
+                for input in inputs.clone() {
+                    t.transform(&mut results, &mut err_buf, input)
+                }
+                // unit tests don't currently support multiple outputs, so just throw these away
+                err_buf.clear();
+
+                targets = target.next.clone();
+                transforms.insert(key, target);
             }
             Transform::Task(t) => {
                 error!("Using a recently refactored `TaskTransform` in a unit test. You may experience limited support for multiple inputs.");
