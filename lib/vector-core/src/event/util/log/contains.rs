@@ -6,7 +6,7 @@ pub fn contains(fields: &BTreeMap<String, Value>, path: &str) -> bool {
     let mut path_iter = PathIter::new(path);
 
     match path_iter.next() {
-        Some(PathComponent::Key(key)) => match fields.get(&key) {
+        Some(PathComponent::Key(key)) => match fields.get(key.as_ref()) {
             None => false,
             Some(value) => value_contains(value, path_iter),
         },
@@ -14,14 +14,14 @@ pub fn contains(fields: &BTreeMap<String, Value>, path: &str) -> bool {
     }
 }
 
-fn value_contains<I>(mut value: &Value, mut path_iter: I) -> bool
+fn value_contains<'a, I>(mut value: &Value, mut path_iter: I) -> bool
 where
-    I: Iterator<Item = PathComponent>,
+    I: Iterator<Item = PathComponent<'a>>,
 {
     loop {
         value = match (path_iter.next(), value) {
             (None, _) => return true,
-            (Some(PathComponent::Key(ref key)), Value::Map(map)) => match map.get(key) {
+            (Some(PathComponent::Key(key)), Value::Map(map)) => match map.get(key.as_ref()) {
                 None => return false,
                 Some(nested_value) => nested_value,
             },

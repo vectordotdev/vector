@@ -20,7 +20,7 @@ tracing = { version = "0.1.28", default-features = false }
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"] }
-pretty_assertions = "0.7.2"
+pretty_assertions = "1.0.0"
 quickcheck = "1.0"
 tempdir = "0.3"
 tokio-test = "0.4.2"

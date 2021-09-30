@@ -1511,4 +1511,50 @@ mod tests {
             vec!["Data type mismatch between foo.step1 (Metric) and foo.step2 (Log)".to_owned()]
         );
     }
+
+    #[tokio::test]
+    async fn invalid_name_in_expanded_transform() {
+        let config: ConfigBuilder = toml::from_str(indoc! {r#"
+            [sources.input]
+              type = "generator"
+              format = "shuffle"
+              lines = ["one", "two"]
+              count = 5
+
+            [transforms.foo]
+              inputs = ["input"]
+              type = "compound"
+              [[transforms.foo.steps]]
+                type = "log_to_metric"
+                [[transforms.foo.steps.metrics]]
+                  type = "counter"
+                  field = "c"
+                  name = "sum"
+                  namespace = "ns"
+              [[transforms.foo.steps]]
+                id = "0"
+                type = "log_to_metric"
+                [[transforms.foo.steps.metrics]]
+                  type = "counter"
+                  field = "c"
+                  name = "sum"
+                  namespace = "ns"
+
+            [sinks.output]
+              type = "console"
+              inputs = [ "foo.0" ]
+              encoding = "json"
+              target = "stdout"
+        "#})
+        .unwrap();
+
+        let err = crate::config::compiler::compile(config).err().unwrap();
+        assert_eq!(
+            err,
+            vec![
+                "failed to expand transform 'foo': conflicting id found while expanding transform"
+                    .to_owned()
+            ]
+        );
+    }
 }

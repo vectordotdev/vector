@@ -138,7 +138,7 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
         let prefix_path = PathIter::new(fields_spec.pod_labels.as_ref()).collect::<Vec<_>>();
         for (key, val) in labels.iter() {
             let mut path = prefix_path.clone();
-            path.push(PathComponent::Key(key.clone()));
+            path.push(PathComponent::Key(key.clone().into()));
             log.insert_path(path, val.to_owned());
         }
     }
@@ -147,7 +147,7 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
         let prefix_path = PathIter::new(fields_spec.pod_annotations.as_ref()).collect::<Vec<_>>();
         for (key, val) in annotations.iter() {
             let mut path = prefix_path.clone();
-            path.push(PathComponent::Key(key.clone()));
+            path.push(PathComponent::Key(key.clone().into()));
             log.insert_path(path, val.to_owned());
         }
     }

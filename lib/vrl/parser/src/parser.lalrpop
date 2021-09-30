@@ -423,10 +423,10 @@ IfStatement: IfStatement =
     <predicate: Sp<Predicate>>
     NonterminalNewline*
     <consequent: Sp<Block>>
-    <alternatives: (Sp<ElseIf>)*>
+    <mut alternatives: (Sp<ElseIf>)*>
     <alternative: ("else" NonterminalNewline* <Sp<Block>>)?> => {
         let mut alternative = alternative;
-
+        alternatives.reverse();
         for Node { span, mut node } in alternatives {
             node.alternative = alternative;
             let node = Node::new(span, Expr::IfStatement(Node::new(span, node)));

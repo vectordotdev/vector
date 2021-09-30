@@ -97,7 +97,7 @@ impl Application {
             LogFormat::Json => true,
         };
 
-        metrics::init().expect("metrics initialization failed");
+        metrics::init_global().expect("metrics initialization failed");
 
         if let Some(threads) = root_opts.threads {
             if threads < 1 {
