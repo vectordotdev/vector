@@ -74,31 +74,50 @@ impl Graph {
 
         for (id, config) in transforms.iter() {
             for input in config.inputs.iter() {
-                if let Some(output_id) = available_inputs.get(input) {
-                    graph.edges.push(Edge {
-                        from: output_id.clone(),
-                        to: id.clone(),
-                    });
-                } else {
-                    errors.push("unknown input")
+                if let Err(e) = graph.add_input(input, id, &available_inputs) {
+                    errors.push(e);
                 }
             }
         }
 
         for (id, config) in sinks.iter() {
             for input in config.inputs.iter() {
-                if let Some(output_id) = available_inputs.get(input) {
-                    graph.edges.push(Edge {
-                        from: output_id.clone(),
-                        to: id.clone(),
-                    });
-                } else {
-                    errors.push("unknown input")
+                if let Err(e) = graph.add_input(input, id, &available_inputs) {
+                    errors.push(e);
                 }
             }
         }
 
-        Ok(graph)
+        if errors.is_empty() {
+            Ok(graph)
+        } else {
+            Err(errors)
+        }
+    }
+
+    fn add_input(
+        &mut self,
+        from: &str,
+        to: &ComponentKey,
+        available_inputs: &HashMap<String, OutputId>,
+    ) -> Result<(), String> {
+        if let Some(output_id) = available_inputs.get(from) {
+            self.edges.push(Edge {
+                from: output_id.clone(),
+                to: to.clone(),
+            });
+            Ok(())
+        } else {
+            let output_type = match self.nodes.get(to) {
+                Some(Node::Transform { .. }) => "transform",
+                Some(Node::Sink { .. }) => "sink",
+                _ => panic!("only transforms and sinks have inputs"),
+            };
+            Err(format!(
+                "Input \"{}\" for {} \"{}\" doesn't match any components.",
+                from, output_type, to
+            ))
+        }
     }
 
     fn paths(&self) -> Result<Vec<Vec<ComponentKey>>, Vec<String>> {
@@ -209,31 +228,6 @@ impl Graph {
         Ok(mapped)
     }
 
-    pub fn check_inputs(&self) -> Result<(), Vec<String>> {
-        let mut errors = Vec::new();
-        let valid_inputs = self.valid_inputs();
-
-        for edge in &self.edges {
-            if !valid_inputs.contains(&edge.from) {
-                let output_type = match self.nodes.get(&edge.to) {
-                    Some(Node::Transform { .. }) => "transform",
-                    Some(Node::Sink { .. }) => "sink",
-                    _ => panic!("only transforms and sinks have inputs"),
-                };
-                errors.push(format!(
-                    "Input \"{}\" for {} \"{}\" doesn't match any components.",
-                    edge.from, output_type, edge.to
-                ));
-            }
-        }
-
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
-    }
-
     pub fn inputs_for(&self, node: &ComponentKey) -> Vec<OutputId> {
         self.edges
             .iter()
@@ -295,18 +289,18 @@ mod test {
     use pretty_assertions::assert_eq;
 
     impl Graph {
-        fn add_source<I: Into<ComponentKey>>(&mut self, id: I, ty: DataType) {
+        fn add_source(&mut self, id: &str, ty: DataType) {
             self.nodes.insert(id.into(), Node::Source { ty });
         }
 
-        fn add_transform<I: Into<ComponentKey>>(
+        fn add_transform(
             &mut self,
-            id: I,
+            id: &str,
             in_ty: DataType,
             out_ty: DataType,
-            inputs: Vec<impl Into<OutputId>>,
+            inputs: Vec<&str>,
         ) {
-            let id = id.into();
+            let id = ComponentKey::from(id);
             let inputs = clean_inputs(inputs);
             self.nodes.insert(
                 id.clone(),
@@ -324,11 +318,7 @@ mod test {
             }
         }
 
-        fn add_transform_output<I, S>(&mut self, id: I, name: S)
-        where
-            I: Into<ComponentKey>,
-            S: Into<String>,
-        {
+        fn add_transform_output(&mut self, id: &str, name: &str) {
             let id = id.into();
             match self.nodes.get_mut(&id) {
                 Some(Node::Transform { named_outputs, .. }) => named_outputs.push(name.into()),
@@ -336,13 +326,8 @@ mod test {
             }
         }
 
-        fn add_sink<I: Into<ComponentKey>>(
-            &mut self,
-            id: I,
-            ty: DataType,
-            inputs: Vec<impl Into<OutputId>>,
-        ) {
-            let id = id.into();
+        fn add_sink(&mut self, id: &str, ty: DataType, inputs: Vec<&str>) {
+            let id = ComponentKey::from(id);
             let inputs = clean_inputs(inputs);
             self.nodes.insert(id.clone(), Node::Sink { ty });
             for from in inputs {
@@ -352,16 +337,21 @@ mod test {
                 });
             }
         }
+
+        fn test_add_input(&mut self, node: &str, input: &str) -> Result<(), String> {
+            let available_inputs = self.input_map().unwrap();
+            self.add_input(input, &node.into(), &available_inputs)
+        }
     }
 
-    fn clean_inputs(inputs: Vec<impl Into<OutputId>>) -> Vec<OutputId> {
+    fn clean_inputs(inputs: Vec<&str>) -> Vec<OutputId> {
         inputs.into_iter().map(Into::into).collect()
     }
 
     #[test]
     fn paths_detects_cycles() {
         let mut graph = Graph::default();
-        graph.add_source(ComponentKey::from("in"), DataType::Log);
+        graph.add_source("in", DataType::Log);
         graph.add_transform("one", DataType::Log, DataType::Log, vec!["in", "three"]);
         graph.add_transform("two", DataType::Log, DataType::Log, vec!["one"]);
         graph.add_transform("three", DataType::Log, DataType::Log, vec!["two"]);
@@ -396,12 +386,7 @@ mod test {
 
         let mut graph = Graph::default();
         graph.add_source("in", DataType::Log);
-        graph.add_transform(
-            ComponentKey::from("in"),
-            DataType::Log,
-            DataType::Log,
-            vec!["in"],
-        );
+        graph.add_transform("in", DataType::Log, DataType::Log, vec!["in"]);
         graph.add_sink("out", DataType::Log, vec!["in"]);
 
         // This isn't really a cyclic dependency but let me have this one.
@@ -536,14 +521,22 @@ mod test {
         );
         graph.add_transform_output("log_to_log", "errors");
         graph.add_sink("good_log_sink", DataType::Log, vec!["log_to_log"]);
-        graph.add_sink("errored_log_sink", DataType::Log, vec!["log_to_log.errors"]);
 
-        // make sure we are cool with the dotted path
-        assert_eq!(Ok(()), graph.check_inputs());
+        // don't add inputs to these yet since they're not validated via these helpers
+        graph.add_sink("errored_log_sink", DataType::Log, vec![]);
+        graph.add_sink("bad_log_sink", DataType::Log, vec![]);
+
+        // make sure we're good with dotted paths
+        assert_eq!(
+            Ok(()),
+            graph.test_add_input("errored_log_sink", "log_to_log.errors")
+        );
 
         // make sure that we're not cool with an unknown dotted path
-        graph.add_sink("bad_log_sink", DataType::Log, vec!["log_to_log.not_errors"]);
         let expected = "Input \"log_to_log.not_errors\" for sink \"bad_log_sink\" doesn't match any components.".to_string();
-        assert_eq!(Err(vec![expected]), graph.check_inputs());
+        assert_eq!(
+            Err(expected),
+            graph.test_add_input("bad_log_sink", "log_to_log.not_errors")
+        );
     }
 }

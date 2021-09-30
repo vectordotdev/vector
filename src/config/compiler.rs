@@ -64,10 +64,6 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         }
     };
 
-    if let Err(input_errors) = graph.check_inputs() {
-        errors.extend(input_errors);
-    }
-
     if let Err(type_errors) = graph.typecheck() {
         errors.extend(type_errors);
     }
