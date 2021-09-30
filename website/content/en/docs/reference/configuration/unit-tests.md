@@ -9,52 +9,58 @@ aliases: [
 ]
 ---
 
-Vector enables you to [unit test] the [transforms] in your processing [pipeline]. Unit tests can
-improve the maintainability of your Vector configurations, particularly in larger and more complex
-pipelines. Unit tests in Vector work just like unit tests in most programming languages:
+Vector enables you to [unit test] [transforms] in your processing [pipeline]. Unit tests in Vector
+work just like unit tests in most programming languages:
 
-1. Provide a set of **inputs** to a transform (or to [multiple transforms](#multiple) chained
-  together)
-1. Provide expected **outputs** from the changes made by the transform (or multiple transforms)
-1. Receive directly actionable feedback on test failures
+1. Provide a set of [inputs](#inputs) to a transform (or to [multiple transforms](#multiple) chained
+  together).
+1. Specify the expected [outputs](#outputs) from the changes made by the transform (or multiple
+  transforms).
+1. Receive directly actionable feedback from any test failures.
 
-In general, unit tests can serve as a useful guardrail when running in Vector in production settings
-where you need to ensure that your topology doesn't exhibit unexpected behavior.
-
-This doc will begin with an [example](#example) unit test configuration and proceed to a more
-reference-style [guide](#configuring).
+Unit tests can serve as a useful guardrail when running in Vector in production settings where you
+need to ensure that your topology doesn't exhibit unexpected behavior and generally improve the
+maintainability of your Vector pipelines, particularly in larger and more complex pipelines.
 
 ## Running unit tests
 
-You can execute tests within a configuration file using the [`test`][vector_test] subcommand:
+You can execute tests within a [configuration](#configuring) file using Vector's
+[`test`][vector_test] subcommand:
 
 ```bash
 vector test /etc/vector/vector.toml
 ```
 
-You can also specify multiple files:
+You can also specify multiple configuration files to test:
+
+```bash
+vector test /etc/vector/pipeline1.toml /etc/vector/pipeline2.toml
+```
+
+Glob patterns are also supported:
 
 ```bash
 vector test /etc/vector/*.toml
 ```
 
-Specifying multiple files can be useful if you want to keep your unit tests in a separate file from
-your pipeline configuration. Vector treats the multiple files as a single configuration.
+Specifying multiple files is useful if you want to, for example, keep your unit tests in a separate
+file from your pipeline configuration. Vector always treats multiple files as a single, unified
+configuration.
 
 ## Verifying output {#verifying}
 
-You can use [VRL assertions][assertions] to verify that the output of one or more transforms
+You can use [VRL assertions][assertions] to verify that the output of the transform(s) being tested
 conforms to your expectations. VRL provides two assertion functions:
 
-* [`assert`][assert] takes a Boolean expression as its first argument. If the Boolean resolves to
-  `false`, the test fails and Vector logs an error.
+* [`assert`][assert] takes a [Boolean expression][boolean] as its first argument. If the Boolean
+  resolves to `false`, the test fails and Vector logs an error.
 * [`assert_eq`][assert_eq] takes any two values as its first two arguments. If those two values
   aren't equal, the test fails and Vector logs an error.
 
 With both functions, you can supply a custom log message to be emitted if the assertion fails:
 
 ```ruby
-# Named arguments
+# Named argument
 assert!(1 == 2, message: "the rules of arithmetic have been violated")
 assert_eq!(1, 2, message: "the rules of arithmetic have been violated")
 
@@ -63,32 +69,25 @@ assert!(1 == 2, "the rules of arithmetic have been violated")
 assert_eq!(1, 2, "the rules of arithmetic have been violated")
 ```
 
-Because the (optional) message can be any string, you can use string concatenation:
-
-```ruby
-val1 = 1
-val2 = 2
-
-assert_eq!(val1, val2, val1 + " does not equal " + val2)
-```
-
 {{< info title="Make your assertions infallible" >}}
 We recommend making `assert` and `assert_eq` invocations in unit tests [infallible] by applying the
-`!` syntax. The `!` indicates that the VRL program should abort if the condition fails. This is
-indeed the preferred behavior for unit tests.
+bang (`!`) syntax, as in `assert!(1 == 1)` rather than `assert(1 == 1)`. The `!` indicates that the
+VRL program should abort if the condition fails.
 
-[infallible]: https://vrl.dev/#fallibility
+[infallible]: /docs/reference/vrl/#fallibility
 {{< /info >}}
 
-
-You can use [Boolean expressions][boolean] written in [Vector Remap Language][vrl] (VRL) to verify
-that your test outputs are what you would expect given your test inputs. Here's an example:
+If you use the `assert` function, you need to pass a [Boolean expression][boolean] to the function
+as the first argument. Especially useful when writing Boolean expressions are the [type
+functions][type], functions like [`exists`][exists], [`includes`][includes],
+[`is_nullish`][is_nullish] and [`contains`][contains], and VRL [comparisons]. Here's an example
+usage of a Boolean expression passed to an `assert` function:
 
 ```toml
 [[tests.outputs.conditions]]
 type = "vrl"
 source = '''
-is_string(.message) && is_timestamp(.timestamp) && !exists(.other)
+assert!(is_string(.message) && is_timestamp(.timestamp) && !exists(.other))
 '''
 ```
 
@@ -99,61 +98,37 @@ following:
 * The `timestamp` field must be a valid timestamp
 * The `other` field must not exist
 
-{{< success title="VRL documentation" >}}
-When writing unit tests, we recommend using the [VRL documentation][vrl] as a steady point of
-reference. Especially useful when writing Boolean expressions are the [type functions][type],
-functions like [`exists`][exists], [`includes`][includes], and [`contains`][contains], and
-[comparisons].
+It's also possible to break a test up into multiple `assert` or `assert_eq` statements:
 
-[comparisons]: https://vrl.dev/expressions/#comparisons
-[contains]: https://vrl.dev/functions/#contains
-[exists]: https://vrl.dev/functions/#exists
-[includes]: https://vrl.dev/functions/#includes
-[type]: https://vrl.dev/functions/#type-functions
-[vrl]: https://vrl.dev
-{{< /success >}}
-
-### Only the last expression is evaluated
-
-When writing a VRL condition for your test output, it's important to bear in mind that the condition
-passes if the **last expression** provided evaluates to `true`. If you include multiple Boolean
-expressions, all but the last one are disregarded. This condition would thus evaluate to `true`:
-
-```ruby
-1 == 2
-"booper" == "bopper"
-true
+```toml
+source = '''
+assert!(exists(.message), "no message field provided")
+assert!(!is_nullish(.message), "message field is an empty string")
+assert!(is_string(.message), "message field has as unexpected type")
+assert_eq!(.message, "success", "message field had an unexpected value")
+assert!(exists(.timestamp), "no timestamp provided")
+assert!(is_timestamp(.timestamp), "timestamp is invalid")
+assert!(!exists(.other), "extraneous other field doesn't belong")
+'''
 ```
 
-Because of this, we recommend always structuring your conditions as a **single Boolean expression**,
-using `&&` (and) and `||` to chain Boolean expressions together when multiple expressions are in
-play. The condition immediately above would evaluate to `false`, as we'd expect, if rewritten like
-this:
+It's also possible to store the Boolean expressions in variables rather than passing the entire
+statement to an `assert` function:
 
-```ruby
-1 == 2 && "booper" == "bopper" && true
-```
+```toml
+source = '''
+message_field_valid = exists(.message) &&
+  !is_nullish(.message) &&
+  .message == "success"
 
-### Multiple lines
-
-For the sake of readability, you can also spread a single Boolean expression across multiple lines.
-Both of the following are valid:
-
-```ruby
-# Indented
-1 == 2 &&
-  "booper" == "bopper" &&
-  true
-
-# Not indented
-1 == 2 &&
-"booper" == "bopper" &&
-true
+assert!(message_field_valid)
+'''
 ```
 
 ## Example unit test configuration {#example}
 
-Let's start with an annotated unit testing example:
+Below is an annotated example of a unit test suite for a transform called `add_metadata`, which
+adds a unique ID and a timestamp to log events:
 
 ```toml
 # The transform being tested is a Vector Remap Language (VRL) transform that
@@ -168,7 +143,7 @@ source = '''
 
 # Here we begin configuring our test suite
 [[tests]]
-name = "transaction_logging_test"
+name = "Test for the add_metadata transform"
 
 # The inputs for the test
 [[tests.inputs]]
@@ -386,18 +361,24 @@ source = '''
 '''
 ```
 
-[assert]: https://vrl.dev/functions/#assert
-[assert_eq]: https://vrl.dev/functions/#assert_eq
-[assertions]: https://vrl.dev/#assertions
-[boolean]: https://vrl.dev/#boolean-expressions
+[assert]: /docs/reference/vrl/functions/#assert
+[assert_eq]: /docs/reference/vrl/functions/#assert_eq
+[assertions]: /docs/reference/vrl#assertions
+[boolean]: /docs/reference/vrl/#boolean-expressions
+[comparisons]: /docs/reference/vrl/expressions/#comparison
+[contains]: /docs/reference/vrl/functions/#contains
 [datadog_search]: https://docs.datadoghq.com/logs/explorer/search_syntax
+[exists]: /docs/reference/vrl/functions/#exists
 [filter]: /docs/reference/configuration/transforms/filter
+[includes]: /docs/reference/vrl/functions/#includes
+[is_nullish]: /docs/reference/vrl/functions/#is_nullish
 [logs]: /docs/about/under-the-hood/architecture/data-model/log
 [metrics]: /docs/about/under-the-hood/architecture/data-model/metric
 [pipeline]: /docs/reference/glossary/#pipeline
 [remap]: /docs/reference/configuration/transforms/remap
 [transforms]: /docs/reference/glossary/#transform
+[type]: /docs/reference/vrl/functions/#type-functions
 [unit test]: https://en.wikipedia.org/wiki/Unit_testing
 [vector_test]: /docs/reference/cli#test
 [vector_tests]: https://github.com/vectordotdev/vector/tree/master/tests/behavior/transforms
-[vrl]: https://vrl.dev
+[vrl]: /docs/reference/vrl
