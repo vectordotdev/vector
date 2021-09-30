@@ -1,4 +1,5 @@
-use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
+use super::{GcpAuthConfig, GcpCredentials, Scope};
+use crate::sinks::gcs_common::config::healthcheck_response;
 use crate::template::TemplateRenderingError;
 use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},

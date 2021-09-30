@@ -24,6 +24,15 @@ pub enum StandardEncodings {
     Ndjson,
 }
 
+impl StandardEncodings {
+    pub const fn content_type(&self) -> &str {
+        match self {
+            StandardEncodings::Text => "text/plain",
+            StandardEncodings::Ndjson => "application/x-ndjson",
+        }
+    }
+}
+
 impl Encoder for StandardEncodings {
     fn encode_event(&self, event: Event, writer: &mut dyn io::Write) -> io::Result<()> {
         match self {
