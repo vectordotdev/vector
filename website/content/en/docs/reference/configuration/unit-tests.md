@@ -12,8 +12,7 @@ aliases: [
 Vector enables you to [unit test] [transforms] in your processing [pipeline]. Unit tests in Vector
 work just like unit tests in most programming languages:
 
-1. Provide a set of [inputs](#inputs) to a transform (or to [multiple transforms](#multiple) chained
-  together).
+1. Provide a set of [inputs](#inputs) to a transform (or to multiple transforms chained together).
 1. Specify the expected [outputs](#outputs) from the changes made by the transform (or multiple
   transforms).
 1. Receive directly actionable feedback from any test failures.
