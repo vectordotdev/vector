@@ -60,13 +60,13 @@ components: sources: generator: {
 			}
 		}
 		interval: {
-			common:      false
+			common: false
 			description: """
 				The amount of time, in seconds, to pause between each batch of output lines. The
 				default is one batch per second. In order to remove the delay and output batches as
 				quickly as possible, set `interval` to `0.0`.
 				"""
-			required:    false
+			required: false
 			warnings: []
 			type: float: {
 				default: 1.0
