@@ -24,6 +24,23 @@ where you need to ensure that your topology doesn't exhibit unexpected behavior.
 This doc will begin with an [example](#example) unit test configuration and proceed to a more
 reference-style [guide](#configuring).
 
+## Running unit tests
+
+You can execute tests within a configuration file using the [`test`][vector_test] subcommand:
+
+```bash
+vector test /etc/vector/vector.toml
+```
+
+You can also specify multiple files:
+
+```bash
+vector test /etc/vector/*.toml
+```
+
+Specifying multiple files can be useful if you want to keep your unit tests in a separate file from
+your pipeline configuration. Vector treats the multiple files as a single configuration.
+
 ## Verifying output {#verifying}
 
 You can use [VRL assertions][assertions] to verify that the output of one or more transforms
@@ -133,23 +150,6 @@ Both of the following are valid:
 "booper" == "bopper" &&
 true
 ```
-
-## Running unit tests
-
-You can execute tests within a configuration file using the [`test`][vector_test] subcommand:
-
-```bash
-vector test /etc/vector/vector.toml
-```
-
-You can also specify multiple files:
-
-```bash
-vector test /etc/vector/*.toml
-```
-
-Specifying multiple files can be useful if you want to keep your unit tests in a separate file from
-your pipeline configuration. Vector treats the multiple files as a single configuration.
 
 ## Example unit test configuration {#example}
 
