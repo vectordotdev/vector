@@ -15,12 +15,16 @@ use tokio::time::{interval, Duration};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct GeneratorConfig {
-    #[serde(alias = "batch_interval")]
-    interval: Option<f64>,
+    #[serde(alias = "batch_interval", default = "default_interval")]
+    interval: f64,
     #[serde(default = "usize::max_value")]
     count: usize,
     #[serde(flatten)]
     format: OutputFormat,
+}
+
+fn default_interval() -> f64 {
+    1.0
 }
 
 #[derive(Debug, PartialEq, Snafu)]
@@ -98,7 +102,7 @@ impl GeneratorConfig {
     }
 
     #[allow(dead_code)] // to make check-component-features pass
-    pub fn repeat(lines: Vec<String>, count: usize, interval: Option<f64>) -> Self {
+    pub fn repeat(lines: Vec<String>, count: usize, interval: f64) -> Self {
         Self {
             count,
             interval,
@@ -110,7 +114,13 @@ impl GeneratorConfig {
     }
 
     async fn inner(self, mut shutdown: ShutdownSignal, mut out: Pipeline) -> Result<(), ()> {
-        let mut interval = self.interval.map(|i| interval(Duration::from_secs_f64(i)));
+        let maybe_interval: Option<f64> = if self.interval != 0.0 {
+            Some(self.interval)
+        } else {
+            None
+        };
+
+        let mut interval = maybe_interval.map(|i| interval(Duration::from_secs_f64(i)));
 
         for n in 0..self.count {
             if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
