@@ -33,9 +33,9 @@ VRL-powered components.
   * [Schema Conversion (TODO)](#schema-conversion-todo)
   * [Condition Checking (TODO)](#condition-checking-todo)
 * [Rationale](#rationale)
+* [Drawbacks](#drawbacks)
   * [Performance](#performance)
   * [Complex Topology](#complex-topology)
-* [Drawbacks (TODO)](#drawbacks-todo)
 * [Outstanding Questions (TODO)](#outstanding-questions-todo)
 * [Plan Of Attack (TODO)](#plan-of-attack-todo)
 * [Future Improvements (TODO)](#future-improvements-todo)
@@ -439,6 +439,8 @@ Correctness is an important aspect in the world of observability data. Human
 contracts can get you so far, but schema validation is the end-all-be-all when
 it comes to reaching 100% correctness in your events processing pipeline.
 
+## Drawbacks
+
 ### Performance
 
 The biggest drawback to this feature is the impact it has on Vector's
@@ -454,12 +456,6 @@ pipelines. When enabling schema validation, the potential for many existing
 pipelines to be rejected is there. Enabling (and configuring) schema support is
 done by the operator themselves, so it's a concious choice, but still one that
 adds maintenance overhead (but reduces the potential for bugs, of course).
-
-...
-
-## Drawbacks (TODO)
-
-...
 
 ## Outstanding Questions (TODO)
 
