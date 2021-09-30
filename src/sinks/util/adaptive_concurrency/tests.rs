@@ -103,7 +103,7 @@ struct TestParams {
     requests: usize,
 
     // The time interval between requests.
-    interval: Option<f64>,
+    interval: f64,
 
     // The delay is the base time every request takes return.
     delay: f64,
