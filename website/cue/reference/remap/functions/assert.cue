@@ -23,8 +23,17 @@ remap: functions: assert: {
 		},
 		{
 			name:        "message"
-			description: "The failure message that's reported if `condition` evaluates to `false`."
-			required:    true
+			description: """
+				The failure message that's reported if `condition` evaluates to `false`. If
+				unspecified, `"assertion failed"` is used as a default failure message. For example,
+				the expression `assert!(1 == 2)` (with no `message` specified) would yield this
+				output:
+
+				```text
+				function call error for "assert" at (0:15): assertion failed
+				```
+				"""
+			required:    false
 			type: ["string"]
 		},
 	]
