@@ -1,11 +1,15 @@
-use super::{DatadogAgentConfig, DatadogAgentSource, DatadogSeriesRequest, LogMsg};
 use crate::{
     codecs::{self, BytesDecoder, BytesDeserializer},
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
     config::{log_schema, SourceConfig, SourceContext},
     event::{
         metric::{MetricKind, MetricSketch, MetricValue},
-        Event, EventStatus,
+        Event, EventStatus, Value,
+    },
+    sources::datadog::agent::{
+        logs::{decode_log_body, LogMsg},
+        metrics::DatadogSeriesRequest,
+        DatadogAgentConfig, DatadogAgentSource,
     },
     serde::{default_decoding, default_framing_message_based},
     test_util::{
@@ -18,14 +22,18 @@ use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::Stream;
 use http::HeaderMap;
+use indoc::indoc;
 use pretty_assertions::assert_eq;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
-use std::net::SocketAddr;
-use std::str;
+use std::{array::IntoIter, collections::BTreeMap, iter::FromIterator, net::SocketAddr, str};
 
-mod dd_proto {
+mod dd_metrics_proto {
     include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
+}
+
+mod dd_traces_proto {
+    include!(concat!(env!("OUT_DIR"), "/pb.rs"));
 }
 
 impl Arbitrary for LogMsg {
@@ -51,13 +59,12 @@ fn test_decode_log_body() {
     fn inner(msgs: Vec<LogMsg>) -> TestResult {
         let body = Bytes::from(serde_json::to_string(&msgs).unwrap());
         let api_key = None;
-
         let decoder = codecs::Decoder::new(
             Box::new(BytesDecoder::new()),
             Box::new(BytesDeserializer::new()),
         );
         let source = DatadogAgentSource::new(true, decoder, "http");
-        let events = source.decode_log_body(body, api_key).unwrap();
+        let events = decode_log_body(body, api_key, &source).unwrap();
         assert_eq!(events.len(), msgs.len());
         for (msg, event) in msgs.into_iter().zip(events.into_iter()) {
             let log = event.as_log();
@@ -101,21 +108,20 @@ async fn source(
     }
     let address = next_addr();
     let context = SourceContext::new_test(sender);
+
+    let config = toml::from_str::<DatadogAgentConfig>(&format!(
+        indoc! { r#"
+            address = "{}"
+            compression = "none"
+            store_api_key = {}
+            acknowledgements = {}
+            multiple_outputs = {}
+        "#},
+        address, store_api_key, acknowledgements, multiple_outputs
+    ))
+    .unwrap();
     tokio::spawn(async move {
-        DatadogAgentConfig {
-            address,
-            tls: None,
-            store_api_key,
-            framing: default_framing_message_based(),
-            decoding: default_decoding(),
-            acknowledgements: acknowledgements.into(),
-            multiple_outputs,
-        }
-        .build(context)
-        .await
-        .unwrap()
-        .await
-        .unwrap();
+        config.build(context).await.unwrap().await.unwrap();
     });
     wait_for_tcp(address).await;
     (recv, logs_output, metrics_output, address)
@@ -709,12 +715,12 @@ async fn decode_sketches() {
     );
 
     let mut buf = Vec::new();
-    let sketch = dd_proto::sketch_payload::Sketch {
+    let sketch = dd_metrics_proto::sketch_payload::Sketch {
         metric: "dd_sketch".to_string(),
         tags: vec!["foo:bar".to_string(), "foobar".to_string()],
         host: "a_host".to_string(),
         distributions: Vec::new(),
-        dogsketches: vec![dd_proto::sketch_payload::sketch::Dogsketch {
+        dogsketches: vec![dd_metrics_proto::sketch_payload::sketch::Dogsketch {
             ts: 1542182950,
             cnt: 2,
             min: 16.0,
@@ -726,7 +732,7 @@ async fn decode_sketches() {
         }],
     };
 
-    let sketch_payload = dd_proto::SketchPayload {
+    let sketch_payload = dd_metrics_proto::SketchPayload {
         metadata: None,
         sketches: vec![sketch],
     };
@@ -779,6 +785,120 @@ async fn decode_sketches() {
 
         assert_eq!(
             &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
+            "12345678abcdefgh12345678abcdefgh"
+        );
+    }
+}
+
+#[tokio::test]
+async fn decode_traces() {
+    trace_init();
+    let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "dd-api-key",
+        "12345678abcdefgh12345678abcdefgh".parse().unwrap(),
+    );
+    headers.insert("X-Datadog-Reported-Languages", "ada".parse().unwrap());
+
+    let mut buf = Vec::new();
+
+    let span = dd_traces_proto::Span {
+        service: "a_service".to_string(),
+        name: "a_name".to_string(),
+        resource: "a_resource".to_string(),
+        trace_id: 123u64,
+        span_id: 456u64,
+        parent_id: 789u64,
+        start: 1_431_648_000_000_001i64,
+        duration: 1_000_000_000i64,
+        error: 404i32,
+        meta: BTreeMap::from_iter(IntoIter::new([("foo".to_string(), "bar".to_string())])),
+        metrics: BTreeMap::from_iter(IntoIter::new([("a_metrics".to_string(), 0.577f64)])),
+        r#type: "a_type".to_string(),
+    };
+
+    let trace = dd_traces_proto::ApiTrace {
+        trace_id: 123u64,
+        spans: vec![span.clone()],
+        start_time: 1_431_648_000_000_001i64,
+        end_time: 1_431_649_000_000_001i64,
+    };
+
+    let payload = dd_traces_proto::TracePayload {
+        host_name: "a_hostname".to_string(),
+        env: "an_environment".to_string(),
+        traces: vec![trace],
+        transactions: vec![span],
+    };
+
+    payload.encode(&mut buf).unwrap();
+
+    let events = spawn_collect_n(
+        async move {
+            assert_eq!(
+                200,
+                send_with_path(
+                    addr,
+                    unsafe { str::from_utf8_unchecked(&buf) },
+                    headers,
+                    "/api/v0.2/traces"
+                )
+                .await
+            );
+        },
+        rx,
+        2,
+    )
+    .await;
+
+    {
+        let trace = events[0].as_log();
+        assert_eq!(trace["host"], "a_hostname".into());
+        assert_eq!(trace["env"], "an_environment".into());
+        assert_eq!(trace["language"], "ada".into());
+        assert!(trace.contains("spans"));
+        assert_eq!(trace["spans"].as_array().len(), 1);
+        let span_from_trace = trace["spans"].as_array()[0].as_map().unwrap();
+        assert_eq!(span_from_trace["service"], "a_service".into());
+        assert_eq!(span_from_trace["name"], "a_name".into());
+        assert_eq!(span_from_trace["resource"], "a_resource".into());
+        assert_eq!(span_from_trace["trace_id"], 123.into());
+        assert_eq!(span_from_trace["span_id"], 456.into());
+        assert_eq!(span_from_trace["parent_id"], 789.into());
+        assert_eq!(
+            span_from_trace["start"],
+            Value::from(Utc.timestamp_nanos(1_431_648_000_000_001i64))
+        );
+        assert_eq!(span_from_trace["duration"], 1_000_000_000.into());
+        assert_eq!(span_from_trace["error"], 404.into());
+        assert_eq!(span_from_trace["meta"].as_map().unwrap().len(), 1);
+        assert_eq!(
+            span_from_trace["meta"].as_map().unwrap()["foo"],
+            "bar".into()
+        );
+        assert_eq!(span_from_trace["metrics"].as_map().unwrap().len(), 1);
+        assert_eq!(
+            span_from_trace["metrics"].as_map().unwrap()["a_metrics"],
+            0.577.into()
+        );
+        assert_eq!(
+            &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
+            "12345678abcdefgh12345678abcdefgh"
+        );
+
+        let apm_event = events[1].as_log();
+        assert!(!apm_event.contains("spans"));
+        assert_eq!(apm_event["env"], "an_environment".into());
+        assert_eq!(apm_event["language"], "ada".into());
+        assert_eq!(apm_event["host"], "a_hostname".into());
+        assert_eq!(apm_event["service"], "a_service".into());
+        assert_eq!(apm_event["name"], "a_name".into());
+        assert_eq!(apm_event["resource"], "a_resource".into());
+
+        assert_eq!(
+            &events[1].metadata().datadog_api_key().as_ref().unwrap()[..],
             "12345678abcdefgh12345678abcdefgh"
         );
     }
