@@ -76,7 +76,7 @@ impl<'a> InternalEvent for PrometheusParseError<'a> {
         counter!(
             "component_errors_total", 1,
             "stage" => "processing",
-            "error_type" => "parsing_failure",
+            "error_type" => "parse_failed",
             "url" => self.url.to_string(),
         );
     }
