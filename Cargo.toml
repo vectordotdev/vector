@@ -594,6 +594,7 @@ sinks-logs = [
   "sinks-datadog_archives",
   "sinks-datadog_events",
   "sinks-datadog_logs",
+  "sinks-datadog_traces",
   "sinks-elasticsearch",
   "sinks-file",
   "sinks-gcp",
@@ -645,6 +646,7 @@ sinks-datadog_archives = ["sinks-aws_s3", "sinks-azure_blob", "sinks-gcp"]
 sinks-datadog_events = []
 sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build", "sinks-azure_blob"]
+sinks-datadog_traces = ["protobuf-build"]
 sinks-elasticsearch = ["rusoto", "transforms-metric_to_log"]
 sinks-file = ["async-compression"]
 sinks-gcp = ["base64", "goauth", "gouth", "smpl_jwt"]
