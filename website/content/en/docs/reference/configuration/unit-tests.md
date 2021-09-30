@@ -146,14 +146,14 @@ extract_from = "add_metadata" # The transform from which the resulting event is 
 [[tests.outputs.conditions]]
 type = "vrl"
 source = '''
-is_timestamp(.timestamp)
-is_string(.id)
-.message == "successful transaction"
+is_timestamp(.timestamp) &&
+  is_string(.id) &&
+  .message == "successful transaction"
 '''
 ```
 
-This example represents a complete test of the `add_metadata` transform, complete with test
-`inputs` and `outputs`.
+This example represents a complete test of the `add_metadata` transform, include test `inputs`
+and expected `outputs` drawn from a specific transform.
 
 {{< success title="Multiple config formats available" >}}
 The unit testing example above is in TOML but Vector also supports YAML and JSON as configuration
@@ -189,11 +189,11 @@ in order for the test to pass. Here's an example:
 
 ```toml
 [[tests]]
-name = "skip_modify_transform"
-no_outputs_from = ["modify_transform"]
+name = "skip_remove_fields"
+no_outputs_from = ["remove_extraneous_fields"]
 ```
 
-In this case,
+In this case, the output from some transform called `remove_extraneous_fields` is
 
 ### Inputs
 
@@ -220,7 +220,7 @@ insert_at = "add_metadata"
 
 [tests.inputs.log_fields]
 message = "<102>1 2020-12-22T15:22:31.111Z vector-user.biz su 2666 ID389 - Something went wrong"
-tags.environment = "production"
+tags = { environment = "production" }
 ```
 
 ### Outputs
@@ -230,19 +230,14 @@ In the `outputs` array of your unit testing configuration you specify two things
 Parameter | Type | Description
 :---------|:-----|:-----------
 `extract_from` | string (name of transform) | The transform whose output you want to test.
-`conditions` | array of objects | The [VRL conditions][verifying] to run against the output.
+`conditions` | array of objects | The [VRL conditions](#verifying) to run against the output.
 
 Each condition in the `conditions` array has two fields:
 
 Parameter | Type | Description
 :---------|:-----|:-----------
-`type` | string | The type of condition you're providing. As the original `check_fields` syntax is now deprecated, this defaults to  `vrl`.
+`type` | string | The type of condition you're providing. As the original `check_fields` syntax is now deprecated, this defaults to [`vrl`][vrl], although [`datadog_search`][datadog_search] syntax is also valid.
 `source` | string (VRL Boolean expression) | Explained in detail [above](#verifying).
-
-
-both the expected output
-events from the transform(s) you specified in in the [`inputs`](#inputs) array as well the point in
-the transform chain from which output events are to be extracted.
 
 Here's an example `outputs` declaration:
 
@@ -256,7 +251,6 @@ source = '''
 is_string(.id) && exists(.tags)
 '''
 ```
-
 
 {{< danger title="`check_fields` conditions now deprecated" >}}
 Vector initially provided a `check_fields` condition type that enabled you to specify Boolean
@@ -309,17 +303,21 @@ type = "metric"
 [tests.inputs.metric]
 name = "count"
 kind = "absolute"
-counter.value = 1
+counter = { value = 1 }
 ```
 
 Here's a full end-to-end example of unit testing a metric through a transform:
 
 ```toml
-[transforms.add_unique_id_to_metric]
+[transforms.add_env_to_metric]
 type = "remap"
 inputs = []
 source = '''
-.id = uuid_v4()
+env, err = get_env_var!("ENV")
+if err != null {
+  log(err, level: "error")
+}
+tags.environment = env
 '''
 
 [[tests]]
@@ -332,7 +330,7 @@ type = "metric"
 [tests.inputs.metric]
 name = "website_hits"
 kind = "absolute"
-counter.value = 1
+counter = { value = 1 }
 
 [[tests.outputs]]
 extract_from = "add_unique_id_to_metric"
@@ -342,11 +340,12 @@ type = "vrl"
 source = '''
 .name == "website_hits" &&
   .kind == "absolute" &&
-  is_string(.id)
+  .tags.environment == "production"
 '''
 ```
 
 [boolean]: https://vrl.dev/#boolean-expressions
+[datadog_search]: https://docs.datadoghq.com/logs/explorer/search_syntax
 [filter]: /docs/reference/configuration/transforms/filter
 [logs]: /docs/about/under-the-hood/architecture/data-model/log
 [metrics]: /docs/about/under-the-hood/architecture/data-model/metric
