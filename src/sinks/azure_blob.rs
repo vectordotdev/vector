@@ -39,6 +39,7 @@ use std::{
 use tower::{Service, ServiceBuilder};
 use tracing_futures::Instrument;
 use uuid::Uuid;
+use vector_core::ByteSizeOf;
 
 #[derive(Clone)]
 pub struct AzureBlobSink {
@@ -287,6 +288,7 @@ fn encode_event(
         })
         .ok()?;
 
+    let byte_size = event.size_of();
     encoding.apply_rules(&mut event);
 
     let log = event.into_log();
@@ -307,10 +309,10 @@ fn encode_event(
         }
     };
 
-    Some(EncodedEvent::new(PartitionInnerBuffer::new(
-        bytes,
-        key.into(),
-    )))
+    Some(EncodedEvent::new(
+        PartitionInnerBuffer::new(bytes, key.into()),
+        byte_size,
+    ))
 }
 
 fn build_request(

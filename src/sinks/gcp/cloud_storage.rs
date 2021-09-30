@@ -32,6 +32,7 @@ use snafu::{ResultExt, Snafu};
 use std::{collections::HashMap, convert::TryFrom, task::Poll};
 use tower::{Service, ServiceBuilder};
 use uuid::Uuid;
+use vector_core::ByteSizeOf;
 
 const NAME: &str = "gcp_cloud_storage";
 const BASE_URL: &str = "https://storage.googleapis.com/";
@@ -411,6 +412,7 @@ fn encode_event(
             });
         })
         .ok()?;
+    let byte_size = event.size_of();
     encoding.apply_rules(&mut event);
     let log = event.into_log();
     let bytes = match encoding.codec() {
@@ -430,10 +432,10 @@ fn encode_event(
         }
     };
 
-    Some(EncodedEvent::new(PartitionInnerBuffer::new(
-        bytes,
-        key.into(),
-    )))
+    Some(EncodedEvent::new(
+        PartitionInnerBuffer::new(bytes, key.into()),
+        byte_size,
+    ))
 }
 
 #[derive(Clone)]

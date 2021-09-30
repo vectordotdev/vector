@@ -161,11 +161,9 @@ where
     }
 
     fn start_send(self: Pin<&mut Self>, item: EncodedEvent<B::Input>) -> Result<(), Self::Error> {
-        let EncodedEvent { item, finalizers } = item;
-        self.project().inner.start_send(EncodedEvent {
-            item: PartitionInnerBuffer::new(item, ()),
-            finalizers,
-        })
+        self.project()
+            .inner
+            .start_send(item.map(|item| PartitionInnerBuffer::new(item, ())))
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -370,7 +368,7 @@ where
                     this.lingers.remove(partition);
 
                     let batch_size = batch.num_items();
-                    let (batch, finalizers) = batch.finish();
+                    let (batch, finalizers, _byte_size) = batch.finish();
                     let future = tokio::spawn(this.service.call(batch, batch_size, finalizers));
 
                     if let Some(map) = this.in_flight.as_mut() {
@@ -679,7 +677,7 @@ mod tests {
 
         let _ = buffered
             .sink_map_err(drop)
-            .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item))))
+            .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item, 0))))
             .await
             .unwrap();
 
@@ -722,7 +720,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(EncodedEvent::new(0)),
+            sink.start_send_unpin(EncodedEvent::new(0, 0)),
             Ok(())
         ));
         assert!(matches!(
@@ -730,7 +728,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(EncodedEvent::new(1)),
+            sink.start_send_unpin(EncodedEvent::new(1, 0)),
             Ok(())
         ));
         assert!(matches!(
@@ -738,7 +736,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(EncodedEvent::new(2)),
+            sink.start_send_unpin(EncodedEvent::new(2, 0)),
             Ok(())
         ));
 
@@ -770,7 +768,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(EncodedEvent::new(3)),
+            sink.start_send_unpin(EncodedEvent::new(3, 0)),
             Ok(())
         ));
         assert!(matches!(
@@ -778,7 +776,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(EncodedEvent::new(4)),
+            sink.start_send_unpin(EncodedEvent::new(4, 0)),
             Ok(())
         ));
         assert!(matches!(
@@ -786,7 +784,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(EncodedEvent::new(5)),
+            sink.start_send_unpin(EncodedEvent::new(5, 0)),
             Ok(())
         ));
 
@@ -841,7 +839,7 @@ mod tests {
 
         let _ = buffered
             .sink_map_err(drop)
-            .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item))))
+            .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item, 0))))
             .await
             .unwrap();
 
@@ -876,7 +874,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            buffered.start_send_unpin(EncodedEvent::new(0)),
+            buffered.start_send_unpin(EncodedEvent::new(0, 0)),
             Ok(())
         ));
         assert!(matches!(
@@ -884,7 +882,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            buffered.start_send_unpin(EncodedEvent::new(1)),
+            buffered.start_send_unpin(EncodedEvent::new(1, 0)),
             Ok(())
         ));
 
@@ -914,7 +912,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            buffered.start_send_unpin(EncodedEvent::new(0)),
+            buffered.start_send_unpin(EncodedEvent::new(0, 0)),
             Ok(())
         ));
         assert!(matches!(
@@ -922,7 +920,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            buffered.start_send_unpin(EncodedEvent::new(1)),
+            buffered.start_send_unpin(EncodedEvent::new(1, 0)),
             Ok(())
         ));
 
@@ -954,7 +952,7 @@ mod tests {
         let sink = PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item))))
+            .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item, 0))))
             .await
             .unwrap();
 
@@ -985,7 +983,7 @@ mod tests {
 
         let input = vec![Partitions::A, Partitions::B];
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item))))
+            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
             .await
             .unwrap();
 
@@ -1010,7 +1008,7 @@ mod tests {
 
         let input = vec![Partitions::A, Partitions::B, Partitions::A, Partitions::B];
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item))))
+            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
             .await
             .unwrap();
 
@@ -1045,7 +1043,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(EncodedEvent::new(1)),
+            sink.start_send_unpin(EncodedEvent::new(1, 0)),
             Ok(())
         ));
         assert!(matches!(sink.poll_flush_unpin(&mut cx), Poll::Pending));
@@ -1135,7 +1133,7 @@ mod tests {
             .map(|i| (0, i))
             .chain((0..20).into_iter().map(|i| (1, i)));
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item))))
+            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
             .await
             .unwrap();
 
