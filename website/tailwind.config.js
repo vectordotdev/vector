@@ -114,11 +114,10 @@ module.exports = {
             },
             code: {
               color: theme('colors.primary', 'currentColor'),
-              backgroundColor: theme('colors.gray.700'),
-            },
-            'code[class^="language-"]': {
-              color: theme('colors.gray.100', 'currentColor'),
-              backgroundColor: theme('colors.black'),
+              '&:not([class^="language-"])': {
+                color: theme('colors.gray.100'),
+                'background-color': theme('colors.gray.700'),
+              }
             },
             color: theme('colors.gray.200'),
             'p, h1, h2, h3, h4, h5, h6, li': {
