@@ -252,7 +252,7 @@ Each condition in the `conditions` array has two fields:
 
 Parameter | Type | Description
 :---------|:-----|:-----------
-`type` | string | The type of condition you're providing. As the original `check_fields` syntax is now deprecated, this defaults to [`vrl`][vrl], although [`datadog_search`][datadog_search] syntax is also valid.
+`type` | string | The type of condition you're providing. As the original `check_fields` syntax is now deprecated, [`vrl`][vrl] is currently the only valid value.
 `source` | string (VRL Boolean expression) | Explained in detail [above](#verifying).
 
 Here's an example `outputs` declaration:
@@ -264,7 +264,8 @@ extract_from = "add_metadata"
 [[tests.outputs.conditions]]
 type = "vrl"
 source = '''
-is_string(.id) && exists(.tags)
+assert!(is_string(.id))
+assert!(exists(.tags))
 '''
 ```
 
@@ -354,9 +355,9 @@ extract_from = "add_unique_id_to_metric"
 [[tests.outputs.conditions]]
 type = "vrl"
 source = '''
-.name == "website_hits" &&
-  .kind == "absolute" &&
-  .tags.environment == "production"
+assert_eq!(.name, "website_hits")
+assert_eq!(.kind, "absolute)
+assert_eq!(.tags.environment, "production")
 '''
 ```
 
