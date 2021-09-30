@@ -309,9 +309,17 @@ impl<T> SinkOuter<T> {
         &self.proxy
     }
 
-    fn map_inputs<U>(self, f: impl Fn(T) -> U) -> SinkOuter<U> {
+    fn map_inputs<U>(mut self, f: impl Fn(T) -> U) -> SinkOuter<U> {
+        let inputs = std::mem::take(&mut self.inputs)
+            .into_iter()
+            .map(f)
+            .collect();
+        self.with_inputs(inputs)
+    }
+
+    fn with_inputs<U>(self, inputs: Vec<U>) -> SinkOuter<U> {
         SinkOuter {
-            inputs: self.inputs.into_iter().map(f).collect(),
+            inputs,
             inner: self.inner,
             buffer: self.buffer,
             healthcheck: self.healthcheck,
@@ -415,9 +423,17 @@ pub struct TransformOuter<T> {
 }
 
 impl<T> TransformOuter<T> {
-    fn map_inputs<U>(self, f: impl Fn(T) -> U) -> TransformOuter<U> {
+    fn map_inputs<U>(mut self, f: impl Fn(T) -> U) -> TransformOuter<U> {
+        let inputs = std::mem::take(&mut self.inputs)
+            .into_iter()
+            .map(f)
+            .collect();
+        self.with_inputs(inputs)
+    }
+
+    fn with_inputs<U>(self, inputs: Vec<U>) -> TransformOuter<U> {
         TransformOuter {
-            inputs: self.inputs.into_iter().map(f).collect(),
+            inputs,
             inner: self.inner,
         }
     }

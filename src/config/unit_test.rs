@@ -1,16 +1,16 @@
-use super::{Config, ConfigBuilder, TestDefinition, TestInput, TestInputValue};
-use crate::config::{
-    self, ComponentKey, ConfigDiff, ConfigPath, GlobalOptions, TransformConfig, TransformContext,
+use super::{
+    graph::Graph, ComponentKey, Config, ConfigBuilder, ConfigDiff, ConfigPath, GlobalOptions,
+    TestDefinition, TestInput, TestInputValue, TransformConfig, TransformContext,
 };
 use crate::{
     conditions::Condition,
+    config,
     event::{Event, Value},
     topology::builder::load_enrichment_tables,
     transforms::Transform,
 };
 use indexmap::IndexMap;
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 pub async fn build_unit_tests_main(
     paths: &[ConfigPath],
@@ -29,7 +29,22 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
 
     let expansions = super::compiler::expand_macros(&mut builder)?;
 
-    let (transforms, sinks) = super::compiler::take_and_resolve_everything(&mut builder)?;
+    // Resolve inputs via the graph, even though we haven't fully validated everything here
+    let graph = Graph::new(&IndexMap::new(), &builder.transforms, &builder.sinks)?;
+    let transforms = std::mem::take(&mut builder.transforms)
+        .into_iter()
+        .map(|(key, transform)| {
+            let inputs = graph.inputs_for(&key);
+            (key, transform.with_inputs(inputs))
+        })
+        .collect();
+    let sinks = std::mem::take(&mut builder.sinks)
+        .into_iter()
+        .map(|(key, sink)| {
+            let inputs = graph.inputs_for(&key);
+            (key, sink.with_inputs(inputs))
+        })
+        .collect();
 
     // Don't let this escape since it's not validated
     let config = Config {

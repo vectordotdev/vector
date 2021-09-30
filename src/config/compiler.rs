@@ -1,9 +1,8 @@
 use super::{
     builder::ConfigBuilder, graph::Graph, validation, ComponentKey, Config, ExpandType, OutputId,
-    SinkOuter, TransformOuter,
+    TransformOuter,
 };
 use indexmap::{IndexMap, IndexSet};
-use std::collections::HashSet;
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
@@ -33,17 +32,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
 
     expand_globs(&mut builder);
 
-    let graph = Graph::from(&builder);
-
-    if let Err(input_errors) = graph.check_inputs() {
-        errors.extend(input_errors);
-    }
-
     if let Err(type_errors) = validation::check_shape(&builder) {
-        errors.extend(type_errors);
-    }
-
-    if let Err(type_errors) = graph.typecheck() {
         errors.extend(type_errors);
     }
 
@@ -51,86 +40,77 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         errors.extend(type_errors);
     }
 
-    match take_and_resolve_everything(&mut builder) {
-        Ok((transforms, sinks)) => {
-            if errors.is_empty() {
-                let config = Config {
-                    global: builder.global,
-                    #[cfg(feature = "api")]
-                    api: builder.api,
-                    #[cfg(feature = "datadog-pipelines")]
-                    datadog: builder.datadog,
-                    healthchecks: builder.healthchecks,
-                    enrichment_tables: builder.enrichment_tables,
-                    sources: builder.sources,
-                    sinks,
-                    transforms,
-                    tests: builder.tests,
-                    expansions,
-                };
+    let ConfigBuilder {
+        global,
+        #[cfg(feature = "api")]
+        api,
+        #[cfg(feature = "datadog-pipelines")]
+        datadog,
+        healthchecks,
+        enrichment_tables,
+        sources,
+        sinks,
+        transforms,
+        tests,
+        provider: _,
+        pipelines: _,
+    } = builder;
 
-                let warnings = validation::warnings(&config);
+    let graph = match Graph::new(&sources, &transforms, &sinks) {
+        Ok(graph) => graph,
+        Err(graph_errors) => {
+            errors.extend(graph_errors);
+            return Err(errors);
+        }
+    };
 
-                Ok((config, warnings))
-            } else {
-                Err(errors)
-            }
-        }
-        Err(resolve_errors) => {
-            errors.extend(resolve_errors);
-            Err(errors)
-        }
+    if let Err(input_errors) = graph.check_inputs() {
+        errors.extend(input_errors);
     }
-}
 
-// TODO: this is a silly name
-pub fn take_and_resolve_everything(
-    builder: &mut ConfigBuilder,
-) -> Result<
-    (
-        IndexMap<ComponentKey, TransformOuter<OutputId>>,
-        IndexMap<ComponentKey, SinkOuter<OutputId>>,
-    ),
-    Vec<String>,
-> {
-    let valid_inputs = Graph::from(&*builder).valid_inputs();
-    let transforms = std::mem::take(&mut builder.transforms)
+    if let Err(type_errors) = graph.typecheck() {
+        errors.extend(type_errors);
+    }
+
+    // Inputs are resolved from string into OutputIds as part of graph construction, so update them
+    // here before adding to the final config (the types require this).
+    let sinks = sinks
+        .into_iter()
+        .map(|(key, sink)| {
+            let inputs = graph.inputs_for(&key);
+            (key, sink.with_inputs(inputs))
+        })
+        .collect();
+    let transforms = transforms
         .into_iter()
         .map(|(key, transform)| {
-            (
-                key,
-                transform.map_inputs(|i| resolve_input(i, &valid_inputs)),
-            )
+            let inputs = graph.inputs_for(&key);
+            (key, transform.with_inputs(inputs))
         })
         .collect();
 
-    let sinks = std::mem::take(&mut builder.sinks)
-        .into_iter()
-        .map(|(key, sink)| (key, sink.map_inputs(|i| resolve_input(i, &valid_inputs))))
-        .collect();
+    if errors.is_empty() {
+        let config = Config {
+            global,
+            #[cfg(feature = "api")]
+            api,
+            #[cfg(feature = "datadog-pipelines")]
+            datadog,
+            healthchecks,
+            enrichment_tables,
+            sources,
+            sinks,
+            transforms,
+            tests,
+            expansions,
+        };
 
-    Ok((transforms, sinks))
-}
+        let warnings = validation::warnings(&config);
 
-/// When we get a dotted path in the `inputs` section of a user's config, we need to determine
-/// which of a few things that represents:
-///
-///   1. A component that's part of an expanded macro (e.g. `route.branch`)
-///   2. A component within a pipeline (e.g. `pipeline.name`
-///   3. A named output of a branching transform (e.g. `name.errors`)
-///
-/// This will do that once I actually write it
-pub fn resolve_input(input: String, valid_inputs: &HashSet<OutputId>) -> OutputId {
-    let mut candidates: IndexMap<String, OutputId> = IndexMap::new();
-    // Map valid output ids to their string representation
-    for (key, string) in valid_inputs.iter().map(|id| (id.clone(), id.to_string())) {
-        // Panic if we find a duplicate string representation
-        if let Some(_other) = candidates.insert(string, key) {
-            panic!()
-        }
+        Ok((config, warnings))
+    } else {
+        Err(errors)
     }
-    // Otherwise pull the resolved output id from the mapping
-    candidates.remove(&input).unwrap()
 }
 
 /// Some component configs can act like macros and expand themselves into multiple replacement
