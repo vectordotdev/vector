@@ -1,6 +1,5 @@
 use super::{
-    builder::ConfigBuilder, graph::Graph, pipeline::Pipelines, ComponentKey, Config, OutputId,
-    Resource,
+    builder::ConfigBuilder, pipeline::Pipelines, ComponentKey, Config, OutputId, Resource,
 };
 use std::collections::HashMap;
 
@@ -194,14 +193,6 @@ pub fn warnings(config: &Config) -> Vec<String> {
     }
 
     warnings
-}
-
-pub fn typecheck(config: &ConfigBuilder) -> Result<(), Vec<String>> {
-    Graph::from(config).typecheck()
-}
-
-pub fn check_inputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
-    Graph::from(config).check_inputs()
 }
 
 fn capitalize(s: &str) -> String {

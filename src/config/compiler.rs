@@ -1,8 +1,9 @@
 use super::{
-    builder::ConfigBuilder, validation, ComponentKey, Config, ExpandType, OutputId, SinkOuter,
-    TransformOuter,
+    builder::ConfigBuilder, graph::Graph, validation, ComponentKey, Config, ExpandType, OutputId,
+    SinkOuter, TransformOuter,
 };
 use indexmap::{IndexMap, IndexSet};
+use std::collections::HashSet;
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
@@ -32,7 +33,9 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
 
     expand_globs(&mut builder);
 
-    if let Err(input_errors) = validation::check_inputs(&builder) {
+    let graph = Graph::from(&builder);
+
+    if let Err(input_errors) = graph.check_inputs() {
         errors.extend(input_errors);
     }
 
@@ -40,7 +43,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         errors.extend(type_errors);
     }
 
-    if let Err(type_errors) = validation::typecheck(&builder) {
+    if let Err(type_errors) = graph.typecheck() {
         errors.extend(type_errors);
     }
 
@@ -90,14 +93,20 @@ pub fn take_and_resolve_everything(
     ),
     Vec<String>,
 > {
+    let valid_inputs = Graph::from(&*builder).valid_inputs();
     let transforms = std::mem::take(&mut builder.transforms)
         .into_iter()
-        .map(|(key, transform)| (key, transform.map_inputs(|i| resolve_input(i, &builder))))
+        .map(|(key, transform)| {
+            (
+                key,
+                transform.map_inputs(|i| resolve_input(i, &valid_inputs)),
+            )
+        })
         .collect();
 
     let sinks = std::mem::take(&mut builder.sinks)
         .into_iter()
-        .map(|(key, sink)| (key, sink.map_inputs(|i| resolve_input(i, &builder))))
+        .map(|(key, sink)| (key, sink.map_inputs(|i| resolve_input(i, &valid_inputs))))
         .collect();
 
     Ok((transforms, sinks))
@@ -111,8 +120,17 @@ pub fn take_and_resolve_everything(
 ///   3. A named output of a branching transform (e.g. `name.errors`)
 ///
 /// This will do that once I actually write it
-pub fn resolve_input(_input: String, _builder: &ConfigBuilder) -> OutputId {
-    todo!()
+pub fn resolve_input(input: String, valid_inputs: &HashSet<OutputId>) -> OutputId {
+    let mut candidates: IndexMap<String, OutputId> = IndexMap::new();
+    // Map valid output ids to their string representation
+    for (key, string) in valid_inputs.iter().map(|id| (id.clone(), id.to_string())) {
+        // Panic if we find a duplicate string representation
+        if let Some(_other) = candidates.insert(string, key) {
+            panic!()
+        }
+    }
+    // Otherwise pull the resolved output id from the mapping
+    candidates.remove(&input).unwrap()
 }
 
 /// Some component configs can act like macros and expand themselves into multiple replacement
