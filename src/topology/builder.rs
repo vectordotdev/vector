@@ -440,7 +440,7 @@ pub async fn build_pieces(
     for (id, output) in outputs {
         let entry = finalized_outputs
             .entry(id.component)
-            .or_insert(HashMap::new());
+            .or_insert_with(HashMap::new);
         entry.insert(id.port, output);
     }
 

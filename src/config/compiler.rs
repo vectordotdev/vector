@@ -206,7 +206,7 @@ impl InputMatcher {
     }
 }
 
-fn expand_globs_inner(inputs: &mut Vec<String>, id: &String, candidates: &IndexSet<String>) {
+fn expand_globs_inner(inputs: &mut Vec<String>, id: &str, candidates: &IndexSet<String>) {
     let raw_inputs = std::mem::take(inputs);
     for raw_input in raw_inputs {
         let matcher = glob::Pattern::new(&raw_input)
@@ -217,7 +217,7 @@ fn expand_globs_inner(inputs: &mut Vec<String>, id: &String, candidates: &IndexS
             });
         let mut matched = false;
         for input in candidates {
-            if matcher.matches(&input) && input != id {
+            if matcher.matches(input) && input != id {
                 matched = true;
                 inputs.push(input.clone())
             }

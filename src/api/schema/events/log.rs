@@ -40,7 +40,7 @@ impl Log {
 
     /// Id of the pipeline associated with the log event
     async fn port(&self) -> Option<&str> {
-        self.output_id.port.as_ref().map(|s| s.as_str())
+        self.output_id.port.as_deref()
     }
 
     /// Log message

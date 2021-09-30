@@ -112,7 +112,7 @@ impl Graph {
                 _ => None,
             })
             .flat_map(|node| {
-                paths_rec(&self, node, Vec::new()).unwrap_or_else(|err| {
+                paths_rec(self, node, Vec::new()).unwrap_or_else(|err| {
                     errors.push(err);
                     Vec::new()
                 })
