@@ -107,12 +107,12 @@ assert!(is_string(.message), "message field has as unexpected type")
 assert_eq!(.message, "success", "message field had an unexpected value")
 assert!(exists(.timestamp), "no timestamp provided")
 assert!(is_timestamp(.timestamp), "timestamp is invalid")
-assert!(!exists(.other), "extraneous other field doesn't belong")
+assert!(!exists(.other), "extraneous other field present")
 '''
 ```
 
-It's also possible to store the Boolean expressions in variables rather than passing the entire
-statement to an `assert` function:
+You can also store the Boolean expressions in variables rather than passing the entire statement to
+the `assert` function:
 
 ```toml
 source = '''
@@ -162,9 +162,9 @@ extract_from = "add_metadata" # The transform from which the resulting event is 
 [[tests.outputs.conditions]]
 type = "vrl"
 source = '''
-is_timestamp(.timestamp) &&
-  is_string(.id) &&
-  .message == "successful transaction"
+assert!(is_timestamp(.timestamp))
+assert!(is_string(.id))
+assert_eq!(.message, "successful transaction")
 '''
 ```
 
