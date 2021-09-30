@@ -4,25 +4,26 @@ This RFC proposes the addition of a new transform that provides a user the abili
 
 ## Context
 
-- [#258](https://github.com/vectordotdev/vector/issues/258)
+* [`throttler` transform](https://github.com/vectordotdev/vector/issues/258)
+* [Dead letter queues](https://github.com/vectordotdev/vector/issues/1772)
 
 ## Scope
 
 ### In scope
 
-- Dropping events (logs and metrics) to rate limit an event stream
-- Rate limit by both bytes (unserialized) and events
-- Exclude events with VRL conditions
-- Specify buckets based on the value of a key in the event
+* Dropping events (logs and metrics) to rate limit an event stream
+* Rate limit by both bytes (unserialized) and events
+* Exclude events with VRL conditions
+* Specify buckets based on the value of a key in the event
 
 ### Out of scope
 
-- Apply backpressure as a form of rate limiting
+* Apply backpressure as a form of rate limiting
 
 ## Pain
 
-- Users lack the necessary tooling to control throughput which can cause excessive costs and negatively impact downstream services due to increased load
-- Admins cannot set quotas for users/usergroups utilizing Vector
+* Users lack the necessary tooling to control throughput which can cause excessive costs and negatively impact downstream services due to increased load
+* Admins cannot set quotas for users/usergroups utilizing Vector
 
 ## Proposal
 
@@ -32,8 +33,8 @@ The `throttle` transform can be used to rate limit specific subsets of your even
 You can enforce rate limits on events or their raw size, as well as excluding events based on a VRL condition to avoid dropping critical logs. Rate limits
 can be applied globally across all logs or by specifying a key to create buckets of events to rate limit more granularly.
 
-The initial implementation will shed load by dropping any events beyond the configured rate limit. This could be configured in the future to apply backpressure 
-or connected to Vector's dead-letter pipelines feature.
+The initial implementation will shed load by dropping any events beyond the configured rate limit. This could be configured in the future to route events to
+a dead letter queue, or possibly apply backpressure to upstream sources.
 
 ### Implementation
 
@@ -119,35 +120,35 @@ impl TaskTransform for Throttle {
 
 ## Rationale
 
-- Controlling throughput provides better reliability for downstream services which can be critical in observability platforms
-- Setting granular quotas is invaluable as an administrator running Vector for a number of users to ensure fair use of the pipeline
+* Controlling throughput provides better reliability for downstream services which can be critical in observability platforms
+* Setting granular quotas is invaluable as an administrator running Vector for a number of users to ensure fair use of the pipeline
 
 ## Drawbacks
 
-- When rate limiting by `Bytes` in a transform it will be the unserialized form of the event, which will differ from what downstream sinks will actually receive
+* When rate limiting by `Bytes` in a transform it will be the unserialized form of the event, which will differ from what downstream sinks will actually receive
 
 ## Prior Art
 
-- [Governor](https://docs.rs/governor/0.3.2/governor/index.html)
-- [Throttle - FluentBit](https://docs.fluentbit.io/manual/pipeline/filters/throttle)
-- [grouper::bucker - Tremor](https://github.com/tremor-rs/tremor-runtime/blob/main/tremor-pipeline/src/op/grouper/bucket.rs)
+* [Governor](https://docs.rs/governor/0.3.2/governor/index.html)
+* [Throttle - FluentBit](https://docs.fluentbit.io/manual/pipeline/filters/throttle)
+* [grouper::bucker - Tremor](https://github.com/tremor-rs/tremor-runtime/blob/main/tremor-pipeline/src/op/grouper/bucket.rs)
 
 ## Alternatives
 
-- Extend `sample` transform to allow for a window configuration
-- Build rate limiting controls as a generic `sink` feature, rather than a separate `transform`
+* Extend `sample` transform to allow for a window configuration
+* Build rate limiting controls as a generic `sink` feature, rather than a separate `transform`
 
 ## Outstanding Questions
 
-- Rate limiting seems like it could be generically a `sink` concern and implemented as a composable part of our `sink` pattern. This could give more "accurate" serialized sizes and possibly be easier to manage for administrators (depending on needs). If rate limiting is also a `sink` concern should it only be implemented there or also available as a `transform`?
+* Rate limiting seems like it could be generically a `sink` concern and implemented as a composable part of our `sink` pattern. This could give more "accurate" serialized sizes and possibly be easier to manage for administrators (depending on needs). If rate limiting is also a `sink` concern should it only be implemented there or also available as a `transform`?
 
 ## Plan Of Attack
 
-- [ ] [feat(new transform): Initial throttle transform spike](https://github.com/vectordotdev/vector/pull/9378)
-- [ ] ...
+* [ ] [feat(new transform): Initial throttle transform spike](https://github.com/vectordotdev/vector/pull/9378)
+* [ ] ...
 
 ## Future Improvements
 
-- Throttle by applying backpressure rather than dropping events completely
-- Batching multiple events through the rate limiter
-- ...
+* Throttle by applying backpressure rather than dropping events completely
+* Batching multiple events through the rate limiter
+* ...
