@@ -57,7 +57,7 @@ components: _aws: {
 					profile: {
 						category:    "Auth"
 						common:      false
-						description: "The AWS profile name to find credentials from a file."
+						description: "The AWS profile name. Used to select AWS credentials from a provided credentials file."
 						required:    false
 						type: string: {
 							default: null
