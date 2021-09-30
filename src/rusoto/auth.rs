@@ -14,7 +14,7 @@ pub enum AwsAuthentication {
     },
     File {
         credentials_file: String,
-        profile: String,
+        profile: Option<String>,
     },
     Role {
         assume_role: String,
@@ -28,6 +28,8 @@ pub enum AwsAuthentication {
 }
 
 impl AwsAuthentication {
+    const AWS_DEFAULT_PROFILE: &'static str = "default";
+
     pub fn build(
         &self,
         region: &Region,
@@ -58,7 +60,13 @@ impl AwsAuthentication {
                         "Ignoring option `assume_role`, instead using AWS credentials file options."
                     );
                 }
-                AwsCredentialsProvider::new_with_credentials_file(credentials_file, profile)
+                AwsCredentialsProvider::new_with_credentials_file(
+                    credentials_file,
+                    profile
+                        .as_ref()
+                        .unwrap_or(&AwsAuthentication::AWS_DEFAULT_PROFILE.to_string())
+                        .as_str(),
+                )
             }
             Self::Role { assume_role } => {
                 if old_assume_role.is_some() {
@@ -152,6 +160,46 @@ mod tests {
     }
 
     #[test]
+    fn parsing_file() {
+        let config = toml::from_str::<ComponentConfig>(
+            r#"
+            auth.credentials_file = "/path/to/file"
+            auth.profile = "foo"
+        "#,
+        )
+        .unwrap();
+
+        match config.auth {
+            AwsAuthentication::File {
+                credentials_file,
+                profile,
+            } => {
+                assert_eq!(&credentials_file, "/path/to/file");
+                assert_eq!(&profile.unwrap(), "foo");
+            }
+            _ => panic!(),
+        }
+
+        let config = toml::from_str::<ComponentConfig>(
+            r#"
+            auth.credentials_file = "/path/to/file"
+        "#,
+        )
+        .unwrap();
+
+        match config.auth {
+            AwsAuthentication::File {
+                credentials_file,
+                profile,
+            } => {
+                assert_eq!(&credentials_file, "/path/to/file");
+                assert_eq!(profile, None);
+            }
+            _ => panic!(),
+        }
+    }
+
+    #[test]
     fn parsing_credentials_file() {
         let tmpdir = tempfile::tempdir().unwrap();
         let tmpfile_path = tmpdir.path().join("credentials");
@@ -169,7 +217,7 @@ mod tests {
 
         let auth = AwsAuthentication::File {
             credentials_file: tmpfile_path.to_str().unwrap().to_string(),
-            profile: "default".to_string(),
+            profile: Some("default".to_string()),
         };
         let result = auth.build(&Region::AfSouth1, None).unwrap();
         assert!(matches!(result, AwsCredentialsProvider::File { .. }));

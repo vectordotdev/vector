@@ -60,7 +60,7 @@ components: _aws: {
 						description: "The AWS profile name. Used to select AWS credentials from a provided credentials file."
 						required:    false
 						type: string: {
-							default: null
+							default: "default"
 							examples: ["develop"]
 							syntax: "literal"
 						}
