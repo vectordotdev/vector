@@ -23,7 +23,7 @@ pub struct GeneratorConfig {
     format: OutputFormat,
 }
 
-fn default_interval() -> f64 {
+const fn default_interval() -> f64 {
     1.0
 }
 
