@@ -259,7 +259,7 @@ cli: {
 			description: """
 				Run Vector config unit tests, then exit. This command is experimental and
 				therefore subject to change. For guidance on how to write unit tests check
-				out the [unit testing documentation](\(urls.vector_unit_testing)).
+				out the [unit testing documentation](\(urls.vector_unit_tests)).
 				"""
 
 			options: {
