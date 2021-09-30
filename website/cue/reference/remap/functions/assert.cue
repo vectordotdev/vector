@@ -22,18 +22,13 @@ remap: functions: assert: {
 			type: ["boolean"]
 		},
 		{
-			name:        "message"
+			name: "message"
 			description: """
-				The failure message that's reported if `condition` evaluates to `false`. If
-				unspecified, `"assertion failed"` is used as a default failure message. For example,
-				the expression `assert!(1 == 2)` (with no `message` specified) would yield this
-				output:
-
-				```text
-				function call error for "assert" at (0:15): assertion failed
-				```
+				An optional custom error message. If the equality assertion fails, `message` is
+				appended to the default message prefix. See the [examples](#assert-examples) below
+				for a sample fully formed log message.
 				"""
-			required:    false
+			required: false
 			type: ["string"]
 		},
 	]
