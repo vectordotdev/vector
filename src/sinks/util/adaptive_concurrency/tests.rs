@@ -103,6 +103,7 @@ struct TestParams {
     requests: usize,
 
     // The time interval between requests.
+    #[serde(default = "default_interval")]
     interval: f64,
 
     // The delay is the base time every request takes return.
@@ -123,6 +124,10 @@ struct TestParams {
 
     #[serde(default = "default_concurrency")]
     concurrency: Concurrency,
+}
+
+const fn default_interval() -> f64 {
+    0.0
 }
 
 const fn default_concurrency() -> Concurrency {
