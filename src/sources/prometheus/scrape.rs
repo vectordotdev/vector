@@ -45,6 +45,7 @@ struct PrometheusScrapeConfig {
     scrape_interval_secs: u64,
     instance_tag: Option<String>,
     endpoint_tag: Option<String>,
+    #[serde(default = "crate::serde::default_false")]
     honor_labels: bool,
     tls: Option<TlsOptions>,
     auth: Option<Auth>,
