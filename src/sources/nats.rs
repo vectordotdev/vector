@@ -137,9 +137,11 @@ async fn nats_source(
                             log.insert(log_schema().source_type_key(), Bytes::from("nats"));
                         }
 
-                        if let Err(error) = out.send(event).await {
-                            error!(message = "Error sending to sink.", %error)
-                        }
+                        out.send(event)
+                            .await
+                            .map_err(|error: crate::pipeline::ClosedError| {
+                                error!(message = "Error sending to sink.", %error);
+                            })?;
                     }
                 }
                 Err(error) => {
