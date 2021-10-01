@@ -57,7 +57,7 @@ You want to apply these changes to each event:
 
 This VRL program would accomplish all of that:
 
-```ruby
+```coffee
 . = parse_json!(string!(.message))
 .timestamp = to_unix_timestamp(to_timestamp!(.timestamp))
 del(.username)
