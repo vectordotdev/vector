@@ -312,17 +312,17 @@ This decision [was made][#6507] for ergonomics purposes.
 
   - Use `parse_*` for functions that decode a string to another type of data
     (e.g. `parse_json` and `parse_grok`).
-  
+
   - Use `decode_*` for string to string decoding functions (e.g.
     `decode_base64`).
-  
+
   - Use `encode_*` for string encoding functions (e.g. `encode_base64`).
-  
+
   - Use `to_*` to convert from one type to another (e.g. `to_bool`).
 
   - Use `is_*` to determine if the provided value is of a given type (e.g.
     `is_string` or `is_json`).
-  
+
   - Use `format_*` for string formatting functions (e.g. `format_timestamp` and
     `format_number`).
 
