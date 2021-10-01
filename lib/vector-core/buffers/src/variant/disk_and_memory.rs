@@ -11,11 +11,15 @@ const ALPHABET: [&str; 27] = [
     "t", "u", "v", "w", "x", "y", "z", "_",
 ];
 
+// Memory buffers are also used with transforms which is opaque to users. We use
+// an instrument flag in the Memory variant to disable instrumentation to avoid
+// emitting metrics for such buffers.
 #[derive(Debug, Clone)]
 pub enum Variant {
     Memory {
         max_events: usize,
         when_full: WhenFull,
+        instrument: bool,
     },
     Disk {
         max_size: usize,
@@ -51,6 +55,7 @@ impl Arbitrary for Variant {
             Variant::Memory {
                 max_events: u16::arbitrary(g) as usize, // u16 avoids allocation failures
                 when_full: WhenFull::arbitrary(g),
+                instrument: false,
             }
         } else {
             Variant::Disk {
@@ -67,12 +72,15 @@ impl Arbitrary for Variant {
             Variant::Memory {
                 max_events,
                 when_full,
+                instrument,
                 ..
             } => {
                 let when_full = *when_full;
+                let instrument = *instrument;
                 Box::new(max_events.shrink().map(move |me| Variant::Memory {
                     max_events: me,
                     when_full,
+                    instrument,
                 }))
             }
             Variant::Disk {

@@ -169,6 +169,7 @@ pub async fn build_pieces(
             vector_core::buffers::Variant::Memory {
                 max_events: 100,
                 when_full: vector_core::buffers::WhenFull::Block,
+                instrument: false,
             },
             tracing::Span::none(),
         )

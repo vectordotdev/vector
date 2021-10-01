@@ -29,6 +29,7 @@ macro_rules! experiment {
                             let variant = Variant::Memory {
                                 max_events: *max_events,
                                 when_full: WhenFull::DropNewest,
+                                instrument: true,
                             };
                             crate::common::setup::<$width>(*max_events, variant)
                         },

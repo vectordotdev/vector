@@ -79,20 +79,20 @@ where
         Variant::Memory {
             max_events,
             when_full,
+            instrument,
             ..
         } => {
             let (tx, rx) = mpsc::channel(max_events);
-            let is_span_disabled = span.is_disabled();
-            let tx = BufferInputCloner::Memory(tx, when_full, span);
-            if is_span_disabled {
-                Ok((tx, Box::new(rx), Acker::Null))
-            } else {
+            let tx = BufferInputCloner::Memory(tx, when_full, span, instrument);
+            if instrument {
                 let rx = rx.inspect(|item: &T| {
                     emit(&BufferEventsSent {
                         count: 1,
                         byte_size: item.size_of(),
                     });
                 });
+                Ok((tx, Box::new(rx), Acker::Null))
+            } else {
                 Ok((tx, Box::new(rx), Acker::Null))
             }
         }
@@ -134,7 +134,7 @@ where
     <T as EncodeBytes<T>>::Error: Debug,
     <T as DecodeBytes<T>>::Error: Debug,
 {
-    Memory(mpsc::Sender<T>, WhenFull, Span),
+    Memory(mpsc::Sender<T>, WhenFull, Span, bool),
     #[cfg(feature = "disk-buffer")]
     Disk(disk::Writer<T>, WhenFull),
 }
@@ -148,24 +148,22 @@ where
     #[must_use]
     pub fn get(&self) -> Box<dyn Sink<T, Error = ()> + 'a + Send + Unpin> {
         match self {
-            BufferInputCloner::Memory(tx, when_full, span) => {
+            BufferInputCloner::Memory(tx, when_full, span, instrument) => {
                 let inner = tx
                     .clone()
                     .sink_map_err(|error| error!(message = "Sender error.", %error));
 
                 if when_full == &WhenFull::DropNewest {
-                    if span.is_disabled() {
-                        Box::new(DropWhenFull::new(inner))
-                    } else {
-                        Box::new(DropWhenFull::new(InstrumentMemoryBuffer::new(
-                            inner,
-                            span.clone(),
-                        )))
-                    }
-                } else if span.is_disabled() {
-                    Box::new(inner)
+                    Box::new(DropWhenFull::new(
+                        InstrumentMemoryBuffer::new(inner, span.clone(), *instrument),
+                        *instrument,
+                    ))
                 } else {
-                    Box::new(InstrumentMemoryBuffer::new(inner, span.clone()))
+                    Box::new(InstrumentMemoryBuffer::new(
+                        inner,
+                        span.clone(),
+                        *instrument,
+                    ))
                 }
             }
 
@@ -173,7 +171,7 @@ where
             BufferInputCloner::Disk(writer, when_full) => {
                 let inner: disk::Writer<T> = (*writer).clone();
                 if when_full == &WhenFull::DropNewest {
-                    Box::new(DropWhenFull::new(inner))
+                    Box::new(DropWhenFull::new(inner, true))
                 } else {
                     Box::new(inner)
                 }
@@ -187,11 +185,16 @@ pub struct DropWhenFull<S> {
     #[pin]
     inner: S,
     drop: bool,
+    instrument: bool,
 }
 
 impl<S> DropWhenFull<S> {
-    pub fn new(inner: S) -> Self {
-        Self { inner, drop: false }
+    pub fn new(inner: S, instrument: bool) -> Self {
+        Self {
+            inner,
+            drop: false,
+            instrument,
+        }
     }
 }
 
@@ -219,7 +222,9 @@ impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
                 message = "Shedding load; dropping event.",
                 internal_log_rate_secs = 10
             );
-            emit(&EventsDropped { count: 1 });
+            if self.instrument {
+                emit(&EventsDropped { count: 1 });
+            }
             Ok(())
         } else {
             self.project().inner.start_send(item)
@@ -244,11 +249,16 @@ pub struct InstrumentMemoryBuffer<S> {
     #[pin]
     inner: S,
     span: Span,
+    instrument: bool,
 }
 
 impl<S> InstrumentMemoryBuffer<S> {
-    pub fn new(inner: S, span: Span) -> Self {
-        Self { inner, span }
+    pub fn new(inner: S, span: Span, instrument: bool) -> Self {
+        Self {
+            inner,
+            span,
+            instrument,
+        }
     }
 }
 
@@ -260,16 +270,20 @@ impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for InstrumentMemoryBuffer<S> {
     }
 
     fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        let span = self.span.clone();
-        let byte_size = item.size_of();
-        self.project().inner.start_send(item).map(|()| {
-            span.in_scope(|| {
-                emit(&BufferEventsReceived {
-                    count: 1,
-                    byte_size,
+        if self.instrument {
+            let span = self.span.clone();
+            let byte_size = item.size_of();
+            self.project().inner.start_send(item).map(|()| {
+                span.in_scope(|| {
+                    emit(&BufferEventsReceived {
+                        count: 1,
+                        byte_size,
+                    });
                 });
-            });
-        })
+            })
+        } else {
+            self.project().inner.start_send(item)
+        }
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
