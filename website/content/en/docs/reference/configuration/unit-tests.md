@@ -12,7 +12,8 @@ aliases: [
 Vector enables you to [unit test] [transforms] in your processing [pipeline]. Unit tests in Vector
 work just like unit tests in most programming languages:
 
-1. Provide a set of [inputs](#inputs) to a transform (or to multiple transforms chained together).
+1. Provide a set of [inputs](#inputs) to a transform (or to [multiple transforms](#multiple) chained
+  together).
 1. Specify the expected [outputs](#outputs) from the changes made by the transform (or multiple
   transforms).
 1. Receive directly actionable feedback from any test failures.
@@ -130,11 +131,16 @@ Below is an annotated example of a unit test suite for a transform called `add_m
 adds a unique ID and a timestamp to log events:
 
 ```toml
+[sources.all_container_services]
+type = "docker_logs"
+docker_host = "http://localhost:2375"
+include_images = ["web_frontend", "web_backend", "auth_service"]
+
 # The transform being tested is a Vector Remap Language (VRL) transform that
 # adds two fields to each incoming log event: a timestamp and a unique ID
 [transforms.add_metadata]
 type = "remap"
-inputs = []
+inputs = ["all_container_services"]
 source = '''
 .timestamp = now()
 .id = uuid_v4()
@@ -171,6 +177,21 @@ assert_eq!(.message, "successful transaction")
 This example represents a complete test of the `add_metadata` transform, include test `inputs`
 and expected `outputs` drawn from a specific transform.
 
+{{< info >}}
+This unit involved only a single Vector transform. An example
+[multi-transform](#multiple-transforms) unit test is provided below.
+{{< /info >}}
+
+### Real vs. test inputs
+
+One important thing to note is that with this example configuration Vector is set up to pull in real
+logs from Docker images using the [`docker_logs`][docker_logs] source. If Vector were running in
+production, the `add_metadata` transform we're unit testing here would be modifying real log events.
+But that's *not* what we're testing here. Instead, the `insert_at = "add_metadata"` directive
+artifically inserts our test inputs into the `add_metadata` transform. You should think of Vector
+unit tests as a way of **mocking observability data sources** and ensuring that your transforms
+respond to those mock sources the way that you would expect.
+
 {{< success title="Multiple config formats available" >}}
 The unit testing example above is in TOML but Vector also supports YAML and JSON as configuration
 formats.
@@ -199,17 +220,6 @@ Inside each test definition, you need to specify two things:
 
 * An array of `inputs` that provides [input events](#inputs) for the test.
 * An array of `outputs` that provides [expected outputs](#outputs) for the test.
-
-Optionally, you can specify a `no_outputs_from` list of transforms that must *not* output events
-in order for the test to pass. Here's an example:
-
-```toml
-[[tests]]
-name = "skip_remove_fields"
-no_outputs_from = ["remove_extraneous_fields"]
-```
-
-In this case, the output from some transform called `remove_extraneous_fields` is
 
 ### Inputs
 
@@ -360,6 +370,142 @@ assert_eq!(.tags.environment, "production")
 '''
 ```
 
+## Multiple transforms
+
+The examples provided thus far in this doc have involved unit testing a single transform. It's also
+possible, however, to test the output of multiple transforms chained together. Imagine a scenario
+in which you have a transform called `add_env_metadata` that tags the event with environment
+metadata, a transform called `sanitize` that removes some undesired fields, and finally a transform
+called `add_host_metadata` that tags the event with a hostname. Below is an example unit test
+configuration for this set of transform, with explanatory annotations:
+
+{{< warning >}}
+You may notice that the three transforms in this example could be combined into a single `remap`
+transform. Their separation into multiple transforms here is purely for demonstration purposes.
+{{< /warning >}}
+
+```toml
+# This source, like all sources, is ignored in the unit test itself
+[sources.web_backend]
+type = "docker_logs"
+docker_host = "http://localhost:2375"
+include_images = ["web_backend"]
+
+# The first transform in the chain
+[transforms.add_env_metadata]
+type = "remap"
+inputs = ["web_backend"]
+source = '''
+.tags.environment = "production"
+'''
+
+# The second transform in the chain
+[transforms.sanitize]
+type = "remap"
+inputs = ["add_env_metadata"]
+source = '''
+del(.username)
+del(.email)
+'''
+
+# The final transform in the chain
+[transforms.add_host_metadata]
+type = "remap"
+inputs = ["sanitize"]
+source = '''
+.tags.host = "web-backend1.vector-user.biz"
+'''
+
+[[tests]]
+name = "Multiple chained remap transforms"
+
+[[tests.inputs]]
+type = "log"
+# Insert test input events into the first transform
+insert_at = "add_env_metadata"
+
+# The input event to insert into the first transform in the chain
+[tests.inputs.log_fields]
+message = "image successfully uploaded"
+code = 202
+username = "tonydanza1337"
+email = "tony@whostheboss.com"
+transaction_id = "bcef6a6a-2b72-4a9a-99a0-97ae89d82815"
+
+[[tests.outputs]]
+# Extract test outputs from the last transform
+extract_from = "add_host_metadata"
+
+[[tests.outputs.conditions]]
+type = "vrl"
+# Our VRL assertions for the test output
+source = '''
+assert_eq!(.tags.environment, "production", "incorrect environment tag")
+assert_eq!(.tags.host, "web-backend1.vector-user.biz", "incorrect host tag")
+assert!(!exists(.username))
+assert!(!exists(.email))
+
+valid_transaction_id = exists(.transaction_id) &&
+  is_string(.transaction_id) &&
+  length!(.transaction_id) == 36
+
+assert!(valid_transaction_id, "transaction ID invalid")
+'''
+```
+
+From a testing standpoint, all three transforms here can be thought of as a single unit. One example
+event is inserted at the beginning of the chain (`add_env_metadata`), one output test event is
+extracted from the end of the chain (`add_host_metadata`), and one set of VRL
+[assertions](#assertions) verifies that that output event conforms to our expectations.
+
+You could also test a subset of this transform chain. This configuration, for example, would test
+only the first two transforms (`add_env_metadata` and `sanitize`):
+
+```toml
+[[tests]]
+name = "First two transforms"
+
+[[tests.inputs]]
+type = "log"
+# Insert test input into the first transform
+insert_at = "add_env_metadata"
+
+# For comparison, we can use the same input event as above
+[tests.inputs.log_fields]
+message = "image successfully uploaded"
+code = 202
+username = "tonydanza1337"
+email = "tony@whostheboss.com"
+transaction_id = "bcef6a6a-2b72-4a9a-99a0-97ae89d82815"
+
+[[tests.outputs]]
+# Extract test output from the second transform rather than the last
+extract_from = "sanitize"
+
+[[tests.outputs.conditions]]
+type = "vrl"
+source = '''
+assert_eq!(.tags.environment, "production", "incorrect environment tag")
+assert!(!exists(.tags.host), "host tag included")
+assert!(!exists(.username))
+assert!(!exists(.email))
+
+valid_transaction_id = exists(.transaction_id) &&
+  is_string(.transaction_id) &&
+  length!(.transaction_id) == 36
+
+assert!(valid_transaction_id, "transaction ID invalid")
+'''
+```
+
+In the VRL conditions for this two-transform test, notice that the assertion regarding the `host`
+tag is changed to this, which verifies that that tag isn't present, which is what we should expect
+given that the `add_host_metadata` transform isn't included here:
+
+```text
+assert!(!exists(.tags.host), "host tag included")
+```
+
 [assert]: /docs/reference/vrl/functions/#assert
 [assert_eq]: /docs/reference/vrl/functions/#assert_eq
 [assertions]: /docs/reference/vrl#assertions
@@ -367,6 +513,7 @@ assert_eq!(.tags.environment, "production")
 [comparisons]: /docs/reference/vrl/expressions/#comparison
 [contains]: /docs/reference/vrl/functions/#contains
 [datadog_search]: https://docs.datadoghq.com/logs/explorer/search_syntax
+[docker_logs]: /docs/reference/configuration/sources/docker_logs
 [exists]: /docs/reference/vrl/functions/#exists
 [filter]: /docs/reference/configuration/transforms/filter
 [includes]: /docs/reference/vrl/functions/#includes
