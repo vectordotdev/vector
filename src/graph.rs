@@ -75,7 +75,6 @@ impl Opts {
     }
 }
 
-// TODO: handle error outputs
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let paths = opts.paths_with_formats();
     let paths = match config::process_paths(&paths) {
@@ -103,7 +102,14 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
         dot += &format!("  \"{}\" [shape=diamond]\n", id);
 
         for input in transform.inputs.iter() {
-            dot += &format!("  \"{}\" -> \"{}\"\n", input, id);
+            if let Some(port) = &input.port {
+                dot += &format!(
+                    "  \"{}\" -> \"{}\" [label=\"{}\"]\n",
+                    input.component, id, port
+                );
+            } else {
+                dot += &format!("  \"{}\" -> \"{}\"\n", input, id);
+            }
         }
     }
 
@@ -111,7 +117,14 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
         dot += &format!("  \"{}\" [shape=invtrapezium]\n", id);
 
         for input in &sink.inputs {
-            dot += &format!("  \"{}\" -> \"{}\"\n", input, id);
+            if let Some(port) = &input.port {
+                dot += &format!(
+                    "  \"{}\" -> \"{}\" [label=\"{}\"]\n",
+                    input.component, id, port
+                );
+            } else {
+                dot += &format!("  \"{}\" -> \"{}\"\n", input, id);
+            }
         }
     }
 
