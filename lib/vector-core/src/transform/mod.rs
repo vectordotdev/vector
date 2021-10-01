@@ -162,7 +162,7 @@ where
 {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let mut err_buf = Vec::new();
-        self.transform(output, &mut err_buf, event)
+        self.transform(output, &mut err_buf, event);
     }
 }
 
