@@ -30,6 +30,15 @@ _config_options: {
 		default: "/etc/vector/vector.toml"
 		env_var: "VECTOR_CONFIG"
 	}
+	"config-dir": {
+		description: """
+			Read configuration from files in one or more directories. File
+			format is detected from the file name. Files not ending in .toml,
+			.json, .yaml, or .yml will be ignored.
+			"""
+		type: "string"
+		env_var: "VECTOR_CONFIG_DIR"
+	}
 	"config-toml": {
 		description: """
 			Read configuration from one or more files. Wildcard paths are
