@@ -144,13 +144,15 @@ pub trait FunctionTransform: Send + dyn_clone::DynClone + Sync {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event);
 }
 
+dyn_clone::clone_trait_object!(FunctionTransform);
+
 /// Similar to `FunctionTransform`, but with a second output for events that encountered an error
 /// during processing.
 pub trait FallibleFunctionTransform: Send + dyn_clone::DynClone + Sync {
     fn transform(&mut self, output: &mut Vec<Event>, errors: &mut Vec<Event>, event: Event);
 }
 
-dyn_clone::clone_trait_object!(FunctionTransform);
+dyn_clone::clone_trait_object!(FallibleFunctionTransform);
 
 /// Transforms that tend to be more complicated runtime style components.
 ///
