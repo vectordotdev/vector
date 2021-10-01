@@ -69,7 +69,9 @@ impl Function for ParseUrl {
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-        let default_known_ports = arguments.optional("default_known_ports");
+        let default_known_ports = arguments
+            .optional("default_known_ports")
+            .unwrap_or_else(|| expr!(false));
 
         Ok(Box::new(ParseUrlFn {
             value,
@@ -81,7 +83,7 @@ impl Function for ParseUrl {
 #[derive(Debug, Clone)]
 struct ParseUrlFn {
     value: Box<dyn Expression>,
-    default_known_ports: Option<Box<dyn Expression>>,
+    default_known_ports: Box<dyn Expression>,
 }
 
 impl Expression for ParseUrlFn {
@@ -89,15 +91,7 @@ impl Expression for ParseUrlFn {
         let value = self.value.resolve(ctx)?;
         let string = value.try_bytes_utf8_lossy()?;
 
-        let default_known_ports = self
-            .default_known_ports
-            .as_ref()
-            .map(|d| {
-                d.resolve(ctx)
-                    .and_then(|v| Value::try_boolean(v).map_err(Into::into))
-            })
-            .transpose()?
-            .unwrap_or(false);
+        let default_known_ports = self.default_known_ports.resolve(ctx)?.try_boolean()?;
 
         Url::parse(&string)
             .map_err(|e| format!("unable to parse url: {}", e).into())
@@ -124,20 +118,11 @@ fn url_to_value(unparsed: &str, url: Url, default_known_ports: bool) -> Value {
     map.insert("path", url.path().to_owned().into());
     map.insert("host", url.host_str().map(ToOwned::to_owned).into());
 
-    let port = url.port_or_known_default().and_then(|port| {
-        if default_known_ports {
-            Some(port)
-        } else {
-            // The URL crate will ellide the port if it is the default, so we explicitly check if
-            // it was specified when default_known_ports is false
-            // https://github.com/servo/rust-url/issues/706
-            if unparsed.contains(&format!(":{}", port)) {
-                Some(port)
-            } else {
-                None
-            }
-        }
-    });
+    let port = if default_known_ports {
+        url.port_or_known_default()
+    } else {
+        url.port()
+    };
     map.insert("port", port.into());
     map.insert("fragment", url.fragment().map(ToOwned::to_owned).into());
     map.insert(
@@ -198,7 +183,7 @@ mod tests {
                 host: "vector.dev",
                 password: "",
                 path: "/",
-                port: 443,
+                port: (),
                 query: {},
                 scheme: "https",
                 username: "",
