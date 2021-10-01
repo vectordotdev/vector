@@ -46,7 +46,7 @@ impl Graph {
         Self::new_inner(sources, transforms, sinks, true).expect("errors ignored")
     }
 
-    pub fn new_inner(
+    fn new_inner(
         sources: &IndexMap<ComponentKey, SourceOuter>,
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
