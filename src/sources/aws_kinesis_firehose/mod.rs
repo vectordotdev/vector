@@ -300,16 +300,13 @@ mod tests {
                 record.to_owned(),
                 record.to_owned(),
             ),
-            // TODO: This test case doesn't work, because currently `codecs::BytesCodec` does not
-            // support forwarding empty frames. This should be addressed and this test case
-            // reenabled.
-            // (
-            //     Compression::Gzip,
-            //     Compression::Gzip,
-            //     true,
-            //     Vec::new(),
-            //     Vec::new(),
-            // ),
+            (
+                Compression::Gzip,
+                Compression::Gzip,
+                true,
+                Vec::new(),
+                Vec::new(),
+            ),
         ];
 
         for (source_record_compression, record_compression, success, record, expected) in cases {
