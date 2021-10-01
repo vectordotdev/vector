@@ -45,7 +45,7 @@ struct AwsS3Config {
     assume_role: Option<String>,
     #[serde(default)]
     auth: AwsAuthentication,
-    #[serde(default)]
+    #[serde(flatten, default)]
     decoding: DecodingConfig,
 }
 
