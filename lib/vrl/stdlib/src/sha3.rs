@@ -42,7 +42,7 @@ impl Function for Sha3 {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _info: &FunctionCompileContext,
+        _ctx: &FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let variants = vec![

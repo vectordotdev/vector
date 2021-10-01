@@ -888,7 +888,7 @@ impl ContainerLogInfo {
                 let prefix_path = PathIter::new("label").collect::<Vec<_>>();
                 for (key, value) in self.metadata.labels.iter() {
                     let mut path = prefix_path.clone();
-                    path.push(PathComponent::Key(key.clone()));
+                    path.push(PathComponent::Key(key.clone().into()));
                     log_event.insert_path(path, value.clone());
                 }
             }

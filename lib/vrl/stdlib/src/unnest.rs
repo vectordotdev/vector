@@ -1,4 +1,4 @@
-use lookup::LookupBuf;
+use lookup_lib::LookupBuf;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -45,7 +45,7 @@ impl Function for Unnest {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _info: &FunctionCompileContext,
+        _ctx: &FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let path = arguments.required_query("path")?;

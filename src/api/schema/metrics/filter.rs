@@ -4,17 +4,15 @@ use super::{
 use crate::{
     config::ComponentKey,
     event::{Metric, MetricValue},
-    metrics::{capture_metrics, get_controller, Controller},
+    metrics::Controller,
 };
 use async_stream::stream;
-use lazy_static::lazy_static;
 use std::collections::BTreeMap;
 use tokio::time::Duration;
 use tokio_stream::{Stream, StreamExt};
 
-lazy_static! {
-    static ref GLOBAL_CONTROLLER: &'static Controller =
-        get_controller().expect("Metrics system not initialized. Please report.");
+fn get_controller() -> &'static Controller {
+    Controller::get().expect("Metrics system not initialized. Please report.")
 }
 
 /// Sums an iteratable of `&Metric`, by folding metric values. Convenience function typically
@@ -141,13 +139,13 @@ impl<'a> MetricsFilter<'a> for Vec<&'a Metric> {
 
 /// Returns a stream of `Metric`s, collected at the provided millisecond interval.
 pub fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
-    let controller = get_controller().unwrap();
+    let controller = get_controller();
     let mut interval = tokio::time::interval(Duration::from_millis(interval as u64));
 
     stream! {
         loop {
             interval.tick().await;
-            for m in capture_metrics(controller) {
+            for m in controller.capture_metrics() {
                 yield m;
             }
         }
@@ -155,20 +153,21 @@ pub fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
 }
 
 pub fn get_all_metrics(interval: i32) -> impl Stream<Item = Vec<Metric>> {
-    let controller = get_controller().unwrap();
+    let controller = get_controller();
     let mut interval = tokio::time::interval(Duration::from_millis(interval as u64));
 
     stream! {
         loop {
             interval.tick().await;
-            yield capture_metrics(controller).collect()
+            yield controller.capture_metrics().collect()
         }
     }
 }
 
 /// Return Vec<Metric> based on a component id tag.
 pub fn by_component_key(component_key: &ComponentKey) -> Vec<Metric> {
-    capture_metrics(&GLOBAL_CONTROLLER)
+    get_controller()
+        .capture_metrics()
         .filter_map(|m| {
             if let Some(pipeline) = component_key.pipeline_str() {
                 m.tag_matches("component_id", component_key.id())

@@ -95,26 +95,27 @@ where
 
     fn retry(&self, _: &Req, result: Result<&Res, &Error>) -> Option<Self::Future> {
         match result {
-            Ok(response) => {
-                if self.remaining_attempts == 0 {
-                    error!("Retries exhausted; dropping the request.");
-                    return None;
-                }
-
-                match self.logic.should_retry_response(response) {
-                    RetryAction::Retry(reason) => {
-                        warn!(message = "Retrying after response.", reason = %reason);
-                        Some(self.build_retry())
+            Ok(response) => match self.logic.should_retry_response(response) {
+                RetryAction::Retry(reason) => {
+                    if self.remaining_attempts == 0 {
+                        error!(
+                            message = "OK/retry response but retries exhausted; dropping the request.",
+                            reason = ?reason
+                        );
+                        return None;
                     }
 
-                    RetryAction::DontRetry(reason) => {
-                        error!(message = "Not retriable; dropping the request.", reason = ?reason);
-                        None
-                    }
-
-                    RetryAction::Successful => None,
+                    warn!(message = "Retrying after response.", reason = %reason);
+                    Some(self.build_retry())
                 }
-            }
+
+                RetryAction::DontRetry(reason) => {
+                    error!(message = "Not retriable; dropping the request.", reason = ?reason);
+                    None
+                }
+
+                RetryAction::Successful => None,
+            },
             Err(error) => {
                 if self.remaining_attempts == 0 {
                     error!(message = "Retries exhausted; dropping the request.", %error);
