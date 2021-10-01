@@ -414,13 +414,16 @@ where
                 .unwrap_or_else(|_| unreachable!())
                 .to_string();
 
-            emit!(&EndpointBytesSent {
-                byte_size,
-                protocol: scheme.unwrap_or(Scheme::HTTP).as_str(),
-                endpoint: &endpoint
-            });
-
             let response = http_client.call(request).await?;
+
+            if response.status().is_success() {
+                emit!(&EndpointBytesSent {
+                    byte_size,
+                    protocol: scheme.unwrap_or(Scheme::HTTP).as_str(),
+                    endpoint: &endpoint
+                });
+            }
+
             let (parts, body) = response.into_parts();
             let mut body = body::aggregate(body).await?;
             Ok(hyper::Response::from_parts(
