@@ -27,7 +27,7 @@ Notice that Vector allows direct field references as well as strftime specifiers
 }
 ```
 
-The value of the key_prefix option would equal:
+The value of the `key_prefix` option would equal:
 
 ```raw
 application_id=1/date=2020-02-14
