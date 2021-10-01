@@ -8,8 +8,8 @@ components: sinks: datadog_archives: {
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"
-		service_providers: ["AWS"] // GCP, Azure is coming
-		stateful:                  false
+		service_providers: ["AWS", "GCP"] // GCP, Azure is coming
+		stateful:                         false
 	}
 
 	features: {
@@ -30,7 +30,13 @@ components: sinks: datadog_archives: {
 				rate_limit_num: 250
 				headers:        false
 			}
-			tls: enabled: false
+			tls: {
+				enabled:                true
+				can_enable:             false
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
+			}
 		}
 	}
 
@@ -52,7 +58,7 @@ components: sinks: datadog_archives: {
 
 	configuration: {
 		bucket: {
-			description: "The S3 bucket name. Do not include a leading `s3://` or a trailing `/`."
+			description: "The bucket name. Do not include a leading `s3://` or a trailing `/`."
 			required:    true
 			warnings: []
 			type: string: {
@@ -79,7 +85,8 @@ components: sinks: datadog_archives: {
 			warnings: []
 			type: string: {
 				enum: {
-					aws_s3: "[AWS S3](\(urls.aws_s3)) is used as an external storage service."
+					aws_s3:               "[AWS S3](\(urls.aws_s3)) is used as an external storage service."
+					google_cloud_storage: "[Google Cloud Storage](\(urls.gcs)) is used as an external storage service."
 				}
 				syntax: "literal"
 			}
@@ -137,6 +144,22 @@ components: sinks: datadog_archives: {
 							syntax: "literal"
 						}
 					}
+				}
+			}
+		}
+		google_cloud_storage: {
+			description:   "GCP Cloud Storage specific configuration options. Required when `service` has the value `\"google_cloud_storage\"`."
+			common:        false
+			required:      false
+			relevant_when: "service = \"google_cloud_storage\""
+			warnings: []
+			type: object: {
+				examples: []
+				options: {
+					acl:              sinks.gcp_cloud_storage.configuration.acl
+					credentials_path: sinks.gcp_cloud_storage.configuration.credentials_path
+					metadata:         sinks.gcp_cloud_storage.configuration.metadata
+					storage_class:    sinks.gcp_cloud_storage.configuration.storage_class
 				}
 			}
 		}
@@ -205,6 +228,13 @@ components: sinks: datadog_archives: {
 				For more details about AWS S3 configuration and how it works check out [AWS S3 sink](\(urls.vector_aws_s3_sink_how_it_works)).
 				"""
 		}
+
+		d_google_cloud_storage: {
+			title: "GCP Cloud Storage setup"
+			body:  """
+				For more details about GCP Cloud Storage configuration and how it works check out [GCS sink](\(urls.vector_gcs_sink_how_it_works)).
+				"""
+		}
 	}
 
 	permissions: iam: [
@@ -221,6 +251,21 @@ components: sinks: datadog_archives: {
 				},
 				{
 					_action: "PutObject"
+				},
+			]
+		},
+		{
+			platform: "gcp"
+			_service: "storage"
+
+			policies: [
+				{
+					_action: "objects.create"
+					required_for: ["operation"]
+				},
+				{
+					_action: "objects.get"
+					required_for: ["healthcheck"]
 				},
 			]
 		},
