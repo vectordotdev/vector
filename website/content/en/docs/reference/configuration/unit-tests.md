@@ -236,7 +236,6 @@ insert_at = "add_metadata"
 
 [tests.inputs.log_fields]
 message = "<102>1 2020-12-22T15:22:31.111Z vector-user.biz su 2666 ID389 - Something went wrong"
-tags = { environment = "production" }
 ```
 
 ### Outputs

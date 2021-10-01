@@ -39,4 +39,9 @@ impl GenericSinkMetrics {
     pub async fn events_out_total(&self) -> Option<metrics::EventsOutTotal> {
         self.0.events_out_total()
     }
+
+    /// Total outgoing events for the current sink
+    pub async fn sent_events_total(&self) -> Option<metrics::SentEventsTotal> {
+        self.0.sent_events_total()
+    }
 }
