@@ -137,25 +137,25 @@ impl components_query::ComponentsQueryComponentsEdgesNodeOn {
         }
     }
 
-    pub fn events_out_total(&self) -> i64 {
+    pub fn sent_events_total(&self) -> i64 {
         match self {
             components_query::ComponentsQueryComponentsEdgesNodeOn::Source(s) => s
                 .metrics
-                .events_out_total
+                .sent_events_total
                 .as_ref()
-                .map(|p| p.events_out_total as i64)
+                .map(|p| p.sent_events_total as i64)
                 .unwrap_or(0),
             components_query::ComponentsQueryComponentsEdgesNodeOn::Transform(t) => t
                 .metrics
-                .events_out_total
+                .sent_events_total
                 .as_ref()
-                .map(|p| p.events_out_total as i64)
+                .map(|p| p.sent_events_total as i64)
                 .unwrap_or(0),
             components_query::ComponentsQueryComponentsEdgesNodeOn::Sink(s) => s
                 .metrics
-                .events_out_total
+                .sent_events_total
                 .as_ref()
-                .map(|p| p.events_out_total as i64)
+                .map(|p| p.sent_events_total as i64)
                 .unwrap_or(0),
         }
     }
