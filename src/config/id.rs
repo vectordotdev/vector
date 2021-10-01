@@ -101,13 +101,6 @@ impl ComponentKey {
     pub const fn is_global(&self) -> bool {
         matches!(self.scope, ComponentScope::Global)
     }
-
-    pub fn join(&self, s: &str) -> Self {
-        let mut other = self.clone();
-        other.id.push('.');
-        other.id.push_str(s);
-        other
-    }
 }
 
 impl From<(Option<String>, String)> for ComponentKey {
