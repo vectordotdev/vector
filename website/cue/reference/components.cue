@@ -49,9 +49,10 @@ components: {
 
 		configuration: #Schema
 
-		// `description` describes the components with a single paragraph.
-		// It is used for SEO purposes and should be full of relevant keywords.
-		description?: string
+		// `description` describes the components with a single paragraph. It
+		// should be 1-3 sentences.  It is used for SEO purposes and should be
+		// full of relevant keywords.
+		description?: =~"[.]$"
 
 		env_vars: #EnvVars
 
