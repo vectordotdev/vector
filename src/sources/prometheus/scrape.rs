@@ -121,6 +121,7 @@ struct PrometheusCompatConfig {
     endpoints: Vec<String>,
     instance_tag: Option<String>,
     endpoint_tag: Option<String>,
+    #[serde(default = "crate::serde::default_false")]
     honor_labels: bool,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
