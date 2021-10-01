@@ -36,7 +36,7 @@ _config_options: {
 			format is detected from the file name. Files not ending in .toml,
 			.json, .yaml, or .yml will be ignored.
 			"""
-		type: "string"
+		type:    "string"
 		env_var: "VECTOR_CONFIG_DIR"
 	}
 	"config-toml": {
