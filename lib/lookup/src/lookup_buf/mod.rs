@@ -5,6 +5,7 @@ use quickcheck::{Arbitrary, Gen};
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
+    borrow::Cow,
     collections::VecDeque,
     fmt::{self, Display, Formatter},
     ops::{Index, IndexMut},
@@ -283,6 +284,14 @@ impl From<String> for LookupBuf {
     fn from(input: String) -> Self {
         let mut segments = VecDeque::with_capacity(1);
         segments.push_back(SegmentBuf::from(input));
+        LookupBuf { segments }
+    }
+}
+
+impl From<Cow<'_, str>> for LookupBuf {
+    fn from(input: Cow<'_, str>) -> Self {
+        let mut segments = VecDeque::with_capacity(1);
+        segments.push_back(SegmentBuf::from(input.as_ref()));
         LookupBuf { segments }
     }
 }

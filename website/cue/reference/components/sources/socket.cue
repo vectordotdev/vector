@@ -86,9 +86,10 @@ components: sources: socket: {
 			}
 		}
 		max_length: {
-			common:      true
-			description: "The maximum bytes size of incoming messages before they are discarded."
-			required:    false
+			common:        true
+			description:   "The maximum bytes size of incoming messages before they are discarded."
+			relevant_when: "mode = `unix_datagram`"
+			required:      false
 			warnings: []
 			type: uint: {
 				default: 102400

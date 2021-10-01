@@ -39,6 +39,8 @@ jobs:
         dependencies: ${{ steps.filter.outputs.dependencies }}
         internal_events: ${{ steps.filter.outputs.internal_events }}
         helm: ${{ steps.filter.outputs.helm }}
+        cue: ${{ steps.filter.outputs.cue }}
+        markdown: ${{ steps.filter.outputs.cue }}
       steps:
       - uses: actions/checkout@v2.3.4
       - uses: dorny/paths-filter@v2

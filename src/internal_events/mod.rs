@@ -287,6 +287,16 @@ pub use self::windows::*;
 #[cfg(feature = "sources-mongodb_metrics")]
 pub use mongodb_metrics::*;
 
+#[cfg(test)]
+#[macro_export]
+macro_rules! emit {
+    ($event:expr) => {{
+        crate::test_util::components::record_internal_event(stringify!($event));
+        vector_core::internal_event::emit($event)
+    }};
+}
+
+#[cfg(not(test))]
 #[macro_export]
 macro_rules! emit {
     ($event:expr) => {

@@ -41,22 +41,21 @@ impl TransformConfig for CompoundConfig {
     fn expand(
         &mut self,
     ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
-        let steps = &self.steps;
-        if !steps.is_empty() {
-            Ok(Some((
-                steps
-                    .iter()
-                    .enumerate()
-                    .map(|(i, step)| {
-                        let TransformStep { id, transform } = step;
-                        (
-                            id.as_ref().cloned().unwrap_or_else(|| i.to_string()),
-                            transform.to_owned(),
-                        )
-                    })
-                    .collect(),
-                ExpandType::Serial,
-            )))
+        let mut map: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
+        for (i, step) in self.steps.iter().enumerate() {
+            if map
+                .insert(
+                    step.id.as_ref().cloned().unwrap_or_else(|| i.to_string()),
+                    step.transform.to_owned(),
+                )
+                .is_some()
+            {
+                return Err("conflicting id found while expanding transform".into());
+            }
+        }
+
+        if !map.is_empty() {
+            Ok(Some((map, ExpandType::Serial)))
         } else {
             Err("must specify at least one transform".into())
         }

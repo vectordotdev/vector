@@ -33,8 +33,8 @@ remap: functions: assert_eq: {
 			name: "message"
 			description: """
 				An optional custom error message. If the equality assertion fails, `message` is
-				appended to the default message prefix. See the examples below for a sample fully
-				formed log message.
+				appended to the default message prefix. See the [examples](#assert_eq-examples)
+				below for a sample fully formed log message.
 				"""
 			required: false
 			type: ["string"]
