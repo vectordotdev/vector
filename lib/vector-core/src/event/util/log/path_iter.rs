@@ -1,26 +1,34 @@
-use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::{mem, str::Chars};
-
-thread_local! {
-    pub static FAST_RE: Regex = Regex::new(r"\A\w+(\.\w+)*\z").unwrap();
-}
+use std::{borrow::Cow, mem, str::Chars};
+use substring::Substring;
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub enum PathComponent {
+pub enum PathComponent<'a> {
     /// For example, in `a.b[0].c[2]` the keys are "a", "b", and "c".
-    Key(String),
+    Key(Cow<'a, str>),
     /// For example, in `a.b[0].c[2]` the indexes are 0 and 2.
     Index(usize),
     /// Indicates that a parsing error occurred.
     Invalid,
 }
 
+impl<'a> PathComponent<'a> {
+    pub fn into_static(self) -> PathComponent<'static> {
+        match self {
+            PathComponent::Key(k) => PathComponent::<'static>::Key(k.into_owned().into()),
+            PathComponent::Index(u) => PathComponent::<'static>::Index(u),
+            PathComponent::Invalid => PathComponent::Invalid,
+        }
+    }
+}
+
 /// Iterator over components of paths specified in form `a.b[0].c[2]`.
 pub struct PathIter<'a> {
     path: &'a str,
     chars: Chars<'a>,
-    state: PathIterState<'a>,
+    state: State,
+    temp: String,
+    pos: usize,
 }
 
 impl<'a> PathIter<'a> {
@@ -30,18 +38,17 @@ impl<'a> PathIter<'a> {
             path,
             chars: path.chars(),
             state: Default::default(),
+            temp: String::default(),
+            pos: 0,
         }
     }
 }
 
-/// The parsing is implemented using a state machine. The idea of using Rust
-/// enums to model states is taken from [Pretty State Machine Patterns in
-/// Rust](https://hoverbear.org/blog/rust-state-machine-pattern/).
-enum PathIterState<'a> {
+enum State {
     Start,
-    Fast(std::str::Split<'a, char>),
-    Key(String),
-    KeyEscape(String), // escape mode inside keys entered into after `\` character
+    Key(usize),
+    Escape,
+    EscapedKey,
     Index(usize),
     Dot,
     OpeningBracket,
@@ -50,30 +57,16 @@ enum PathIterState<'a> {
     Invalid,
 }
 
-impl PathIterState<'_> {
-    fn is_start(&self) -> bool {
-        matches!(self, Self::Start)
-    }
-}
-
-impl<'a> Default for PathIterState<'a> {
-    fn default() -> PathIterState<'a> {
-        PathIterState::Start
+impl Default for State {
+    fn default() -> State {
+        State::Start
     }
 }
 
 impl<'a> Iterator for PathIter<'a> {
-    type Item = PathComponent;
+    type Item = PathComponent<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        use PathIterState::{
-            ClosingBracket, Dot, End, Fast, Index, Invalid, Key, KeyEscape, OpeningBracket, Start,
-        };
-
-        if self.state.is_start() && FAST_RE.with(|re| re.is_match(self.path)) {
-            self.state = Fast(self.path.split('.'));
-        }
-
         let mut res = None;
         loop {
             if let Some(res) = res {
@@ -82,77 +75,92 @@ impl<'a> Iterator for PathIter<'a> {
 
             let c = self.chars.next();
             self.state = match mem::take(&mut self.state) {
-                Start => match c {
-                    Some('.') | Some('[') | Some(']') | None => Invalid,
-                    Some('\\') => KeyEscape(String::new()),
-                    Some(c) => Key(c.to_string()),
+                State::Start => match c {
+                    Some('.') | Some('[') | Some(']') | None => State::Invalid,
+                    Some('\\') => State::Escape,
+                    Some(_) => State::Key(self.pos),
                 },
-                Key(mut s) => match c {
-                    Some('.') => {
-                        res = Some(Some(PathComponent::Key(s)));
-                        Dot
+                State::Key(start) => match c {
+                    Some('.') | Some('[') | None => {
+                        res = Some(Some(PathComponent::Key(
+                            self.path.substring(start, self.pos).into(),
+                        )));
+                        char_to_state(c)
                     }
-                    Some('[') => {
-                        res = Some(Some(PathComponent::Key(s)));
-                        OpeningBracket
+                    Some(']') => State::Invalid,
+                    Some('\\') => {
+                        self.temp.push_str(self.path.substring(start, self.pos));
+                        State::Escape
                     }
-                    Some(']') => Invalid,
-                    Some('\\') => KeyEscape(s),
-                    None => {
-                        res = Some(Some(PathComponent::Key(s)));
-                        End
+                    Some(_) => State::Key(start),
+                },
+                State::EscapedKey => match c {
+                    Some('.') | Some('[') | None => {
+                        res = Some(Some(PathComponent::Key(
+                            std::mem::take(&mut self.temp).into(),
+                        )));
+                        char_to_state(c)
                     }
+                    Some(']') => State::Invalid,
+                    Some('\\') => State::Escape,
                     Some(c) => {
-                        s.push(c);
-                        Key(s)
+                        self.temp.push(c);
+                        State::EscapedKey
                     }
                 },
-                KeyEscape(mut s) => match c {
+                State::Escape => match c {
                     Some(c) if c == '.' || c == '[' || c == ']' || c == '\\' => {
-                        s.push(c);
-                        Key(s)
+                        self.temp.push(c);
+                        State::EscapedKey
                     }
-                    _ => Invalid,
+                    _ => State::Invalid,
                 },
-                Index(i) => match c {
+                State::Index(i) => match c {
                     Some(c) if ('0'..='9').contains(&c) => {
-                        Index(10 * i + (c as usize - '0' as usize))
+                        State::Index(10 * i + (c as usize - '0' as usize))
                     }
                     Some(']') => {
                         res = Some(Some(PathComponent::Index(i)));
-                        ClosingBracket
+                        State::ClosingBracket
                     }
-                    _ => Invalid,
+                    _ => State::Invalid,
                 },
-                Dot => match c {
-                    Some('.') | Some('[') | Some(']') | None => Invalid,
-                    Some('\\') => KeyEscape(String::new()),
-                    Some(c) => Key(c.to_string()),
+                State::Dot => match c {
+                    Some('.') | Some('[') | Some(']') | None => State::Invalid,
+                    Some('\\') => State::Escape,
+                    Some(_) => State::Key(self.pos),
                 },
-                OpeningBracket => match c {
-                    Some(c) if ('0'..='9').contains(&c) => Index(c as usize - '0' as usize),
-                    _ => Invalid,
+                State::OpeningBracket => match c {
+                    Some(c) if ('0'..='9').contains(&c) => State::Index(c as usize - '0' as usize),
+                    _ => State::Invalid,
                 },
-                ClosingBracket => match c {
-                    Some('.') => Dot,
-                    Some('[') => OpeningBracket,
-                    None => End,
-                    _ => Invalid,
+                State::ClosingBracket => match c {
+                    Some('.') | Some('[') | None => char_to_state(c),
+                    _ => State::Invalid,
                 },
-                End => {
+                State::End => {
                     res = Some(None);
-                    End
+                    State::End
                 }
-                Invalid => {
+                State::Invalid => {
                     res = Some(Some(PathComponent::Invalid));
-                    End
+                    State::End
                 }
-                Fast(mut iter) => {
-                    res = Some(iter.next().map(|s| PathComponent::Key(s.to_string())));
-                    Fast(iter)
-                }
-            }
+            };
+            self.pos += 1;
         }
+    }
+}
+
+#[inline]
+fn char_to_state(c: Option<char>) -> State {
+    match c {
+        Some('.') => State::Dot,
+        Some('[') => State::OpeningBracket,
+        Some(']') => State::ClosingBracket,
+        Some('\\') => State::Escape,
+        None => State::End,
+        _ => State::Invalid,
     }
 }
 
@@ -162,7 +170,7 @@ mod test {
 
     #[test]
     fn path_iter_elementary() {
-        let actual: Vec<_> = PathIter::new(&"squirrel".to_string()).collect();
+        let actual: Vec<_> = PathIter::new("squirrel").collect();
         let expected = vec![PathComponent::Key("squirrel".into())];
         assert_eq!(actual, expected);
     }

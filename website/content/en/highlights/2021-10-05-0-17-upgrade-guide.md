@@ -49,3 +49,13 @@ which also writes to stdout by default.  Following some discussion in
 that stdout can be processed separately.
 
 If you were previously depending on Vector's logs appearing in stdout, you should now look for them in stderr.
+
+### The `generator` source now has a default `interval` setting
+
+Previously, the [`generator`][generator] source had no default `interval`, which meant that if you
+started Vector without setting an `interval`, the `generator` would output batches of test events as
+fast as it can. In version 0.17.0, the default for `interval` is now `1.0`, which means that Vector
+outputs one batch per second. To specify no delay between batches you now need to explicit set
+`interval` to `0.0`.
+
+[generator]: /docs/reference/configuration/sources/generator

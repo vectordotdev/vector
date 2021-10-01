@@ -1,3 +1,5 @@
+// ## skip check-events ##
+
 use crate::sources::fluent::DecodeError;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;

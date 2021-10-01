@@ -77,7 +77,7 @@ mod tests {
     // Initialize the metrics system.
     fn init_metrics() -> oneshot::Sender<()> {
         vector::trace::init(true, true, "info");
-        let _ = vector::metrics::init();
+        let _ = vector::metrics::init_test();
 
         let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
         tokio::spawn(async move {

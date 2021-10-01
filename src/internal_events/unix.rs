@@ -1,3 +1,5 @@
+// ## skip check-events ##
+
 use metrics::counter;
 use std::{io::Error, path::Path};
 use vector_core::internal_event::InternalEvent;
