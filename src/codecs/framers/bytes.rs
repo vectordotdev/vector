@@ -18,12 +18,16 @@ impl FramingConfig for BytesDecoderConfig {
 ///
 /// This is basically a no-op and is used to convert from `BytesMut` to `Bytes`.
 #[derive(Debug, Clone)]
-pub struct BytesCodec;
+pub struct BytesCodec {
+    /// Whether the empty buffer has been flushed. This is important to
+    /// propagate empty frames in message based transports.
+    flushed: bool,
+}
 
 impl BytesCodec {
     /// Creates a new `BytesCodec`.
     pub const fn new() -> Self {
-        Self
+        Self { flushed: false }
     }
 }
 
@@ -38,11 +42,26 @@ impl Decoder for BytesCodec {
     type Error = BoxedFramingError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        // We don't support emitting empty frames in stream based decoding,
+        // since this will currently result in an infinite loop when using
+        // `FramedRead`.
+        self.flushed = true;
         Ok(if src.is_empty() {
             None
         } else {
             let frame = src.split();
             Some(frame.freeze())
+        })
+    }
+
+    fn decode_eof(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        Ok(if !self.flushed {
+            self.flushed = true;
+            let frame = src.split();
+            Some(frame.freeze())
+        } else {
+            self.flushed = false;
+            None
         })
     }
 }
@@ -70,6 +89,17 @@ mod tests {
         let mut reader = FramedRead::new(input, decoder);
 
         assert_eq!(reader.next().await.unwrap().unwrap(), "foo");
+        assert!(reader.next().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn decode_frame_reader_empty() {
+        let input: &[u8] = b"";
+        let decoder = BytesCodec::new();
+
+        let mut reader = FramedRead::new(input, decoder);
+
+        assert_eq!(reader.next().await.unwrap().unwrap(), "");
         assert!(reader.next().await.is_none());
     }
 }
