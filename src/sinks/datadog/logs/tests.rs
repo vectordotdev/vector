@@ -238,7 +238,7 @@ async fn enterprise_headers() {
     let (rx, _trigger, server) = build_test_server_status(addr, StatusCode::OK);
     tokio::spawn(server);
 
-    let (expected_messages, events) = random_lines_with_stream(100, 10, None);
+    let (_expected_messages, events) = random_lines_with_stream(100, 10, None);
 
     let api_key = "0xDECAFBAD";
     let events = events.map(|mut e| {
