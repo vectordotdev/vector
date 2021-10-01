@@ -95,7 +95,7 @@ impl Expression for ParseUrlFn {
 
         Url::parse(&string)
             .map_err(|e| format!("unable to parse url: {}", e).into())
-            .map(|url| url_to_value(&string, url, default_known_ports))
+            .map(|url| url_to_value(url, default_known_ports))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
@@ -103,7 +103,7 @@ impl Expression for ParseUrlFn {
     }
 }
 
-fn url_to_value(unparsed: &str, url: Url, default_known_ports: bool) -> Value {
+fn url_to_value(url: Url, default_known_ports: bool) -> Value {
     let mut map = BTreeMap::<&str, Value>::new();
 
     map.insert("scheme", url.scheme().to_owned().into());
