@@ -811,6 +811,7 @@ dependencies = [
  "leveldb",
  "metrics",
  "metrics-exporter-prometheus",
+ "metrics-tracing-context",
  "metrics-util",
  "pin-project 1.0.8",
  "pretty_assertions",
@@ -821,6 +822,7 @@ dependencies = [
  "tokio",
  "tokio-test",
  "tracing 0.1.28",
+ "tracing-subscriber",
 ]
 
 [[package]]

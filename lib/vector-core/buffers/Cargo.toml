@@ -17,7 +17,6 @@ serde = { version = "1.0.130", default-features = false, features = ["derive"] }
 snafu = { version = "0.6.10", default-features = false, features = ["std"], optional = true }
 tokio = { version = "1.12.0", default-features = false, features = ["rt", "macros", "rt-multi-thread"] }
 tracing = { version = "0.1.28", default-features = false }
-metrics-util = { version = "0.10.1", default-features = false }
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"] }
@@ -26,6 +25,9 @@ quickcheck = "1.0"
 tempdir = "0.3"
 tokio-test = "0.4.2"
 metrics-exporter-prometheus = "0.6"
+metrics-util = { version = "0.10.1", default-features = false }
+metrics-tracing-context = { version = "0.8.0", default-features = false }
+tracing-subscriber = { version = "0.2.24", default-features = false }
 
 [features]
 disk-buffer = ["db-key", "snafu", "leveldb"]

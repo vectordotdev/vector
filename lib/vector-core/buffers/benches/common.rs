@@ -4,9 +4,14 @@ use bytes::{Buf, BufMut};
 use core_common::byte_size_of::ByteSizeOf;
 use futures::task::{noop_waker, Context, Poll};
 use futures::{Sink, Stream};
+use metrics_tracing_context::{MetricsLayer, TracingContextLayer};
+use metrics_util::layers::Layer;
+use metrics_util::DebuggingRecorder;
 use std::fmt;
 use std::pin::Pin;
 use tracing::Span;
+use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
+use tracing_subscriber::Registry;
 
 #[derive(Clone, Copy)]
 pub struct Message<const N: usize> {
@@ -173,5 +178,15 @@ pub fn war_measurement<const N: usize>(
     for msg in input.2.into_iter() {
         send_msg(msg, sink.as_mut(), &mut snd_context);
         consume(stream.as_mut(), &mut rcv_context)
+    }
+}
+
+pub fn init_instrumentation() {
+    let subscriber = Registry::default().with(MetricsLayer::new());
+    let _ = tracing::subscriber::set_global_default(subscriber);
+
+    if metrics::try_recorder().is_none() {
+        let recorder = TracingContextLayer::all().layer(DebuggingRecorder::new());
+        metrics::set_boxed_recorder(Box::new(recorder)).unwrap();
     }
 }
