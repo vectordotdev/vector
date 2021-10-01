@@ -399,7 +399,7 @@ mod test {
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics", in_addr).into()],
+            endpoints: vec![format!("http://{}/metrics", in_addr)],
             scrape_interval_secs: 1,
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
@@ -449,7 +449,7 @@ mod test {
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics", in_addr).into()],
+            endpoints: vec![format!("http://{}/metrics", in_addr)],
             scrape_interval_secs: 1,
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
