@@ -9,7 +9,7 @@ use tokio::time::{timeout, Duration};
 #[tokio::test]
 async fn sources_finished() {
     let mut old_config = Config::builder();
-    let generator = GeneratorConfig::repeat(vec!["text".to_owned()], 1, None);
+    let generator = GeneratorConfig::repeat(vec!["text".to_owned()], 1, 0.0);
     old_config.add_source("in", generator);
     old_config.add_sink(
         "out",
