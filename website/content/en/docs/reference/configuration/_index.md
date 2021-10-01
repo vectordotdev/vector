@@ -167,8 +167,6 @@ sinks:
 To use this configuration file, specify it with the `--config` flag when
 starting Vector:
 
-{{< tabs default="TOML" >}} {{< tab title="TOML" >}}
-
 {{< tabs default="TOML" >}}
 {{< tab title="TOML" >}}
 ```shell
