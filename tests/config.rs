@@ -219,10 +219,10 @@ async fn bad_inputs() {
 
     assert_eq!(
         vec![
-            "Input \"asdf\" for sink \"out\" doesn't match any components.",
             "Sink \"out\" has input \"in\" duplicated 2 times",
-            "Input \"qwerty\" for transform \"sample2\" doesn't match any components.",
             "Transform \"sample\" has no inputs",
+            "Input \"qwerty\" for transform \"sample2\" doesn't match any components.",
+            "Input \"asdf\" for sink \"out\" doesn't match any components.",
         ],
         err,
     );
