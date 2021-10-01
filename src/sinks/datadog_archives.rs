@@ -443,16 +443,7 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
         let (partition_key, batch_size, finalizers) = metadata;
 
-        let filename = Uuid::new_v4().to_string();
-
-        let key = format!(
-            "{}/{}{}.{}",
-            self.key_prefix.clone().unwrap_or_default(),
-            partition_key,
-            filename,
-            "json.gz"
-        )
-        .replace("//", "/");
+        let key = generate_object_key(self.key_prefix.clone(), partition_key);
 
         trace!(
             message = "Sending events.",
@@ -512,16 +503,7 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
         let (partition_key, batch_size, finalizers) = metadata;
 
-        let filename = Uuid::new_v4().to_string();
-
-        let key = format!(
-            "{}/{}{}.{}",
-            self.key_prefix.clone().unwrap_or_default(),
-            partition_key,
-            filename,
-            "json.gz"
-        )
-        .replace("//", "/");
+        let key = generate_object_key(self.key_prefix.clone(), partition_key);
 
         trace!(
             message = "Sending events.",
@@ -549,6 +531,20 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
             finalizers,
         }
     }
+}
+
+fn generate_object_key(key_prefix: Option<String>, partition_key: String) -> String {
+    let filename = Uuid::new_v4().to_string();
+
+    let key = format!(
+        "{}/{}{}.{}",
+        key_prefix.unwrap_or_default(),
+        partition_key,
+        filename,
+        "json.gz"
+    )
+    .replace("//", "/");
+    key
 }
 
 #[async_trait::async_trait]
