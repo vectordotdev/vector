@@ -8,6 +8,13 @@ components: transforms: "remap": {
 		[Vector Remap Language](\(urls.vrl_reference)) (VRL), an expression-oriented language designed for processing
 		observability data (logs and metrics) in a safe and performant manner.
 
+		This transform also implements an additional `errors` output. When the
+		`drop_on_error` configuration value is set to `true`, events that result in
+		runtime errors will be dropped from the default output stream and sent to
+		the `errors` output instead. For a transform component named `foo`, this
+		error output can be accessed by specifying `foo.errors` as the input to
+		another component.
+
 		Please refer to the [VRL reference](\(urls.vrl_reference)) when writing VRL scripts.
 		"""
 
@@ -89,7 +96,9 @@ components: transforms: "remap": {
 			common:   false
 			required: false
 			description: """
-				Drop the event if the VRL program returns an error at runtime.
+				Drop the event from the primary output stream if the VRL program returns
+				an error at runtime. These events will instead be written to the
+				`errors` output.
 				"""
 			type: bool: default: false
 		}

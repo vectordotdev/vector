@@ -2,7 +2,7 @@ use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, VrlTarget},
     internal_events::{RemapMappingAbort, RemapMappingError},
-    transforms::{FunctionTransform, Transform},
+    transforms::{FallibleFunctionTransform, Transform},
     Result,
 };
 
@@ -38,7 +38,11 @@ impl_generate_config_from_default!(RemapConfig);
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
     async fn build(&self, context: &TransformContext) -> Result<Transform> {
-        Remap::new(self.clone(), &context.enrichment_tables).map(Transform::function)
+        Remap::new(self.clone(), &context.enrichment_tables).map(Transform::fallible_function)
+    }
+
+    fn named_outputs(&self) -> Vec<String> {
+        vec![String::from("errors")]
     }
 
     fn input_type(&self) -> DataType {
@@ -120,8 +124,8 @@ impl Clone for Remap {
     }
 }
 
-impl FunctionTransform for Remap {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+impl FallibleFunctionTransform for Remap {
+    fn transform(&mut self, output: &mut Vec<Event>, err_output: &mut Vec<Event>, event: Event) {
         // If a program can fail or abort at runtime, we need to clone the
         // original event and keep it around, to allow us to discard any
         // mutations made to the event while the VRL program runs, before it
@@ -131,7 +135,7 @@ impl FunctionTransform for Remap {
         // ignore events if their failed/aborted, in which case we can skip the
         // cloning, since any mutations made by VRL will be ignored regardless.
         #[allow(clippy::if_same_then_else)]
-        let original_event = if !self.drop_on_error && self.program.can_fail() {
+        let original_event = if self.program.can_fail() {
             Some(event.clone())
         } else if !self.drop_on_abort && self.program.can_abort() {
             Some(event.clone())
@@ -169,6 +173,8 @@ impl FunctionTransform for Remap {
 
                 if !self.drop_on_error {
                     output.push(original_event.expect("event will be set"))
+                } else {
+                    err_output.push(original_event.expect("event will be set"))
                 }
             }
         }
@@ -339,7 +345,8 @@ mod tests {
         let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
         let mut result = vec![];
-        tform.transform(&mut result, event);
+        let mut err_result = vec![];
+        tform.transform(&mut result, &mut err_result, event);
 
         assert_eq!(get_field_string(&result[0], "message"), "foo");
         assert_eq!(get_field_string(&result[1], "message"), "bar");

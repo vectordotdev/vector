@@ -154,6 +154,18 @@ pub trait FallibleFunctionTransform: Send + dyn_clone::DynClone + Sync {
 
 dyn_clone::clone_trait_object!(FallibleFunctionTransform);
 
+// For testing, it's convenient to ignore the error output and continue to use helpers like
+// `transform_one`.
+impl<T> FunctionTransform for T
+where
+    T: FallibleFunctionTransform,
+{
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+        let mut err_buf = Vec::new();
+        self.transform(output, &mut err_buf, event)
+    }
+}
+
 /// Transforms that tend to be more complicated runtime style components.
 ///
 /// These require coordination and map a stream of some `T` to some `U`.
