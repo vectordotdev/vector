@@ -1,4 +1,4 @@
-use crate::sinks::gcs_common::partitioner::KeyPartitioner;
+use crate::sinks::util::partitioner::KeyPartitioner;
 use crate::{
     config::SinkContext,
     event::Event,

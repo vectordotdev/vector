@@ -1,5 +1,6 @@
 use super::{GcpAuthConfig, GcpCredentials, Scope};
-use crate::sinks::gcs_common::service::GcsResponse;
+use crate::sinks::gcs_common::config::{GcsRetryLogic, BASE_URL};
+use crate::sinks::util::partitioner::KeyPartitioner;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
@@ -8,7 +9,6 @@ use crate::{
     sinks::{
         gcs_common::{
             config::{build_healthcheck, GcsPredefinedAcl, GcsStorageClass, KeyPrefixTemplate},
-            partitioner::KeyPartitioner,
             service::{GcsRequest, GcsRequestSettings, GcsService},
             sink::GcsSink,
         },
@@ -17,7 +17,6 @@ use crate::{
         util::{
             batch::{BatchConfig, BatchSettings},
             encoding::{EncodingConfig, EncodingConfiguration},
-            retries::{RetryAction, RetryLogic},
             Compression, Concurrency, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -28,7 +27,6 @@ use crate::{
 use bytes::Bytes;
 use chrono::Utc;
 use http::header::{HeaderName, HeaderValue};
-use http::StatusCode;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
@@ -39,16 +37,6 @@ use uuid::Uuid;
 use vector_core::event::{EventFinalizers, Finalizable};
 
 const NAME: &str = "gcp_cloud_storage";
-const BASE_URL: &str = "https://storage.googleapis.com/";
-
-// #[derive(Clone)]
-// struct GcsSink {
-//     bucket: String,
-//     client: HttpClient,
-//     creds: Option<GcpCredentials>,
-//     base_url: String,
-//     settings: RequestSettings,
-// }
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -308,33 +296,6 @@ fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, 
         HeaderName::from_bytes(name.as_bytes())?,
         HeaderValue::from_str(value)?,
     ))
-}
-
-#[derive(Clone)]
-struct GcsRetryLogic;
-
-// This is a clone of HttpRetryLogic for the Body type, should get merged
-impl RetryLogic for GcsRetryLogic {
-    type Error = hyper::Error;
-    type Response = GcsResponse;
-
-    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
-        true
-    }
-
-    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
-        let status = response.inner.status();
-
-        match status {
-            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
-            StatusCode::NOT_IMPLEMENTED => {
-                RetryAction::DontRetry("endpoint not implemented".into())
-            }
-            _ if status.is_server_error() => RetryAction::Retry(format!("{}", status)),
-            _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("response status: {}", status)),
-        }
-    }
 }
 
 #[cfg(test)]

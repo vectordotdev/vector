@@ -1,3 +1,5 @@
+use crate::sinks::gcs_common::service::GcsResponse;
+use crate::sinks::util::retries::{RetryAction, RetryLogic};
 use crate::{
     http::{HttpClient, HttpError},
     sinks::{gcp::GcpCredentials, Healthcheck, HealthcheckError},
@@ -9,6 +11,8 @@ use http::{StatusCode, Uri};
 use hyper::Body;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+
+pub const BASE_URL: &str = "https://storage.googleapis.com/";
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
@@ -119,5 +123,32 @@ pub fn healthcheck_response(
         StatusCode::FORBIDDEN => Err(GcpError::InvalidCredentials0.into()),
         StatusCode::NOT_FOUND => Err(not_found_error),
         status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
+    }
+}
+
+#[derive(Clone)]
+pub struct GcsRetryLogic;
+
+// This is a clone of HttpRetryLogic for the Body type, should get merged
+impl RetryLogic for GcsRetryLogic {
+    type Error = hyper::Error;
+    type Response = GcsResponse;
+
+    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
+        true
+    }
+
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
+        let status = response.inner.status();
+
+        match status {
+            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
+            StatusCode::NOT_IMPLEMENTED => {
+                RetryAction::DontRetry("endpoint not implemented".into())
+            }
+            _ if status.is_server_error() => RetryAction::Retry(format!("{}", status)),
+            _ if status.is_success() => RetryAction::Successful,
+            _ => RetryAction::DontRetry(format!("response status: {}", status)),
+        }
     }
 }

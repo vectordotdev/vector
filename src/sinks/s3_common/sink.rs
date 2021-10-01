@@ -1,3 +1,4 @@
+use crate::sinks::util::partitioner::KeyPartitioner;
 use crate::{
     config::SinkContext,
     event::Event,
@@ -10,8 +11,6 @@ use std::{fmt, num::NonZeroUsize, time::Duration};
 use tower::Service;
 use vector_core::{buffers::Ackable, event::Finalizable, sink::StreamSink};
 use vector_core::{buffers::Acker, event::EventStatus};
-
-use crate::sinks::s3_common::partitioner::KeyPartitioner;
 
 pub struct S3Sink<Svc, RB, E> {
     acker: Acker,
