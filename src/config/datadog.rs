@@ -58,7 +58,7 @@ pub fn try_attach(config: &mut Config) -> bool {
 
     info!("Datadog API key provided. Internal metrics will be sent to Datadog.");
 
-    let internal_metrics_id = OutputId::from(INTERNAL_METRICS_KEY);
+    let internal_metrics_id = OutputId::from(ComponentKey::from(INTERNAL_METRICS_KEY));
     let datadog_metrics_id = ComponentKey::from(DATADOG_METRICS_KEY);
 
     // Create an internal metrics source. We're using a distinct source here and not

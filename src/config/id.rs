@@ -39,13 +39,18 @@ impl fmt::Display for OutputId {
     }
 }
 
-// TODO: this is too broad to be generally safe. Try to get rid of it.
-impl<T: Into<ComponentKey>> From<T> for OutputId {
-    fn from(key: T) -> Self {
+impl From<ComponentKey> for OutputId {
+    fn from(key: ComponentKey) -> Self {
         Self {
-            component: key.into(),
+            component: key,
             port: None,
         }
+    }
+}
+
+impl From<&ComponentKey> for OutputId {
+    fn from(key: &ComponentKey) -> Self {
+        Self::from(key.clone())
     }
 }
 
@@ -55,6 +60,21 @@ impl From<(&ComponentKey, String)> for OutputId {
             component: key.clone(),
             port: Some(name),
         }
+    }
+}
+
+// This panicking implementation is convenient for testing, but should never be enabled for use
+// outside of tests.
+#[cfg(test)]
+impl From<&str> for OutputId {
+    fn from(s: &str) -> Self {
+        assert_eq!(
+            false,
+            s.contains("."),
+            "Cannot convert dotted paths to strings without more context"
+        );
+        let component = ComponentKey::from(s);
+        component.into()
     }
 }
 
