@@ -9,8 +9,6 @@ of VRL, the [language documentation][docs] exists for that audience.
 
 ## Table of Contents
 
-<!-- vim-markdown-toc GFM -->
-
 * [The Zen of VRL](#the-zen-of-vrl)
 * [Why VRL](#why-vrl)
 * [Target Audience](#target-audience)
@@ -35,8 +33,6 @@ of VRL, the [language documentation][docs] exists for that audience.
     * [Signatures](#signatures)
 * [Patterns](#patterns)
   * [Error Chaining](#error-chaining)
-
-<!-- vim-markdown-toc -->
 
 ## The Zen of VRL
 
