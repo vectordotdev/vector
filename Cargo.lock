@@ -811,6 +811,7 @@ dependencies = [
  "leveldb",
  "metrics",
  "metrics-exporter-prometheus",
+ "metrics-util",
  "pin-project 1.0.8",
  "pretty_assertions",
  "quickcheck",

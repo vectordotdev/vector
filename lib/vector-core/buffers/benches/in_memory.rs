@@ -3,6 +3,7 @@ use criterion::{
     criterion_group, criterion_main, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId,
     Criterion, SamplingMode, Throughput,
 };
+use metrics_util::DebuggingRecorder;
 use std::mem;
 use std::time::Duration;
 
@@ -14,6 +15,9 @@ macro_rules! experiment {
     ($criterion:expr, [$( $width:expr ),*], $group_name:expr, $id_slug:expr, $measure_fn:ident) => {
         let mut group: BenchmarkGroup<WallTime> = $criterion.benchmark_group($group_name);
         group.sampling_mode(SamplingMode::Auto);
+        if metrics::try_recorder().is_none() {
+            DebuggingRecorder::new().install().unwrap();
+        }
 
         let max_events = 1_000;
         $(
@@ -54,7 +58,7 @@ fn write_then_read_memory(c: &mut Criterion) {
         c,
         [32, 64, 128, 256, 512, 1024],
         "buffer-memory",
-        "write-and-read",
+        "write-then-read",
         wtr_measurement
     );
 }
