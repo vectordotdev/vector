@@ -1,15 +1,19 @@
 use crate::{
+    codecs::{self, DecodingConfig},
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::Event,
     internal_events::HttpDecompressError,
-    sources::{self, util::ErrorMessage},
+    sources::{
+        self,
+        util::{ErrorMessage, TcpError},
+    },
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
-use bytes::{Buf, Bytes};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 use chrono::Utc;
 use flate2::read::{DeflateDecoder, MultiGzDecoder};
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
@@ -18,7 +22,8 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{io::Read, net::SocketAddr, sync::Arc};
-use vector_core::event::{BatchNotifier, BatchStatus, LogEvent};
+use tokio_util::codec::Decoder;
+use vector_core::event::{BatchNotifier, BatchStatus};
 use warp::{
     filters::BoxedFilter, path, path::FullPath, reject::Rejection, reply::Response, Filter, Reply,
 };
@@ -38,6 +43,8 @@ pub struct DatadogAgentConfig {
     tls: Option<TlsConfig>,
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
+    #[serde(flatten, default)]
+    decoding: DecodingConfig,
 }
 
 inventory::submit! {
@@ -56,6 +63,7 @@ impl GenerateConfig for DatadogAgentConfig {
             address: "0.0.0.0:8080".parse().unwrap(),
             tls: None,
             store_api_key: true,
+            decoding: Default::default(),
         })
         .unwrap()
     }
@@ -65,7 +73,7 @@ impl GenerateConfig for DatadogAgentConfig {
 #[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let source = DatadogAgentSource::new(self.store_api_key);
+        let source = DatadogAgentSource::new(self.store_api_key, self.decoding.build()?);
 
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let listener = tls.bind(&self.address).await?;
@@ -115,16 +123,18 @@ struct DatadogAgentSource {
     api_key_matcher: Regex,
     log_schema_timestamp_key: &'static str,
     log_schema_source_type_key: &'static str,
+    decoder: codecs::Decoder,
 }
 
 impl DatadogAgentSource {
-    fn new(store_api_key: bool) -> Self {
+    fn new(store_api_key: bool, decoder: codecs::Decoder) -> Self {
         Self {
             store_api_key,
             api_key_matcher: Regex::new(r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??")
                 .expect("static regex always compiles"),
             log_schema_source_type_key: log_schema().source_type_key(),
             log_schema_timestamp_key: log_schema().timestamp_key(),
+            decoder,
         }
     }
 
@@ -208,8 +218,9 @@ impl DatadogAgentSource {
                     } else {
                         None
                     };
+
                     let events = decode(&encoding_header, body)
-                        .and_then(|body| self.decode_body(body, token));
+                        .and_then(|body| self.decode_body(self.decoder.clone(), body, token));
                     Self::handle_request(events, acknowledgements, out.clone())
                 },
             )
@@ -218,6 +229,7 @@ impl DatadogAgentSource {
 
     fn decode_body(
         &self,
+        decoder: codecs::Decoder,
         body: Bytes,
         api_key: Option<Arc<str>>,
     ) -> Result<Vec<Event>, ErrorMessage> {
@@ -238,29 +250,49 @@ impl DatadogAgentSource {
         })?;
 
         let now = Utc::now();
-        Ok(messages
-            .into_iter()
-            .map(|msg| {
-                let mut log = LogEvent::default();
-                log.insert_flat(self.log_schema_timestamp_key, now);
-                log.insert_flat(
-                    self.log_schema_source_type_key,
-                    Bytes::from("datadog_agent"),
-                );
-                log.insert_flat("message".to_string(), msg.message);
-                log.insert_flat("status".to_string(), msg.status);
-                log.insert_flat("timestamp".to_string(), msg.timestamp);
-                log.insert_flat("hostname".to_string(), msg.hostname);
-                log.insert_flat("service".to_string(), msg.service);
-                log.insert_flat("ddsource".to_string(), msg.ddsource);
-                log.insert_flat("ddtags".to_string(), msg.ddtags);
-                if let Some(k) = &api_key {
-                    log.metadata_mut().set_datadog_api_key(Some(Arc::clone(k)));
+        let mut decoded = Vec::new();
+
+        for message in messages {
+            let mut decoder = decoder.clone();
+            let mut buffer = BytesMut::new();
+            buffer.put(message.message);
+            loop {
+                match decoder.decode_eof(&mut buffer) {
+                    Ok(Some((events, _byte_size))) => {
+                        for mut event in events {
+                            if let Event::Log(ref mut log) = event {
+                                log.insert_flat(self.log_schema_timestamp_key, now);
+                                log.insert_flat(
+                                    self.log_schema_source_type_key,
+                                    Bytes::from("datadog_agent"),
+                                );
+                                log.insert_flat("status", message.status.clone());
+                                log.insert_flat("timestamp", message.timestamp);
+                                log.insert_flat("hostname", message.hostname.clone());
+                                log.insert_flat("service", message.service.clone());
+                                log.insert_flat("ddsource", message.ddsource.clone());
+                                log.insert_flat("ddtags", message.ddtags.clone());
+                                if let Some(k) = &api_key {
+                                    log.metadata_mut().set_datadog_api_key(Some(Arc::clone(k)));
+                                }
+                            }
+
+                            decoded.push(event);
+                        }
+                    }
+                    Ok(None) => break,
+                    Err(error) => {
+                        // Error is logged by `crate::codecs::Decoder`, no further
+                        // handling is needed here.
+                        if !error.can_continue() {
+                            break;
+                        }
+                    }
                 }
-                log
-            })
-            .map(|log| log.into())
-            .collect())
+            }
+        }
+
+        Ok(decoded)
     }
 }
 
@@ -361,8 +393,10 @@ mod tests {
             let body = Bytes::from(serde_json::to_string(&msgs).unwrap());
             let api_key = None;
 
-            let source = DatadogAgentSource::new(true);
-            let events = source.decode_body(body, api_key).unwrap();
+            let source = DatadogAgentSource::new(true, Default::default());
+            let events = source
+                .decode_body(Default::default(), body, api_key)
+                .unwrap();
             assert_eq!(events.len(), msgs.len());
             for (msg, event) in msgs.into_iter().zip(events.into_iter()) {
                 let log = event.as_log();
@@ -400,6 +434,7 @@ mod tests {
                 address,
                 tls: None,
                 store_api_key,
+                decoding: Default::default(),
             }
             .build(context)
             .await
