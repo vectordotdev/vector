@@ -69,7 +69,7 @@ impl From<(&ComponentKey, String)> for OutputId {
 impl From<&str> for OutputId {
     fn from(s: &str) -> Self {
         assert!(
-            !s.contains("."),
+            !s.contains('.'),
             "Cannot convert dotted paths to strings without more context"
         );
         let component = ComponentKey::from(s);
