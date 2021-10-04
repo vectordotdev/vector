@@ -38,7 +38,11 @@ impl Function for GetEnrichmentTableRecord {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[]
+        &[Example {
+            title: "find records",
+            source: r#"get_enrichment_table_record!("test", {"id": 1})"#,
+            result: Ok(r#"{"id": 1, "firstname": "Bob", "surname": "Smith"}"#),
+        }]
     }
 
     fn compile(
