@@ -1819,6 +1819,7 @@
 {{ define "config-object" }}
 {{ $prefix := .name }}
 {{ $level := .level }}
+{{ $innerLevel := add $level 1 }}
 <div class="border dark:border-gray-700 rounded flex flex-col divide-y dark:divide-gray-700">
   {{ range $k, $v := .config.options }}
   {{ $name := printf "%s.%s" $prefix $k }}
@@ -1882,7 +1883,7 @@
     {{ range $k, $v := $v.type }}
     {{ if eq $k "object" }}
     <div class="mt-4">
-      {{ template "config-object" (dict "name" $name "config" $v "level" 5) }}
+      {{ template "config-object" (dict "name" $name "config" $v "level" $innerLevel) }}
     </div>
     {{ end }}
 
