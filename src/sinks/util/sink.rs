@@ -37,10 +37,7 @@ use super::{
     service::{Map, ServiceBuilderExt},
     EncodedEvent,
 };
-use crate::{
-    buffers::Acker,
-    event::{EventFinalizers, EventStatus},
-};
+use crate::{buffers::Acker, event::EventStatus, internal_events::EventsSent};
 use futures::{
     future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream, TryFutureExt,
 };
@@ -517,7 +514,12 @@ where
             .call(items)
             .err_into()
             .map(move |result| {
-                logic.update_finalizers(result, finalizers);
+                let status = logic.result_status(result);
+                finalizers.update_status(status);
+                if status == EventStatus::Delivered {
+                    emit!(&EventsSent { count, byte_size });
+                    // TODO: Emit a BytesSent event here too
+                }
 
                 // If the rx end is dropped we still completed
                 // the request so this is a weird case that we can
@@ -570,16 +572,7 @@ where
 
 pub trait ServiceLogic: Clone {
     type Response: Response;
-
     fn result_status(&self, result: crate::Result<Self::Response>) -> EventStatus;
-
-    fn update_finalizers(
-        &self,
-        result: crate::Result<Self::Response>,
-        finalizers: EventFinalizers,
-    ) {
-        finalizers.update_status(self.result_status(result));
-    }
 }
 
 #[derive(Derivative)]

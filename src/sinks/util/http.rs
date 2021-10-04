@@ -8,7 +8,7 @@ use crate::{
     buffers::Acker,
     event::Event,
     http::{HttpClient, HttpError},
-    internal_events::{EndpointBytesSent, EventsSent},
+    internal_events::EndpointBytesSent,
 };
 use bytes::{Buf, Bytes};
 use futures::{future::BoxFuture, ready, Sink};
@@ -179,10 +179,6 @@ where
         let byte_size = event.size_of();
         let finalizers = event.metadata_mut().take_finalizers();
         if let Some(item) = self.sink.encode_event(event) {
-            emit!(&EventsSent {
-                count: 1,
-                byte_size
-            });
             *self.project().slot = Some(EncodedEvent {
                 item,
                 finalizers,
@@ -341,10 +337,6 @@ where
         let finalizers = event.metadata_mut().take_finalizers();
         let byte_size = event.size_of();
         if let Some(item) = self.sink.encode_event(event) {
-            emit!(&EventsSent {
-                count: 1,
-                byte_size
-            });
             *self.project().slot = Some(EncodedEvent {
                 item,
                 finalizers,
