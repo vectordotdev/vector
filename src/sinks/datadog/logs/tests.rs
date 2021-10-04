@@ -5,6 +5,7 @@ use crate::{
     test_util::{next_addr, random_lines_with_stream},
 };
 use bytes::Bytes;
+use chrono::Utc;
 use futures::{
     channel::mpsc::{Receiver, TryRecvError},
     stream, StreamExt,
@@ -80,6 +81,8 @@ async fn smoke() {
             val.0.headers.get("Content-Type").unwrap(),
             "application/json"
         );
+        assert_eq!(val.0.headers.get("DD-EVP-ORIGIN").unwrap(), "vector");
+        assert!(val.0.headers.get("DD-EVP-ORIGIN-VERSION").is_some());
 
         let mut json = serde_json::Deserializer::from_slice(&val.1[..])
             .into_iter::<serde_json::Value>()
@@ -94,6 +97,15 @@ async fn smoke() {
             .as_str()
             .unwrap();
         assert_eq!(message, expected[i]);
+        let timestamp = json
+            .get(0)
+            .unwrap()
+            .get("timestamp")
+            .unwrap()
+            .as_i64()
+            .unwrap();
+        let delta = Utc::now().timestamp_millis() - timestamp;
+        assert!(delta > 0 && delta < 1000);
     }
 }
 
@@ -215,4 +227,45 @@ async fn multiple_api_keys() {
 
     keys.sort();
     assert_eq!(keys, vec!["atoken", "pkc", "vvo"])
+}
+
+#[tokio::test]
+async fn enterprise_headers() {
+    let (mut config, mut cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
+            default_api_key = "atoken"
+            compression = "none"
+        "#})
+    .unwrap();
+
+    let addr = next_addr();
+    // Swap out the endpoint so we can force send it to our local server
+    let endpoint = format!("http://{}", addr);
+    config.endpoint = Some(endpoint.clone());
+
+    cx.globals.enterprise = true;
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let (rx, _trigger, server) = build_test_server_status(addr, StatusCode::OK);
+    tokio::spawn(server);
+
+    let (_expected_messages, events) = random_lines_with_stream(100, 10, None);
+
+    let api_key = "0xDECAFBAD";
+    let events = events.map(|mut e| {
+        println!("EVENT: {:?}", e);
+        e.as_mut_log()
+            .metadata_mut()
+            .set_datadog_api_key(Some(Arc::from(api_key)));
+        e
+    });
+
+    let () = sink.run(events).await.unwrap();
+    let output: (Parts, Bytes) = rx.take(1).collect::<Vec<_>>().await.pop().unwrap();
+    let parts = output.0;
+
+    assert_eq!(
+        parts.headers.get("DD-EVP-ORIGIN").unwrap(),
+        "vector-enterprise"
+    );
+    assert!(parts.headers.get("DD-EVP-ORIGIN-VERSION").is_some());
 }

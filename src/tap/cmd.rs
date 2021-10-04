@@ -40,8 +40,8 @@ pub async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
     };
 
     // Issue the 'tap' request, printing to stdout.
-    let res = subscription_client.output_events_subscription(
-        opts.components.clone(),
+    let res = subscription_client.output_events_by_component_id_patterns_subscription(
+        opts.component_id_patterns.clone(),
         opts.format,
         opts.limit as i64,
         opts.interval as i64,
@@ -61,7 +61,7 @@ pub async fn cmd(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
             Some(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => break,
             Some(Some(res)) = stream.next() => {
                 if let Some(d) = res.data {
-                    for log_event in d.output_events.iter().filter_map(|ev| ev.as_log()) {
+                    for log_event in d.output_events_by_component_id_patterns.iter().filter_map(|ev| ev.as_log()) {
                         println!("{}", log_event.string);
                     }
                 }

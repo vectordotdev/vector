@@ -177,7 +177,7 @@ mod tests {
         codecs::{DecodingConfig, JsonParserConfig},
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus, Value},
-        test_util::{next_addr, spawn_collect_n, trace_init, wait_for_tcp},
+        test_util::{components, next_addr, spawn_collect_n, trace_init, wait_for_tcp},
         Pipeline,
     };
     use flate2::{
@@ -206,6 +206,7 @@ mod tests {
         acknowledgements: bool,
         decoding: DecodingConfig,
     ) -> (impl Stream<Item = Event>, SocketAddr) {
+        components::init();
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
         let path = path.to_owned();
@@ -296,7 +297,9 @@ mod tests {
         rx: impl Stream<Item = Event> + Unpin,
         n: usize,
     ) -> Vec<Event> {
-        spawn_collect_n(async move { assert_eq!(200, send.await) }, rx, n).await
+        let events = spawn_collect_n(async move { assert_eq!(200, send.await) }, rx, n).await;
+        components::SOURCE_TESTS.assert(&["http_path"]);
+        events
     }
 
     #[tokio::test]
@@ -404,6 +407,7 @@ mod tests {
             2,
         )
         .await;
+        components::SOURCE_TESTS.assert(&["http_path"]);
 
         assert!(events
             .remove(1)
@@ -442,6 +446,7 @@ mod tests {
             2,
         )
         .await;
+        components::SOURCE_TESTS.assert(&["http_path"]);
 
         {
             let event = events.remove(0);
@@ -489,6 +494,7 @@ mod tests {
             2,
         )
         .await;
+        components::SOURCE_TESTS.assert(&["http_path"]);
 
         {
             let event = events.remove(0);
@@ -539,6 +545,7 @@ mod tests {
             4,
         )
         .await;
+        components::SOURCE_TESTS.assert(&["http_path"]);
 
         {
             let event = events.remove(0);
@@ -760,6 +767,7 @@ mod tests {
             2,
         )
         .await;
+        components::SOURCE_TESTS.assert(&["http_path"]);
 
         {
             let event = events.remove(0);
@@ -781,7 +789,6 @@ mod tests {
 
     #[tokio::test]
     async fn http_wrong_path() {
-        trace_init();
         let (_rx, addr) = source(
             vec![],
             vec![],
@@ -824,6 +831,7 @@ mod tests {
             1,
         )
         .await;
+        components::SOURCE_TESTS.assert(&["http_path"]);
     }
 
     #[tokio::test]
@@ -850,6 +858,7 @@ mod tests {
             1,
         )
         .await;
+        components::SOURCE_TESTS.assert(&["http_path"]);
 
         assert_eq!(events.len(), 1);
     }

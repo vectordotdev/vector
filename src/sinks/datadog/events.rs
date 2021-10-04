@@ -171,7 +171,7 @@ impl DatadogEventsService {
                     "title",
                 ]
                 .iter()
-                .map(|field| vec![PathComponent::Key(field.to_string())])
+                .map(|field| vec![PathComponent::Key((*field).into())])
                 .collect(),
             ),
             // DataDog Event API requires unix timestamp.

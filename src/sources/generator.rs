@@ -1,26 +1,34 @@
 use crate::{
+    codecs::{self, DecodingConfig},
     config::{DataType, SourceConfig, SourceContext, SourceDescription},
-    event::Event,
     internal_events::GeneratorEventProcessed,
     shutdown::ShutdownSignal,
+    sources::util::TcpError,
     Pipeline,
 };
 use fakedata::logs::*;
-use futures::SinkExt;
+use futures::{SinkExt, StreamExt};
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::task::Poll;
-use tokio::time::{interval, Duration};
+use tokio::time::{self, Duration};
+use tokio_util::codec::FramedRead;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct GeneratorConfig {
-    #[serde(alias = "batch_interval")]
-    interval: Option<f64>,
+    #[serde(alias = "batch_interval", default = "default_interval")]
+    interval: f64,
     #[serde(default = "usize::max_value")]
     count: usize,
     #[serde(flatten)]
     format: OutputFormat,
+    #[serde(flatten, default)]
+    decoding: DecodingConfig,
+}
+
+const fn default_interval() -> f64 {
+    1.0
 }
 
 #[derive(Debug, PartialEq, Snafu)]
@@ -49,10 +57,10 @@ pub enum OutputFormat {
 }
 
 impl OutputFormat {
-    fn generate_event(&self, n: usize) -> Event {
+    fn generate_line(&self, n: usize) -> String {
         emit!(&GeneratorEventProcessed);
 
-        let line = match self {
+        match self {
             Self::Shuffle {
                 sequence,
                 ref lines,
@@ -62,8 +70,7 @@ impl OutputFormat {
             Self::Syslog => syslog_5424_log_line(),
             Self::BsdSyslog => syslog_3164_log_line(),
             Self::Json => json_log_line(),
-        };
-        Event::from(line)
+        }
     }
 
     fn shuffle_generate(sequence: bool, lines: &[String], n: usize) -> String {
@@ -93,12 +100,8 @@ impl OutputFormat {
 }
 
 impl GeneratorConfig {
-    pub(self) fn generator(self, shutdown: ShutdownSignal, out: Pipeline) -> super::Source {
-        Box::pin(self.inner(shutdown, out))
-    }
-
     #[allow(dead_code)] // to make check-component-features pass
-    pub fn repeat(lines: Vec<String>, count: usize, interval: Option<f64>) -> Self {
+    pub fn repeat(lines: Vec<String>, count: usize, interval: f64) -> Self {
         Self {
             count,
             interval,
@@ -106,32 +109,62 @@ impl GeneratorConfig {
                 lines,
                 sequence: false,
             },
+            decoding: Default::default(),
+        }
+    }
+}
+
+async fn generator_source(
+    interval: f64,
+    count: usize,
+    format: OutputFormat,
+    decoder: codecs::Decoder,
+    mut shutdown: ShutdownSignal,
+    mut out: Pipeline,
+) -> Result<(), ()> {
+    let maybe_interval: Option<f64> = if interval != 0.0 {
+        Some(interval)
+    } else {
+        None
+    };
+
+    let mut interval = maybe_interval.map(|i| time::interval(Duration::from_secs_f64(i)));
+
+    for n in 0..count {
+        if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
+            break;
+        }
+
+        if let Some(interval) = &mut interval {
+            interval.tick().await;
+        }
+
+        let line = format.generate_line(n);
+
+        let mut stream = FramedRead::new(line.as_bytes(), decoder.clone());
+        while let Some(next) = stream.next().await {
+            match next {
+                Ok((events, _byte_size)) => {
+                    for event in events {
+                        out.send(event)
+                            .await
+                            .map_err(|_: crate::pipeline::ClosedError| {
+                                error!(message = "Failed to forward events; downstream is closed.");
+                            })?;
+                    }
+                }
+                Err(error) => {
+                    // Error is logged by `crate::codecs::Decoder`, no further
+                    // handling is needed here.
+                    if !error.can_continue() {
+                        break;
+                    }
+                }
+            }
         }
     }
 
-    async fn inner(self, mut shutdown: ShutdownSignal, mut out: Pipeline) -> Result<(), ()> {
-        let mut interval = self.interval.map(|i| interval(Duration::from_secs_f64(i)));
-
-        for n in 0..self.count {
-            if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
-                break;
-            }
-
-            if let Some(interval) = &mut interval {
-                interval.tick().await;
-            }
-
-            let event = self.format.generate_event(n);
-
-            out.send(event)
-                .await
-                .map_err(|_: crate::pipeline::ClosedError| {
-                    error!(message = "Failed to forward events; downstream is closed.");
-                })?;
-        }
-
-        Ok(())
-    }
+    Ok(())
 }
 
 inventory::submit! {
@@ -145,7 +178,14 @@ impl_generate_config_from_default!(GeneratorConfig);
 impl SourceConfig for GeneratorConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         self.format.validate()?;
-        Ok(self.clone().generator(cx.shutdown, cx.out))
+        Ok(Box::pin(generator_source(
+            self.interval,
+            self.count,
+            self.format.clone(),
+            self.decoding.build()?,
+            cx.shutdown,
+            cx.out,
+        )))
     }
 
     fn output_type(&self) -> DataType {
@@ -160,7 +200,7 @@ impl SourceConfig for GeneratorConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::log_schema, shutdown::ShutdownSignal, Pipeline};
+    use crate::{config::log_schema, event::Event, shutdown::ShutdownSignal, Pipeline};
     use futures::{channel::mpsc, poll, StreamExt};
     use std::time::{Duration, Instant};
 
@@ -172,7 +212,16 @@ mod tests {
     async fn runit(config: &str) -> mpsc::Receiver<Event> {
         let (tx, rx) = Pipeline::new_test();
         let config: GeneratorConfig = toml::from_str(config).unwrap();
-        config.generator(ShutdownSignal::noop(), tx).await.unwrap();
+        generator_source(
+            config.interval,
+            config.count,
+            config.format,
+            config.decoding.build().unwrap(),
+            ShutdownSignal::noop(),
+            tx,
+        )
+        .await
+        .unwrap();
         rx
     }
 

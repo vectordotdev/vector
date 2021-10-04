@@ -1,3 +1,5 @@
+// ## skip check-events ##
+
 use crate::sources::nginx_metrics::parser::ParseError;
 use metrics::{counter, histogram};
 use std::time::Instant;

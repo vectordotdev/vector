@@ -162,10 +162,10 @@ impl FunctionCall {
                 })
             })?;
 
-        let compile_info = FunctionCompileContext { span: call_span };
+        let compile_ctx = FunctionCompileContext { span: call_span };
 
         let mut expr = function
-            .compile(state, &compile_info, list)
+            .compile(state, &compile_ctx, list)
             .map_err(|error| Error::Compilation { call_span, error })?;
 
         // Asking for an infallible function to abort on error makes no sense.

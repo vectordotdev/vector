@@ -2183,3 +2183,24 @@
 #         .none == "foobarbaz" &&
 #         .from_split == "big__bad__booper"
 #       '''
+
+[transforms.remap_function_reverse_dns]
+  inputs = []
+  type = "remap"
+  source = """
+    .host = reverse_dns!(.ip)
+  """
+[[tests]]
+  name = "remap_function_reverse_dns"
+  [tests.input]
+    insert_at = "remap_function_reverse_dns"
+    type = "log"
+    [tests.input.log_fields]
+      ip = "127.0.0.1"
+  [[tests.outputs]]
+    extract_from = "remap_function_reverse_dns"
+    [[tests.outputs.conditions]]
+      "type" = "vrl"
+      source = '''
+        .host == "localhost"
+      '''
