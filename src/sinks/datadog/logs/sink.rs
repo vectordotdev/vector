@@ -194,7 +194,7 @@ impl RequestBuilder {
                 log.rename_key_flat(self.log_schema_message_key, "message");
                 log.rename_key_flat(self.log_schema_host_key, "host");
                 if let Some(Value::Timestamp(ts)) = log.remove(self.log_schema_timestamp_key) {
-                    log.insert(TIMESTAMP_KEY, Value::Integer(ts.timestamp_millis()));
+                    log.insert_flat(TIMESTAMP_KEY, Value::Integer(ts.timestamp_millis()));
                 }
                 self.encoding.apply_rules(&mut event);
             }
