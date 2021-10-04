@@ -34,9 +34,68 @@ use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
 use std::pin::Pin;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::task::{Context, Poll};
-use tracing::Span;
+use std::time::Duration;
+use tokio::time::interval;
+use tracing::{Instrument, Span};
 pub use variant::*;
+
+pub struct BufferUsageData {
+    received_event_count: AtomicUsize,
+    received_event_byte_size: AtomicUsize,
+    sent_event_count: AtomicUsize,
+    sent_event_byte_size: AtomicUsize,
+    dropped_event_count: Option<AtomicUsize>,
+}
+
+impl BufferUsageData {
+    fn new(dropped_event_count: Option<AtomicUsize>) -> Self {
+        Self {
+            received_event_count: AtomicUsize::new(0),
+            received_event_byte_size: AtomicUsize::new(0),
+            sent_event_count: AtomicUsize::new(0),
+            sent_event_byte_size: AtomicUsize::new(0),
+            dropped_event_count,
+        }
+    }
+
+    fn init_instrumentation(buffer_usage_data: &Arc<BufferUsageData>, span: Span) {
+        let buffer_usage_data = buffer_usage_data.clone();
+        tokio::spawn(
+            async move {
+                let mut interval = interval(Duration::from_secs(2));
+                loop {
+                    interval.tick().await;
+
+                    emit(&BufferEventsReceived {
+                        count: buffer_usage_data
+                            .received_event_count
+                            .load(Ordering::Relaxed),
+                        byte_size: buffer_usage_data
+                            .received_event_byte_size
+                            .load(Ordering::Relaxed),
+                    });
+
+                    emit(&BufferEventsSent {
+                        count: buffer_usage_data.sent_event_count.load(Ordering::Relaxed),
+                        byte_size: buffer_usage_data
+                            .sent_event_byte_size
+                            .load(Ordering::Relaxed),
+                    });
+
+                    if let Some(dropped_event_count) = &buffer_usage_data.dropped_event_count {
+                        emit(&EventsDropped {
+                            count: dropped_event_count.load(Ordering::Relaxed),
+                        });
+                    }
+                }
+            }
+            .instrument(span),
+        );
+    }
+}
 
 /// Build a new buffer based on the passed `Variant`
 ///
@@ -83,16 +142,28 @@ where
             ..
         } => {
             let (tx, rx) = mpsc::channel(max_events);
-            let tx = BufferInputCloner::Memory(tx, when_full, span, instrument);
             if instrument {
-                let rx = rx.inspect(|item: &T| {
-                    emit(&BufferEventsSent {
-                        count: 1,
-                        byte_size: item.size_of(),
-                    });
+                let dropped_event_count = match when_full {
+                    WhenFull::Block => None,
+                    WhenFull::DropNewest => Some(AtomicUsize::new(0)),
+                };
+
+                let buffer_usage_data = Arc::new(BufferUsageData::new(dropped_event_count));
+                BufferUsageData::init_instrumentation(&buffer_usage_data, span);
+                let tx = BufferInputCloner::Memory(tx, when_full, Some(buffer_usage_data.clone()));
+                let rx = rx.inspect(move |item: &T| {
+                    buffer_usage_data
+                        .sent_event_count
+                        .fetch_add(1, Ordering::Relaxed);
+                    buffer_usage_data
+                        .sent_event_byte_size
+                        .fetch_add(item.size_of(), Ordering::Relaxed);
                 });
+
                 Ok((tx, Box::new(rx), Acker::Null))
             } else {
+                let tx = BufferInputCloner::Memory(tx, when_full, None);
+
                 Ok((tx, Box::new(rx), Acker::Null))
             }
         }
@@ -134,7 +205,7 @@ where
     <T as EncodeBytes<T>>::Error: Debug,
     <T as DecodeBytes<T>>::Error: Debug,
 {
-    Memory(mpsc::Sender<T>, WhenFull, Span, bool),
+    Memory(mpsc::Sender<T>, WhenFull, Option<Arc<BufferUsageData>>),
     #[cfg(feature = "disk-buffer")]
     Disk(disk::Writer<T>, WhenFull),
 }
@@ -148,23 +219,16 @@ where
     #[must_use]
     pub fn get(&self) -> Box<dyn Sink<T, Error = ()> + 'a + Send + Unpin> {
         match self {
-            BufferInputCloner::Memory(tx, when_full, span, instrument) => {
+            BufferInputCloner::Memory(tx, when_full, buffer_usage_data) => {
                 let inner = tx
                     .clone()
                     .sink_map_err(|error| error!(message = "Sender error.", %error));
 
-                if when_full == &WhenFull::DropNewest {
-                    Box::new(DropWhenFull::new(
-                        InstrumentMemoryBuffer::new(inner, span.clone(), *instrument),
-                        *instrument,
-                    ))
-                } else {
-                    Box::new(InstrumentMemoryBuffer::new(
-                        inner,
-                        span.clone(),
-                        *instrument,
-                    ))
-                }
+                Box::new(MemoryBufferInput::new(
+                    inner,
+                    *when_full,
+                    buffer_usage_data.clone(),
+                ))
             }
 
             #[cfg(feature = "disk-buffer")]
@@ -177,6 +241,95 @@ where
                 }
             }
         }
+    }
+}
+
+#[pin_project]
+pub struct MemoryBufferInput<S> {
+    #[pin]
+    inner: S,
+    drop: Option<bool>,
+    buffer_usage_data: Option<Arc<BufferUsageData>>,
+}
+
+impl<S> MemoryBufferInput<S> {
+    pub fn new(
+        inner: S,
+        when_full: WhenFull,
+        buffer_usage_data: Option<Arc<BufferUsageData>>,
+    ) -> Self {
+        let drop = match when_full {
+            WhenFull::Block => None,
+            WhenFull::DropNewest => Some(false),
+        };
+
+        Self {
+            inner,
+            drop,
+            buffer_usage_data,
+        }
+    }
+}
+
+// Instrumenting events received by the memory buffer can be accomplished by
+// hooking into the lifecycle of writing events to the buffer, hence the
+// InstrumentMemoryBuffer wrapper. This is not necessary for disk buffers
+// which are instrumented for this at a lower level in their implementation.
+impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for MemoryBufferInput<S> {
+    type Error = S::Error;
+
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        let this = self.project();
+        if let Some(_) = this.drop {
+            match this.inner.poll_ready(cx) {
+                Poll::Ready(Ok(())) => {
+                    *this.drop = Some(false);
+                    Poll::Ready(Ok(()))
+                }
+                Poll::Pending => {
+                    *this.drop = Some(true);
+                    Poll::Ready(Ok(()))
+                }
+                error @ std::task::Poll::Ready(..) => error,
+            }
+        } else {
+            this.inner.poll_ready(cx)
+        }
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+        if let Some(should_drop) = self.drop {
+            if should_drop {
+                debug!(
+                    message = "Shedding load; dropping event.",
+                    internal_log_rate_secs = 10
+                );
+
+                if let Some(buf_usage_data) = &self.buffer_usage_data {
+                    if let Some(dropped_event_count) = &buf_usage_data.dropped_event_count {
+                        dropped_event_count.fetch_add(1, Ordering::Relaxed);
+                    }
+                }
+                return Ok(());
+            }
+        }
+        if let Some(buf_usage_data) = &self.buffer_usage_data {
+            buf_usage_data
+                .received_event_count
+                .fetch_add(1, Ordering::Relaxed);
+            buf_usage_data
+                .received_event_byte_size
+                .fetch_add(item.size_of(), Ordering::Relaxed);
+        }
+        self.project().inner.start_send(item)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_flush(cx)
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_close(cx)
     }
 }
 
@@ -226,61 +379,6 @@ impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
                 emit(&EventsDropped { count: 1 });
             }
             Ok(())
-        } else {
-            self.project().inner.start_send(item)
-        }
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.project().inner.poll_flush(cx)
-    }
-
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.project().inner.poll_close(cx)
-    }
-}
-
-// Instrumenting events received by the memory buffer can be accomplished by
-// hooking into the lifecycle of writing events to the buffer, hence the
-// InstrumentMemoryBuffer wrapper. This is not necessary for disk buffers
-// which are instrumented for this at a lower level in their implementation.
-#[pin_project]
-pub struct InstrumentMemoryBuffer<S> {
-    #[pin]
-    inner: S,
-    span: Span,
-    instrument: bool,
-}
-
-impl<S> InstrumentMemoryBuffer<S> {
-    pub fn new(inner: S, span: Span, instrument: bool) -> Self {
-        Self {
-            inner,
-            span,
-            instrument,
-        }
-    }
-}
-
-impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for InstrumentMemoryBuffer<S> {
-    type Error = S::Error;
-
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.project().inner.poll_ready(cx)
-    }
-
-    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        if self.instrument {
-            let span = self.span.clone();
-            let byte_size = item.size_of();
-            self.project().inner.start_send(item).map(|()| {
-                span.in_scope(|| {
-                    emit(&BufferEventsReceived {
-                        count: 1,
-                        byte_size,
-                    });
-                });
-            })
         } else {
             self.project().inner.start_send(item)
         }
