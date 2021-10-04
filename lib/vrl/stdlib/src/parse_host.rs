@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::sync::Arc;
 use tldextract::*;
 use vrl::prelude::*;
 
@@ -31,6 +32,11 @@ impl Function for ParseHost {
             },
             Parameter {
                 keyword: "private_domains",
+                kind: kind::BOOLEAN,
+                required: false,
+            },
+            Parameter {
+                keyword: "update_cache",
                 kind: kind::BOOLEAN,
                 required: false,
             },
@@ -75,28 +81,43 @@ impl Function for ParseHost {
         ]
     }
 
-    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
+    fn compile(&self, state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
+        let data_dir: String = state
+            .get_external_context::<std::path::PathBuf>()
+            .unwrap()
+            .as_os_str()
+            .to_os_string()
+            .into_string()
+            .unwrap();
         let value = arguments.required("value");
 
         let private_domains = arguments
             .optional("private_domains")
             .unwrap_or_else(|| expr!(true));
 
-        let options = TldOption {
-            cache_path: Some("/tmp/.tld_cache".to_string()),
+        let update_cache = arguments
+            .optional_literal("update_cache")?
+            .map(|literal| literal.to_value().try_boolean())
+            .unwrap_or(Ok(false))
+            .expect("update_cache should be boolean");
+
+        let extractor = Arc::new(TldExtractor::new(TldOption {
+            cache_path: Some(format!("{}/.tld_cache", data_dir)),
+            update_local: update_cache,
             ..Default::default()
-        };
-        let private_options = TldOption {
-            cache_path: Some("/tmp/.private_tld_cache".to_string()),
+        }));
+        let private_extractor = Arc::new(TldExtractor::new(TldOption {
+            cache_path: Some(format!("{}/.private_tld_cache", data_dir)),
+            update_local: update_cache,
             private_domains: true,
             ..Default::default()
-        };
+        }));
 
         Ok(Box::new(ParseHostFn {
             value,
-            options,
+            extractor,
             private_domains,
-            private_options,
+            private_extractor,
         }))
     }
 }
@@ -104,9 +125,9 @@ impl Function for ParseHost {
 #[derive(Debug, Clone)]
 struct ParseHostFn {
     value: Box<dyn Expression>,
-    options: TldOption,
+    extractor: Arc<TldExtractor>,
     private_domains: Box<dyn Expression>,
-    private_options: TldOption,
+    private_extractor: Arc<TldExtractor>,
 }
 
 impl Expression for ParseHostFn {
@@ -115,13 +136,11 @@ impl Expression for ParseHostFn {
         let string = value.try_bytes_utf8_lossy()?;
 
         let private_domains = self.private_domains.resolve(ctx)?.try_boolean()?;
-        let options = self.options.clone();
-        let private_options = self.private_options.clone();
 
         let ext = if private_domains {
-            TldExtractor::new(private_options)
+            &self.private_extractor
         } else {
-            TldExtractor::new(options)
+            &self.extractor
         };
         let tld = ext.extract(&string).unwrap();
         Ok(tld_to_value(tld))

@@ -35,7 +35,7 @@ shared = { path = "../../shared", default-features = false, optional = true }
 strip-ansi-escapes = { version = "0.1", optional = true }
 syslog_loose = { version = "0.15", optional = true }
 # support for non-full URL's isn't released yet
-tldextract = { git = "https://github.com/spencergilbert/tldextract-rs.git", rev = "15cedac3", optional = true }
+tldextract = { git = "https://github.com/spencergilbert/tldextract-rs.git", rev = "26e1d899ff42b6f597e2ed34b4c9fe6df93c0d5f", optional = true }
 tracing = { version = "0.1", optional = true }
 url = { version = "2", optional = true }
 uuid = { version = "0.8", features = ["v4"], optional = true }
