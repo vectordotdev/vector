@@ -105,9 +105,9 @@ impl<S> LogSinkBuilder<S> {
     pub fn build(self) -> LogSink<S> {
         LogSink {
             default_api_key: self.default_api_key,
-            encoding: Some(self.encoding),
-            acker: Some(self.context.acker()),
-            service: Some(self.service),
+            encoding: self.encoding,
+            acker: self.context.acker(),
+            service: self.service,
             timeout: self.timeout.unwrap_or(BATCH_DEFAULT_TIMEOUT),
             compression: self.compression.unwrap_or_default(),
             log_schema: self.log_schema.unwrap_or_else(|| log_schema()),
@@ -124,16 +124,16 @@ pub struct LogSink<S> {
     /// case we batch them by this default.
     default_api_key: Arc<str>,
     /// The ack system for this sink to vector's buffer mechanism
-    acker: Option<Acker>,
+    acker: Acker,
     /// The API service
-    service: Option<S>,
+    service: S,
     /// The encoding of payloads
     ///
     /// This struct always generates JSON payloads. However we do, technically,
     /// allow the user to set the encoding to a single value -- JSON -- and this
     /// encoding comes with rules on sanitizing the payload which must be
     /// applied.
-    encoding: Option<EncodingConfigWithDefault<Encoding>>,
+    encoding: EncodingConfigWithDefault<Encoding>,
     /// The compression technique to use when building the request body
     compression: Compression,
     /// The total duration before a flush is forced
@@ -167,6 +167,8 @@ pub enum RequestBuildError {
     Io { error: std::io::Error },
 }
 
+const TIMESTAMP_KEY: &str = "timestamp";
+
 impl RequestBuilder {
     fn new(
         encoding: EncodingConfigWithDefault<Encoding>,
@@ -190,8 +192,10 @@ impl RequestBuilder {
             {
                 let log = event.as_mut_log();
                 log.rename_key_flat(self.log_schema_message_key, "message");
-                log.rename_key_flat(self.log_schema_timestamp_key, "date");
                 log.rename_key_flat(self.log_schema_host_key, "host");
+                if let Some(Value::Timestamp(ts)) = log.remove(self.log_schema_timestamp_key) {
+                    log.insert_flat(TIMESTAMP_KEY, Value::Integer(ts.timestamp_millis()));
+                }
                 self.encoding.apply_rules(&mut event);
             }
 
@@ -254,26 +258,14 @@ where
     S::Response: AsRef<EventStatus> + Send + 'static,
     S::Error: Debug + Into<crate::Error> + Send,
 {
-    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let io_bandwidth = 64;
         let (io_tx, io_rx) = channel(io_bandwidth);
-        let service = self
-            .service
-            .take()
-            .expect("same sink should not be run twice");
-        let acker = self
-            .acker
-            .take()
-            .expect("same sink should not be run twice");
-        let encoding = self
-            .encoding
-            .take()
-            .expect("same sink should not be run twice");
+        let encoding = self.encoding;
         let default_api_key = Arc::clone(&self.default_api_key);
         let compression = self.compression;
         let log_schema = self.log_schema;
-
-        let io = run_io(io_rx, service, acker).in_current_span();
+        let io = run_io(io_rx, self.service, self.acker).in_current_span();
         let _ = tokio::spawn(io);
 
         let batcher = Batcher::new(
@@ -303,12 +295,12 @@ where
                         }
                     }
                     Err(error) => {
-                        error!("Sink was unable to construct a payload body: {}", error);
+                        error!(message = "Sink was unable to construct a payload body.", %error);
                         return Err(());
                     }
                 },
                 Err(error) => {
-                    error!("Task failed to properly join: {}", error);
+                    error!(message = "Task failed to properly join.", %error);
                     return Err(());
                 }
             }

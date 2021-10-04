@@ -6,7 +6,7 @@ pub fn get<'a>(fields: &'a BTreeMap<String, Value>, path: &str) -> Option<&'a Va
     let mut path_iter = PathIter::new(path);
 
     match path_iter.next() {
-        Some(PathComponent::Key(key)) => match fields.get(&key) {
+        Some(PathComponent::Key(key)) => match fields.get(key.as_ref()) {
             None => None,
             Some(value) => get_value(value, path_iter),
         },
@@ -15,14 +15,14 @@ pub fn get<'a>(fields: &'a BTreeMap<String, Value>, path: &str) -> Option<&'a Va
 }
 
 /// Returns a reference to a field value specified by a path iter.
-pub fn get_value<I>(mut value: &Value, mut path_iter: I) -> Option<&Value>
+pub fn get_value<'a, I>(mut value: &Value, mut path_iter: I) -> Option<&Value>
 where
-    I: Iterator<Item = PathComponent>,
+    I: Iterator<Item = PathComponent<'a>>,
 {
     loop {
         match (path_iter.next(), value) {
             (None, _) => return Some(value),
-            (Some(PathComponent::Key(ref key)), Value::Map(map)) => match map.get(key) {
+            (Some(PathComponent::Key(key)), Value::Map(map)) => match map.get(key.as_ref()) {
                 None => return None,
                 Some(nested_value) => {
                     value = nested_value;

@@ -5,7 +5,7 @@
 {{ $output := $config.output }}
 {{ $alias := $config.alias }}
 
-<div class="mt-8 block space-y-1">
+<div class="block space-y-1">
   {{ if eq $classes.development "beta" }}
   {{ partial "badge.html" (dict "prefix" "status" "word" "beta" "color" "red" "inline" true) }}
   {{ end }}

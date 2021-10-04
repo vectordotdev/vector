@@ -1,6 +1,8 @@
-use super::InternalEvent;
+// ## skip check-events ##
+
 use metrics::counter;
 use std::{io::Error, path::Path};
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct UnixSocketConnectionEstablished<'a> {
@@ -64,12 +66,12 @@ where
 }
 
 #[derive(Debug)]
-pub struct UnixSocketFileDeleteFailed<'a> {
+pub struct UnixSocketFileDeleteError<'a> {
     pub path: &'a Path,
     pub error: Error,
 }
 
-impl<'a> InternalEvent for UnixSocketFileDeleteFailed<'a> {
+impl<'a> InternalEvent for UnixSocketFileDeleteError<'a> {
     fn emit_logs(&self) {
         warn!(
             message = "Failed in deleting unix socket file.",

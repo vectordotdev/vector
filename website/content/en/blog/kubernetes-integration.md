@@ -120,7 +120,7 @@ We want Vector to become the backbone of observability in Kubernetes. If you sha
 [node_logging]: https://kubernetes.io/docs/concepts/cluster-administration/logging/#logging-at-the-node-level
 [opentelemetry]: https://opentelemetry.io
 [prometheus]: https://prometheus.io
-[pulls]: https://github.com/timberio/vector/pulls?q=is%3Apr+sort%3Aupdated-desc+kubernetes+is%3Aclosed
+[pulls]: https://github.com/vectordotdev/vector/pulls?q=is%3Apr+sort%3Aupdated-desc+kubernetes+is%3Aclosed
 [sinks]: /docs/reference/configuration/sinks/
 [tools]: https://landscape.cncf.io/card-mode?category=observability-and-analysis
 [transforms]: /docs/reference/configuration/transforms/

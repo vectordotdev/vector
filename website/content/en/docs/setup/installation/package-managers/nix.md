@@ -28,15 +28,19 @@ Vector is an end-to-end observability data pipeline designed to deploy under var
 
 {{< tabs default="Upgrade Vector" >}}
 {{< tab title="Upgrade Vector" >}}
+
 ```shell
 nix-env --upgrade vector \
   --file https://github.com/NixOS/nixpkgs/archive/master.tar.gz
 ```
+
 {{< /tab >}}
 {{< tab title="Uninstall Vector" >}}
+
 ```shell
 nix-env --uninstall vector
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 

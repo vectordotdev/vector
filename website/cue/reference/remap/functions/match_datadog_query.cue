@@ -27,28 +27,28 @@ remap: functions: match_datadog_query: {
 		{
 			title: "OR query"
 			source: #"""
-					match_datadog_query({"message": "contains this and that"}, "this OR that")
+				match_datadog_query({"message": "contains this and that"}, "this OR that")
 				"""#
 			return: true
 		},
 		{
 			title: "AND query"
 			source: #"""
-					match_datadog_query({"message": "contains only this"}, "this AND that")
+				match_datadog_query({"message": "contains only this"}, "this AND that")
 				"""#
 			return: false
 		},
 		{
 			title: "Facet wildcard"
 			source: #"""
-					match_datadog_query({"custom": {"name": "vector"}}, "@name:vec*")
+				match_datadog_query({"custom": {"name": "vector"}}, "@name:vec*")
 				"""#
 			return: true
 		},
 		{
 			title: "Tag range"
 			source: #"""
-					match_datadog_query({"tags": ["a:x", "b:y", "c:z"]}, s'b:["x" TO "z"]')
+				match_datadog_query({"tags": ["a:x", "b:y", "c:z"]}, s'b:["x" TO "z"]')
 				"""#
 			return: true
 		},

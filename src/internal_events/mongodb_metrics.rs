@@ -1,7 +1,9 @@
-use super::InternalEvent;
+// ## skip check-events ##
+
 use metrics::{counter, histogram};
 use mongodb::{bson, error::Error as MongoError};
 use std::time::Instant;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct MongoDbMetricsEventsReceived<'a> {
@@ -12,7 +14,7 @@ pub struct MongoDbMetricsEventsReceived<'a> {
 impl<'a> InternalEvent for MongoDbMetricsEventsReceived<'a> {
     fn emit_metrics(&self) {
         counter!(
-            "received_events_total", self.count as u64,
+            "component_received_events_total", self.count as u64,
             "uri" => self.uri.to_owned(),
         );
         counter!(

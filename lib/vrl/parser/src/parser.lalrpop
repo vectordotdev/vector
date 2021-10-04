@@ -423,10 +423,10 @@ IfStatement: IfStatement =
     <predicate: Sp<Predicate>>
     NonterminalNewline*
     <consequent: Sp<Block>>
-    <alternatives: (Sp<ElseIf>)*>
+    <mut alternatives: (Sp<ElseIf>)*>
     <alternative: ("else" NonterminalNewline* <Sp<Block>>)?> => {
         let mut alternative = alternative;
-
+        alternatives.reverse();
         for Node { span, mut node } in alternatives {
             node.alternative = alternative;
             let node = Node::new(span, Expr::IfStatement(Node::new(span, node)));
@@ -445,9 +445,13 @@ ElseIf: IfStatement =
     IfStatement { predicate, consequent, alternative: None }
 };
 
+StatementSeparator: () = {
+    NonterminalNewline, ";"
+};
+
 Predicate: Predicate = {
     Box<ArithmeticExpr> => Predicate::One(<>),
-    "(" <v:(<AssignmentExpr> ";")+> <e:(<AssignmentExpr>)?> ")" => {
+    "(" NonterminalNewline* <v:(<AssignmentExpr> StatementSeparator+)+> <e:(<AssignmentExpr>)?> ")" => {
         let expressions = match e {
             None => v,
             Some(e) => {

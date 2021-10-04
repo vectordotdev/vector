@@ -3,7 +3,13 @@ mod encoding_config;
 pub mod finalizer;
 #[cfg(all(unix, feature = "sources-dnstap"))]
 pub mod framestream;
-#[cfg(feature = "sources-utils-http")]
+#[cfg(any(
+    feature = "sources-utils-http-auth",
+    feature = "sources-utils-http-encoding",
+    feature = "sources-utils-http-error",
+    feature = "sources-utils-http-prelude",
+    feature = "sources-utils-http-query"
+))]
 mod http;
 pub mod multiline_config;
 #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
@@ -18,12 +24,19 @@ mod unix_datagram;
 #[cfg(all(unix, feature = "sources-utils-unix"))]
 mod unix_stream;
 
-#[cfg(any(feature = "sources-http", feature = "sources-heroku_logs"))]
+#[cfg(feature = "sources-utils-http-query")]
 pub use self::http::add_query_parameters;
-#[cfg(feature = "sources-prometheus")]
+#[cfg(any(
+    feature = "sources-prometheus",
+    feature = "sources-utils-http-encoding"
+))]
 pub use self::http::decode;
-#[cfg(feature = "sources-utils-http")]
-pub use self::http::{ErrorMessage, HttpSource, HttpSourceAuthConfig};
+#[cfg(feature = "sources-utils-http-error")]
+pub use self::http::ErrorMessage;
+#[cfg(feature = "sources-utils-http-prelude")]
+pub use self::http::HttpSource;
+#[cfg(feature = "sources-utils-http-auth")]
+pub use self::http::HttpSourceAuthConfig;
 pub use encoding_config::EncodingConfig;
 pub use multiline_config::MultilineConfig;
 #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]

@@ -1,4 +1,5 @@
-use super::InternalEvent;
+// ## skip check-events ##
+
 use http::{
     header::{self, HeaderMap, HeaderValue},
     Request, Response,
@@ -6,6 +7,7 @@ use http::{
 use hyper::{body::HttpBody, Error};
 use metrics::{counter, histogram};
 use std::time::Duration;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct AboutToSendHttpRequest<'a, T> {

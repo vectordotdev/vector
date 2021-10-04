@@ -137,12 +137,17 @@ impl LogEvent {
         K: AsRef<str> + Into<String> + PartialEq + Display,
     {
         if from_key != to_key {
-            if let Some(val) = self.remove(from_key) {
+            if let Some(val) = self.fields.as_map_mut().remove(from_key.as_ref()) {
                 self.insert_flat(to_key, val);
             }
         }
     }
 
+    /// Insert a key in place without reference to pathing
+    ///
+    /// This function will insert a key in place without reference to any
+    /// pathing information in the key. It will insert over the top of any value
+    /// that exists in the map already.
     #[instrument(level = "trace", skip(self, key), fields(key = %key))]
     pub fn insert_flat<K, V>(&mut self, key: K, value: V)
     where

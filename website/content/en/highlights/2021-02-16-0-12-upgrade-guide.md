@@ -161,8 +161,8 @@ Adjust as necessary. The above values are the defaults and are not required to b
 [key_value_parser_transform]: /docs/reference/vrl/functions/#parse_key_value
 [logfmt_parser_transform]: /docs/reference/vrl/functions/#parse_logfmt
 [merge_transform]: /docs/reference/vrl/functions/#merge
-[pr_5281]: https://github.com/timberio/vector/pull/5281
-[pr_5978]: https://github.com/timberio/vector/pull/5978
+[pr_5281]: https://github.com/vectordotdev/vector/pull/5281
+[pr_5978]: https://github.com/vectordotdev/vector/pull/5978
 [filter_transform]: /docs/reference/configuration/transforms/filter/
 [ignore_checkpoints]: /docs/reference/configuration/sources/file/#ignore_checkpoints
 [read_from]: /docs/reference/configuration/sources/file/#read_from

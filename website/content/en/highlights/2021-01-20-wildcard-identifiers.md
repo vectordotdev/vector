@@ -37,4 +37,4 @@ type = "aws_s3"
 inputs = ["app*", "system_logs"]
 ```
 
-[pr_6170]: https://github.com/timberio/vector/pull/6170
+[pr_6170]: https://github.com/vectordotdev/vector/pull/6170

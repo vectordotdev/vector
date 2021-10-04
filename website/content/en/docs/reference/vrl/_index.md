@@ -2,22 +2,28 @@
 title: Vector Remap Language (VRL)
 description: A domain-specific language for modifying your observability data
 short: Vector Remap Language
-weight: 4
+weight: 1
 aliases: ["/docs/reference/remap"]
 ---
 
-Vector Remap Language (VRL) is an expression-oriented language designed for transforming observability data (logs and metrics) in a [safe](#safety) and [performant](#performance) manner. It features a simple [syntax](expressions) and a rich set of built-in functions tailored specifically to observability use cases.
+Vector Remap Language (VRL) is an expression-oriented language designed for
+transforming observability data (logs and metrics) in a [safe](#safety) and
+[performant](#performance) manner. It features a simple [syntax](expressions)
+and a rich set of built-in functions tailored specifically to observability use
+cases.
 
-You can use VRL in Vector via the [`remap`][remap] transform. For a more in-depth picture, see the [announcement blog post][blog_post].
+You can use VRL in Vector via the [`remap`][remap] transform. For a more
+in-depth picture, see the [announcement blog post][blog_post].
 
 ## Quickstart
 
 VRL programs act on a single observability [event](#event) and can be used to:
 
-* **Transform** observability events
-* Specify **conditions** for [routing][route] and [filtering][filter] events
+- **Transform** observability events
+- Specify **conditions** for [routing][route] and [filtering][filter] events
 
-Those programs are specified as part of your Vector [configuration]. Here's an example `remap` transform that contains a VRL program in the `source` field:
+Those programs are specified as part of your Vector [configuration]. Here's an
+example `remap` transform that contains a VRL program in the `source` field:
 
 ```toml {title="vector.toml"}
 [transforms.modify]
@@ -29,11 +35,14 @@ source = '''
 '''
 ```
 
-This program changes the contents of each event that passes through this transform, [deleting][del] the `user_info` field and adding a [timestamp][now] to the event.
+This program changes the contents of each event that passes through this
+transform, [deleting][del] the `user_info` field and adding a [timestamp][now]
+to the event.
 
 ### Example: parsing JSON
 
-Let's have a look at a more complex example. Imagine that you're working with HTTP log events that look like this:
+Let's have a look at a more complex example. Imagine that you're working with
+HTTP log events that look like this:
 
 ```text
 "{\"status\":200,\"timestamp\":\"2021-03-01T19:19:24.646170Z\",\"message\":\"SUCCESS\",\"username\":\"ub40fan4life\"}"
@@ -41,14 +50,14 @@ Let's have a look at a more complex example. Imagine that you're working with HT
 
 You want to apply these changes to each event:
 
-* Parse the raw string into JSON
-* Reformat the `time` into a UNIX timestamp
-* Remove the `username` field
-* Convert the `message` to lowercase
+- Parse the raw string into JSON
+- Reformat the `time` into a UNIX timestamp
+- Remove the `username` field
+- Convert the `message` to lowercase
 
 This VRL program would accomplish all of that:
 
-```ruby
+```coffee
 . = parse_json!(string!(.message))
 .timestamp = to_unix_timestamp(to_timestamp!(.timestamp))
 del(.username)
@@ -67,7 +76,10 @@ Finally, the resulting event:
 
 ### Example: filtering events
 
-The JSON parsing program in the example above modifies the contents of each event. But you can also use VRL to specify conditions, which convert events into a single Boolean expression. Here's an example [`filter`][filter] transform that filters out all messages for which the `severity` field equals `"info"`:
+The JSON parsing program in the example above modifies the contents of each
+event. But you can also use VRL to specify conditions, which convert events into
+a single Boolean expression. Here's an example [`filter`][filter] transform that
+filters out all messages for which the `severity` field equals `"info"`:
 
 ```toml {title="vector.toml"}
 [transforms.filter_out_info]
@@ -76,41 +88,49 @@ inputs = ["logs"]
 condition = '.severity != "info"'
 ```
 
-Conditions can also be more multifaceted. This condition would filter out all events for which the `severity` field is `"info"`, the `status_code` field is greater than or equal to 400, and the `host` field isn't set:
+Conditions can also be more multifaceted. This condition would filter out all
+events for which the `severity` field is `"info"`, the `status_code` field is
+greater than or equal to 400, and the `host` field isn't set:
 
 ```vrl
 condition = '.severity != "info" && .status_code < 400 && exists(.host)
 ```
 
-{{< info title="More VRL examples" >}}
-You can find more VRL examples further down [on this page](#other-examples) or in the [VRL example reference](/docs/reference/vrl/examples).
-{{< /info >}}
+{{< info title="More VRL examples" >}} You can find more VRL examples further
+down [on this page](#other-examples) or in the
+[VRL example reference](/docs/reference/vrl/examples). {{< /info >}}
 
 ## Reference
 
-All language constructs are contained in the following reference pages. Use these references as you write your VRL programs:
+All language constructs are contained in the following reference pages. Use
+these references as you write your VRL programs:
 
 {{< pages >}}
 
 ## Learn
 
-VRL is designed to minimize the learning curve. These resources can help you get acquainted with Vector and VRL:
+VRL is designed to minimize the learning curve. These resources can help you get
+acquainted with Vector and VRL:
 
-{{< jump "/docs/setup/quickstart" >}}
-{{< jump "/guides/level-up/transformation" >}}
+{{< jump "/docs/setup/quickstart" >}} {{< jump "/guides/level-up/transformation"
+>}}
 
 ## The goals of VRL {#goals}
 
-VRL is built by the Vector team and its development is guided by two core goals, [safety](#safety) and [performance](#performance), without compromising on flexibility. This makes VRL ideal for critical, performance-sensitive infrastructure, like observabiity pipelines. To illustrate how we achieve these, below is a VRL feature matrix across these principles:
+VRL is built by the Vector team and its development is guided by two core goals,
+[safety](#safety) and [performance](#performance), without compromising on
+flexibility. This makes VRL ideal for critical, performance-sensitive
+infrastructure, like observabiity pipelines. To illustrate how we achieve these,
+below is a VRL feature matrix across these principles:
 
-Feature | Safety | Performance
-:-------|:-------|:-----------
-[Compilation](#compilation) | ✅ | ✅
-[Ergonomic safety](#ergonomic-safety) | ✅ | ✅
-[Fail safety](#fail-safety) | ✅ |
-[Memory safety](#memory-safety) | ✅ |
-[Vector and Rust native](#vector-rust-native) | ✅ | ✅
-[Statelessness](#stateless) | ✅ | ✅
+| Feature                                       | Safety | Performance |
+| :-------------------------------------------- | :----- | :---------- |
+| [Compilation](#compilation)                   | ✅      | ✅           |
+| [Ergonomic safety](#ergonomic-safety)         | ✅      | ✅           |
+| [Fail safety](#fail-safety)                   | ✅      |             |
+| [Memory safety](#memory-safety)               | ✅      |             |
+| [Vector and Rust native](#vector-rust-native) | ✅      | ✅           |
+| [Statelessness](#stateless)                   | ✅      | ✅           |
 
 ## Concepts
 

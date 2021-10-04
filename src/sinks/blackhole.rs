@@ -91,7 +91,7 @@ impl BlackholeSink {
 
 #[async_trait]
 impl StreamSink for BlackholeSink {
-    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         // Spin up a task that does the periodic reporting.  This is decoupled from the main sink so
         // that rate limiting support can be added more simply without having to interleave it with
         // the printing.
@@ -137,7 +137,7 @@ impl StreamSink for BlackholeSink {
                 .total_raw_bytes
                 .fetch_add(message_len, Ordering::AcqRel);
 
-            emit!(BlackholeEventReceived {
+            emit!(&BlackholeEventReceived {
                 byte_size: message_len
             });
 
@@ -167,7 +167,7 @@ mod tests {
             print_interval_secs: 10,
             rate: None,
         };
-        let mut sink = BlackholeSink::new(config, Acker::Null);
+        let sink = Box::new(BlackholeSink::new(config, Acker::Null));
 
         let (_input_lines, events) = random_events_with_stream(100, 10, None);
         let _ = sink.run(Box::pin(events)).await.unwrap();

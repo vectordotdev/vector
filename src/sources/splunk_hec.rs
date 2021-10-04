@@ -91,7 +91,7 @@ impl SourceConfig for SplunkConfig {
             .and(
                 warp::path::full()
                     .map(|path: warp::filters::path::FullPath| {
-                        emit!(SplunkHecRequestReceived {
+                        emit!(&SplunkHecRequestReceived {
                             path: path.as_str()
                         });
                     })
@@ -470,7 +470,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             de.extract(log, &mut json);
         }
 
-        emit!(SplunkHecEventReceived);
+        emit!(&SplunkHecEventReceived);
         self.events += 1;
 
         Ok(event)
@@ -491,7 +491,7 @@ impl<'de, R: JsonRead<'de>> Iterator for EventIterator<'de, R> {
                 }
             }
             Some(Err(error)) => {
-                emit!(SplunkHecRequestBodyInvalid {
+                emit!(&SplunkHecRequestBodyInvalid {
                     error: error.into()
                 });
                 Some(Err(
@@ -599,7 +599,7 @@ fn raw_event(
             Ok(0) => return Err(ApiError::NoData.into()),
             Ok(_) => Value::from(Bytes::from(data)),
             Err(error) => {
-                emit!(SplunkHecRequestBodyInvalid { error });
+                emit!(&SplunkHecRequestBodyInvalid { error });
                 return Err(ApiError::InvalidDataFormat { event: 0 }.into());
             }
         }
@@ -634,7 +634,7 @@ fn raw_event(
         .as_mut_log()
         .try_insert(log_schema().source_type_key(), Bytes::from("splunk_hec"));
 
-    emit!(SplunkHecEventReceived);
+    emit!(&SplunkHecEventReceived);
 
     Ok(event)
 }
@@ -689,7 +689,7 @@ fn finish_ok(_: ()) -> Response {
 
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
     if let Some(&error) = rejection.find::<ApiError>() {
-        emit!(SplunkHecRequestError { error });
+        emit!(&SplunkHecRequestError { error });
         Ok((match error {
             ApiError::MissingAuthorization => response_json(
                 StatusCode::UNAUTHORIZED,

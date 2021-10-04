@@ -18,7 +18,7 @@ api: {
 		Vector in real-time.
 		"""
 	playground_url:  "https://playground.vector.dev:8686/playground"
-	schema_json_url: "https://github.com/timberio/vector/blob/master/lib/vector-api-client/graphql/schema.json"
+	schema_json_url: "https://github.com/vectordotdev/vector/blob/master/lib/vector-api-client/graphql/schema.json"
 	configuration: {
 		enabled: {
 			common: true

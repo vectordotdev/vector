@@ -72,7 +72,7 @@ fn parse_records(
         .iter()
         .map(|record| {
             decode_record(record, compression).map(|record| {
-                emit!(AwsKinesisFirehoseEventReceived {
+                emit!(&AwsKinesisFirehoseEventReceived {
                     byte_size: record.len()
                 });
 
@@ -121,7 +121,7 @@ fn decode_record(
             match infer::get(&buf) {
                 Some(filetype) => match filetype.mime_type() {
                     "application/gzip" => decode_gzip(&buf[..]).or_else(|error| {
-                        emit!(AwsKinesisFirehoseAutomaticRecordDecodeError {
+                        emit!(&AwsKinesisFirehoseAutomaticRecordDecodeError {
                             compression: Compression::Gzip,
                             error
                         });

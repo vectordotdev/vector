@@ -36,7 +36,7 @@ impl FunctionTransform for Picker {
                 {
                     Some(message) => message,
                     None => {
-                        emit!(KubernetesLogsFormatPickerEdgeCase {
+                        emit!(&KubernetesLogsFormatPickerEdgeCase {
                             what: "got an event with no message field"
                         });
                         return;
@@ -46,7 +46,7 @@ impl FunctionTransform for Picker {
                 let bytes = match message {
                     Value::Bytes(bytes) => bytes,
                     _ => {
-                        emit!(KubernetesLogsFormatPickerEdgeCase {
+                        emit!(&KubernetesLogsFormatPickerEdgeCase {
                             what: "got an event with non-bytes message field"
                         });
                         return;

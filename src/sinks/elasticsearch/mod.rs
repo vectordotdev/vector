@@ -191,7 +191,7 @@ impl DataStreamConfig {
         self.dtype
             .render_string(event)
             .map_err(|error| {
-                emit!(TemplateRenderingFailed {
+                emit!(&TemplateRenderingFailed {
                     error,
                     field: Some("data_stream.type"),
                     drop_event: true,
@@ -204,7 +204,7 @@ impl DataStreamConfig {
         self.dataset
             .render_string(event)
             .map_err(|error| {
-                emit!(TemplateRenderingFailed {
+                emit!(&TemplateRenderingFailed {
                     error,
                     field: Some("data_stream.dataset"),
                     drop_event: true,
@@ -217,7 +217,7 @@ impl DataStreamConfig {
         self.namespace
             .render_string(event)
             .map_err(|error| {
-                emit!(TemplateRenderingFailed {
+                emit!(&TemplateRenderingFailed {
                     error,
                     field: Some("data_stream.namespace"),
                     drop_event: true,
@@ -417,7 +417,7 @@ impl ElasticSearchCommonMode {
             Self::Normal { index, .. } => index
                 .render_string(event)
                 .map_err(|error| {
-                    emit!(TemplateRenderingFailed {
+                    emit!(&TemplateRenderingFailed {
                         error,
                         field: Some("index"),
                         drop_event: true,
@@ -434,7 +434,7 @@ impl ElasticSearchCommonMode {
                 Some(template) => template
                     .render_string(event)
                     .map_err(|error| {
-                        emit!(TemplateRenderingFailed {
+                        emit!(&TemplateRenderingFailed {
                             error,
                             field: Some("bulk_action"),
                             drop_event: true,
@@ -522,7 +522,7 @@ impl ElasticSearchCommon {
         serde_json::to_writer(&mut body, &event.into_log()).unwrap();
         body.push(b'\n');
 
-        emit!(ElasticSearchEventEncoded {
+        emit!(&ElasticSearchEventEncoded {
             byte_size: body.len(),
             index,
         });

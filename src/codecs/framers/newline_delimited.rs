@@ -27,6 +27,11 @@ impl NewlineDelimitedDecoderConfig {
     pub fn new() -> Self {
         Default::default()
     }
+
+    /// Creates a `NewlineDelimitedCodec` with a maximum frame length limit.
+    pub const fn new_with_max_length(max_length: usize) -> Self {
+        Self { max_length }
+    }
 }
 
 #[typetag::serde(name = "newline_delimited")]

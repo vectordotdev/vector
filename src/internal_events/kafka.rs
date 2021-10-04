@@ -1,5 +1,7 @@
-use super::InternalEvent;
+// ## skip check-events ##
+
 use metrics::{counter, gauge};
+use vector_core::internal_event::InternalEvent;
 use vector_core::update_counter;
 
 #[derive(Debug)]
@@ -13,7 +15,7 @@ impl InternalEvent for KafkaEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("received_events_total", 1);
+        counter!("component_received_events_total", 1);
         counter!("events_in_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
@@ -98,5 +100,22 @@ impl InternalEvent for KafkaStatisticsReceived<'_> {
             "kafka_consumed_messages_bytes_total",
             self.statistics.rxmsg_bytes as u64
         );
+    }
+}
+
+pub struct KafkaHeaderExtractionFailed<'a> {
+    pub header_field: &'a str,
+}
+
+impl InternalEvent for KafkaHeaderExtractionFailed<'_> {
+    fn emit_logs(&self) {
+        error!(
+            message = "Failed to extract header. Value should be a map of String -> Bytes.",
+            header_field = self.header_field
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("kafka_header_extraction_failures_total", 1);
     }
 }

@@ -162,10 +162,10 @@ async fn kafka_source(
     while let Some(message) = stream.next().await {
         match message {
             Err(error) => {
-                emit!(KafkaEventFailed { error });
+                emit!(&KafkaEventFailed { error });
             }
             Ok(msg) => {
-                emit!(KafkaEventReceived {
+                emit!(&KafkaEventReceived {
                     byte_size: msg.payload_len()
                 });
 
@@ -261,7 +261,7 @@ async fn kafka_source(
                         Err(error) => error!(message = "Error sending to sink.", %error),
                         Ok(_) => {
                             if let Err(error) = consumer.store_offset(&msg) {
-                                emit!(KafkaOffsetUpdateFailed { error });
+                                emit!(&KafkaOffsetUpdateFailed { error });
                             }
                         }
                     },
@@ -298,7 +298,7 @@ fn mark_done(consumer: Arc<StreamConsumer<KafkaStatisticsContext>>) -> impl Fn(F
             .set_offset(Offset::from_raw(entry.offset + 1)) // Not sure why this needs a +1
             .expect("Setting offset failed");
         if let Err(error) = consumer.store_offsets(&tpl) {
-            emit!(KafkaOffsetUpdateFailed { error });
+            emit!(&KafkaOffsetUpdateFailed { error });
         }
     }
 }

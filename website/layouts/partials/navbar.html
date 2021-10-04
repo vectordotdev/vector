@@ -45,38 +45,51 @@
           </div>
         </div>
       </div>
+
+
       <div class="flex-1 flex items-center justify-center px-2 lg:ml-6 lg:justify-end">
         {{/* Dark/light mode toggler */}}
-        <div class="mr-6 pt-0.5">
+        <div class="mr-6">
           {{ partial "navbar/mode-toggler.html" . }}
         </div>
 
-
         {{/* Search bar */}}
-        {{ partial "navbar/search-bar.html" }}
+        <div class="max-w-xxs flex-grow">
+          <label for="search" class="sr-only">
+            Search
+          </label>
 
-      {{/* Social icons */}}
-      <div class="hidden lg:flex space-x-3.5 md:order-2 text-lg pt-1.5 ml-2 lg:ml-4 md:ml-3">
-        {{ partial "social-buttons.html" (dict "color" true) }}
-      </div>
+          {{/* Targeted by the global site search in assets/js/search.tsx */}}
+          <div id="site-search"></div>
+        </div>
 
-      {{/* Mobile dropdown toggle */}}
-      <div class="flex lg:hidden">
-        <button @click="open = !open" type="button" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white" aria-controls="mobile-menu" aria-expanded="false">
-          <span class="sr-only">
-            Open navbar dropdown menu
-          </span>
+        {{/* Social icons */}}
+        <div class="hidden lg:flex space-x-3.5 md:order-2 text-lg pt-1.5 ml-2 lg:ml-4 md:ml-3">
+          {{ partial "social-buttons.html" (dict "color" true) }}
+        </div>
 
-          {{/* Heroicon: outline/menu-alt-3 */}}
-          <svg x-show="!open" class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" />
-          </svg>
+        {{/* Mobile dropdown toggle */}}
+        <div class="flex lg:hidden">
+          <button @click="open = !open" type="button"
+            class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
+            aria-controls="mobile-menu" aria-expanded="false">
+            <span class="sr-only">
+              Open navbar dropdown menu
+            </span>
 
-          {{/* Heroicon: outline/x */}}
-          <svg x-show="open" class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+            {{/* Heroicon: outline/menu-alt-3 */}}
+            <svg x-show="!open" class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" />
+            </svg>
+
+            {{/* Heroicon: outline/x */}}
+            <svg x-show="open" class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   </div>

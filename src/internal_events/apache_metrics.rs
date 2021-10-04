@@ -1,7 +1,9 @@
-use super::InternalEvent;
+// ## skip check-events ##
+
 use crate::sources::apache_metrics;
 use metrics::{counter, histogram};
 use std::time::Instant;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct ApacheMetricsEventReceived<'a> {
@@ -17,7 +19,7 @@ impl<'a> InternalEvent for ApacheMetricsEventReceived<'a> {
 
     fn emit_metrics(&self) {
         counter!(
-            "received_events_total", self.count as u64,
+            "component_received_events_total", self.count as u64,
             "uri" => self.uri.to_owned(),
         );
         counter!(

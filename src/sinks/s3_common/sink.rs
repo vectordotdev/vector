@@ -1,8 +1,7 @@
-use crate::sinks::util::sink::ServiceLogic;
 use crate::{
     config::SinkContext,
     event::Event,
-    sinks::util::{buffer::GZIP_FAST, sink::StdServiceLogic, Compression},
+    sinks::util::{buffer::GZIP_FAST, Compression},
 };
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -31,23 +30,22 @@ use tower::{Service, ServiceExt};
 use tracing_futures::Instrument;
 use vector_core::{
     buffers::Acker,
-    event::{EventFinalizers, Finalizable},
+    event::{EventFinalizers, EventStatus, Finalizable},
     sink::StreamSink,
     stream::batcher::Batcher,
 };
 
 use crate::sinks::s3_common::partitioner::KeyPartitioner;
 use crate::sinks::s3_common::service::S3Request;
-use crate::sinks::util::sink::Response;
 
 pub struct S3Sink<S, R>
 where
     R: S3RequestBuilder,
 {
-    acker: Option<Acker>,
-    service: Option<S>,
+    acker: Acker,
+    service: S,
     request_builder: R,
-    partitioner: Option<KeyPartitioner>,
+    partitioner: KeyPartitioner,
     batch_size_bytes: Option<NonZeroUsize>,
     batch_size_events: NonZeroUsize,
     batch_timeout: Duration,
@@ -67,10 +65,10 @@ where
         batch_timeout: Duration,
     ) -> Self {
         Self {
-            acker: Some(cx.acker()),
-            service: Some(service),
+            acker: cx.acker(),
+            service,
             request_builder,
-            partitioner: Some(partitioner),
+            partitioner,
             batch_size_bytes,
             batch_size_events,
             batch_timeout,
@@ -83,11 +81,11 @@ impl<S, R> StreamSink for S3Sink<S, R>
 where
     S: Service<S3Request> + Send + 'static,
     S::Future: Send + 'static,
-    S::Response: Response + Send + 'static,
+    S::Response: AsRef<EventStatus> + Send + 'static,
     S::Error: Debug + Into<crate::Error> + Send,
     R: S3RequestBuilder + Send,
 {
-    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         // All sinks do the same fundamental job: take in events, and ship them
         // out. Empirical testing shows that our number one priority for high
         // throughput needs to be servicing I/O as soon as we possibly can.  In
@@ -96,25 +94,13 @@ where
         // batching, ordering, and so on.
         let (io_tx, io_rx) = channel(64);
         let io_barrier = Arc::new(Barrier::new(2));
-        let service = self
-            .service
-            .take()
-            .expect("same sink should not be run twice");
-        let acker = self
-            .acker
-            .take()
-            .expect("same sink should not be run twice");
-        let partitioner = self
-            .partitioner
-            .take()
-            .expect("same sink should not be run twice");
 
-        let io = run_io(io_rx, Arc::clone(&io_barrier), service, acker).in_current_span();
+        let io = run_io(io_rx, Arc::clone(&io_barrier), self.service, self.acker).in_current_span();
         let _ = tokio::spawn(io);
 
         let batcher = Batcher::new(
             input,
-            partitioner,
+            self.partitioner,
             self.batch_timeout,
             self.batch_size_events,
             self.batch_size_bytes,
@@ -161,7 +147,7 @@ async fn run_io<S>(mut rx: Receiver<S3Request>, barrier: Arc<Barrier>, mut servi
 where
     S: Service<S3Request>,
     S::Future: Send + 'static,
-    S::Response: Response + Send + 'static,
+    S::Response: AsRef<EventStatus> + Send + 'static,
     S::Error: Debug + Into<crate::Error> + Send,
 {
     let in_flight = FuturesUnordered::new();
@@ -188,10 +174,6 @@ where
                     message = "Submitting service request.",
                     in_flight_requests = in_flight.len()
                 );
-                // TODO: This likely need be parameterized, which builds a
-                // stronger case for following through with the comment
-                // mentioned below.
-                let logic = StdServiceLogic::default();
                 // TODO: I'm not entirely happy with how we're smuggling
                 // batch_size/finalizers this far through, from the finished
                 // batch all the way through to the concrete request type...we
@@ -205,8 +187,14 @@ where
                 let fut = svc.call(req)
                     .err_into()
                     .map(move |result| {
-                        logic.update_finalizers(result, finalizers);
-
+                        let status = match result {
+                            Err(error) => {
+                                error!("Sink IO failed with error: {}.", error);
+                                EventStatus::Errored
+                            },
+                            Ok(response) => { *response.as_ref() }
+                        };
+                        finalizers.update_status(status);
                         // If the rx end is dropped we still completed
                         // the request so this is a weird case that we can
                         // ignore for now.
