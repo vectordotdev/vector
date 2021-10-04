@@ -178,8 +178,8 @@ This example represents a complete test of the `add_metadata` transform, include
 and expected `outputs` drawn from a specific transform.
 
 {{< info >}}
-This unit involved only a single Vector transform. An example
-[multi-transform](#multiple-transforms) unit test is provided below.
+This unit involved only a single Vector transform. An example [multi-transform](#multiple) unit test
+is provided below.
 {{< /info >}}
 
 ### Real vs. test inputs
