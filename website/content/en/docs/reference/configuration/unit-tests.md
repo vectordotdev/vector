@@ -59,7 +59,7 @@ conforms to your expectations. VRL provides two assertion functions:
 
 With both functions, you can supply a custom log message to be emitted if the assertion fails:
 
-```ruby
+```coffee
 # Named argument
 assert!(1 == 2, message: "the rules of arithmetic have been violated")
 assert_eq!(1, 2, message: "the rules of arithmetic have been violated")
@@ -178,8 +178,8 @@ This example represents a complete test of the `add_metadata` transform, include
 and expected `outputs` drawn from a specific transform.
 
 {{< info >}}
-This unit involved only a single Vector transform. An example
-[multi-transform](#multiple-transforms) unit test is provided below.
+This unit involved only a single Vector transform. An example [multi-transform](#multiple) unit test
+is provided below.
 {{< /info >}}
 
 ### Real vs. test inputs
@@ -370,7 +370,7 @@ assert_eq!(.tags.environment, "production")
 '''
 ```
 
-## Multiple transforms
+## Multiple transforms {#multiple}
 
 The examples provided thus far in this doc have involved unit testing a single transform. It's also
 possible, however, to test the output of multiple transforms chained together. Imagine a scenario
@@ -456,7 +456,7 @@ assert!(valid_transaction_id, "transaction ID invalid")
 From a testing standpoint, all three transforms here can be thought of as a single unit. One example
 event is inserted at the beginning of the chain (`add_env_metadata`), one output test event is
 extracted from the end of the chain (`add_host_metadata`), and one set of VRL
-[assertions](#assertions) verifies that that output event conforms to our expectations.
+[assertions](#verifying) verifies that that output event conforms to our expectations.
 
 You could also test a subset of this transform chain. This configuration, for example, would test
 only the first two transforms (`add_env_metadata` and `sanitize`):

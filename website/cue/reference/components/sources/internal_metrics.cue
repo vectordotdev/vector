@@ -1114,6 +1114,7 @@ components: sources: internal_metrics: {
 				"delete_failed":               "The file deletion failed."
 				"field_missing":               "The event field was missing."
 				"glob_failed":                 "The glob pattern match operation failed."
+				"http_error":                  "The HTTP request resulted in an error code."
 				"invalid_metric":              "The metric was invalid."
 				"mapping_failed":              "The mapping failed."
 				"match_failed":                "The match operation failed."

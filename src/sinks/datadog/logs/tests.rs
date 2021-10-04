@@ -5,6 +5,7 @@ use crate::{
     test_util::{next_addr, random_lines_with_stream},
 };
 use bytes::Bytes;
+use chrono::Utc;
 use futures::{
     channel::mpsc::{Receiver, TryRecvError},
     stream, StreamExt,
@@ -96,6 +97,15 @@ async fn smoke() {
             .as_str()
             .unwrap();
         assert_eq!(message, expected[i]);
+        let timestamp = json
+            .get(0)
+            .unwrap()
+            .get("timestamp")
+            .unwrap()
+            .as_i64()
+            .unwrap();
+        let delta = Utc::now().timestamp_millis() - timestamp;
+        assert!(delta > 0 && delta < 1000);
     }
 }
 
