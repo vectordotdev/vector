@@ -12,10 +12,10 @@ use std::any::Any;
 pub fn compile(
     source: &str,
     fns: &[Box<dyn Function>],
-    external_context: Option<Box<dyn Any>>,
+    external_context: Vec<Box<dyn Any>>,
 ) -> compiler::Result {
     let mut state = state::Compiler::new();
-    state.set_external_context(external_context);
+    state.add_external_context(external_context);
 
     compile_with_state(source, fns, &mut state)
 }

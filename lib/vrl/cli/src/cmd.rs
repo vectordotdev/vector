@@ -102,7 +102,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
     } else {
         let objects = opts.read_into_objects()?;
         let source = opts.read_program()?;
-        let program = vrl::compile(&source, &stdlib::all(), None).map_err(|diagnostics| {
+        let program = vrl::compile(&source, &stdlib::all(), Vec::new()).map_err(|diagnostics| {
             Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
         })?;
 

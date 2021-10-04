@@ -15,7 +15,7 @@ pub struct Compiler {
     variables: HashMap<Ident, assignment::Details>,
 
     /// context passed between the client program and a VRL function.
-    external_context: Option<Box<dyn Any>>,
+    external_context: Vec<Box<dyn Any>>,
 
     /// On request, the compiler can store its state in this field, which can
     /// later be used to revert the compiler state to the previously stored
@@ -76,7 +76,7 @@ impl Compiler {
         let snapshot = Self {
             target,
             variables,
-            external_context: None,
+            external_context: Vec::new(),
             snapshot: None,
         };
 
@@ -86,7 +86,8 @@ impl Compiler {
     /// Roll back the compiler state to a previously stored snapshot.
     pub(crate) fn rollback(&mut self) {
         if let Some(mut snapshot) = self.snapshot.take() {
-            let context = snapshot.external_context.take();
+            let mut context = Vec::new();
+            std::mem::swap(&mut snapshot.external_context, &mut context);
             *self = *snapshot;
             self.external_context = context;
         }
@@ -97,24 +98,24 @@ impl Compiler {
         self.target.as_ref().map(|assignment| &assignment.type_def)
     }
 
-    /// Sets the external context data for VRL functions to use.
-    pub fn set_external_context(&mut self, data: Option<Box<dyn Any>>) {
-        self.external_context = data;
+    /// Adds the data to the external context Vec for VRL functions to use.
+    pub fn add_external_context(&mut self, mut data: Vec<Box<dyn Any>>) {
+        self.external_context.append(&mut data);
     }
 
     /// Retrieves the first data of the required type from the external context.
     pub fn get_external_context<T: 'static>(&self) -> Option<&T> {
         self.external_context
-            .as_ref()
-            .and_then(|data| data.downcast_ref::<T>())
+            .iter()
+            .find_map(|data| data.downcast_ref::<T>())
     }
 
     /// Retrieves a mutable reference to the first data of the required type from
     /// the external context.
     pub fn get_external_context_mut<T: 'static>(&mut self) -> Option<&mut T> {
         self.external_context
-            .as_mut()
-            .and_then(|data| data.downcast_mut::<T>())
+            .iter_mut()
+            .find_map(|data| data.downcast_mut::<T>())
     }
 }
 

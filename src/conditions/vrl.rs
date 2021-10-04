@@ -50,7 +50,7 @@ impl ConditionConfig for VrlConfig {
         let program = vrl::compile(
             &self.source,
             &functions,
-            Some(Box::new(enrichment_tables.clone())),
+            vec![Box::new(enrichment_tables.clone())],
         )
         .map_err(|diagnostics| {
             Formatter::new(&self.source, diagnostics)

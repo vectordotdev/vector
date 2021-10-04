@@ -205,7 +205,7 @@ mod tests {
         };
 
         let mut compiler = state::Compiler::new();
-        compiler.set_external_context(Some(Box::new(registry)));
+        compiler.add_external_context(vec![Box::new(registry)]);
 
         assert_eq!(Ok(()), func.update_state(&mut compiler));
         assert_eq!(Some(IndexHandle(0)), func.index);

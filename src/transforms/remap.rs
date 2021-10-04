@@ -88,7 +88,7 @@ impl Remap {
         let program = vrl::compile(
             &source,
             &functions,
-            Some(Box::new(enrichment_tables.clone())),
+            vec![Box::new(enrichment_tables.clone())],
         )
         .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
 
