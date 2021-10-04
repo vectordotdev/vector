@@ -1,9 +1,14 @@
 package metadata
 
 remap: functions: exists: {
-	category: "Event"
+	category: "Path"
 	description: """
-		Checks whether the `path` exists for the current event.
+		Checks whether the `path` exists for the target.
+
+		This function allows you to distinguish between a missing path,
+		or a path with a `null` value, something a regular path lookup
+		such as `.foo` would not allow, since that always returns `null`
+		if the path doesn't exist.
 		"""
 
 	arguments: [
@@ -11,7 +16,6 @@ remap: functions: exists: {
 			name:        "path"
 			description: "The path of the field to check."
 			required:    true
-			multiple:    false
 			type: ["path"]
 		},
 	]

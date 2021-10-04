@@ -33,6 +33,7 @@ criterion_group!(
               format_int,
               format_number,
               format_timestamp,
+              get,
               get_env_var,
               get_hostname,
               includes,
@@ -89,8 +90,11 @@ criterion_group!(
               parse_xml,
               push,
               redact,
+              remove,
               replace,
+              reverse_dns,
               round,
+              set,
               sha1,
               sha2,
               sha3,
@@ -463,6 +467,25 @@ bench_function! {
 }
 
 bench_function! {
+    set => vrl_stdlib::Set;
+
+    single {
+        args: func_args![value: value!({ "foo": "bar" }), path: vec!["baz"], data: true],
+        want: Ok(value!({ "foo": "bar", "baz": true })),
+    }
+
+    nested {
+        args: func_args![value: value!({ "foo": { "bar": "baz" } }), path: vec!["foo", "bar", "qux"], data: 42],
+        want: Ok(value!({ "foo": { "bar": { "qux": 42 } } })),
+    }
+
+    indexing {
+        args: func_args![value: value!([0, 42, 91]), path: vec![3], data: 1],
+        want: Ok(value!([0, 42, 91, 1])),
+    }
+}
+
+bench_function! {
     ip_aton => vrl_stdlib::IpAton;
 
     valid {
@@ -731,6 +754,25 @@ bench_function! {
     literal {
         args: func_args![value: "ohno"],
         want: Ok(value!(null)),
+    }
+}
+
+bench_function! {
+    get => vrl_stdlib::Get;
+
+    single {
+        args: func_args![value: value!({ "foo": "bar" }), path: vec!["foo"]],
+        want: Ok("bar"),
+    }
+
+    nested {
+        args: func_args![value: value!({ "foo": { "bar": "baz" } }), path: vec!["foo", "bar"]],
+        want: Ok("baz"),
+    }
+
+    indexing {
+        args: func_args![value: value!([0, 42, 91]), path: vec![-2]],
+        want: Ok(42),
     }
 }
 
@@ -1714,6 +1756,25 @@ bench_function! {
 }
 
 bench_function! {
+    remove => vrl_stdlib::Remove;
+
+    single {
+        args: func_args![value: value!({ "foo": "bar", "baz": true }), path: vec!["foo"]],
+        want: Ok(value!({ "baz": true })),
+    }
+
+    nested {
+        args: func_args![value: value!({ "foo": { "bar": "baz" } }), path: vec!["foo", "bar"]],
+        want: Ok(value!({ "foo": {} })),
+    }
+
+    indexing {
+        args: func_args![value: value!([0, 42, 91]), path: vec![-2]],
+        want: Ok(vec![0, 91]),
+    }
+}
+
+bench_function! {
     replace => vrl_stdlib::Replace;
 
     string {
@@ -1732,6 +1793,15 @@ bench_function! {
             with: "o",
         ],
         want: Ok("I like opples ond bononos")
+    }
+}
+
+bench_function! {
+    reverse_dns => vrl_stdlib::ReverseDns;
+
+    google {
+        args: func_args![value: value!("8.8.8.8")],
+        want: Ok(value!("dns.google")),
     }
 }
 
