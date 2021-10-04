@@ -70,7 +70,7 @@ where
         // order to do that, we'll spin up a separate task that deals
         // exclusively with I/O, while we deal with everything else here:
         // batching, ordering, and so on.
-        let request_builder_rate_limit = NonZeroUsize::new(50);
+        let request_builder_concurrency_limit = NonZeroUsize::new(50);
 
         let sink = input
             .batched(
@@ -81,7 +81,7 @@ where
             )
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
             .request_builder(
-                request_builder_rate_limit,
+                request_builder_concurrency_limit,
                 self.request_builder,
                 self.encoding,
                 self.compression,
