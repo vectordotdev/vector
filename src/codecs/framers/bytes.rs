@@ -46,23 +46,23 @@ impl Decoder for BytesCodec {
         // since this will currently result in an infinite loop when using
         // `FramedRead`.
         self.flushed = true;
-        Ok(if src.is_empty() {
-            None
+        if src.is_empty() {
+            Ok(None)
         } else {
             let frame = src.split();
-            Some(frame.freeze())
-        })
+            Ok(Some(frame.freeze()))
+        }
     }
 
     fn decode_eof(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        Ok(if !self.flushed {
+        if !self.flushed {
             self.flushed = true;
             let frame = src.split();
-            Some(frame.freeze())
+            Ok(Some(frame.freeze()))
         } else {
             self.flushed = false;
-            None
-        })
+            Ok(None)
+        }
     }
 }
 
