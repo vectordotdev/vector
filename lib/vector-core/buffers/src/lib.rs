@@ -12,6 +12,7 @@
 extern crate tracing;
 
 mod acker;
+mod buffer_usage_data;
 pub mod bytes;
 #[cfg(feature = "disk-buffer")]
 pub mod disk;
@@ -20,6 +21,7 @@ mod internal_events;
 mod test;
 mod variant;
 
+use crate::buffer_usage_data::BufferUsageData;
 use crate::bytes::{DecodeBytes, EncodeBytes};
 use crate::internal_events::EventsDropped;
 pub use acker::Acker;
@@ -27,75 +29,17 @@ use core_common::byte_size_of::ByteSizeOf;
 use core_common::internal_event::emit;
 use futures::StreamExt;
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
-use internal_events::{BufferEventsReceived, BufferEventsSent};
 use pin_project::pin_project;
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
 use std::pin::Pin;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use std::time::Duration;
-use tokio::time::interval;
-use tracing::{Instrument, Span};
+use tracing::Span;
 pub use variant::*;
-
-pub struct BufferUsageData {
-    received_event_count: AtomicUsize,
-    received_event_byte_size: AtomicUsize,
-    sent_event_count: AtomicUsize,
-    sent_event_byte_size: AtomicUsize,
-    dropped_event_count: Option<AtomicUsize>,
-}
-
-impl BufferUsageData {
-    fn new(dropped_event_count: Option<AtomicUsize>) -> Self {
-        Self {
-            received_event_count: AtomicUsize::new(0),
-            received_event_byte_size: AtomicUsize::new(0),
-            sent_event_count: AtomicUsize::new(0),
-            sent_event_byte_size: AtomicUsize::new(0),
-            dropped_event_count,
-        }
-    }
-
-    fn init_instrumentation(buffer_usage_data: &Arc<BufferUsageData>, span: Span) {
-        let buffer_usage_data = buffer_usage_data.clone();
-        tokio::spawn(
-            async move {
-                let mut interval = interval(Duration::from_secs(2));
-                loop {
-                    interval.tick().await;
-
-                    emit(&BufferEventsReceived {
-                        count: buffer_usage_data
-                            .received_event_count
-                            .load(Ordering::Relaxed),
-                        byte_size: buffer_usage_data
-                            .received_event_byte_size
-                            .load(Ordering::Relaxed),
-                    });
-
-                    emit(&BufferEventsSent {
-                        count: buffer_usage_data.sent_event_count.load(Ordering::Relaxed),
-                        byte_size: buffer_usage_data
-                            .sent_event_byte_size
-                            .load(Ordering::Relaxed),
-                    });
-
-                    if let Some(dropped_event_count) = &buffer_usage_data.dropped_event_count {
-                        emit(&EventsDropped {
-                            count: dropped_event_count.load(Ordering::Relaxed),
-                        });
-                    }
-                }
-            }
-            .instrument(span),
-        );
-    }
-}
 
 /// Build a new buffer based on the passed `Variant`
 ///
@@ -152,12 +96,8 @@ where
                 BufferUsageData::init_instrumentation(&buffer_usage_data, span);
                 let tx = BufferInputCloner::Memory(tx, when_full, Some(buffer_usage_data.clone()));
                 let rx = rx.inspect(move |item: &T| {
-                    buffer_usage_data
-                        .sent_event_count
-                        .fetch_add(1, Ordering::Relaxed);
-                    buffer_usage_data
-                        .sent_event_byte_size
-                        .fetch_add(item.size_of(), Ordering::Relaxed);
+                    buffer_usage_data.increment_sent_event_count(1);
+                    buffer_usage_data.increment_sent_event_byte_size(item.size_of());
                 });
 
                 Ok((tx, Box::new(rx), Acker::Null))
@@ -235,7 +175,7 @@ where
             BufferInputCloner::Disk(writer, when_full) => {
                 let inner: disk::Writer<T> = (*writer).clone();
                 if when_full == &WhenFull::DropNewest {
-                    Box::new(DropWhenFull::new(inner, true))
+                    Box::new(DropWhenFull::new(inner))
                 } else {
                     Box::new(inner)
                 }
@@ -273,14 +213,14 @@ impl<S> MemoryBufferInput<S> {
 
 // Instrumenting events received by the memory buffer can be accomplished by
 // hooking into the lifecycle of writing events to the buffer, hence the
-// InstrumentMemoryBuffer wrapper. This is not necessary for disk buffers
+// MemoryBufferInput wrapper. This is not necessary for disk buffers
 // which are instrumented for this at a lower level in their implementation.
 impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for MemoryBufferInput<S> {
     type Error = S::Error;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let this = self.project();
-        if let Some(_) = this.drop {
+        if this.drop.is_some() {
             match this.inner.poll_ready(cx) {
                 Poll::Ready(Ok(())) => {
                     *this.drop = Some(false);
@@ -305,21 +245,15 @@ impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for MemoryBufferInput<S> {
                     internal_log_rate_secs = 10
                 );
 
-                if let Some(buf_usage_data) = &self.buffer_usage_data {
-                    if let Some(dropped_event_count) = &buf_usage_data.dropped_event_count {
-                        dropped_event_count.fetch_add(1, Ordering::Relaxed);
-                    }
+                if let Some(buffer_usage_data) = &self.buffer_usage_data {
+                    buffer_usage_data.try_increment_dropped_event_count(1);
                 }
                 return Ok(());
             }
         }
-        if let Some(buf_usage_data) = &self.buffer_usage_data {
-            buf_usage_data
-                .received_event_count
-                .fetch_add(1, Ordering::Relaxed);
-            buf_usage_data
-                .received_event_byte_size
-                .fetch_add(item.size_of(), Ordering::Relaxed);
+        if let Some(buffer_usage_data) = &self.buffer_usage_data {
+            buffer_usage_data.increment_received_event_count(1);
+            buffer_usage_data.increment_received_event_byte_size(item.size_of());
         }
         self.project().inner.start_send(item)
     }
@@ -338,16 +272,11 @@ pub struct DropWhenFull<S> {
     #[pin]
     inner: S,
     drop: bool,
-    instrument: bool,
 }
 
 impl<S> DropWhenFull<S> {
-    pub fn new(inner: S, instrument: bool) -> Self {
-        Self {
-            inner,
-            drop: false,
-            instrument,
-        }
+    pub fn new(inner: S) -> Self {
+        Self { inner, drop: false }
     }
 }
 
@@ -375,9 +304,7 @@ impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
                 message = "Shedding load; dropping event.",
                 internal_log_rate_secs = 10
             );
-            if self.instrument {
-                emit(&EventsDropped { count: 1 });
-            }
+            emit(&EventsDropped { count: 1 });
             Ok(())
         } else {
             self.project().inner.start_send(item)

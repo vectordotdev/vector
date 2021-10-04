@@ -9,7 +9,6 @@ use metrics_util::layers::Layer;
 use metrics_util::DebuggingRecorder;
 use std::fmt;
 use std::pin::Pin;
-use tokio::runtime::Runtime;
 use tracing::Span;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::Registry;

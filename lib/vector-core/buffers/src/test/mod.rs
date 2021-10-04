@@ -14,7 +14,7 @@ async fn drop_when_full() {
     future::lazy(|cx| {
         let (tx, rx) = mpsc::channel(2);
 
-        let mut tx = Box::pin(DropWhenFull::new(tx, true));
+        let mut tx = Box::pin(DropWhenFull::new(tx));
 
         assert_eq!(tx.as_mut().poll_ready(cx), Poll::Ready(Ok(())));
         assert_eq!(tx.as_mut().start_send(1), Ok(()));
