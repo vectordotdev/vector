@@ -8,10 +8,10 @@ components: enrichment_tables: file: {
 		For the lookup to be as performant as possible, the data is indexed according to the fields that are used
 		in the search. It should be noted that indexes can only be created for fields for which an exact match is
 		used in the condition. For range searches, an index is not used and the enrichment table drops back to a
-		sequential scan of the data. A sequential scan will not impact performance significantly provided lhere
+		sequential scan of the data. A sequential scan will not impact performance significantly provided there
 		are only a few possible rows returned by the exact matches in the condition. It is not recommended to
 		use a condition that only uses date range searches.
-	"
+	'''
 
 	classes: {
 		commonly_used: false

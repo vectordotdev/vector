@@ -10,7 +10,8 @@ remap: functions: get_enrichment_table_record: {
 		The condition is specified as an object of field to value. The
 		given fields are searched with the enrichment table to find the
 		row that matches the given values. All fields must match.
-		There are currently two form of search criteria:
+
+		There are currently two forms of search criteria:
 
 		1.  An exact match search. The given field must match the value
 		exactly (case sensitivity can be specified with a separate parameter

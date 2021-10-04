@@ -3,14 +3,13 @@ package metadata
 remap: functions: find_enrichment_table_records: {
 	category: "Enrichment"
 	description: """
-		Searches an enrichment table for a row that matches the given
-		condition.
+		Searches an enrichment table for rows that match the given condition.
 
 		The condition is specified as an object of field to value. The
 		given fields are searched with the enrichment table to find the
 		rows that match the given values. All fields must match.
 
-		There are currently two form of search criteria:
+		There are currently two forms of search criteria:
 
 		1.  An exact match search. The given field must match the value
 		exactly (case sensitivity can be specified with a separate parameter
@@ -51,7 +50,7 @@ remap: functions: find_enrichment_table_records: {
 		},
 	]
 	internal_failure_reasons: []
-	return: types: ["object"]
+	return: types: ["array"]
 
 	examples: [
 		{
