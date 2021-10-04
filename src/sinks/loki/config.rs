@@ -2,15 +2,12 @@ use super::healthcheck::healthcheck;
 use super::sink::LokiSink;
 use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
 use crate::http::{Auth, HttpClient, MaybeAuth};
-use crate::sinks::util::buffer::loki::{GlobalTimestamps, LokiBuffer};
 use crate::sinks::util::encoding::EncodingConfig;
-use crate::sinks::util::http::PartitionHttpSink;
-use crate::sinks::util::{
-    BatchConfig, BatchSettings, Concurrency, PartitionBuffer, TowerRequestConfig, UriSerde,
-};
+use crate::sinks::util::{BatchConfig, Concurrency, TowerRequestConfig, UriSerde};
+use crate::sinks::VectorSink;
 use crate::template::Template;
 use crate::tls::{TlsOptions, TlsSettings};
-use futures::{FutureExt, SinkExt};
+use futures::future::FutureExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -69,13 +66,14 @@ impl GenerateConfig for LokiConfig {
     }
 }
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "loki")]
-impl SinkConfig for LokiConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(crate::sinks::VectorSink, crate::sinks::Healthcheck)> {
+impl LokiConfig {
+    fn build_client(&self, cx: SinkContext) -> crate::Result<HttpClient> {
+        let tls = TlsSettings::from_options(&self.tls)?;
+        let client = HttpClient::new(tls, cx.proxy())?;
+        Ok(client)
+    }
+
+    pub fn build_processor(&self, cx: SinkContext) -> crate::Result<VectorSink> {
         if self.labels.is_empty() {
             return Err("`labels` must include at least one label.".into());
         }
@@ -91,11 +89,66 @@ impl SinkConfig for LokiConfig {
             ..Default::default()
         });
 
-        let batch_settings = BatchSettings::default()
-            .bytes(102_400)
-            .events(100_000)
-            .timeout(1)
-            .parse_config(self.batch)?;
+        // let batch_settings = BatchSettings::default()
+        //     .bytes(102_400)
+        //     .events(100_000)
+        //     .timeout(1)
+        //     .parse_config(self.batch)?;
+        let client = self.build_client(cx)?;
+
+        let config = LokiConfig {
+            auth: self.auth.choose_one(&self.endpoint.auth)?,
+            ..self.clone()
+        };
+
+        let sink = LokiSink::new(config.clone())?;
+
+        // let sink = PartitionHttpSink::new(
+        //     sink,
+        //     PartitionBuffer::new(LokiBuffer::new(
+        //         batch_settings.size,
+        //         GlobalTimestamps::default(),
+        //         config.out_of_order_action.clone(),
+        //     )),
+        //     request_settings,
+        //     batch_settings.timeout,
+        //     client.clone(),
+        //     cx.acker(),
+        // )
+        // .ordered()
+        // .sink_map_err(|error| error!(message = "Fatal loki sink error.", %error));
+
+        Ok(VectorSink::Stream(Box::new(sink)))
+    }
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "loki")]
+impl SinkConfig for LokiConfig {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, crate::sinks::Healthcheck)> {
+        if self.labels.is_empty() {
+            return Err("`labels` must include at least one label.".into());
+        }
+
+        for label in self.labels.keys() {
+            if !valid_label_name(label) {
+                return Err(format!("Invalid label name {:?}", label.get_ref()).into());
+            }
+        }
+
+        let request_settings = self.request.unwrap_with(&TowerRequestConfig {
+            concurrency: Concurrency::Fixed(5),
+            ..Default::default()
+        });
+
+        // let batch_settings = BatchSettings::default()
+        //     .bytes(102_400)
+        //     .events(100_000)
+        //     .timeout(1)
+        //     .parse_config(self.batch)?;
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls, cx.proxy())?;
 
@@ -104,26 +157,26 @@ impl SinkConfig for LokiConfig {
             ..self.clone()
         };
 
-        let sink = LokiSink::new(config.clone());
+        let sink = LokiSink::new(config.clone())?;
 
-        let sink = PartitionHttpSink::new(
-            sink,
-            PartitionBuffer::new(LokiBuffer::new(
-                batch_settings.size,
-                GlobalTimestamps::default(),
-                config.out_of_order_action.clone(),
-            )),
-            request_settings,
-            batch_settings.timeout,
-            client.clone(),
-            cx.acker(),
-        )
-        .ordered()
-        .sink_map_err(|error| error!(message = "Fatal loki sink error.", %error));
+        // let sink = PartitionHttpSink::new(
+        //     sink,
+        //     PartitionBuffer::new(LokiBuffer::new(
+        //         batch_settings.size,
+        //         GlobalTimestamps::default(),
+        //         config.out_of_order_action.clone(),
+        //     )),
+        //     request_settings,
+        //     batch_settings.timeout,
+        //     client.clone(),
+        //     cx.acker(),
+        // )
+        // .ordered()
+        // .sink_map_err(|error| error!(message = "Fatal loki sink error.", %error));
 
         let healthcheck = healthcheck(config, client).boxed();
 
-        Ok((crate::sinks::VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
