@@ -80,7 +80,7 @@ impl Handle {
 
 #[derive(Debug)]
 pub struct Histogram {
-    buckets: Box<[(f64, AtomicU32); 22]>,
+    buckets: Box<[(f64, AtomicU32); 20]>,
     count: AtomicU32,
     sum: AtomicF64,
 }
@@ -96,14 +96,12 @@ impl Histogram {
         // around but never quite get to zero with an increasingly coarse
         // long-tail.
         let buckets = Box::new([
-            (f64::NEG_INFINITY, AtomicU32::new(0)),
             (0.015_625, AtomicU32::new(0)),
             (0.03125, AtomicU32::new(0)),
             (0.0625, AtomicU32::new(0)),
             (0.125, AtomicU32::new(0)),
             (0.25, AtomicU32::new(0)),
             (0.5, AtomicU32::new(0)),
-            (0.0, AtomicU32::new(0)),
             (1.0, AtomicU32::new(0)),
             (2.0, AtomicU32::new(0)),
             (4.0, AtomicU32::new(0)),
