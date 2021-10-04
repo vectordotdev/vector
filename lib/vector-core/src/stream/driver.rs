@@ -8,7 +8,7 @@ use tracing::Instrument;
 
 use crate::event::{EventStatus, Finalizable};
 
-#[derive(Eq, Ord)]
+#[derive(Eq)]
 struct PendingAcknowledgement {
     seq_no: u64,
     ack_size: usize,
@@ -24,6 +24,14 @@ impl PartialOrd for PendingAcknowledgement {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         // Reverse ordering so that in a `BinaryHeap`, the lowest sequence number is the highest priority.
         Some(other.seq_no.cmp(&self.seq_no))
+    }
+}
+
+impl Ord for PendingAcknowledgement {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        other
+            .partial_cmp(self)
+            .expect("PendingAcknowledgement should always return a valid comparison")
     }
 }
 
@@ -103,13 +111,8 @@ where
                             pending_acks.push(PendingAcknowledgement { seq_no, ack_size });
 
                             let mut num_to_ack = 0;
-                            loop {
-                                let should_pop = match pending_acks.peek() {
-                                    Some(pending_ack) => pending_ack.seq_no == seq_tail,
-                                    None => break,
-                                };
-
-                                if should_pop {
+                            while let Some(pending_ack) = pending_acks.peek() {
+                                if pending_ack.seq_no == seq_tail {
                                     let PendingAcknowledgement { ack_size, .. } = pending_acks.pop()
                                         .expect("should not be here unless pending_acks is non-empty");
                                     num_to_ack += ack_size;
