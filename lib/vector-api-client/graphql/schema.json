@@ -1358,9 +1358,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Id of the component associated with the notification",
+              "description": "Pattern that raised the event",
               "isDeprecated": false,
-              "name": "componentId",
+              "name": "pattern",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1369,18 +1369,6 @@
                   "name": "String",
                   "ofType": null
                 }
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": "Id of the pipeline associated to the component",
-              "isDeprecated": false,
-              "name": "pipelineId",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
               }
             },
             {
@@ -5857,7 +5845,7 @@
                 {
                   "defaultValue": null,
                   "description": null,
-                  "name": "componentIds",
+                  "name": "patterns",
                   "type": {
                     "kind": "NON_NULL",
                     "name": null,
@@ -5906,9 +5894,9 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "A stream of events emitted from matched component(s)",
+              "description": "A stream of events emitted from matched component ID patterns",
               "isDeprecated": false,
-              "name": "outputEvents",
+              "name": "outputEventsByComponentIdPatterns",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,

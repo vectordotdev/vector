@@ -7923,6 +7923,7 @@ dependencies = [
  "ansi_term 0.12.1",
  "chrono",
  "chrono-tz",
+ "enrichment",
  "glob",
  "prettydiff",
  "regex",

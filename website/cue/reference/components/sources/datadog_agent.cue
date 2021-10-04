@@ -8,15 +8,6 @@ components: sources: datadog_agent: {
 	description: """
 		Receives observability data from a Datadog Agent over HTTP or HTTPS. For now, this is limited to logs, but will
 		be expanded in the future to cover metrics and traces.
-
-		To send logs from a Datadog Agent to this source, the [Datadog Agent](\(urls.datadog_agent_doc)) configuration
-		must be updated to use:
-
-		```
-		logs_config.dd_url = "<VECTOR_HOST>:<SOURCE_PORT>"
-		logs_config.use_v2_api = false # source does not yet support new v2 API
-		logs_config.use_http = true # this source only supports HTTP/HTTPS
-		logs_config.logs_no_ssl = true|false # should match source SSL configuration.
 		"""
 
 	classes: {
@@ -127,6 +118,24 @@ components: sources: datadog_agent: {
 					syntax: "literal"
 				}
 			}
+		}
+	}
+
+	how_it_works: {
+		decompression: {
+			title: "Configuring the Datadog Agent"
+			body:  """
+				To send logs from a Datadog Agent to this source, the [Datadog Agent](\(urls.datadog_agent_doc)) configuration
+				must be updated to use:
+
+				```yaml
+				logs_config:
+					dd_url: "<VECTOR_HOST>:<SOURCE_PORT>"
+					use_v2_api: false # source does not yet support new v2 API
+					use_http: true # this source only supports HTTP/HTTPS
+					logs_no_ssl: true|false # should match source SSL configuration.
+				```
+				"""
 		}
 	}
 }
