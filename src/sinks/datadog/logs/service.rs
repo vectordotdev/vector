@@ -144,7 +144,7 @@ impl Service<LogApiRequest> for LogApiService {
                     match status {
                         StatusCode::BAD_REQUEST => Err(LogApiError::BadRequest),
                         StatusCode::FORBIDDEN => Ok(LogApiResponse::PermissionIssue),
-                        StatusCode::OK => Ok(LogApiResponse::Ok),
+                        StatusCode::ACCEPTED => Ok(LogApiResponse::Ok),
                         StatusCode::PAYLOAD_TOO_LARGE => Err(LogApiError::PayloadTooLarge),
                         _ => Err(LogApiError::ServerError),
                     }
