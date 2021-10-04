@@ -139,26 +139,23 @@ pub fn wtr_measurement<const N: usize>(
         Vec<Message<N>>,
     ),
 ) {
-    let rt = Runtime::new().unwrap();
-    rt.block_on(async move {
-        {
-            let waker = noop_waker();
-            let mut context = Context::from_waker(&waker);
+    {
+        let waker = noop_waker();
+        let mut context = Context::from_waker(&waker);
 
-            let mut sink = input.0;
-            for msg in input.2.into_iter() {
-                send_msg(msg, sink.as_mut(), &mut context)
-            }
+        let mut sink = input.0;
+        for msg in input.2.into_iter() {
+            send_msg(msg, sink.as_mut(), &mut context)
         }
+    }
 
-        {
-            let waker = noop_waker();
-            let mut context = Context::from_waker(&waker);
+    {
+        let waker = noop_waker();
+        let mut context = Context::from_waker(&waker);
 
-            let mut stream = input.1;
-            consume(stream.as_mut(), &mut context)
-        }
-    })
+        let mut stream = input.1;
+        consume(stream.as_mut(), &mut context)
+    }
 }
 
 #[allow(clippy::type_complexity)]
@@ -169,21 +166,18 @@ pub fn war_measurement<const N: usize>(
         Vec<Message<N>>,
     ),
 ) {
-    let rt = Runtime::new().unwrap();
-    rt.block_on(async move {
-        let snd_waker = noop_waker();
-        let mut snd_context = Context::from_waker(&snd_waker);
+    let snd_waker = noop_waker();
+    let mut snd_context = Context::from_waker(&snd_waker);
 
-        let rcv_waker = noop_waker();
-        let mut rcv_context = Context::from_waker(&rcv_waker);
+    let rcv_waker = noop_waker();
+    let mut rcv_context = Context::from_waker(&rcv_waker);
 
-        let mut stream = input.1;
-        let mut sink = input.0;
-        for msg in input.2.into_iter() {
-            send_msg(msg, sink.as_mut(), &mut snd_context);
-            consume(stream.as_mut(), &mut rcv_context)
-        }
-    })
+    let mut stream = input.1;
+    let mut sink = input.0;
+    for msg in input.2.into_iter() {
+        send_msg(msg, sink.as_mut(), &mut snd_context);
+        consume(stream.as_mut(), &mut rcv_context)
+    }
 }
 
 pub fn init_instrumentation() {
