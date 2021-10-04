@@ -276,7 +276,7 @@ following log:
 
 Which can be achieved with the following VRL program:
 
-```ruby
+```coffee
 . = parse_common_log!(.log)
 .total_bytes = del(.size)
 .internal_request = ip_cidr_contains("5.86.0.0/16", .host) ?? false
@@ -369,7 +369,7 @@ We want to parse it into this result:
 
 Someone new to VRL might write the following VRL program:
 
-```ruby
+```coffee
 . = parse_common_log(.log)
 .total_bytes = del(.size)
 ```
@@ -402,7 +402,7 @@ three things:
 
 1.  **Handle the error**
 
-    ```ruby
+    ```coffee
     ., err = parse_common_log(.log)
     if err != null {
       .malformed = true
@@ -421,7 +421,7 @@ three things:
 
 2.  **Raise the error and abort**
 
-    ```ruby
+    ```coffee
     . = parse_common_log!(.log)
     .total_bytes = del(.size)
     ```
@@ -436,7 +436,7 @@ three things:
 
 3.  **Specify types**
 
-    ```ruby
+    ```coffee
     .log = to_string!(.log)
 
     ., err = parse_common_log(.log)

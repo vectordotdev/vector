@@ -59,7 +59,7 @@ conforms to your expectations. VRL provides two assertion functions:
 
 With both functions, you can supply a custom log message to be emitted if the assertion fails:
 
-```ruby
+```coffee
 # Named argument
 assert!(1 == 2, message: "the rules of arithmetic have been violated")
 assert_eq!(1, 2, message: "the rules of arithmetic have been violated")
