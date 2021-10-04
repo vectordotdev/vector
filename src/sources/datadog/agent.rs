@@ -220,7 +220,7 @@ impl DatadogAgentSource {
                     };
 
                     let events = decode(&encoding_header, body)
-                        .and_then(|body| self.decode_body(self.decoder.clone(), body, token));
+                        .and_then(|body| self.decode_body(body, token));
                     Self::handle_request(events, acknowledgements, out.clone())
                 },
             )
@@ -229,7 +229,6 @@ impl DatadogAgentSource {
 
     fn decode_body(
         &self,
-        decoder: codecs::Decoder,
         body: Bytes,
         api_key: Option<Arc<str>>,
     ) -> Result<Vec<Event>, ErrorMessage> {
@@ -253,7 +252,7 @@ impl DatadogAgentSource {
         let mut decoded = Vec::new();
 
         for message in messages {
-            let mut decoder = decoder.clone();
+            let mut decoder = self.decoder.clone();
             let mut buffer = BytesMut::new();
             buffer.put(message.message);
             loop {
@@ -356,6 +355,7 @@ struct LogMsg {
 mod tests {
     use super::{DatadogAgentConfig, LogMsg};
     use crate::{
+        codecs::{self, BytesCodec, BytesParser},
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus},
         sources::datadog::agent::DatadogAgentSource,
@@ -393,10 +393,10 @@ mod tests {
             let body = Bytes::from(serde_json::to_string(&msgs).unwrap());
             let api_key = None;
 
-            let source = DatadogAgentSource::new(true, Default::default());
-            let events = source
-                .decode_body(Default::default(), body, api_key)
-                .unwrap();
+            let decoder =
+                codecs::Decoder::new(Box::new(BytesCodec::new()), Box::new(BytesParser::new()));
+            let source = DatadogAgentSource::new(true, decoder);
+            let events = source.decode_body(body, api_key).unwrap();
             assert_eq!(events.len(), msgs.len());
             for (msg, event) in msgs.into_iter().zip(events.into_iter()) {
                 let log = event.as_log();
