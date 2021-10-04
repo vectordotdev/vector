@@ -1,5 +1,3 @@
-// ## skip check-events ##
-
 use hyper::StatusCode;
 use metrics::{counter, histogram};
 #[cfg(feature = "sources-prometheus")]
@@ -65,7 +63,7 @@ pub struct PrometheusParseError<'a> {
 #[cfg(feature = "sources-prometheus")]
 impl<'a> InternalEvent for PrometheusParseError<'a> {
     fn emit_logs(&self) {
-        error!(message = "Parsing error.", url = %self.url, error = ?self.error);
+        error!(message = "Parsing error.", url = %self.url, error = ?self.error, stage = "processing");
         debug!(
             message = %format!("Failed to parse response:\n\n{}\n\n", self.body),
             url = %self.url,
@@ -75,22 +73,41 @@ impl<'a> InternalEvent for PrometheusParseError<'a> {
 
     fn emit_metrics(&self) {
         counter!("parse_errors_total", 1);
+        counter!(
+            "component_errors_total", 1,
+            "stage" => "processing",
+            "error_type" => "parse_failed",
+            "url" => self.url.to_string(),
+        );
     }
 }
 
 #[derive(Debug)]
-pub struct PrometheusErrorResponse {
+pub struct PrometheusHttpResponseError {
     pub code: hyper::StatusCode,
     pub url: http::Uri,
 }
 
-impl InternalEvent for PrometheusErrorResponse {
+impl InternalEvent for PrometheusHttpResponseError {
     fn emit_logs(&self) {
-        error!(message = "HTTP error response.", url = %self.url, code = %self.code);
+        error!(
+            message = "HTTP error response.",
+            url = %self.url,
+            code = %self.code,
+            stage = "receiving",
+            error = "Invalid HTTP response"
+        );
     }
 
     fn emit_metrics(&self) {
         counter!("http_error_response_total", 1);
+        counter!(
+            "component_errors_total", 1,
+            "code" => self.code.to_string(),
+            "url" => self.url.to_string(),
+            "error_type" => "http_error",
+            "stage" => "receiving",
+        );
     }
 }
 
@@ -102,11 +119,22 @@ pub struct PrometheusHttpError {
 
 impl InternalEvent for PrometheusHttpError {
     fn emit_logs(&self) {
-        error!(message = "HTTP request processing error.", url = %self.url, error = ?self.error);
+        error!(
+            message = "HTTP request processing error.",
+            url = %self.url,
+            error = ?self.error,
+            stage = "receiving",
+        );
     }
 
     fn emit_metrics(&self) {
         counter!("http_request_errors_total", 1);
+        counter!(
+            "component_errors_total", 1,
+            "url" => self.url.to_string(),
+            "error_type" => "http_error",
+            "stage" => "receiving",
+        );
     }
 }
 
@@ -117,22 +145,20 @@ pub struct PrometheusRemoteWriteParseError {
 
 impl InternalEvent for PrometheusRemoteWriteParseError {
     fn emit_logs(&self) {
-        error!(message = "Could not decode request body.", error = ?self.error);
+        error!(
+            message = "Could not decode request body.",
+            error = ?self.error,
+            stage = "processing"
+        );
     }
 
     fn emit_metrics(&self) {
         counter!("parse_errors_total", 1);
-    }
-}
-
-#[derive(Debug)]
-pub struct PrometheusRemoteWriteReceived {
-    pub count: usize,
-}
-
-impl InternalEvent for PrometheusRemoteWriteReceived {
-    fn emit_logs(&self) {
-        debug!(message = "Received remote_write events.", count = ?self.count);
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => "parse_failed",
+            "stage" => "processing",
+        );
     }
 }
 
@@ -142,13 +168,20 @@ pub struct PrometheusNoNameError;
 impl InternalEvent for PrometheusNoNameError {
     fn emit_logs(&self) {
         error!(
-            message = "Decoded timeseries is missing the __name__ field.",
+            message = "Could not decode timeseries.",
+            error = "Decoded timeseries is missing the __name__ field.",
+            stage = "processing",
             internal_log_rate_secs = 5
         );
     }
 
     fn emit_metrics(&self) {
         counter!("parse_errors_total", 1);
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => "parse_failed",
+            "stage" => "processing",
+        );
     }
 }
 
