@@ -1,122 +1,122 @@
-name: Benchmark Suite
+# name: Benchmark Suite
 
-on:
-  pull_request:
-    paths:
-      - ".github/workflows/benches.yml"
-      - ".cargo/**"
-      - "benches/**"
-      - "lib/**"
-      - "proto/**"
-      - "src/**"
-      - "tests/**"
-      - "build.rs"
-      - "Cargo.lock"
-      - "Cargo.toml"
-      - "rust-toolchain"
-  push:
-    branches:
-      - master
-    paths:
-      - ".github/workflows/benches.yml"
-      - ".cargo/**"
-      - "benches/**"
-      - "lib/**"
-      - "proto/**"
-      - "src/**"
-      - "tests/**"
-      - "build.rs"
-      - "Cargo.lock"
-      - "Cargo.toml"
-      - "rust-toolchain"
-  workflow_dispatch:
+# on:
+#   pull_request:
+#     paths:
+#       - ".github/workflows/benches.yml"
+#       - ".cargo/**"
+#       - "benches/**"
+#       - "lib/**"
+#       - "proto/**"
+#       - "src/**"
+#       - "tests/**"
+#       - "build.rs"
+#       - "Cargo.lock"
+#       - "Cargo.toml"
+#       - "rust-toolchain"
+#   push:
+#     branches:
+#       - master
+#     paths:
+#       - ".github/workflows/benches.yml"
+#       - ".cargo/**"
+#       - "benches/**"
+#       - "lib/**"
+#       - "proto/**"
+#       - "src/**"
+#       - "tests/**"
+#       - "build.rs"
+#       - "Cargo.lock"
+#       - "Cargo.toml"
+#       - "rust-toolchain"
+#   workflow_dispatch:
 
-env:
-  VERBOSE: true
-  AWS_ACCESS_KEY_ID: "dummy"
-  AWS_SECRET_ACCESS_KEY: "dummy"
-  CI: true
-  AWS_REGION: us-east-1
+# env:
+#   VERBOSE: true
+#   AWS_ACCESS_KEY_ID: "dummy"
+#   AWS_SECRET_ACCESS_KEY: "dummy"
+#   CI: true
+#   AWS_REGION: us-east-1
 
-jobs:
-  cancel-previous:
-    runs-on: ubuntu-20.04
-    timeout-minutes: 3
-    if: github.ref != 'refs/heads/master'
-    steps:
-      - uses: styfle/cancel-workflow-action@0.9.0
-        with:
-          access_token: ${{ secrets.GITHUB_TOKEN }}
-          all_but_latest: true # can cancel workflows scheduled later
+# jobs:
+#   cancel-previous:
+#     runs-on: ubuntu-20.04
+#     timeout-minutes: 3
+#     if: github.ref != 'refs/heads/master'
+#     steps:
+#       - uses: styfle/cancel-workflow-action@0.9.0
+#         with:
+#           access_token: ${{ secrets.GITHUB_TOKEN }}
+#           all_but_latest: true # can cancel workflows scheduled later
 
-  bench:
-    name: Bench - Linux
-    runs-on: [self-hosted, linux, x64, benchmarks]
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2.1.5
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
+#   bench:
+#     name: Bench - Linux
+#     runs-on: [self-hosted, linux, x64, benchmarks]
+#     steps:
+#       - uses: actions/checkout@v2
+#       - uses: actions/cache@v2.1.5
+#         with:
+#           path: |
+#             ~/.cargo/registry
+#             ~/.cargo/git
+#           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+#       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+#       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+#       - run: bash scripts/environment/prepare.sh
+#       - run: echo "::add-matcher::.github/matchers/rust.json"
+#       - run: make slim-builds
 
-      - name: Checkout master to build first
-        run: |
-          git fetch --depth 1 origin master
-          git checkout --force origin/master
-        # build benchmarks on all CPUs, including isolated benchmarking CPU
-      - name: Prebuild master benchmarks
-        run: taskset -c "0-$(nproc)" make bench-all CARGO_BENCH_FLAGS="--no-run"
-        # run benchmarks on isolated CPU and with address randomization
-        # disabled
-      - name: Run master benchmarks
-        run: setarch $(uname -m) -R taskset -c "$(cat /sys/devices/system/cpu/isolated)" make bench-all
+#       - name: Checkout master to build first
+#         run: |
+#           git fetch --depth 1 origin master
+#           git checkout --force origin/master
+#         # build benchmarks on all CPUs, including isolated benchmarking CPU
+#       - name: Prebuild master benchmarks
+#         run: taskset -c "0-$(nproc)" make bench-all CARGO_BENCH_FLAGS="--no-run"
+#         # run benchmarks on isolated CPU and with address randomization
+#         # disabled
+#       - name: Run master benchmarks
+#         run: setarch $(uname -m) -R taskset -c "$(cat /sys/devices/system/cpu/isolated)" make bench-all
 
-      - name: Checkout current SHA
-        run: git clean --force && git checkout --force $GITHUB_SHA
-        # build benchmarks on all CPUs, including isolated benchmarking CPU
-      - name: Prebuild benchmarks
-        run: taskset -c "0-$(nproc)" make bench-all CARGO_BENCH_FLAGS="--no-run"
-        # run benchmarks on isolated CPU and with address randomization
-        # disabled
-      - name: Run benchmarks
-        run: |
-          mkdir -p target/criterion
-          setarch $(uname -m) -R taskset -c "$(cat /sys/devices/system/cpu/isolated)" make bench-all | tee target/criterion/out
+#       - name: Checkout current SHA
+#         run: git clean --force && git checkout --force $GITHUB_SHA
+#         # build benchmarks on all CPUs, including isolated benchmarking CPU
+#       - name: Prebuild benchmarks
+#         run: taskset -c "0-$(nproc)" make bench-all CARGO_BENCH_FLAGS="--no-run"
+#         # run benchmarks on isolated CPU and with address randomization
+#         # disabled
+#       - name: Run benchmarks
+#         run: |
+#           mkdir -p target/criterion
+#           setarch $(uname -m) -R taskset -c "$(cat /sys/devices/system/cpu/isolated)" make bench-all | tee target/criterion/out
 
-      - uses: actions/upload-artifact@v2
-        with:
-          name: "criterion"
-          path: "./target/criterion"
-      - name: Upload criterion data to S3
-        run: scripts/upload-benchmarks-s3.sh
-        if: github.ref == 'refs/heads/master'
-        env:
-          AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
-          AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
-      # note: should run last to flag regressions
-      - name: Compare benchmarks
-        run: |
-          echo "Comparing $(git rev-parse HEAD) with $(git rev-parse origin/master)"
-          cat target/criterion/out | scripts/check-criterion-output.sh
+#       - uses: actions/upload-artifact@v2
+#         with:
+#           name: "criterion"
+#           path: "./target/criterion"
+#       - name: Upload criterion data to S3
+#         run: scripts/upload-benchmarks-s3.sh
+#         if: github.ref == 'refs/heads/master'
+#         env:
+#           AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
+#           AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
+#       # note: should run last to flag regressions
+#       - name: Compare benchmarks
+#         run: |
+#           echo "Comparing $(git rev-parse HEAD) with $(git rev-parse origin/master)"
+#           cat target/criterion/out | scripts/check-criterion-output.sh
 
-  master-failure:
-    name: master-failure
-    if: failure() && github.ref == 'refs/heads/master'
-    needs:
-      - cancel-previous
-      - bench
-    runs-on: ubuntu-20.04
-    steps:
-    - name: Discord notification
-      env:
-        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      uses: Ilshidur/action-discord@0.3.0
-      with:
-        args: "Master benchmarks failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
+#   master-failure:
+#     name: master-failure
+#     if: failure() && github.ref == 'refs/heads/master'
+#     needs:
+#       - cancel-previous
+#       - bench
+#     runs-on: ubuntu-20.04
+#     steps:
+#     - name: Discord notification
+#       env:
+#         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+#       uses: Ilshidur/action-discord@0.3.0
+#       with:
+#         args: "Master benchmarks failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"

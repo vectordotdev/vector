@@ -1,36 +1,36 @@
-# A workflow that runs [cargo-flake](https://github.com/blt/cargo-flake) across
-# our tests, benchmarks included.
-#
-# This is a nighly flow as the cargo-flake run is time consuming.
-name: cargo_flake
+# # A workflow that runs [cargo-flake](https://github.com/blt/cargo-flake) across
+# # our tests, benchmarks included.
+# #
+# # This is a nighly flow as the cargo-flake run is time consuming.
+# name: cargo_flake
 
-on:
-  workflow_dispatch:
-  schedule:
-    - cron: "0 0 * * *"
+# on:
+#   workflow_dispatch:
+#   schedule:
+#     - cron: "0 0 * * *"
 
-env:
-  AUTOINSTALL: true
-  VERBOSE: true
-  CI: true
-  DEBIAN_FRONTEND: noninteractive
+# env:
+#   AUTOINSTALL: true
+#   VERBOSE: true
+#   CI: true
+#   DEBIAN_FRONTEND: noninteractive
 
-jobs:
-  hack:
-    runs-on: [self-hosted, linux, x64, general]
-    name: Cargo Flake
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2.1.5
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: cargo install cargo-flake
-      - run: make slim-builds
-      - run: cargo flake --features 'default benches metrics-benches remap-benches'
+# jobs:
+#   hack:
+#     runs-on: [self-hosted, linux, x64, general]
+#     name: Cargo Flake
+#     steps:
+#       - uses: actions/checkout@v2
+#       - uses: actions/cache@v2.1.5
+#         with:
+#           path: |
+#             ~/.cargo/registry
+#             ~/.cargo/git
+#           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+#       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+#       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+#       - run: bash scripts/environment/prepare.sh
+#       - run: echo "::add-matcher::.github/matchers/rust.json"
+#       - run: cargo install cargo-flake
+#       - run: make slim-builds
+#       - run: cargo flake --features 'default benches metrics-benches remap-benches'
