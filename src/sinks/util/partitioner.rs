@@ -2,10 +2,6 @@ use crate::{internal_events::TemplateRenderingFailed, template::Template};
 use vector_core::{event::Event, partition::Partitioner};
 
 /// Partitions items based on the generated S3 object key for the given event.
-///
-/// TODO: Realistically, this could be a generic "template partitioner", since
-/// I'm guessing other sinks might want to partition based on a key generated
-/// from event data.
 pub struct KeyPartitioner(Template);
 
 impl KeyPartitioner {

@@ -12,7 +12,7 @@ use tower::Service;
 use vector_core::{buffers::Ackable, event::Finalizable, sink::StreamSink};
 use vector_core::{buffers::Acker, event::EventStatus};
 
-pub struct S3Sink<Svc, RB, E> {
+pub struct AzureBlobSink<Svc, RB, E> {
     acker: Acker,
     service: Svc,
     request_builder: RB,
@@ -24,7 +24,7 @@ pub struct S3Sink<Svc, RB, E> {
     batch_timeout: Duration,
 }
 
-impl<Svc, RB, E> S3Sink<Svc, RB, E> {
+impl<Svc, RB, E> AzureBlobSink<Svc, RB, E> {
     pub fn new(
         cx: SinkContext,
         service: Svc,
@@ -50,7 +50,7 @@ impl<Svc, RB, E> S3Sink<Svc, RB, E> {
     }
 }
 
-impl<Svc, RB, E> S3Sink<Svc, RB, E>
+impl<Svc, RB, E> AzureBlobSink<Svc, RB, E>
 where
     Svc: Service<RB::Request> + Send + 'static,
     Svc::Future: Send + 'static,
@@ -88,7 +88,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        error!("Failed to build S3 request: {:?}.", e);
+                        error!("Failed to build Azure Blob request: {:?}.", e);
                         None
                     }
                     Ok(req) => Some(req),
@@ -101,7 +101,7 @@ where
 }
 
 #[async_trait]
-impl<Svc, RB, E> StreamSink for S3Sink<Svc, RB, E>
+impl<Svc, RB, E> StreamSink for AzureBlobSink<Svc, RB, E>
 where
     Svc: Service<RB::Request> + Send + 'static,
     Svc::Future: Send + 'static,

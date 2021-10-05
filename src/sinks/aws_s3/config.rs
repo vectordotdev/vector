@@ -8,7 +8,6 @@ use crate::{
         s3_common::{
             self,
             config::{S3Options, S3RetryLogic},
-            partitioner::KeyPartitioner,
             service::S3Service,
         },
         util::{
@@ -26,6 +25,7 @@ use tower::ServiceBuilder;
 use vector_core::sink::VectorSink;
 
 use super::sink::S3RequestOptions;
+use crate::sinks::util::partitioner::KeyPartitioner;
 
 const DEFAULT_REQUEST_LIMITS: TowerRequestConfig = {
     TowerRequestConfig::const_new(Concurrency::Fixed(50), Concurrency::Fixed(50))

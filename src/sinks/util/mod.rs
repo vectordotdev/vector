@@ -6,6 +6,7 @@ pub mod compressor;
 pub mod concurrent_map;
 pub mod encoding;
 pub mod http;
+pub mod partitioner;
 pub mod request_builder;
 pub mod retries;
 pub mod service;
