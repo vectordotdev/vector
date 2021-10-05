@@ -101,7 +101,7 @@ pub trait SinkBuilderExt: Stream {
                 // Split the input into metadata and events.
                 let (metadata, events) = builder
                     .split_input(input)
-                    .map_err(|e| RequestBuilderError::SplitError(e))?;
+                    .map_err(RequestBuilderError::SplitError)?;
 
                 // Encode/compress each event.
                 for event in events.into_iter() {
@@ -111,7 +111,7 @@ pub trait SinkBuilderExt: Stream {
                     // pass the error through.
                     let _ = encoder
                         .encode_event(event, &mut compressor)
-                        .map_err(|e| RequestBuilderError::EncodingError(e))?;
+                        .map_err(RequestBuilderError::EncodingError)?;
                 }
 
                 // Now build the actual request.
