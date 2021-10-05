@@ -1121,7 +1121,7 @@ dependencies = [
  "prost-types",
  "tonic",
  "tonic-build",
- "tracing-core 0.1.20",
+ "tracing-core 0.1.21",
 ]
 
 [[package]]
@@ -1140,7 +1140,7 @@ dependencies = [
  "tokio-stream",
  "tonic",
  "tracing 0.1.28",
- "tracing-core 0.1.20",
+ "tracing-core 0.1.21",
  "tracing-subscriber",
 ]
 
@@ -3651,7 +3651,7 @@ dependencies = [
  "metrics-util",
  "once_cell",
  "tracing 0.1.28",
- "tracing-core 0.1.20",
+ "tracing-core 0.1.21",
  "tracing-subscriber",
 ]
 
@@ -7063,7 +7063,7 @@ dependencies = [
  "log",
  "pin-project-lite",
  "tracing-attributes 0.1.16",
- "tracing-core 0.1.20",
+ "tracing-core 0.1.21",
 ]
 
 [[package]]
@@ -7097,9 +7097,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-core"
-version = "0.1.20"
+version = "0.1.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46125608c26121c81b0c6d693eab5a420e416da7e43c426d2e8f7df8da8a3acf"
+checksum = "1f4ed65637b8390770814083d20756f87bfa2c21bf2f110babdc5438351746e4"
 dependencies = [
  "lazy_static",
 ]
@@ -7134,7 +7134,7 @@ dependencies = [
  "dashmap",
  "mock_instant",
  "tracing 0.1.28",
- "tracing-core 0.1.20",
+ "tracing-core 0.1.21",
  "tracing-subscriber",
 ]
 
@@ -7146,7 +7146,7 @@ checksum = "a6923477a48e41c1951f1999ef8bb5a3023eb723ceadafe78ffb65dc366761e3"
 dependencies = [
  "lazy_static",
  "log",
- "tracing-core 0.1.20",
+ "tracing-core 0.1.21",
 ]
 
 [[package]]
@@ -7156,7 +7156,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb65ea441fbb84f9f6748fd496cf7f63ec9af5bca94dd86456978d055e8eb28b"
 dependencies = [
  "serde",
- "tracing-core 0.1.20",
+ "tracing-core 0.1.21",
 ]
 
 [[package]]
@@ -7176,7 +7176,7 @@ dependencies = [
  "smallvec",
  "thread_local",
  "tracing 0.1.28",
- "tracing-core 0.1.20",
+ "tracing-core 0.1.21",
  "tracing-log",
  "tracing-serde",
 ]
@@ -7671,7 +7671,7 @@ dependencies = [
  "tower-layer",
  "tower-test",
  "tracing 0.1.28",
- "tracing-core 0.1.20",
+ "tracing-core 0.1.21",
  "tracing-futures 0.2.5",
  "tracing-limit",
  "tracing-log",
@@ -7771,7 +7771,7 @@ dependencies = [
  "toml",
  "tower",
  "tracing 0.1.28",
- "tracing-core 0.1.20",
+ "tracing-core 0.1.21",
  "tracing-log",
  "tracing-subscriber",
  "twox-hash",
