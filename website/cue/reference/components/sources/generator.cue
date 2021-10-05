@@ -18,6 +18,7 @@ components: sources: generator: {
 
 	features: {
 		multiline: enabled: false
+		codecs: enabled:    true
 		generate: {}
 	}
 
