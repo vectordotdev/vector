@@ -1,9 +1,10 @@
 use super::config::{Encoding, LokiConfig, OutOfOrderAction};
 use crate::config::log_schema;
-use crate::event::{self, Event, Value};
 use crate::http::Auth;
-use crate::internal_events::{LokiEventUnlabeled, LokiEventsProcessed, TemplateRenderingFailed};
-use crate::internal_events::{LokiOutOfOrderEventDropped, LokiOutOfOrderEventRewritten};
+use crate::internal_events::{
+    LokiEventUnlabeled, LokiEventsProcessed, LokiOutOfOrderEventDropped,
+    LokiOutOfOrderEventRewritten, TemplateRenderingFailed,
+};
 use crate::sinks::util::buffer::loki::{
     GlobalTimestamps, Labels, LokiEvent, LokiRecord, PartitionKey,
 };
@@ -19,6 +20,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use tokio::sync::mpsc::channel;
+use vector_core::event::{self, Event, Value};
 use vector_core::partition::Partitioner;
 use vector_core::sink::StreamSink;
 use vector_core::stream::batcher::Batcher;
@@ -313,7 +315,7 @@ impl LokiSink {
 
 #[async_trait::async_trait]
 impl StreamSink for LokiSink {
-    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let io_bandwidth = 64;
         let (io_tx, io_rx) = channel(io_bandwidth);
 
