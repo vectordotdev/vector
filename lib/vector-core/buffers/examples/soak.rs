@@ -24,7 +24,7 @@ pub struct Message<const N: usize> {
 
 impl<const N: usize> ByteSizeOf for Message<N> {
     fn allocated_bytes(&self) -> usize {
-        self.id.size_of() + self._padding.iter().fold(0, |acc, v| acc + v.size_of())
+        0
     }
 }
 
