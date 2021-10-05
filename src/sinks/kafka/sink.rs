@@ -3,6 +3,7 @@ use super::config::KafkaSinkConfig;
 use crate::event::Event;
 use crate::internal_events::TemplateRenderingFailed;
 use crate::kafka::KafkaStatisticsContext;
+use crate::sinks::kafka::config::QUEUED_MIN_MESSAGES;
 use crate::sinks::kafka::encoder::Encoding;
 use crate::sinks::kafka::request_builder::KafkaRequestBuilder;
 use crate::sinks::kafka::service::KafkaService;
@@ -21,9 +22,8 @@ use snafu::{ResultExt, Snafu};
 use std::convert::TryFrom;
 use std::num::NonZeroUsize;
 use tokio::time::Duration;
-use vector_core::buffers::Acker;
 use tower::limit::ConcurrencyLimit;
-use crate::sinks::kafka::config::QUEUED_MIN_MESSAGES;
+use vector_core::buffers::Acker;
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {

@@ -44,14 +44,12 @@ impl Finalizable for KafkaRequest {
 }
 
 pub struct KafkaService {
-    kafka_producer: FutureProducer<KafkaStatisticsContext>
+    kafka_producer: FutureProducer<KafkaStatisticsContext>,
 }
 
 impl KafkaService {
     pub fn new(kafka_producer: FutureProducer<KafkaStatisticsContext>) -> KafkaService {
-        KafkaService {
-            kafka_producer
-        }
+        KafkaService { kafka_producer }
     }
 }
 
