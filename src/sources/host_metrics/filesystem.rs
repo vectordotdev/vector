@@ -114,7 +114,7 @@ impl HostMetrics {
                     .await
             }
             Err(error) => {
-                error!(message = "Failed to load partitions info", %error, internal_log_rate_secs = 60);
+                error!(message = "Failed to load partitions info.", %error, internal_log_rate_secs = 60);
                 vec![]
             }
         }

@@ -1,4 +1,4 @@
-use getset::{Getters, MutGetters, Setters};
+use getset::{CopyGetters, Getters, MutGetters, Setters};
 
 #[derive(Getters, MutGetters, Default, Debug, Clone)]
 #[get = "pub"]
@@ -35,8 +35,8 @@ impl DnstapEventSchema {
     }
 }
 
-#[derive(Getters, Setters, Debug, Clone)]
-#[get = "pub"]
+#[derive(CopyGetters, Setters, Debug, Clone)]
+#[get_copy = "pub"]
 pub struct DnstapRootDataSchema {
     server_identity: &'static str,
     server_version: &'static str,
@@ -68,8 +68,8 @@ impl Default for DnstapRootDataSchema {
     }
 }
 
-#[derive(Getters, Debug, Clone)]
-#[get = "pub"]
+#[derive(CopyGetters, Debug, Clone)]
+#[get_copy = "pub"]
 pub struct DnstapMessageSchema {
     socket_family: &'static str,
     socket_protocol: &'static str,
@@ -102,8 +102,8 @@ impl Default for DnstapMessageSchema {
     }
 }
 
-#[derive(Getters, Debug, Clone)]
-#[get = "pub"]
+#[derive(CopyGetters, Debug, Clone)]
+#[get_copy = "pub"]
 pub struct DnsMessageCommonSchema {
     response_code: &'static str,
     response: &'static str,
@@ -126,8 +126,8 @@ impl Default for DnsMessageCommonSchema {
     }
 }
 
-#[derive(Getters, Debug, Clone)]
-#[get = "pub"]
+#[derive(CopyGetters, Debug, Clone)]
+#[get_copy = "pub"]
 pub struct DnsQueryMessageSchema {
     response_code: &'static str,
     response: &'static str,
@@ -161,8 +161,8 @@ impl Default for DnsQueryMessageSchema {
     }
 }
 
-#[derive(Getters, Debug, Clone)]
-#[get = "pub"]
+#[derive(CopyGetters, Debug, Clone)]
+#[get_copy = "pub"]
 pub struct DnsUpdateMessageSchema {
     response_code: &'static str,
     response: &'static str,
@@ -194,8 +194,8 @@ impl Default for DnsUpdateMessageSchema {
     }
 }
 
-#[derive(Getters, Debug, Clone)]
-#[get = "pub"]
+#[derive(CopyGetters, Debug, Clone)]
+#[get_copy = "pub"]
 pub struct DnsMessageHeaderCommonSchema {
     id: &'static str,
     opcode: &'static str,
@@ -214,8 +214,8 @@ impl Default for DnsMessageHeaderCommonSchema {
     }
 }
 
-#[derive(Getters, Debug, Clone)]
-#[get = "pub"]
+#[derive(CopyGetters, Debug, Clone)]
+#[get_copy = "pub"]
 pub struct DnsQueryHeaderSchema {
     id: &'static str,
     opcode: &'static str,
@@ -255,8 +255,8 @@ impl Default for DnsQueryHeaderSchema {
     }
 }
 
-#[derive(Getters, Debug, Clone)]
-#[get = "pub"]
+#[derive(CopyGetters, Debug, Clone)]
+#[get_copy = "pub"]
 pub struct DnsUpdateHeaderSchema {
     id: &'static str,
     opcode: &'static str,
@@ -284,8 +284,8 @@ impl Default for DnsUpdateHeaderSchema {
     }
 }
 
-#[derive(Getters, Debug, Clone)]
-#[get = "pub"]
+#[derive(CopyGetters, Debug, Clone)]
+#[get_copy = "pub"]
 pub struct DnsMessageOptPseudoSectionSchema {
     extended_rcode: &'static str,
     version: &'static str,
@@ -306,8 +306,8 @@ impl Default for DnsMessageOptPseudoSectionSchema {
     }
 }
 
-#[derive(Getters, Debug, Clone)]
-#[get = "pub"]
+#[derive(CopyGetters, Debug, Clone)]
+#[get_copy = "pub"]
 pub struct DnsMessageOptionSchema {
     opt_code: &'static str,
     opt_name: &'static str,
@@ -324,8 +324,8 @@ impl Default for DnsMessageOptionSchema {
     }
 }
 
-#[derive(Getters, Debug, Clone)]
-#[get = "pub"]
+#[derive(CopyGetters, Debug, Clone)]
+#[get_copy = "pub"]
 pub struct DnsRecordSchema {
     name: &'static str,
     record_type: &'static str,
@@ -350,8 +350,8 @@ impl Default for DnsRecordSchema {
     }
 }
 
-#[derive(Getters, Debug, Clone)]
-#[get = "pub"]
+#[derive(CopyGetters, Debug, Clone)]
+#[get_copy = "pub"]
 pub struct DnsQueryQuestionSchema {
     name: &'static str,
     question_type: &'static str,
@@ -370,8 +370,8 @@ impl Default for DnsQueryQuestionSchema {
     }
 }
 
-#[derive(Getters, Debug, Clone)]
-#[get = "pub"]
+#[derive(CopyGetters, Debug, Clone)]
+#[get_copy = "pub"]
 pub struct DnsUpdateZoneInfoSchema {
     zone_name: &'static str,
     zone_class: &'static str,

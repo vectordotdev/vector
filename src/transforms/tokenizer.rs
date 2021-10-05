@@ -65,7 +65,7 @@ impl TransformConfig for TokenizerConfig {
 
 #[derive(Clone, Debug)]
 pub struct Tokenizer {
-    field_names: Vec<(String, Vec<PathComponent>, Conversion)>,
+    field_names: Vec<(String, Vec<PathComponent<'static>>, Conversion)>,
     field: String,
     drop_field: bool,
 }
@@ -81,7 +81,9 @@ impl Tokenizer {
             .into_iter()
             .map(|name| {
                 let conversion = types.get(&name).unwrap_or(&Conversion::Bytes).clone();
-                let path: Vec<PathComponent> = PathIter::new(&name).collect();
+                let path: Vec<PathComponent<'static>> = PathIter::new(name.as_str())
+                    .map(|component| component.into_static())
+                    .collect();
                 (name, path, conversion)
             })
             .collect();

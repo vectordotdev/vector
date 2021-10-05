@@ -97,7 +97,8 @@ mod tests {
     }
 
     fn get_metric_value(op_kind: &'static str) -> Option<MetricValue> {
-        let controller = crate::metrics::get_controller().expect("failed to init metric container");
+        let controller =
+            crate::metrics::Controller::get().expect("failed to init metric container");
 
         let tags_to_lookup = Some(
             vec![("op_kind".to_owned(), op_kind.to_owned())]
@@ -105,7 +106,8 @@ mod tests {
                 .collect(),
         );
 
-        crate::metrics::capture_metrics(controller)
+        controller
+            .capture_metrics()
             .find(|metric| {
                 metric.name() == "k8s_state_ops_total" && metric.tags() == tags_to_lookup.as_ref()
             })
@@ -143,7 +145,7 @@ mod tests {
     #[tokio::test]
     async fn add() {
         trace_init();
-        let _ = crate::metrics::init();
+        let _ = crate::metrics::init_test();
         let _guard = tests_lock().await;
 
         let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
@@ -174,7 +176,7 @@ mod tests {
     #[tokio::test]
     async fn update() {
         trace_init();
-        let _ = crate::metrics::init();
+        let _ = crate::metrics::init_test();
         let _guard = tests_lock().await;
 
         let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
@@ -205,7 +207,7 @@ mod tests {
     #[tokio::test]
     async fn delete() {
         trace_init();
-        let _ = crate::metrics::init();
+        let _ = crate::metrics::init_test();
         let _guard = tests_lock().await;
 
         let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
@@ -236,7 +238,7 @@ mod tests {
     #[tokio::test]
     async fn resync() {
         trace_init();
-        let _ = crate::metrics::init();
+        let _ = crate::metrics::init_test();
         let _guard = tests_lock().await;
 
         let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
@@ -263,7 +265,7 @@ mod tests {
     #[tokio::test]
     async fn request_maintenance_without_maintenance() {
         trace_init();
-        let _ = crate::metrics::init();
+        let _ = crate::metrics::init_test();
         let _guard = tests_lock().await;
 
         let (mut writer, _events_rx, _actions_tx) = prepare_test();
@@ -276,7 +278,7 @@ mod tests {
     #[tokio::test]
     async fn request_maintenance_with_maintenance() {
         trace_init();
-        let _ = crate::metrics::init();
+        let _ = crate::metrics::init_test();
         let _guard = tests_lock().await;
 
         let (events_tx, _events_rx) = mpsc::channel(0);
@@ -299,7 +301,7 @@ mod tests {
     #[tokio::test]
     async fn perform_maintenance() {
         trace_init();
-        let _ = crate::metrics::init();
+        let _ = crate::metrics::init_test();
         let _guard = tests_lock().await;
 
         let (mut writer, mut events_rx, mut actions_tx) = prepare_test();

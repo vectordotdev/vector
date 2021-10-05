@@ -9,9 +9,9 @@ pub enum EventType {
     ReceivedEventsTotals(Vec<IdentifiedMetric>),
     /// Interval in ms + identified metric
     ReceivedEventsThroughputs(i64, Vec<IdentifiedMetric>),
-    EventsOutTotals(Vec<IdentifiedMetric>),
+    SentEventsTotals(Vec<IdentifiedMetric>),
     /// Interval in ms + identified metric
-    EventsOutThroughputs(i64, Vec<IdentifiedMetric>),
+    SentEventsThroughputs(i64, Vec<IdentifiedMetric>),
     ProcessedBytesTotals(Vec<IdentifiedMetric>),
     /// Interval + identified metric
     ProcessedBytesThroughputs(i64, Vec<IdentifiedMetric>),
@@ -33,8 +33,8 @@ pub struct ComponentRow {
     pub processed_bytes_throughput_sec: i64,
     pub received_events_total: i64,
     pub received_events_throughput_sec: i64,
-    pub events_out_total: i64,
-    pub events_out_throughput_sec: i64,
+    pub sent_events_total: i64,
+    pub sent_events_throughput_sec: i64,
     pub errors: i64,
 }
 
@@ -65,17 +65,17 @@ pub async fn updater(mut state: State, mut event_rx: EventRx) -> StateRx {
                         }
                     }
                 }
-                EventType::EventsOutTotals(rows) => {
+                EventType::SentEventsTotals(rows) => {
                     for (key, v) in rows {
                         if let Some(r) = state.get_mut(&key) {
-                            r.events_out_total = v;
+                            r.sent_events_total = v;
                         }
                     }
                 }
-                EventType::EventsOutThroughputs(interval, rows) => {
+                EventType::SentEventsThroughputs(interval, rows) => {
                     for (key, v) in rows {
                         if let Some(r) = state.get_mut(&key) {
-                            r.events_out_throughput_sec =
+                            r.sent_events_throughput_sec =
                                 (v as f64 * (1000.0 / interval as f64)) as i64;
                         }
                     }

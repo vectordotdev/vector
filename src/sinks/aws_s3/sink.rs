@@ -31,10 +31,7 @@ impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
     type Request = S3Request;
     type SplitError = ();
 
-    fn split_input(
-        &self,
-        input: (String, Vec<Event>),
-    ) -> Result<(Self::Metadata, Self::Events), Self::SplitError> {
+    fn split_input(&self, input: (String, Vec<Event>)) -> Result<(Self::Metadata, Self::Events), Self::SplitError> {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
 

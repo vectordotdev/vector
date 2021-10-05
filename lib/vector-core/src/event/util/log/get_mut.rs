@@ -6,7 +6,7 @@ pub fn get_mut<'a>(fields: &'a mut BTreeMap<String, Value>, path: &str) -> Optio
     let mut path_iter = PathIter::new(path);
 
     match path_iter.next() {
-        Some(PathComponent::Key(key)) => match fields.get_mut(&key) {
+        Some(PathComponent::Key(key)) => match fields.get_mut(key.as_ref()) {
             None => None,
             Some(value) => get_mut_value(value, path_iter),
         },
@@ -14,14 +14,14 @@ pub fn get_mut<'a>(fields: &'a mut BTreeMap<String, Value>, path: &str) -> Optio
     }
 }
 
-fn get_mut_value<I>(mut value: &mut Value, mut path_iter: I) -> Option<&mut Value>
+fn get_mut_value<'a, I>(mut value: &mut Value, mut path_iter: I) -> Option<&mut Value>
 where
-    I: Iterator<Item = PathComponent>,
+    I: Iterator<Item = PathComponent<'a>>,
 {
     loop {
         match (path_iter.next(), value) {
             (None, value) => return Some(value),
-            (Some(PathComponent::Key(ref key)), Value::Map(map)) => match map.get_mut(key) {
+            (Some(PathComponent::Key(key)), Value::Map(map)) => match map.get_mut(key.as_ref()) {
                 None => return None,
                 Some(nested_value) => {
                     value = nested_value;

@@ -43,13 +43,13 @@ fn remove_map(
 ) -> Option<(Value, bool)> {
     match path.next()? {
         PathComponent::Key(key) => match path.peek() {
-            None => fields.remove(&key).map(|v| (v, fields.is_empty())),
+            None => fields.remove(key.as_ref()).map(|v| (v, fields.is_empty())),
             Some(_) => {
                 let (result, empty) = fields
-                    .get_mut(&key)
+                    .get_mut(key.as_ref())
                     .and_then(|value| remove_rec(value, path, prune))?;
                 if prune && empty {
-                    fields.remove(&key);
+                    fields.remove(key.as_ref());
                 }
                 Some((result, fields.is_empty()))
             }

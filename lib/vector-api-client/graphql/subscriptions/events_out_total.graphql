@@ -1,5 +1,0 @@
-subscription EventsOutTotalSubscription($interval: Int!) {
-  eventsOutTotal(interval: $interval) {
-    eventsOutTotal
-  }
-}

@@ -72,8 +72,7 @@ where
         // order to do that, we'll spin up a separate task that deals
         // exclusively with I/O, while we deal with everything else here:
         // batching, ordering, and so on.
-
-        let request_builder_rate_limit = NonZeroUsize::new(50);
+        let request_builder_concurrency_limit = NonZeroUsize::new(50);
 
         let sink = input
             .batched(
@@ -84,7 +83,7 @@ where
             )
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
             .request_builder(
-                request_builder_rate_limit,
+                request_builder_concurrency_limit,
                 self.request_builder,
                 self.encoding,
                 self.compression,
@@ -92,7 +91,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        error!("failed to build S3 request: {:?}", e);
+                        error!("Failed to build S3 request: {:?}.", e);
                         None
                     }
                     Ok(req) => Some(req),
@@ -118,7 +117,7 @@ where
     RB::SplitError: Send + Debug,
     E: Encoder + Send + Sync + 'static,
 {
-    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }
 }

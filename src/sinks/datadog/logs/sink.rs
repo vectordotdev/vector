@@ -166,6 +166,8 @@ pub enum RequestBuildError {
     Io { error: std::io::Error },
 }
 
+const TIMESTAMP_KEY: &str = "timestamp";
+
 impl RequestBuilder {
     fn new(
         encoding: EncodingConfigWithDefault<Encoding>,
@@ -189,8 +191,10 @@ impl RequestBuilder {
             {
                 let log = event.as_mut_log();
                 log.rename_key_flat(self.log_schema_message_key, "message");
-                log.rename_key_flat(self.log_schema_timestamp_key, "date");
                 log.rename_key_flat(self.log_schema_host_key, "host");
+                if let Some(Value::Timestamp(ts)) = log.remove(self.log_schema_timestamp_key) {
+                    log.insert_flat(TIMESTAMP_KEY, Value::Integer(ts.timestamp_millis()));
+                }
                 self.encoding.apply_rules(&mut event);
             }
 
@@ -287,12 +291,12 @@ where
                         }
                     }
                     Err(error) => {
-                        error!("Sink was unable to construct a payload body: {}", error);
+                        error!(message = "Sink was unable to construct a payload body.", %error);
                         return Err(());
                     }
                 },
                 Err(error) => {
-                    error!("Task failed to properly join: {}", error);
+                    error!(message = "Task failed to properly join.", %error);
                     return Err(());
                 }
             }

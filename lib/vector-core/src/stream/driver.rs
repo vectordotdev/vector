@@ -1,12 +1,38 @@
-use std::{collections::HashMap, fmt};
 
+use std::{collections::BinaryHeap, fmt};
 use buffers::{Ackable, Acker};
 use futures::{stream::FuturesUnordered, FutureExt, Stream, StreamExt, TryFutureExt};
-use tokio::{pin, select, sync::oneshot};
+use tokio::{pin, select, task::JoinError};
 use tower::{Service, ServiceExt};
 use tracing::Instrument;
-
 use crate::event::{EventStatus, Finalizable};
+
+#[derive(Eq)]
+struct PendingAcknowledgement {
+    seq_no: u64,
+    ack_size: usize,
+}
+
+impl PartialEq for PendingAcknowledgement {
+    fn eq(&self, other: &Self) -> bool {
+        self.seq_no == other.seq_no
+    }
+}
+
+impl PartialOrd for PendingAcknowledgement {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        // Reverse ordering so that in a `BinaryHeap`, the lowest sequence number is the highest priority.
+        Some(other.seq_no.cmp(&self.seq_no))
+    }
+}
+
+impl Ord for PendingAcknowledgement {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        other
+            .partial_cmp(self)
+            .expect("PendingAcknowledgement should always return a valid comparison")
+    }
+}
 
 /// Drives the interaction between a stream of items and a service which processes them
 /// asynchronously.
@@ -55,7 +81,8 @@ where
     /// return an error for a legitimate reason in the future.
     pub async fn run(self) -> Result<(), ()> {
         let mut in_flight = FuturesUnordered::new();
-        let mut pending_acks = HashMap::new();
+        let mut pending_acks = BinaryHeap::new();
+
         let mut seq_head: u64 = 0;
         let mut seq_tail: u64 = 0;
 
@@ -69,6 +96,48 @@ where
 
         loop {
             select! {
+                // Using `biased` ensures we check the branches in the order they're written, and
+                // the way they're ordered is to ensure that we're reacting to completed requests as
+                // soon as possible to acknowledge them and make room for more requests to be processed.
+                biased;
+
+                // One of our service calls has completed.
+                Some(result) = in_flight.next() => {
+                    // Rebind so we can annotate the type, otherwise the compiler is inexplicably angry.
+                    let result: Result<(u64, usize), JoinError> = result;
+                    match result {
+                        Ok((seq_no, ack_size)) => {
+                            trace!(message = "Sending request.", seq_no, ack_size);
+                            pending_acks.push(PendingAcknowledgement { seq_no, ack_size });
+
+                            let mut num_to_ack = 0;
+                            while let Some(pending_ack) = pending_acks.peek() {
+                                if pending_ack.seq_no == seq_tail {
+                                    let PendingAcknowledgement { ack_size, .. } = pending_acks.pop()
+                                        .expect("should not be here unless pending_acks is non-empty");
+                                    num_to_ack += ack_size;
+                                    seq_tail += 1;
+                                } else {
+                                    break
+                                }
+                            }
+
+                            if num_to_ack > 0 {
+                                trace!(message = "Acking events.", ack_size = num_to_ack);
+                                acker.ack(num_to_ack);
+                            }
+                        },
+                        Err(e) => {
+                            if e.is_panic() {
+                                error!("driver service call unexpectedly panicked");
+                            }
+
+                            if e.is_cancelled() {
+                                error!("driver service call unexpectedly cancelled");
+                            }
+                        },
+                    }
+                }
                 // We've received an item from the input stream.
                 Some(req) = input.next() => {
                     // Rebind the variable to avoid a bug with the pattern matching
@@ -76,10 +145,6 @@ where
                     let mut req = req;
                     let seqno = seq_head;
                     seq_head += 1;
-
-                    let (tx, rx) = oneshot::channel();
-
-                    in_flight.push(rx);
 
                     trace!(
                         message = "Submitting service request.",
@@ -103,34 +168,17 @@ where
                                 }
                             };
                             finalizers.update_status(status);
-
-                            // The receiver could drop before we reach this point if Driver`
-                            // goes away as part of a sink closing.  We can't do anything
-                            // about it, so just silently ignore the error.
-                            let _ = tx.send((seqno, ack_size));
+                            (seqno, ack_size)
                         })
                         .instrument(info_span!("request", request_id = %seqno));
-                    tokio::spawn(fut);
-                },
 
-                // One of our service calls has completed.
-                Some(Ok((seqno, ack_size))) = in_flight.next() => {
-                    trace!(message = "Sending request.", seqno, ack_size);
-                    pending_acks.insert(seqno, ack_size);
+                    let handle = tokio::spawn(fut);
+                    in_flight.push(handle);
+                }
 
-                    let mut num_to_ack = 0;
-                    while let Some(ack_size) = pending_acks.remove(&seq_tail) {
-                        num_to_ack += ack_size;
-                        seq_tail += 1;
-                    }
-
-                    if num_to_ack > 0 {
-                        trace!(message = "Acking events.", ack_size = num_to_ack);
-                        acker.ack(num_to_ack);
-                    }
-                },
-
-                else => break
+                else => {
+                    break
+                }
             }
         }
 

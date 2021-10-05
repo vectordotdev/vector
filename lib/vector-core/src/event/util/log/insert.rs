@@ -14,45 +14,45 @@ pub fn insert_path(
     map_insert(fields, path.into_iter().peekable(), value)
 }
 
-fn map_insert<I>(
+fn map_insert<'a, I>(
     fields: &mut BTreeMap<String, Value>,
     mut path_iter: Peekable<I>,
     value: Value,
 ) -> Option<Value>
 where
-    I: Iterator<Item = PathComponent>,
+    I: Iterator<Item = PathComponent<'a>>,
 {
     match (path_iter.next(), path_iter.peek()) {
-        (Some(PathComponent::Key(current)), None) => fields.insert(current, value),
+        (Some(PathComponent::Key(current)), None) => fields.insert(current.into_owned(), value),
         (Some(PathComponent::Key(current)), Some(PathComponent::Key(_))) => {
-            if let Some(Value::Map(map)) = fields.get_mut(&current) {
+            if let Some(Value::Map(map)) = fields.get_mut(current.as_ref()) {
                 map_insert(map, path_iter, value)
             } else {
                 let mut map = BTreeMap::new();
                 map_insert(&mut map, path_iter, value);
-                fields.insert(current, Value::Map(map))
+                fields.insert(current.into_owned(), Value::Map(map))
             }
         }
         (Some(PathComponent::Key(current)), Some(&PathComponent::Index(next))) => {
-            if let Some(Value::Array(array)) = fields.get_mut(&current) {
+            if let Some(Value::Array(array)) = fields.get_mut(current.as_ref()) {
                 array_insert(array, path_iter, value)
             } else {
                 let mut array = Vec::with_capacity(next + 1);
                 array_insert(&mut array, path_iter, value);
-                fields.insert(current, Value::Array(array))
+                fields.insert(current.into_owned(), Value::Array(array))
             }
         }
         _ => None,
     }
 }
 
-fn array_insert<I>(
+fn array_insert<'a, I>(
     values: &mut Vec<Value>,
     mut path_iter: Peekable<I>,
     value: Value,
 ) -> Option<Value>
 where
-    I: Iterator<Item = PathComponent>,
+    I: Iterator<Item = PathComponent<'a>>,
 {
     match (path_iter.next(), path_iter.peek()) {
         (Some(PathComponent::Index(current)), None) => {

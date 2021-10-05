@@ -4,30 +4,30 @@ Currently the `datadog_agent` [source](https://vector.dev/docs/reference/configu
 supports logs. This RFC suggests to extend Vector to support receiving metrics from Datadog agents and ingest those as
 metrics from a Vector perspective so they can be benefit from Vector capabilities.
 
-  * [Context](#context)
-  * [Cross cutting concerns](#cross-cutting-concerns)
-  * [Scope](#scope)
-    + [In scope](#in-scope)
-    + [Out of scope](#out-of-scope)
-  * [Pain](#pain)
-  * [Proposal](#proposal)
-    + [User Experience](#user-experience)
-    + [Implementation](#implementation)
-  * [Rationale](#rationale)
-  * [Drawbacks](#drawbacks)
-  * [Prior Art](#prior-art)
-  * [Alternatives](#alternatives)
-    + [For transport between Agents and Vector](#for-transport-between-agents-and-vector)
-    + [Flattening sketches](#flattening-sketches)
-    + [For Request routing](#for-request-routing)
-  * [Outstanding Questions](#outstanding-questions)
-  * [Plan Of Attack](#plan-of-attack)
-  * [Future Improvements](#future-improvements)
+* [Context](#context)
+* [Cross cutting concerns](#cross-cutting-concerns)
+* [Scope](#scope)
+  * [In scope](#in-scope)
+  * [Out of scope](#out-of-scope)
+* [Pain](#pain)
+* [Proposal](#proposal)
+  * [User Experience](#user-experience)
+  * [Implementation](#implementation)
+* [Rationale](#rationale)
+* [Drawbacks](#drawbacks)
+* [Prior Art](#prior-art)
+* [Alternatives](#alternatives)
+  * [For transport between Agents and Vector](#for-transport-between-agents-and-vector)
+  * [Flattening sketches](#flattening-sketches)
+  * [For Request routing](#for-request-routing)
+* [Outstanding Questions](#outstanding-questions)
+* [Plan Of Attack](#plan-of-attack)
+* [Future Improvements](#future-improvements)
 
 ## Context
 
-- Vector is foreseen as a Datadog Agents aggregator, thus receiving metrics from Datadog Agents is a logical development
-- Vector has support to send metrics to Datadog, thus receiving metrics from Agent is a consistent feature to add
+* Vector is foreseen as a Datadog Agents aggregator, thus receiving metrics from Datadog Agents is a logical development
+* Vector has support to send metrics to Datadog, thus receiving metrics from Agent is a consistent feature to add
 
 ## Cross cutting concerns
 
@@ -45,33 +45,33 @@ better aggregation and accuracy.
 
 ### In scope
 
-- Implement a Datadog metrics endpoint in Vector, it will match the [metrics intake
+* Implement a Datadog metrics endpoint in Vector, it will match the [metrics intake
   API](https://docs.datadoghq.com/api/latest/metrics/) with additional route that the Agent uses
-- Include support for sketches that uses protobuf.
-- Ensure all Datadog metrics type are mapped to internal Vector metric type and that there is no loss of accuracy in a
+* Include support for sketches that uses protobuf.
+* Ensure all Datadog metrics type are mapped to internal Vector metric type and that there is no loss of accuracy in a
   pass through configuration.
 
 ### Out of scope
 
-- Anything not related to metrics
-  - Processing API validation requests
-  - Processing other kind of payloads: traces, event, etc.
-- Shipping sketches to Datadog in the `datadog_metrics` sinks, it is required reach a fully functional situation but
+* Anything not related to metrics
+  * Processing API validation requests
+  * Processing other kind of payloads: traces, event, etc.
+* Shipping sketches to Datadog in the `datadog_metrics` sinks, it is required reach a fully functional situation but
   this is not the goal of this RFC that focus on receiving metrics from Datadog Agents.
 
 ## Pain
 
-- Users cannot aggregate metrics from Datadog agents
+* Users cannot aggregate metrics from Datadog agents
 
 ## Proposal
 
 ### User Experience
 
-- Vector will support receiving Datadog Metrics sent by the official Datadog Agent through a standard source
-- Metrics received will be fully supported inside Vector, all metric types will be supported
-- The following metrics flow: `n*(Datadog Agents) -> Vector -> Datadog` should just work
-- No foreseen backward compatibily issue (tags management may be a bit bothersome)
-- New configuration settings should be consistent with existing ones
+* Vector will support receiving Datadog Metrics sent by the official Datadog Agent through a standard source
+* Metrics received will be fully supported inside Vector, all metric types will be supported
+* The following metrics flow: `n*(Datadog Agents) -> Vector -> Datadog` should just work
+* No foreseen backward compatibily issue (tags management may be a bit bothersome)
+* New configuration settings should be consistent with existing ones
 
 Regarding the Datadog Agent configuration, ideally it should be only a matter of configuring `metrics_dd_url:
 https://vector.mycompany.tld` to forward metrics to a Vector deployement.
@@ -81,11 +81,12 @@ behavior](https://github.com/DataDog/datadog-agent/blob/main/pkg/config/config.g
 [here](https://github.com/DataDog/datadog-agent/blob/main/pkg/forwarder/forwarder_health.go#L131-L143)). I.e. if
 `dd_url` contains a known pattern (i.e. it has a suffix that matches a Datadog site) some extra hostname manipulation
 happens. But overal, the following paths are expected to be supported on the host behind `dd_url`:
-- `/api/v1/validate` for API key validation
-- `/api/v1/check_run` for check submission
-- `/intake/` for events and metadata (possibly others)
-- `/support/flare/` for support flare
-- `/api/v1/series` & `/api/beta/sketches` for metrics submission
+
+* `/api/v1/validate` for API key validation
+* `/api/v1/check_run` for check submission
+* `/intake/` for events and metadata (possibly others)
+* `/support/flare/` for support flare
+* `/api/v1/series` & `/api/beta/sketches` for metrics submission
 
 Then to only ship metrics, and let other payload follow the standard path, the newly introduced Datadog Agent setting
 `metrics_dd_url` would have to be set to point to a Vector host, with a `datadog_agent` source enabled. And then request
@@ -94,20 +95,21 @@ targeted to `/api/v1/series` & `/api/beta/sketches` would be diverted there allo
 ### Implementation
 
 A few details about the Datadog Agents & [Datadog metrics](https://docs.datadoghq.com/metrics/types/):
-- The base structure for all metrics is named
+
+* The base structure for all metrics is named
   [`MetricSample`](https://github.com/DataDog/datadog-agent/blob/main/pkg/metrics/metric_sample.go#L81-L94) and can be
   of [several types](https://github.com/DataDog/datadog-agent/blob/main/pkg/metrics/metric_sample.go#L20-L31)
-- Major Agent usecases:
-  - Metrics are send from corechecks (i.e. go code)
+* Major Agent usecases:
+  * Metrics are send from corechecks (i.e. go code)
     [here](https://github.com/DataDog/datadog-agent/blob/main/pkg/aggregator/sender.go#L227-L252)
-  - Dogstatsd metrics are converted to the `MetricSample` structure
+  * Dogstatsd metrics are converted to the `MetricSample` structure
     [here](https://github.com/DataDog/datadog-agent/blob/main/pkg/dogstatsd/enrich.go#L87-L137) However Datadog Agents
     metrics are transformed before being sent, ultimately metrics accounts for two differents kind of payload:
-- The count, gauge and rate series kind of payload, sent to `/api/v1/series` using the [JSON schema officially
+* The count, gauge and rate series kind of payload, sent to `/api/v1/series` using the [JSON schema officially
   documented](https://docs.datadoghq.com/api/latest/metrics) with few undocumented [additional
   fields](https://github.com/DataDog/datadog-agent/blob/main/pkg/metrics/series.go#L45-L57), but this align very well
   with the existing `datadog_metrics` sinks.
-- The sketches kind of payload, sent to `/api/beta/sketches` and serialized as protobuf as shown
+* The sketches kind of payload, sent to `/api/beta/sketches` and serialized as protobuf as shown
   [here](https://github.com/DataDog/datadog-agent/blob/main/pkg/serializer/serializer.go#L315-L338) (it ultimately lands
   [here](https://github.com/DataDog/datadog-agent/blob/main/pkg/metrics/sketch_series.go#L103-L269)). Public `.proto`
   definition can be found
@@ -120,20 +122,20 @@ representing it](https://github.com/timberio/vector/blob/master/lib/vector-core/
 
 The implementation would then consist in:
 
-- Implement a Datadog Agent change and introduce a new override (let's say `metrics_dd_url`) that would only divert
+* Implement a Datadog Agent change and introduce a new override (let's say `metrics_dd_url`) that would only divert
    request to `/api/v1/series` & `/api/beta/sketches` to a specific endpoints.
-- Handle the `/api/v1/series` route (based on both the offical [API](https://docs.datadoghq.com/api/latest/metrics/) and
+* Handle the `/api/v1/series` route (based on both the offical [API](https://docs.datadoghq.com/api/latest/metrics/) and
   the [Datadog Agent itself](https://github.com/DataDog/datadog-agent/blob/main/pkg/forwarder/telemetry.go#L20-L31)) to
   cover every metric type handled by this endpoint (count, gauge and rate) and:
-    - Add support for missing fields in the `datadog_metrics` sinks
-    - The same value but different keys tags (Datadog allows `key:foo` & `key:bar` but Vector doesn't) maybe supported
+  * Add support for missing fields in the `datadog_metrics` sinks
+  * The same value but different keys tags (Datadog allows `key:foo` & `key:bar` but Vector doesn't) maybe supported
       later if there is demand for it (see the note below).
-    - Overall this is fairly straighforward
-- Handle the `/api/beta/sketches` route in the `datadog_agent` source to support sketches/distribution encoded using
+  * Overall this is fairly straighforward
+* Handle the `/api/beta/sketches` route in the `datadog_agent` source to support sketches/distribution encoded using
   protobuf, but once decoded those sketches will require internal support in Vector:
-   - Distribution metrics in the `datadog_metrics` sink would need to use sketches and the associated endpoint. This is
+  * Distribution metrics in the `datadog_metrics` sink would need to use sketches and the associated endpoint. This is
      a prerequisite to support end-to-end sketches forwarding.
-   - The sketches the agent ships is based on this [paper](http://www.vldb.org/pvldb/vol12/p2195-masson.pdf) whereas
+  * The sketches the agent ships is based on this [paper](http://www.vldb.org/pvldb/vol12/p2195-masson.pdf) whereas
      Vector uses what's called a summary inside the Agent, implementing the complete DDSketch support in Vector is
      probably a good idea as sketches have convenient properties for wide consistent aggregation and limited error. To
      support smooth migration, full DDsktech (or compatible sketch) support is mandatory, as customers that emit
@@ -152,9 +154,9 @@ arise, Vector internal tag representation will not be changed following this RFC
 
 ## Rationale
 
-- Smoother Vector integration with Datadog.
-- Needed for Vector to act as a complete Datadog Agent aggregator (but further work will still be required).
-- Extend the Vector ecosystem, bring additional feature for distribution metrics that would enable consistent
+* Smoother Vector integration with Datadog.
+* Needed for Vector to act as a complete Datadog Agent aggregator (but further work will still be required).
+* Extend the Vector ecosystem, bring additional feature for distribution metrics that would enable consistent
   aggregation.
 
 ## Drawbacks
@@ -177,6 +179,7 @@ service for aggregation and it does not support sketches.
 ## Alternatives
 
 ### For transport between Agents and Vector
+
 The use an alternate protocol between Datadog Agents and Vector (Like Prometheus, Statds, OpenTelemetry or Vector own
 protocol) could be envisioned. This would call for a significant, yet possible with the current Agent architecture,
 addition, those changes would mostly be located in the
@@ -187,6 +190,7 @@ something that aligns well with the purpose of the Datadog Agent. This would als
 because of protocol conversion.
 
 ### Flattening sketches
+
 For sketches, we could flatten sketches and compute usual derived metrics (min/max/average/count/some percentiles) and
 send those as gauge/count, but it would prevent (or at least impact) existing distribution/sketches users. Moreover if
 instead of sketches only derived metrics are used a lot of the tagging flexiblity will be lost. By submitting tagged
@@ -197,6 +201,7 @@ the implementation in Vector and remove the prerequisite of having sketches supp
 ### For Request routing
 
 Instead of being done in the Agent, the request routing could be implemented either:
+
 1. In Vector, that would receive both metric and non-metric payload, simply proxying non-metric payload directly to
    Datdog without further processing.
 2. Or in a third party middle layer (e.g. haproxy or similare). It could leverage the [documented
@@ -215,11 +220,11 @@ None
 
 ## Plan Of Attack
 
-- [ ] Implement a new `metrics_dd_url` overrides in the Datadog Agent
-- [ ] Support `/api/v1/series` route still in the `datadog_agent` source, implement complete support in the
+* [ ] Implement a new `metrics_dd_url` overrides in the Datadog Agent
+* [ ] Support `/api/v1/series` route still in the `datadog_agent` source, implement complete support in the
   `datadog_metrics` sinks for the undocumented fields, incoming tags would be stored as key only with an empty string
   for their value inside Vector. Validate the `Agent->Vector->Datadog` scenario for gauge, count & rate.
-- [ ] Support `/api/beta/sketches` route, again in the `datadog_agent`, and validate the `Agent->Vector->Datadog`
+* [ ] Support `/api/beta/sketches` route, again in the `datadog_agent`, and validate the `Agent->Vector->Datadog`
   scenario for sketches/distributions. This would also required internal sketches support in Vector along with sending
   sketches from the `datadog_metrics` sinks, this is not directly addressed by this RFC but it is tracked in the
   following issues: [#7283](https://github.com/timberio/vector/issues/7283),
@@ -229,6 +234,6 @@ The later task depends on the issue [#9181](https://github.com/vectordotdev/vect
 
 ## Future Improvements
 
-- Wider use of sketches for distribution aggregation.
-- Expose some sketches function in VRL (at least merging sketches).
-- Continue on processing other kind of Datadog payloads.
+* Wider use of sketches for distribution aggregation.
+* Expose some sketches function in VRL (at least merging sketches).
+* Continue on processing other kind of Datadog payloads.

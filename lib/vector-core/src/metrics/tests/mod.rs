@@ -23,7 +23,9 @@ fn test_labels_injection() {
 
     counter!("labels_injected_total", 1);
 
-    let metric = super::capture_metrics(super::get_controller().unwrap())
+    let metric = super::Controller::get()
+        .unwrap()
+        .capture_metrics()
         .map(|e| e.into_metric())
         .find(|metric| metric.name() == "labels_injected_total")
         .unwrap();
@@ -46,7 +48,9 @@ fn test_cardinality_metric() {
     let _ = super::init();
 
     let capture_value = || {
-        let metric = super::capture_metrics(super::get_controller().unwrap())
+        let metric = super::Controller::get()
+            .unwrap()
+            .capture_metrics()
             .map(Event::into_metric)
             .find(|metric| metric.name() == super::CARDINALITY_KEY_NAME)
             .unwrap();

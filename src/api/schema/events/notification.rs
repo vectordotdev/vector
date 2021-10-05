@@ -1,4 +1,3 @@
-use crate::config::ComponentKey;
 use async_graphql::{Enum, SimpleObject};
 
 #[derive(Enum, Debug, Copy, Clone, PartialEq, Eq)]
@@ -13,22 +12,17 @@ pub enum EventNotificationType {
 #[derive(Debug, SimpleObject)]
 /// A notification regarding events observation
 pub struct EventNotification {
-    /// Id of the component associated with the notification
-    component_id: String,
-
-    /// Id of the pipeline associated to the component
-    pipeline_id: Option<String>,
+    /// Pattern that raised the event
+    pattern: String,
 
     /// Event notification type
     notification: EventNotificationType,
 }
 
 impl EventNotification {
-    pub fn new(component_key: ComponentKey, notification: EventNotificationType) -> Self {
+    pub const fn new(pattern: String, notification: EventNotificationType) -> Self {
         Self {
-            component_id: component_key.id().to_string(),
-            // the GraphQL SimpleObject forces to decompose at creation time
-            pipeline_id: component_key.pipeline_str().map(Into::into),
+            pattern,
             notification,
         }
     }

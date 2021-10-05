@@ -33,7 +33,7 @@ impl Function for ParseApacheLog {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _info: &FunctionCompileContext,
+        _ctx: &FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let variants = vec![value!("common"), value!("combined"), value!("error")];
