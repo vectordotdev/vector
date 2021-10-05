@@ -207,6 +207,7 @@ chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.5", default-features = false }
 csv = { version = "1.1", optional = true }
 colored = { version = "2.0.0", default-features = false }
+count-write = { version = "0.1.0", default-features = false }
 dashmap = { version = "4.0.2", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
@@ -446,14 +447,14 @@ sources-apache_metrics = []
 sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "infer", "sources-utils-tls", "warp"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid", "codecs"]
-sources-datadog = ["snap", "sources-utils-tls", "warp", "sources-utils-http-error", "codecs"]
+sources-datadog = ["snap", "sources-utils-tls", "warp", "sources-utils-http-error"]
 sources-dnstap = ["base64", "data-encoding", "trust-dns-proto", "dnsmsg-parser", "tonic-build", "prost-build"]
 sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
-sources-exec = ["codecs"]
+sources-exec = []
 sources-file = ["file-source"]
 sources-fluent = ["base64", "listenfd", "tokio-util/net", "rmpv", "rmp-serde", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "serde_bytes", "codecs"]
-sources-generator = ["fakedata", "codecs"]
+sources-generator = ["fakedata"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query"]
 sources-host_metrics = ["heim"]
 sources-http = ["sources-utils-http", "codecs", "sources-utils-http-query"]
@@ -461,7 +462,7 @@ sources-internal_logs = []
 sources-internal_metrics = []
 sources-journald = ["codecs"]
 sources-kafka = ["rdkafka", "codecs"]
-sources-nats = ["async-nats", "codecs"]
+sources-nats = ["async-nats"]
 sources-logstash = ["listenfd", "tokio-util/net", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "codecs"]
 sources-kubernetes_logs = ["file-source", "kubernetes", "transforms-merge", "transforms-regex_parser"]
 sources-mongodb_metrics = ["mongodb"]

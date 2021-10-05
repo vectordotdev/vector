@@ -43,11 +43,18 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, io};
+use crate::event::LogEvent;
+use crate::transforms::metric_to_log::MetricToLog;
+use std::io::Write;
 
 /// Encodes an event.
 pub trait Encoder {
     /// Encodes an individual event to the provided writer.
     fn encode_event(&self, event: Event, writer: &mut dyn io::Write) -> io::Result<()>;
+}
+
+pub trait LogEncoder {
+    fn encode_log(&self, log: LogEvent, writer: &mut dyn io::Write) -> io::Result<()>;
 }
 
 /// The behavior of a encoding configuration.
@@ -159,6 +166,26 @@ pub trait EncodingConfiguration {
         self.apply_except_fields(event);
         self.apply_only_fields(event);
         self.apply_timestamp_format(event);
+    }
+}
+
+/// An adapter to create an `Event` encoder with only a `LogEncoder`
+pub struct LogEncoderAdapter<T> {
+    pub metric_to_log: MetricToLog,
+    pub log_encoder: T
+}
+
+impl <T> Encoder for LogEncoderAdapter<T>
+where T: LogEncoder {
+    fn encode_event(&self, event: Event, writer: &mut dyn Write) -> io::Result<()> {
+        let maybe_log = match event {
+            Event::Log(log) => Some(log),
+            Event::Metric(metric) => self.metric_to_log.transform_one(metric)
+        };
+        if let Some(log) = maybe_log {
+            self.log_encoder.encode_log(log, writer)?;
+        }
+        Ok(())
     }
 }
 
