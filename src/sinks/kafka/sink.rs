@@ -1,15 +1,12 @@
 use super::config::KafkaRole;
 use super::config::KafkaSinkConfig;
 use crate::event::Event;
-use crate::internal_events::TemplateRenderingFailed;
 use crate::kafka::KafkaStatisticsContext;
 use crate::sinks::kafka::config::QUEUED_MIN_MESSAGES;
 use crate::sinks::kafka::encoder::Encoding;
 use crate::sinks::kafka::request_builder::KafkaRequestBuilder;
 use crate::sinks::kafka::service::KafkaService;
 use crate::sinks::util::encoding::EncodingConfig;
-use crate::sinks::util::request_builder::RequestBuilderError;
-use crate::sinks::util::{Compression, SinkBuilderExt, StreamSink};
 use crate::template::{Template, TemplateParseError};
 use async_trait::async_trait;
 use futures::stream::BoxStream;
@@ -20,10 +17,11 @@ use rdkafka::producer::FutureProducer;
 use rdkafka::ClientConfig;
 use snafu::{ResultExt, Snafu};
 use std::convert::TryFrom;
-use std::num::NonZeroUsize;
 use tokio::time::Duration;
 use tower::limit::ConcurrencyLimit;
 use vector_core::buffers::Acker;
+use futures::future;
+use crate::sinks::util::{StreamSink, builder::SinkBuilderExt};
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
@@ -67,39 +65,16 @@ impl KafkaSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let request_builder_concurrency_limit = NonZeroUsize::new(50);
-
-        let request_builder = KafkaRequestBuilder {
-            topic: self.topic,
+        let service = ConcurrencyLimit::new(self.service, QUEUED_MIN_MESSAGES as usize);
+        let request_builder = KafkaRequestBuilder{
             key_field: self.key_field,
             headers_field: self.headers_field,
+            topic_template: self.topic,
+            encoder: self.encoding,
         };
-
-        let service = ConcurrencyLimit::new(self.service, QUEUED_MIN_MESSAGES as usize);
-
         let sink = input
-            .request_builder(
-                request_builder_concurrency_limit,
-                request_builder,
-                self.encoding,
-                Compression::None,
-            )
-            .filter_map(|request| async move {
-                match request {
-                    Ok(req) => Some(req),
-                    Err(RequestBuilderError::EncodingError(e)) => {
-                        error!("Failed to encode Kafka request: {:?}.", e);
-                        None
-                    }
-                    Err(RequestBuilderError::SplitError(error)) => {
-                        emit!(&TemplateRenderingFailed {
-                            error,
-                            field: Some("topic"),
-                            drop_event: true,
-                        });
-                        None
-                    }
-                }
+            .filter_map(|event| {
+                future::ready(request_builder.build_request(event))
             })
             .into_driver(service, self.acker);
         sink.run().await

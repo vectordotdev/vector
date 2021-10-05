@@ -2,28 +2,21 @@ use crate::config::log_schema;
 use crate::event::{Event, Finalizable, Value};
 use crate::internal_events::KafkaHeaderExtractionFailed;
 use crate::sinks::kafka::service::{KafkaRequest, KafkaRequestMetadata};
-use crate::sinks::util::RequestBuilder;
-use crate::template::{Template, TemplateRenderingError};
+use crate::template::Template;
 use rdkafka::message::OwnedHeaders;
+use crate::sinks::kafka::encoder::Encoding;
+use crate::sinks::util::encoding::{Encoder, EncodingConfig};
 
 pub struct KafkaRequestBuilder {
-    pub topic: Template,
     pub key_field: Option<String>,
     pub headers_field: Option<String>,
+    pub topic_template: Template,
+    pub encoder: EncodingConfig<Encoding>,
 }
 
-impl RequestBuilder<Event> for KafkaRequestBuilder {
-    type Metadata = KafkaRequestMetadata;
-    type Events = [Event; 1];
-    type Payload = Vec<u8>;
-    type Request = KafkaRequest;
-    type SplitError = TemplateRenderingError;
-
-    fn split_input(
-        &self,
-        mut event: Event,
-    ) -> Result<(Self::Metadata, Self::Events), Self::SplitError> {
-        let topic = self.topic.render_string(&event)?;
+impl KafkaRequestBuilder {
+    pub fn build_request(&self, mut event: Event) -> Option<KafkaRequest> {
+        let topic = self.topic_template.render_string(&event).ok()?;
         let metadata = KafkaRequestMetadata {
             finalizers: event.take_finalizers(),
             key: get_key(&event, &self.key_field),
@@ -31,15 +24,13 @@ impl RequestBuilder<Event> for KafkaRequestBuilder {
             headers: get_headers(&event, &self.headers_field),
             topic,
         };
-        let events = [event];
-        Ok((metadata, events))
-    }
+        let mut body = vec![];
+        self.encoder.encode_event(event, &mut body).ok()?;
 
-    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        KafkaRequest {
-            body: payload,
-            metadata,
-        }
+        Some(KafkaRequest {
+            body,
+            metadata
+        })
     }
 }
 
