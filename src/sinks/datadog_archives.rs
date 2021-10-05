@@ -54,8 +54,6 @@ use crate::sinks::util::encoding::StandardEncodings;
 use crate::sinks::util::BatchSettings;
 use goauth::scopes::Scope;
 
-use super::util::{encoding::Encoder, Compression, RequestBuilder};
-
 const DEFAULT_REQUEST_LIMITS: TowerRequestConfig = {
     TowerRequestConfig::const_new(Concurrency::Fixed(50), Concurrency::Fixed(50))
         .rate_limit_num(250)
