@@ -13,7 +13,7 @@ impl Function for ParseUrl {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            kind: kind::ANY,
+            kind: kind::BYTES,
             required: true,
         }]
     }
