@@ -3,7 +3,7 @@ use crate::{
     event::{Event, Value},
     http::{Auth, HttpClient, HttpError, MaybeAuth},
     sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration, TimestampFormat},
         http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
         retries::{RetryAction, RetryLogic},
         sink, BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
@@ -59,8 +59,8 @@ impl SinkConfig for NewRelicConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let batch = BatchSettings::default()
-            .bytes(bytesize::mib(10u64))
-            .timeout(1)
+            .bytes(bytesize::mb(1u64))
+            .timeout(10)
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
@@ -97,12 +97,18 @@ impl HttpSink for NewRelicConfig {
     type Output = Vec<u8>;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
-        self.encoding.apply_rules(&mut event);
+        let encoding = EncodingConfigWithDefault {
+            timestamp_format: Some(TimestampFormat::Unix),
+            ..self.encoding.clone()
+        };
+        encoding.apply_rules(&mut event);
         //TODO: check that timestamp has the correct format and reformat if not
         //TODO: For Events, check that eventType exist, set default value if not ("VectorSink")
         //TODO: For Metrics, check name and valu exist and has correct type. Also check type has a valid value if exist
         //TODO: For metrics, remove host, message and source_type
         let log = event.into_log();
+
+        println!("----------> LOG object = {:#?}", log);
 
         let field = crate::config::log_schema().message_key();
         println!("----------> Get field {}", field);
