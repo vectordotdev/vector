@@ -22,6 +22,13 @@ pub struct NewlineDelimitedDecoderOptions {
     max_length: usize,
 }
 
+impl NewlineDelimitedDecoderOptions {
+    /// Creates a `NewlineDelimitedDecoderOptions` with a maximum frame length limit.
+    pub const fn new_with_max_length(max_length: usize) -> Self {
+        Self { max_length }
+    }
+}
+
 impl NewlineDelimitedDecoderConfig {
     /// Creates a new `NewlineDelimitedDecoderConfig`.
     pub fn new() -> Self {
@@ -30,7 +37,9 @@ impl NewlineDelimitedDecoderConfig {
 
     /// Creates a `NewlineDelimitedCodec` with a maximum frame length limit.
     pub const fn new_with_max_length(max_length: usize) -> Self {
-        Self { max_length }
+        Self {
+            newline_delimited: { NewlineDelimitedDecoderOptions::new_with_max_length(max_length) },
+        }
     }
 }
 
