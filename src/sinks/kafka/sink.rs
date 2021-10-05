@@ -22,6 +22,8 @@ use std::convert::TryFrom;
 use std::num::NonZeroUsize;
 use tokio::time::Duration;
 use vector_core::buffers::Acker;
+use tower::limit::ConcurrencyLimit;
+use crate::sinks::kafka::config::QUEUED_MIN_MESSAGES;
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
@@ -73,6 +75,8 @@ impl KafkaSink {
             headers_field: self.headers_field,
         };
 
+        let service = ConcurrencyLimit::new(self.service, QUEUED_MIN_MESSAGES as usize);
+
         let sink = input
             .request_builder(
                 request_builder_concurrency_limit,
@@ -97,7 +101,7 @@ impl KafkaSink {
                     }
                 }
             })
-            .into_driver(self.service, self.acker);
+            .into_driver(service, self.acker);
         sink.run().await
     }
 }

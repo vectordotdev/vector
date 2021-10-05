@@ -1,20 +1,12 @@
 use crate::buffers::Ackable;
 use crate::event::{EventFinalizers, EventStatus, Finalizable};
 use crate::kafka::KafkaStatisticsContext;
-use crate::sinks::kafka::config::QUEUED_MIN_MESSAGES;
 use futures::future::BoxFuture;
 use rdkafka::error::KafkaError;
 use rdkafka::message::OwnedHeaders;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::util::Timeout;
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::atomic::AtomicU64;
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
 use std::task::{Context, Poll};
-use tokio::time::Duration;
-use tokio::time::Sleep;
 use tower::Service;
 
 pub struct KafkaRequest {
@@ -52,17 +44,13 @@ impl Finalizable for KafkaRequest {
 }
 
 pub struct KafkaService {
-    kafka_producer: FutureProducer<KafkaStatisticsContext>,
-    current_in_flight: Arc<AtomicU64>,
-    delay: Option<Pin<Box<Sleep>>>,
+    kafka_producer: FutureProducer<KafkaStatisticsContext>
 }
 
 impl KafkaService {
     pub fn new(kafka_producer: FutureProducer<KafkaStatisticsContext>) -> KafkaService {
         KafkaService {
-            kafka_producer,
-            current_in_flight: Arc::new(AtomicU64::new(0)),
-            delay: None,
+            kafka_producer
         }
     }
 }
@@ -72,24 +60,12 @@ impl Service<KafkaRequest> for KafkaService {
     type Error = KafkaError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // rdkafka has an `in_flight_count()` but that can't be used here
-        // since it doesn't count requests that have not been queued yet
-        if self.current_in_flight.load(Ordering::Relaxed) < QUEUED_MIN_MESSAGES {
-            return Poll::Ready(Ok(()));
-        }
-
-        // This is the same amount of time that rdkafka delays when the internal queue is full
-        let mut sleep = Box::pin(tokio::time::sleep(Duration::from_millis(100)));
-        let result = sleep.as_mut().poll(cx).map(|_| Ok(()));
-        self.delay = Some(sleep); // prevent the timer from being dropped
-        result
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, request: KafkaRequest) -> Self::Future {
-        self.current_in_flight.fetch_add(1, Ordering::Relaxed);
         let kafka_producer = self.kafka_producer.clone();
-        let current_in_flight = Arc::clone(&self.current_in_flight);
 
         Box::pin(async move {
             let mut record = FutureRecord::to(&request.metadata.topic).payload(&request.body);
@@ -108,7 +84,6 @@ impl Service<KafkaRequest> for KafkaService {
                 Ok((_partition, _offset)) => Ok(KafkaResponse {}),
                 Err((kafka_err, _original_record)) => Err(kafka_err),
             };
-            current_in_flight.fetch_sub(1, Ordering::Relaxed);
             result
         })
     }
