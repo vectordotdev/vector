@@ -5,6 +5,7 @@ use tokio::time::interval;
 use tracing::{Instrument, Span};
 
 use crate::internal_events::{BufferEventsReceived, BufferEventsSent, EventsDropped};
+use crate::WhenFull;
 
 pub struct BufferUsageData {
     received_event_count: AtomicU64,
@@ -15,7 +16,12 @@ pub struct BufferUsageData {
 }
 
 impl BufferUsageData {
-    pub fn new(dropped_event_count: Option<AtomicU64>, span: Span) -> Arc<Self> {
+    pub fn new(when_full: WhenFull, span: Span) -> Arc<Self> {
+        let dropped_event_count = match when_full {
+            WhenFull::Block => None,
+            WhenFull::DropNewest => Some(AtomicU64::new(0)),
+        };
+
         let buffer_usage_data = Arc::new(Self {
             received_event_count: AtomicU64::new(0),
             received_byte_size: AtomicUsize::new(0),

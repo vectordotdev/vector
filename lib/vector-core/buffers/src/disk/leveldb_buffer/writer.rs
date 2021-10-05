@@ -1,10 +1,9 @@
 use super::Key;
 use crate::{
+    buffer_usage_data::BufferUsageData,
     bytes::{DecodeBytes, EncodeBytes},
-    internal_events::BufferEventsReceived,
 };
 use bytes::BytesMut;
-use core_common::internal_event::emit;
 use futures::{task::AtomicWaker, Sink};
 use leveldb::database::{
     batch::{Batch, Writebatch},
@@ -18,7 +17,6 @@ use std::sync::{
     Arc, Mutex,
 };
 use std::task::{Context, Poll, Waker};
-use tracing::Span;
 
 /// The writer side of N to 1 channel through leveldb.
 pub struct Writer<T>
@@ -50,8 +48,8 @@ where
     pub(crate) current_size: Arc<AtomicUsize>,
     /// Buffer for internal use.
     pub(crate) slot: Option<T>,
-    /// Span for instrumenting received events
-    pub(crate) span: Span,
+    /// Atomic structure for recording buffer metadata
+    pub(crate) buffer_usage_data: Arc<BufferUsageData>,
 }
 
 // Writebatch isn't Send, but the leveldb docs explicitly say that it's okay to
@@ -81,7 +79,7 @@ where
             max_size: self.max_size,
             current_size: Arc::clone(&self.current_size),
             slot: None,
-            span: self.span.clone(),
+            buffer_usage_data: self.buffer_usage_data.clone(),
         }
     }
 }
@@ -176,13 +174,9 @@ where
         if self.batch_size >= 100 {
             self.flush();
         }
-        let span = self.span.clone();
-        span.in_scope(|| {
-            emit(&BufferEventsReceived {
-                count: 1,
-                byte_size: event_size,
-            });
-        });
+        self.buffer_usage_data.increment_received_event_count(1);
+        self.buffer_usage_data
+            .increment_received_byte_size(event_size);
 
         None
     }

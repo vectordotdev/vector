@@ -1,16 +1,17 @@
+use crate::buffer_usage_data::BufferUsageData;
 use crate::bytes::{DecodeBytes, EncodeBytes};
 use futures::{Sink, Stream};
 use pin_project::pin_project;
 use snafu::Snafu;
 use std::fmt::Debug;
 use std::fmt::Display;
+use std::sync::Arc;
 use std::{
     io,
     path::{Path, PathBuf},
     pin::Pin,
     task::{Context, Poll},
 };
-use tracing::Span;
 
 pub mod leveldb_buffer;
 
@@ -78,7 +79,7 @@ pub fn open<'a, T>(
     data_dir: &Path,
     name: &str,
     max_size: usize,
-    span: Span,
+    buffer_usage_data: Arc<BufferUsageData>,
 ) -> Result<
     (
         Writer<T>,
@@ -118,6 +119,7 @@ where
             }
         })?;
 
-    let (writer, reader, acker) = leveldb_buffer::Buffer::build(&path, max_size, span)?;
+    let (writer, reader, acker) =
+        leveldb_buffer::Buffer::build(&path, max_size, buffer_usage_data)?;
     Ok((Writer { inner: writer }, Box::new(reader), acker))
 }

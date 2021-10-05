@@ -1,7 +1,6 @@
 use super::Key;
-use crate::{bytes::DecodeBytes, internal_events::BufferEventsSent};
+use crate::{buffer_usage_data::BufferUsageData, bytes::DecodeBytes};
 use bytes::Bytes;
-use core_common::internal_event::emit;
 use futures::{task::AtomicWaker, Stream};
 use leveldb::database::{
     batch::{Batch, Writebatch},
@@ -82,6 +81,8 @@ where
     // Pending read from the LevelDB datasbase
     pub(crate) pending_read: Option<JoinHandle<Vec<(Key, Vec<u8>)>>>,
     pub(crate) phantom: PhantomData<T>,
+    /// Atomic structure for recording buffer metadata
+    pub(crate) buffer_usage_data: Arc<BufferUsageData>,
 }
 
 // Writebatch isn't Send, but the leveldb docs explicitly say that it's okay to
@@ -160,10 +161,8 @@ where
             let byte_size = buffer.len();
             match T::decode(buffer) {
                 Ok(event) => {
-                    emit(&BufferEventsSent {
-                        count: 1,
-                        byte_size,
-                    });
+                    this.buffer_usage_data.increment_sent_event_count(1);
+                    this.buffer_usage_data.increment_sent_byte_size(byte_size);
                     Poll::Ready(Some(event))
                 }
                 Err(error) => {

@@ -23,10 +23,8 @@ mod variant;
 
 use crate::buffer_usage_data::BufferUsageData;
 use crate::bytes::{DecodeBytes, EncodeBytes};
-use crate::internal_events::EventsDropped;
 pub use acker::Acker;
 use core_common::byte_size_of::ByteSizeOf;
-use core_common::internal_event::emit;
 use futures::StreamExt;
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
 use pin_project::pin_project;
@@ -35,7 +33,6 @@ use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
 use std::pin::Pin;
-use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use tracing::Span;
@@ -73,10 +70,11 @@ where
             ..
         } => {
             let buffer_dir = format!("{}_buffer", id);
-
-            let (tx, rx, acker) = disk::open(&data_dir, &buffer_dir, max_size, span)
-                .map_err(|error| error.to_string())?;
-            let tx = BufferInputCloner::Disk(tx, when_full);
+            let buffer_usage_data = BufferUsageData::new(when_full, span);
+            let (tx, rx, acker) =
+                disk::open(&data_dir, &buffer_dir, max_size, buffer_usage_data.clone())
+                    .map_err(|error| error.to_string())?;
+            let tx = BufferInputCloner::Disk(tx, when_full, buffer_usage_data);
             Ok((tx, rx, acker))
         }
         Variant::Memory {
@@ -87,12 +85,7 @@ where
         } => {
             let (tx, rx) = mpsc::channel(max_events);
             if instrument {
-                let dropped_event_count = match when_full {
-                    WhenFull::Block => None,
-                    WhenFull::DropNewest => Some(AtomicU64::new(0)),
-                };
-
-                let buffer_usage_data = BufferUsageData::new(dropped_event_count, span);
+                let buffer_usage_data = BufferUsageData::new(when_full, span);
                 let tx = BufferInputCloner::Memory(tx, when_full, Some(buffer_usage_data.clone()));
                 let rx = rx.inspect(move |item: &T| {
                     buffer_usage_data.increment_sent_event_count(1);
@@ -146,7 +139,7 @@ where
 {
     Memory(mpsc::Sender<T>, WhenFull, Option<Arc<BufferUsageData>>),
     #[cfg(feature = "disk-buffer")]
-    Disk(disk::Writer<T>, WhenFull),
+    Disk(disk::Writer<T>, WhenFull, Arc<BufferUsageData>),
 }
 
 impl<'a, T> BufferInputCloner<T>
@@ -171,10 +164,10 @@ where
             }
 
             #[cfg(feature = "disk-buffer")]
-            BufferInputCloner::Disk(writer, when_full) => {
+            BufferInputCloner::Disk(writer, when_full, buffer_usage_data) => {
                 let inner: disk::Writer<T> = (*writer).clone();
                 if when_full == &WhenFull::DropNewest {
-                    Box::new(DropWhenFull::new(inner))
+                    Box::new(DropWhenFull::new(inner, buffer_usage_data.clone()))
                 } else {
                     Box::new(inner)
                 }
@@ -266,16 +259,24 @@ impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for MemoryBufferInput<S> {
     }
 }
 
+/// DropWhenFull is used by disk buffers to implement dropping behavior and as a
+/// point of instrumentation. The MemoryBufferInput wrapper implements dropping
+/// behavior so DropWhenFull is no longer needed for memory buffers.
 #[pin_project]
 pub struct DropWhenFull<S> {
     #[pin]
     inner: S,
     drop: bool,
+    buffer_usage_data: Arc<BufferUsageData>,
 }
 
 impl<S> DropWhenFull<S> {
-    pub fn new(inner: S) -> Self {
-        Self { inner, drop: false }
+    pub fn new(inner: S, buffer_usage_data: Arc<BufferUsageData>) -> Self {
+        Self {
+            inner,
+            drop: false,
+            buffer_usage_data,
+        }
     }
 }
 
@@ -303,7 +304,7 @@ impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
                 message = "Shedding load; dropping event.",
                 internal_log_rate_secs = 10
             );
-            emit(&EventsDropped { count: 1 });
+            self.buffer_usage_data.try_increment_dropped_event_count(1);
             Ok(())
         } else {
             self.project().inner.start_send(item)
