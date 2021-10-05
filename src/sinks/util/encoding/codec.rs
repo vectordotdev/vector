@@ -154,7 +154,7 @@ mod tests {
             "{{\"{}\":\"log event\",\"{}\":\"{}\"}}\n",
             msg_key,
             ts_key,
-            now.to_rfc3339_opts(SecondsFormat::Nanos, true)
+            now.to_rfc3339_opts(SecondsFormat::AutoSi, true)
         );
         assert_eq!(expected, encoded);
     }

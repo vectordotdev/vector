@@ -22,9 +22,13 @@ remap: functions: assert: {
 			type: ["boolean"]
 		},
 		{
-			name:        "message"
-			description: "The failure message that's reported if `condition` evaluates to `false`."
-			required:    true
+			name: "message"
+			description: """
+				An optional custom error message. If the equality assertion fails, `message` is
+				appended to the default message prefix. See the [examples](#assert-examples) below
+				for a sample fully formed log message.
+				"""
+			required: false
 			type: ["string"]
 		},
 	]

@@ -101,7 +101,11 @@ impl DatadogLogsConfig {
 
         let service = ServiceBuilder::new()
             .settings(request_limits, LogApiRetry)
-            .service(LogApiService::new(client, self.get_uri()));
+            .service(LogApiService::new(
+                client,
+                self.get_uri(),
+                cx.globals.enterprise,
+            ));
         let sink = LogSink::new(service, cx, default_api_key)
             .batch_timeout(batch_timeout)
             .encoding(self.encoding.clone())

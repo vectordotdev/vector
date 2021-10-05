@@ -6,7 +6,7 @@ remap: features: high_quality_error_messages: {
 
 		This VRL program, for example...
 
-		```ruby
+		```coffee
 		.foo, err = upcase(.foo)
 		```
 

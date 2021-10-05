@@ -4,7 +4,7 @@ use cached::{proc_macro::cached, SizedCache};
 use datadog_search_syntax::{
     normalize_fields, parse, BooleanType, Comparison, ComparisonValue, Field, QueryNode,
 };
-use lookup::{parser::parse_lookup, LookupBuf};
+use lookup_lib::{parser::parse_lookup, LookupBuf};
 use regex::Regex;
 use std::borrow::Cow;
 

@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 async-graphql = { version = "2.10.0", default-features = false, optional = true }
 async-trait = { version = "0.1", default-features = false }
-atomig = { version = "0.3.1", features = ["derive", "serde"] }
+atomig = { version = "0.3.2", features = ["derive", "serde"] }
 buffers = { path = "buffers", default-features = false }
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
@@ -28,7 +28,7 @@ lookup = { path = "../lookup", features = ["arbitrary"] }
 metrics = { version = "0.17.0", default-features = false, features = ["std"]}
 metrics-tracing-context = { version = "0.8.0", default-features = false }
 metrics-util = { version = "0.10.1", default-features = false, features = ["std"] }
-mlua = { version = "0.6.3", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { version = "0.6.4", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 no-proxy = { version  = "0.3.1", default-features = false, features = ["serialize"] }
 once_cell = { version = "1.8", default-features = false }
 pest = { version = "2.1.3", default-features = false }
@@ -63,7 +63,7 @@ criterion = { version = "0.3.5", features = ["html_reports"] }
 env-test-util = "1.0.1"
 quickcheck = "1.0.3"
 proptest = "1.0"
-pretty_assertions = "0.7.2"
+pretty_assertions = "1.0.0"
 tokio-test = "0.4.2"
 
 [features]
