@@ -88,7 +88,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        error!("failed to build request: {:?}", e);
+                        error!("Failed to build request: {:?}.", e);
                         None
                     }
                     Ok(req) => Some(req),
