@@ -14,7 +14,7 @@ impl Function for ParseUrl {
         &[
             Parameter {
                 keyword: "value",
-                kind: kind::ANY,
+                kind: kind::BYTES,
                 required: true,
             },
             Parameter {

@@ -66,6 +66,16 @@ impl Finalizable for Event {
     }
 }
 
+impl Finalizable for Vec<Event> {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.iter_mut()
+            .fold(EventFinalizers::default(), |mut acc, x| {
+                acc.merge(x.take_finalizers());
+                acc
+            })
+    }
+}
+
 impl Event {
     #[must_use]
     pub fn new_empty_log() -> Self {

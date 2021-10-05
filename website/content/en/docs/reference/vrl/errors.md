@@ -28,7 +28,7 @@ You have three options for handling errors in VRL:
 
 As documented in the [assignment expression reference], you can **assign** errors when invoking an expression that's fallible. When assigned, runtime errors are simple strings:
 
-```ruby
+```coffee
 structured, err = parse_json("not json")
 if err != null {
   log("Unable to parse JSON: " + err, level: "error")
@@ -39,7 +39,7 @@ if err != null {
 
 If the expression fails, the `ok` assignment target is assigned the "empty" value of its type:
 
-```ruby
+```coffee
 # `.foo` can be `100` or `"not an int"`
 foo, err = to_int(.foo)
 
@@ -72,7 +72,7 @@ Null | `null`
 
 As documented in the [coalesce expression reference][coalesce], you can **coalesce** errors to efficiently step through multiple expressions:
 
-```ruby
+```coffee
 structured = parse_json("not json") ?? parse_syslog("not syslog") ?? {}
 . = merge(., structured)
 ```
@@ -81,7 +81,7 @@ structured = parse_json("not json") ?? parse_syslog("not syslog") ?? {}
 
 As documented in the [function call reference][call], you can **raise** errors to immediately abort the program by adding a `!` to the end of the function name:
 
-```ruby
+```coffee
 structured = parse_json!("not json")
 . = merge(., structured)
 ```

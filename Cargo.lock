@@ -410,9 +410,9 @@ checksum = "065374052e7df7ee4047b1160cca5e1467a12351a40b3da123c870ba0b8eda2a"
 
 [[package]]
 name = "atomig"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "413dc7da5dbea1ddd9aa01fdb743f54bf90af543744fad6d77e13c38004d194d"
+checksum = "3bab175edd22a3f32cbdeb22ade3f0b2ad6831bf696992fbe7ae69b564849fdb"
 dependencies = [
  "atomig-macro",
  "serde",
@@ -971,7 +971,7 @@ checksum = "64c01c1c607d25c71bbaa67c113d6c6b36c434744b4fd66691d711b5b1bc0c8b"
 dependencies = [
  "chrono",
  "chrono-tz-build",
- "phf 0.10.0",
+ "phf",
 ]
 
 [[package]]
@@ -981,7 +981,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db058d493fb2f65f41861bfed7e3fe6335264a9f0f92710cab5bdf01fef09069"
 dependencies = [
  "parse-zoneinfo",
- "phf 0.10.0",
+ "phf",
  "phf_codegen",
 ]
 
@@ -1121,7 +1121,7 @@ dependencies = [
  "prost-types",
  "tonic",
  "tonic-build",
- "tracing-core 0.1.20",
+ "tracing-core 0.1.21",
 ]
 
 [[package]]
@@ -1140,7 +1140,7 @@ dependencies = [
  "tokio-stream",
  "tonic",
  "tracing 0.1.28",
- "tracing-core 0.1.20",
+ "tracing-core 0.1.21",
  "tracing-subscriber",
 ]
 
@@ -1776,6 +1776,18 @@ name = "discard"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "212d0f5754cb6769937f4501cc0e67f4f4483c8d2c3e1e922ee9edbe4ab4c7c0"
+
+[[package]]
+name = "dns-lookup"
+version = "1.0.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53ecafc952c4528d9b51a458d1a8904b81783feff9fde08ab6ed2545ff396872"
+dependencies = [
+ "cfg-if 1.0.0",
+ "libc",
+ "socket2 0.4.2",
+ "winapi 0.3.9",
+]
 
 [[package]]
 name = "dnsmsg-parser"
@@ -3455,9 +3467,9 @@ dependencies = [
 
 [[package]]
 name = "lru"
-version = "0.6.6"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ea2d928b485416e8908cff2d97d621db22b27f7b3b6729e438bcf42c671ba91"
+checksum = "6c748cfe47cb8da225c37595b3108bea1c198c84aaae8ea0ba76d01dda9fc803"
 
 [[package]]
 name = "lru-cache"
@@ -3639,7 +3651,7 @@ dependencies = [
  "metrics-util",
  "once_cell",
  "tracing 0.1.28",
- "tracing-core 0.1.20",
+ "tracing-core 0.1.21",
  "tracing-subscriber",
 ]
 
@@ -3940,9 +3952,9 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.22.1"
+version = "0.22.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7555d6c7164cc913be1ce7f95cbecdabda61eb2ccd89008524af306fb7f5031"
+checksum = "d3bb9a13fa32bc5aeb64150cd3f32d6cf4c748f8f8a417cce5d2eb976a8370ba"
 dependencies = [
  "bitflags",
  "cc",
@@ -4445,15 +4457,6 @@ dependencies = [
 
 [[package]]
 name = "phf"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3dfb61232e34fcb633f43d12c58f83c1df82962dcdfa565a4e866ffc17dafe12"
-dependencies = [
- "phf_shared 0.8.0",
-]
-
-[[package]]
-name = "phf"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9fc3db1018c4b59d7d582a739436478b6035138b6aecbce989fc91c3e98409f"
@@ -4651,9 +4654,9 @@ dependencies = [
 
 [[package]]
 name = "postgres-types"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "430f4131e1b7657b0cd9a2b0c3408d77c9a43a042d300b8c77f981dffcc43a2f"
+checksum = "04619f94ba0cc80999f4fc7073607cb825bc739a883cb6d20900fc5e009d6b0d"
 dependencies = [
  "bytes 1.1.0",
  "chrono",
@@ -5723,7 +5726,7 @@ dependencies = [
  "libc",
  "log",
  "memchr",
- "nix 0.22.1",
+ "nix 0.22.2",
  "radix_trie",
  "scopeguard",
  "smallvec",
@@ -6854,9 +6857,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-postgres"
-version = "0.7.2"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d2b1383c7e4fb9a09e292c7c6afb7da54418d53b045f1c1fac7a911411a2b8b"
+checksum = "2f916ee7e52c8a74dfe4162dd73a073d0d7d4b387ea7b97a774c0c10b0776531"
 dependencies = [
  "async-trait",
  "byteorder",
@@ -6866,7 +6869,7 @@ dependencies = [
  "log",
  "parking_lot",
  "percent-encoding",
- "phf 0.8.0",
+ "phf",
  "pin-project-lite",
  "postgres-protocol",
  "postgres-types",
@@ -7060,7 +7063,7 @@ dependencies = [
  "log",
  "pin-project-lite",
  "tracing-attributes 0.1.16",
- "tracing-core 0.1.20",
+ "tracing-core 0.1.21",
 ]
 
 [[package]]
@@ -7094,9 +7097,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-core"
-version = "0.1.20"
+version = "0.1.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46125608c26121c81b0c6d693eab5a420e416da7e43c426d2e8f7df8da8a3acf"
+checksum = "1f4ed65637b8390770814083d20756f87bfa2c21bf2f110babdc5438351746e4"
 dependencies = [
  "lazy_static",
 ]
@@ -7131,7 +7134,7 @@ dependencies = [
  "dashmap",
  "mock_instant",
  "tracing 0.1.28",
- "tracing-core 0.1.20",
+ "tracing-core 0.1.21",
  "tracing-subscriber",
 ]
 
@@ -7143,7 +7146,7 @@ checksum = "a6923477a48e41c1951f1999ef8bb5a3023eb723ceadafe78ffb65dc366761e3"
 dependencies = [
  "lazy_static",
  "log",
- "tracing-core 0.1.20",
+ "tracing-core 0.1.21",
 ]
 
 [[package]]
@@ -7153,7 +7156,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb65ea441fbb84f9f6748fd496cf7f63ec9af5bca94dd86456978d055e8eb28b"
 dependencies = [
  "serde",
- "tracing-core 0.1.20",
+ "tracing-core 0.1.21",
 ]
 
 [[package]]
@@ -7173,7 +7176,7 @@ dependencies = [
  "smallvec",
  "thread_local",
  "tracing 0.1.28",
- "tracing-core 0.1.20",
+ "tracing-core 0.1.21",
  "tracing-log",
  "tracing-serde",
 ]
@@ -7593,7 +7596,7 @@ dependencies = [
  "metrics-util",
  "mlua",
  "mongodb",
- "nix 0.22.1",
+ "nix 0.22.2",
  "no-proxy",
  "nom 7.0.0",
  "notify",
@@ -7668,7 +7671,7 @@ dependencies = [
  "tower-layer",
  "tower-test",
  "tracing 0.1.28",
- "tracing-core 0.1.20",
+ "tracing-core 0.1.21",
  "tracing-futures 0.2.5",
  "tracing-limit",
  "tracing-log",
@@ -7766,8 +7769,9 @@ dependencies = [
  "tokio-test",
  "tokio-util",
  "toml",
+ "tower",
  "tracing 0.1.28",
- "tracing-core 0.1.20",
+ "tracing-core 0.1.21",
  "tracing-log",
  "tracing-subscriber",
  "twox-hash",
@@ -7881,6 +7885,7 @@ dependencies = [
  "criterion",
  "csv",
  "datadog-search-syntax",
+ "dns-lookup",
  "grok",
  "hex",
  "hostname",
@@ -7915,6 +7920,7 @@ dependencies = [
  "ansi_term 0.12.1",
  "chrono",
  "chrono-tz",
+ "enrichment",
  "glob",
  "prettydiff",
  "regex",
@@ -8284,9 +8290,9 @@ dependencies = [
 
 [[package]]
 name = "woothee"
-version = "0.11.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89d5a45c5d9c772e577c263597681448fd91a46aed911783394eec396e45d4ee"
+checksum = "cd445a24dfaa0d13caab15a1533ae72a16da7c2d1521e6842beaf5c034e7940f"
 dependencies = [
  "lazy_static",
  "regex",

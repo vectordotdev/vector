@@ -46,16 +46,18 @@ pub enum TapNotification {
 pub enum TapPayload {
     Log(ComponentKey, LogEvent),
     Metric(ComponentKey, LogEvent),
-    Notification(ComponentKey, TapNotification),
+    Notification(String, TapNotification),
 }
 
 impl TapPayload {
-    pub fn matched(input_id: &str) -> Self {
-        Self::Notification(ComponentKey::from(input_id), TapNotification::Matched)
+    /// Raise a `matched` event against the provided pattern.
+    pub fn matched<T: Into<String>>(pattern: T) -> Self {
+        Self::Notification(pattern.into(), TapNotification::Matched)
     }
 
-    pub fn not_matched(input_id: &str) -> Self {
-        Self::Notification(ComponentKey::from(input_id), TapNotification::NotMatched)
+    /// Raise a `not_matched` event against the provided pattern.
+    pub fn not_matched<T: Into<String>>(pattern: T) -> Self {
+        Self::Notification(pattern.into(), TapNotification::NotMatched)
     }
 }
 
@@ -149,11 +151,11 @@ impl TapController {
     /// Creates a new tap sink, and spawns a handler for watching for topology changes
     /// and a separate inner handler for events. Uses a oneshot channel to trigger shutdown
     /// of handlers when the `TapSink` drops out of scope.
-    pub fn new(watch_rx: WatchRx, tap_tx: TapSender, patterns: &[String]) -> Self {
+    pub fn new(watch_rx: WatchRx, tap_tx: TapSender, component_id_patterns: &[String]) -> Self {
         let (_shutdown, shutdown_rx) = oneshot::channel();
 
         tokio::spawn(tap_handler(
-            patterns.iter().cloned().collect(),
+            component_id_patterns.iter().cloned().collect(),
             tap_tx,
             watch_rx,
             shutdown_rx,
@@ -198,12 +200,12 @@ async fn send_not_matched(tx: TapSender, pattern: &str) -> Result<(), SendError<
 /// Returns a tap handler that listens for topology changes, and connects sinks to observe
 /// `LogEvent`s` when a component matches one or more of the provided patterns.
 async fn tap_handler(
-    patterns: HashSet<String>,
+    component_id_patterns: HashSet<String>,
     tx: TapSender,
     mut watch_rx: WatchRx,
     mut shutdown_rx: ShutdownRx,
 ) {
-    debug!(message = "Started tap.", patterns = ?patterns);
+    debug!(message = "Started tap.", patterns = ?component_id_patterns);
 
     // Sinks register for the current tap. Contains the id of the matched component, and
     // a shutdown trigger for sending a remove control message when matching sinks change.
@@ -215,7 +217,7 @@ async fn tap_handler(
             Ok(_) = watch_rx.changed() => {
                 // Get the patterns that matched on the last iteration, to compare with the latest
                 // round of matches when sending notifications.
-                let last_matches = patterns
+                let last_matches = component_id_patterns
                     .iter()
                     .filter(|pattern| sinks.keys().any(|id| pattern.matches_glob(&id.to_string())))
                     .collect::<HashSet<_>>();
@@ -230,7 +232,7 @@ async fn tap_handler(
                 // Loop over all outputs, and connect sinks for the components that match one
                 // or more patterns.
                 for (component_key, mut control_tx) in outputs.iter() {
-                    match patterns
+                    match component_id_patterns
                         .iter()
                         .filter(|pattern| pattern.matches_glob(&component_key.to_string()))
                         .collect_vec()
@@ -238,7 +240,7 @@ async fn tap_handler(
                         found if !found.is_empty() => {
                             debug!(
                                 message="Component matched.",
-                                ?component_key, ?patterns, matched = ?found
+                                ?component_key, ?component_id_patterns, matched = ?found
                             );
 
                             // (Re)connect the sink. This is necessary because a sink may be
@@ -276,7 +278,7 @@ async fn tap_handler(
                         }
                         _ => {
                             debug!(
-                                message="Component not matched.", ?component_key, ?patterns
+                                message="Component not matched.", ?component_key, ?component_id_patterns
                             );
                         }
                     }
@@ -292,7 +294,7 @@ async fn tap_handler(
 
                 // Send notifications to the client. The # of notifications will always be
                 // exactly equal to the number of patterns, so we can pre-allocate capacity.
-                let mut notifications = Vec::with_capacity(patterns.len());
+                let mut notifications = Vec::with_capacity(component_id_patterns.len());
 
                 // Matched notifications.
                 for pattern in matched.difference(&last_matches) {
@@ -300,12 +302,12 @@ async fn tap_handler(
                 }
 
                 // Not matched notifications.
-                for pattern in HashSet::from_iter(&patterns).difference(&matched) {
+                for pattern in HashSet::from_iter(&component_id_patterns).difference(&matched) {
                     notifications.push(send_not_matched(tx.clone(), pattern).boxed());
                 }
 
                 // Send all events. If any event returns an error, this means the client
-                // channel has gone away, so we can break out the loop.
+                // channel has gone away, so we can break the loop.
                 if try_join_all(notifications).await.is_err() {
                     debug!("Couldn't send notification(s); tap gone away.");
                     break;
@@ -314,7 +316,7 @@ async fn tap_handler(
         }
     }
 
-    debug!(message = "Stopped tap.", patterns = ?patterns);
+    debug!(message = "Stopped tap.", patterns = ?component_id_patterns);
 }
 
 #[cfg(test)]
@@ -373,12 +375,12 @@ mod tests {
         for notification in notifications.into_iter() {
             match notification {
                 Some(TapPayload::Notification(returned_id, TapNotification::Matched))
-                    if returned_id.to_string() == pattern_matched =>
+                    if returned_id == pattern_matched =>
                 {
                     continue
                 }
                 Some(TapPayload::Notification(returned_id, TapNotification::NotMatched))
-                    if returned_id.to_string() == pattern_not_matched =>
+                    if returned_id == pattern_not_matched =>
                 {
                     continue
                 }

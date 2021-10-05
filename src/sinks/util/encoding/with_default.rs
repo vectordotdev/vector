@@ -36,20 +36,26 @@ pub struct EncodingConfigWithDefault<E: Default + PartialEq> {
     pub(crate) timestamp_format: Option<TimestampFormat>,
 }
 
-impl<E: Default + PartialEq> EncodingConfiguration<E> for EncodingConfigWithDefault<E> {
-    fn codec(&self) -> &E {
+impl<E: Default + PartialEq> EncodingConfiguration for EncodingConfigWithDefault<E> {
+    type Codec = E;
+
+    fn codec(&self) -> &Self::Codec {
         &self.codec
     }
+
     fn schema(&self) -> &Option<String> {
         &self.schema
     }
+
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
     fn only_fields(&self) -> &Option<Vec<Vec<PathComponent<'static>>>> {
         &self.only_fields
     }
+
     fn except_fields(&self) -> &Option<Vec<String>> {
         &self.except_fields
     }
+
     fn timestamp_format(&self) -> &Option<TimestampFormat> {
         &self.timestamp_format
     }

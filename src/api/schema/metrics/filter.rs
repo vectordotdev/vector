@@ -1,5 +1,6 @@
 use super::{
     EventsInTotal, EventsOutTotal, ProcessedBytesTotal, ProcessedEventsTotal, ReceivedEventsTotal,
+    SentEventsTotal,
 };
 use crate::{
     config::ComponentKey,
@@ -48,6 +49,7 @@ pub trait MetricsFilter<'a> {
     fn received_events_total(&self) -> Option<ReceivedEventsTotal>;
     fn events_in_total(&self) -> Option<EventsInTotal>;
     fn events_out_total(&self) -> Option<EventsOutTotal>;
+    fn sent_events_total(&self) -> Option<SentEventsTotal>;
 }
 
 impl<'a> MetricsFilter<'a> for Vec<Metric> {
@@ -82,6 +84,15 @@ impl<'a> MetricsFilter<'a> for Vec<Metric> {
         let sum = sum_metrics(self.iter().filter(|m| m.name() == "events_out_total"))?;
 
         Some(EventsOutTotal::new(sum))
+    }
+
+    fn sent_events_total(&self) -> Option<SentEventsTotal> {
+        let sum = sum_metrics(
+            self.iter()
+                .filter(|m| m.name() == "component_sent_events_total"),
+        )?;
+
+        Some(SentEventsTotal::new(sum))
     }
 }
 
@@ -134,6 +145,16 @@ impl<'a> MetricsFilter<'a> for Vec<&'a Metric> {
         )?;
 
         Some(EventsOutTotal::new(sum))
+    }
+
+    fn sent_events_total(&self) -> Option<SentEventsTotal> {
+        let sum = sum_metrics(
+            self.iter()
+                .filter(|m| m.name() == "component_sent_events_total")
+                .copied(),
+        )?;
+
+        Some(SentEventsTotal::new(sum))
     }
 }
 
