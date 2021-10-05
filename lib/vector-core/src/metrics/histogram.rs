@@ -20,7 +20,7 @@ impl AgentDDSketchHistogram {
         }
     }
 
-    pub fn sketch(&self) -> &DDSketch {
+    pub fn sketch(&self) -> &AgentDDSketch {
         &self.sketch
     }
 
@@ -48,7 +48,15 @@ impl AgentDDSketchHistogram {
         }
     }
 
-    pub fn insert_buckets(&mut self, buckets: Vec<Bucket>) {
+    /// Inserts the given set of buckets into this histogram sketch.
+    ///
+    /// # Allowable ranges
+    ///
+    /// We currently only allow positive upper bounds for buckets.  Any buckets with bounds lower
+    /// than 0.0 will be silently discarded.
+    ///
+    /// If the buckets given
+    pub fn insert_buckets(&mut self, mut buckets: Vec<Bucket>) -> Option<AgentDDSketch> {
         // If we already have _any_ buckets, and these new buckets don't match, reset our entire
         // state.  It's likely to get messed up if some buckets still exist and we're tracking their
         // count deltas, and new bucketing feels like a reasonable signal to reset ourselves.
@@ -60,21 +68,23 @@ impl AgentDDSketchHistogram {
 
             if !seen_buckets.is_empty() {
                 self.seen.clear();
-                self.sketch = DDSketch::new(self.config.clone());
-                println!("clearing existing buckets, new buckets mismatched")
-            } else {
-                println!("buckets matched, proceeding");
+                self.sketch = AgentDDSketch::with_agent_defaults();
             }
         }
+
+        // Buckets need to be sorted from lowest to highest so that we can properly calculate the
+        // rolling lower/upper bounds.1
+        buckets.sort_by(|a, b| {
+            let oa = OrderedFloat(a.upper_limit);
+            let ob = OrderedFloat(b.upper_limit);
+
+            oa.cmp(&ob)
+        });
 
         let mut lower = 0.0;
 
         for bucket in buckets {
             if let Some(delta) = self.track_bucket_change(&bucket) {
-                println!(
-                    "bucket had delta, interpolating (ub={},delta={})",
-                    bucket.upper_limit, delta
-                );
                 let mut upper = bucket.upper_limit;
                 if upper.is_sign_positive() && upper.is_infinite() {
                     upper = lower;
@@ -84,20 +94,20 @@ impl AgentDDSketchHistogram {
             }
             lower = bucket.upper_limit;
         }
+
+        None
     }
 
-    pub fn interpolate_bucket(&mut self, lower: f64, upper: f64, count: u32) {
-        todo!()
+    fn interpolate_bucket(&mut self, lower: f64, upper: f64, count: u32) {
+        self.sketch.insert_interpolate(lower, upper, count)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use sketches_ddsketch::Config;
-
     use crate::{event::metric::Bucket, metrics::handle::Histogram};
 
-    use super::HistogramSketch;
+    use super::AgentDDSketchHistogram;
 
     static HISTO_VALUES: &[u64] = &[
         104221, 10206, 32436, 121686, 92848, 83685, 23739, 15122, 50491, 88507, 48318, 28004,
@@ -113,7 +123,7 @@ mod tests {
 
     #[test]
     fn basic_test() {
-        let mut histo_sketch = HistogramSketch::with_dd_agent_defaults();
+        let mut histo_sketch = AgentDDSketchHistogram::with_ddagent_defaults();
         assert!(histo_sketch.sketch().is_empty());
 
         let histo = Histogram::new();
@@ -134,23 +144,34 @@ mod tests {
     }
 
     #[test]
-    fn negative_to_positive() {
-        let mut histo_sketch = HistogramSketch::with_dd_agent_defaults();
-        assert!(histo_sketch.sketch().is_empty());
+    fn test_clear_buckets_if_mismatch() {
+        let mut histo_sketch = AgentDDSketchHistogram::with_ddagent_defaults();
+        assert_eq!(histo_sketch.sketch().count(), 0);
 
-        let bounds = &[
-            -10.0, -1.0, -0.1, -0.01, -0.001, 0.0, 0.001, 0.01, 0.1, 1.0, 10.0,
+        let first_buckets = vec![
+            Bucket {
+                upper_limit: 0.0001,
+                count: 1,
+            },
+            Bucket {
+                upper_limit: 0.001,
+                count: 1,
+            },
+            Bucket {
+                upper_limit: 0.01,
+                count: 1,
+            },
         ];
 
-        let buckets = bounds
-            .iter()
-            .map(|b| Bucket {
-                upper_limit: *b,
-                count: 1,
-            })
-            .collect::<Vec<_>>();
-        histo_sketch.insert_buckets(buckets);
+        histo_sketch.insert_buckets(first_buckets);
+        assert_eq!(histo_sketch.sketch().count(), 3);
 
-        assert!(!histo_sketch.sketch().is_empty());
+        let second_buckets = vec![Bucket {
+            upper_limit: 0.1,
+            count: 1,
+        }];
+
+        histo_sketch.insert_buckets(second_buckets);
+        assert_eq!(histo_sketch.sketch().count(), 1);
     }
 }
