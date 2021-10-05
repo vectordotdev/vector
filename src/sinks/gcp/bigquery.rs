@@ -83,13 +83,18 @@ impl GenerateConfig for BigquerySinkConfig {
 #[typetag::serde(name = "gcp_bigquery")]
 impl SinkConfig for BigquerySinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let request_settings = self.request.unwrap_with(&Default::default());
+        let request_settings = self.request.unwrap_with(&TowerRequestConfig {
+            // BigQuery returns intermittent 502 errors, which require waiting 30 seconds
+            retry_initial_backoff_secs: Some(30),
+            ..Default::default()
+        });
         let tls_settings = TlsSettings::from_options(&self.tls)?;
 
         let client = HttpClient::new(tls_settings, cx.proxy())?;
         let sink = BigquerySink::from_config(self).await?;
         let batch_settings = BatchSettings::default()
-            .bytes(bytesize::mib(10u64))
+            // BigQuery has a max request size of 10MB
+            .bytes(bytesize::mib(8u64))
             .events(1000)
             .timeout(1)
             .parse_config(self.batch)?;
@@ -245,4 +250,13 @@ struct TableDataInsertAllRequest {
     /// If specified, treats the destination table as a base template, and inserts the rows into an instance table named \"{destination}{templateSuffix}\". BigQuery will manage creation of the instance table, using the schema of the base template table. See https://cloud.google.com
     #[serde(skip_serializing_if = "Option::is_none")]
     template_suffix: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<BigquerySinkConfig>();
+    }
 }
