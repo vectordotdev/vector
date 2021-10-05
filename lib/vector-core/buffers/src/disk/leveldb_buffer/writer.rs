@@ -7,12 +7,18 @@ use leveldb::database::{
     options::WriteOptions,
     Database,
 };
-use std::fmt::Debug;
-use std::pin::Pin;
-use std::sync::{
+#[cfg(loom)]
+use loom::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc, Mutex,
 };
+use std::fmt::Debug;
+use std::pin::Pin;
+// #[cfg(not(loom))]
+// use std::sync::{
+//     atomic::{AtomicUsize, Ordering},
+//     Arc, Mutex,
+// };
 use std::task::{Context, Poll, Waker};
 
 /// The writer side of N to 1 channel through leveldb.

@@ -13,16 +13,14 @@ use leveldb::database::{
     options::{Options, ReadOptions},
     Database,
 };
+#[cfg(loom)]
+use loom::sync::{atomic::AtomicUsize, Arc, Mutex};
 pub use reader::Reader;
 use snafu::ResultExt;
 use std::fmt::Debug;
-use std::{
-    collections::VecDeque,
-    marker::PhantomData,
-    path::Path,
-    sync::{atomic::AtomicUsize, Arc, Mutex},
-    time::Instant,
-};
+#[cfg(not(loom))]
+use std::sync::{atomic::AtomicUsize, Arc, Mutex};
+use std::{collections::VecDeque, marker::PhantomData, path::Path, time::Instant};
 pub use writer::Writer;
 
 /// How much of disk buffer needs to be deleted before we trigger compaction.

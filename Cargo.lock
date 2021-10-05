@@ -808,12 +808,14 @@ dependencies = [
  "db-key",
  "futures 0.3.17",
  "leveldb",
+ "loom",
  "metrics",
- "metrics-exporter-prometheus",
+ "once_cell",
  "pin-project 1.0.8",
  "pretty_assertions",
  "proptest",
  "proptest-derive",
+ "rand 0.8.4",
  "serde",
  "snafu",
  "tempdir",
@@ -2078,9 +2080,9 @@ dependencies = [
 
 [[package]]
 name = "ffi-opaque"
-version = "0.1.0"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "534be3985e262585e2a8bb8322969e2115f0eff293b5bf522bef397fff54c9bc"
+checksum = "ec54ac60a7f2ee9a97cad9946f9bf629a3bc6a7ae59e68983dc9318f5a54b81a"
 
 [[package]]
 name = "file-source"
@@ -2348,6 +2350,19 @@ dependencies = [
  "attohttpc 0.15.0",
  "lazy_static",
  "serde_json",
+]
+
+[[package]]
+name = "generator"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1d9279ca822891c1a4dae06d185612cf8fc6acfe5dff37781b41297811b12ee"
+dependencies = [
+ "cc",
+ "libc",
+ "log",
+ "rustversion",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -3296,8 +3311,6 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 [[package]]
 name = "leveldb"
 version = "0.8.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32651baaaa5596b3a6e0bee625e73fd0334c167db0ea5ac68750ef9a629a2d6a"
 dependencies = [
  "db-key",
  "leveldb-sys",
@@ -3307,7 +3320,6 @@ dependencies = [
 [[package]]
 name = "leveldb-sys"
 version = "2.0.9"
-source = "git+https://github.com/timberio/leveldb-sys.git?branch=leveldb_mmap_limit#deca67b91b32c77bb5bcd122e306877468520a97"
 dependencies = [
  "cmake",
  "ffi-opaque",
@@ -3455,6 +3467,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "loom"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2111607c723d7857e0d8299d5ce7a0bf4b844d3e44f8de136b13da513eaf8fc4"
+dependencies = [
+ "cfg-if 1.0.0",
+ "generator",
+ "scoped-tls",
+]
+
+[[package]]
 name = "lru"
 version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3596,22 +3619,6 @@ dependencies = [
  "ahash",
  "metrics-macros",
  "proc-macro-hack",
-]
-
-[[package]]
-name = "metrics-exporter-prometheus"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "343a5ceb38235928e7a5687412590f07e6d281522dcd9ff51246f8856eef5fe5"
-dependencies = [
- "hyper",
- "ipnet",
- "metrics",
- "metrics-util",
- "parking_lot",
- "quanta",
- "thiserror",
- "tokio",
 ]
 
 [[package]]
@@ -8401,3 +8408,8 @@ dependencies = [
  "cc",
  "libc",
 ]
+
+[[patch.unused]]
+name = "leveldb-sys"
+version = "2.0.9"
+source = "git+https://github.com/timberio/leveldb-sys.git?branch=leveldb_mmap_limit#deca67b91b32c77bb5bcd122e306877468520a97"

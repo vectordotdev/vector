@@ -9,11 +9,17 @@ use leveldb::database::{
     options::{ReadOptions, WriteOptions},
     Database,
 };
+#[cfg(loom)]
+use loom::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc, Mutex,
+};
 use std::collections::VecDeque;
 use std::fmt::Display;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
+#[cfg(not(loom))]
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc, Mutex,

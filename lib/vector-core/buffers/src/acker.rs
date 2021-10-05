@@ -1,7 +1,15 @@
 use futures::task::AtomicWaker;
+#[cfg(loom)]
+use loom::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 use metrics::counter;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+#[cfg(not(loom))]
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 
 #[derive(Debug, Clone)]
 pub enum Acker {
