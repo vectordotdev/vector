@@ -48,13 +48,7 @@ impl Buffer {
             let buffer = Vec::with_capacity(bytes);
             match compression {
                 Compression::None => InnerBuffer::Plain(buffer),
-                Compression::Gzip(level) => {
-                    let level = level.unwrap_or(GZIP_FAST);
-                    InnerBuffer::Gzip(GzEncoder::new(
-                        buffer,
-                        flate2::Compression::new(level as u32),
-                    ))
-                }
+                Compression::Gzip(level) => InnerBuffer::Gzip(GzEncoder::new(buffer, level)),
             }
         })
     }
