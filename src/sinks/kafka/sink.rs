@@ -84,7 +84,7 @@ impl KafkaSink {
                 match request {
                     Ok(req) => Some(req),
                     Err(RequestBuilderError::EncodingError(e)) => {
-                        error!("failed to encode Kafka request: {:?}", e);
+                        error!("Failed to encode Kafka request: {:?}.", e);
                         None
                     }
                     Err(RequestBuilderError::SplitError(error)) => {
