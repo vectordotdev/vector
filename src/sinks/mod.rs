@@ -53,6 +53,8 @@ pub mod loki;
 pub mod nats;
 #[cfg(feature = "sinks-new_relic_logs")]
 pub mod new_relic_logs;
+#[cfg(feature = "sinks-new_relic")]
+pub mod new_relic;
 #[cfg(feature = "sinks-papertrail")]
 pub mod papertrail;
 #[cfg(feature = "sinks-prometheus")]

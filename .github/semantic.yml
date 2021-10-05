@@ -208,6 +208,7 @@ scopes:
   - loki sink # Anything `loki` sink related
   - nats sink # Anything `nats` sink related
   - new_relic_logs sink # Anything `new_relic_logs` sink related
+  - new_relic sink # Anything `new_relic` sink related
   - papertrail sink # Anything `papertrail` sink related
   - prometheus_exporter sink # Anything `prometheus_exporter` sink related
   - prometheus_remote_write sink # Anything `prometheus_remote_write` sink related
