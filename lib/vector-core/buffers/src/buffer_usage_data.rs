@@ -15,18 +15,16 @@ pub struct BufferUsageData {
 }
 
 impl BufferUsageData {
-    pub fn new(dropped_event_count: Option<AtomicUsize>) -> Self {
-        Self {
+    pub fn new(dropped_event_count: Option<AtomicUsize>, span: Span) -> Arc<Self> {
+        let buffer_usage_data = Arc::new(Self {
             received_event_count: AtomicUsize::new(0),
             received_event_byte_size: AtomicUsize::new(0),
             sent_event_count: AtomicUsize::new(0),
             sent_event_byte_size: AtomicUsize::new(0),
             dropped_event_count,
-        }
-    }
+        });
 
-    pub fn init_instrumentation(buffer_usage_data: &Arc<BufferUsageData>, span: Span) {
-        let buffer_usage_data = buffer_usage_data.clone();
+        let usage_data = buffer_usage_data.clone();
         tokio::spawn(
             async move {
                 let mut interval = interval(Duration::from_secs(2));
@@ -34,22 +32,16 @@ impl BufferUsageData {
                     interval.tick().await;
 
                     emit(&BufferEventsReceived {
-                        count: buffer_usage_data
-                            .received_event_count
-                            .load(Ordering::Relaxed),
-                        byte_size: buffer_usage_data
-                            .received_event_byte_size
-                            .load(Ordering::Relaxed),
+                        count: usage_data.received_event_count.load(Ordering::Relaxed),
+                        byte_size: usage_data.received_event_byte_size.load(Ordering::Relaxed),
                     });
 
                     emit(&BufferEventsSent {
-                        count: buffer_usage_data.sent_event_count.load(Ordering::Relaxed),
-                        byte_size: buffer_usage_data
-                            .sent_event_byte_size
-                            .load(Ordering::Relaxed),
+                        count: usage_data.sent_event_count.load(Ordering::Relaxed),
+                        byte_size: usage_data.sent_event_byte_size.load(Ordering::Relaxed),
                     });
 
-                    if let Some(dropped_event_count) = &buffer_usage_data.dropped_event_count {
+                    if let Some(dropped_event_count) = &usage_data.dropped_event_count {
                         emit(&EventsDropped {
                             count: dropped_event_count.load(Ordering::Relaxed),
                         });
@@ -58,6 +50,8 @@ impl BufferUsageData {
             }
             .instrument(span),
         );
+
+        buffer_usage_data
     }
 
     pub fn increment_received_event_count(&self, count: usize) {

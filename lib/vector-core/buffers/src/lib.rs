@@ -92,8 +92,7 @@ where
                     WhenFull::DropNewest => Some(AtomicUsize::new(0)),
                 };
 
-                let buffer_usage_data = Arc::new(BufferUsageData::new(dropped_event_count));
-                BufferUsageData::init_instrumentation(&buffer_usage_data, span);
+                let buffer_usage_data = BufferUsageData::new(dropped_event_count, span);
                 let tx = BufferInputCloner::Memory(tx, when_full, Some(buffer_usage_data.clone()));
                 let rx = rx.inspect(move |item: &T| {
                     buffer_usage_data.increment_sent_event_count(1);
