@@ -64,6 +64,19 @@ components: transforms: log_to_metric: {
 							default: false
 						}
 					}
+					absolute_kind: {
+						description: """
+							If `true` the metric will be of kind `absolute`.
+							If `false` the metric will be of kind `incremental`.
+							"""
+						required: false
+						common:   false
+						warnings: []
+						relevant_when: #"type = "counter""#
+						type: bool: {
+							default: false
+						}
+					}
 					name: {
 						description: "The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`."
 						required:    false

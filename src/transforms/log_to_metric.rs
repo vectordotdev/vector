@@ -31,6 +31,8 @@ pub struct CounterConfig {
     namespace: Option<String>,
     #[serde(default = "default_increment_by_value")]
     increment_by_value: bool,
+    #[serde(default = "default_absolute_kind")]
+    absolute_kind: bool,
     tags: Option<IndexMap<String, String>>,
 }
 
@@ -92,6 +94,10 @@ const fn default_increment_by_value() -> bool {
     false
 }
 
+const fn default_absolute_kind() -> bool {
+    false
+}
+
 #[derive(Debug, Clone)]
 pub struct LogToMetric {
     config: LogToMetricConfig,
@@ -109,6 +115,7 @@ impl GenerateConfig for LogToMetricConfig {
                 name: None,
                 namespace: None,
                 increment_by_value: false,
+                absolute_kind: false,
                 tags: None,
             })],
         })
@@ -239,16 +246,18 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 .transpose()?;
 
             let tags = render_tags(&counter.tags, event)?;
+            let kind = if counter.absolute_kind {
+                MetricKind::Absolute
+            } else {
+                MetricKind::Incremental
+            };
 
-            Ok(Metric::new_with_metadata(
-                name,
-                MetricKind::Incremental,
-                MetricValue::Counter { value },
-                metadata,
+            Ok(
+                Metric::new_with_metadata(name, kind, MetricValue::Counter { value }, metadata)
+                    .with_namespace(namespace)
+                    .with_tags(tags)
+                    .with_timestamp(timestamp),
             )
-            .with_namespace(namespace)
-            .with_tags(tags)
-            .with_timestamp(timestamp))
         }
         MetricConfig::Histogram(hist) => {
             let value = value.to_string_lossy().parse().map_err(|error| {
@@ -570,6 +579,36 @@ mod tests {
             Metric::new_with_metadata(
                 "amount_total",
                 MetricKind::Incremental,
+                MetricValue::Counter { value: 33.99 },
+                metadata,
+            )
+            .with_timestamp(Some(ts()))
+        );
+    }
+
+    #[test]
+    fn count_absolute() {
+        let config = parse_config(
+            r#"
+            [[metrics]]
+            type = "counter"
+            field = "amount"
+            name = "amount_total"
+            increment_by_value = true
+            absolute_kind = true
+            "#,
+        );
+
+        let event = create_event("amount", "33.99");
+        let metadata = event.metadata().clone();
+        let mut transform = LogToMetric::new(config);
+        let metric = transform_one(&mut transform, event).unwrap();
+
+        assert_eq!(
+            metric.into_metric(),
+            Metric::new_with_metadata(
+                "amount_total",
+                MetricKind::Absolute,
                 MetricValue::Counter { value: 33.99 },
                 metadata,
             )
