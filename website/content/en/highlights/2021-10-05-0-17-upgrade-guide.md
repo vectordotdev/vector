@@ -2,7 +2,7 @@
 date: "2021-10-05"
 title: "0.17 Upgrade Guide"
 description: "An upgrade guide that addresses breaking changes in 0.17.0"
-authors: ["tobz"]
+authors: ["jszwedko", "tobz"]
 pr_numbers: []
 release: "0.17.0"
 hide_on_release_notes: false
@@ -10,11 +10,13 @@ badges:
   type: breaking change
 ---
 
-Vector's 0.17.0 release includes two **breaking changes**:
+Vector's 0.17.0 release includes five **breaking changes**:
 
 1. [Blackhole sink configuration changes](#blackhole)
 1. [Datadog Logs sink loses `batch.max_bytes` setting](#datadog_logs_max_bytes)
 1. [Vector now logs to stderr](#logging)
+1. [The `generator` source now has a default `interval` setting](#interval)
+1. [The deprecated `wasm` transform was removed](#wasm)
 
 We cover them below to help you upgrade quickly:
 
@@ -50,7 +52,7 @@ that stdout can be processed separately.
 
 If you were previously depending on Vector's logs appearing in stdout, you should now look for them in stderr.
 
-### The `generator` source now has a default `interval` setting
+### The `generator` source now has a default `interval` setting {#interval}
 
 Previously, the [`generator`][generator] source had no default `interval`, which meant that if you
 started Vector without setting an `interval`, the `generator` would output batches of test events as
@@ -59,3 +61,15 @@ outputs one batch per second. To specify no delay between batches you now need t
 `interval` to `0.0`.
 
 [generator]: /docs/reference/configuration/sources/generator
+
+### The deprecated `wasm` transform was removed {#wasm}
+
+The `wasm` transform was [deprecated in v0.16.0](deprecation) and has been removed in this release.
+
+In its place, we recommend using the `remap` and `lua` transforms.
+
+Note, we may revisit adding WASM support to Vector for custom plugins in the future. If you have a use-case, please add
+it to the [Github issue](9466).
+
+[deprecation]: /content/en/highlights/2021-08-23-removing-wasm
+[9466]: https://github.com/vectordotdev/vector/issues/9466
