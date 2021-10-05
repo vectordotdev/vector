@@ -11,9 +11,9 @@ use vector_core::{
         driver::Driver,
     },
 };
+use std::io;
 
 use super::{encoding::Encoder, Compression, Compressor, ConcurrentMap, RequestBuilder};
-use crate::sinks::util::request_builder::{RequestBuilderError, RequestBuilderResult};
 
 impl<T: ?Sized> SinkBuilderExt for T where T: Stream {}
 
@@ -77,7 +77,7 @@ pub trait SinkBuilderExt: Stream {
         builder: B,
         encoding: E,
         compression: Compression,
-    ) -> ConcurrentMap<Self, RequestBuilderResult<B::Request, B::SplitError>>
+    ) -> ConcurrentMap<Self, Result<B::Request, io::Error>>
     where
         Self: Sized,
         Self: Stream<Item = I>,
@@ -85,7 +85,6 @@ pub trait SinkBuilderExt: Stream {
         B::Events: IntoIterator<Item = Event>,
         B::Payload: From<Vec<u8>>,
         B::Request: Send,
-        B::SplitError: Send,
         I: Send + 'static,
         E: Encoder + Send + Sync + 'static,
     {
@@ -100,8 +99,7 @@ pub trait SinkBuilderExt: Stream {
             Box::pin(async move {
                 // Split the input into metadata and events.
                 let (metadata, events) = builder
-                    .split_input(input)
-                    .map_err(RequestBuilderError::SplitError)?;
+                    .split_input(input);
 
                 // Encode/compress each event.
                 for event in events.into_iter() {
@@ -110,8 +108,7 @@ pub trait SinkBuilderExt: Stream {
                     // technically we might run out of memory when allocating for the vector, so we
                     // pass the error through.
                     let _ = encoder
-                        .encode_event(event, &mut compressor)
-                        .map_err(RequestBuilderError::EncodingError)?;
+                        .encode_event(event, &mut compressor)?;
                 }
 
                 // Now build the actual request.
