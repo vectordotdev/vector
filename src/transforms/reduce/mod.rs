@@ -20,6 +20,14 @@ mod merge_strategy;
 use merge_strategy::*;
 
 //------------------------------------------------------------------------------
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+#[serde(deny_unknown_fields, default)]
+pub struct BatchesWhenConfig {
+    /// How often to run batch check
+    pub check_interval: usize,
+    /// Condition to check for batch
+    pub source: AnyCondition,
+}
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -39,8 +47,15 @@ pub struct ReduceConfig {
     /// An optional condition that determines when an event is the end of a
     /// reduce.
     pub ends_when: Option<AnyCondition>,
+    /// An optional condition that determines when an event starts the
+    /// beginning of a reduce
     pub starts_when: Option<AnyCondition>,
+    /// An optional condition that determines when an event completes all
+    /// outstanding merge states
     pub flushes_when: Option<AnyCondition>,
+    /// An optional condition that uses merge state to determine if event
+    /// is complete
+    pub batches_when: Option<BatchesWhenConfig>,
 }
 
 inventory::submit! {
@@ -70,10 +85,35 @@ impl TransformConfig for ReduceConfig {
 }
 
 #[derive(Debug)]
+struct BatchChecker {
+    interval: usize,
+    source: Box<dyn Condition>,
+}
+
+impl BatchChecker {
+    pub fn check(&self, mut entry: hash_map::OccupiedEntry<Discriminant, ReduceState>) -> Option<Event> {
+        let st = entry.get_mut();
+        if st.entries_since_last_batch_check > self.interval {
+            st.entries_since_last_batch_check = 0;
+            let ev: Event = entry.get().clone().flush().into();
+            if self.source.check(&ev) {
+                entry.remove();
+                Some(ev)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug)]
 struct ReduceState {
     fields: HashMap<String, Box<dyn ReduceValueMerger>>,
     stale_since: Instant,
     metadata: EventMetadata,
+    entries_since_last_batch_check: usize,
 }
 
 impl ReduceState {
@@ -98,6 +138,7 @@ impl ReduceState {
                 })
                 .collect(),
             metadata,
+            entries_since_last_batch_check: 1,
         }
     }
 
@@ -130,6 +171,7 @@ impl ReduceState {
             }
         }
         self.stale_since = Instant::now();
+        self.entries_since_last_batch_check += 1;
     }
 
     fn flush(mut self) -> LogEvent {
@@ -154,6 +196,7 @@ pub struct Reduce {
     ends_when: Option<Box<dyn Condition>>,
     starts_when: Option<Box<dyn Condition>>,
     flushes_when: Option<Box<dyn Condition>>,
+    batch_check: Option<BatchChecker>,
 }
 
 impl Reduce {
@@ -180,6 +223,18 @@ impl Reduce {
             .as_ref()
             .map(|c| c.build(enrichment_tables))
             .transpose()?;
+        let batch_check = config
+            .batches_when
+            .as_ref()
+            .map(|c| {
+                c.source.build(enrichment_tables)
+                    .map(|source| {
+                        BatchChecker {
+                            interval: c.check_interval,
+                            source: source,
+                        }
+                    })
+            }).transpose()?;
         let group_by = config.group_by.clone().into_iter().collect();
 
         Ok(Reduce {
@@ -191,6 +246,7 @@ impl Reduce {
             ends_when,
             starts_when,
             flushes_when,
+            batch_check,
         })
     }
 
@@ -215,13 +271,19 @@ impl Reduce {
             .for_each(|(_, s)| output.push(Event::from(s.flush())));
     }
 
-    fn push_or_new_reduce_state(&mut self, event: LogEvent, discriminant: Discriminant) {
+    fn push_or_new_reduce_state(&mut self, event: LogEvent, discriminant: Discriminant) -> Option<Event> {
         match self.reduce_merge_states.entry(discriminant) {
             hash_map::Entry::Vacant(entry) => {
                 entry.insert(ReduceState::new(event, &self.merge_strategies));
+                None
             }
             hash_map::Entry::Occupied(mut entry) => {
                 entry.get_mut().add_event(event, &self.merge_strategies);
+                if let Some(check) = &self.batch_check {
+                    check.check(entry)
+                } else {
+                    None
+                }
             }
         }
     }
@@ -272,7 +334,9 @@ impl Reduce {
                     .into(),
             );
         } else {
-            self.push_or_new_reduce_state(event, discriminant)
+            if let Some(ev) = self.push_or_new_reduce_state(event, discriminant) {
+                output.push(ev);
+            }
         }
 
         self.flush_into(output);

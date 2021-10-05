@@ -87,6 +87,47 @@ components: transforms: reduce: {
         syntax: "literal"
       }
     }
+    batches_when: {
+      common: false
+      description: """
+        A condition used to distinguish when a state should be flushed to merge state
+        """
+      required: false
+      warnings: []
+      type: object: {
+        examples: []
+        options: {
+          source: {
+            common: false
+            description: """
+              A condition used to distinguish when a state should be flushed to merge state
+              """
+            required: false
+            warnings: []
+            type: string: {
+              default: null
+              examples: [
+                #".exit_code != null"#,
+              ]
+              syntax: "literal"
+            }
+          }
+          check_interval: {
+            common: false
+            description: """
+              How often to check merged state for a batch
+              """
+            required: false
+            warnings: []
+            type: int: {
+              default: null
+              examples: []
+              syntax: "literal"
+            }
+          }
+        }
+      }
+    }
 		group_by: {
 			common:      true
 			description: "An ordered list of fields by which to group events. Each group is combined independently, allowing you to keep independent events separate. When no fields are specified, all events will be combined in a single group. Events missing a specified field will be combined in their own group."
