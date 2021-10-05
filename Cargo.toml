@@ -120,7 +120,7 @@ console-subscriber = { git = "https://github.com/tokio-rs/console", rev = "f2c30
 
 # Tracing
 tracing = { version = "0.1.28", default-features = false }
-tracing-core = { version = "0.1.20", default-features = false }
+tracing-core = { version = "0.1.21", default-features = false }
 tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-03"] }
 tracing-log = { version = "0.1.2", default-features = false }
 tracing-subscriber = { version = "0.2.24", default-features = false }
