@@ -5,6 +5,7 @@ use crate::{
     test_util::{next_addr, random_lines_with_stream},
 };
 use bytes::Bytes;
+use chrono::Utc;
 use futures::{
     channel::mpsc::{Receiver, TryRecvError},
     stream, StreamExt,
@@ -67,11 +68,11 @@ async fn start_test(
 #[tokio::test]
 /// Assert the basic functionality of the sink in good conditions
 ///
-/// This test rigs the sink to return StatusCode::OK to responses, checks that
+/// This test rigs the sink to return StatusCode::ACCEPTED to responses, checks that
 /// all batches were delivered and then asserts that every message is able to be
 /// deserialized.
 async fn smoke() {
-    let (expected, rx) = start_test(StatusCode::OK, BatchStatus::Delivered).await;
+    let (expected, rx) = start_test(StatusCode::ACCEPTED, BatchStatus::Delivered).await;
 
     let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
@@ -96,6 +97,15 @@ async fn smoke() {
             .as_str()
             .unwrap();
         assert_eq!(message, expected[i]);
+        let timestamp = json
+            .get(0)
+            .unwrap()
+            .get("timestamp")
+            .unwrap()
+            .as_i64()
+            .unwrap();
+        let delta = Utc::now().timestamp_millis() - timestamp;
+        assert!(delta > 0 && delta < 1000);
     }
 }
 
@@ -133,7 +143,7 @@ async fn api_key_in_metadata() {
 
     let (sink, _) = config.build(cx).await.unwrap();
 
-    let (rx, _trigger, server) = build_test_server_status(addr, StatusCode::OK);
+    let (rx, _trigger, server) = build_test_server_status(addr, StatusCode::ACCEPTED);
     tokio::spawn(server);
 
     let (expected_messages, events) = random_lines_with_stream(100, 10, None);
@@ -198,7 +208,7 @@ async fn multiple_api_keys() {
 
     let (sink, _) = config.build(cx).await.unwrap();
 
-    let (rx, _trigger, server) = build_test_server_status(addr, StatusCode::OK);
+    let (rx, _trigger, server) = build_test_server_status(addr, StatusCode::ACCEPTED);
     tokio::spawn(server);
 
     let events = vec![
@@ -235,7 +245,7 @@ async fn enterprise_headers() {
     cx.globals.enterprise = true;
     let (sink, _) = config.build(cx).await.unwrap();
 
-    let (rx, _trigger, server) = build_test_server_status(addr, StatusCode::OK);
+    let (rx, _trigger, server) = build_test_server_status(addr, StatusCode::ACCEPTED);
     tokio::spawn(server);
 
     let (_expected_messages, events) = random_lines_with_stream(100, 10, None);

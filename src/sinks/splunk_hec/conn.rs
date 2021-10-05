@@ -165,7 +165,7 @@ mod tests {
     async fn test_build_request_compression_gzip_returns_expected_request() {
         let endpoint = "http://localhost:8888";
         let token = "token";
-        let compression = Compression::Gzip(None);
+        let compression = Compression::gzip_default();
         let events = "events".as_bytes().to_vec();
 
         let request = build_request(endpoint, token, compression, events.clone())
@@ -199,7 +199,7 @@ mod tests {
     async fn test_build_request_uri_invalid_uri_returns_error() {
         let endpoint = "invalid";
         let token = "token";
-        let compression = Compression::Gzip(None);
+        let compression = Compression::gzip_default();
         let events = "events".as_bytes().to_vec();
 
         let err = build_request(endpoint, token, compression, events.clone())

@@ -29,6 +29,8 @@
 //       `Encoder` that defines some `encode` function which this config then calls internally as
 //       part of it's own (yet to be written) `encode() -> Vec<u8>` function.
 
+mod codec;
+pub use codec::StandardEncodings;
 mod config;
 pub use config::EncodingConfig;
 mod with_default;
@@ -39,13 +41,20 @@ use crate::{
     Result,
 };
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{fmt::Debug, io};
+
+/// Encodes an event.
+pub trait Encoder {
+    /// Encodes an individual event to the provided writer.
+    fn encode_event(&self, event: Event, writer: &mut dyn io::Write) -> io::Result<()>;
+}
 
 /// The behavior of a encoding configuration.
-pub trait EncodingConfiguration<E> {
+pub trait EncodingConfiguration {
+    type Codec;
     // Required Accessors
 
-    fn codec(&self) -> &E;
+    fn codec(&self) -> &Self::Codec;
     fn schema(&self) -> &Option<String>;
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
     fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>>;
@@ -149,6 +158,17 @@ pub trait EncodingConfiguration<E> {
         self.apply_except_fields(event);
         self.apply_only_fields(event);
         self.apply_timestamp_format(event);
+    }
+}
+
+impl<E> Encoder for E
+where
+    E: EncodingConfiguration,
+    E::Codec: Encoder,
+{
+    fn encode_event(&self, mut event: Event, writer: &mut dyn io::Write) -> io::Result<()> {
+        self.apply_rules(&mut event);
+        self.codec().encode_event(event, writer)
     }
 }
 

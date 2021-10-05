@@ -120,7 +120,7 @@ console-subscriber = { git = "https://github.com/tokio-rs/console", rev = "f2c30
 
 # Tracing
 tracing = { version = "0.1.28", default-features = false }
-tracing-core = { version = "0.1.20", default-features = false }
+tracing-core = { version = "0.1.21", default-features = false }
 tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-03"] }
 tracing-log = { version = "0.1.2", default-features = false }
 tracing-subscriber = { version = "0.2.24", default-features = false }
@@ -236,7 +236,7 @@ k8s-openapi = { version = "0.13.0", default-features = true, features = ["api", 
 lazy_static = { version = "1.4.0", default-features = false }
 listenfd = { version = "0.3.5", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
-lru = { version = "0.6.6", default-features = false, optional = true }
+lru = { version = "0.7.0", default-features = false, optional = true }
 maxminddb = { version = "0.21.0", default-features = false, optional = true }
 md-5 = { version = "0.9", optional = true }
 # make sure to update the external docs when the Lua version changes
@@ -446,14 +446,14 @@ sources-apache_metrics = []
 sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "infer", "sources-utils-tls", "warp"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid", "codecs"]
-sources-datadog = ["snap", "sources-utils-tls", "warp", "sources-utils-http-error"]
+sources-datadog = ["snap", "sources-utils-tls", "warp", "sources-utils-http-error", "codecs"]
 sources-dnstap = ["base64", "data-encoding", "trust-dns-proto", "dnsmsg-parser", "tonic-build", "prost-build"]
 sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = ["codecs"]
 sources-file = ["file-source"]
 sources-fluent = ["base64", "listenfd", "tokio-util/net", "rmpv", "rmp-serde", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "serde_bytes", "codecs"]
-sources-generator = ["fakedata"]
+sources-generator = ["fakedata", "codecs"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query"]
 sources-host_metrics = ["heim"]
 sources-http = ["sources-utils-http", "codecs", "sources-utils-http-query"]
@@ -461,7 +461,7 @@ sources-internal_logs = []
 sources-internal_metrics = []
 sources-journald = ["codecs"]
 sources-kafka = ["rdkafka", "codecs"]
-sources-nats = ["async-nats"]
+sources-nats = ["async-nats", "codecs"]
 sources-logstash = ["listenfd", "tokio-util/net", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "codecs"]
 sources-kubernetes_logs = ["file-source", "kubernetes", "transforms-merge", "transforms-regex_parser"]
 sources-mongodb_metrics = ["mongodb"]

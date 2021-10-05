@@ -23,9 +23,9 @@ mod variant;
 
 use crate::buffer_usage_data::BufferUsageData;
 use crate::bytes::{DecodeBytes, EncodeBytes};
-pub use acker::Acker;
 use core_common::byte_size_of::ByteSizeOf;
 use futures::StreamExt;
+pub use acker::{Ackable, Acker};
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
 use pin_project::pin_project;
 #[cfg(test)]
@@ -44,6 +44,7 @@ pub use variant::*;
 ///
 /// This function will fail only when creating a new disk buffer. Because of
 /// legacy reasons the error is not a type but a `String`.
+#[allow(clippy::needless_pass_by_value)]
 pub fn build<'a, T>(
     variant: Variant,
     span: Span,

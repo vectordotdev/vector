@@ -223,7 +223,9 @@ mod tests {
     use super::{HttpSourceAuthConfig, LogplexConfig};
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
-        test_util::{next_addr, random_string, spawn_collect_n, trace_init, wait_for_tcp},
+        test_util::{
+            components, next_addr, random_string, spawn_collect_n, trace_init, wait_for_tcp,
+        },
         Pipeline,
     };
     use chrono::{DateTime, Utc};
@@ -243,6 +245,7 @@ mod tests {
         status: EventStatus,
         acknowledgements: bool,
     ) -> (impl Stream<Item = Event>, SocketAddr) {
+        components::init();
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
         let mut context = SourceContext::new_test(sender);
@@ -320,6 +323,7 @@ mod tests {
             SAMPLE_BODY.lines().count(),
         )
         .await;
+        components::SOURCE_TESTS.assert(&["http_path"]);
 
         let event = events.remove(0);
         let log = event.as_log();
@@ -360,6 +364,7 @@ mod tests {
             SAMPLE_BODY.lines().count(),
         )
         .await;
+        components::SOURCE_TESTS.assert(&["http_path"]);
 
         assert_eq!(events.len(), SAMPLE_BODY.lines().count());
     }
@@ -389,8 +394,6 @@ mod tests {
 
     #[tokio::test]
     async fn logplex_auth_failure() {
-        trace_init();
-
         let (_rx, addr) = source(Some(make_auth()), vec![], EventStatus::Delivered, true).await;
 
         assert_eq!(

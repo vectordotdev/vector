@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 async-graphql = { version = "2.10.0", default-features = false, optional = true }
 async-trait = { version = "0.1", default-features = false }
-atomig = { version = "0.3.1", features = ["derive", "serde"] }
+atomig = { version = "0.3.2", features = ["derive", "serde"] }
 buffers = { path = "buffers", default-features = false }
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
@@ -46,8 +46,9 @@ tokio = { version = "1.12.0", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, optional = true }
 tokio-util = { version = "0.6.8", default-features = false, features = ["time"] }
 toml = { version = "0.5.8", default-features = false }
+tower = { version = "0.4", default-features = false }
 tracing = { version = "0.1.28", default-features = false }
-tracing-core = { version = "0.1.20", default-features = false }
+tracing-core = { version = "0.1.21", default-features = false }
 tracing-log = { version = "0.1.2", default-features = false }
 tracing-subscriber = { version = "0.2.24", default-features = false }
 typetag = { version = "0.1.7", default-features = false }
