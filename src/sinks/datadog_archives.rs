@@ -573,7 +573,7 @@ mod tests {
             S3Config::default(),
         );
 
-        let (metadata, _events) = request_builder.split_input((key, vec![log])).unwrap();
+        let (metadata, _events) = request_builder.split_input((key, vec![log]));
         let req = request_builder.build_request(metadata, fake_buf.clone());
         let expected_key_prefix = "audit/dt=20210823/hour=16/";
         let expected_key_ext = ".json.gz";
@@ -589,7 +589,7 @@ mod tests {
         let key = key_partitioner
             .partition(&log2)
             .expect("key wasn't provided");
-        let (metadata, _events) = request_builder.split_input((key, vec![log2])).unwrap();
+        let (metadata, _events) = request_builder.split_input((key, vec![log2]));
         let req = request_builder.build_request(metadata, fake_buf);
         let uuid2 = &req.key[expected_key_prefix.len()..req.key.len() - expected_key_ext.len()];
         assert_ne!(uuid1, uuid2);
