@@ -24,6 +24,9 @@ quickcheck = "1.0"
 tempdir = "0.3"
 tokio-test = "0.4.2"
 metrics-exporter-prometheus = "0.6"
+metrics-util = { version = "0.10.1", default-features = false }
+metrics-tracing-context = { version = "0.8.0", default-features = false }
+tracing-subscriber = { version = "0.2.24", default-features = false }
 
 [features]
 disk-buffer = ["db-key", "snafu", "leveldb"]

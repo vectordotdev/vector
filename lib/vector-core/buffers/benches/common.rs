@@ -3,9 +3,13 @@ use buffers::{self, Variant};
 use bytes::{Buf, BufMut};
 use futures::task::{noop_waker, Context, Poll};
 use futures::{Sink, Stream};
+use metrics_tracing_context::{MetricsLayer, TracingContextLayer};
+use metrics_util::layers::Layer;
+use metrics_util::DebuggingRecorder;
 use std::fmt;
 use std::pin::Pin;
 use tokio::runtime::Runtime;
+use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 
 #[derive(Clone, Copy)]
 pub struct Message<const N: usize> {
@@ -106,6 +110,16 @@ fn send_msg<const N: usize>(
 #[inline]
 fn consume<T>(mut stream: Pin<&mut (dyn Stream<Item = T> + Unpin + Send)>, context: &mut Context) {
     while let Poll::Ready(Some(_)) = stream.as_mut().poll_next(context) {}
+}
+
+pub fn init_instrumentation() {
+    if metrics::try_recorder().is_none() {
+        let subscriber = tracing_subscriber::Registry::default().with(MetricsLayer::new());
+        tracing::subscriber::set_global_default(subscriber).unwrap();
+
+        let recorder = TracingContextLayer::all().layer(DebuggingRecorder::new());
+        metrics::set_boxed_recorder(Box::new(recorder)).unwrap();
+    }
 }
 
 //
