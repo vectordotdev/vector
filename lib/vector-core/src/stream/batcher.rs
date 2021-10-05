@@ -227,8 +227,10 @@ where
 
 impl<St, Prt> Batcher<St, Prt, ExpirationQueue<Prt::Key>>
 where
-    St: Stream + Unpin,
+    St: Stream<Item = Prt::Item> + Unpin,
     Prt: Partitioner + Unpin,
+    Prt::Key: Eq + Hash + Clone,
+    Prt::Item: ByteSizeOf,
 {
     pub fn new(
         stream: St,
@@ -252,8 +254,10 @@ where
 
 impl<St, Prt, KT> Batcher<St, Prt, KT>
 where
-    St: Stream + Unpin,
+    St: Stream<Item = Prt::Item> + Unpin,
     Prt: Partitioner + Unpin,
+    Prt::Key: Eq + Hash + Clone,
+    Prt::Item: ByteSizeOf,
 {
     pub fn with_timer(
         stream: St,
@@ -441,12 +445,12 @@ mod test {
             .prop_map(TestTimer::new)
     }
 
-    #[pin_project]
-    #[derive(Debug)]
     /// A test partitioner
     ///
     /// This partitioner is nothing special. It has a large-ish key space but
     /// not so large that we'll never see batches accumulate properly.
+    #[pin_project]
+    #[derive(Debug)]
     struct TestPartitioner {
         key_space: NonZeroU8,
     }

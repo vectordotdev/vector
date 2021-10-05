@@ -30,7 +30,7 @@ use vector_core::config::{log_schema, LogSchema};
 use vector_core::event::{Event, EventFinalizers, EventStatus, Finalizable, Value};
 use vector_core::partition::Partitioner;
 use vector_core::sink::StreamSink;
-use vector_core::stream::batcher::Batcher;
+use vector_core::stream::Batcher;
 
 const MAX_PAYLOAD_ARRAY: usize = 1_000;
 const MAX_PAYLOAD_BYTES: usize = 5_000_000;

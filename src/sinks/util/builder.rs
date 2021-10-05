@@ -1,4 +1,6 @@
-use std::{fmt, future::Future, io, num::NonZeroUsize, pin::Pin, sync::Arc, time::Duration};
+use std::{
+    fmt, future::Future, hash::Hash, io, num::NonZeroUsize, pin::Pin, sync::Arc, time::Duration,
+};
 
 use futures_util::Stream;
 use tower::Service;
@@ -6,13 +8,11 @@ use vector_core::{
     buffers::{Ackable, Acker},
     event::{Event, EventStatus, Finalizable},
     partition::Partitioner,
-    stream::{
-        batcher::{Batcher, ExpirationQueue},
-        driver::Driver,
-    },
+    stream::{Batcher, ConcurrentMap, Driver, ExpirationQueue},
+    ByteSizeOf,
 };
 
-use super::{encoding::Encoder, Compression, Compressor, ConcurrentMap, RequestBuilder};
+use super::{encoding::Encoder, Compression, Compressor, RequestBuilder};
 
 impl<T: ?Sized> SinkBuilderExt for T where T: Stream {}
 
@@ -30,8 +30,10 @@ pub trait SinkBuilderExt: Stream {
         batch_allocation_limit: Option<NonZeroUsize>,
     ) -> Batcher<Self, P, ExpirationQueue<P::Key>>
     where
-        Self: Sized + Unpin,
+        Self: Stream<Item = P::Item> + Sized + Unpin,
         P: Partitioner + Unpin,
+        P::Key: Eq + Hash + Clone,
+        P::Item: ByteSizeOf,
     {
         Batcher::new(
             self,

@@ -7737,6 +7737,7 @@ dependencies = [
  "enrichment",
  "env-test-util",
  "futures 0.3.17",
+ "futures-util",
  "getset",
  "http",
  "hyper-proxy",
