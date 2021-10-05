@@ -1,6 +1,7 @@
 use std::{fmt, future::Future, num::NonZeroUsize, pin::Pin, sync::Arc, time::Duration};
 
 use futures_util::Stream;
+use std::io;
 use tower::Service;
 use vector_core::{
     buffers::{Ackable, Acker},
@@ -11,7 +12,6 @@ use vector_core::{
         driver::Driver,
     },
 };
-use std::io;
 
 use super::{encoding::Encoder, Compression, Compressor, ConcurrentMap, RequestBuilder};
 
@@ -98,8 +98,7 @@ pub trait SinkBuilderExt: Stream {
 
             Box::pin(async move {
                 // Split the input into metadata and events.
-                let (metadata, events) = builder
-                    .split_input(input);
+                let (metadata, events) = builder.split_input(input);
 
                 // Encode/compress each event.
                 for event in events.into_iter() {
@@ -107,8 +106,7 @@ pub trait SinkBuilderExt: Stream {
                     // as the write target, but the `std::io::Write` interface _is_ fallible, and
                     // technically we might run out of memory when allocating for the vector, so we
                     // pass the error through.
-                    let _ = encoder
-                        .encode_event(event, &mut compressor)?;
+                    let _ = encoder.encode_event(event, &mut compressor)?;
                 }
 
                 // Now build the actual request.

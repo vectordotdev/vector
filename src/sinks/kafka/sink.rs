@@ -7,8 +7,10 @@ use crate::sinks::kafka::encoder::Encoding;
 use crate::sinks::kafka::request_builder::KafkaRequestBuilder;
 use crate::sinks::kafka::service::KafkaService;
 use crate::sinks::util::encoding::EncodingConfig;
+use crate::sinks::util::{builder::SinkBuilderExt, StreamSink};
 use crate::template::{Template, TemplateParseError};
 use async_trait::async_trait;
+use futures::future;
 use futures::stream::BoxStream;
 use futures::StreamExt;
 use rdkafka::consumer::{BaseConsumer, Consumer};
@@ -20,8 +22,6 @@ use std::convert::TryFrom;
 use tokio::time::Duration;
 use tower::limit::ConcurrencyLimit;
 use vector_core::buffers::Acker;
-use futures::future;
-use crate::sinks::util::{StreamSink, builder::SinkBuilderExt};
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
@@ -66,16 +66,14 @@ impl KafkaSink {
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let service = ConcurrencyLimit::new(self.service, QUEUED_MIN_MESSAGES as usize);
-        let request_builder = KafkaRequestBuilder{
+        let request_builder = KafkaRequestBuilder {
             key_field: self.key_field,
             headers_field: self.headers_field,
             topic_template: self.topic,
             encoder: self.encoding,
         };
         let sink = input
-            .filter_map(|event| {
-                future::ready(request_builder.build_request(event))
-            })
+            .filter_map(|event| future::ready(request_builder.build_request(event)))
             .into_driver(service, self.acker);
         sink.run().await
     }

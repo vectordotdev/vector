@@ -1,11 +1,11 @@
 use crate::config::log_schema;
 use crate::event::{Event, Finalizable, Value};
 use crate::internal_events::KafkaHeaderExtractionFailed;
+use crate::sinks::kafka::encoder::Encoding;
 use crate::sinks::kafka::service::{KafkaRequest, KafkaRequestMetadata};
+use crate::sinks::util::encoding::{Encoder, EncodingConfig};
 use crate::template::Template;
 use rdkafka::message::OwnedHeaders;
-use crate::sinks::kafka::encoder::Encoding;
-use crate::sinks::util::encoding::{Encoder, EncodingConfig};
 
 pub struct KafkaRequestBuilder {
     pub key_field: Option<String>,
@@ -27,10 +27,7 @@ impl KafkaRequestBuilder {
         let mut body = vec![];
         self.encoder.encode_event(event, &mut body).ok()?;
 
-        Some(KafkaRequest {
-            body,
-            metadata
-        })
+        Some(KafkaRequest { body, metadata })
     }
 }
 
