@@ -444,7 +444,7 @@ sources-metrics = [
 
 sources-apache_metrics = []
 sources-aws_ecs_metrics = []
-sources-aws_kinesis_firehose = ["base64", "infer", "sources-utils-tls", "warp"]
+sources-aws_kinesis_firehose = ["base64", "infer", "sources-utils-tls", "warp", "codecs"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid", "codecs"]
 sources-datadog = ["snap", "sources-utils-tls", "warp", "sources-utils-http-error", "codecs"]
 sources-dnstap = ["base64", "data-encoding", "trust-dns-proto", "dnsmsg-parser", "tonic-build", "prost-build"]
