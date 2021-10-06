@@ -188,8 +188,9 @@ impl Reduce {
 
     fn flush_into(&mut self, output: &mut Vec<Event>) {
         let mut flush_discriminants = Vec::new();
+        let now = Instant::now();
         for (k, t) in &self.reduce_merge_states {
-            if t.stale_since.elapsed() >= self.expire_after {
+            if (now - t.stale_since) >= self.expire_after {
                 flush_discriminants.push(k.clone());
             }
         }
@@ -252,8 +253,6 @@ impl Reduce {
         } else {
             self.push_or_new_reduce_state(event, discriminant)
         }
-
-        self.flush_into(output);
     }
 }
 
