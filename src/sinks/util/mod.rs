@@ -130,3 +130,20 @@ pub fn encode_namespace<'a>(
         .map(|namespace| format!("{}{}{}", namespace, delimiter, name))
         .unwrap_or_else(|| name.into_owned())
 }
+
+/// Marker trait for types that can hold a batch of events
+pub trait EventCount {
+    fn event_count(&self) -> usize;
+}
+
+impl<T> EventCount for Vec<T> {
+    fn event_count(&self) -> usize {
+        self.len()
+    }
+}
+
+impl EventCount for serde_json::Value {
+    fn event_count(&self) -> usize {
+        1
+    }
+}
