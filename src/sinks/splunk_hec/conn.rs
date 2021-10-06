@@ -427,35 +427,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_build_sink_invalid_batch_config_returns_error() {
-        let invalid_batch_config = BatchConfig {
-            max_bytes: Some(1000),
-            max_events: None,
-            max_size: Some(10),
-            timeout_secs: None,
-        };
-
-        let err = build_sink(
-            StubSink::default(),
-            &TowerRequestConfig::default(),
-            &None,
-            &ProxyConfig::default(),
-            invalid_batch_config,
-            Compression::None,
-            Acker::Null,
-            "http://localhost:36448",
-            "token",
-        )
-        .err()
-        .unwrap();
-
-        assert_eq!(
-            err.to_string(),
-            "Cannot configure both `max_bytes` and `max_size`"
-        )
-    }
-
-    #[tokio::test]
     async fn test_build_sink_invalid_tls_options_returns_error() {
         let invalid_tls_options = Some(TlsOptions {
             verify_certificate: Some(true),

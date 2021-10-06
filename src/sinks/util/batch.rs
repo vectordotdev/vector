@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::marker::PhantomData;
 use std::time::Duration;
+use vector_core::stream::BatcherSettings;
 
 #[derive(Debug, Snafu)]
 pub enum BatchError {
@@ -27,22 +28,6 @@ pub struct BatchConfig {
 }
 
 impl BatchConfig {
-    // This is used internally by new_relic_logs sink, else it could be
-    // pub(super) too
-    pub const fn use_size_as_bytes(&self) -> Result<Self, BatchError> {
-        let max_bytes = match (self.max_bytes, self.max_size) {
-            (Some(_), Some(_)) => return Err(BatchError::BytesAndSize),
-            (Some(bytes), None) => Some(bytes),
-            (None, Some(size)) => Some(size),
-            (None, None) => None,
-        };
-        Ok(Self {
-            max_bytes,
-            max_size: None,
-            ..*self
-        })
-    }
-
     pub(super) const fn disallow_max_bytes(&self) -> Result<Self, BatchError> {
         // Sinks that used `max_size` for an event count cannot count
         // bytes, so err if `max_bytes` is set.
@@ -50,20 +35,6 @@ impl BatchConfig {
             Some(_) => Err(BatchError::BytesNotAllowed),
             None => Ok(*self),
         }
-    }
-
-    pub(super) const fn use_size_as_events(&self) -> Result<Self, BatchError> {
-        let max_events = match (self.max_events, self.max_size) {
-            (Some(_), Some(_)) => return Err(BatchError::EventsAndSize),
-            (Some(events), None) => Some(events),
-            (None, Some(size)) => Some(size),
-            (None, None) => None,
-        };
-        Ok(Self {
-            max_events,
-            max_size: None,
-            ..*self
-        })
     }
 
     pub(super) fn get_settings_or_default<T>(
@@ -171,6 +142,16 @@ impl<B> BatchSettings<B> {
             },
             timeout: self.timeout,
         }
+    }
+
+    /// Converts these settings into [`BatcherSettings`].
+    ///
+    /// `BatcherSettings` is effectively the `vector_core` spiritual successor of
+    /// [`BatchSettings<B>`].  Once all sinks are rewritten in the new stream-based style and we can
+    /// eschew customized batch buffer types, we can de-genericify `BatchSettings` and move it into
+    /// `vector_core`, and use that instead of `BatcherSettings`.
+    pub const fn into_batcher_settings(self) -> BatcherSettings {
+        BatcherSettings::new(self.timeout, self.size.bytes, self.size.events)
     }
 }
 

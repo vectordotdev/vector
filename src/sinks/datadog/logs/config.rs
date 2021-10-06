@@ -1,11 +1,11 @@
 use super::service::LogApiRetry;
+use super::sink::{DatadogLogsJsonEncoding, LogSinkBuilder};
 use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
 use crate::http::HttpClient;
 use crate::sinks::datadog::logs::healthcheck::healthcheck;
 use crate::sinks::datadog::logs::service::LogApiService;
-use crate::sinks::datadog::logs::sink::LogSink;
 use crate::sinks::datadog::Region;
-use crate::sinks::util::encoding::EncodingConfigWithDefault;
+use crate::sinks::util::encoding::EncodingConfigFixed;
 use crate::sinks::util::service::ServiceBuilderExt;
 use crate::sinks::util::Concurrency;
 use crate::sinks::util::{BatchConfig, Compression, TowerRequestConfig};
@@ -20,10 +20,8 @@ use std::time::Duration;
 use tower::ServiceBuilder;
 use vector_core::config::proxy::ProxyConfig;
 
-const DEFAULT_REQUEST_LIMITS: TowerRequestConfig = {
-    TowerRequestConfig::const_new(Concurrency::Fixed(50), Concurrency::Fixed(50))
-        .rate_limit_num(250)
-};
+const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
+    TowerRequestConfig::new(Concurrency::Fixed(50)).rate_limit_num(250);
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -39,7 +37,7 @@ pub struct DatadogLogsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    pub(crate) encoding: EncodingConfigWithDefault<Encoding>,
+    encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
     tls: Option<TlsConfig>,
 
     #[serde(default)]
@@ -50,14 +48,6 @@ pub struct DatadogLogsConfig {
 
     #[serde(default)]
     request: TowerRequestConfig,
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Json,
 }
 
 impl GenerateConfig for DatadogLogsConfig {
@@ -106,11 +96,10 @@ impl DatadogLogsConfig {
                 self.get_uri(),
                 cx.globals.enterprise,
             ));
-        let sink = LogSink::new(service, cx, default_api_key)
+        let sink = LogSinkBuilder::new(service, cx, default_api_key)
             .batch_timeout(batch_timeout)
             .encoding(self.encoding.clone())
             .compression(self.compression.unwrap_or_default())
-            .log_schema(vector_core::config::log_schema())
             .build();
 
         Ok(VectorSink::Stream(Box::new(sink)))

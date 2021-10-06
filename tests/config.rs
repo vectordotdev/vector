@@ -454,7 +454,7 @@ async fn bad_s3_region() {
         endpoint = "this shoudlnt work"
 
         [sinks.out4.batch]
-        max_size = 100000
+        max_bytes = 100000
         "#,
         Some(Format::Toml),
     )
@@ -697,7 +697,7 @@ async fn parses_sink_full_batch_bytes() {
         encoding = "json"
 
         [sinks.out.batch]
-        max_size = 100
+        max_bytes = 100
         timeout_secs = 10
         "#,
         Some(Format::Toml),
