@@ -119,11 +119,11 @@ tokio-util = { version = "0.6.8", default-features = false, features = ["codec",
 console-subscriber = { git = "https://github.com/tokio-rs/console", rev = "f2c30d52c9f22de69bac38009a9183135808806c",  optional = true }
 
 # Tracing
-tracing = { version = "0.1.28", default-features = false }
-tracing-core = { version = "0.1.20", default-features = false }
+tracing = { version = "0.1.29", default-features = false }
+tracing-core = { version = "0.1.21", default-features = false }
 tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-03"] }
 tracing-log = { version = "0.1.2", default-features = false }
-tracing-subscriber = { version = "0.2.24", default-features = false }
+tracing-subscriber = { version = "0.2.25", default-features = false }
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
 # Metrics
@@ -236,11 +236,11 @@ k8s-openapi = { version = "0.13.0", default-features = true, features = ["api", 
 lazy_static = { version = "1.4.0", default-features = false }
 listenfd = { version = "0.3.5", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
-lru = { version = "0.6.6", default-features = false, optional = true }
+lru = { version = "0.7.0", default-features = false, optional = true }
 maxminddb = { version = "0.21.0", default-features = false, optional = true }
 md-5 = { version = "0.9", optional = true }
 # make sure to update the external docs when the Lua version changes
-mlua = { version = "0.6.4", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { version = "0.6.5", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 mongodb = { version = "2.0.0", default-features = false, features = ["tokio-runtime"], optional = true }
 async-nats = { version = "0.10.1", default-features = false, optional = true }
 no-proxy = { version  = "0.3.1", default-features = false, features = ["serialize"] }
@@ -444,16 +444,16 @@ sources-metrics = [
 
 sources-apache_metrics = []
 sources-aws_ecs_metrics = []
-sources-aws_kinesis_firehose = ["base64", "infer", "sources-utils-tls", "warp"]
+sources-aws_kinesis_firehose = ["base64", "infer", "sources-utils-tls", "warp", "codecs"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid", "codecs"]
-sources-datadog = ["snap", "sources-utils-tls", "warp", "sources-utils-http-error"]
+sources-datadog = ["snap", "sources-utils-tls", "warp", "sources-utils-http-error", "codecs"]
 sources-dnstap = ["base64", "data-encoding", "trust-dns-proto", "dnsmsg-parser", "tonic-build", "prost-build"]
 sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = ["codecs"]
 sources-file = ["file-source"]
 sources-fluent = ["base64", "listenfd", "tokio-util/net", "rmpv", "rmp-serde", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "serde_bytes", "codecs"]
-sources-generator = ["fakedata"]
+sources-generator = ["fakedata", "codecs"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query"]
 sources-host_metrics = ["heim"]
 sources-http = ["sources-utils-http", "codecs", "sources-utils-http-query"]
@@ -461,7 +461,7 @@ sources-internal_logs = []
 sources-internal_metrics = []
 sources-journald = ["codecs"]
 sources-kafka = ["rdkafka", "codecs"]
-sources-nats = ["async-nats"]
+sources-nats = ["async-nats", "codecs"]
 sources-logstash = ["listenfd", "tokio-util/net", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "codecs"]
 sources-kubernetes_logs = ["file-source", "kubernetes", "transforms-merge", "transforms-regex_parser"]
 sources-mongodb_metrics = ["mongodb"]
@@ -792,24 +792,6 @@ name = "languages"
 harness = false
 test = true
 required-features = ["language-benches"]
-
-[[bench]]
-name = "metrics_on"
-harness = false
-test = true
-required-features = ["metrics-benches"]
-
-[[bench]]
-name = "metrics_no_tracing_integration"
-harness = false
-test = true
-required-features = ["metrics-benches"]
-
-[[bench]]
-name = "metrics_off"
-harness = false
-test = true
-required-features = ["metrics-benches"]
 
 [[bench]]
 name = "distribution_statistic"

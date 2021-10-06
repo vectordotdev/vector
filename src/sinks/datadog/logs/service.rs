@@ -81,11 +81,16 @@ impl AsRef<EventStatus> for LogApiResponse {
 pub struct LogApiService {
     client: HttpClient,
     uri: Uri,
+    enterprise: bool,
 }
 
 impl LogApiService {
-    pub const fn new(client: HttpClient, uri: Uri) -> Self {
-        Self { client, uri }
+    pub const fn new(client: HttpClient, uri: Uri, enterprise: bool) -> Self {
+        Self {
+            client,
+            uri,
+            enterprise,
+        }
     }
 }
 
@@ -102,6 +107,15 @@ impl Service<LogApiRequest> for LogApiService {
         let mut client = self.client.clone();
         let http_request = Request::post(&self.uri)
             .header("Content-Type", "application/json")
+            .header(
+                "DD-EVP-ORIGIN",
+                if self.enterprise {
+                    "vector-enterprise"
+                } else {
+                    "vector"
+                },
+            )
+            .header("DD-EVP-ORIGIN-VERSION", crate::get_version())
             .header("DD-API-KEY", request.api_key.to_string());
         let http_request = if request.is_compressed {
             http_request.header("Content-Encoding", "gzip")
@@ -120,7 +134,8 @@ impl Service<LogApiRequest> for LogApiService {
                     // From https://docs.datadoghq.com/api/latest/logs/:
                     //
                     // The status codes answered by the HTTP API are:
-                    // 200: OK
+                    // 200: OK (v1)
+                    // 202: Accepted (v2)
                     // 400: Bad request (likely an issue in the payload
                     //      formatting)
                     // 403: Permission issue (likely using an invalid API Key)
@@ -130,7 +145,7 @@ impl Service<LogApiRequest> for LogApiService {
                     match status {
                         StatusCode::BAD_REQUEST => Err(LogApiError::BadRequest),
                         StatusCode::FORBIDDEN => Ok(LogApiResponse::PermissionIssue),
-                        StatusCode::OK => Ok(LogApiResponse::Ok),
+                        StatusCode::OK | StatusCode::ACCEPTED => Ok(LogApiResponse::Ok),
                         StatusCode::PAYLOAD_TOO_LARGE => Err(LogApiError::PayloadTooLarge),
                         _ => Err(LogApiError::ServerError),
                     }

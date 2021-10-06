@@ -1,7 +1,6 @@
 use super::service::LogApiRequest;
 use crate::config::SinkContext;
 use crate::sinks::datadog::logs::config::Encoding;
-use crate::sinks::util::buffer::GZIP_FAST;
 use crate::sinks::util::encoding::{EncodingConfigWithDefault, EncodingConfiguration};
 use crate::sinks::util::Compression;
 use async_trait::async_trait;
@@ -167,6 +166,8 @@ pub enum RequestBuildError {
     Io { error: std::io::Error },
 }
 
+const TIMESTAMP_KEY: &str = "timestamp";
+
 impl RequestBuilder {
     fn new(
         encoding: EncodingConfigWithDefault<Encoding>,
@@ -190,8 +191,10 @@ impl RequestBuilder {
             {
                 let log = event.as_mut_log();
                 log.rename_key_flat(self.log_schema_message_key, "message");
-                log.rename_key_flat(self.log_schema_timestamp_key, "date");
                 log.rename_key_flat(self.log_schema_host_key, "host");
+                if let Some(Value::Timestamp(ts)) = log.remove(self.log_schema_timestamp_key) {
+                    log.insert_flat(TIMESTAMP_KEY, Value::Integer(ts.timestamp_millis()));
+                }
                 self.encoding.apply_rules(&mut event);
             }
 
@@ -223,11 +226,8 @@ impl RequestBuilder {
         let (encoded_body, is_compressed) = match self.compression {
             Compression::None => (body, false),
             Compression::Gzip(level) => {
-                let level = level.unwrap_or(GZIP_FAST);
-                let mut encoder = GzEncoder::new(
-                    Vec::with_capacity(serialized_payload_bytes_len),
-                    flate2::Compression::new(level as u32),
-                );
+                let mut encoder =
+                    GzEncoder::new(Vec::with_capacity(serialized_payload_bytes_len), level);
 
                 encoder
                     .write_all(&body)
