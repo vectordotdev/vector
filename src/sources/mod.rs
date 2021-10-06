@@ -64,6 +64,8 @@ pub mod stdin;
 pub mod syslog;
 #[cfg(feature = "sources-vector")]
 pub mod vector;
+#[cfg(feature = "sources-ws")]
+pub mod websocket;
 
 pub(crate) mod util;
 
