@@ -23,9 +23,9 @@ mod variant;
 
 use crate::buffer_usage_data::BufferUsageData;
 use crate::bytes::{DecodeBytes, EncodeBytes};
+pub use acker::{Ackable, Acker};
 use core_common::byte_size_of::ByteSizeOf;
 use futures::StreamExt;
-pub use acker::{Ackable, Acker};
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
 use pin_project::pin_project;
 #[cfg(test)]

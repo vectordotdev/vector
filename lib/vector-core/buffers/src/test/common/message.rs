@@ -17,7 +17,7 @@ impl Message {
 
 impl ByteSizeOf for Message {
     fn allocated_bytes(&self) -> usize {
-        self.id.size_of()
+        0
     }
 }
 

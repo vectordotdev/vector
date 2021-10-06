@@ -23,6 +23,12 @@ pub struct Message<const N: usize> {
     _padding: [u64; N],
 }
 
+impl<const N: usize> ByteSizeOf for Message<N> {
+    fn allocated_bytes(&self) -> usize {
+        0
+    }
+}
+
 impl<const N: usize> Message<N> {
     fn new(id: u64) -> Self {
         Message {
@@ -33,12 +39,6 @@ impl<const N: usize> Message<N> {
 
     pub fn id(&self) -> u64 {
         self.id
-    }
-}
-
-impl<const N: usize> ByteSizeOf for Message<N> {
-    fn allocated_bytes(&self) -> usize {
-        self.id.size_of() + self._padding.iter().fold(0, |acc, v| acc + v.size_of())
     }
 }
 
