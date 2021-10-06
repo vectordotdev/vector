@@ -17,9 +17,11 @@ pub struct JsonParserConfig {
 }
 
 /// Options for building a `JsonParser`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
 pub struct JsonParserOptions {
-    #[serde(default)]
+    #[serde(default = "crate::serde::default_true")]
+    #[derivative(Default(value = "true"))]
     skip_empty: bool,
 }
 
