@@ -38,18 +38,18 @@ impl BufferUsageData {
                     interval.tick().await;
 
                     emit(&BufferEventsReceived {
-                        count: usage_data.received_event_count.load(Ordering::Relaxed),
-                        byte_size: usage_data.received_byte_size.load(Ordering::Relaxed),
+                        count: usage_data.received_event_count.swap(0, Ordering::Relaxed),
+                        byte_size: usage_data.received_byte_size.swap(0, Ordering::Relaxed),
                     });
 
                     emit(&BufferEventsSent {
-                        count: usage_data.sent_event_count.load(Ordering::Relaxed),
-                        byte_size: usage_data.sent_byte_size.load(Ordering::Relaxed),
+                        count: usage_data.sent_event_count.swap(0, Ordering::Relaxed),
+                        byte_size: usage_data.sent_byte_size.swap(0, Ordering::Relaxed),
                     });
 
                     if let Some(dropped_event_count) = &usage_data.dropped_event_count {
                         emit(&EventsDropped {
-                            count: dropped_event_count.load(Ordering::Relaxed),
+                            count: dropped_event_count.swap(0, Ordering::Relaxed),
                         });
                     }
                 }
