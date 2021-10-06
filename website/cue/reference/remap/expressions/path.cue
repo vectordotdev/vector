@@ -39,7 +39,7 @@ remap: expressions: path: {
 							"""
 					}
 					coalescing: {
-						title:       "Path segment coalecing"
+						title:       "Path segment coalescing"
 						description: """
 							Path segments can be coalesced, allowing for the first non-null value to be used. This is
 							particularly useful when working with

@@ -33,7 +33,6 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 				enabled: true
 				codec: {
 					enabled: true
-					default: null
 					enum: ["json", "text"]
 				}
 			}

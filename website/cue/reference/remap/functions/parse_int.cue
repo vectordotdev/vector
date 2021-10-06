@@ -55,7 +55,7 @@ remap: functions: parse_int: {
 			return: 34
 		},
 		{
-			title: "Parse hexdecimal"
+			title: "Parse hexadecimal"
 			source: #"""
 				parse_int!("0x2a")
 				"""#

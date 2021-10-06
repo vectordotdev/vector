@@ -60,7 +60,7 @@ impl TransformConfig for RenameFieldsConfig {
 
 impl RenameFields {
     pub fn new(fields: IndexMap<String, String>, drop_empty: bool) -> crate::Result<Self> {
-        Ok(RenameFields { fields, drop_empty })
+        Ok(Self { fields, drop_empty })
     }
 }
 
@@ -71,11 +71,11 @@ impl FunctionTransform for RenameFields {
             match log.remove_prune(&old_key, self.drop_empty) {
                 Some(v) => {
                     if event.as_mut_log().insert(&new_key, v).is_some() {
-                        emit!(RenameFieldsFieldOverwritten { field: old_key });
+                        emit!(&RenameFieldsFieldOverwritten { field: old_key });
                     }
                 }
                 None => {
-                    emit!(RenameFieldsFieldDoesNotExist { field: old_key });
+                    emit!(&RenameFieldsFieldDoesNotExist { field: old_key });
                 }
             }
         }

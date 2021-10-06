@@ -38,7 +38,7 @@ impl Server {
     }
 
     /// Returns a copy of the SocketAddr that the server was started on.
-    pub fn addr(&self) -> SocketAddr {
+    pub const fn addr(&self) -> SocketAddr {
         self.addr
     }
 

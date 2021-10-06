@@ -14,7 +14,6 @@ use std::{
     pin::Pin,
     time::{Duration, Instant},
 };
-use vector_core::enrichment;
 
 mod merge_strategy;
 
@@ -196,7 +195,7 @@ impl Reduce {
         }
         for k in &flush_discriminants {
             if let Some(t) = self.reduce_merge_states.remove(k) {
-                emit!(ReduceStaleEventFlushed);
+                emit!(&ReduceStaleEventFlushed);
                 output.push(Event::from(t.flush()));
             }
         }

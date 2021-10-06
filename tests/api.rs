@@ -77,7 +77,7 @@ mod tests {
     // Initialize the metrics system.
     fn init_metrics() -> oneshot::Sender<()> {
         vector::trace::init(true, true, "info");
-        let _ = vector::metrics::init();
+        let _ = vector::metrics::init_test();
 
         let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
         tokio::spawn(async move {
@@ -510,7 +510,6 @@ mod tests {
                       # General
                       type = "blackhole"
                       inputs = ["processed_events_total_batch_source"]
-                      print_amount = 100000
                 "#;
 
                 let topology = from_str_config(conf).await;
@@ -560,7 +559,6 @@ mod tests {
                       # General
                       type = "blackhole"
                       inputs = ["events_out_total_batch_source"]
-                      print_amount = 100000
                 "#;
 
             let topology = from_str_config(conf).await;
@@ -611,7 +609,6 @@ mod tests {
                       # General
                       type = "blackhole"
                       inputs = ["processed_bytes_total_batch_source"]
-                      print_amount = 100000
                 "#;
 
                 let topology = from_str_config(conf).await;
@@ -654,7 +651,6 @@ mod tests {
                   # General
                   type = "blackhole"
                   inputs = ["component_added_source_1"]
-                  print_amount = 100000
             "#;
 
             let mut topology = from_str_config(conf).await;
@@ -707,7 +703,6 @@ mod tests {
                   # General
                   type = "blackhole"
                   inputs = ["component_added_source_1", "component_added_source_2"]
-                  print_amount = 100000
             "#;
 
             let c = config::load_from_str(conf, Some(Format::Toml)).unwrap();
@@ -744,7 +739,6 @@ mod tests {
                   # General
                   type = "blackhole"
                   inputs = ["component_removed_source_1", "component_removed_source_2"]
-                  print_amount = 100000
             "#;
 
             let mut topology = from_str_config(conf).await;
@@ -792,7 +786,6 @@ mod tests {
                   # General
                   type = "blackhole"
                   inputs = ["component_removed_source_1"]
-                  print_amount = 100000
             "#;
 
             let c = config::load_from_str(conf, Some(Format::Toml)).unwrap();
@@ -822,7 +815,6 @@ mod tests {
                   # General
                   type = "blackhole"
                   inputs = ["error_gen"]
-                  print_amount = 100000
             "#;
 
             let topology = from_str_config(conf).await;
@@ -877,7 +869,6 @@ mod tests {
                   # General
                   type = "blackhole"
                   inputs = ["error_gen"]
-                  print_amount = 100000
             "#;
 
             let topology = from_str_config(conf).await;
@@ -946,7 +937,6 @@ mod tests {
                 [sinks.out]
                   type = "blackhole"
                   inputs = ["file"]
-                  print_amount = 100000
             "#,
                 checkpoints.path().to_str().unwrap(),
                 path
@@ -993,7 +983,6 @@ mod tests {
                 [sinks.out]
                   type = "blackhole"
                   inputs = ["gen1"]
-                  print_amount = 100000
             "#;
 
             let topology = from_str_config(&conf).await;
@@ -1049,7 +1038,6 @@ mod tests {
                 [sinks.out]
                   type = "blackhole"
                   inputs = ["gen1", "gen2", "gen3", "gen4"]
-                  print_amount = 100000
             "#;
 
             let topology = from_str_config(&conf).await;

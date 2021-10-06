@@ -1,4 +1,5 @@
 use crate::{
+    codecs::{CharacterDelimitedCodec, FramingError},
     config::log_schema,
     event::Event,
     internal_events::aws_s3::source::{
@@ -12,7 +13,6 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
-use codec::BytesDelimitedCodec;
 use futures::{FutureExt, SinkExt, Stream, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError};
@@ -103,7 +103,7 @@ pub enum ProcessingError {
     },
     #[snafu(display("Failed to read all of s3://{}/{}: {}", bucket, key, source))]
     ReadObject {
-        source: std::io::Error,
+        source: Box<dyn FramingError>,
         bucket: String,
         key: String,
     },
@@ -233,13 +233,13 @@ impl IngestorProcess {
         let messages = self.receive_messages().await;
         let messages = messages
             .map(|messages| {
-                emit!(SqsMessageReceiveSucceeded {
+                emit!(&SqsMessageReceiveSucceeded {
                     count: messages.len(),
                 });
                 messages
             })
             .map_err(|err| {
-                emit!(SqsMessageReceiveFailed { error: &err });
+                emit!(&SqsMessageReceiveFailed { error: &err });
                 err
             })
             .unwrap_or_default();
@@ -264,7 +264,7 @@ impl IngestorProcess {
 
             match self.handle_sqs_message(message).await {
                 Ok(()) => {
-                    emit!(SqsMessageProcessingSucceeded {
+                    emit!(&SqsMessageProcessingSucceeded {
                         message_id: &message_id
                     });
                     if self.state.delete_message {
@@ -275,7 +275,7 @@ impl IngestorProcess {
                     }
                 }
                 Err(err) => {
-                    emit!(SqsMessageProcessingFailed {
+                    emit!(&SqsMessageProcessingFailed {
                         message_id: &message_id,
                         error: &err,
                     });
@@ -291,19 +291,19 @@ impl IngestorProcess {
                     // Batch deletes can have partial successes/failures, so we have to check
                     // for both cases and emit accordingly.
                     if !result.successful.is_empty() {
-                        emit!(SqsMessageDeleteSucceeded {
+                        emit!(&SqsMessageDeleteSucceeded {
                             message_ids: result.successful,
                         });
                     }
 
                     if !result.failed.is_empty() {
-                        emit!(SqsMessageDeletePartialFailure {
+                        emit!(&SqsMessageDeletePartialFailure {
                             entries: result.failed
                         });
                     }
                 }
                 Err(err) => {
-                    emit!(SqsMessageDeleteBatchFailed {
+                    emit!(&SqsMessageDeleteBatchFailed {
                         entries: cloned_entries,
                         error: err,
                     });
@@ -340,7 +340,7 @@ impl IngestorProcess {
         }
 
         if s3_event.event_name.kind != "ObjectCreated" {
-            emit!(SqsS3EventRecordInvalidEventIgnored {
+            emit!(&SqsS3EventRecordInvalidEventIgnored {
                 bucket: &s3_event.s3.bucket.name,
                 key: &s3_event.s3.object.key,
                 kind: &s3_event.event_name.kind,
@@ -406,9 +406,9 @@ impl IngestorProcess {
                 // prefer duplicate lines over message loss. Future work could include recording
                 // the offset of the object that has been read, but this would only be relevant in
                 // the case that the same vector instance processes the same message.
-                let mut read_error: Option<std::io::Error> = None;
+                let mut read_error: Option<Box<dyn FramingError>> = None;
                 let lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
-                    FramedRead::new(object_reader, BytesDelimitedCodec::new(b'\n'))
+                    FramedRead::new(object_reader, CharacterDelimitedCodec::new('\n'))
                         .map(|res| {
                             res.map_err(|err| {
                                 read_error = Some(err);
@@ -435,7 +435,7 @@ impl IngestorProcess {
                 let aws_region = Bytes::from(s3_event.aws_region.as_str().as_bytes().to_vec());
 
                 let mut stream = lines.filter_map(|line| {
-                    emit!(SqsS3EventReceived {
+                    emit!(&SqsS3EventReceived {
                         byte_size: line.len()
                     });
 

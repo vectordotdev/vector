@@ -1,37 +1,23 @@
-use super::ApiKey;
-use crate::{
-    http::HttpClient,
-    sinks::util::{http::HttpSink, PartitionInnerBuffer},
-};
-use http::StatusCode;
+use crate::http::HttpClient;
+use http::{Request, Response, StatusCode, Uri};
 use hyper::body::Body;
-use std::sync::Arc;
 
 /// The healthcheck is performed by sending an empty request to Datadog and
 /// checking the return.
-pub(crate) async fn healthcheck<T, O>(
-    sink: T,
-    client: HttpClient,
-    api_key: String,
-) -> crate::Result<()>
-where
-    T: HttpSink<Output = PartitionInnerBuffer<Vec<O>, ApiKey>>,
-{
-    let req = sink
-        .build_request(PartitionInnerBuffer::new(
-            Vec::with_capacity(0),
-            Arc::from(api_key),
-        ))
-        .await?
-        .map(Body::from);
+pub async fn healthcheck(client: HttpClient, uri: Uri, api_key: String) -> crate::Result<()> {
+    let body = vec![];
+    let request: Request<Body> = Request::post(uri)
+        .header("Content-Type", "application/json")
+        .header("DD-API-KEY", &api_key[..])
+        .header("Content-Length", body.len())
+        .body(Body::from(body))?;
+    let response: Response<Body> = client.send(request).await?;
 
-    let res = client.send(req).await?;
-
-    let status = res.status();
-    let body = hyper::body::to_bytes(res.into_body()).await?;
+    let status = response.status();
+    let body = hyper::body::to_bytes(response.into_body()).await?;
 
     match status {
-        StatusCode::OK => Ok(()),
+        StatusCode::ACCEPTED => Ok(()),
         StatusCode::UNAUTHORIZED => {
             let json: serde_json::Value = serde_json::from_slice(&body[..])?;
 

@@ -5,11 +5,12 @@ use crate::{
     test_util::{next_addr, random_lines_with_stream},
 };
 use bytes::Bytes;
-use futures::SinkExt;
+use chrono::Utc;
 use futures::{
     channel::mpsc::{Receiver, TryRecvError},
     stream, StreamExt,
 };
+use http::request::Parts;
 use hyper::StatusCode;
 use indoc::indoc;
 use pretty_assertions::assert_eq;
@@ -41,7 +42,6 @@ async fn start_test(
     let config = indoc! {r#"
             default_api_key = "atoken"
             compression = "none"
-            batch.max_events = 1
         "#};
     let (mut config, cx) = load_sink::<DatadogLogsConfig>(config).unwrap();
 
@@ -56,12 +56,11 @@ async fn start_test(
     let (rx, _trigger, server) = build_test_server_status(addr, http_status);
     tokio::spawn(server);
 
-    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let (batch, receiver) = BatchNotifier::new_with_receiver();
     let (expected, events) = random_lines_with_stream(100, 10, Some(batch));
 
     let _ = sink.run(events).await.unwrap();
-
-    assert_eq!(receiver.try_recv(), Ok(batch_status));
+    assert_eq!(receiver.await, batch_status);
 
     (expected, rx)
 }
@@ -69,11 +68,11 @@ async fn start_test(
 #[tokio::test]
 /// Assert the basic functionality of the sink in good conditions
 ///
-/// This test rigs the sink to return StatusCode::OK to responses, checks that
+/// This test rigs the sink to return StatusCode::ACCEPTED to responses, checks that
 /// all batches were delivered and then asserts that every message is able to be
 /// deserialized.
 async fn smoke() {
-    let (expected, rx) = start_test(StatusCode::OK, BatchStatus::Delivered).await;
+    let (expected, rx) = start_test(StatusCode::ACCEPTED, BatchStatus::Delivered).await;
 
     let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
@@ -82,16 +81,14 @@ async fn smoke() {
             val.0.headers.get("Content-Type").unwrap(),
             "application/json"
         );
+        assert_eq!(val.0.headers.get("DD-EVP-ORIGIN").unwrap(), "vector");
+        assert!(val.0.headers.get("DD-EVP-ORIGIN-VERSION").is_some());
 
         let mut json = serde_json::Deserializer::from_slice(&val.1[..])
             .into_iter::<serde_json::Value>()
             .map(|v| v.expect("decoding json"));
 
         let json = json.next().unwrap();
-
-        // The json we send to Datadog is an array of events.
-        // As we have set batch.max_events to 1, each entry will be
-        // an array containing a single record.
         let message = json
             .get(0)
             .unwrap()
@@ -100,6 +97,15 @@ async fn smoke() {
             .as_str()
             .unwrap();
         assert_eq!(message, expected[i]);
+        let timestamp = json
+            .get(0)
+            .unwrap()
+            .get("timestamp")
+            .unwrap()
+            .as_i64()
+            .unwrap();
+        let delta = Utc::now().timestamp_millis() - timestamp;
+        assert!(delta > 0 && delta < 1000);
     }
 }
 
@@ -110,7 +116,7 @@ async fn smoke() {
 /// there should be no outbound messages from the sink. That is, receiving from
 /// its Receiver must fail.
 async fn handles_failure() {
-    let (_expected, mut rx) = start_test(StatusCode::FORBIDDEN, BatchStatus::Failed).await;
+    let (_expected, mut rx) = start_test(StatusCode::FORBIDDEN, BatchStatus::Errored).await;
     let res = rx.try_next();
 
     assert!(matches!(res, Err(TryRecvError { .. })));
@@ -127,59 +133,56 @@ async fn api_key_in_metadata() {
     let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
             default_api_key = "atoken"
             compression = "none"
-            batch.max_events = 1
         "#})
     .unwrap();
 
     let addr = next_addr();
-    // Swap out the endpoint so we can force send it
-    // to our local server
+    // Swap out the endpoint so we can force send it to our local server
     let endpoint = format!("http://{}", addr);
     config.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
 
-    let (rx, _trigger, server) = build_test_server_status(addr, StatusCode::OK);
+    let (rx, _trigger, server) = build_test_server_status(addr, StatusCode::ACCEPTED);
     tokio::spawn(server);
 
-    let (expected, events) = random_lines_with_stream(100, 10, None);
+    let (expected_messages, events) = random_lines_with_stream(100, 10, None);
 
     let api_key = "0xDECAFBAD";
-    let mut events = events.map(|mut e| {
+    let events = events.map(|mut e| {
+        println!("EVENT: {:?}", e);
         e.as_mut_log()
             .metadata_mut()
             .set_datadog_api_key(Some(Arc::from(api_key)));
-        Ok(e)
+        e
     });
 
-    let _ = sink.into_sink().send_all(&mut events).await.unwrap();
-    let output = rx.take(expected.len()).collect::<Vec<_>>().await;
-
-    for (i, val) in output.iter().enumerate() {
-        assert_eq!(val.0.headers.get("DD-API-KEY").unwrap(), api_key);
-
-        assert_eq!(
-            val.0.headers.get("Content-Type").unwrap(),
-            "application/json"
-        );
-
-        let mut json = serde_json::Deserializer::from_slice(&val.1[..])
-            .into_iter::<serde_json::Value>()
-            .map(|v| v.expect("decoding json"));
-
-        let json = json.next().unwrap();
-
-        // The json we send to Datadog is an array of events.
-        // As we have set batch.max_events to 1, each entry will be
-        // an array containing a single record.
-        let message = json
-            .get(0)
-            .unwrap()
-            .get("message")
-            .unwrap()
-            .as_str()
-            .unwrap();
-        assert_eq!(message, expected[i]);
+    let () = sink.run(events).await.unwrap();
+    // The log API takes payloads in units of 1,000 and, as a result, we ship in
+    // units of 1,000. There will only be a single response on the stream.
+    let output: (Parts, Bytes) = rx.take(1).collect::<Vec<_>>().await.pop().unwrap();
+    // Check that the header et al are shaped as expected.
+    let parts = output.0;
+    assert_eq!(parts.headers.get("DD-API-KEY").unwrap(), api_key);
+    assert_eq!(
+        parts.headers.get("Content-Type").unwrap(),
+        "application/json"
+    );
+    // Check that the body appropriately transmits the messages fed in.
+    let body = output.1;
+    let payload_array: Vec<serde_json::Value> = serde_json::Deserializer::from_slice(&body[..])
+        .into_iter::<serde_json::Value>()
+        .map(|v| v.expect("decoding json"))
+        .next()
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .clone();
+    assert_eq!(payload_array.len(), expected_messages.len());
+    for (i, obj) in payload_array.into_iter().enumerate() {
+        let obj = obj.as_object().unwrap();
+        let message = obj.get("message").unwrap().as_str().unwrap();
+        assert_eq!(message, expected_messages[i]);
     }
 }
 
@@ -194,7 +197,6 @@ async fn multiple_api_keys() {
     let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
             default_api_key = "atoken"
             compression = "none"
-            batch.max_events = 1
         "#})
     .unwrap();
 
@@ -206,7 +208,7 @@ async fn multiple_api_keys() {
 
     let (sink, _) = config.build(cx).await.unwrap();
 
-    let (rx, _trigger, server) = build_test_server_status(addr, StatusCode::OK);
+    let (rx, _trigger, server) = build_test_server_status(addr, StatusCode::ACCEPTED);
     tokio::spawn(server);
 
     let events = vec![
@@ -225,4 +227,45 @@ async fn multiple_api_keys() {
 
     keys.sort();
     assert_eq!(keys, vec!["atoken", "pkc", "vvo"])
+}
+
+#[tokio::test]
+async fn enterprise_headers() {
+    let (mut config, mut cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
+            default_api_key = "atoken"
+            compression = "none"
+        "#})
+    .unwrap();
+
+    let addr = next_addr();
+    // Swap out the endpoint so we can force send it to our local server
+    let endpoint = format!("http://{}", addr);
+    config.endpoint = Some(endpoint.clone());
+
+    cx.globals.enterprise = true;
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let (rx, _trigger, server) = build_test_server_status(addr, StatusCode::ACCEPTED);
+    tokio::spawn(server);
+
+    let (_expected_messages, events) = random_lines_with_stream(100, 10, None);
+
+    let api_key = "0xDECAFBAD";
+    let events = events.map(|mut e| {
+        println!("EVENT: {:?}", e);
+        e.as_mut_log()
+            .metadata_mut()
+            .set_datadog_api_key(Some(Arc::from(api_key)));
+        e
+    });
+
+    let () = sink.run(events).await.unwrap();
+    let output: (Parts, Bytes) = rx.take(1).collect::<Vec<_>>().await.pop().unwrap();
+    let parts = output.0;
+
+    assert_eq!(
+        parts.headers.get("DD-EVP-ORIGIN").unwrap(),
+        "vector-enterprise"
+    );
+    assert!(parts.headers.get("DD-EVP-ORIGIN-VERSION").is_some());
 }

@@ -46,7 +46,7 @@ To give the GraphQL API a spin, check out the [Vector GraphQL
 Playground][playground], which lets you run queries against a hosted Vector
 instance.
 
-[code]: https://github.com/timberio/vector/tree/master/src/api
+[code]: https://github.com/vectordotdev/vector/tree/master/src/api
 [docs]: https://vector.dev/docs/reference/api
 [graphql]: https://graphql.org
 [lee]: https://github.com/LeeBenson

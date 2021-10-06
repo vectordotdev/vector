@@ -60,7 +60,7 @@ impl TransformConfig for AddTagsConfig {
 }
 
 impl AddTags {
-    pub fn new(tags: IndexMap<String, String>, overwrite: bool) -> Self {
+    pub const fn new(tags: IndexMap<String, String>, overwrite: bool) -> Self {
         AddTags { tags, overwrite }
     }
 }
@@ -77,11 +77,11 @@ impl FunctionTransform for AddTags {
                         entry.insert(value.clone());
                     }
                     (Entry::Occupied(mut entry), true) => {
-                        emit!(AddTagsTagOverwritten { tag: name.as_ref() });
+                        emit!(&AddTagsTagOverwritten { tag: name.as_ref() });
                         entry.insert(value.clone());
                     }
                     (Entry::Occupied(_entry), false) => {
-                        emit!(AddTagsTagNotOverwritten { tag: name.as_ref() })
+                        emit!(&AddTagsTagNotOverwritten { tag: name.as_ref() })
                     }
                 }
             }

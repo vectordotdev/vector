@@ -135,6 +135,7 @@ where
             unacked_sizes: VecDeque::new(),
             buffer: VecDeque::new(),
             last_compaction: Instant::now(),
+            pending_read: None,
             phantom: PhantomData,
         };
         // Compact on every start

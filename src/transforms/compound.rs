@@ -6,12 +6,19 @@ use crate::{
     transforms::Transform,
 };
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
+use serde::{self, Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
 pub struct CompoundConfig {
-    nested: IndexMap<String, Box<dyn TransformConfig>>,
+    steps: Vec<TransformStep>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct TransformStep {
+    id: Option<String>,
+
+    #[serde(flatten)]
+    transform: Box<dyn TransformConfig>,
 }
 
 inventory::submit! {
@@ -20,10 +27,7 @@ inventory::submit! {
 
 impl GenerateConfig for CompoundConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
-            nested: IndexMap::new(),
-        })
-        .unwrap()
+        toml::Value::try_from(Self { steps: Vec::new() }).unwrap()
     }
 }
 
@@ -37,8 +41,21 @@ impl TransformConfig for CompoundConfig {
     fn expand(
         &mut self,
     ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
-        if !self.nested.is_empty() {
-            Ok(Some((self.nested.clone(), ExpandType::Serial)))
+        let mut map: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
+        for (i, step) in self.steps.iter().enumerate() {
+            if map
+                .insert(
+                    step.id.as_ref().cloned().unwrap_or_else(|| i.to_string()),
+                    step.transform.to_owned(),
+                )
+                .is_some()
+            {
+                return Err("conflicting id found while expanding transform".into());
+            }
+        }
+
+        if !map.is_empty() {
+            Ok(Some((map, ExpandType::Serial)))
         } else {
             Err("must specify at least one transform".into())
         }
@@ -72,12 +89,13 @@ mod test {
         // changed when reloading.
         let config = toml::from_str::<CompoundConfig>(
             r#"
-            [nested.step1]
+            [[steps]]
             type = "mock"
             suffix = "step1"
 
-            [nested.step2]
+            [[steps]]
             type = "mock"
+            id = "foo"
             suffix = "step1"
         "#,
         )
@@ -88,7 +106,7 @@ mod test {
 
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
-            r#"[{"step1":{"type":"mock"},"step2":{"type":"mock"}},"Serial"]"#
+            r#"[{"0":{"type":"mock"},"foo":{"type":"mock"}},"Serial"]"#
         );
     }
 }

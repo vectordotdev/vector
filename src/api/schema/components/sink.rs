@@ -5,7 +5,7 @@ use crate::{
         metrics::{self, IntoSinkMetrics},
         sort,
     },
-    config::ComponentId,
+    config::ComponentKey,
     filter_check,
 };
 use async_graphql::{Enum, InputObject, Object};
@@ -13,17 +13,17 @@ use std::cmp;
 
 #[derive(Debug, Clone)]
 pub struct Data {
-    pub component_id: ComponentId,
+    pub component_key: ComponentKey,
     pub component_type: String,
-    pub inputs: Vec<ComponentId>,
+    pub inputs: Vec<ComponentKey>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Sink(pub Data);
 
 impl Sink {
-    pub fn get_component_id(&self) -> &ComponentId {
-        &self.0.component_id
+    pub const fn get_component_key(&self) -> &ComponentKey {
+        &self.0.component_key
     }
 
     pub fn get_component_type(&self) -> &str {
@@ -43,7 +43,7 @@ impl filter::CustomFilter<Sink> for SinksFilter {
         filter_check!(
             self.component_id.as_ref().map(|f| f
                 .iter()
-                .all(|f| f.filter_value(sink.get_component_id().as_str()))),
+                .all(|f| f.filter_value(&sink.get_component_key().to_string()))),
             self.component_type
                 .as_ref()
                 .map(|f| f.iter().all(|f| f.filter_value(sink.get_component_type())))
@@ -58,15 +58,15 @@ impl filter::CustomFilter<Sink> for SinksFilter {
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 pub enum SinksSortFieldName {
-    ComponentId,
+    ComponentKey,
     ComponentType,
 }
 
 impl sort::SortableByField<SinksSortFieldName> for Sink {
     fn sort(&self, rhs: &Self, field: &SinksSortFieldName) -> cmp::Ordering {
         match field {
-            SinksSortFieldName::ComponentId => {
-                Ord::cmp(self.get_component_id(), rhs.get_component_id())
+            SinksSortFieldName::ComponentKey => {
+                Ord::cmp(self.get_component_key(), rhs.get_component_key())
             }
             SinksSortFieldName::ComponentType => {
                 Ord::cmp(self.get_component_type(), rhs.get_component_type())
@@ -79,7 +79,12 @@ impl sort::SortableByField<SinksSortFieldName> for Sink {
 impl Sink {
     /// Sink component_id
     pub async fn component_id(&self) -> &str {
-        self.get_component_id().as_str()
+        self.get_component_key().id()
+    }
+
+    /// Sink component_id
+    pub async fn pipeline_id(&self) -> Option<&str> {
+        self.get_component_key().pipeline_str()
     }
 
     /// Sink type
@@ -93,7 +98,7 @@ impl Sink {
             .inputs
             .iter()
             .filter_map(
-                |component_id| match state::component_by_component_id(component_id) {
+                |component_key| match state::component_by_component_key(component_key) {
                     Some(Component::Source(s)) => Some(s),
                     _ => None,
                 },
@@ -107,7 +112,7 @@ impl Sink {
             .inputs
             .iter()
             .filter_map(
-                |component_id| match state::component_by_component_id(component_id) {
+                |component_key| match state::component_by_component_key(component_key) {
                     Some(Component::Transform(t)) => Some(t),
                     _ => None,
                 },
@@ -117,7 +122,7 @@ impl Sink {
 
     /// Sink metrics
     pub async fn metrics(&self) -> metrics::SinkMetrics {
-        metrics::by_component_id(self.get_component_id())
+        metrics::by_component_key(self.get_component_key())
             .into_sink_metrics(self.get_component_type())
     }
 }
@@ -129,17 +134,17 @@ mod tests {
     fn sink_fixtures() -> Vec<Sink> {
         vec![
             Sink(Data {
-                component_id: ComponentId::from("webserver"),
+                component_key: ComponentKey::from("webserver"),
                 component_type: "http".to_string(),
                 inputs: vec![],
             }),
             Sink(Data {
-                component_id: ComponentId::from("db"),
+                component_key: ComponentKey::from("db"),
                 component_type: "clickhouse".to_string(),
                 inputs: vec![],
             }),
             Sink(Data {
-                component_id: ComponentId::from("zip_drive"),
+                component_key: ComponentKey::from("zip_drive"),
                 component_type: "file".to_string(),
                 inputs: vec![],
             }),
@@ -150,13 +155,13 @@ mod tests {
     fn sort_component_id_asc() {
         let mut sinks = sink_fixtures();
         let fields = vec![sort::SortField::<SinksSortFieldName> {
-            field: SinksSortFieldName::ComponentId,
+            field: SinksSortFieldName::ComponentKey,
             direction: sort::Direction::Asc,
         }];
         sort::by_fields(&mut sinks, &fields);
 
         for (i, component_id) in ["db", "webserver", "zip_drive"].iter().enumerate() {
-            assert_eq!(sinks[i].get_component_id().as_str(), *component_id);
+            assert_eq!(sinks[i].get_component_key().to_string(), *component_id);
         }
     }
 
@@ -164,13 +169,13 @@ mod tests {
     fn sort_component_id_desc() {
         let mut sinks = sink_fixtures();
         let fields = vec![sort::SortField::<SinksSortFieldName> {
-            field: SinksSortFieldName::ComponentId,
+            field: SinksSortFieldName::ComponentKey,
             direction: sort::Direction::Desc,
         }];
         sort::by_fields(&mut sinks, &fields);
 
         for (i, component_id) in ["zip_drive", "webserver", "db"].iter().enumerate() {
-            assert_eq!(sinks[i].get_component_id().as_str(), *component_id);
+            assert_eq!(sinks[i].get_component_key().to_string(), *component_id);
         }
     }
 
@@ -184,7 +189,7 @@ mod tests {
         sort::by_fields(&mut sinks, &fields);
 
         for (i, component_id) in ["db", "zip_drive", "webserver"].iter().enumerate() {
-            assert_eq!(sinks[i].get_component_id().as_str(), *component_id);
+            assert_eq!(sinks[i].get_component_key().to_string(), *component_id);
         }
     }
 
@@ -198,7 +203,7 @@ mod tests {
         sort::by_fields(&mut sinks, &fields);
 
         for (i, component_id) in ["webserver", "zip_drive", "db"].iter().enumerate() {
-            assert_eq!(sinks[i].get_component_id().as_str(), *component_id);
+            assert_eq!(sinks[i].get_component_key().to_string(), *component_id);
         }
     }
 }

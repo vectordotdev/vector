@@ -34,7 +34,7 @@ enum Errors {
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct RemoteWriteConfig {
+pub struct RemoteWriteConfig {
     pub endpoint: String,
 
     pub default_namespace: Option<String>,
@@ -107,7 +107,7 @@ impl SinkConfig for RemoteWriteConfig {
                             template
                                 .render_string(&event)
                                 .map_err(|error| {
-                                    emit!(TemplateRenderingFailed {
+                                    emit!(&TemplateRenderingFailed {
                                         error,
                                         field: Some("tenant_id"),
                                         drop_event: false,

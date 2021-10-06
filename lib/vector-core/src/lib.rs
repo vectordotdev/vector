@@ -24,8 +24,6 @@
 #[cfg(feature = "api")]
 pub mod api;
 pub mod config;
-#[cfg(feature = "vrl")]
-pub mod enrichment;
 pub mod event;
 pub mod mapping;
 pub mod metrics;
@@ -35,13 +33,13 @@ pub mod source;
 mod test_util;
 pub mod transform;
 pub use buffers;
-mod byte_size_of;
 pub mod partition;
 pub mod serde;
 pub mod stream;
 pub mod time;
+pub use core_common::byte_size_of::ByteSizeOf;
+pub use core_common::internal_event;
 
-pub use byte_size_of::ByteSizeOf;
 use std::path::PathBuf;
 
 #[macro_use]

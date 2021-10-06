@@ -1,12 +1,15 @@
-use super::InternalEvent;
+// ## skip check-events ##
+
+use crate::event::metric::{MetricKind, MetricValue};
 use metrics::counter;
 use serde_json::Error;
+use vector_core::internal_event::InternalEvent;
 
 #[cfg(feature = "sources-splunk_hec")]
-pub(crate) use self::source::*;
+pub use self::source::*;
 
 #[derive(Debug)]
-pub(crate) struct SplunkEventSent {
+pub struct SplunkEventSent {
     pub byte_size: usize,
 }
 
@@ -17,7 +20,7 @@ impl InternalEvent for SplunkEventSent {
 }
 
 #[derive(Debug)]
-pub(crate) struct SplunkEventEncodeError {
+pub struct SplunkEventEncodeError {
     pub error: Error,
 }
 
@@ -35,14 +38,35 @@ impl InternalEvent for SplunkEventEncodeError {
     }
 }
 
+#[derive(Debug)]
+pub(crate) struct SplunkInvalidMetricReceived<'a> {
+    pub value: &'a MetricValue,
+    pub kind: &'a MetricKind,
+}
+
+impl<'a> InternalEvent for SplunkInvalidMetricReceived<'a> {
+    fn emit_logs(&self) {
+        warn!(
+            message = "Invalid metric received kind; dropping event.",
+            value = ?self.value,
+            kind = ?self.kind,
+            internal_log_rate_secs = 30,
+        )
+    }
+
+    fn emit_metrics(&self) {
+        counter!("processing_errors_total", 1, "error_type" => "invalid_metric_kind");
+    }
+}
+
 #[cfg(feature = "sources-splunk_hec")]
 mod source {
-    use super::InternalEvent;
     use crate::sources::splunk_hec::ApiError;
     use metrics::counter;
+    use vector_core::internal_event::InternalEvent;
 
     #[derive(Debug)]
-    pub(crate) struct SplunkHecEventReceived;
+    pub struct SplunkHecEventReceived;
 
     impl InternalEvent for SplunkHecEventReceived {
         fn emit_logs(&self) {
@@ -50,12 +74,13 @@ mod source {
         }
 
         fn emit_metrics(&self) {
+            counter!("component_received_events_total", 1);
             counter!("events_in_total", 1);
         }
     }
 
     #[derive(Debug)]
-    pub(crate) struct SplunkHecRequestReceived<'a> {
+    pub struct SplunkHecRequestReceived<'a> {
         pub path: &'a str,
     }
 
@@ -74,7 +99,7 @@ mod source {
     }
 
     #[derive(Debug)]
-    pub(crate) struct SplunkHecRequestBodyInvalid {
+    pub struct SplunkHecRequestBodyInvalid {
         pub error: std::io::Error,
     }
 
@@ -91,7 +116,7 @@ mod source {
     }
 
     #[derive(Debug)]
-    pub(crate) struct SplunkHecRequestError {
+    pub struct SplunkHecRequestError {
         pub(crate) error: ApiError,
     }
 

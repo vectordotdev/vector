@@ -1,21 +1,21 @@
-use crate::enrichment;
 use crate::expression::assignment;
 use crate::{parser::ast::Ident, TypeDef, Value};
-use std::collections::HashMap;
+use std::{any::Any, collections::HashMap};
 
 /// The state held by the compiler.
 ///
 /// This state allows the compiler to track certain invariants during
 /// compilation, which in turn drives our progressive type checking system.
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct Compiler {
-    // stored external target type definition
+    /// stored external target type definition
     target: Option<assignment::Details>,
 
-    // stored internal variable type definitions
+    /// stored internal variable type definitions
     variables: HashMap<Ident, assignment::Details>,
 
-    enrichment_tables: Option<Box<dyn enrichment::TableSetup>>,
+    /// context passed between the client program and a VRL function.
+    external_context: Option<Box<dyn Any>>,
 
     /// On request, the compiler can store its state in this field, which can
     /// later be used to revert the compiler state to the previously stored
@@ -31,6 +31,10 @@ pub struct Compiler {
 }
 
 impl Compiler {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
     /// Creates a new compiler that starts with an initial given typedef.
     pub fn new_with_type_def(type_def: TypeDef) -> Self {
         Self {
@@ -38,16 +42,6 @@ impl Compiler {
                 type_def,
                 value: None,
             }),
-            variables: HashMap::new(),
-            enrichment_tables: None,
-            snapshot: None,
-        }
-    }
-
-    /// Enrichment tables are added to the compiler state as an object of name => enrichment_table.
-    pub fn new_with_enrichment_tables(enrichment_tables: Box<dyn enrichment::TableSetup>) -> Self {
-        Self {
-            enrichment_tables: Some(enrichment_tables),
             ..Default::default()
         }
     }
@@ -78,12 +72,11 @@ impl Compiler {
     pub(crate) fn snapshot(&mut self) {
         let target = self.target.clone();
         let variables = self.variables.clone();
-        let enrichment_tables = self.enrichment_tables.clone();
 
         let snapshot = Self {
             target,
             variables,
-            enrichment_tables,
+            external_context: None,
             snapshot: None,
         };
 
@@ -92,8 +85,10 @@ impl Compiler {
 
     /// Roll back the compiler state to a previously stored snapshot.
     pub(crate) fn rollback(&mut self) {
-        if let Some(snapshot) = self.snapshot.take() {
+        if let Some(mut snapshot) = self.snapshot.take() {
+            let context = snapshot.external_context.take();
             *self = *snapshot;
+            self.external_context = context;
         }
     }
 
@@ -102,12 +97,24 @@ impl Compiler {
         self.target.as_ref().map(|assignment| &assignment.type_def)
     }
 
-    pub fn get_enrichment_tables(&self) -> Option<&dyn enrichment::TableSetup> {
-        self.enrichment_tables.as_ref().map(|table| table.as_ref())
+    /// Sets the external context data for VRL functions to use.
+    pub fn set_external_context(&mut self, data: Option<Box<dyn Any>>) {
+        self.external_context = data;
     }
 
-    pub fn get_enrichment_tables_mut(&mut self) -> &mut Option<Box<dyn enrichment::TableSetup>> {
-        &mut self.enrichment_tables
+    /// Retrieves the first data of the required type from the external context.
+    pub fn get_external_context<T: 'static>(&self) -> Option<&T> {
+        self.external_context
+            .as_ref()
+            .and_then(|data| data.downcast_ref::<T>())
+    }
+
+    /// Retrieves a mutable reference to the first data of the required type from
+    /// the external context.
+    pub fn get_external_context_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.external_context
+            .as_mut()
+            .and_then(|data| data.downcast_mut::<T>())
     }
 }
 
@@ -119,6 +126,14 @@ pub struct Runtime {
 }
 
 impl Runtime {
+    pub fn is_empty(&self) -> bool {
+        self.variables.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.variables.clear();
+    }
+
     pub fn variable(&self, ident: &Ident) -> Option<&Value> {
         self.variables.get(ident)
     }

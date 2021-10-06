@@ -15,7 +15,7 @@ remap: functions: format_timestamp: {
 		},
 		{
 			name:        "format"
-			description: "The format string as decribed by the [Chrono library](\(urls.chrono_time_formats))."
+			description: "The format string as described by the [Chrono library](\(urls.chrono_time_formats))."
 			required:    true
 			type: ["string"]
 		},

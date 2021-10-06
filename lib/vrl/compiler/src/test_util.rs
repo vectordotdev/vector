@@ -54,7 +54,7 @@ macro_rules! bench_function {
                     let mut runtime_state = $crate::state::Runtime::default();
                     let mut target: $crate::Value = ::std::collections::BTreeMap::default().into();
                     let tz = shared::TimeZone::Named(chrono_tz::Tz::UTC);
-                    let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz, None);
+                    let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz);
 
                     b.iter(|| {
                         let got = expression.resolve(&mut ctx).map_err(|e| e.to_string());
@@ -94,7 +94,7 @@ macro_rules! test_function {
                         let mut runtime_state = $crate::state::Runtime::default();
                         let mut target: $crate::Value = ::std::collections::BTreeMap::default().into();
                         let tz = $tz;
-                        let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz, None);
+                        let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz);
 
                         let got_value = expression.resolve(&mut ctx)
                             .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
@@ -122,7 +122,16 @@ macro_rules! test_function {
 #[macro_export]
 macro_rules! __prep_bench_or_test {
     ($func:path, $state:expr, $args:expr, $want:expr) => {{
-        ($func.compile(&$state, $args.into()), $want)
+        (
+            $func.compile(
+                &$state,
+                &$crate::function::FunctionCompileContext {
+                    span: vrl::diagnostic::Span::new(0, 0),
+                },
+                $args.into(),
+            ),
+            $want,
+        )
     }};
 }
 

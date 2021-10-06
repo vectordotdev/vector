@@ -40,9 +40,9 @@ remap: literals: regular_expression: {
 			title: "Named Captures"
 			description: #"""
 				Regular expressions support named capture groups, allowing extractions to be associated with keys.
-				Named captures should be preceded with a `?P<name>` declaraction. This regex, for example...
+				Named captures should be preceded with a `?P<name>` declaration. This regex, for example...
 
-				```ruby
+				```coffee
 				r'(?P<y>\d{4})-(?P<m>\d{2})-(?P<d>\d{2})'
 				```
 

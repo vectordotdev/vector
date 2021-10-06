@@ -21,7 +21,6 @@ components: sinks: papertrail: {
 				enabled: true
 				codec: {
 					enabled: true
-					default: null
 					enum: ["json", "text"]
 				}
 			}

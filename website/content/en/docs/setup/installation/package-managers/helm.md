@@ -151,6 +151,10 @@ To uninstall the Vector helm chart:
 helm uninstall vector --namespace vector
 ```
 
+## View Helm Chart Source
+
+If you'd like to clone the charts, file an Issue or submit a Pull Request, please take a look at [vectordotdev/helm-charts](https://github.com/vectordotdev/helm-charts).
+
 ## Management
 
 {{< jump "/docs/administration/management" "helm" >}}

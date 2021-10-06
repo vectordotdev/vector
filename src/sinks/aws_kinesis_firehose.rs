@@ -27,6 +27,11 @@ use std::{
 use tower::Service;
 use tracing_futures::Instrument;
 
+// AWS Kinesis Firehose API accepts payloads up to 4MB or 500 events
+// https://docs.aws.amazon.com/firehose/latest/dev/limits.html
+const MAX_PAYLOAD_SIZE: usize = 4_194_304_usize;
+const MAX_PAYLOAD_EVENTS: usize = 500_usize;
+
 #[derive(Clone)]
 pub struct KinesisFirehoseService {
     client: KinesisFirehoseClient,
@@ -72,6 +77,20 @@ impl GenerateConfig for KinesisFirehoseSinkConfig {
         )
         .unwrap()
     }
+}
+
+#[derive(Debug, PartialEq, Snafu)]
+enum BuildError {
+    #[snafu(display(
+        "Batch max size is too high. The value must be {} bytes or less",
+        MAX_PAYLOAD_SIZE
+    ))]
+    BatchMaxSize,
+    #[snafu(display(
+        "Batch max events is too high. The value must be {} or less",
+        MAX_PAYLOAD_EVENTS
+    ))]
+    BatchMaxEvents,
 }
 
 #[async_trait::async_trait]
@@ -136,11 +155,22 @@ impl KinesisFirehoseService {
         client: KinesisFirehoseClient,
         cx: SinkContext,
     ) -> crate::Result<impl Sink<Event, Error = ()>> {
+        let batch_config = config.batch.use_size_as_bytes()?;
+
+        if batch_config.max_bytes.unwrap_or_default() > MAX_PAYLOAD_SIZE {
+            return Err(Box::new(BuildError::BatchMaxSize));
+        }
+
+        if batch_config.max_events.unwrap_or_default() > MAX_PAYLOAD_EVENTS {
+            return Err(Box::new(BuildError::BatchMaxEvents));
+        }
+
         let batch = BatchSettings::default()
             .bytes(4_000_000)
             .events(500)
             .timeout(1)
-            .parse_config(config.batch)?;
+            .parse_config(batch_config)?;
+
         let request = config.request.unwrap_with(&TowerRequestConfig::default());
         let encoding = config.encoding.clone();
         let kinesis = KinesisFirehoseService { client, config };
@@ -260,6 +290,62 @@ mod tests {
     }
 
     #[test]
+    fn check_batch_size() {
+        let config = KinesisFirehoseSinkConfig {
+            stream_name: String::from("test"),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
+            encoding: EncodingConfig::from(Encoding::Json),
+            compression: Compression::None,
+            batch: BatchConfig {
+                max_bytes: Some(MAX_PAYLOAD_SIZE + 1),
+                ..Default::default()
+            },
+            request: Default::default(),
+            assume_role: None,
+            auth: Default::default(),
+        };
+
+        let cx = SinkContext::new_test();
+
+        let client = config.create_client(&cx.proxy).unwrap();
+
+        let res = KinesisFirehoseService::new(config, client, cx);
+
+        assert_eq!(
+            res.err().and_then(|e| e.downcast::<BuildError>().ok()),
+            Some(Box::new(BuildError::BatchMaxSize))
+        );
+    }
+
+    #[test]
+    fn check_batch_events() {
+        let config = KinesisFirehoseSinkConfig {
+            stream_name: String::from("test"),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
+            encoding: EncodingConfig::from(Encoding::Json),
+            compression: Compression::None,
+            batch: BatchConfig {
+                max_events: Some(MAX_PAYLOAD_EVENTS + 1),
+                ..Default::default()
+            },
+            request: Default::default(),
+            assume_role: None,
+            auth: Default::default(),
+        };
+
+        let cx = SinkContext::new_test();
+
+        let client = config.create_client(&cx.proxy).unwrap();
+
+        let res = KinesisFirehoseService::new(config, client, cx);
+
+        assert_eq!(
+            res.err().and_then(|e| e.downcast::<BuildError>().ok()),
+            Some(Box::new(BuildError::BatchMaxEvents))
+        );
+    }
+
+    #[test]
     fn firehose_encode_event_text() {
         let message = "hello world".to_string();
         let event = encode_event(message.clone().into(), &Encoding::Text.into());
@@ -375,6 +461,7 @@ mod integration_tests {
         let hits = response["hits"]["hits"]
             .as_array()
             .expect("Elasticsearch response does not include hits->hits");
+        #[allow(clippy::needless_collect)] // https://github.com/rust-lang/rust-clippy/issues/6909
         let input = input
             .into_iter()
             .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())

@@ -111,7 +111,7 @@ components: sources: aws_s3: components._aws & {
 						type: bool: default: true
 					}
 					queue_url: {
-						description: "The URL of the SQS queue to receieve bucket notifications from."
+						description: "The URL of the SQS queue to receive bucket notifications from."
 						required:    true
 						warnings: []
 						type: string: {
@@ -279,6 +279,7 @@ components: sources: aws_s3: components._aws & {
 	telemetry: metrics: {
 		events_in_total:                        components.sources.internal_metrics.output.metrics.events_in_total
 		processed_bytes_total:                  components.sources.internal_metrics.output.metrics.processed_bytes_total
+		component_received_events_total:        components.sources.internal_metrics.output.metrics.component_received_events_total
 		sqs_message_delete_failed_total:        components.sources.internal_metrics.output.metrics.sqs_message_delete_failed_total
 		sqs_message_delete_succeeded_total:     components.sources.internal_metrics.output.metrics.sqs_message_delete_succeeded_total
 		sqs_message_processing_failed_total:    components.sources.internal_metrics.output.metrics.sqs_message_processing_failed_total

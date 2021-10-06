@@ -36,7 +36,8 @@ default-features = false
 features = []
 
 [dependencies.indexmap]
-version = "1.7"
+# pinned due to https://github.com/tkaitchuck/aHash/issues/95
+version = "~1.6.2"
 default-features = false
 features = ["serde"]
 
@@ -66,7 +67,7 @@ default-features = false
 features = []
 
 [dependencies.tokio]
-version = "1.11.0"
+version = "1.12.0"
 default-features = false
 features = ["full"]
 
@@ -74,7 +75,7 @@ features = ["full"]
 criterion = "0.3"
 quickcheck = "1"
 tempfile = "3.1.0"
-pretty_assertions = "0.7.2"
+pretty_assertions = "1.0.0"
 
 [[bench]]
 name = "buffer"

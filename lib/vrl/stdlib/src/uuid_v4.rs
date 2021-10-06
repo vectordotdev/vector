@@ -17,7 +17,12 @@ impl Function for UuidV4 {
         }]
     }
 
-    fn compile(&self, _state: &state::Compiler, _: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _ctx: &FunctionCompileContext,
+        _: ArgumentList,
+    ) -> Compiled {
         Ok(Box::new(UuidV4Fn))
     }
 }
@@ -53,7 +58,7 @@ mod tests {
         let mut state = vrl::state::Runtime::default();
         let mut object: Value = map![].into();
         let tz = TimeZone::default();
-        let mut ctx = Context::new(&mut object, &mut state, &tz, None);
+        let mut ctx = Context::new(&mut object, &mut state, &tz);
         let value = UuidV4Fn.resolve(&mut ctx).unwrap();
 
         assert!(matches!(&value, Value::Bytes(_)));

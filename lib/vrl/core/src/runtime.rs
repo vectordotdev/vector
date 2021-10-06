@@ -9,6 +9,7 @@ pub type RuntimeResult = Result<Value, Terminate>;
 #[derive(Debug, Default)]
 pub struct Runtime {
     state: state::Runtime,
+    root_lookup: LookupBuf,
 }
 
 /// The error raised if the runtime is terminated.
@@ -42,7 +43,18 @@ impl Error for Terminate {
 
 impl Runtime {
     pub fn new(state: state::Runtime) -> Self {
-        Self { state }
+        Self {
+            state,
+            root_lookup: LookupBuf::root(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.state.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.state.clear();
     }
 
     /// Given the provided [`Target`], resolve the provided [`Program`] to
@@ -57,7 +69,7 @@ impl Runtime {
         //
         // VRL technically supports any `Value` object as the root, but the
         // assumption is people are expected to use it to query objects.
-        match target.get(&LookupBuf::root()) {
+        match target.get(&self.root_lookup) {
             Ok(Some(Value::Object(_))) => {}
             Ok(Some(value)) => {
                 return Err(Terminate::Error(
@@ -81,12 +93,7 @@ impl Runtime {
             }
         };
 
-        let mut context = Context::new(
-            target,
-            &mut self.state,
-            timezone,
-            program.enrichment_tables(),
-        );
+        let mut context = Context::new(target, &mut self.state, timezone);
 
         let mut values = program
             .iter()

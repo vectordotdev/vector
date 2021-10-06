@@ -13,11 +13,14 @@ would logs and metrics from any other source.
 
 ## Logs
 
-Vector provide clear, informative, well-structured logs via the [`internal_logs`][internal_logs] source. This section
+Vector provides clear, informative, well-structured logs via the [`internal_logs`][internal_logs] source. This section
 shows you how to use them in your Vector topology.
 
 *Which* logs Vector pipes through the `internal_logs` source is determined by the [log level](#levels), which defaults
 to `info`.
+
+In addition to the `internal_logs` source, Vector also writes its logs to [`stderr`][], which can be captured by
+Kubernetes, SystemD, or however you are running Vector.
 
 ### Accessing logs
 
@@ -119,10 +122,11 @@ IO and disrupting the service. The trade-off is that repetitive logs aren't logg
 [journald_source]: /docs/reference/configuration/sources/journald
 [output]: /docs/reference/configuration/sources/internal_metrics/#output
 [remap]: /docs/reference/configuration/transforms/remap
-[rfc_2064]: https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
+[rfc_2064]: https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 [sinks]: /sinks
 [sources]: /sources
 [starting]: /docs/administration/management
+[stderr]: https://en.wikipedia.org/wiki/Standard_streams#Standard_error_(stderr)
 [topology]: /docs/about/concepts/#topology
 [transform]: /transforms
 [troubleshooting]: /guides/level-up/troubleshooting

@@ -1,8 +1,10 @@
-use super::InternalEvent;
+// ## skip check-events ##
+
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub(crate) struct CoercerConversionFailed<'a> {
+pub struct CoercerConversionFailed<'a> {
     pub field: &'a str,
     pub error: crate::types::Error,
 }

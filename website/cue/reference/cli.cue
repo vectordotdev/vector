@@ -30,6 +30,15 @@ _config_options: {
 		default: "/etc/vector/vector.toml"
 		env_var: "VECTOR_CONFIG"
 	}
+	"config-dir": {
+		description: """
+			Read configuration from files in one or more directories. File
+			format is detected from the file name. Files not ending in .toml,
+			.json, .yaml, or .yml will be ignored.
+			"""
+		type:    "string"
+		env_var: "VECTOR_CONFIG_DIR"
+	}
 	"config-toml": {
 		description: """
 			Read configuration from one or more files. Wildcard paths are
@@ -149,14 +158,6 @@ cli: {
 			description: "Watch for changes in the configuration file and reload accordingly"
 			env_var:     "VECTOR_WATCH_CONFIG"
 		}
-		"enable-datadog-tracing": {
-			description: """
-				Send internal tracing spans to a local APM-enabled
-				Datadog agent with a granularity matching the current log level.
-				"""
-			env_var:      "VECTOR_ENABLE_DATADOG_TRACING"
-			experimental: true
-		}
 	}
 
 	options: _config_options & {
@@ -259,7 +260,7 @@ cli: {
 			description: """
 				Run Vector config unit tests, then exit. This command is experimental and
 				therefore subject to change. For guidance on how to write unit tests check
-				out the [unit testing documentation](\(urls.vector_unit_testing)).
+				out the [unit testing documentation](\(urls.vector_unit_tests)).
 				"""
 
 			options: {

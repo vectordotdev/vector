@@ -8,7 +8,6 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 use std::str::FromStr;
-use vector_core::enrichment;
 
 #[derive(Deserialize, Serialize, Clone, Derivative)]
 #[serde(untagged)]
@@ -517,6 +516,7 @@ impl_generate_config_from_default!(CheckFieldsConfig);
 
 impl CheckFieldsConfig {
     #[cfg(test)]
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn new(predicates: IndexMap<String, CheckFieldsPredicateArg>) -> Self {
         Self { predicates }
     }
