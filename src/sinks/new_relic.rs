@@ -38,7 +38,8 @@ pub enum NewRelicApi {
 pub struct NewRelicConfig {
     pub license_key: String,
     pub region: Option<NewRelicRegion>,
-    pub api: Option<NewRelicApi>,
+    pub api: NewRelicApi,
+    //#[serde(default)]
     pub compression: Compression,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
@@ -100,7 +101,7 @@ impl SinkConfig for NewRelicConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Log
+        DataType::Any
     }
 
     fn sink_type(&self) -> &'static str {
@@ -119,21 +120,50 @@ impl HttpSink for NewRelicConfig {
             ..self.encoding.clone()
         };
         encoding.apply_rules(&mut event);
-        
-        let mut log = event.into_log();
 
-        match self.api.as_ref().unwrap_or(&NewRelicApi::Events) {
+        match self.api {
             NewRelicApi::Events => {
-                if let None = log.get("eventType") {
-                    log.insert("eventType", Value::from(String::from("VectorSink")));
+                if let Event::Log(mut log) = event {
+                    if let None = log.get("eventType") {
+                        log.insert("eventType", Value::from(String::from("VectorSink")));
+                    }
+                    let mut body = serde_json::to_vec(&log).expect("Events should be valid json!");
+                    body.push(b'\n');
+                    Some(body)
+                }
+                else {
+                    None
                 }
             },
-            NewRelicApi::Metrics => {                        
+            NewRelicApi::Metrics => {
                 //TODO: For Metrics, check name and valu exist and has correct type. Also check type has a valid value if exist
                 //TODO: For metrics, remove host, message and source_type
+                /*
+                log.remove("host");
+                log.remove("message");
+                log.remove("source_type");
+                */
+                match event {
+                    Event::Log(_log) => {
+                        //TODO: generate a New Relic Metric model from a Log
+                        None
+                    },
+                    Event::Metric(metric) => {
+                        println!("----------> METRIC object received = {:#?}", metric);
+                        //TODO: generate a New Relic Metric model from a Metric
+                        None
+                    }
+                }
             },
             NewRelicApi::Logs => {
-                // ?
+                if let Event::Log(mut log) = event {
+                    let mut body = serde_json::to_vec(&log).expect("Events should be valid json!");
+                    body.push(b'\n');
+                    Some(body)
+                }
+                else {
+                    None
+                }
             }
         }
 
@@ -147,17 +177,12 @@ impl HttpSink for NewRelicConfig {
 
         println!("Message is = {:#?}", message);
         */
-
-        let mut body = serde_json::to_vec(&log).expect("Events should be valid json!");
-        body.push(b'\n');
-
-        Some(body)
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
 
         //TODO: set correct URLs
-        let uri = match self.api.as_ref().unwrap_or(&NewRelicApi::Events) {
+        let uri = match self.api {
             NewRelicApi::Events => {
                 match self.region.as_ref().unwrap_or(&NewRelicRegion::Us) {
                     NewRelicRegion::Us => Uri::from_static("http://localhost:8888/events/us"),
