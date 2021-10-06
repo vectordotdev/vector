@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{Event},
+    event::{Event, Value},
     http::{HttpClient},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration, TimestampFormat},
@@ -120,11 +120,24 @@ impl HttpSink for NewRelicConfig {
         };
         encoding.apply_rules(&mut event);
         
-        //TODO: For Events, check that eventType exist, set default value if not ("VectorSink")
-        //TODO: For Metrics, check name and valu exist and has correct type. Also check type has a valid value if exist
-        //TODO: For metrics, remove host, message and source_type
-        let log = event.into_log();
+        let mut log = event.into_log();
 
+        match self.api.as_ref().unwrap_or(&NewRelicApi::Events) {
+            NewRelicApi::Events => {
+                if let None = log.get("eventType") {
+                    log.insert("eventType", Value::from(String::from("VectorSink")));
+                }
+            },
+            NewRelicApi::Metrics => {                        
+                //TODO: For Metrics, check name and valu exist and has correct type. Also check type has a valid value if exist
+                //TODO: For metrics, remove host, message and source_type
+            },
+            NewRelicApi::Logs => {
+                // ?
+            }
+        }
+
+        /*
         println!("----------> LOG object = {:#?}", log);
 
         let field = crate::config::log_schema().message_key();
@@ -133,6 +146,7 @@ impl HttpSink for NewRelicConfig {
         let message = message.to_string_lossy();
 
         println!("Message is = {:#?}", message);
+        */
 
         let mut body = serde_json::to_vec(&log).expect("Events should be valid json!");
         body.push(b'\n');
