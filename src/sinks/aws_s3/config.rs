@@ -22,10 +22,8 @@ use crate::{
 use rusoto_s3::S3Client;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
-use std::time::Duration;
 use tower::ServiceBuilder;
 use vector_core::sink::VectorSink;
-use vector_core::stream::BatcherSettings;
 
 use super::sink::S3RequestOptions;
 
