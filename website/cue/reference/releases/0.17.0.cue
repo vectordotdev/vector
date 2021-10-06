@@ -12,9 +12,9 @@ releases: "0.17.0": {
 	This release includes:
 
 	* One new component:
-		* [`splunk_hec_metrics` source](\(urls.vector_splunk_hec_metrics_source)) for sending metrics to Splunk
+		* [`splunk_hec_metrics` sink](\(urls.vector_splunk_hec_metrics_sink)) for sending metrics to Splunk
 	* [Adaptive Concurrency](/highlights/TODO) enabled by default to maximize throughput for HTTP-based sinks
-	* An enhancment to the `host_metrics`](\(urls.vector_host_metrics_source)) to fetch memory and CPU metrics for cgroups
+	* An enhancement to the `host_metrics`](\(urls.vector_host_metrics_source)) to fetch memory and CPU metrics for cgroups
 	* New VRL functions: [find](\(urls.vrl_functions)/#find), [unique](\(urls.vrl_functions)/#unique), and, a set of functions for dynamically looking up event fields, [get](\(urls.vrl_functions)/#get), [set](\(urls.vrl_functions)/#set), and [remove](\(urls.vrl_functions)/#remove).
 
 	It also contains a number of additional enhancements and bug fixes. Check out the [highlights](#highlights) and
@@ -22,23 +22,30 @@ releases: "0.17.0": {
 	"""
 
 	whats_next: [
-	
-		{
-			title:       "Kubernetes aggregator role"
-			description: """
-				We are hard at work at expanding the ability to run Vector as an [aggregator in
-				Kubernetes](\(urls.vector_aggregator_role)). This will allow you to build end-to-end observability
-				pipelines in Kubernetes with Vector. Distributing processing on the edge, centralizing it with an
-				aggregator, or both. If you are interested in beta testing, please [join our chat](\(urls.vector_chat))
-				and let us know.
 
-				We do expect this to be released in 0.17.0.
+		{
+			title:       "Component metric standardization"
+			description: """
+				We are in the process of ensuring that all Vector components report a consistent set of metrics to make
+				it easier to monitor the performance of Vector.  These metrics are outlined in this new [instrumentation
+				specification](\(urls.specs_instrumentation)).
 				"""
 		},
 		{
-			title:       "Accepting metrics from the Datadog Agent"
+			title:       "VRL iteration support"
 			description: """
-				We are in the process of adding support to the [`datadog_agent`](\(urls.vector_datadog_agent_source)) to accept metrics from the Datadog Agent.
+				A common request from users when the incoming log event shape is unknown, to be able to iterate over the
+				keys and values in those log events. We recently published an [RFC](\(urls.vector_rfc_8381)) for this and
+				expect to implement this support this quarter.
+				"""
+		},
+		{
+			title: "New unified Vector helm chart"
+			description: """
+				Taking all of our learnings from the existing agent and aggregator Helm charts, we've started work on
+				a new Helm chart that will unify both the agent and aggregator deployments into one chart, which can be
+				configured by deployment role, to simplify deployment and chart maintenance. You can follow along in
+				[vectordotdev/helm-charts#38](https://github.com/vectordotdev/helm-charts/issues/38).
 				"""
 		},
 	]
