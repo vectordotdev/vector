@@ -1,5 +1,7 @@
-use super::InternalEvent;
+// ## skip check-events ##
+
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)] // some features only use some variants

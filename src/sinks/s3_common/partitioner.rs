@@ -22,7 +22,7 @@ impl Partitioner for KeyPartitioner {
         self.0
             .render_string(item)
             .map_err(|error| {
-                emit!(TemplateRenderingFailed {
+                emit!(&TemplateRenderingFailed {
                     error,
                     field: Some("key_prefix"),
                     drop_event: true,

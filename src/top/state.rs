@@ -6,12 +6,12 @@ type IdentifiedMetric = (ComponentKey, i64);
 
 #[derive(Debug)]
 pub enum EventType {
-    EventsInTotals(Vec<IdentifiedMetric>),
+    ReceivedEventsTotals(Vec<IdentifiedMetric>),
     /// Interval in ms + identified metric
-    EventsInThroughputs(i64, Vec<IdentifiedMetric>),
-    EventsOutTotals(Vec<IdentifiedMetric>),
+    ReceivedEventsThroughputs(i64, Vec<IdentifiedMetric>),
+    SentEventsTotals(Vec<IdentifiedMetric>),
     /// Interval in ms + identified metric
-    EventsOutThroughputs(i64, Vec<IdentifiedMetric>),
+    SentEventsThroughputs(i64, Vec<IdentifiedMetric>),
     ProcessedBytesTotals(Vec<IdentifiedMetric>),
     /// Interval + identified metric
     ProcessedBytesThroughputs(i64, Vec<IdentifiedMetric>),
@@ -31,10 +31,10 @@ pub struct ComponentRow {
     pub component_type: String,
     pub processed_bytes_total: i64,
     pub processed_bytes_throughput_sec: i64,
-    pub events_in_total: i64,
-    pub events_in_throughput_sec: i64,
-    pub events_out_total: i64,
-    pub events_out_throughput_sec: i64,
+    pub received_events_total: i64,
+    pub received_events_throughput_sec: i64,
+    pub sent_events_total: i64,
+    pub sent_events_throughput_sec: i64,
     pub errors: i64,
 }
 
@@ -50,32 +50,32 @@ pub async fn updater(mut state: State, mut event_rx: EventRx) -> StateRx {
     tokio::spawn(async move {
         while let Some(event_type) = event_rx.recv().await {
             match event_type {
-                EventType::EventsInTotals(rows) => {
+                EventType::ReceivedEventsTotals(rows) => {
                     for (key, v) in rows {
                         if let Some(r) = state.get_mut(&key) {
-                            r.events_in_total = v;
+                            r.received_events_total = v;
                         }
                     }
                 }
-                EventType::EventsInThroughputs(interval, rows) => {
+                EventType::ReceivedEventsThroughputs(interval, rows) => {
                     for (key, v) in rows {
                         if let Some(r) = state.get_mut(&key) {
-                            r.events_in_throughput_sec =
+                            r.received_events_throughput_sec =
                                 (v as f64 * (1000.0 / interval as f64)) as i64;
                         }
                     }
                 }
-                EventType::EventsOutTotals(rows) => {
+                EventType::SentEventsTotals(rows) => {
                     for (key, v) in rows {
                         if let Some(r) = state.get_mut(&key) {
-                            r.events_out_total = v;
+                            r.sent_events_total = v;
                         }
                     }
                 }
-                EventType::EventsOutThroughputs(interval, rows) => {
+                EventType::SentEventsThroughputs(interval, rows) => {
                     for (key, v) in rows {
                         if let Some(r) = state.get_mut(&key) {
-                            r.events_out_throughput_sec =
+                            r.sent_events_throughput_sec =
                                 (v as f64 * (1000.0 / interval as f64)) as i64;
                         }
                     }

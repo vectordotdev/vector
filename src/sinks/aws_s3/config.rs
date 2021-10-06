@@ -1,5 +1,6 @@
 use crate::config::SinkContext;
 use crate::sinks::s3_common::sink::S3Sink;
+use crate::sinks::util::encoding::StandardEncodings;
 use crate::{
     config::{DataType, GenerateConfig, ProxyConfig, SinkConfig},
     rusoto::{AwsAuthentication, RegionOrEndpoint},
@@ -23,6 +24,8 @@ use std::convert::TryInto;
 use std::num::NonZeroUsize;
 use tower::ServiceBuilder;
 use vector_core::sink::VectorSink;
+
+use super::sink::S3RequestOptions;
 
 const DEFAULT_REQUEST_LIMITS: TowerRequestConfig = {
     TowerRequestConfig::const_new(Concurrency::Fixed(50), Concurrency::Fixed(50))
@@ -53,7 +56,7 @@ pub struct S3SinkConfig {
     pub options: S3Options,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub encoding: EncodingConfig<Encoding>,
+    pub encoding: EncodingConfig<StandardEncodings>,
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
     #[serde(default)]
@@ -66,24 +69,6 @@ pub struct S3SinkConfig {
     pub auth: AwsAuthentication,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Text,
-    Ndjson,
-}
-
-#[derive(Clone)]
-pub struct S3RequestOptions {
-    pub bucket: String,
-    pub filename_time_format: String,
-    pub filename_append_uuid: bool,
-    pub filename_extension: Option<String>,
-    pub api_options: S3Options,
-    pub encoding: EncodingConfig<Encoding>,
-    pub compression: Compression,
-}
-
 impl GenerateConfig for S3SinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -94,7 +79,7 @@ impl GenerateConfig for S3SinkConfig {
             filename_extension: None,
             options: S3Options::default(),
             region: RegionOrEndpoint::default(),
-            encoding: Encoding::Text.into(),
+            encoding: StandardEncodings::Text.into(),
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
@@ -174,6 +159,8 @@ impl S3SinkConfig {
             service,
             request_options,
             partitioner,
+            self.encoding.clone(),
+            self.compression,
             batch_size_bytes,
             batch_size_events,
             batch_timeout,

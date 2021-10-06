@@ -126,7 +126,7 @@ impl HttpSink for LogdnaConfig {
         let key = self
             .render_key(&event)
             .map_err(|(field, error)| {
-                emit!(TemplateRenderingFailed {
+                emit!(&TemplateRenderingFailed {
                     error,
                     field,
                     drop_event: true,

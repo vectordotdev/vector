@@ -112,6 +112,15 @@ components: sources: kubernetes_logs: {
 							syntax:  "literal"
 						}
 					}
+					pod_annotations: {
+						common:      false
+						description: "Event field for Pod annotations."
+						required:    false
+						type: string: {
+							default: "kubernetes.pod_annotations"
+							syntax:  "literal"
+						}
+					}
 					pod_name: {
 						common:      false
 						description: "Event field for Pod name."
@@ -349,6 +358,15 @@ components: sources: kubernetes_logs: {
 					options: {}
 				}
 			}
+			"kubernetes.pod_annotations": {
+				description: "Set of annotations attached to the Pod."
+				required:    false
+				common:      true
+				type: object: {
+					examples: [{"myannotation": "myvalue"}]
+					options: {}
+				}
+			}
 			"kubernetes.pod_name": {
 				description: "Pod name."
 				required:    false
@@ -439,6 +457,9 @@ components: sources: kubernetes_logs: {
 					"addonmanager.kubernetes.io/mode": "Reconcile"
 					"gcp-auth-skip-secret":            "true"
 					"integration-test":                "storage-provisioner"
+				}
+				"kubernetes.pod_annotations": {
+					"prometheus.io/scrape": "false"
 				}
 				"kubernetes.pod_name":      "storage-provisioner"
 				"kubernetes.pod_namespace": "kube-system"

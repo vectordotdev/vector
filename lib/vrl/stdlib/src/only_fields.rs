@@ -18,7 +18,12 @@ impl Function for OnlyFields {
         }
     }
 
-    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _ctx: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let mut paths = vec![];
         paths.push(arguments.required_path("1")?);
 

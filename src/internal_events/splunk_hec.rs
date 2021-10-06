@@ -1,7 +1,9 @@
-use super::InternalEvent;
+// ## skip check-events ##
+
 use crate::event::metric::{MetricKind, MetricValue};
 use metrics::counter;
 use serde_json::Error;
+use vector_core::internal_event::InternalEvent;
 
 #[cfg(feature = "sources-splunk_hec")]
 pub use self::source::*;
@@ -59,9 +61,9 @@ impl<'a> InternalEvent for SplunkInvalidMetricReceived<'a> {
 
 #[cfg(feature = "sources-splunk_hec")]
 mod source {
-    use super::InternalEvent;
     use crate::sources::splunk_hec::ApiError;
     use metrics::counter;
+    use vector_core::internal_event::InternalEvent;
 
     #[derive(Debug)]
     pub struct SplunkHecEventReceived;

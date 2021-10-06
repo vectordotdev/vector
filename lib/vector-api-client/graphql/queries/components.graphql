@@ -15,11 +15,11 @@ query ComponentsQuery($first: Int!) {
                         processedBytesTotal {
                             processedBytesTotal
                         }
-                        eventsInTotal {
-                            eventsInTotal
+                        receivedEventsTotal {
+                            receivedEventsTotal
                         }
-                        eventsOutTotal {
-                            eventsOutTotal
+                        sentEventsTotal {
+                            sentEventsTotal
                         }
                     }
                 }
@@ -32,11 +32,11 @@ query ComponentsQuery($first: Int!) {
                         processedBytesTotal {
                             processedBytesTotal
                         }
-                        eventsInTotal {
-                            eventsInTotal
+                        receivedEventsTotal {
+                            receivedEventsTotal
                         }
-                        eventsOutTotal {
-                            eventsOutTotal
+                        sentEventsTotal {
+                            sentEventsTotal
                         }
                     }
                 }
@@ -49,11 +49,11 @@ query ComponentsQuery($first: Int!) {
                         processedBytesTotal {
                             processedBytesTotal
                         }
-                        eventsInTotal {
-                            eventsInTotal
+                        receivedEventsTotal {
+                            receivedEventsTotal
                         }
-                        eventsOutTotal {
-                            eventsOutTotal
+                        sentEventsTotal {
+                            sentEventsTotal
                         }
                     }
                 }

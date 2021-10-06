@@ -1,5 +1,5 @@
 use crate::{
-    codecs::Decoder,
+    codecs::{Decoder, DecodingConfig},
     event::Event,
     internal_events::{SocketEventsReceived, SocketMode},
     shutdown::ShutdownSignal,
@@ -28,6 +28,9 @@ pub struct UdpConfig {
     host_key: Option<String>,
     #[get_copy = "pub"]
     receive_buffer_bytes: Option<usize>,
+    #[serde(flatten, default)]
+    #[get = "pub"]
+    decoding: DecodingConfig,
 }
 
 impl UdpConfig {
@@ -37,6 +40,7 @@ impl UdpConfig {
             max_length: crate::serde::default_max_length(),
             host_key: None,
             receive_buffer_bytes: None,
+            decoding: Default::default(),
         }
     }
 }
@@ -69,7 +73,7 @@ pub fn udp(
             loop {
                 match stream.next().await {
                     Some(Ok(((events, byte_size), received_from))) => {
-                        emit!(SocketEventsReceived {
+                        emit!(&SocketEventsReceived {
                             mode: SocketMode::Udp,
                             byte_size,
                             count: events.len()

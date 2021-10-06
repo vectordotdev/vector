@@ -1,5 +1,7 @@
-use super::InternalEvent;
+// ## skip check-events ##
+
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct EventsReceived {
@@ -39,5 +41,48 @@ impl InternalEvent for EventsSent {
             counter!("component_sent_events_total", self.count as u64);
             counter!("component_sent_event_bytes_total", self.byte_size as u64);
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct BytesSent<'a> {
+    pub byte_size: usize,
+    pub protocol: &'a str,
+}
+
+impl<'a> InternalEvent for BytesSent<'a> {
+    fn emit_logs(&self) {
+        trace!(message = "Bytes sent.", byte_size = %self.byte_size, protocol = %self.protocol);
+    }
+
+    fn emit_metrics(&self) {
+        counter!("component_sent_bytes_total", self.byte_size as u64,
+                 "protocol" => self.protocol.to_string());
+    }
+}
+
+#[derive(Debug)]
+pub struct EndpointBytesSent<'a> {
+    pub byte_size: usize,
+    pub protocol: &'a str,
+    pub endpoint: &'a str,
+}
+
+impl<'a> InternalEvent for EndpointBytesSent<'a> {
+    fn emit_logs(&self) {
+        trace!(
+            message = "Bytes sent.",
+            byte_size = %self.byte_size,
+            protocol = %self.protocol,
+            endpoint = %self.endpoint
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_sent_bytes_total", self.byte_size as u64,
+            "protocol" => self.protocol.to_string(),
+            "endpoint" => self.endpoint.to_string()
+        );
     }
 }

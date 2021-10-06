@@ -1,6 +1,6 @@
-use super::InternalEvent;
 use crate::event::metric::{MetricKind, MetricValue};
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct StatsdInvalidMetricReceived<'a> {

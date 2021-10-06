@@ -81,11 +81,11 @@ impl UnixConnector {
         loop {
             match self.connect().await {
                 Ok(stream) => {
-                    emit!(UnixSocketConnectionEstablished { path: &self.path });
+                    emit!(&UnixSocketConnectionEstablished { path: &self.path });
                     return stream;
                 }
                 Err(error) => {
-                    emit!(UnixSocketConnectionFailed {
+                    emit!(&UnixSocketConnectionFailed {
                         error,
                         path: &self.path
                     });
@@ -133,7 +133,7 @@ impl UnixSink {
 #[async_trait]
 impl StreamSink for UnixSink {
     // Same as TcpSink, more details there.
-    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let encode_event = Arc::clone(&self.encode_event);
         let mut input = input
             .map(|mut event| {
@@ -146,7 +146,7 @@ impl StreamSink for UnixSink {
 
         while Pin::new(&mut input).peek().await.is_some() {
             let mut sink = self.connect().await;
-            let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
+            let _open_token = OpenGauge::new().open(|count| emit!(&ConnectionOpen { count }));
 
             let result = match sink
                 .send_all_peekable(&mut (&mut input).map(|item| item.item).peekable())
@@ -157,7 +157,7 @@ impl StreamSink for UnixSink {
             };
 
             if let Err(error) = result {
-                emit!(UnixSocketError {
+                emit!(&UnixSocketError {
                     error: &error,
                     path: &self.connector.path
                 });

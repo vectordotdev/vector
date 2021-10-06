@@ -221,7 +221,7 @@ impl Sink<Event> for PulsarSink {
         );
 
         let message = encode_event(item, &self.encoding, &self.avro_schema).map_err(|e| {
-            emit!(PulsarEncodeEventFailed {
+            emit!(&PulsarEncodeEventFailed {
                 error: &*e.to_string()
             })
         })?;

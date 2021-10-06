@@ -1,28 +1,32 @@
-use super::InternalEvent;
+// ## skip check-events ##
+
 use metrics::{counter, histogram};
 use std::time::Duration;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct ExecEventReceived<'a> {
+pub struct ExecEventsReceived<'a> {
+    pub count: usize,
     pub command: &'a str,
     pub byte_size: usize,
 }
 
-impl InternalEvent for ExecEventReceived<'_> {
+impl InternalEvent for ExecEventsReceived<'_> {
     fn emit_logs(&self) {
         trace!(
-            message = "Received one event.",
+            message = "Received events.",
+            count = self.count,
             command = %self.command,
         );
     }
 
     fn emit_metrics(&self) {
         counter!(
-            "component_received_events_total", 1,
+            "component_received_events_total", self.count as u64,
             "command" => self.command.to_owned(),
         );
         counter!(
-            "events_in_total", 1,
+            "events_in_total", self.count as u64,
             "command" => self.command.to_owned(),
         );
         counter!(

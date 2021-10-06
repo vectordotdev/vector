@@ -3,9 +3,9 @@
 mod integration_tests {
     use crate::config::SinkContext;
     use crate::rusoto::RegionOrEndpoint;
-    use crate::sinks::aws_s3::config::Encoding;
     use crate::sinks::aws_s3::S3SinkConfig;
     use crate::sinks::s3_common::config::S3Options;
+    use crate::sinks::util::encoding::StandardEncodings;
     use crate::sinks::util::BatchConfig;
     use crate::sinks::util::Compression;
     use crate::sinks::util::TowerRequestConfig;
@@ -220,7 +220,7 @@ mod integration_tests {
 
         let (_lines, events, receiver) = make_events_batch(1, 1);
         sink.run(events).await.unwrap();
-        assert_eq!(receiver.await, BatchStatus::Errored);
+        assert_eq!(receiver.await, BatchStatus::Failed);
 
         let objects = list_objects(&bucket, prefix.unwrap()).await;
         assert_eq!(objects, None);
@@ -268,7 +268,7 @@ mod integration_tests {
             filename_extension: None,
             options: S3Options::default(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
-            encoding: Encoding::Text.into(),
+            encoding: StandardEncodings::Text.into(),
             compression: Compression::None,
             batch: BatchConfig {
                 max_events: Some(batch_size),

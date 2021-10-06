@@ -17,7 +17,7 @@ pub async fn healthcheck(client: HttpClient, uri: Uri, api_key: String) -> crate
     let body = hyper::body::to_bytes(response.into_body()).await?;
 
     match status {
-        StatusCode::OK => Ok(()),
+        StatusCode::ACCEPTED => Ok(()),
         StatusCode::UNAUTHORIZED => {
             let json: serde_json::Value = serde_json::from_slice(&body[..])?;
 

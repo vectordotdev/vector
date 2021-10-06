@@ -20,18 +20,18 @@ pub struct EventsSubscription;
 
 #[Subscription]
 impl EventsSubscription {
-    /// A stream of events emitted from matched component(s)
-    pub async fn output_events<'a>(
+    /// A stream of events emitted from matched component ID patterns
+    pub async fn output_events_by_component_id_patterns<'a>(
         &'a self,
         ctx: &'a Context<'a>,
-        component_ids: Vec<String>,
+        patterns: Vec<String>,
         #[graphql(default = 500)] interval: u32,
         #[graphql(default = 100, validator(IntRange(min = "1", max = "10_000")))] limit: u32,
     ) -> impl Stream<Item = Vec<OutputEventsPayload>> + 'a {
         let watch_rx = ctx.data_unchecked::<WatchRx>().clone();
 
         // Client input is confined to `u32` to provide sensible bounds.
-        create_events_stream(watch_rx, component_ids, interval as u64, limit as usize)
+        create_events_stream(watch_rx, patterns, interval as u64, limit as usize)
     }
 }
 
@@ -40,7 +40,7 @@ impl EventsSubscription {
 /// all matching events; filtering should be done at the caller level.
 fn create_events_stream(
     watch_rx: WatchRx,
-    component_ids: Vec<String>,
+    component_id_patterns: Vec<String>,
     interval: u64,
     limit: usize,
 ) -> impl Stream<Item = Vec<OutputEventsPayload>> {
@@ -56,7 +56,7 @@ fn create_events_stream(
     tokio::spawn(async move {
         // Create a tap controller. When this drops out of scope, clean up will be performed on the
         // event handlers and topology observation that the tap controller provides.
-        let _tap_controller = TapController::new(watch_rx, tap_tx, &component_ids);
+        let _tap_controller = TapController::new(watch_rx, tap_tx, &component_id_patterns);
 
         // A tick interval to represent when to 'cut' the results back to the client.
         let mut interval = time::interval(time::Duration::from_millis(interval));

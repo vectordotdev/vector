@@ -22,9 +22,11 @@ Make sure to replace `{arch}` with one of the following:
 
 {{< tabs default="Uninstall Vector" >}}
 {{< tab title="Uninstall Vector" >}}
+
 ```shell
 sudo rpm -e vector
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 

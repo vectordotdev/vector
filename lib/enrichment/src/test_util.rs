@@ -67,3 +67,20 @@ pub(crate) fn get_table_registry() -> TableRegistry {
 
     registry
 }
+
+/// Create a table registry with dummy data
+pub(crate) fn get_table_registry_with_tables(
+    tables: Vec<(String, DummyEnrichmentTable)>,
+) -> TableRegistry {
+    let registry = TableRegistry::default();
+
+    let mut tablesmap: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
+
+    for (name, table) in tables.into_iter() {
+        tablesmap.insert(name, Box::new(table) as Box<dyn Table + Send + Sync>);
+    }
+
+    registry.load(tablesmap);
+
+    registry
+}

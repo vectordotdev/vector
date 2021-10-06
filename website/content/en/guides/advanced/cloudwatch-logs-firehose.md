@@ -9,6 +9,7 @@ tags: ["aws", "cloudwatch", "logs", "firehose", "advanced", "guides", "guide"]
 ---
 
 {{< requirement title="Pre-requisites" >}}
+
 * You have logs in [AWS CloudWatch Logs][AWS CloudWatch Logs] that you'd like to
   consume.
 * You are able to deploy Vector with a publicly exposed HTTPS endpoint.
@@ -25,11 +26,11 @@ running Vector instances over HTTPS.
 
 You will learn how to:
 
-- Configure Vector to consume AWS CloudWatch Log events via the
+* Configure Vector to consume AWS CloudWatch Log events via the
  [`aws_kinesis_firehose`][aws_kinesis_firehose]] source and
  [`aws_cloudwatch_logs_subscription_parser`][aws_cloudwatch_logs_subscription_parser]
  transform
-- Configure [AWS Kinesis Firehose][AWS Kinesis Firehose] to forward events to
+* Configure [AWS Kinesis Firehose][AWS Kinesis Firehose] to forward events to
   a remotely running Vector instance (or instances)
 
 Once completed, you'll have a setup that will receive events written to
@@ -49,13 +50,13 @@ Why use [AWS CloudWatch Logs subscriptions][AWS CloudWatch Logs subscriptions]
 and [AWS Kinesis Firehose][AWS Kinesis Firehose] to forward logs to Vector? This
 pipeline:
 
-- Is tolerant of downtime
-    - Firehose will retry requests for a configurable period
-    - Firehose will dead-letter events that cannot be sent to S3
-- Allows you to load balance the log ingestion
-    - You can put multiple `vector` instances behind a load balancer
-- Allows to ingest logs from multiple log groups
-    - You can use one Firehose delivery stream as the destination for multiple
+* Is tolerant of downtime
+  * Firehose will retry requests for a configurable period
+  * Firehose will dead-letter events that cannot be sent to S3
+* Allows you to load balance the log ingestion
+  * You can put multiple `vector` instances behind a load balancer
+* Allows to ingest logs from multiple log groups
+  * You can use one Firehose delivery stream as the destination for multiple
       CloudWatch Logs subscription filters
 
 ## Setup
@@ -542,12 +543,12 @@ This will take the above event and output two new events:
 Here we can see the individual events are extracted along with some additional
 context:
 
-- `id`: the ID of the log event
-- `log_group` the log_group of the log event
-- `log_stream` the log_stream of the log event
-- `owner` the AWS account ID of the owner of the log event
-- `subcription_filters` the filters that matched to send the event
-- `timestamp` is overwritten with the timestamp from the log event
+* `id`: the ID of the log event
+* `log_group` the log_group of the log event
+* `log_stream` the log_stream of the log event
+* `owner` the AWS account ID of the owner of the log event
+* `subcription_filters` the filters that matched to send the event
+* `timestamp` is overwritten with the timestamp from the log event
 
 This is pretty good, but, our original events are also JSON, so let's parse
 those out using the [`json_parser`][json_parser] transform:

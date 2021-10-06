@@ -39,6 +39,8 @@ jobs:
         dependencies: ${{ steps.filter.outputs.dependencies }}
         internal_events: ${{ steps.filter.outputs.internal_events }}
         helm: ${{ steps.filter.outputs.helm }}
+        cue: ${{ steps.filter.outputs.cue }}
+        markdown: ${{ steps.filter.outputs.cue }}
       steps:
       - uses: actions/checkout@v2.3.4
       - uses: dorny/paths-filter@v2
@@ -71,6 +73,8 @@ jobs:
               - 'scripts/cross/**'
             cue:
               - 'website/cue/**'
+            markdown:
+              - '**/**.md'
             internal_events:
               - 'src/internal_events/**'
             helm:
@@ -391,7 +395,12 @@ jobs:
         uses: EmbarkStudios/cargo-deny-action@v1.2.6
         with:
           command: check licenses
-
+      - name: Check Cue docs
+        if: needs.changes.outputs.cue == 'true'
+        run: make check-docs
+      - name: Check Markdown
+        if: needs.changes.outputs.markdown == 'true'
+        run: make check-markdown
   master-failure:
     name: master-failure
     if: failure() && github.ref == 'refs/heads/master'

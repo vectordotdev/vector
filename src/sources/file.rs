@@ -4,7 +4,9 @@ use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     encoding_transcode::{Decoder, Encoder},
     event::{BatchNotifier, Event, LogEvent},
-    internal_events::{FileEventReceived, FileOpen, FileSourceInternalEventsEmitter},
+    internal_events::{
+        FileBytesReceived, FileEventsReceived, FileOpen, FileSourceInternalEventsEmitter,
+    },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
     trace::{current_span, Instrument},
@@ -332,6 +334,10 @@ pub fn file_source(
             .map(futures::stream::iter)
             .flatten()
             .map(move |mut line| {
+                emit!(&FileBytesReceived {
+                    byte_size: line.text.len(),
+                    file: &line.filename,
+                });
                 // transcode each line from the file's encoding charset to utf8
                 line.text = match encoding_decoder.as_mut() {
                     Some(d) => d.decode_to_utf8(line.text),
@@ -387,7 +393,7 @@ pub fn file_source(
         spawn_blocking(move || {
             let _enter = span.enter();
             let result = file_server.run(tx, shutdown, checkpointer);
-            emit!(FileOpen { count: 0 });
+            emit!(&FileOpen { count: 0 });
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
             // passed to the `JoinHandle` error, similar to the usual threads.
@@ -447,7 +453,8 @@ fn create_event(
     hostname: &Option<String>,
     file_key: &Option<String>,
 ) -> Event {
-    emit!(FileEventReceived {
+    emit!(&FileEventsReceived {
+        count: 1,
         file: &file,
         byte_size: line.len(),
     });
@@ -476,6 +483,7 @@ mod tests {
         event::{EventStatus, Value},
         shutdown::ShutdownSignal,
         sources::file,
+        test_util::components::{self, SOURCE_TESTS},
     };
     use encoding_rs::UTF_16LE;
     use pretty_assertions::assert_eq;
@@ -1213,7 +1221,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received=run_file_source(&config, false, NoAcks, async {
+        let received = run_file_source(&config, false, NoAcks, async {
             let mut file = File::create(&path).unwrap();
 
             sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
@@ -1640,6 +1648,8 @@ mod tests {
         acking_mode: AckingMode,
         inner: impl Future<Output = ()>,
     ) -> Vec<Event> {
+        components::init();
+
         let (tx, rx) = if acking_mode == Acks {
             let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
             (tx, rx.boxed())
@@ -1662,6 +1672,7 @@ mod tests {
         if wait_shutdown {
             shutdown_done.await;
         }
+        SOURCE_TESTS.assert(&["file"]);
         result
     }
 

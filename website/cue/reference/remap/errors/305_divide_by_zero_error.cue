@@ -14,7 +14,7 @@ remap: errors: "305": {
 		If you know that a value is necessarily zero, don't divide by it. If a value *could* be
 		zero, capture the potential error thrown by the operation:
 
-		```ruby
+		```coffee
 		result, err = 27 / .some_value
 		if err != nil {
 			# Handle error

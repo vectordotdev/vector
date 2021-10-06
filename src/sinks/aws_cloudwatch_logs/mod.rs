@@ -438,7 +438,7 @@ fn partition_encode(
     let group = match group.render_string(&event) {
         Ok(b) => b,
         Err(error) => {
-            emit!(TemplateRenderingFailed {
+            emit!(&TemplateRenderingFailed {
                 error,
                 field: Some("group"),
                 drop_event: true,
@@ -450,7 +450,7 @@ fn partition_encode(
     let stream = match stream.render_string(&event) {
         Ok(b) => b,
         Err(error) => {
-            emit!(TemplateRenderingFailed {
+            emit!(&TemplateRenderingFailed {
                 error,
                 field: Some("stream"),
                 drop_event: true,

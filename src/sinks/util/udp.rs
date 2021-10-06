@@ -139,11 +139,11 @@ impl UdpConnector {
         loop {
             match self.connect().await {
                 Ok(socket) => {
-                    emit!(UdpSocketConnectionEstablished {});
+                    emit!(&UdpSocketConnectionEstablished {});
                     return socket;
                 }
                 Err(error) => {
-                    emit!(UdpSocketConnectionFailed { error });
+                    emit!(&UdpSocketConnectionFailed { error });
                     sleep(backoff.next().unwrap()).await;
                 }
             }
@@ -247,7 +247,7 @@ impl UdpSink {
 
 #[async_trait]
 impl StreamSink for UdpSink {
-    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mut input = input.peekable();
 
         while Pin::new(&mut input).peek().await.is_some() {
@@ -261,13 +261,13 @@ impl StreamSink for UdpSink {
                 };
 
                 match udp_send(&mut socket, &input).await {
-                    Ok(()) => emit!(SocketEventsSent {
+                    Ok(()) => emit!(&SocketEventsSent {
                         mode: SocketMode::Udp,
                         count: 1,
                         byte_size: input.len(),
                     }),
                     Err(error) => {
-                        emit!(UdpSocketError { error });
+                        emit!(&UdpSocketError { error });
                         break;
                     }
                 };
@@ -281,7 +281,7 @@ impl StreamSink for UdpSink {
 async fn udp_send(socket: &mut UdpSocket, buf: &[u8]) -> tokio::io::Result<()> {
     let sent = socket.send(buf).await?;
     if sent != buf.len() {
-        emit!(UdpSendIncomplete {
+        emit!(&UdpSendIncomplete {
             data_size: buf.len(),
             sent,
         });

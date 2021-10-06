@@ -618,7 +618,7 @@
           {{ if $infallible }}
           {{ partial "badge.html" (dict "word" "infallible" "color" "blue") }}
           {{ else }}
-          {{ partial "badge.html" (dict "word" "fallible" "color" "red") }}
+          {{ partial "badge.html" (dict "word" "fallible" "color" "yellow") }}
           {{ end }}
         </span>
       </span>
@@ -806,7 +806,7 @@
         {{ $vrlSourceCode }}
 
         {{ if .raises }}
-        {{ $errorCode := highlight .raises.compiletime "ruby" "" }}
+        {{ $errorCode := highlight .raises.compiletime "rust" "" }}
         <span>
           ...you should see this error:
         </span>
@@ -953,7 +953,7 @@
                   VRL program
                 </span>
 
-                {{ highlight . "ruby" "" }}
+                {{ highlight . "coffee" "" }}
               </div>
               {{ end }}
 
@@ -1001,7 +1001,7 @@
 
       <div class="mt-2 border rounded p-4 dark:border-gray-700">
         <div>
-          {{ highlight .source "ruby" "" }}
+          {{ highlight .source "coffee" "" }}
         </div>
 
         {{ with .definitions }}
@@ -1084,7 +1084,7 @@
             </span>
 
             <div class="mt-1">
-              {{ highlight .source "ruby" "" }}
+              {{ highlight .source "coffee" "" }}
             </div>
           </div>
 
@@ -1181,7 +1181,7 @@
 
         <div class="mt-2 flex flex-col space-y-2 text-sm">
           {{ range . }}
-          {{ highlight . "ruby" "" }}
+          {{ highlight . "coffee" "" }}
           {{ end }}
         </div>
       </div>
@@ -1791,6 +1791,13 @@
     <code>{{ . }}</code>
     {{ end }}
   </td>
+  <td>
+    {{ if .required }}
+    <span>yes</span>
+    {{ else }}
+    <span>no</span>
+    {{ end }}
+  </td>
 </tr>
 {{ end }}
 
@@ -1811,6 +1818,9 @@
       </th>
       <th class="w-1/6">
         Default
+      </th>
+      <th>
+        Required?
       </th>
     </tr>
   </thead>

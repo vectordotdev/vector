@@ -395,14 +395,14 @@ impl Source {
             );
             let file_info = annotator.annotate(&mut event, &line.filename);
 
-            emit!(KubernetesLogsEventReceived {
+            emit!(&KubernetesLogsEventReceived {
                 file: &line.filename,
                 byte_size,
                 pod_name: file_info.as_ref().map(|info| info.pod_name),
             });
 
             if file_info.is_none() {
-                emit!(KubernetesLogsEventAnnotationFailed { event: &event });
+                emit!(&KubernetesLogsEventAnnotationFailed { event: &event });
             } else {
                 let namespace = file_info.as_ref().map(|info| info.pod_namespace);
 
@@ -410,7 +410,7 @@ impl Source {
                     let ns_info = ns_annotator.annotate(&mut event, name);
 
                     if ns_info.is_none() {
-                        emit!(KubernetesLogsEventNamespaceAnnotationFailed { event: &event });
+                        emit!(&KubernetesLogsEventNamespaceAnnotationFailed { event: &event });
                     }
                 }
             }
