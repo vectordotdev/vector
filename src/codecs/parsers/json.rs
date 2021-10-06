@@ -13,6 +13,15 @@ use std::convert::TryInto;
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct JsonParserConfig {
     #[serde(default)]
+    json: JsonParserOptions,
+}
+
+/// Options for building a `JsonParser`.
+#[derive(Debug, Clone, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
+pub struct JsonParserOptions {
+    #[serde(default = "crate::serde::default_true")]
+    #[derivative(Default(value = "true"))]
     skip_empty: bool,
 }
 
@@ -31,7 +40,9 @@ impl JsonParserConfig {
 
     /// Creates a new `JsonParserConfig` with the provided options.
     pub const fn new_with_options(skip_empty: bool) -> Self {
-        Self { skip_empty }
+        Self {
+            json: JsonParserOptions { skip_empty },
+        }
     }
 }
 
@@ -88,7 +99,7 @@ impl Parser for JsonParser {
 impl From<&JsonParserConfig> for JsonParser {
     fn from(config: &JsonParserConfig) -> Self {
         Self {
-            skip_empty: config.skip_empty,
+            skip_empty: config.json.skip_empty,
         }
     }
 }
