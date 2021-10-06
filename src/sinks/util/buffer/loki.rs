@@ -13,9 +13,11 @@ use crate::{
     sinks::loki::OutOfOrderAction,
 };
 use dashmap::DashMap;
+use serde::{ser::SerializeSeq, Serialize};
 use serde_json::{json, value::to_raw_value};
 use std::collections::HashMap;
 use std::sync::Arc;
+use vector_core::ByteSizeOf;
 
 const WRAPPER_OVERHEAD: usize = r#"{"streams":[]}"#.len();
 const STREAM_OVERHEAD: usize = r#"{"stream":{},"values":[]}"#.len();
@@ -23,10 +25,44 @@ const LABEL_OVERHEAD: usize = r#""":"""#.len();
 
 pub type Labels = Vec<(String, String)>;
 
+#[derive(Debug, Default, Serialize)]
+pub struct LokiBatch {
+    stream: HashMap<String, String>,
+    values: Vec<LokiEvent>,
+}
+
+impl From<Vec<LokiRecord>> for LokiBatch {
+    fn from(events: Vec<LokiRecord>) -> Self {
+        events.into_iter().fold(Self::default(), |mut res, item| {
+            res.stream.extend(item.labels.into_iter());
+            res.values.push(item.event);
+            res
+        })
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct LokiEvent {
     pub timestamp: i64,
     pub event: String,
+}
+
+impl ByteSizeOf for LokiEvent {
+    fn allocated_bytes(&self) -> usize {
+        self.timestamp.allocated_bytes() + self.event.allocated_bytes()
+    }
+}
+
+impl Serialize for LokiEvent {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(2))?;
+        seq.serialize_element(&self.timestamp)?;
+        seq.serialize_element(&self.event)?;
+        seq.end()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -34,6 +70,16 @@ pub struct LokiRecord {
     pub partition: PartitionKey,
     pub labels: Labels,
     pub event: LokiEvent,
+}
+
+impl ByteSizeOf for LokiRecord {
+    fn allocated_bytes(&self) -> usize {
+        self.partition.allocated_bytes()
+            + self.labels.iter().fold(0, |res, item| {
+                res + item.0.allocated_bytes() + item.1.allocated_bytes()
+            })
+            + self.event.allocated_bytes()
+    }
 }
 
 #[derive(Debug)]
@@ -58,6 +104,16 @@ impl From<&LokiEvent> for LokiEncodedEvent {
 pub struct PartitionKey {
     pub tenant_id: Option<String>,
     labels: String,
+}
+
+impl ByteSizeOf for PartitionKey {
+    fn allocated_bytes(&self) -> usize {
+        self.tenant_id
+            .as_ref()
+            .map(|value| value.allocated_bytes())
+            .unwrap_or(0)
+            + self.labels.allocated_bytes()
+    }
 }
 
 impl PartitionKey {

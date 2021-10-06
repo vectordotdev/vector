@@ -1,17 +1,21 @@
 use super::config::{Encoding, LokiConfig, OutOfOrderAction};
+use super::service::LokiService;
 use crate::config::log_schema;
-use crate::http::Auth;
+use crate::config::SinkContext;
+use crate::http::{Auth, HttpClient};
 use crate::internal_events::{
     LokiEventUnlabeled, LokiEventsProcessed, LokiOutOfOrderEventDropped,
     LokiOutOfOrderEventRewritten, TemplateRenderingFailed,
 };
 use crate::sinks::util::buffer::loki::{
-    GlobalTimestamps, Labels, LokiEvent, LokiRecord, PartitionKey,
+    GlobalTimestamps, Labels, LokiBatch, LokiEvent, LokiRecord, PartitionKey,
 };
 use crate::sinks::util::encoding::{EncodingConfig, EncodingConfiguration};
 use crate::sinks::util::UriSerde;
 use crate::template::Template;
-use futures::stream::{BoxStream, Stream};
+use futures::stream::{BoxStream, Stream, StreamExt};
+use http::Request;
+use hyper::Body;
 use pin_project::pin_project;
 use shared::encode_logfmt;
 use std::collections::HashMap;
@@ -19,8 +23,11 @@ use std::num::NonZeroUsize;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use tokio::sync::mpsc::channel;
-use vector_core::event::{self, Event, Value};
+use tokio::sync::mpsc;
+use tower::{Service, ServiceExt};
+use tracing_futures::Instrument;
+use vector_core::buffers::Acker;
+use vector_core::event::{self, Event, EventStatus, Value};
 use vector_core::partition::Partitioner;
 use vector_core::sink::StreamSink;
 use vector_core::stream::batcher::Batcher;
@@ -82,11 +89,11 @@ impl RequestBuilder {
     fn build(
         &self,
         key: PartitionKey,
-        json: serde_json::Value,
-    ) -> crate::Result<http::Request<Vec<u8>>> {
+        value: Vec<LokiRecord>,
+    ) -> crate::Result<http::Request<hyper::Body>> {
         let tenant_id = key.tenant_id;
-
-        let body = serde_json::to_vec(&json).unwrap();
+        let batch = LokiBatch::from(value);
+        let body = serde_json::to_vec(&batch)?;
 
         emit!(&LokiEventsProcessed {
             byte_size: body.len(),
@@ -98,6 +105,7 @@ impl RequestBuilder {
             req = req.header("X-Scope-OrgID", tenant_id);
         }
 
+        let body = hyper::Body::from(body);
         let mut req = req.body(body).unwrap();
 
         if let Some(auth) = &self.auth {
@@ -109,7 +117,7 @@ impl RequestBuilder {
 }
 
 #[derive(Clone)]
-struct EventEncoder {
+pub(super) struct EventEncoder {
     key_partitioner: KeyPartitioner,
     encoding: EncodingConfig<Encoding>,
     labels: HashMap<Template, Template>,
@@ -146,7 +154,7 @@ impl EventEncoder {
         }
     }
 
-    fn encode_event(&self, mut event: Event) -> LokiRecord {
+    pub(super) fn encode_event(&self, mut event: Event) -> LokiRecord {
         let tenant_id = self.key_partitioner.partition(&event);
         let mut labels = self.build_labels(&event);
         self.remove_label_fields(&mut event);
@@ -285,8 +293,10 @@ where
 
 #[derive(Clone)]
 pub struct LokiSink {
+    acker: Acker,
+    client: HttpClient,
     request_builder: RequestBuilder,
-    encoder: EventEncoder,
+    pub(super) encoder: EventEncoder,
     max_batch_size: usize,
     max_batch_bytes: usize,
     timeout: Duration,
@@ -295,8 +305,10 @@ pub struct LokiSink {
 
 impl LokiSink {
     #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
-    pub fn new(config: LokiConfig) -> crate::Result<Self> {
+    pub fn new(config: LokiConfig, client: HttpClient, cx: SinkContext) -> crate::Result<Self> {
         Ok(Self {
+            acker: cx.acker(),
+            client,
             request_builder: RequestBuilder::new(config.endpoint, config.auth),
             encoder: EventEncoder {
                 key_partitioner: KeyPartitioner::new(config.tenant_id),
@@ -317,7 +329,10 @@ impl LokiSink {
 impl StreamSink for LokiSink {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let io_bandwidth = 64;
-        let (io_tx, io_rx) = channel(io_bandwidth);
+        let (io_tx, io_rx) = mpsc::channel::<Request<Body>>(io_bandwidth);
+        let service = tower::ServiceBuilder::new().service(LokiService::new(self.client.clone()));
+        let io = run_io(io_rx, service, self.acker).in_current_span();
+        let _ = tokio::spawn(io);
 
         let filter = FilterEncoder::new(
             input,
@@ -327,6 +342,7 @@ impl StreamSink for LokiSink {
         );
 
         let record_partitionner = RecordPartitionner;
+        let request_builder = self.request_builder.clone();
 
         let batcher = Batcher::new(
             filter,
@@ -335,7 +351,10 @@ impl StreamSink for LokiSink {
             NonZeroUsize::new(self.max_batch_size).unwrap(),
             NonZeroUsize::new(self.max_batch_bytes),
         )
-        .map(|(key, value)| tokio::spawn(async move { self.request_builder.build(key, value) }))
+        .map(|(key, value)| {
+            let builder = request_builder.clone();
+            tokio::spawn(async move { builder.build(key, value) })
+        })
         .buffer_unordered(io_bandwidth);
 
         tokio::pin!(batcher);
@@ -367,17 +386,32 @@ impl StreamSink for LokiSink {
     }
 }
 
-// #[async_trait::async_trait]
-// impl HttpSink for LokiSink {
-//     type Input = PartitionInnerBuffer<LokiRecord, PartitionKey>;
-//     type Output = PartitionInnerBuffer<serde_json::Value, PartitionKey>;
-
-//     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
-//         self.encoder.encode_event(event)
-//     }
-
-//     async fn build_request(&self, output: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
-//         let (key, value) = output.into_parts();
-//         self.request_builder.build(key, value)
-//     }
-// }
+async fn run_io<S>(mut rx: mpsc::Receiver<http::Request<Body>>, mut service: S, acker: Acker)
+where
+    S: Service<http::Request<Body>>,
+    S::Future: Send + 'static,
+    S::Response: AsRef<EventStatus> + Send + 'static,
+    S::Error: std::fmt::Debug + Into<crate::Error> + Send,
+{
+    let mut seqno = 0;
+    while let Some(req) = rx.recv().await {
+        let svc = service
+            .ready()
+            .await
+            .expect("should not get error when waiting for svc readiness");
+        let size = req.body().size_hint().0;
+        let result = svc
+            .call(req)
+            .instrument(info_span!("request", request_id = %seqno))
+            .await
+            .map(|res| *res.as_ref())
+            .map_err(|error| {
+                error!("Sink IO failed with error: {:?}.", error);
+                EventStatus::Failed
+            });
+        if result.is_ok() {
+            acker.ack(size);
+        }
+        seqno += 1;
+    }
+}

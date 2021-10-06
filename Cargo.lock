@@ -2676,7 +2676,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "mach",
- "nix 0.20.2",
+ "nix 0.20.1",
  "pin-utils",
  "uom",
  "winapi 0.3.9",
@@ -2758,7 +2758,7 @@ dependencies = [
  "heim-runtime",
  "libc",
  "macaddr",
- "nix 0.20.2",
+ "nix 0.20.1",
  "widestring",
  "winapi 0.3.9",
 ]
@@ -3946,9 +3946,9 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.20.2"
+version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5e06129fb611568ef4e868c14b326274959aa70ff7776e9d55323531c374945"
+checksum = "df8e5e343312e7fbeb2a52139114e9e702991ef9c2aea6817ff2440b35647d56"
 dependencies = [
  "bitflags",
  "cc",

@@ -3,7 +3,7 @@ use super::sink::LokiSink;
 use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
 use crate::http::{Auth, HttpClient, MaybeAuth};
 use crate::sinks::util::encoding::EncodingConfig;
-use crate::sinks::util::{BatchConfig, Concurrency, TowerRequestConfig, UriSerde};
+use crate::sinks::util::{BatchConfig, TowerRequestConfig, UriSerde};
 use crate::sinks::VectorSink;
 use crate::template::Template;
 use crate::tls::{TlsOptions, TlsSettings};
@@ -67,58 +67,10 @@ impl GenerateConfig for LokiConfig {
 }
 
 impl LokiConfig {
-    fn build_client(&self, cx: SinkContext) -> crate::Result<HttpClient> {
+    pub(super) fn build_client(&self, cx: SinkContext) -> crate::Result<HttpClient> {
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls, cx.proxy())?;
         Ok(client)
-    }
-
-    pub fn build_processor(&self, cx: SinkContext) -> crate::Result<VectorSink> {
-        if self.labels.is_empty() {
-            return Err("`labels` must include at least one label.".into());
-        }
-
-        for label in self.labels.keys() {
-            if !valid_label_name(label) {
-                return Err(format!("Invalid label name {:?}", label.get_ref()).into());
-            }
-        }
-
-        let request_settings = self.request.unwrap_with(&TowerRequestConfig {
-            concurrency: Concurrency::Fixed(5),
-            ..Default::default()
-        });
-
-        // let batch_settings = BatchSettings::default()
-        //     .bytes(102_400)
-        //     .events(100_000)
-        //     .timeout(1)
-        //     .parse_config(self.batch)?;
-        let client = self.build_client(cx)?;
-
-        let config = LokiConfig {
-            auth: self.auth.choose_one(&self.endpoint.auth)?,
-            ..self.clone()
-        };
-
-        let sink = LokiSink::new(config.clone())?;
-
-        // let sink = PartitionHttpSink::new(
-        //     sink,
-        //     PartitionBuffer::new(LokiBuffer::new(
-        //         batch_settings.size,
-        //         GlobalTimestamps::default(),
-        //         config.out_of_order_action.clone(),
-        //     )),
-        //     request_settings,
-        //     batch_settings.timeout,
-        //     client.clone(),
-        //     cx.acker(),
-        // )
-        // .ordered()
-        // .sink_map_err(|error| error!(message = "Fatal loki sink error.", %error));
-
-        Ok(VectorSink::Stream(Box::new(sink)))
     }
 }
 
@@ -139,40 +91,14 @@ impl SinkConfig for LokiConfig {
             }
         }
 
-        let request_settings = self.request.unwrap_with(&TowerRequestConfig {
-            concurrency: Concurrency::Fixed(5),
-            ..Default::default()
-        });
-
-        // let batch_settings = BatchSettings::default()
-        //     .bytes(102_400)
-        //     .events(100_000)
-        //     .timeout(1)
-        //     .parse_config(self.batch)?;
-        let tls = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(tls, cx.proxy())?;
+        let client = self.build_client(cx.clone())?;
 
         let config = LokiConfig {
             auth: self.auth.choose_one(&self.endpoint.auth)?,
             ..self.clone()
         };
 
-        let sink = LokiSink::new(config.clone())?;
-
-        // let sink = PartitionHttpSink::new(
-        //     sink,
-        //     PartitionBuffer::new(LokiBuffer::new(
-        //         batch_settings.size,
-        //         GlobalTimestamps::default(),
-        //         config.out_of_order_action.clone(),
-        //     )),
-        //     request_settings,
-        //     batch_settings.timeout,
-        //     client.clone(),
-        //     cx.acker(),
-        // )
-        // .ordered()
-        // .sink_map_err(|error| error!(message = "Fatal loki sink error.", %error));
+        let sink = LokiSink::new(config.clone(), client.clone(), cx)?;
 
         let healthcheck = healthcheck(config, client).boxed();
 
@@ -188,7 +114,7 @@ impl SinkConfig for LokiConfig {
     }
 }
 
-fn valid_label_name(label: &Template) -> bool {
+pub(super) fn valid_label_name(label: &Template) -> bool {
     label.is_dynamic() || {
         // Loki follows prometheus on this https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
         // Although that isn't explicitly said anywhere besides what's in the code.

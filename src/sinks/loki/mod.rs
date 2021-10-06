@@ -12,6 +12,7 @@
 //! does not match, we will add a default label `{agent="vector"}`.
 mod config;
 mod healthcheck;
+mod service;
 mod sink;
 
 use crate::config::SinkDescription;
@@ -31,7 +32,6 @@ mod tests {
     use crate::config::ProxyConfig;
     use crate::event::Event;
     use crate::http::HttpClient;
-    use crate::sinks::util::http::HttpSink;
     use crate::sinks::util::test::{build_test_server, load_sink};
     use crate::test_util;
     use crate::tls::TlsSettings;
@@ -44,7 +44,7 @@ mod tests {
 
     #[test]
     fn interpolate_labels() {
-        let (config, _cx) = load_sink::<LokiConfig>(
+        let (config, cx) = load_sink::<LokiConfig>(
             r#"
             endpoint = "http://localhost:3100"
             labels = {label1 = "{{ foo }}", label2 = "some-static-label", label3 = "{{ foo }}", "{{ foo }}" = "{{ foo }}"}
@@ -53,13 +53,14 @@ mod tests {
         "#,
         )
         .unwrap();
-        let sink = LokiSink::new(config);
+        let client = config.build_client(cx.clone()).unwrap();
+        let sink = LokiSink::new(config, client, cx).unwrap();
 
         let mut e1 = Event::from("hello world");
 
         e1.as_mut_log().insert("foo", "bar");
 
-        let mut record = sink.encode_event(e1).unwrap().into_parts().0;
+        let mut record = sink.encoder.encode_event(e1);
 
         // HashMap -> Vec doesn't like keeping ordering
         record.labels.sort();
@@ -84,7 +85,7 @@ mod tests {
 
     #[test]
     fn use_label_from_dropped_fields() {
-        let (config, _cx) = load_sink::<LokiConfig>(
+        let (config, cx) = load_sink::<LokiConfig>(
             r#"
             endpoint = "http://localhost:3100"
             labels.bar = "{{ foo }}"
@@ -93,13 +94,14 @@ mod tests {
         "#,
         )
         .unwrap();
-        let sink = LokiSink::new(config);
+        let client = config.build_client(cx.clone()).unwrap();
+        let sink = LokiSink::new(config, client, cx).unwrap();
 
         let mut e1 = Event::from("hello world");
 
         e1.as_mut_log().insert("foo", "bar");
 
-        let record = sink.encode_event(e1).unwrap().into_parts().0;
+        let record = sink.encoder.encode_event(e1);
 
         let expected_line = serde_json::to_string(&serde_json::json!({
             "message": "hello world",
@@ -178,7 +180,8 @@ mod tests {
 #[cfg(feature = "loki-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use super::config::valid_label_name;
+    use super::config::{valid_label_name, LokiConfig, OutOfOrderAction};
+    use crate::config::log_schema;
     use crate::{
         config::SinkConfig,
         sinks::util::test::load_sink,
