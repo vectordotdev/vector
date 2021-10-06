@@ -172,20 +172,6 @@ components: sources: [Name=string]: {
 								syntax: "literal"
 							}
 						}
-						json: {
-							description:   "Options for `json` decoding."
-							required:      false
-							common:        false
-							relevant_when: "codec = `json`"
-							type: object: options: {
-								skip_empty: {
-									description: "Whether empty frames are skipped without warning. Since NDJSON allows multiple empty newlines, these are silently ignored by default. When disabling this option, the JSON parser emits an error for unexpected end of input."
-									required:    false
-									common:      false
-									type: bool: default: true
-								}
-							}
-						}
 					}
 				}
 			}

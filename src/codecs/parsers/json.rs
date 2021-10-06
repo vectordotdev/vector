@@ -11,19 +11,7 @@ use std::convert::TryInto;
 
 /// Config used to build a `JsonParser`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct JsonParserConfig {
-    #[serde(default)]
-    json: JsonParserOptions,
-}
-
-/// Options for building a `JsonParser`.
-#[derive(Debug, Clone, Derivative, Deserialize, Serialize)]
-#[derivative(Default)]
-pub struct JsonParserOptions {
-    #[serde(default = "crate::serde::default_true")]
-    #[derivative(Default(value = "true"))]
-    skip_empty: bool,
-}
+pub struct JsonParserConfig;
 
 #[typetag::serde(name = "json")]
 impl ParserConfig for JsonParserConfig {
@@ -37,36 +25,24 @@ impl JsonParserConfig {
     pub fn new() -> Self {
         Default::default()
     }
-
-    /// Creates a new `JsonParserConfig` with the provided options.
-    pub const fn new_with_options(skip_empty: bool) -> Self {
-        Self {
-            json: JsonParserOptions { skip_empty },
-        }
-    }
 }
 
 /// Parser that builds `Event`s from a byte frame containing JSON.
 #[derive(Debug, Clone, Default)]
-pub struct JsonParser {
-    skip_empty: bool,
-}
+pub struct JsonParser;
 
 impl JsonParser {
     /// Creates a new `JsonParser`.
     pub fn new() -> Self {
         Default::default()
     }
-
-    /// Creates a new `JsonParser` with the provided options.
-    pub const fn new_with_options(skip_empty: bool) -> Self {
-        Self { skip_empty }
-    }
 }
 
 impl Parser for JsonParser {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
-        if self.skip_empty && bytes.is_empty() {
+        // It's common to receive empty frames when parsing NDJSON, since it
+        // allows multiple empty newlines. We proceed without a warning here.
+        if bytes.is_empty() {
             return Ok(smallvec![]);
         }
 
@@ -97,10 +73,8 @@ impl Parser for JsonParser {
 }
 
 impl From<&JsonParserConfig> for JsonParser {
-    fn from(config: &JsonParserConfig) -> Self {
-        Self {
-            skip_empty: config.json.skip_empty,
-        }
+    fn from(_: &JsonParserConfig) -> Self {
+        Self
     }
 }
 
@@ -155,7 +129,7 @@ mod tests {
     #[test]
     fn skip_empty() {
         let input = Bytes::from("");
-        let parser = JsonParser::new_with_options(true);
+        let parser = JsonParser::new();
 
         let events = parser.parse(input).unwrap();
         let mut events = events.into_iter();
@@ -167,14 +141,6 @@ mod tests {
     fn error_invalid_json() {
         let input = Bytes::from("{ foo");
         let parser = JsonParser::new();
-
-        assert!(parser.parse(input).is_err());
-    }
-
-    #[test]
-    fn error_empty() {
-        let input = Bytes::from("");
-        let parser = JsonParser::new_with_options(false);
 
         assert!(parser.parse(input).is_err());
     }
