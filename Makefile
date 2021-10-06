@@ -378,7 +378,7 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh gcp start
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features "gcp-integration-tests gcp-pubsub-integration-tests gcp-cloud-storage-integration-tests" \
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features "gcp-integration-tests gcp-pubsub-integration-tests gcp-cloud-storage-integration-tests gcp-bigquery-integration-tests" \
 	 --lib ::gcp::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh gcp stop
