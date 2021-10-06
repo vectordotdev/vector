@@ -119,7 +119,7 @@ tokio-util = { version = "0.6.8", default-features = false, features = ["codec",
 console-subscriber = { git = "https://github.com/tokio-rs/console", rev = "f2c30d52c9f22de69bac38009a9183135808806c",  optional = true }
 
 # Tracing
-tracing = { version = "0.1.28", default-features = false }
+tracing = { version = "0.1.29", default-features = false }
 tracing-core = { version = "0.1.21", default-features = false }
 tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-03"] }
 tracing-log = { version = "0.1.2", default-features = false }

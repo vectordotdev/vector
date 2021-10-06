@@ -819,7 +819,7 @@ dependencies = [
  "tempdir",
  "tokio",
  "tokio-test",
- "tracing 0.1.28",
+ "tracing 0.1.29",
 ]
 
 [[package]]
@@ -1140,7 +1140,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tonic",
- "tracing 0.1.28",
+ "tracing 0.1.29",
  "tracing-core 0.1.21",
  "tracing-subscriber",
 ]
@@ -1644,7 +1644,7 @@ dependencies = [
  "snafu",
  "strum_macros 0.21.1",
  "thiserror",
- "tracing 0.1.28",
+ "tracing 0.1.29",
  "vrl-compiler",
 ]
 
@@ -2120,7 +2120,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
- "tracing 0.1.28",
+ "tracing 0.1.29",
  "winapi 0.3.9",
 ]
 
@@ -2561,7 +2561,7 @@ dependencies = [
  "slab",
  "tokio",
  "tokio-util",
- "tracing 0.1.28",
+ "tracing 0.1.29",
 ]
 
 [[package]]
@@ -2895,7 +2895,7 @@ dependencies = [
  "socket2 0.4.2",
  "tokio",
  "tower-service",
- "tracing 0.1.28",
+ "tracing 0.1.29",
  "want",
 ]
 
@@ -3203,7 +3203,7 @@ dependencies = [
  "reqwest",
  "serde_json",
  "tokio",
- "tracing 0.1.28",
+ "tracing 0.1.29",
 ]
 
 [[package]]
@@ -3463,7 +3463,7 @@ dependencies = [
  "serde",
  "serde_json",
  "snafu",
- "tracing 0.1.28",
+ "tracing 0.1.29",
 ]
 
 [[package]]
@@ -3651,7 +3651,7 @@ dependencies = [
  "metrics",
  "metrics-util",
  "once_cell",
- "tracing 0.1.28",
+ "tracing 0.1.29",
  "tracing-core 0.1.21",
  "tracing-subscriber",
 ]
@@ -6106,7 +6106,7 @@ dependencies = [
  "serde",
  "serde_json",
  "snafu",
- "tracing 0.1.28",
+ "tracing 0.1.29",
 ]
 
 [[package]]
@@ -6798,7 +6798,7 @@ dependencies = [
  "pin-project-lite",
  "signal-hook-registry",
  "tokio-macros",
- "tracing 0.1.28",
+ "tracing 0.1.29",
  "winapi 0.3.9",
 ]
 
@@ -6982,7 +6982,7 @@ dependencies = [
  "tower",
  "tower-layer",
  "tower-service",
- "tracing 0.1.28",
+ "tracing 0.1.29",
  "tracing-futures 0.2.5",
 ]
 
@@ -7015,7 +7015,7 @@ dependencies = [
  "tokio-util",
  "tower-layer",
  "tower-service",
- "tracing 0.1.28",
+ "tracing 0.1.29",
 ]
 
 [[package]]
@@ -7056,14 +7056,14 @@ dependencies = [
 
 [[package]]
 name = "tracing"
-version = "0.1.28"
+version = "0.1.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84f96e095c0c82419687c20ddf5cb3eadb61f4e1405923c9dc8e53a1adacbda8"
+checksum = "375a639232caf30edfc78e8d89b2d4c375515393e7af7e16f01cd96917fb2105"
 dependencies = [
  "cfg-if 1.0.0",
  "log",
  "pin-project-lite",
- "tracing-attributes 0.1.16",
+ "tracing-attributes 0.1.18",
  "tracing-core 0.1.21",
 ]
 
@@ -7079,9 +7079,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-attributes"
-version = "0.1.16"
+version = "0.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98863d0dd09fa59a1b79c6750ad80dbda6b75f4e71c437a6a1a8cb91a8bcbd77"
+checksum = "f4f480b8f81512e825f337ad51e94c1eb5d3bbdf2b363dcd01e2b19a9ffe3f8e"
 dependencies = [
  "proc-macro2 1.0.29",
  "quote 1.0.9",
@@ -7114,7 +7114,7 @@ dependencies = [
  "futures 0.3.17",
  "futures-task",
  "pin-project 1.0.8",
- "tracing 0.1.28",
+ "tracing 0.1.29",
 ]
 
 [[package]]
@@ -7134,7 +7134,7 @@ dependencies = [
  "criterion",
  "dashmap",
  "mock_instant",
- "tracing 0.1.28",
+ "tracing 0.1.29",
  "tracing-core 0.1.21",
  "tracing-subscriber",
 ]
@@ -7176,7 +7176,7 @@ dependencies = [
  "sharded-slab",
  "smallvec",
  "thread_local",
- "tracing 0.1.28",
+ "tracing 0.1.29",
  "tracing-core 0.1.21",
  "tracing-log",
  "tracing-serde",
@@ -7671,7 +7671,7 @@ dependencies = [
  "tower",
  "tower-layer",
  "tower-test",
- "tracing 0.1.28",
+ "tracing 0.1.29",
  "tracing-core 0.1.21",
  "tracing-futures 0.2.5",
  "tracing-limit",
@@ -7771,7 +7771,7 @@ dependencies = [
  "tokio-util",
  "toml",
  "tower",
- "tracing 0.1.28",
+ "tracing 0.1.29",
  "tracing-core 0.1.21",
  "tracing-log",
  "tracing-subscriber",
@@ -7845,7 +7845,7 @@ dependencies = [
  "serde",
  "shared",
  "thiserror",
- "tracing 0.1.28",
+ "tracing 0.1.29",
  "vrl-diagnostic",
  "vrl-parser",
 ]
@@ -7906,7 +7906,7 @@ dependencies = [
  "shared",
  "strip-ansi-escapes",
  "syslog_loose",
- "tracing 0.1.28",
+ "tracing 0.1.29",
  "uaparser",
  "url",
  "uuid",
@@ -8017,7 +8017,7 @@ dependencies = [
  "tokio-tungstenite",
  "tokio-util",
  "tower-service",
- "tracing 0.1.28",
+ "tracing 0.1.29",
 ]
 
 [[package]]
