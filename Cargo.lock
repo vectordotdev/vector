@@ -804,6 +804,7 @@ name = "buffers"
 version = "0.1.0"
 dependencies = [
  "bytes 1.1.0",
+ "core_common",
  "criterion",
  "db-key",
  "futures 0.3.17",
