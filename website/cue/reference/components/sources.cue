@@ -183,7 +183,6 @@ components: sources: [Name=string]: {
 									required:    false
 									common:      false
 									type: bool: default: false
-									relevant_when: "`codec` = `json`"
 								}
 							}
 						}
