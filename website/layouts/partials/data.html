@@ -1560,7 +1560,7 @@
 
 {{ define "vrl-function-example" }}
 {{ $id := printf "%s-examples-%s" .name (.ctx.title | urlize) }}
-{{ $scenario := (dict "title" .ctx.title "program" .ctx.source "output" (.ctx.return | default dict)) }}
+{{ $scenario := (dict "title" .ctx.title "program" .ctx.source) }}
 {{ $hash := $scenario | jsonify | base64Encode }}
 {{ $hashUrl := printf "%s/h/%s" .vrl_web_url $hash }}
 <div>
@@ -1602,7 +1602,7 @@
       </svg>
 
       <span>
-        Open in the VRL Playground
+        Open this example in VRL Web
       </span>
     </a>
   </div>
