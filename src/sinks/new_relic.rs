@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{Event, Value},
+    event::{Event, Value, Metric, MetricValue},
     http::{HttpClient},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration, TimestampFormat},
@@ -13,6 +13,7 @@ use crate::{
 use futures::{future, FutureExt, SinkExt};
 use http::{Request, Uri};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
@@ -136,27 +137,50 @@ impl HttpSink for NewRelicConfig {
                 }
             },
             NewRelicApi::Metrics => {
-                //TODO: For Metrics, check name and valu exist and has correct type. Also check type has a valid value if exist
-                //TODO: For metrics, remove host, message and source_type
-                /*
-                log.remove("host");
-                log.remove("message");
-                log.remove("source_type");
-                */
                 match event {
-                    Event::Log(_log) => {
-                        //TODO: generate a New Relic Metric model from a Log
-                        None
+                    Event::Log(mut log) => {
+                        //TODO: For Metrics, check name and valu exist and has correct type. Also check type has a valid value if exist
+                        log.remove("host");
+                        log.remove("message");
+                        log.remove("source_type");
+                        let mut body = serde_json::to_vec(&log).expect("Events should be valid json!");
+                        body.push(b'\n');
+                        Some(body)
                     },
                     Event::Metric(metric) => {
                         println!("----------> METRIC object received = {:#?}", metric);
                         //TODO: generate a New Relic Metric model from a Metric
-                        None
+                        //TODO: build a JSON from it
+                        let mut arr = vec!();
+                        let mut map = HashMap::new();
+                        let mut metrics_arr = vec!();
+                        let mut metric_obj = HashMap::new();
+
+                        metric_obj.insert("name", Value::from(metric.name().to_string()));
+                        match metric.value() {
+                            MetricValue::Gauge { value } => {
+                                metric_obj.insert("type", Value::from("gauge".to_string()));
+                                metric_obj.insert("value", Value::from(*value));
+                            },
+                            MetricValue::Counter { value } => {
+                                metric_obj.insert("type", Value::from("count".to_string()));
+                                metric_obj.insert("value", Value::from(*value));
+                            },
+                            _ => {}
+                        }
+
+                        metrics_arr.push(metric_obj);
+                        map.insert("metric", metrics_arr);
+                        arr.push(map);
+
+                        let mut body = serde_json::to_vec(&arr).expect("Events should be valid json!");
+                        body.push(b'\n');
+                        Some(body)
                     }
                 }
             },
             NewRelicApi::Logs => {
-                if let Event::Log(mut log) = event {
+                if let Event::Log(log) = event {
                     let mut body = serde_json::to_vec(&log).expect("Events should be valid json!");
                     body.push(b'\n');
                     Some(body)
