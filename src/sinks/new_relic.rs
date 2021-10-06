@@ -1,29 +1,44 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{Event, Value},
-    http::{Auth, HttpClient, HttpError, MaybeAuth},
+    event::{Event},
+    http::{HttpClient},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration, TimestampFormat},
-        http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
-        retries::{RetryAction, RetryLogic},
-        sink, BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
+        http::{BatchedHttpSink, HttpSink},
+        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
     },
     tls::{TlsOptions, TlsSettings},
 };
-use bytes::Bytes;
-use futures::{future, FutureExt, SinkExt};
-use http::{Request, StatusCode, Uri};
-use hyper::Body;
-use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
 
-//TODO: add config properties:
-// region
-// license_key
-// api
+use futures::{future, FutureExt, SinkExt};
+use http::{Request, Uri};
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum NewRelicRegion {
+    #[derivative(Default)]
+    Us,
+    Eu,
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum NewRelicApi {
+    #[derivative(Default)]
+    Events,
+    Metrics,
+    Logs
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct NewRelicConfig {
+    pub license_key: String,
+    pub region: Option<NewRelicRegion>,
+    pub api: Option<NewRelicApi>,
     pub compression: Compression,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
@@ -58,14 +73,16 @@ impl SinkConfig for NewRelicConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        //TODO: for prod usage: increase bytes (~10MB) and timeout (~1 minute), or even put it in the config
         let batch = BatchSettings::default()
             .bytes(bytesize::mb(1u64))
-            .timeout(10)
+            .timeout(1)
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
+        //Batched sink send blocks of logs, but does the New Relic collector accept this format?
         let sink = BatchedHttpSink::new(
             self.clone(),
             Buffer::new(batch.size, self.compression),
@@ -102,7 +119,7 @@ impl HttpSink for NewRelicConfig {
             ..self.encoding.clone()
         };
         encoding.apply_rules(&mut event);
-        //TODO: check that timestamp has the correct format and reformat if not
+        
         //TODO: For Events, check that eventType exist, set default value if not ("VectorSink")
         //TODO: For Metrics, check name and valu exist and has correct type. Also check type has a valid value if exist
         //TODO: For metrics, remove host, message and source_type
@@ -124,15 +141,37 @@ impl HttpSink for NewRelicConfig {
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
-        let uri = "http://localhost:8888".parse::<Uri>().expect("Unable to encode uri");
+
+        //TODO: set correct URLs
+        let uri = match self.api.as_ref().unwrap_or(&NewRelicApi::Events) {
+            NewRelicApi::Events => {
+                match self.region.as_ref().unwrap_or(&NewRelicRegion::Us) {
+                    NewRelicRegion::Us => Uri::from_static("http://localhost:8888/events/us"),
+                    NewRelicRegion::Eu => Uri::from_static("http://localhost:8888/events/eu"),
+                }
+            },
+            NewRelicApi::Metrics => {
+                match self.region.as_ref().unwrap_or(&NewRelicRegion::Us) {
+                    NewRelicRegion::Us => Uri::from_static("http://localhost:8888/metrics/us"),
+                    NewRelicRegion::Eu => Uri::from_static("http://localhost:8888/metrics/eu"),
+                }
+            },
+            NewRelicApi::Logs => {
+                match self.region.as_ref().unwrap_or(&NewRelicRegion::Us) {
+                    NewRelicRegion::Us => Uri::from_static("https://log-api.newrelic.com/log/v1"),
+                    NewRelicRegion::Eu => Uri::from_static("https://log-api.eu.newrelic.com/log/v1"),
+                }
+            }
+        };
 
         let mut builder = Request::post(&uri).header("Content-Type", "application/json");
+        builder = builder.header("X-License-Key", self.license_key.clone());
 
         if let Some(ce) = self.compression.content_encoding() {
             builder = builder.header("Content-Encoding", ce);
         }
 
-        let mut request = builder.body(events).unwrap();
+        let request = builder.body(events).unwrap();
 
         Ok(request)
     }
