@@ -18,10 +18,6 @@ Vector's 0.17.0 release includes five **breaking changes**:
 1. [The `generator` source now has a default `interval` setting](#interval)
 1. [The deprecated `wasm` transform was removed](#wasm)
 
-And one deprecation:
-
-1. [The `aws_s3` `multiline` option has been deprecated](#multiline)
-
 We cover them below to help you upgrade quickly:
 
 ## Upgrade guide
@@ -77,30 +73,3 @@ it to the [Github issue](9466).
 
 [deprecation]: /content/en/highlights/2021-08-23-removing-wasm
 [9466]: https://github.com/vectordotdev/vector/issues/9466
-
-### The `aws_s3` `multiline` option has been deprecated {#multiline}
-
-As part of some on-going work to support automatic decoding of data in sources, we have deprecated the `multiline`
-option on the `aws_s3` source in-lieu of the `reduce` transform which can be used to multiple events into one.
-
-For example:
-
-```toml
-[sources.my_aws_s3_source.multiline]
-start_pattern = '\\$'
-mode = "continue_past"
-condition_pattern = '\\$'
-timeout_ms = 1000
-```
-
-Would translate to:
-
-```toml
-[transforms.s3_multiline_merging]
-type = "reduce"
-inputs = [ "my_aws_s3_source" ]
-ends_when = '!match(string!(.message), "\\$")'
-expire_after_ms = 1_000
-group_by = [ "bucket", "object" ]
-merge_strategies.message = "concat_newline"
-```
