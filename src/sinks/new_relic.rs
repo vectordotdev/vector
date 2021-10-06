@@ -54,6 +54,40 @@ pub struct NewRelicConfig {
     pub tls: Option<TlsOptions>,
 }
 
+pub struct NewRelicMetric;
+
+impl NewRelicMetric {
+    pub fn from_metric(metric: Metric) -> Option<Vec<u8>> {
+        let mut arr = vec!();
+        let mut map = HashMap::new();
+        let mut metrics_arr = vec!();
+        let mut metric_obj = HashMap::new();
+
+        metric_obj.insert("name", Value::from(metric.name().to_string()));
+        match metric.value() {
+            MetricValue::Gauge { value } => {
+                metric_obj.insert("type", Value::from("gauge".to_string()));
+                metric_obj.insert("value", Value::from(*value));
+            },
+            MetricValue::Counter { value } => {
+                metric_obj.insert("type", Value::from("count".to_string()));
+                metric_obj.insert("value", Value::from(*value));
+            },
+            _ => {
+                return None;
+            }
+        }
+
+        metrics_arr.push(metric_obj);
+        map.insert("metrics", metrics_arr);
+        arr.push(map);
+
+        let mut body = serde_json::to_vec(&arr).expect("Events should be valid json!");
+        body.push(b'\n');
+        Some(body)
+    }
+}
+
 inventory::submit! {
     SinkDescription::new::<NewRelicConfig>("new_relic")
 }
@@ -148,34 +182,7 @@ impl HttpSink for NewRelicConfig {
                         Some(body)
                     },
                     Event::Metric(metric) => {
-                        println!("----------> METRIC object received = {:#?}", metric);
-                        //TODO: generate a New Relic Metric model from a Metric
-                        //TODO: build a JSON from it
-                        let mut arr = vec!();
-                        let mut map = HashMap::new();
-                        let mut metrics_arr = vec!();
-                        let mut metric_obj = HashMap::new();
-
-                        metric_obj.insert("name", Value::from(metric.name().to_string()));
-                        match metric.value() {
-                            MetricValue::Gauge { value } => {
-                                metric_obj.insert("type", Value::from("gauge".to_string()));
-                                metric_obj.insert("value", Value::from(*value));
-                            },
-                            MetricValue::Counter { value } => {
-                                metric_obj.insert("type", Value::from("count".to_string()));
-                                metric_obj.insert("value", Value::from(*value));
-                            },
-                            _ => {}
-                        }
-
-                        metrics_arr.push(metric_obj);
-                        map.insert("metric", metrics_arr);
-                        arr.push(map);
-
-                        let mut body = serde_json::to_vec(&arr).expect("Events should be valid json!");
-                        body.push(b'\n');
-                        Some(body)
+                        NewRelicMetric::from_metric(metric)
                     }
                 }
             },
