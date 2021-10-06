@@ -133,21 +133,21 @@ where
 {
     /// Create a new Batch instance
     ///
-    /// Creates a new batch instance with specific element and allocation
-    /// limits. The element limit is a maximum cap on the number of `I`
-    /// instances. The allocation limit is a soft-max on the number of allocated
-    /// bytes stored in this batch, not taking into account overhead from this
+    /// Creates a new batch instance with specific element and allocation limits. The element limit
+    /// is a maximum cap on the number of `I` instances. The allocation limit is a soft-max on the
+    /// number of allocated bytes stored in this batch, not taking into account overhead from this
     /// structure itself.
     ///
-    /// If `allocation_limit` is smaller than the size of `I` as reported by
-    /// `std::mem::size_of`, then the allocation limit will be raised such that
-    /// the batch can hold a single instance of `I`.  Like
+    /// If `allocation_limit` is smaller than the size of `I` as reported by `std::mem::size_of`,
+    /// then the allocation limit will be raised such that the batch can hold a single instance of
+    /// `I`.  Likewise, `element_limit` will be raised such that it is always at least 1, ensuring
+    /// that a new batch can be pushed into.
     fn new(element_limit: usize, allocation_limit: usize) -> Self {
-        // TODO: This may need to be reworked, because it's subtly wrong as-is. ByteSizeOf::size_of()
-        // always returns the size of the type itself, plus any "allocated bytes".  Thus, there are
-        // times when an item will be bigger than simply the size of the type itself (aka
-        // mem::size_of::<I>()) and thus than type of item would never fit in a batch where the
-        // `allocation_limit` is at or lower than the size of that item.
+        // TODO: This may need to be reworked, because it's subtly wrong as-is.
+        // ByteSizeOf::size_of() always returns the size of the type itself, plus any "allocated
+        // bytes".  Thus, there are times when an item will be bigger than simply the size of the
+        // type itself (aka mem::size_of::<I>()) and thus than type of item would never fit in a
+        // batch where the `allocation_limit` is at or lower than the size of that item.
         //
         // We're counteracting this here by ensuring that the element limit is always at least 1.
         let element_limit = cmp::max(element_limit, 1);
