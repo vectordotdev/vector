@@ -117,7 +117,6 @@ impl ConfigBuilder {
             }
             for input in pipeline_transform.outputs.iter() {
                 if let Some(transform) = self.transforms.get_mut(input) {
-                    // TODO: it's a bit sad to `to_string` these only to re-resolve them later
                     transform.inputs.push(component_id.to_string());
                 } else if let Some(sink) = self.sinks.get_mut(input) {
                     sink.inputs.push(component_id.to_string());
