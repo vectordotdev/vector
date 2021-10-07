@@ -1,5 +1,5 @@
 use super::super::batch::{Batch, BatchConfig, BatchError, BatchSettings, PushResult};
-use super::super::EventCount;
+use super::super::ElementCount;
 use vector_core::ByteSizeOf;
 
 pub trait Partition<K> {
@@ -99,8 +99,8 @@ impl<T: ByteSizeOf, K> ByteSizeOf for PartitionInnerBuffer<T, K> {
     }
 }
 
-impl<T: EventCount, K> EventCount for PartitionInnerBuffer<T, K> {
-    fn event_count(&self) -> usize {
-        self.inner.event_count()
+impl<T: ElementCount, K> ElementCount for PartitionInnerBuffer<T, K> {
+    fn element_count(&self) -> usize {
+        self.inner.element_count()
     }
 }

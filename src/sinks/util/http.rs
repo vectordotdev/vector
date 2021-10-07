@@ -1,7 +1,7 @@
 use super::{
     retries::{RetryAction, RetryLogic},
     sink::{self, ServiceLogic},
-    Batch, EncodedEvent, EventCount, Partition, TowerBatchedSink, TowerPartitionSink,
+    Batch, ElementCount, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink,
     TowerRequestConfig, TowerRequestSettings,
 };
 use crate::{
@@ -59,7 +59,7 @@ pub struct BatchedHttpSink<
     SL = sink::StdServiceLogic<http::Response<Bytes>>,
 > where
     B: Batch,
-    B::Output: ByteSizeOf + EventCount + Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
     SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
 {
@@ -80,7 +80,7 @@ pub struct BatchedHttpSink<
 impl<T, B> BatchedHttpSink<T, B>
 where
     B: Batch,
-    B::Output: ByteSizeOf + EventCount + Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     pub fn new(
@@ -107,7 +107,7 @@ where
 impl<T, B, RL, SL> BatchedHttpSink<T, B, RL, SL>
 where
     B: Batch,
-    B::Output: ByteSizeOf + EventCount + Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     RL: RetryLogic<Response = http::Response<Bytes>, Error = HttpError> + Send + 'static,
     SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
@@ -152,7 +152,7 @@ where
 impl<T, B, RL, SL> Sink<Event> for BatchedHttpSink<T, B, RL, SL>
 where
     B: Batch,
-    B::Output: ByteSizeOf + EventCount + Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
     RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
     SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
@@ -209,7 +209,7 @@ where
 pub struct PartitionHttpSink<T, B, K, RL = HttpRetryLogic>
 where
     B: Batch,
-    B::Output: ByteSizeOf + EventCount + Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
@@ -230,7 +230,7 @@ where
 impl<T, B, K> PartitionHttpSink<T, B, K, HttpRetryLogic>
 where
     B: Batch,
-    B::Output: ByteSizeOf + EventCount + Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
@@ -258,7 +258,7 @@ where
 impl<T, B, K, RL> PartitionHttpSink<T, B, K, RL>
 where
     B: Batch,
-    B::Output: ByteSizeOf + EventCount + Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     RL: RetryLogic<Response = http::Response<Bytes>, Error = HttpError> + Send + 'static,
@@ -309,7 +309,7 @@ where
 impl<T, B, K, RL> Sink<Event> for PartitionHttpSink<T, B, K, RL>
 where
     B: Batch,
-    B::Output: ByteSizeOf + EventCount + Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
@@ -383,7 +383,7 @@ impl<F, B> HttpBatchService<F, B> {
 impl<F, B> Service<B> for HttpBatchService<F, B>
 where
     F: Future<Output = crate::Result<hyper::Request<Vec<u8>>>> + Send + 'static,
-    B: ByteSizeOf + EventCount + Send + 'static,
+    B: ByteSizeOf + ElementCount + Send + 'static,
 {
     type Response = http::Response<Bytes>;
     type Error = crate::Error;
@@ -399,7 +399,7 @@ where
 
         Box::pin(async move {
             let events_sent = EventsSent {
-                count: body.event_count(),
+                count: body.element_count(),
                 byte_size: body.size_of(),
             };
             let request = request_builder(body).await?;

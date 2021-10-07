@@ -132,18 +132,18 @@ pub fn encode_namespace<'a>(
 }
 
 /// Marker trait for types that can hold a batch of events
-pub trait EventCount {
-    fn event_count(&self) -> usize;
+pub trait ElementCount {
+    fn element_count(&self) -> usize;
 }
 
-impl<T> EventCount for Vec<T> {
-    fn event_count(&self) -> usize {
+impl<T> ElementCount for Vec<T> {
+    fn element_count(&self) -> usize {
         self.len()
     }
 }
 
-impl EventCount for serde_json::Value {
-    fn event_count(&self) -> usize {
+impl ElementCount for serde_json::Value {
+    fn element_count(&self) -> usize {
         1
     }
 }
