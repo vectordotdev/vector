@@ -56,7 +56,12 @@ impl Pipeline {
                 Poll::Ready(Ok(())) => {
                     // continue to send below
                 }
-                Poll::Ready(Err(_error)) => return Poll::Ready(Err(ClosedError)),
+                Poll::Ready(Err(_error)) => {
+                    if sent.count > 0 {
+                        emit!(&sent);
+                    }
+                    return Poll::Ready(Err(ClosedError));
+                }
             }
 
             let event_bytes = event.size_of();
