@@ -1,3 +1,4 @@
+use super::config::MAX_PAYLOAD_BYTES;
 use super::service::LogApiRequest;
 use crate::config::SinkContext;
 use crate::sinks::util::encoding::{Encoder, EncodingConfigFixed, StandardEncodings};
@@ -10,7 +11,6 @@ use std::fmt::Debug;
 use std::io::{self, Write};
 use std::num::NonZeroUsize;
 use std::sync::Arc;
-use std::time::Duration;
 use tower::Service;
 use vector_core::buffers::Acker;
 use vector_core::config::{log_schema, LogSchema};
@@ -18,19 +18,6 @@ use vector_core::event::{Event, EventFinalizers, EventStatus, Finalizable, Value
 use vector_core::partition::Partitioner;
 use vector_core::sink::StreamSink;
 use vector_core::stream::BatcherSettings;
-
-const MAX_PAYLOAD_ARRAY: usize = 1_000;
-const MAX_PAYLOAD_BYTES: usize = 5_000_000;
-// The Datadog API has a hard limit of 5MB for uncompressed payloads. Above this
-// threshold the API will toss results. We previously serialized Events as they
-// came in -- a very CPU intensive process -- and to avoid that we only batch up
-// to 750KB below the max and then build our payloads. This does mean that in
-// some situations we'll kick out over-large payloads -- for instance, a string
-// of escaped double-quotes -- but we believe this should be very rare in
-// practice.
-const BATCH_GOAL_BYTES: usize = 4_250_000;
-const BATCH_DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
-
 #[derive(Default)]
 struct EventPartitioner;
 
@@ -48,19 +35,19 @@ pub struct LogSinkBuilder<S> {
     encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
     service: S,
     context: SinkContext,
-    timeout: Option<Duration>,
+    batch_settings: BatcherSettings,
     compression: Option<Compression>,
     default_api_key: Arc<str>,
 }
 
 impl<S> LogSinkBuilder<S> {
-    pub fn new(service: S, context: SinkContext, default_api_key: Arc<str>) -> Self {
+    pub fn new(service: S, context: SinkContext, default_api_key: Arc<str>, batch_settings: BatcherSettings) -> Self {
         Self {
             encoding: Default::default(),
             service,
             context,
             default_api_key,
-            timeout: None,
+            batch_settings,
             compression: None,
         }
     }
@@ -76,18 +63,13 @@ impl<S> LogSinkBuilder<S> {
         self
     }
 
-    pub const fn batch_timeout(mut self, duration: Option<Duration>) -> Self {
-        self.timeout = duration;
-        self
-    }
-
     pub fn build(self) -> LogSink<S> {
         LogSink {
             default_api_key: self.default_api_key,
             encoding: self.encoding,
             acker: self.context.acker(),
             service: self.service,
-            timeout: self.timeout.unwrap_or(BATCH_DEFAULT_TIMEOUT),
+            batch_settings: self.batch_settings,
             compression: self.compression.unwrap_or_default(),
         }
     }
@@ -109,11 +91,8 @@ pub struct LogSink<S> {
     encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
     /// The compression technique to use when building the request body
     compression: Compression,
-    /// The total duration before a flush is forced
-    ///
-    /// This value sets the duration that is allowed to ellapse prior to a flush
-    /// of all buffered `Event` instances.
-    timeout: Duration,
+    /// Batch settings: timeout, max events, max bytes, etc.
+    batch_settings: BatcherSettings,
 }
 
 /// Customized encoding specific to the Datadog Logs sink, as the logs API only accepts JSON encoded
@@ -233,7 +212,6 @@ where
         let default_api_key = Arc::clone(&self.default_api_key);
 
         let partitioner = EventPartitioner::default();
-        let settings = BatcherSettings::new(self.timeout, BATCH_GOAL_BYTES, MAX_PAYLOAD_ARRAY);
 
         let builder_limit = NonZeroUsize::new(64);
         let request_builder = LogRequestBuilder {
@@ -243,7 +221,7 @@ where
         };
 
         let sink = input
-            .batched(partitioner, settings)
+            .batched(partitioner, self.batch_settings)
             .request_builder(builder_limit, request_builder)
             .filter_map(|request| async move {
                 match request {

@@ -114,7 +114,9 @@ impl S3SinkConfig {
             .service(S3Service::new(client));
 
         // Configure our partitioning/batching.
-        let batch_settings = DEFAULT_BATCH_SETTINGS.parse_config(self.batch)?;
+        let batch_settings = DEFAULT_BATCH_SETTINGS
+            .parse_config(self.batch)?
+            .into_batcher_settings()?;
         let key_prefix = self
             .key_prefix
             .as_ref()
@@ -122,8 +124,6 @@ impl S3SinkConfig {
             .unwrap_or_else(|| DEFAULT_KEY_PREFIX.into())
             .try_into()?;
         let partitioner = KeyPartitioner::new(key_prefix);
-
-        let settings = batch_settings.into_batcher_settings();
 
         // And now collect all of the S3-specific options and configuration knobs.
         let filename_time_format = self
@@ -145,7 +145,7 @@ impl S3SinkConfig {
             compression: self.compression,
         };
 
-        let sink = S3Sink::new(cx, service, request_options, partitioner, settings);
+        let sink = S3Sink::new(cx, service, request_options, partitioner, batch_settings);
 
         Ok(VectorSink::Stream(Box::new(sink)))
     }

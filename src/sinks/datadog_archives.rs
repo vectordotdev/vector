@@ -44,13 +44,12 @@ use crate::{
     template::Template,
 };
 
-use super::util::{
-    encoding::{Encoder, StandardEncodings},
-    Compression, RequestBuilder,
-};
+use super::util::{BatchSettings, Compression, RequestBuilder, encoding::{Encoder, StandardEncodings}};
 
 const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
     TowerRequestConfig::new(Concurrency::Fixed(50)).rate_limit_num(250);
+const DEFAULT_BATCH_SETTINGS: BatchSettings<()> =
+    BatchSettings::const_default().timeout(900).bytes(100_000_000).events(25_000);
 const DEFAULT_COMPRESSION: Compression = Compression::gzip_default();
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -153,11 +152,9 @@ impl DatadogArchivesSinkConfig {
             _ => (),
         }
 
-        // We should avoid producing many small batches - this might slow down Log Rehydration,
-        // these values are similar with how DataDog's Log Archives work internally:
-        // batch size - 100mb
-        // batch timeout - 15min
-        let batcher_settings = BatcherSettings::new(Duration::from_secs(900), 100_000_000, 20_000);
+        // We use the default batch settings directly as we don't support allowing users to change
+        // the batching behavior, as it could negatively impact performance.
+        let batcher_settings = DEFAULT_BATCH_SETTINGS.into_batcher_settings()?;
 
         let partitioner = DatadogArchivesSinkConfig::build_partitioner();
 
