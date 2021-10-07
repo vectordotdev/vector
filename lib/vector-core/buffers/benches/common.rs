@@ -11,7 +11,6 @@ use std::fmt;
 use std::pin::Pin;
 use tracing::Span;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
-use tracing_subscriber::Registry;
 
 #[derive(Clone, Copy)]
 pub struct Message<const N: usize> {
@@ -120,6 +119,16 @@ fn consume<T>(mut stream: Pin<&mut (dyn Stream<Item = T> + Unpin + Send)>, conte
     while let Poll::Ready(Some(_)) = stream.as_mut().poll_next(context) {}
 }
 
+pub fn init_instrumentation() {
+    if metrics::try_recorder().is_none() {
+        let subscriber = tracing_subscriber::Registry::default().with(MetricsLayer::new());
+        tracing::subscriber::set_global_default(subscriber).unwrap();
+
+        let recorder = TracingContextLayer::all().layer(DebuggingRecorder::new());
+        metrics::set_boxed_recorder(Box::new(recorder)).unwrap();
+    }
+}
+
 //
 // Measurements
 //
@@ -176,15 +185,5 @@ pub fn war_measurement<const N: usize>(
     for msg in input.2.into_iter() {
         send_msg(msg, sink.as_mut(), &mut snd_context);
         consume(stream.as_mut(), &mut rcv_context)
-    }
-}
-
-pub fn init_instrumentation() {
-    let subscriber = Registry::default().with(MetricsLayer::new());
-    let _ = tracing::subscriber::set_global_default(subscriber);
-
-    if metrics::try_recorder().is_none() {
-        let recorder = TracingContextLayer::all().layer(DebuggingRecorder::new());
-        metrics::set_boxed_recorder(Box::new(recorder)).unwrap();
     }
 }

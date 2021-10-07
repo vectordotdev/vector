@@ -7,7 +7,16 @@ use tokio_util::codec::{LinesCodec, LinesCodecError};
 /// Config used to build a `OctetCountingCodec`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct OctetCountingDecoderConfig {
+    #[serde(default)]
+    octet_counting: OctetCountingDecoderOptions,
+}
+
+/// Options for building a `OctetCountingCodec`.
+#[derive(Debug, Clone, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
+pub struct OctetCountingDecoderOptions {
     #[serde(default = "crate::serde::default_max_length")]
+    #[derivative(Default(value = "crate::serde::default_max_length()"))]
     max_length: usize,
 }
 
@@ -15,7 +24,7 @@ pub struct OctetCountingDecoderConfig {
 impl FramingConfig for OctetCountingDecoderConfig {
     fn build(&self) -> crate::Result<BoxedFramer> {
         Ok(Box::new(OctetCountingCodec::new_with_max_length(
-            self.max_length,
+            self.octet_counting.max_length,
         )))
     }
 }
