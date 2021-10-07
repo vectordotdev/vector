@@ -28,8 +28,6 @@ pub struct Pipeline {
     #[derivative(Debug = "ignore")]
     inlines: Vec<Box<dyn FunctionTransform>>,
     enqueued: VecDeque<Event>,
-    events_outstanding: usize,
-    bytes_outstanding: usize,
 }
 
 impl Pipeline {
@@ -72,8 +70,6 @@ impl Pipeline {
             match self.inner.start_send(event) {
                 Ok(()) => {
                     // we good, keep looping
-                    self.events_outstanding -= 1;
-                    self.bytes_outstanding -= event_bytes;
                     sent_count += 1;
                     sent_bytes += event_bytes;
                 }
@@ -117,9 +113,6 @@ impl Sink<Event> for Pipeline {
     }
 
     fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
-        self.events_outstanding += 1;
-        self.bytes_outstanding += item.size_of();
-
         // Note how this gets **swapped** with `new_working_set` in the loop.
         // At the end of the loop, it will only contain finalized events.
         let mut working_set = vec![item];
@@ -182,8 +175,6 @@ impl Pipeline {
             // We ensure the buffer is sufficient that it is unlikely to require reallocations.
             // There is a possibility a component might blow this queue size.
             enqueued: VecDeque::with_capacity(10),
-            events_outstanding: 0,
-            bytes_outstanding: 0,
         }
     }
 }
