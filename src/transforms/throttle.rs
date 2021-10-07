@@ -1,3 +1,4 @@
+use crate::conditions::AnyCondition;
 use crate::config::{DataType, TransformConfig, TransformContext, TransformDescription};
 use crate::event::Event;
 use crate::transforms::{TaskTransform, Transform};
@@ -6,6 +7,7 @@ use async_stream::stream;
 use futures::{stream, Stream, StreamExt};
 use governor::*;
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::num::NonZeroU32;
 use std::pin::Pin;
 use std::time::Duration;
@@ -13,17 +15,12 @@ use std::time::Duration;
 #[derive(Deserialize, Default, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct ThrottleConfig {
-    events_per_second: u32,
-    bytes_per_second: u32,
+    events_threshold: Option<u32>,
+    bytes_threshold: Option<u32>,
+    window: f64,
     key_field: Option<String>,
-    //behavior: Behavior,
+    exclude: Option<AnyCondition>,
 }
-
-//#[derive(Clone, Debug)]
-//enum Behavior {
-//    ShedLoad,
-//    BackPressure,
-//}
 
 inventory::submit! {
     TransformDescription::new::<ThrottleConfig>("throttle")
@@ -39,11 +36,11 @@ impl TransformConfig for ThrottleConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Any
+        DataType::Log
     }
 
     fn output_type(&self) -> DataType {
-        DataType::Any
+        DataType::Log
     }
 
     fn transform_type(&self) -> &'static str {
@@ -53,19 +50,35 @@ impl TransformConfig for ThrottleConfig {
 
 #[derive(Clone, Debug)]
 pub struct Throttle {
-    events_per_second: NonZeroU32,
-    bytes_per_second: NonZeroU32,
+    quota: Quota,
     key_field: Option<String>,
-    //behavior: Behavior,
+    exclude: Option<AnyCondition>,
 }
 
 impl Throttle {
     pub fn new(config: &ThrottleConfig) -> crate::Result<Self> {
+        let threshold = match (config.events_threshold, config.bytes_threshold) {
+            (Some(events), None) => events,
+            (None, Some(bytes)) => bytes,
+            _ => return Err(Box::new(ConfigError::EventsAndBytes)),
+        };
+
+        let threshold = match NonZeroU32::new(threshold) {
+            Some(threshold) => threshold,
+            None => return Err(Box::new(ConfigError::NonZero)),
+        };
+
+        let quota = match Quota::with_period(Duration::from_secs_f64(
+            config.window / threshold.get() as f64,
+        )) {
+            Some(quota) => quota.allow_burst(threshold),
+            None => return Err(Box::new(ConfigError::NonZero)),
+        };
+
         Ok(Self {
-            events_per_second: NonZeroU32::new(config.events_per_second).unwrap(),
-            bytes_per_second: NonZeroU32::new(config.bytes_per_second).unwrap(),
+            quota,
             key_field: None,
-            //behavior: Behavior::ShedLoad,
+            exclude: None,
         })
     }
 }
@@ -78,7 +91,7 @@ impl TaskTransform for Throttle {
     where
         Self: 'static,
     {
-        let lim = RateLimiter::direct(Quota::per_second(self.events_per_second));
+        let limiter = RateLimiter::direct(self.quota);
 
         let mut flush_stream = tokio::time::interval(Duration::from_millis(1000));
 
@@ -94,7 +107,7 @@ impl TaskTransform for Throttle {
                         match maybe_event {
                             None => true,
                             Some(event) => {
-                                match lim.check() {
+                                match limiter.check() {
                                     Ok(()) => {
                                         output.push(event);
                                         false
@@ -115,4 +128,14 @@ impl TaskTransform for Throttle {
             .flatten(),
         )
     }
+}
+
+#[derive(Debug, Snafu)]
+pub enum ConfigError {
+    #[snafu(display(
+        "must provide exactly one of `events_threshold` or `bytes_threshold` configuration"
+    ))]
+    EventsAndBytes,
+    #[snafu(display("`events_threshold`, `bytes_threshold`, and `window` must be non-zero"))]
+    NonZero,
 }
