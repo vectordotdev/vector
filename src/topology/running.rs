@@ -572,15 +572,7 @@ impl RunningTopology {
     }
 
     fn remove_outputs(&mut self, key: &ComponentKey) {
-        let ids = self
-            .outputs
-            .keys()
-            .filter(|id| &id.component == key)
-            .cloned()
-            .collect::<Vec<_>>();
-        for id in ids {
-            self.outputs.remove(&id);
-        }
+        self.outputs.retain(|id, _output| &id.component != key);
     }
 
     async fn remove_inputs(&mut self, key: &ComponentKey) {
