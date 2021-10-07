@@ -23,6 +23,7 @@ use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use snafu::{ResultExt, Snafu};
+use uuid::Uuid;
 
 const NAME: &str = "gcp_bigquery";
 const ENDPOINT: &str = "https://bigquery.googleapis.com";
@@ -58,6 +59,8 @@ pub struct BigquerySinkConfig {
     project: String,
     dataset: String,
     table: String,
+    #[serde(default)]
+    include_insert_id: bool,
     #[serde(default)]
     ignore_unknown_values: bool,
     #[serde(default)]
@@ -150,6 +153,7 @@ enum HealthcheckError {
 }
 
 struct BigquerySink {
+    include_insert_id: bool,
     ignore_unknown_values: bool,
     skip_invalid_rows: bool,
     template_suffix: Option<String>,
@@ -175,6 +179,7 @@ impl BigquerySink {
         );
 
         Ok(BigquerySink {
+            include_insert_id: config.include_insert_id,
             ignore_unknown_values: config.ignore_unknown_values,
             skip_invalid_rows: config.skip_invalid_rows,
             template_suffix: config.template_suffix.clone(),
@@ -209,10 +214,15 @@ impl HttpSink for BigquerySink {
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
+        let insert_id = if self.include_insert_id {
+            Some(Uuid::new_v4().to_hyphenated().to_string())
+        } else {
+            None
+        };
         let insert_request_rows = events
             .into_iter()
             .map(|v| InsertAllRequestRows {
-                insert_id: None,
+                insert_id: insert_id.clone(),
                 json: v,
             })
             .collect();
