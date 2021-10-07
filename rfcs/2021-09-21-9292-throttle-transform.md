@@ -46,15 +46,11 @@ Config:
 
 ```rust
 pub struct ThrottleConfig {
-    threshold: Threshold,
-    window: f64,
+    // only one of *_threshold options
+    events_threshold: u32,
+    bytes_threshold: u32,
     key_field: Option<String>,
     exclude: Option<AnyCondition>,
-}
-
-enum Threshold {
-    Events(u32),
-    Bytes(u32),
 }
 ```
 
