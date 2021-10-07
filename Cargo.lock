@@ -7672,6 +7672,7 @@ dependencies = [
  "metrics",
  "metrics-tracing-context",
  "metrics-util",
+ "mime",
  "mlua",
  "mongodb",
  "nix 0.22.2",

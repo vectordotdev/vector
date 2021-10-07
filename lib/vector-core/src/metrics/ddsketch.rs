@@ -158,6 +158,25 @@ impl Bin {
     }
 }
 
+/// An implementation of [`DDSketch`][ddsketch] that mirrors the implementation from the Datadog agent.
+/// 
+/// This implementation is subtly different from the open-source implementations of DDSketch, as
+/// Datadog made some slight tweaks to configuration values and in-memory layout to optimize it for
+/// insertion performance within the agent.
+///
+/// We've mimiced the agent version of DDSketch here in order to support a future where we can take
+/// sketches shipped by the agent, handle them internally, merge them, and so on, without any loss
+/// of accuracy, eventually forwarding them to Datadog ourselves.
+/// 
+/// As such, this implementation is constrained in the same ways: the configuration parameters
+/// cannot be changed, the collapsing strategy is fixed, and we support a limited number of methods
+/// for inserting into the sketch.
+/// 
+/// Importantly, we have a special function, again taken from the agent version, to allow us to
+/// interpolate histograms, specifically our own aggregated histograms, into a sketch so that we can
+/// emit useful default quantiles, rather than having to ship the buckets -- upper bound and count
+/// -- to a downstream system that might have no native way to do the same thing, basically
+/// providing no value as they have no way to render useful data from them.
 pub struct AgentDDSketch {
     config: Config,
     bins: Vec<Bin>,
@@ -339,6 +358,18 @@ impl AgentDDSketch {
         let key = self.config.key(v);
         self.insert_keys(vec![key]);
     }
+
+    pub fn insert_many(&mut self, vs: &[f64]) {
+        // TODO: this should return a result that makes sure we have enough room to actually add 1
+        // more sample without hitting `self.config.max_count()`
+        let mut keys = Vec::with_capacity(vs.len());
+        for v in vs {
+            self.adjust_basic_stats(*v, 1);
+            keys.push(self.config.key(*v)); 
+        }
+        self.insert_keys(keys);
+    }
+
 
     pub fn insert_n(&mut self, v: f64, n: u32) {
         // TODO: this should return a result that makes sure we have enough room to actually add N
@@ -712,6 +743,60 @@ mod tests {
     }
 
     #[test]
+    fn test_merge() {
+        let mut all_values = AgentDDSketch::with_agent_defaults();
+        let mut odd_values = AgentDDSketch::with_agent_defaults();
+        let mut even_values = AgentDDSketch::with_agent_defaults();
+        let mut all_values_many = AgentDDSketch::with_agent_defaults();
+
+        let mut values = Vec::new();
+        for i in -50..=50 {
+            let v = i as f64;
+
+            all_values.insert(v);
+
+            if i & 1 == 0 {
+                odd_values.insert(v);
+            } else {
+                even_values.insert(v);
+            }
+
+            values.push(v);
+        }
+
+        all_values_many.insert_many(&values);
+
+        odd_values.merge(even_values);
+        let merged_values = odd_values;
+
+        // Number of bins should be equal to the number of values we inserted.
+        assert_eq!(all_values.bin_count(), values.len());
+
+        // Values at both ends of the quantile range should be equal.
+        let low_end = all_values.quantile(0.01).expect("should have estimated value");
+        let high_end = all_values.quantile(0.99).expect("should have estimated value");
+        assert_eq!(high_end, -low_end);
+
+        let target_bin_count = all_values.bin_count();
+        for sketch in &[all_values, all_values_many, merged_values] {
+            assert_eq!(sketch.quantile(0.5), Some(0.0));
+            assert_eq!(sketch.quantile(0.0), Some(-50.0));
+            assert_eq!(sketch.quantile(1.0), Some(50.0));
+
+            for p in 0..50 {
+                let q = p as f64 / 100.0;
+                let positive = sketch.quantile(q + 0.5).expect("should have estimated value");
+                let negative = -sketch.quantile(0.5 - q).expect("should have estimated value");
+
+                assert!((positive - negative).abs() <= 1.0e-6,
+                    "positive vs negative difference too great ({} vs {})", positive, negative);
+            }
+
+            assert_eq!(target_bin_count, sketch.bin_count());
+        }
+    }
+
+    #[test]
     #[cfg(ddsketch_extended)]
     fn test_ddsketch_pareto_distribution() {
         use ndarray::{Array, Axis};
@@ -865,11 +950,6 @@ mod tests {
         }
 
         max_relative_acc
-    }
-
-    #[test]
-    fn test_sketch_merge() {
-        todo!()
     }
 
     #[test]
