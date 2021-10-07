@@ -1,10 +1,12 @@
 use buffers::bytes::{DecodeBytes, EncodeBytes};
 use buffers::{self, Variant};
 use bytes::{Buf, BufMut};
+use core_common::byte_size_of::ByteSizeOf;
 use futures::task::{noop_waker, Context, Poll};
 use futures::{Sink, Stream};
 use std::fmt;
 use std::pin::Pin;
+use tokio::runtime::Runtime;
 
 #[derive(Clone, Copy)]
 pub struct Message<const N: usize> {
@@ -18,6 +20,12 @@ impl<const N: usize> Message<N> {
             id,
             _padding: [0; N],
         }
+    }
+}
+
+impl<const N: usize> ByteSizeOf for Message<N> {
+    fn allocated_bytes(&self) -> usize {
+        0
     }
 }
 
@@ -114,9 +122,7 @@ fn consume<T>(mut stream: Pin<&mut (dyn Stream<Item = T> + Unpin + Send)>, conte
 // behind an abstract interface. As a happy consequence of this our benchmark
 // measurements are common. "Write Then Read" writes all messages into the
 // buffer and then reads them out. "Write And Read" writes a message and then
-// reads it from the buffer. Measurement is done without a runtime avoiding
-// conflating the overhead of the runtime with our buffer code. This,
-// admittedly, is tough to read.
+// reads it from the buffer.
 //
 
 #[allow(clippy::type_complexity)]
@@ -127,23 +133,26 @@ pub fn wtr_measurement<const N: usize>(
         Vec<Message<N>>,
     ),
 ) {
-    {
-        let waker = noop_waker();
-        let mut context = Context::from_waker(&waker);
+    let rt = Runtime::new().unwrap();
+    rt.block_on(async move {
+        {
+            let waker = noop_waker();
+            let mut context = Context::from_waker(&waker);
 
-        let mut sink = input.0;
-        for msg in input.2.into_iter() {
-            send_msg(msg, sink.as_mut(), &mut context)
+            let mut sink = input.0;
+            for msg in input.2.into_iter() {
+                send_msg(msg, sink.as_mut(), &mut context)
+            }
         }
-    }
 
-    {
-        let waker = noop_waker();
-        let mut context = Context::from_waker(&waker);
+        {
+            let waker = noop_waker();
+            let mut context = Context::from_waker(&waker);
 
-        let mut stream = input.1;
-        consume(stream.as_mut(), &mut context)
-    }
+            let mut stream = input.1;
+            consume(stream.as_mut(), &mut context)
+        }
+    })
 }
 
 #[allow(clippy::type_complexity)]
@@ -154,16 +163,19 @@ pub fn war_measurement<const N: usize>(
         Vec<Message<N>>,
     ),
 ) {
-    let snd_waker = noop_waker();
-    let mut snd_context = Context::from_waker(&snd_waker);
+    let rt = Runtime::new().unwrap();
+    rt.block_on(async move {
+        let snd_waker = noop_waker();
+        let mut snd_context = Context::from_waker(&snd_waker);
 
-    let rcv_waker = noop_waker();
-    let mut rcv_context = Context::from_waker(&rcv_waker);
+        let rcv_waker = noop_waker();
+        let mut rcv_context = Context::from_waker(&rcv_waker);
 
-    let mut stream = input.1;
-    let mut sink = input.0;
-    for msg in input.2.into_iter() {
-        send_msg(msg, sink.as_mut(), &mut snd_context);
-        consume(stream.as_mut(), &mut rcv_context)
-    }
+        let mut stream = input.1;
+        let mut sink = input.0;
+        for msg in input.2.into_iter() {
+            send_msg(msg, sink.as_mut(), &mut snd_context);
+            consume(stream.as_mut(), &mut rcv_context)
+        }
+    })
 }

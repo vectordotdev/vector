@@ -194,6 +194,10 @@ impl ConfigBuilder {
         #[cfg(feature = "datadog-pipelines")]
         {
             self.datadog = with.datadog;
+            if self.datadog.enabled {
+                // enable other enterprise features
+                self.global.enterprise = true;
+            }
         }
 
         self.provider = with.provider;

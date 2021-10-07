@@ -18,6 +18,7 @@ components: sources: generator: {
 
 	features: {
 		multiline: enabled: false
+		codecs: enabled:    true
 		generate: {}
 	}
 
@@ -60,12 +61,16 @@ components: sources: generator: {
 			}
 		}
 		interval: {
-			common:      false
-			description: "The amount of time, in seconds, to pause between each batch of output lines. If not set, there is no delay."
-			required:    false
+			common: false
+			description: """
+				The amount of time, in seconds, to pause between each batch of output lines. The
+				default is one batch per second. In order to remove the delay and output batches as
+				quickly as possible, set `interval` to `0.0`.
+				"""
+			required: false
 			warnings: []
 			type: float: {
-				default: null
+				default: 1.0
 				examples: [1.0, 0.1, 0.01]
 			}
 		}

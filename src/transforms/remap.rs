@@ -54,9 +54,10 @@ impl TransformConfig for RemapConfig {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Remap {
     program: Program,
+    runtime: Runtime,
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
@@ -94,10 +95,28 @@ impl Remap {
 
         Ok(Remap {
             program,
+            runtime: Runtime::default(),
             timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
         })
+    }
+
+    #[cfg(test)]
+    const fn runtime(&self) -> &Runtime {
+        &self.runtime
+    }
+}
+
+impl Clone for Remap {
+    fn clone(&self) -> Self {
+        Self {
+            program: self.program.clone(),
+            runtime: Runtime::default(),
+            timezone: self.timezone,
+            drop_on_error: self.drop_on_error,
+            drop_on_abort: self.drop_on_abort,
+        }
     }
 }
 
@@ -122,9 +141,10 @@ impl FunctionTransform for Remap {
 
         let mut target: VrlTarget = event.into();
 
-        let mut runtime = Runtime::default();
-
-        let result = runtime.resolve(&mut target, &self.program, &self.timezone);
+        let result = self
+            .runtime
+            .resolve(&mut target, &self.program, &self.timezone);
+        self.runtime.clear();
 
         match result {
             Ok(_) => {
@@ -221,6 +241,42 @@ mod tests {
 
     fn get_field_string(event: &Event, field: &str) -> String {
         event.as_log().get(field).unwrap().to_string_lossy()
+    }
+
+    #[test]
+    fn check_remap_doesnt_share_state_between_events() {
+        let conf = RemapConfig {
+            source: Some(".foo = .sentinel".to_string()),
+            file: None,
+            timezone: TimeZone::default(),
+            drop_on_error: true,
+            drop_on_abort: false,
+        };
+        let mut tform = Remap::new(conf, &Default::default()).unwrap();
+        assert!(tform.runtime().is_empty());
+
+        let event1 = {
+            let mut event1 = LogEvent::from("event1");
+            event1.insert("sentinel", "bar");
+            Event::from(event1)
+        };
+        let metadata1 = event1.metadata().clone();
+        let result1 = transform_one(&mut tform, event1).unwrap();
+        assert_eq!(get_field_string(&result1, "message"), "event1");
+        assert_eq!(get_field_string(&result1, "foo"), "bar");
+        assert_eq!(result1.metadata(), &metadata1);
+        assert!(tform.runtime().is_empty());
+
+        let event2 = {
+            let event2 = LogEvent::from("event2");
+            Event::from(event2)
+        };
+        let metadata2 = event2.metadata().clone();
+        let result2 = transform_one(&mut tform, event2).unwrap();
+        assert_eq!(get_field_string(&result2, "message"), "event2");
+        assert_eq!(result2.as_log().get("foo"), Some(&Value::Null));
+        assert_eq!(result2.metadata(), &metadata2);
+        assert!(tform.runtime().is_empty());
     }
 
     #[test]

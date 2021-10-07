@@ -290,7 +290,9 @@ impl SinkOuter {
         if self.healthcheck_uri.is_some() && self.healthcheck.uri.is_some() {
             warn!("Both `healthcheck.uri` and `healthcheck_uri` options are specified. Using value of `healthcheck.uri`.")
         } else if self.healthcheck_uri.is_some() {
-            warn!("`healthcheck_uri` option has been deprecated, use `healthcheck.uri` instead. ")
+            warn!(
+                "The `healthcheck_uri` option has been deprecated, use `healthcheck.uri` instead."
+            )
         }
         SinkHealthcheckOptions {
             uri: self

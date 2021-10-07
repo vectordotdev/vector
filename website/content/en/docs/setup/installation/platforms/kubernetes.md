@@ -101,7 +101,7 @@ kubectl kustomize
 ##### Install Vector
 
 ```shell
-kubectl install -k .
+kubectl apply -k .
 ```
 
 ##### Tail Vector logs
@@ -197,7 +197,7 @@ kubectl kustomize
 ##### Install Vector
 
 ```shell
-kubectl install -k .
+kubectl apply -k .
 ```
 
 ##### Tail Vector logs

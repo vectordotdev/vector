@@ -336,7 +336,7 @@ pub fn file_source(
             .map(move |mut line| {
                 emit!(&FileBytesReceived {
                     byte_size: line.text.len(),
-                    path: &line.filename,
+                    file: &line.filename,
                 });
                 // transcode each line from the file's encoding charset to utf8
                 line.text = match encoding_decoder.as_mut() {
@@ -454,6 +454,7 @@ fn create_event(
     file_key: &Option<String>,
 ) -> Event {
     emit!(&FileEventsReceived {
+        count: 1,
         file: &file,
         byte_size: line.len(),
     });
@@ -482,6 +483,7 @@ mod tests {
         event::{EventStatus, Value},
         shutdown::ShutdownSignal,
         sources::file,
+        test_util::components::{self, SOURCE_TESTS},
     };
     use encoding_rs::UTF_16LE;
     use pretty_assertions::assert_eq;
@@ -1219,7 +1221,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received=run_file_source(&config, false, NoAcks, async {
+        let received = run_file_source(&config, false, NoAcks, async {
             let mut file = File::create(&path).unwrap();
 
             sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
@@ -1646,6 +1648,8 @@ mod tests {
         acking_mode: AckingMode,
         inner: impl Future<Output = ()>,
     ) -> Vec<Event> {
+        components::init();
+
         let (tx, rx) = if acking_mode == Acks {
             let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
             (tx, rx.boxed())
@@ -1668,6 +1672,7 @@ mod tests {
         if wait_shutdown {
             shutdown_done.await;
         }
+        SOURCE_TESTS.assert(&["file"]);
         result
     }
 

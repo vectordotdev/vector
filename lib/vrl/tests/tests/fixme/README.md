@@ -4,7 +4,7 @@ This directory contains tests that show a bug in VRL that needs to be resolved.
 
 The first line in these tests should start with:
 
-```ruby
+```coffee
 # SKIP
 ```
 

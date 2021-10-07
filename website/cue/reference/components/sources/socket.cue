@@ -16,6 +16,7 @@ components: sources: socket: {
 
 	features: {
 		multiline: enabled: false
+		codecs: enabled:    true
 		receive: {
 			from: {
 				service: services.socket_client
@@ -86,10 +87,10 @@ components: sources: socket: {
 			}
 		}
 		max_length: {
-			common:      true
-			description: "The maximum bytes size of incoming messages before they are discarded."
+			common:        true
+			description:   "The maximum bytes size of incoming messages before they are discarded."
 			relevant_when: "mode = `unix_datagram`"
-			required:    false
+			required:      false
 			warnings: []
 			type: uint: {
 				default: 102400
