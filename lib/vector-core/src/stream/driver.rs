@@ -82,6 +82,11 @@ where
     ///
     /// No errors are currently returned.  The return type is purely to simplify caller code, but may
     /// return an error for a legitimate reason in the future.
+    ///
+    /// # Panics
+    ///
+    /// A service should not return an error from its `poll_ready` function. If it does,
+    /// this function will panic.
     pub async fn run(self) -> Result<(), ()> {
         let mut in_flight = FuturesUnordered::new();
         let mut pending_acks = BinaryHeap::new();
