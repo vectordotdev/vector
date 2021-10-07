@@ -77,7 +77,7 @@ impl NewRelicMetric {
         Some(json)
     }
     
-    pub fn from_metric(metric: Metric) -> Option<Vec<u8>> {
+    pub fn json_from_metric(metric: Metric) -> Option<Vec<u8>> {
         match metric.value() {
             MetricValue::Gauge { value } => {
                 Self::new(
@@ -99,7 +99,7 @@ impl NewRelicMetric {
         }
     }
 
-    pub fn from_log(log: LogEvent) -> Option<Vec<u8>> {
+    pub fn json_from_log(log: LogEvent) -> Option<Vec<u8>> {
         if let Some(m_name) = log.get("name") {
             if let Some(m_value) = log.get("value") {
                 if let Some(m_type) = log.get("type") {
@@ -196,10 +196,10 @@ impl HttpSink for NewRelicConfig {
             NewRelicApi::Metrics => {
                 match event {
                     Event::Log(log) => {
-                        NewRelicMetric::from_log(log)
+                        NewRelicMetric::json_from_log(log)
                     },
                     Event::Metric(metric) => {
-                        NewRelicMetric::from_metric(metric)
+                        NewRelicMetric::json_from_metric(metric)
                     }
                 }
             },
