@@ -55,7 +55,7 @@ fn benchmark_batch(c: &mut Criterion) {
                             inner: b,
                             key: Bytes::from("key"),
                         }))
-                        .map(|item| Ok(EncodedEvent::new(item))),
+                        .map(|item| Ok(EncodedEvent::new(item, 0))),
                         batch_sink,
                     )
                 },
@@ -85,7 +85,7 @@ fn benchmark_batch(c: &mut Criterion) {
 
                         (
                             rt,
-                            stream::iter(input.clone()).map(|item| Ok(EncodedEvent::new(item))),
+                            stream::iter(input.clone()).map(|item| Ok(EncodedEvent::new(item, 0))),
                             batch_sink,
                         )
                     },
