@@ -38,6 +38,7 @@ pub enum NewRelicApi {
 #[serde(deny_unknown_fields)]
 pub struct NewRelicConfig {
     pub license_key: String,
+    pub account_id: String,
     pub region: Option<NewRelicRegion>,
     pub api: NewRelicApi,
     //#[serde(default)]
@@ -79,6 +80,7 @@ impl NewRelicMetric {
         Self(vec!(metric_store))
     }
     
+    //TODO: add timestamp
     pub fn json_from_metric(metric: Metric) -> Option<Vec<u8>> {
         match metric.value() {
             MetricValue::Gauge { value } => {
@@ -101,11 +103,15 @@ impl NewRelicMetric {
         }
     }
 
+    //TODO: add timestamp
     pub fn json_from_log(log: LogEvent) -> Option<Vec<u8>> {
         if let Some(m_name) = log.get("name") {
             if let Some(m_value) = log.get("value") {
                 if let Some(m_type) = log.get("type") {
-                    return Self::new(m_name.clone(), m_type.clone(), m_value.clone()).to_json();
+                    let m_type_str = m_type.to_string_lossy();
+                    if m_type_str == "count" || m_type_str == "gauge" {
+                        return Self::new(m_name.clone(), m_type.clone(), m_value.clone()).to_json();
+                    }
                 }
             }
         }
@@ -180,16 +186,16 @@ impl SinkConfig for NewRelicConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        //TODO: for prod usage: increase bytes (~10MB) and timeout (~1 minute), or even put it in the config
+        //TODO: for prod usage: increase timeout (~1 minute), or even put it in the config
         let batch = BatchSettings::default()
-            .bytes(bytesize::mb(1u64))
-            .timeout(1)
+            .bytes(bytesize::mb(10u64))
+            .timeout(5)
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
-        //Batched sink send blocks of logs, but does the New Relic collector accept this format?
+        //TODO: Batched sink send blocks of events, but does the New Relic collector accept this format?
         let sink = BatchedHttpSink::new(
             self.clone(),
             Buffer::new(batch.size, self.compression),
@@ -258,36 +264,35 @@ impl HttpSink for NewRelicConfig {
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
-
-        //TODO: set correct URLs
         let uri = match self.api {
             NewRelicApi::Events => {
                 match self.region.as_ref().unwrap_or(&NewRelicRegion::Us) {
-                    NewRelicRegion::Us => Uri::from_static("http://localhost:8888/events/us"),
-                    NewRelicRegion::Eu => Uri::from_static("http://localhost:8888/events/eu"),
+                    //NewRelicRegion::Us => Uri::from_static("http://localhost:8888/events/us"),
+                    //NewRelicRegion::Eu => Uri::from_static("http://localhost:8888/events/eu"),
+                    NewRelicRegion::Us => format!("https://insights-collector.newrelic.com/v1/accounts/{}/events", self.account_id).parse::<Uri>().unwrap(),
+                    NewRelicRegion::Eu => format!("https://insights-collector.eu01.nr-data.net/v1/accounts/{}/events", self.account_id).parse::<Uri>().unwrap(),
                 }
             },
             NewRelicApi::Metrics => {
                 match self.region.as_ref().unwrap_or(&NewRelicRegion::Us) {
-                    NewRelicRegion::Us => Uri::from_static("http://localhost:8888/metrics/us"),
-                    NewRelicRegion::Eu => Uri::from_static("http://localhost:8888/metrics/eu"),
+                    //NewRelicRegion::Us => Uri::from_static("http://localhost:8888/metrics/us"),
+                    //NewRelicRegion::Eu => Uri::from_static("http://localhost:8888/metrics/eu"),
+                    NewRelicRegion::Us => Uri::from_static("https://metric-api.newrelic.com/metric/v1"),
+                    NewRelicRegion::Eu => Uri::from_static("https://metric-api.eu.newrelic.com/metric/v1"),
                 }
             },
             NewRelicApi::Logs => {
                 match self.region.as_ref().unwrap_or(&NewRelicRegion::Us) {
-                    NewRelicRegion::Us => Uri::from_static("http://localhost:8888/logs/us"),
-                    NewRelicRegion::Eu => Uri::from_static("http://localhost:8888/logs/eu"),
-                    /*
+                    //NewRelicRegion::Us => Uri::from_static("http://localhost:8888/logs/us"),
+                    //NewRelicRegion::Eu => Uri::from_static("http://localhost:8888/logs/eu"),
                     NewRelicRegion::Us => Uri::from_static("https://log-api.newrelic.com/log/v1"),
                     NewRelicRegion::Eu => Uri::from_static("https://log-api.eu.newrelic.com/log/v1"),
-                    */
                 }
             }
         };
 
         let mut builder = Request::post(&uri).header("Content-Type", "application/json");
-        //TODO: change it when sending metrics, use "Api-Key" instead
-        builder = builder.header("X-License-Key", self.license_key.clone());
+        builder = builder.header("Api-Key", self.license_key.clone());
 
         if let Some(ce) = self.compression.content_encoding() {
             builder = builder.header("Content-Encoding", ce);
