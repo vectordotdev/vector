@@ -35,19 +35,6 @@ pub struct Opts {
         use_delimiter(true)
     )]
     pub config_dirs: Vec<PathBuf>,
-
-    /// Read pipeline configuration from files in one or more directories.
-    /// File format is detected from the file name.
-    ///
-    /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
-    #[structopt(
-        name = "pipeline-dir",
-        short = "P",
-        long,
-        env = "VECTOR_PIPELINE_DIR",
-        use_delimiter(true)
-    )]
-    pub pipeline_dirs: Vec<PathBuf>,
 }
 
 impl Opts {
@@ -79,7 +66,7 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
     };
 
     println!("Running tests");
-    match config::build_unit_tests(&paths, &opts.pipeline_dirs).await {
+    match config::build_unit_tests(&paths, &vec![]).await {
         Ok(mut tests) => {
             tests.iter_mut().for_each(|t| {
                 let (test_inspections, test_errors) = t.run();

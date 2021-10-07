@@ -68,19 +68,6 @@ pub struct Opts {
         use_delimiter(true)
     )]
     pub config_dirs: Vec<PathBuf>,
-
-    /// Read pipeline configuration from files in one or more directories.
-    /// File format is detected from the file name.
-    ///
-    /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
-    #[structopt(
-        name = "pipeline-dir",
-        short = "P",
-        long,
-        env = "VECTOR_PIPELINE_DIR",
-        use_delimiter(true)
-    )]
-    pub pipeline_dirs: Vec<PathBuf>,
 }
 
 impl Opts {
@@ -146,13 +133,12 @@ fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         fmt.title(format!("Failed to load {:?}", &paths_list));
         fmt.sub_error(errors);
     };
-    config::init_log_schema(&paths, &opts.pipeline_dirs, true)
+    config::init_log_schema(&paths, &vec![], true)
         .map_err(&mut report_error)
         .ok()?;
-    let (builder, load_warnings) =
-        config::load_builder_and_pipelines_from_paths(&paths, &opts.pipeline_dirs)
-            .map_err(&mut report_error)
-            .ok()?;
+    let (builder, load_warnings) = config::load_builder_and_pipelines_from_paths(&paths, &vec![])
+        .map_err(&mut report_error)
+        .ok()?;
 
     // Build
     let (config, build_warnings) = builder

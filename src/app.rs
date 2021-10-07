@@ -29,7 +29,6 @@ use crate::internal_events::{
 
 pub struct ApplicationConfig {
     pub config_paths: Vec<config::ConfigPath>,
-    pub pipeline_paths: Vec<PathBuf>,
     pub topology: RunningTopology,
     pub graceful_crash: mpsc::UnboundedReceiver<()>,
     #[cfg(feature = "api")]
@@ -116,7 +115,6 @@ impl Application {
 
         let config = {
             let config_paths = root_opts.config_paths_with_formats();
-            let pipeline_paths = root_opts.pipeline_paths();
             let watch_config = root_opts.watch_config;
             let require_healthy = root_opts.require_healthy;
 
@@ -165,12 +163,12 @@ impl Application {
                     paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
                 );
 
-                config::init_log_schema(&config_paths, pipeline_paths, true)
+                config::init_log_schema(&config_paths, &vec![], true)
                     .map_err(handle_config_errors)?;
 
                 let mut config = config::load_from_paths_with_provider(
                     &config_paths,
-                    pipeline_paths,
+                    &vec![],
                     &mut signal_handler,
                 )
                 .await
@@ -198,7 +196,6 @@ impl Application {
 
                 Ok(ApplicationConfig {
                     config_paths,
-                    pipeline_paths: pipeline_paths.clone(),
                     topology,
                     graceful_crash,
                     #[cfg(feature = "api")]
@@ -305,7 +302,7 @@ impl Application {
                                 config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
 
                                 // Reload config
-                                let new_config = config::load_from_paths_with_provider(&config_paths, opts.pipeline_paths(), &mut signal_handler)
+                                let new_config = config::load_from_paths_with_provider(&config_paths, &vec![], &mut signal_handler)
                                     .await
                                     .map_err(handle_config_errors).ok();
 
