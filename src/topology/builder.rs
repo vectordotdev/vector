@@ -37,19 +37,46 @@ pub async fn load_enrichment_tables<'a>(
     let mut errors = vec![];
 
     // Build enrichment tables
-    for (name, table) in config
-        .enrichment_tables
-        .iter()
-        .filter(|(name, _)| diff.enrichment_tables.contains_new(name))
-    {
-        let table = match table.inner.build(&config.global).await {
-            Ok(table) => table,
-            Err(error) => {
-                errors.push(format!("Enrichment Table \"{}\": {}", name, error));
-                continue;
+    'tables: for (name, table) in config.enrichment_tables.iter() {
+        let table_name = name.to_string();
+        if ENRICHMENT_TABLES.needs_reload(&table_name) {
+            let indexes = if !diff.enrichment_tables.contains_new(name) {
+                // If this is an existing enrichment table, we need to store the indexes to reapply
+                // them again post load.
+                Some(ENRICHMENT_TABLES.index_fields(&table_name))
+            } else {
+                None
+            };
+
+            let mut table = match table.inner.build(&config.global).await {
+                Ok(table) => table,
+                Err(error) => {
+                    errors.push(format!("Enrichment Table \"{}\": {}", name, error));
+                    continue;
+                }
+            };
+
+            if let Some(indexes) = indexes {
+                for (case, index) in indexes {
+                    match table
+                        .add_index(case, &index.iter().map(|s| s.as_ref()).collect::<Vec<_>>())
+                    {
+                        Ok(_) => (),
+                        Err(error) => {
+                            // If there is an error adding an index we do not want to use the reloaded
+                            // data, the previously loaded data will still need to be used.
+                            // Just report the error and continue.
+                            error!(message = "Unable to add index to reloaded enrichment table.",
+                                    table = ?name.to_string(),
+                                    %error);
+                            continue 'tables;
+                        }
+                    }
+                }
             }
-        };
-        enrichment_tables.insert(name.to_string(), table);
+
+            enrichment_tables.insert(table_name, table);
+        }
     }
 
     ENRICHMENT_TABLES.load(enrichment_tables);

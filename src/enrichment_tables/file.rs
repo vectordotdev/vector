@@ -174,6 +174,7 @@ inventory::submit! {
 
 impl_generate_config_from_default!(FileConfig);
 
+#[derive(Clone)]
 pub struct File {
     config: FileConfig,
     timezone: TimeZone,
@@ -185,94 +186,6 @@ pub struct File {
         Vec<usize>,
         HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher>,
     )>,
-}
-
-impl Clone for File {
-    /// The clone method also checks if the underlying file has been modified and then if it has
-    /// it reloads the data.
-    ///
-    /// This is a slightly unorthodox use of clone. A preferred alternative would have been to
-    /// create an explicit method that would take a `File` and return either the existing or a
-    /// reloaded version of the object. However, since tables are stored as dyn objects this
-    /// prevents them returning Self.
-    ///
-    /// So this piggybacks on the functionality provided by `dyn_clone` to enable the struct to
-    /// return Self and performing the reloading as needed.
-    ///
-    /// Due to the amount of data that is likely to be stored in `File` a clone would be expensive
-    /// anyway and so cloning should only occur when absolutely necessary (when Vector receives a
-    /// SIGHUP to tell it to reload the config and data).
-    fn clone(&self) -> Self {
-        let reloaded = match fs::metadata(&self.config.file.path)
-            .and_then(|metadata| metadata.modified())
-        {
-            Ok(modified) if modified > self.last_modified => {
-                // The underlying file has been modified, so we clone by reloading the data.
-                match self.config.load_file(self.timezone) {
-                    Ok((headers, data, modified)) => {
-                        let indexes = self.index_fields();
-                        let mut cloned = Self {
-                            config: self.config.clone(),
-                            timezone: self.timezone,
-                            headers,
-                            data,
-                            last_modified: modified,
-                            indexes: Vec::new(),
-                        };
-
-                        match indexes
-                            .into_iter()
-                            .map(|(case, fields)| cloned.add_index(case, &fields))
-                            .collect::<Result<Vec<IndexHandle>, String>>()
-                        {
-                            Err(error) => {
-                                error!(message = "Unable to add index to reloaded enrichment file.",
-                                    file = ?self.config.file.path.to_str().unwrap_or("path with invalid utf"),
-                                    %error);
-                                None
-                            }
-                            Ok(_) => {
-                                // It is safe to ignore the returned index handle since that
-                                // represents the position of the index in the list, this will be
-                                // unchanged.
-                                trace!(
-                                    "Reloaded enrichment file {}.",
-                                    self.config
-                                        .file
-                                        .path
-                                        .to_str()
-                                        .unwrap_or("path with invalid utf"),
-                                );
-                                Some(cloned)
-                            }
-                        }
-                    }
-                    Err(error) => {
-                        error!(message = "Error reloading enrichment file.",
-                            file = ?self.config.file.path.to_str().unwrap_or("path with invalid utf"),
-                            %error);
-                        None
-                    }
-                }
-            }
-            Err(error) => {
-                error!(message = "Error fetching enrichment file metadata.",
-                    file = ?self.config.file.path.to_str().unwrap_or("path with invalid utf"),
-                    %error);
-                None
-            }
-            _ => None,
-        };
-
-        reloaded.unwrap_or_else(|| Self {
-            config: self.config.clone(),
-            timezone: self.timezone,
-            last_modified: self.last_modified,
-            data: self.data.clone(),
-            headers: self.headers.clone(),
-            indexes: self.indexes.clone(),
-        })
-    }
 }
 
 impl File {
@@ -448,23 +361,6 @@ impl File {
         let IndexHandle(handle) = handle;
         Ok(self.indexes[handle].2.get(&key))
     }
-
-    /// Returns a list of the field names that are in each index
-    fn index_fields(&self) -> Vec<(Case, Vec<&str>)> {
-        self.indexes
-            .iter()
-            .map(|index| {
-                let (case, fields, _) = index;
-                (
-                    *case,
-                    fields
-                        .iter()
-                        .map(|idx| self.headers[*idx].as_str())
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .collect::<Vec<_>>()
-    }
 }
 
 /// Adds the bytes from the given value to the hash.
@@ -580,6 +476,30 @@ impl Table for File {
                 Ok(IndexHandle(self.indexes.len() - 1))
             }
         }
+    }
+
+    /// Returns a list of the field names that are in each index
+    fn index_fields(&self) -> Vec<(Case, Vec<String>)> {
+        self.indexes
+            .iter()
+            .map(|index| {
+                let (case, fields, _) = index;
+                (
+                    *case,
+                    fields
+                        .iter()
+                        .map(|idx| self.headers[*idx].clone())
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect::<Vec<_>>()
+    }
+
+    /// Checks the modified timestamp of the data file to see if data has changed.
+    fn needs_reload(&self) -> bool {
+        matches!(fs::metadata(&self.config.file.path)
+            .and_then(|metadata| metadata.modified()),
+            Ok(modified) if modified > self.last_modified)
     }
 }
 
