@@ -1,5 +1,5 @@
 use chrono::{SecondsFormat, format::{DelayedFormat, StrftimeItems}, prelude::Local};
-use fakedata_generator::{gen_domain, gen_http_method, gen_ipv4, gen_username};
+use fakedata_generator::{gen_domain, gen_ipv4, gen_username};
 use rand::{thread_rng, Rng};
 
 static APPLICATION_NAMES: [&str; 10] = [

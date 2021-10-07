@@ -12,7 +12,7 @@ use crate::{
     transforms::Transform,
     Pipeline,
 };
-use futures::{future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use std::pin::Pin;
 use std::{
@@ -298,7 +298,7 @@ pub async fn build_pieces(
                 .take()
                 .expect("Task started but input has been taken.");
 
-            let mut rx = Box::pin(crate::utilization::wrap(rx));
+            let mut rx = crate::utilization::wrap(rx);
 
             sink.run(
                 rx.by_ref()

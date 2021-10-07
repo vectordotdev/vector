@@ -1,8 +1,8 @@
 use crate::event::{EventStatus, Finalizable};
 use buffers::{Ackable, Acker};
-use futures::{FutureExt, Stream, StreamExt, TryFutureExt, poll, ready, stream::FuturesUnordered};
+use futures::{FutureExt, Stream, StreamExt, TryFutureExt, poll, stream::FuturesUnordered};
 use std::{collections::{BinaryHeap, VecDeque}, fmt, task::Poll};
-use tokio::{pin, select, task::JoinError};
+use tokio::{pin, select};
 use tower::{Service, ServiceExt};
 use tracing::Instrument;
 
@@ -188,10 +188,9 @@ where
                                 };
                                 finalizers.update_status(status);
                                 (seqno, ack_size)
-                            });
-                            //.instrument(info_span!("request", request_id = %seqno));
+                            })
+                            .instrument(info_span!("request", request_id = %seqno));
 
-                        //let handle = tokio::spawn(fut);
                         in_flight.push(fut);
                     }
                 }

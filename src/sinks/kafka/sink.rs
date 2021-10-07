@@ -23,8 +23,6 @@ use std::convert::TryFrom;
 use tokio::time::Duration;
 use tower::limit::ConcurrencyLimit;
 use vector_core::buffers::Acker;
-use std::fs::File;
-use std::io::Read;
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {

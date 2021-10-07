@@ -8,4 +8,5 @@ set -e -o verbose
 if [[ "${CI-}" == "true" && "${PROFILE-}" != "debug" ]]; then
     echo "CARGO_PROFILE_RELEASE_LTO=fat" >> "${GITHUB_ENV}"
     echo "CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1" >> "${GITHUB_ENV}"
+    echo "CARGO_PROFILE_RELEASE_DEBUG=false" >> "${GITHUB_ENV}"
 fi

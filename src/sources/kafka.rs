@@ -9,11 +9,10 @@ use crate::{
     sources::util::TcpError,
     Pipeline,
 };
-use async_stream::stream;
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
-use futures_util::{future::ready, pin_mut, stream};
+use futures_util::{future::ready};
 use rdkafka::{
     config::ClientConfig,
     consumer::{Consumer, StreamConsumer},
