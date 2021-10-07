@@ -268,7 +268,7 @@ mod tests {
     use crate::{
         config::SinkConfig,
         sinks::util::test::{build_test_server_status, load_sink},
-        test_util::{next_addr, random_lines_with_stream},
+        test_util::{components, next_addr, random_lines_with_stream},
     };
     use bytes::Bytes;
     use futures::{
@@ -280,6 +280,8 @@ mod tests {
     use indoc::indoc;
     use pretty_assertions::assert_eq;
     use vector_core::event::{BatchNotifier, BatchStatus};
+
+    const SINK_TAGS: [&str; 1] = ["endpoint"];
 
     #[test]
     fn generate_config() {
@@ -325,7 +327,11 @@ mod tests {
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (expected, events) = random_events_with_stream(100, 10, Some(batch));
 
-        let _ = sink.run(events).await.unwrap();
+        components::init();
+        sink.run(events).await.unwrap();
+        if batch_status == BatchStatus::Delivered {
+            components::SINK_TESTS.assert(&SINK_TAGS);
+        }
 
         assert_eq!(receiver.try_recv(), Ok(batch_status));
 
@@ -392,7 +398,9 @@ mod tests {
             Ok(e)
         });
 
+        components::init();
         let _ = sink.into_sink().send_all(&mut events).await.unwrap();
+        components::SINK_TESTS.assert(&SINK_TAGS);
         let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
         for (i, val) in output.iter().enumerate() {

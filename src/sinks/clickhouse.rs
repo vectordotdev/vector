@@ -281,7 +281,10 @@ mod integration_tests {
     use crate::{
         config::{log_schema, SinkConfig, SinkContext},
         sinks::util::encoding::TimestampFormat,
-        test_util::{random_string, trace_init},
+        test_util::{
+            components::{self, SINK_TESTS},
+            random_string, trace_init,
+        },
     };
     use futures::{future, stream};
     use serde_json::Value;
@@ -297,6 +300,8 @@ mod integration_tests {
     use tokio::time::{timeout, Duration};
     use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
     use warp::Filter;
+
+    const SINK_TAGS: [&str; 1] = ["endpoint"];
 
     #[tokio::test]
     async fn insert_events() {
@@ -335,9 +340,7 @@ mod integration_tests {
             .as_mut_log()
             .insert("items", vec!["item1", "item2"]);
 
-        sink.run(stream::once(ready(input_event.clone())))
-            .await
-            .unwrap();
+        components::run_sink_event(sink, input_event.clone(), &SINK_TAGS).await;
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -381,9 +384,7 @@ mod integration_tests {
         let (mut input_event, mut receiver) = make_event();
         input_event.as_mut_log().insert("unknown", "mysteries");
 
-        sink.run(stream::once(ready(input_event.clone())))
-            .await
-            .unwrap();
+        components::run_sink_event(sink, input_event.clone(), &SINK_TAGS).await;
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -434,9 +435,7 @@ mod integration_tests {
 
         let (mut input_event, _receiver) = make_event();
 
-        sink.run(stream::once(future::ready(input_event.clone())))
-            .await
-            .unwrap();
+        components::run_sink_event(sink, input_event.clone(), &SINK_TAGS).await;
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -493,9 +492,7 @@ timestamp_format = "unix""#,
 
         let (mut input_event, _receiver) = make_event();
 
-        sink.run(stream::once(future::ready(input_event.clone())))
-            .await
-            .unwrap();
+        components::run_sink_event(sink, input_event.clone(), &SINK_TAGS).await;
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);

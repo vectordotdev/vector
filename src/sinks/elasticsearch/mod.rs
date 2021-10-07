@@ -1107,7 +1107,7 @@ mod integration_tests {
         config::{ProxyConfig, SinkConfig, SinkContext},
         http::HttpClient,
         sinks::HealthcheckError,
-        test_util::{random_events_with_stream, random_string, trace_init},
+        test_util::{components, random_events_with_stream, random_string, trace_init},
         tls::{self, TlsOptions},
     };
     use chrono::Utc;
@@ -1117,6 +1117,8 @@ mod integration_tests {
     use serde_json::{json, Value};
     use std::{fs::File, future::ready, io::Read};
     use vector_core::event::{BatchNotifier, BatchStatus, LogEvent};
+
+    const SINK_TAGS: [&str; 1] = ["endpoint"];
 
     impl ElasticSearchCommon {
         async fn flush_request(&self) -> crate::Result<()> {
@@ -1229,9 +1231,7 @@ mod integration_tests {
 
         let timestamp = input_event[crate::config::log_schema().timestamp_key()].clone();
 
-        sink.run(stream::once(ready(input_event.into())))
-            .await
-            .unwrap();
+        components::run_sink_event(sink, input_event.into(), &SINK_TAGS).await;
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
@@ -1446,17 +1446,20 @@ mod integration_tests {
         if break_events {
             // Break all but the first event to simulate some kind of partial failure
             let mut doit = false;
-            sink.run(events.map(move |mut event| {
-                if doit {
-                    event.as_mut_log().insert("_type", 1);
-                }
-                doit = true;
-                event
-            }))
-            .await
-            .expect("Sending events failed");
+            components::run_sink(
+                sink,
+                events.map(move |mut event| {
+                    if doit {
+                        event.as_mut_log().insert("_type", 1);
+                    }
+                    doit = true;
+                    event
+                }),
+                &SINK_TAGS,
+            )
+            .await;
         } else {
-            sink.run(events).await.expect("Sending events failed");
+            components::run_sink(sink, events, &SINK_TAGS).await;
         }
 
         assert_eq!(receiver.try_recv(), Ok(batch_status));

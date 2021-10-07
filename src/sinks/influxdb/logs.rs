@@ -240,13 +240,15 @@ mod tests {
             http::HttpSink,
             test::{build_test_server_status, load_sink},
         },
-        test_util::next_addr,
+        test_util::{components, next_addr},
     };
     use chrono::{offset::TimeZone, Utc};
     use futures::{channel::mpsc, stream, StreamExt};
     use http::{request::Parts, StatusCode};
     use indoc::indoc;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+
+    const SINK_TAGS: [&str; 1] = ["endpoint"];
 
     type Receiver = mpsc::Receiver<(Parts, bytes::Bytes)>;
 
@@ -591,7 +593,11 @@ mod tests {
         }
         drop(batch);
 
+        components::init();
         sink.run(stream::iter(events)).await.unwrap();
+        if batch_status == BatchStatus::Delivered {
+            components::SINK_TESTS.assert(&SINK_TAGS);
+        }
 
         assert_eq!(receiver.try_recv(), Ok(batch_status));
 
@@ -663,6 +669,7 @@ mod integration_tests {
             test_util::{onboarding_v2, BUCKET, ORG, TOKEN},
             InfluxDb2Settings,
         },
+        test_util::components,
     };
     use chrono::Utc;
     use futures::stream;
@@ -708,7 +715,7 @@ mod integration_tests {
 
         let events = vec![Event::Log(event1), Event::Log(event2)];
 
-        sink.run(stream::iter(events)).await.unwrap();
+        components::run_sink(sink, stream::iter(events), &SINK_TAGS).await;
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 

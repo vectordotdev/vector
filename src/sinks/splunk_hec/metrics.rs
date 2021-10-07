@@ -571,6 +571,7 @@ mod integration_tests {
         config::{SinkConfig, SinkContext},
         event::{Metric, MetricKind},
         sinks::splunk_hec::conn::integration_test_helpers::get_token,
+        test_util::components,
     };
     use futures::stream;
     use serde_json::Value as JsonValue;
@@ -580,6 +581,8 @@ mod integration_tests {
     use vector_core::event::{BatchNotifier, BatchStatus};
     const USERNAME: &str = "admin";
     const PASSWORD: &str = "password";
+
+    const SINK_TAGS: [&str; 1] = ["endpoint"];
 
     #[tokio::test]
     async fn splunk_insert_counter_metric() {
@@ -601,7 +604,7 @@ mod integration_tests {
         .with_batch_notifier(&batch)
         .into();
         drop(batch);
-        sink.run(stream::once(ready(event))).await.unwrap();
+        components::run_sink_event(sink, event, &SINK_TAGS).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         assert!(
@@ -633,7 +636,7 @@ mod integration_tests {
         .with_batch_notifier(&batch)
         .into();
         drop(batch);
-        sink.run(stream::once(ready(event))).await.unwrap();
+        components::run_sink_event(sink, event, &SINK_TAGS).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         assert!(

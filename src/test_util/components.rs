@@ -5,8 +5,10 @@
 //! internal events and metrics, and testing that they fit the required
 //! patterns.
 
-use crate::event::{Metric, MetricValue};
+use crate::event::{Event, Metric, MetricValue};
 use crate::metrics::{self, Controller};
+use crate::sinks::VectorSink;
+use futures::{stream, SinkExt, Stream, StreamExt};
 use lazy_static::lazy_static;
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -35,6 +37,17 @@ lazy_static! {
             "component_received_bytes_total",
             "component_received_events_total",
             "component_received_event_bytes_total",
+        ],
+        untagged_counters: &[
+            "component_sent_events_total",
+            "component_sent_event_bytes_total",
+        ],
+    };
+    /// The component test specification for all sinks
+    pub static ref SINK_TESTS: ComponentTests = ComponentTests {
+        events: &["EventsSent", "BytesSent"], // EventsReceived is emitted in the topology
+        tagged_counters: &[
+            "component_sent_bytes_total",
         ],
         untagged_counters: &[
             "component_sent_events_total",
@@ -144,4 +157,30 @@ impl ComponentTester {
             }
         }
     }
+}
+
+/// Convenience wrapper for running sink tests
+pub async fn run_sink<S>(sink: VectorSink, events: S, tags: &[&str])
+where
+    S: Stream<Item = Event> + Send,
+{
+    init();
+    sink.run(events).await.expect("Running sink failed");
+    SINK_TESTS.assert(tags);
+}
+
+/// Convenience wrapper for running a sink with a single event
+pub async fn run_sink_event(sink: VectorSink, event: Event, tags: &[&str]) {
+    init();
+    run_sink(sink, stream::once(std::future::ready(event)), tags).await
+}
+
+/// Convenience wrapper for running sinks with `send_all`
+pub async fn sink_send_all(sink: VectorSink, events: Vec<Event>, tags: &[&str]) {
+    init();
+    sink.into_sink()
+        .send_all(&mut stream::iter(events).map(Ok))
+        .await
+        .expect("Sending events to sink failed");
+    SINK_TESTS.assert(tags);
 }
