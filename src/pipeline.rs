@@ -39,17 +39,18 @@ impl Pipeline {
     ) -> Poll<Result<(), <Self as Sink<Event>>::Error>> {
         // We batch the updates to EventsSent for efficiency, and do it here because
         // it gives us a chance to allow the natural batching of `Pipeline` to kick in.
-        let mut sent = EventsSent {
-            count: 0,
-            byte_size: 0,
-        };
+        let mut sent_count = 0;
+        let mut sent_bytes = 0;
 
         while let Some(event) = self.enqueued.pop_front() {
             match self.inner.poll_ready(cx) {
                 Poll::Pending => {
                     self.enqueued.push_front(event);
-                    if sent.count > 0 {
-                        emit!(&sent);
+                    if sent_count > 0 {
+                        emit!(&EventsSent {
+                            count: sent_count,
+                            byte_size: sent_bytes,
+                        });
                     }
                     return Poll::Pending;
                 }
@@ -57,8 +58,11 @@ impl Pipeline {
                     // continue to send below
                 }
                 Poll::Ready(Err(_error)) => {
-                    if sent.count > 0 {
-                        emit!(&sent);
+                    if sent_count > 0 {
+                        emit!(&EventsSent {
+                            count: sent_count,
+                            byte_size: sent_bytes,
+                        });
                     }
                     return Poll::Ready(Err(ClosedError));
                 }
@@ -70,8 +74,8 @@ impl Pipeline {
                     // we good, keep looping
                     self.events_outstanding -= 1;
                     self.bytes_outstanding -= event_bytes;
-                    sent.count += 1;
-                    sent.byte_size += event_bytes;
+                    sent_count += 1;
+                    sent_bytes += event_bytes;
                 }
                 Err(error) if error.is_full() => {
                     // We only try to send after a successful call to poll_ready, which reserves
@@ -80,16 +84,22 @@ impl Pipeline {
                     panic!("Channel was both ready and full; this is a bug.")
                 }
                 Err(error) if error.is_disconnected() => {
-                    if sent.count > 0 {
-                        emit!(&sent);
+                    if sent_count > 0 {
+                        emit!(&EventsSent {
+                            count: sent_count,
+                            byte_size: sent_bytes,
+                        });
                     }
                     return Poll::Ready(Err(ClosedError));
                 }
                 Err(_) => unreachable!(),
             }
         }
-        if sent.count > 0 {
-            emit!(&sent);
+        if sent_count > 0 {
+            emit!(&EventsSent {
+                count: sent_count,
+                byte_size: sent_bytes,
+            });
         }
         Poll::Ready(Ok(()))
     }
