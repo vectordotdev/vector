@@ -11,10 +11,10 @@ This RFC proposes the addition of a new transform that provides a user the abili
 
 ### In scope
 
-* Dropping events (logs and metrics) to rate limit an event stream
+* Dropping logs to rate limit an event stream
 * Rate limit by both bytes (unserialized) and events
 * Exclude events with VRL conditions
-* Specify buckets based on the value of a key in the event
+* Optionally specify buckets based on the value of a key in the event
 
 ### Out of scope
 
@@ -46,11 +46,15 @@ Config:
 
 ```rust
 pub struct ThrottleConfig {
-    // One of events_* or bytes_* may be configured, but not both
-    events_per_second: u32,
-    bytes_per_second: u32,
+    threshold: Threshold,
+    window: f64,
     key_field: Option<String>,
     exclude: Option<AnyCondition>,
+}
+
+struct Threshold {
+    events: u32,
+    bytes: u32,
 }
 ```
 
@@ -65,8 +69,12 @@ impl TaskTransform for Throttle {
     where
         Self: 'static,
     {
-        let lim = RateLimiter::keyed(Quota::per_second(self.events_per_second));
+	let quota = Quota::with_period(Duration::from_secs(self.window))
+            .unwrap()
+	    .allow_burst(self.threshold);
+        let lim = RateLimiter::keyed(quota);
 
+	let mut flush_keys = tokio::time::interval(Duration::from_secs(self.window * 2);
         let mut flush_stream = tokio::time::interval(Duration::from_millis(1000));
 
         Box::pin(
@@ -77,6 +85,10 @@ impl TaskTransform for Throttle {
                     _ = flush_stream.tick() => {
                         false
                     }
+		    _ = flush_keys.tick() => {
+			lim.retain_recent();
+		    	false
+		    }
                     maybe_event = input_rx.next() => {
                         match maybe_event {
                             None => true,
@@ -100,7 +112,7 @@ impl TaskTransform for Throttle {
                                         false
                                     }
                                     _ => {
-                                        // Dropping event
+                                        emit!(EventRateLimited);
                                         false
                                     }
                                 }
@@ -140,15 +152,15 @@ impl TaskTransform for Throttle {
 
 ## Outstanding Questions
 
-* Rate limiting seems like it could be generically a `sink` concern and implemented as a composable part of our `sink` pattern. This could give more "accurate" serialized sizes and possibly be easier to manage for administrators (depending on needs). If rate limiting is also a `sink` concern should it only be implemented there or also available as a `transform`?
+* ~~Rate limiting seems like it could be generically a `sink` concern and implemented as a composable part of our `sink` pattern. This could give more "accurate" serialized sizes and possibly be easier to manage for administrators (depending on needs). If rate limiting is also a `sink` concern should it only be implemented there or also available as a `transform`?~~ We may additionally add this to sinks, but this transform has value on its own.
 
 ## Plan Of Attack
 
 * [ ] [feat(new transform): Initial throttle transform spike](https://github.com/vectordotdev/vector/pull/9378)
-* [ ] ...
+* [ ] Add documentations
 
 ## Future Improvements
 
-* Throttle by applying backpressure rather than dropping events completely
+* Configure the transform with additional behaviors
 * Batching multiple events through the rate limiter
-* ...
+* Optionally persist rate limiter state across restarts
