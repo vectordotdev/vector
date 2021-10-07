@@ -593,7 +593,6 @@ mod test {
                   encoding = "json"
             "#},
             Some(Format::Toml),
-            Default::default(),
         )
         .unwrap();
 
@@ -617,7 +616,6 @@ mod test {
                   encoding = "json"
             "#},
             Some(Format::Toml),
-            Default::default(),
         )
         .unwrap();
 
@@ -651,7 +649,6 @@ mod test {
                   encoding = "json"
             "#},
             Some(Format::Toml),
-            Default::default(),
         )
         .unwrap();
 
@@ -962,7 +959,6 @@ mod resource_tests {
                   encoding = "json"
             "#},
             Some(Format::Toml),
-            Default::default(),
         )
         .is_err());
     }
