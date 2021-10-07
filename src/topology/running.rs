@@ -515,7 +515,6 @@ impl RunningTopology {
             "sink",
             component_kind = "sink",
             component_id = %task.id(),
-            component_scope = %task.scope(),
             component_type = %task.typetag(),
             // maintained for compatibility
             component_name = %task.id(),
@@ -533,7 +532,6 @@ impl RunningTopology {
             "transform",
             component_kind = "transform",
             component_id = %task.id(),
-            component_scope = %task.scope(),
             component_type = %task.typetag(),
             // maintained for compatibility
             component_name = %task.id(),
@@ -551,7 +549,6 @@ impl RunningTopology {
             "source",
             component_kind = "source",
             component_id = %task.id(),
-            component_scope = %task.scope(),
             component_type = %task.typetag(),
             // maintained for compatibility
             component_name = %task.id(),
