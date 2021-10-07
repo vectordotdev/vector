@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{Event, Value, Metric, MetricValue},
+    event::{Event, Value, Metric, MetricValue, LogEvent},
     http::{HttpClient},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration, TimestampFormat},
@@ -54,37 +54,76 @@ pub struct NewRelicConfig {
     pub tls: Option<TlsOptions>,
 }
 
-pub struct NewRelicMetric;
+pub struct NewRelicMetric {
+    content:
+        Vec <
+            HashMap <
+                String,
+                Vec <
+                    HashMap <
+                        String,
+                        Value
+                    >
+                >
+            >
+        >
+}
 
 impl NewRelicMetric {
-    pub fn from_metric(metric: Metric) -> Option<Vec<u8>> {
-        let mut arr = vec!();
+    pub fn new(m_name: Value, m_type: Value, m_value: Value) -> Self {
+        let mut content = vec!();
         let mut map = HashMap::new();
         let mut metrics_arr = vec!();
         let mut metric_obj = HashMap::new();
+        metric_obj.insert("name".to_owned(), m_name);
+        metric_obj.insert("type".to_owned(), m_type);
+        metric_obj.insert("value".to_owned(), m_value);
+        metrics_arr.push(metric_obj);
+        map.insert("metrics".to_owned(), metrics_arr);
+        content.push(map);
 
-        metric_obj.insert("name", Value::from(metric.name().to_string()));
+        Self {
+            content
+        }
+    }
+
+    pub fn to_json(&self) -> Option<Vec<u8>> {
+        let mut json = serde_json::to_vec(&self.content).unwrap();
+        json.push(b'\n');
+        Some(json)
+    }
+    
+    pub fn from_metric(metric: Metric) -> Option<Vec<u8>> {
         match metric.value() {
             MetricValue::Gauge { value } => {
-                metric_obj.insert("type", Value::from("gauge".to_string()));
-                metric_obj.insert("value", Value::from(*value));
+                Self::new(
+                    Value::from(metric.name().to_string()),
+                    Value::from("gauge".to_string()),
+                    Value::from(*value)
+                ).to_json()
             },
             MetricValue::Counter { value } => {
-                metric_obj.insert("type", Value::from("count".to_string()));
-                metric_obj.insert("value", Value::from(*value));
+                Self::new(
+                    Value::from(metric.name().to_string()),
+                    Value::from("count".to_string()),
+                    Value::from(*value)
+                ).to_json()
             },
             _ => {
-                return None;
+                None
             }
         }
+    }
 
-        metrics_arr.push(metric_obj);
-        map.insert("metrics", metrics_arr);
-        arr.push(map);
-
-        let mut body = serde_json::to_vec(&arr).expect("Events should be valid json!");
-        body.push(b'\n');
-        Some(body)
+    pub fn from_log(log: LogEvent) -> Option<Vec<u8>> {
+        if let Some(m_name) = log.get("name") {
+            if let Some(m_value) = log.get("value") {
+                if let Some(m_type) = log.get("type") {
+                    return Self::new(m_name.clone(), m_type.clone(), m_value.clone()).to_json();
+                }
+            }
+        }
+        None
     }
 }
 
@@ -173,13 +212,7 @@ impl HttpSink for NewRelicConfig {
             NewRelicApi::Metrics => {
                 match event {
                     Event::Log(mut log) => {
-                        //TODO: For Metrics, check name and valu exist and has correct type. Also check type has a valid value if exist
-                        log.remove("host");
-                        log.remove("message");
-                        log.remove("source_type");
-                        let mut body = serde_json::to_vec(&log).expect("Events should be valid json!");
-                        body.push(b'\n');
-                        Some(body)
+                        NewRelicMetric::from_log(log)
                     },
                     Event::Metric(metric) => {
                         NewRelicMetric::from_metric(metric)
@@ -197,17 +230,6 @@ impl HttpSink for NewRelicConfig {
                 }
             }
         }
-
-        /*
-        println!("----------> LOG object = {:#?}", log);
-
-        let field = crate::config::log_schema().message_key();
-        println!("----------> Get field {}", field);
-        let message = log.get(field).expect("Message field not found");
-        let message = message.to_string_lossy();
-
-        println!("Message is = {:#?}", message);
-        */
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
