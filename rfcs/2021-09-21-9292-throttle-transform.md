@@ -52,9 +52,9 @@ pub struct ThrottleConfig {
     exclude: Option<AnyCondition>,
 }
 
-struct Threshold {
-    events: u32,
-    bytes: u32,
+enum Threshold {
+    Events(u32),
+    Bytes(u32),
 }
 ```
 
