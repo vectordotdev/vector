@@ -54,15 +54,23 @@ pub struct NewRelicConfig {
     pub tls: Option<TlsOptions>,
 }
 
-type NRMetricData = HashMap<String, Value>;
-type NRMetricStore = HashMap<String, Vec<NRMetricData>>;
+pub trait ToJSON : Serialize {
+    fn to_json(&self) -> Option<Vec<u8>> {
+        let mut json = serde_json::to_vec(self).ok()?;
+        json.push(b'\n');
+        Some(json)
+    }
+}
+
+type NRKeyValData = HashMap<String, Value>;
+type NRMetricStore = HashMap<String, Vec<NRKeyValData>>;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NewRelicMetric(Vec<NRMetricStore>);
 
 impl NewRelicMetric {
     pub fn new(m_name: Value, m_type: Value, m_value: Value) -> Self {
-        let mut metric_data = NRMetricData::new();
+        let mut metric_data = NRKeyValData::new();
         metric_data.insert("name".to_owned(), m_name);
         metric_data.insert("type".to_owned(), m_type);
         metric_data.insert("value".to_owned(), m_value);
@@ -70,26 +78,20 @@ impl NewRelicMetric {
         metric_store.insert("metrics".to_owned(), vec!(metric_data));
         Self(vec!(metric_store))
     }
-
-    pub fn to_json(&self) -> Option<Vec<u8>> {
-        let mut json = serde_json::to_vec(&self).unwrap();
-        json.push(b'\n');
-        Some(json)
-    }
     
     pub fn json_from_metric(metric: Metric) -> Option<Vec<u8>> {
         match metric.value() {
             MetricValue::Gauge { value } => {
                 Self::new(
-                    Value::from(metric.name().to_string()),
-                    Value::from("gauge".to_string()),
+                    Value::from(metric.name().to_owned()),
+                    Value::from("gauge".to_owned()),
                     Value::from(*value)
                 ).to_json()
             },
             MetricValue::Counter { value } => {
                 Self::new(
-                    Value::from(metric.name().to_string()),
-                    Value::from("count".to_string()),
+                    Value::from(metric.name().to_owned()),
+                    Value::from("count".to_owned()),
                     Value::from(*value)
                 ).to_json()
             },
@@ -110,6 +112,52 @@ impl NewRelicMetric {
         None
     }
 }
+
+impl ToJSON for NewRelicMetric {}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct NewRelicEvent(NRKeyValData);
+
+impl NewRelicEvent {
+    pub fn new() -> Self {
+        Self(NRKeyValData::new())
+    }
+
+    pub fn json_from_log(log: LogEvent) -> Option<Vec<u8>> {
+        let mut s = Self::new();
+        for (k, v) in log.all_fields() {
+            s.0.insert(k, v.clone());
+        }
+        if let None = log.get("eventType") {
+            s.0.insert("eventType".to_owned(), Value::from("VectorSink".to_owned()));
+        }
+        s.to_json()
+    }
+}
+
+impl ToJSON for NewRelicEvent {}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct NewRelicLog(NRKeyValData);
+
+impl NewRelicLog {
+    pub fn new() -> Self {
+        Self(NRKeyValData::new())
+    }
+
+    pub fn json_from_log(log: LogEvent) -> Option<Vec<u8>> {
+        let mut s = Self::new();
+        for (k, v) in log.all_fields() {
+            s.0.insert(k, v.clone());
+        }
+        if let None = log.get("message") {
+            s.0.insert("message".to_owned(), Value::from("log from vector".to_owned()));
+        }
+        s.to_json()
+    }
+}
+
+impl ToJSON for NewRelicLog {}
 
 inventory::submit! {
     SinkDescription::new::<NewRelicConfig>("new_relic")
@@ -181,13 +229,8 @@ impl HttpSink for NewRelicConfig {
 
         match self.api {
             NewRelicApi::Events => {
-                if let Event::Log(mut log) = event {
-                    if let None = log.get("eventType") {
-                        log.insert("eventType", Value::from(String::from("VectorSink")));
-                    }
-                    let mut body = serde_json::to_vec(&log).expect("Events should be valid json!");
-                    body.push(b'\n');
-                    Some(body)
+                if let Event::Log(log) = event {
+                    NewRelicEvent::json_from_log(log)
                 }
                 else {
                     None
@@ -205,9 +248,7 @@ impl HttpSink for NewRelicConfig {
             },
             NewRelicApi::Logs => {
                 if let Event::Log(log) = event {
-                    let mut body = serde_json::to_vec(&log).expect("Events should be valid json!");
-                    body.push(b'\n');
-                    Some(body)
+                    NewRelicLog::json_from_log(log)
                 }
                 else {
                     None
@@ -234,13 +275,18 @@ impl HttpSink for NewRelicConfig {
             },
             NewRelicApi::Logs => {
                 match self.region.as_ref().unwrap_or(&NewRelicRegion::Us) {
+                    NewRelicRegion::Us => Uri::from_static("http://localhost:8888/logs/us"),
+                    NewRelicRegion::Eu => Uri::from_static("http://localhost:8888/logs/eu"),
+                    /*
                     NewRelicRegion::Us => Uri::from_static("https://log-api.newrelic.com/log/v1"),
                     NewRelicRegion::Eu => Uri::from_static("https://log-api.eu.newrelic.com/log/v1"),
+                    */
                 }
             }
         };
 
         let mut builder = Request::post(&uri).header("Content-Type", "application/json");
+        //TODO: change it when sending metrics, use "Api-Key" instead
         builder = builder.header("X-License-Key", self.license_key.clone());
 
         if let Some(ce) = self.compression.content_encoding() {
