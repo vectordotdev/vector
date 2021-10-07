@@ -32,7 +32,7 @@
 //! it to notify the consumer that the request has succeeded.
 
 use super::{
-    batch::{Batch, FinalizersBatch, PushResult, StatefulBatch},
+    batch::{Batch, EncodedBatch, FinalizersBatch, PushResult, StatefulBatch},
     buffer::{Partition, PartitionBuffer, PartitionInnerBuffer},
     service::{Map, ServiceBuilderExt},
     EncodedEvent,
@@ -368,8 +368,8 @@ where
                     this.lingers.remove(partition);
 
                     let batch_size = batch.num_items();
-                    let (batch, finalizers, _byte_size) = batch.finish();
-                    let future = tokio::spawn(this.service.call(batch, batch_size, finalizers));
+                    let batch = batch.finish();
+                    let future = tokio::spawn(this.service.call(batch, batch_size));
 
                     if let Some(map) = this.in_flight.as_mut() {
                         map.insert(partition.clone(), future.map(|_| ()).fuse().boxed());
@@ -491,12 +491,13 @@ where
         self.service.poll_ready(cx).map_err(Into::into)
     }
 
-    fn call(
-        &mut self,
-        req: Request,
-        batch_size: usize,
-        finalizers: EventFinalizers,
-    ) -> BoxFuture<'static, ()> {
+    fn call(&mut self, batch: EncodedBatch<Request>, batch_size: usize) -> BoxFuture<'static, ()> {
+        let EncodedBatch {
+            items,
+            finalizers,
+            count,
+            byte_size,
+        } = batch;
         let seqno = self.seq_head;
         self.seq_head += 1;
 
@@ -513,7 +514,7 @@ where
         );
         let logic = self.logic.clone();
         self.service
-            .call(req)
+            .call(items)
             .err_into()
             .map(move |result| {
                 logic.update_finalizers(result, finalizers);
@@ -1075,10 +1076,16 @@ mod tests {
             }
         });
         let mut sink = ServiceSink::new(svc, acker);
+        let req = |items: u8| EncodedBatch {
+            items,
+            finalizers: Default::default(),
+            count: items as usize,
+            byte_size: 1,
+        };
 
         // send some initial requests
-        let mut fut1 = sink.call(1, 1, Default::default());
-        let mut fut2 = sink.call(2, 2, Default::default());
+        let mut fut1 = sink.call(req(1), 1);
+        let mut fut2 = sink.call(req(2), 2);
 
         assert_eq!(ack_counter.load(Relaxed), 0);
 
@@ -1090,8 +1097,8 @@ mod tests {
         assert_eq!(ack_counter.load(Relaxed), 3);
 
         // send one request that will error and one normal
-        let mut fut3 = sink.call(3, 3, Default::default()); // i will error
-        let mut fut4 = sink.call(4, 4, Default::default());
+        let mut fut3 = sink.call(req(3), 3); // I will error
+        let mut fut4 = sink.call(req(4), 4);
 
         // make sure they all "worked"
         assert!(matches!(fut3.poll_unpin(&mut cx), Poll::Ready(())));
