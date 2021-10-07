@@ -66,7 +66,7 @@ impl InstallOpts {
 
         let current_exe = ::std::env::current_exe().unwrap();
         let config_paths = self.config_paths_with_formats();
-        let arguments = create_service_arguments(&config_paths, &vec![]).unwrap();
+        let arguments = create_service_arguments(&config_paths).unwrap();
 
         ServiceInfo {
             name: OsString::from(service_name),
