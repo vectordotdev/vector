@@ -302,7 +302,7 @@ tonic-build = { version = "0.5", default-features = false, features = ["transpor
 
 [dev-dependencies]
 approx = "0.5.0"
-assert_cmd = "2.0.1"
+assert_cmd = "2.0.2"
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
 libc = "0.2.103"
