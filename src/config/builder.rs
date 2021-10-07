@@ -4,8 +4,8 @@ use super::api;
 use super::datadog;
 use super::{
     compiler, pipeline::Pipelines, provider, ComponentKey, Config, EnrichmentTableConfig,
-    EnrichmentTableOuter, HealthcheckOptions, OutputId, SinkConfig, SinkOuter, SourceConfig,
-    SourceOuter, TestDefinition, TransformOuter,
+    EnrichmentTableOuter, HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter,
+    TestDefinition, TransformOuter,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -53,39 +53,47 @@ impl Clone for ConfigBuilder {
 }
 
 impl From<Config> for ConfigBuilder {
-    fn from(mut c: Config) -> Self {
-        let transforms = std::mem::take(&mut c.transforms)
+    fn from(config: Config) -> Self {
+        let Config {
+            global,
+            #[cfg(feature = "api")]
+            api,
+            #[cfg(feature = "datadog-pipelines")]
+            datadog,
+            healthchecks,
+            enrichment_tables,
+            sources,
+            sinks,
+            transforms,
+            tests,
+            expansions: _,
+        } = config;
+
+        let transforms = transforms
             .into_iter()
-            .map(|(key, transform)| (key, transform.map_inputs(stringify_input)))
+            .map(|(key, transform)| (key, transform.map_inputs(ToString::to_string)))
             .collect();
 
-        let sinks = std::mem::take(&mut c.sinks)
+        let sinks = sinks
             .into_iter()
-            .map(|(key, sink)| (key, sink.map_inputs(stringify_input)))
+            .map(|(key, sink)| (key, sink.map_inputs(ToString::to_string)))
             .collect();
 
         ConfigBuilder {
-            global: c.global,
+            global,
             #[cfg(feature = "api")]
-            api: c.api,
+            api,
             #[cfg(feature = "datadog-pipelines")]
-            datadog: c.datadog,
-            healthchecks: c.healthchecks,
-            enrichment_tables: c.enrichment_tables,
-            sources: c.sources,
+            datadog,
+            healthchecks,
+            enrichment_tables,
+            sources,
             sinks,
             transforms,
             provider: None,
-            tests: c.tests,
+            tests,
             pipelines: Default::default(),
         }
-    }
-}
-
-fn stringify_input(output_id: OutputId) -> String {
-    match output_id.port {
-        Some(port) => format!("{}.{}", output_id.component, port),
-        None => output_id.component.to_string(),
     }
 }
 
