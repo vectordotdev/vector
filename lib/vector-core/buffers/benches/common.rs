@@ -1,6 +1,7 @@
 use buffers::bytes::{DecodeBytes, EncodeBytes};
 use buffers::{self, Variant};
 use bytes::{Buf, BufMut};
+use core_common::byte_size_of::ByteSizeOf;
 use futures::task::{noop_waker, Context, Poll};
 use futures::{Sink, Stream};
 use std::fmt;
@@ -19,6 +20,12 @@ impl<const N: usize> Message<N> {
             id,
             _padding: [0; N],
         }
+    }
+}
+
+impl<const N: usize> ByteSizeOf for Message<N> {
+    fn allocated_bytes(&self) -> usize {
+        0
     }
 }
 
