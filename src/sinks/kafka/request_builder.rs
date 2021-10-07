@@ -1,17 +1,19 @@
-use crate::config::log_schema;
 use crate::event::{Event, Finalizable, Value};
 use crate::internal_events::KafkaHeaderExtractionFailed;
 use crate::sinks::kafka::encoder::Encoding;
 use crate::sinks::kafka::service::{KafkaRequest, KafkaRequestMetadata};
 use crate::sinks::util::encoding::{Encoder, EncodingConfig};
 use crate::template::Template;
+use bytes::Bytes;
 use rdkafka::message::OwnedHeaders;
+use vector_core::config::LogSchema;
 
 pub struct KafkaRequestBuilder {
     pub key_field: Option<String>,
     pub headers_field: Option<String>,
     pub topic_template: Template,
     pub encoder: EncodingConfig<Encoding>,
+    pub log_schema: &'static LogSchema,
 }
 
 impl KafkaRequestBuilder {
@@ -20,7 +22,7 @@ impl KafkaRequestBuilder {
         let metadata = KafkaRequestMetadata {
             finalizers: event.take_finalizers(),
             key: get_key(&event, &self.key_field),
-            timestamp_millis: get_timestamp_millis(&event),
+            timestamp_millis: get_timestamp_millis(&event, self.log_schema),
             headers: get_headers(&event, &self.headers_field),
             topic,
         };
@@ -31,20 +33,20 @@ impl KafkaRequestBuilder {
     }
 }
 
-fn get_key(event: &Event, key_field: &Option<String>) -> Option<Vec<u8>> {
+fn get_key(event: &Event, key_field: &Option<String>) -> Option<Bytes> {
     key_field.as_ref().and_then(|key_field| match event {
-        Event::Log(log) => log.get(key_field).map(|value| value.as_bytes().to_vec()),
+        Event::Log(log) => log.get(key_field).map(|value| value.as_bytes()),
         Event::Metric(metric) => metric
             .tags()
             .and_then(|tags| tags.get(key_field))
-            .map(|value| value.clone().into_bytes()),
+            .map(|value| value.clone().into()),
     })
 }
 
-fn get_timestamp_millis(event: &Event) -> Option<i64> {
+fn get_timestamp_millis(event: &Event, log_schema: &'static LogSchema) -> Option<i64> {
     match &event {
         Event::Log(log) => log
-            .get(log_schema().timestamp_key())
+            .get(log_schema.timestamp_key())
             .and_then(|v| v.as_timestamp())
             .copied(),
         Event::Metric(metric) => metric.timestamp(),

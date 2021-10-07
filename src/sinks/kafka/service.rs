@@ -1,6 +1,7 @@
 use crate::buffers::Ackable;
 use crate::event::{EventFinalizers, EventStatus, Finalizable};
 use crate::kafka::KafkaStatisticsContext;
+use bytes::Bytes;
 use futures::future::BoxFuture;
 use rdkafka::error::KafkaError;
 use rdkafka::message::OwnedHeaders;
@@ -16,7 +17,7 @@ pub struct KafkaRequest {
 
 pub struct KafkaRequestMetadata {
     pub finalizers: EventFinalizers,
-    pub key: Option<Vec<u8>>,
+    pub key: Option<Bytes>,
     pub timestamp_millis: Option<i64>,
     pub headers: Option<OwnedHeaders>,
     pub topic: String,
@@ -68,7 +69,7 @@ impl Service<KafkaRequest> for KafkaService {
         Box::pin(async move {
             let mut record = FutureRecord::to(&request.metadata.topic).payload(&request.body);
             if let Some(key) = &request.metadata.key {
-                record = record.key(key);
+                record = record.key(&key[..]);
             }
             if let Some(timestamp) = request.metadata.timestamp_millis {
                 record = record.timestamp(timestamp);

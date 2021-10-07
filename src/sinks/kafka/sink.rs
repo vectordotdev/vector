@@ -18,6 +18,7 @@ use rdkafka::error::KafkaError;
 use rdkafka::producer::FutureProducer;
 use rdkafka::ClientConfig;
 use snafu::{ResultExt, Snafu};
+use vector_core::config::log_schema;
 use std::convert::TryFrom;
 use tokio::time::Duration;
 use tower::limit::ConcurrencyLimit;
@@ -65,16 +66,17 @@ impl KafkaSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let service = ConcurrencyLimit::new(self.service, QUEUED_MIN_MESSAGES as usize);
+        //let service = ConcurrencyLimit::new(self.service, QUEUED_MIN_MESSAGES as usize);
         let request_builder = KafkaRequestBuilder {
             key_field: self.key_field,
             headers_field: self.headers_field,
             topic_template: self.topic,
             encoder: self.encoding,
+            log_schema: log_schema(),
         };
         let sink = input
             .filter_map(|event| future::ready(request_builder.build_request(event)))
-            .into_driver(service, self.acker);
+            .into_driver(self.service, self.acker);
         sink.run().await
     }
 }

@@ -21,7 +21,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
-use tokio::time::{timeout, Duration};
+use tokio::{select, time::{timeout, Duration}};
 use vector_core::ByteSizeOf;
 
 lazy_static! {
@@ -126,12 +126,21 @@ pub async fn build_pieces(
         // force_shutdown_tripwire. That means that if the force_shutdown_tripwire resolves while
         // the server Task is still running the Task will simply be dropped on the floor.
         let server = async {
-            match future::try_select(server, force_shutdown_tripwire.unit_error().boxed()).await {
-                Ok(_) => {
+            let result = select! {
+                biased;
+
+                _ = force_shutdown_tripwire => {
+                    Ok(())
+                },
+                result = server => result,
+            };
+
+            match result  {
+                Ok(()) => {
                     debug!("Finished.");
                     Ok(TaskOutput::Source)
-                }
-                Err(_) => Err(()),
+                },
+                Err(()) => Err(()),
             }
         };
         let server = Task::new(key.clone(), typetag, server);

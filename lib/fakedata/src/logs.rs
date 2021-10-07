@@ -1,22 +1,23 @@
-use chrono::{prelude::Local, SecondsFormat};
+use chrono::{SecondsFormat, format::{DelayedFormat, StrftimeItems}, prelude::Local};
 use fakedata_generator::{gen_domain, gen_http_method, gen_ipv4, gen_username};
 use rand::{thread_rng, Rng};
 
-const APPLICATION_NAMES: [&str; 10] = [
+static APPLICATION_NAMES: [&str; 10] = [
     "auth", "data", "deploy", "etl", "scraper", "cron", "ingress", "egress", "alerter", "fwd",
 ];
 
-const ERROR_LEVELS: [&str; 9] = [
+static ERROR_LEVELS: [&str; 9] = [
     "alert", "crit", "debug", "emerg", "error", "info", "notice", "trace1-8", "warn",
 ];
 
-const HTTP_CODES: [usize; 15] = [
+static HTTP_CODES: [usize; 15] = [
     200, 300, 301, 302, 304, 307, 400, 401, 403, 404, 410, 500, 501, 503, 550,
 ];
 
-const HTTP_VERSIONS: [&str; 3] = ["HTTP/1.0", "HTTP/1.1", "HTTP/2.0"];
+static HTTP_VERSIONS: [&str; 3] = ["HTTP/1.0", "HTTP/1.1", "HTTP/2.0"];
+static HTTP_METHODS: [&str; 7] = ["DELETE", "GET", "HEAD", "OPTION", "PATCH", "POST", "PUT"];
 
-const HTTP_ENDPOINTS: [&str; 9] = [
+static HTTP_ENDPOINTS: [&str; 9] = [
     "/wp-admin",
     "/controller/setup",
     "/user/booperbot124",
@@ -28,7 +29,7 @@ const HTTP_ENDPOINTS: [&str; 9] = [
     "/this/endpoint/prints/money",
 ];
 
-const ERROR_MESSAGES: [&str; 9] = [
+static ERROR_MESSAGES: [&str; 9] = [
     "There's a breach in the warp core, captain",
     "Great Scott! We're never gonna reach 88 mph with the flux capacitor in its current state!",
     "You're not gonna believe what just happened",
@@ -125,76 +126,76 @@ pub fn json_log_line() -> String {
 }
 
 // Formatted timestamps
-fn timestamp_apache_common() -> String {
-    Local::now().format(APACHE_COMMON_TIME_FORMAT).to_string()
+fn timestamp_apache_common() -> DelayedFormat<StrftimeItems<'static>> {
+    Local::now().format(APACHE_COMMON_TIME_FORMAT)
 }
 
-fn timestamp_apache_error() -> String {
-    Local::now().format(APACHE_ERROR_TIME_FORMAT).to_string()
+fn timestamp_apache_error() -> DelayedFormat<StrftimeItems<'static>> {
+    Local::now().format(APACHE_ERROR_TIME_FORMAT)
 }
 
-fn timestamp_syslog_3164() -> String {
-    Local::now().format(SYSLOG_3164_FORMAT).to_string()
+fn timestamp_syslog_3164() -> DelayedFormat<StrftimeItems<'static>> {
+    Local::now().format(SYSLOG_3164_FORMAT)
 }
 
 fn timestamp_syslog_5424() -> String {
     Local::now().to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
-fn timestamp_json() -> String {
-    Local::now().format(JSON_TIME_FORMAT).to_string()
+fn timestamp_json() -> DelayedFormat<StrftimeItems<'static>> {
+    Local::now().format(JSON_TIME_FORMAT)
 }
 
 // Other random strings
-fn application() -> String {
-    random_from_array(&APPLICATION_NAMES).to_string()
+fn application() -> &'static str {
+    random_from_array(&APPLICATION_NAMES)
 }
 
 fn domain() -> String {
     gen_domain()
 }
 
-fn error_level() -> String {
-    random_from_array(&ERROR_LEVELS).to_string()
+fn error_level() -> &'static str {
+    random_from_array(&ERROR_LEVELS)
 }
 
-fn error_message() -> String {
-    random_from_array(&ERROR_MESSAGES).to_string()
+fn error_message() -> &'static str {
+    random_from_array(&ERROR_MESSAGES)
 }
 
-fn http_code() -> String {
-    random_from_array(&HTTP_CODES).to_string()
+fn http_code() -> usize {
+    random_from_array_copied(&HTTP_CODES)
 }
 
-fn byte_size() -> String {
+fn byte_size() -> usize {
     random_in_range(50, 50000)
 }
 
-fn http_endpoint() -> String {
-    random_from_array(&HTTP_ENDPOINTS).into()
+fn http_endpoint() -> &'static str {
+    random_from_array(&HTTP_ENDPOINTS)
 }
 
-fn http_method() -> String {
-    gen_http_method()
+fn http_method() -> &'static str {
+    random_from_array(&HTTP_METHODS)
 }
 
-fn http_version() -> String {
-    random_from_array(&HTTP_VERSIONS).into()
+fn http_version() -> &'static str {
+    random_from_array(&HTTP_VERSIONS)
 }
 
 fn ipv4_address() -> String {
     gen_ipv4()
 }
 
-fn pid() -> String {
+fn pid() -> usize {
     random_in_range(1, 9999)
 }
 
-fn port() -> String {
+fn port() -> usize {
     random_in_range(1024, 65535)
 }
 
-fn priority() -> String {
+fn priority() -> usize {
     random_in_range(0, 191)
 }
 
@@ -206,15 +207,19 @@ fn username() -> String {
     gen_username()
 }
 
-fn syslog_version() -> String {
+fn syslog_version() -> usize {
     random_in_range(1, 3)
 }
 
 // Helper functions
-fn random_in_range(min: usize, max: usize) -> String {
-    thread_rng().gen_range(min..max).to_string()
+fn random_in_range(min: usize, max: usize) -> usize {
+    thread_rng().gen_range(min..max)
 }
 
-fn random_from_array<T: Copy>(v: &[T]) -> T {
+fn random_from_array<T: ?Sized>(v: &'static [&'static T]) -> &'static T {
+    &v[thread_rng().gen_range(0..v.len())]
+}
+
+fn random_from_array_copied<T: Copy>(v: &[T]) -> T {
     v[thread_rng().gen_range(0..v.len())]
 }
