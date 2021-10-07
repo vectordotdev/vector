@@ -28,7 +28,6 @@ mod diff;
 pub mod format;
 mod id;
 mod loading;
-mod pipeline;
 pub mod provider;
 mod unit_test;
 mod validation;
