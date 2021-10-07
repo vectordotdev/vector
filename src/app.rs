@@ -163,16 +163,12 @@ impl Application {
                     paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
                 );
 
-                config::init_log_schema(&config_paths, &vec![], true)
-                    .map_err(handle_config_errors)?;
+                config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
 
-                let mut config = config::load_from_paths_with_provider(
-                    &config_paths,
-                    &vec![],
-                    &mut signal_handler,
-                )
-                .await
-                .map_err(handle_config_errors)?;
+                let mut config =
+                    config::load_from_paths_with_provider(&config_paths, &mut signal_handler)
+                        .await
+                        .map_err(handle_config_errors)?;
 
                 if !config.healthchecks.enabled {
                     info!("Health checks are disabled.");
@@ -302,7 +298,7 @@ impl Application {
                                 config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
 
                                 // Reload config
-                                let new_config = config::load_from_paths_with_provider(&config_paths, &vec![], &mut signal_handler)
+                                let new_config = config::load_from_paths_with_provider(&config_paths, &mut signal_handler)
                                     .await
                                     .map_err(handle_config_errors).ok();
 

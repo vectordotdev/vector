@@ -133,10 +133,10 @@ fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         fmt.title(format!("Failed to load {:?}", &paths_list));
         fmt.sub_error(errors);
     };
-    config::init_log_schema(&paths, &vec![], true)
+    config::init_log_schema(&paths, true)
         .map_err(&mut report_error)
         .ok()?;
-    let (builder, load_warnings) = config::load_builder_and_pipelines_from_paths(&paths, &vec![])
+    let (builder, load_warnings) = config::load_builder_from_paths(&paths)
         .map_err(&mut report_error)
         .ok()?;
 

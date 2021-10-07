@@ -251,12 +251,9 @@ fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::Ex
     }
 }
 
-fn create_service_arguments(
-    config_paths: &[config::ConfigPath],
-    pipeline_paths: &[PathBuf],
-) -> Option<Vec<OsString>> {
+fn create_service_arguments(config_paths: &[config::ConfigPath]) -> Option<Vec<OsString>> {
     let config_paths = config::process_paths(config_paths)?;
-    match config::load_from_paths(&config_paths, pipeline_paths) {
+    match config::load_from_paths(&config_paths) {
         Ok(_) => Some(
             config_paths
                 .iter()

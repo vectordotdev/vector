@@ -1,6 +1,5 @@
 use super::{
-    builder::ConfigBuilder, format, pipeline::Pipelines, validation, vars, Config, ConfigPath,
-    Format, FormatHint,
+    builder::ConfigBuilder, format, validation, vars, Config, ConfigPath, Format, FormatHint,
 };
 use crate::signal;
 use glob::glob;
@@ -97,12 +96,8 @@ pub fn process_paths(config_paths: &[ConfigPath]) -> Option<Vec<ConfigPath>> {
     Some(paths)
 }
 
-pub fn load_from_paths(
-    config_paths: &[ConfigPath],
-    pipeline_paths: &[PathBuf],
-) -> Result<Config, Vec<String>> {
-    let (builder, load_warnings) =
-        load_builder_and_pipelines_from_paths(config_paths, pipeline_paths)?;
+pub fn load_from_paths(config_paths: &[ConfigPath]) -> Result<Config, Vec<String>> {
+    let (builder, load_warnings) = load_builder_from_paths(config_paths)?;
     let (config, build_warnings) = builder.build_with_warnings()?;
 
     for warning in load_warnings.into_iter().chain(build_warnings) {
@@ -116,11 +111,9 @@ pub fn load_from_paths(
 /// used as bootstrapping for a remote source. Otherwise, provider instantiation is skipped.
 pub async fn load_from_paths_with_provider(
     config_paths: &[ConfigPath],
-    pipeline_paths: &[PathBuf],
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Config, Vec<String>> {
-    let (mut builder, load_warnings) =
-        load_builder_and_pipelines_from_paths(config_paths, pipeline_paths)?;
+    let (mut builder, load_warnings) = load_builder_from_paths(config_paths)?;
     validation::check_provider(&builder)?;
     signal_handler.clear();
 
@@ -139,35 +132,7 @@ pub async fn load_from_paths_with_provider(
     Ok(new_config)
 }
 
-fn pipeline_paths_from_config_paths(config_paths: &[ConfigPath]) -> Vec<PathBuf> {
-    config_paths
-        .iter()
-        .filter_map(|path| path.pipeline_dir())
-        .filter(|path| path.exists())
-        .collect()
-}
-
-fn load_pipelines_from_paths(pipeline_paths: &[PathBuf]) -> Result<Pipelines, Vec<String>> {
-    Pipelines::load_from_paths(pipeline_paths)
-}
-
-pub fn load_builder_and_pipelines_from_paths(
-    config_paths: &[ConfigPath],
-    pipeline_paths: &[PathBuf],
-) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
-    let pipelines = if pipeline_paths.is_empty() {
-        let pipeline_paths = pipeline_paths_from_config_paths(config_paths);
-        load_pipelines_from_paths(&pipeline_paths)?
-    } else {
-        load_pipelines_from_paths(pipeline_paths)?
-    };
-    let (mut builder, load_warnings) = load_builder_from_paths(config_paths)?;
-    builder.set_pipelines(pipelines);
-
-    Ok((builder, load_warnings))
-}
-
-fn load_builder_from_paths(
+pub fn load_builder_from_paths(
     config_paths: &[ConfigPath],
 ) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
     let mut inputs = Vec::new();
@@ -217,14 +182,8 @@ fn load_builder_from_paths(
     }
 }
 
-pub fn load_from_str(
-    input: &str,
-    format: FormatHint,
-    pipelines: Pipelines,
-) -> Result<Config, Vec<String>> {
-    let (mut builder, load_warnings) =
-        load_from_inputs(std::iter::once((input.as_bytes(), format)))?;
-    builder.set_pipelines(pipelines);
+pub fn load_from_str(input: &str, format: FormatHint) -> Result<Config, Vec<String>> {
+    let (builder, load_warnings) = load_from_inputs(std::iter::once((input.as_bytes(), format)))?;
     let (config, build_warnings) = builder.build_with_warnings()?;
 
     for warning in load_warnings.into_iter().chain(build_warnings) {
@@ -291,17 +250,4 @@ pub fn load(
     let (with_vars, warnings) = vars::interpolate(&source_string, &vars);
 
     format::deserialize(&with_vars, format).map(|builder| (builder, warnings))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::load_pipelines_from_paths;
-    use std::path::PathBuf;
-
-    #[test]
-    fn load_pipelines_from_tests() {
-        let path = PathBuf::from("tests/pipelines/pipelines");
-        let paths = vec![path];
-        load_pipelines_from_paths(&paths).unwrap();
-    }
 }

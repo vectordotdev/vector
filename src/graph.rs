@@ -69,7 +69,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
         None => return exitcode::CONFIG,
     };
 
-    let config = match config::load_from_paths(&paths, &vec![]) {
+    let config = match config::load_from_paths(&paths) {
         Ok(config) => config,
         Err(errs) => {
             for err in errs {

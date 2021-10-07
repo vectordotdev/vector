@@ -66,7 +66,7 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
     };
 
     println!("Running tests");
-    match config::build_unit_tests(&paths, &vec![]).await {
+    match config::build_unit_tests(&paths).await {
         Ok(mut tests) => {
             tests.iter_mut().for_each(|t| {
                 let (test_inspections, test_errors) = t.run();
