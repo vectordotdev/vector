@@ -54,41 +54,25 @@ pub struct NewRelicConfig {
     pub tls: Option<TlsOptions>,
 }
 
-pub struct NewRelicMetric {
-    content:
-        Vec <
-            HashMap <
-                String,
-                Vec <
-                    HashMap <
-                        String,
-                        Value
-                    >
-                >
-            >
-        >
-}
+type NRMetricData = HashMap<String, Value>;
+type NRMetricStore = HashMap<String, Vec<NRMetricData>>;
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct NewRelicMetric(Vec<NRMetricStore>);
 
 impl NewRelicMetric {
     pub fn new(m_name: Value, m_type: Value, m_value: Value) -> Self {
-        let mut content = vec!();
-        let mut map = HashMap::new();
-        let mut metrics_arr = vec!();
-        let mut metric_obj = HashMap::new();
-        metric_obj.insert("name".to_owned(), m_name);
-        metric_obj.insert("type".to_owned(), m_type);
-        metric_obj.insert("value".to_owned(), m_value);
-        metrics_arr.push(metric_obj);
-        map.insert("metrics".to_owned(), metrics_arr);
-        content.push(map);
-
-        Self {
-            content
-        }
+        let mut metric_data = NRMetricData::new();
+        metric_data.insert("name".to_owned(), m_name);
+        metric_data.insert("type".to_owned(), m_type);
+        metric_data.insert("value".to_owned(), m_value);
+        let mut metric_store = NRMetricStore::new();
+        metric_store.insert("metrics".to_owned(), vec!(metric_data));
+        Self(vec!(metric_store))
     }
 
     pub fn to_json(&self) -> Option<Vec<u8>> {
-        let mut json = serde_json::to_vec(&self.content).unwrap();
+        let mut json = serde_json::to_vec(&self).unwrap();
         json.push(b'\n');
         Some(json)
     }
@@ -211,7 +195,7 @@ impl HttpSink for NewRelicConfig {
             },
             NewRelicApi::Metrics => {
                 match event {
-                    Event::Log(mut log) => {
+                    Event::Log(log) => {
                         NewRelicMetric::from_log(log)
                     },
                     Event::Metric(metric) => {
