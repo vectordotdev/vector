@@ -7,6 +7,7 @@ use buffers::{
     Variant, WhenFull,
 };
 use bytes::{Buf, BufMut};
+use core_common::byte_size_of::ByteSizeOf;
 use futures::{SinkExt, StreamExt};
 use metrics::{counter, increment_counter};
 use metrics_exporter_prometheus::PrometheusBuilder;
@@ -19,6 +20,12 @@ use tokio::{
 pub struct Message<const N: usize> {
     id: u64,
     _padding: [u64; N],
+}
+
+impl<const N: usize> ByteSizeOf for Message<N> {
+    fn allocated_bytes(&self) -> usize {
+        0
+    }
 }
 
 impl<const N: usize> Message<N> {

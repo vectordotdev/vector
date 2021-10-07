@@ -16,6 +16,7 @@ components: sources: http: {
 
 	features: {
 		multiline: enabled: false
+		codecs: enabled:    true
 		receive: {
 			from: {
 				service: services.http
