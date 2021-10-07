@@ -177,12 +177,7 @@ where
 
     fn start_send(self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
         let finalizers = event.metadata_mut().take_finalizers();
-        let byte_size = event.size_of();
         if let Some(item) = self.sink.encode_event(event) {
-            emit!(&EventsSent {
-                count: 1,
-                byte_size
-            });
             *self.project().slot = Some(EncodedEvent { item, finalizers });
         }
 
@@ -335,12 +330,7 @@ where
 
     fn start_send(self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
         let finalizers = event.metadata_mut().take_finalizers();
-        let byte_size = event.size_of();
         if let Some(item) = self.sink.encode_event(event) {
-            emit!(&EventsSent {
-                count: 1,
-                byte_size
-            });
             *self.project().slot = Some(EncodedEvent { item, finalizers });
         }
 
@@ -398,10 +388,8 @@ where
         let mut http_client = self.inner.clone();
 
         Box::pin(async move {
-            let events_sent = EventsSent {
-                count: body.element_count(),
-                byte_size: body.size_of(),
-            };
+            let events_count = body.element_count();
+            let events_bytes = body.size_of();
             let request = request_builder(body).await?;
             let byte_size = request.body().len();
             let request = request.map(Body::from);
@@ -421,7 +409,10 @@ where
             let response = http_client.call(request).await?;
 
             if response.status().is_success() {
-                emit!(&events_sent);
+                emit!(&EventsSent {
+                    count: events_count,
+                    byte_size: events_bytes,
+                });
                 emit!(&EndpointBytesSent {
                     byte_size,
                     protocol: scheme.unwrap_or(Scheme::HTTP).as_str(),
