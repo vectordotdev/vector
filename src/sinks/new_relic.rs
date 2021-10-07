@@ -186,16 +186,22 @@ impl SinkConfig for NewRelicConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        //TODO: for prod usage: increase timeout (~1 minute), or even put it in the config
+        
+        /* TODO
+        PROBLEM:
+            BatchedHttpSink sends the events/metrics/logs one by one in a batch, but it doesn't work for New Relic, because it has its own format for grouping data points.
+        SOLUTION:
+            Create a custom buffer that generates all the evenets/metrics/logs together in a batch and send to New Relic.
+        */
+
         let batch = BatchSettings::default()
-            .bytes(bytesize::mb(10u64))
-            .timeout(5)
+            .bytes(bytesize::mb(1u64))
+            .timeout(0)
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
-        //TODO: Batched sink send blocks of events, but does the New Relic collector accept this format?
         let sink = BatchedHttpSink::new(
             self.clone(),
             Buffer::new(batch.size, self.compression),
