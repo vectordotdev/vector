@@ -5,8 +5,8 @@ use crate::{
         metrics::{self, IntoSourceMetrics},
         sort,
     },
-    config::ComponentKey,
     config::DataType,
+    config::{ComponentKey, OutputId},
     filter_check,
 };
 use async_graphql::{Enum, InputObject, Object};
@@ -101,7 +101,9 @@ impl Source {
     /// Transform outputs
     pub async fn transforms(&self) -> Vec<transform::Transform> {
         state::filter_components(|(_component_key, components)| match components {
-            Component::Transform(t) if t.0.inputs.contains(&self.0.component_key) => {
+            Component::Transform(t)
+                if t.0.inputs.contains(&OutputId::from(&self.0.component_key)) =>
+            {
                 Some(t.clone())
             }
             _ => None,
@@ -111,7 +113,9 @@ impl Source {
     /// Sink outputs
     pub async fn sinks(&self) -> Vec<sink::Sink> {
         state::filter_components(|(_component_key, components)| match components {
-            Component::Sink(s) if s.0.inputs.contains(&self.0.component_key) => Some(s.clone()),
+            Component::Sink(s) if s.0.inputs.contains(&OutputId::from(&self.0.component_key)) => {
+                Some(s.clone())
+            }
             _ => None,
         })
     }

@@ -102,7 +102,14 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
         dot += &format!("  \"{}\" [shape=diamond]\n", id);
 
         for input in transform.inputs.iter() {
-            dot += &format!("  \"{}\" -> \"{}\"\n", input, id);
+            if let Some(port) = &input.port {
+                dot += &format!(
+                    "  \"{}\" -> \"{}\" [label=\"{}\"]\n",
+                    input.component, id, port
+                );
+            } else {
+                dot += &format!("  \"{}\" -> \"{}\"\n", input, id);
+            }
         }
     }
 
@@ -110,7 +117,14 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
         dot += &format!("  \"{}\" [shape=invtrapezium]\n", id);
 
         for input in &sink.inputs {
-            dot += &format!("  \"{}\" -> \"{}\"\n", input, id);
+            if let Some(port) = &input.port {
+                dot += &format!(
+                    "  \"{}\" -> \"{}\" [label=\"{}\"]\n",
+                    input.component, id, port
+                );
+            } else {
+                dot += &format!("  \"{}\" -> \"{}\"\n", input, id);
+            }
         }
     }
 

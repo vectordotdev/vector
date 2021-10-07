@@ -105,7 +105,7 @@ impl Pipelines {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct PipelineTransform {
     #[serde(flatten)]
-    pub inner: TransformOuter,
+    pub inner: TransformOuter<String>,
     #[serde(default)]
     pub outputs: Vec<ComponentKey>,
 }
@@ -117,8 +117,8 @@ impl PipelineTransform {
             .inputs
             .into_iter()
             .map(|component_id| {
-                if local_ids.contains(component_id.id()) {
-                    component_id.into_pipeline(pipeline_id)
+                if local_ids.contains(&component_id) {
+                    ComponentKey::pipeline(pipeline_id, component_id.as_str()).to_string()
                 } else {
                     component_id
                 }
