@@ -54,8 +54,9 @@ impl Service<Request<Body>> for LokiService {
             match client.call(request).in_current_span().await {
                 Ok(response) => {
                     let status = response.status();
+
                     match status {
-                        StatusCode::OK | StatusCode::NO_CONTENT => Ok(Response::Success),
+                        StatusCode::NO_CONTENT => Ok(Response::Success),
                         code => Err(Error::ServerError { code }),
                     }
                 }

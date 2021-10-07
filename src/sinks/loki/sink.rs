@@ -93,7 +93,8 @@ impl RequestBuilder {
     ) -> crate::Result<http::Request<hyper::Body>> {
         let tenant_id = key.tenant_id;
         let batch = LokiBatch::from(value);
-        let body = serde_json::to_vec(&batch)?;
+        let body = serde_json::json!({ "streams": [batch] });
+        let body = serde_json::to_vec(&body)?;
 
         emit!(&LokiEventsProcessed {
             byte_size: body.len(),
@@ -355,7 +356,7 @@ impl StreamSink for LokiSink {
             let builder = request_builder.clone();
             tokio::spawn(async move { builder.build(key, value) })
         })
-        .buffer_unordered(io_bandwidth);
+        .buffered(io_bandwidth);
 
         tokio::pin!(batcher);
 
@@ -364,9 +365,7 @@ impl StreamSink for LokiSink {
                 Ok(batch_request) => match batch_request {
                     Ok(request) => {
                         if io_tx.send(request).await.is_err() {
-                            error!(
-                            "Sink I/O channel should not be closed before sink itself is closed."
-                        );
+                            error!("Sink I/O channel should not be closed before sink itself is closed.");
                             return Err(());
                         }
                     }

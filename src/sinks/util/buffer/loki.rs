@@ -59,7 +59,7 @@ impl Serialize for LokiEvent {
         S: serde::Serializer,
     {
         let mut seq = serializer.serialize_seq(Some(2))?;
-        seq.serialize_element(&self.timestamp)?;
+        seq.serialize_element(&self.timestamp.to_string())?;
         seq.serialize_element(&self.event)?;
         seq.end()
     }
