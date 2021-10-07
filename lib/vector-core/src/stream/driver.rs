@@ -161,7 +161,7 @@ where
                                 break
                             },
                         };
-                        
+
                         let mut req = batch.pop_front().expect("batch should not be empty");
                         let seqno = seq_head;
                         seq_head += 1;

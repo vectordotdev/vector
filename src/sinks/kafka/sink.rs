@@ -23,6 +23,8 @@ use std::convert::TryFrom;
 use tokio::time::Duration;
 use tower::limit::ConcurrencyLimit;
 use vector_core::buffers::Acker;
+use std::fs::File;
+use std::io::Read;
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
@@ -66,7 +68,9 @@ impl KafkaSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        //let service = ConcurrencyLimit::new(self.service, QUEUED_MIN_MESSAGES as usize);
+
+        // rdkafka will internally retry forever, so we need some limit to prevent this from overflowing
+        let service = ConcurrencyLimit::new(self.service, QUEUED_MIN_MESSAGES as usize);
         let request_builder = KafkaRequestBuilder {
             key_field: self.key_field,
             headers_field: self.headers_field,
@@ -76,7 +80,7 @@ impl KafkaSink {
         };
         let sink = input
             .filter_map(|event| future::ready(request_builder.build_request(event)))
-            .into_driver(self.service, self.acker);
+            .into_driver(service, self.acker);
         sink.run().await
     }
 }
