@@ -49,6 +49,7 @@ pub struct ThrottleConfig {
     // only one of *_threshold options
     events_threshold: u32,
     bytes_threshold: u32,
+    window: f64,
     key_field: Option<String>,
     exclude: Option<AnyCondition>,
 }
