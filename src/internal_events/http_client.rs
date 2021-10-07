@@ -64,9 +64,9 @@ impl<'a, T: HttpBody> InternalEvent for GotHttpResponse<'a, T> {
     }
 
     fn emit_metrics(&self) {
-        counter!("http_client_responses_total", 1, "status" => self.response.status().to_string());
+        counter!("http_client_responses_total", 1, "status" => self.response.status().as_str());
         histogram!("http_client_rtt_seconds", self.roundtrip);
-        histogram!("http_client_response_rtt_seconds", self.roundtrip, "status" => self.response.status().to_string());
+        histogram!("http_client_response_rtt_seconds", self.roundtrip, "status" => self.response.status().as_str());
     }
 }
 
