@@ -12,7 +12,7 @@ use crate::{
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
-use futures_util::{future::ready};
+use futures_util::future::ready;
 use rdkafka::{
     config::ClientConfig,
     consumer::{Consumer, StreamConsumer},
@@ -21,8 +21,11 @@ use rdkafka::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{collections::{BTreeMap, HashMap}, io::Cursor};
 use std::sync::Arc;
+use std::{
+    collections::{BTreeMap, HashMap},
+    io::Cursor,
+};
 use tokio_util::codec::FramedRead;
 
 #[derive(Debug, Snafu)]
@@ -228,7 +231,7 @@ async fn kafka_source(
                             }
 
                             Some(Some(Ok(event)))
-                        },
+                        }
                         Err(e) => {
                             // Error is logged by `crate::codecs::Decoder`, no further handling
                             // is needed here.

@@ -1,4 +1,8 @@
-use chrono::{SecondsFormat, format::{DelayedFormat, StrftimeItems}, prelude::Local};
+use chrono::{
+    format::{DelayedFormat, StrftimeItems},
+    prelude::Local,
+    SecondsFormat,
+};
 use fakedata_generator::{gen_domain, gen_ipv4, gen_username};
 use rand::{thread_rng, Rng};
 

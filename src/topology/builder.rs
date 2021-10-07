@@ -21,7 +21,10 @@ use std::{
     sync::{Arc, Mutex},
 };
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
-use tokio::{select, time::{timeout, Duration}};
+use tokio::{
+    select,
+    time::{timeout, Duration},
+};
 use vector_core::ByteSizeOf;
 
 lazy_static! {
@@ -135,11 +138,11 @@ pub async fn build_pieces(
                 result = server => result,
             };
 
-            match result  {
+            match result {
                 Ok(()) => {
                     debug!("Finished.");
                     Ok(TaskOutput::Source)
-                },
+                }
                 Err(()) => Err(()),
             }
         };

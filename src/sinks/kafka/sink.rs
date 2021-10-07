@@ -18,11 +18,11 @@ use rdkafka::error::KafkaError;
 use rdkafka::producer::FutureProducer;
 use rdkafka::ClientConfig;
 use snafu::{ResultExt, Snafu};
-use vector_core::config::log_schema;
 use std::convert::TryFrom;
 use tokio::time::Duration;
 use tower::limit::ConcurrencyLimit;
 use vector_core::buffers::Acker;
+use vector_core::config::log_schema;
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
@@ -66,7 +66,6 @@ impl KafkaSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-
         // rdkafka will internally retry forever, so we need some limit to prevent this from overflowing
         let service = ConcurrencyLimit::new(self.service, QUEUED_MIN_MESSAGES as usize);
         let request_builder = KafkaRequestBuilder {

@@ -1,7 +1,11 @@
 use crate::event::{EventStatus, Finalizable};
 use buffers::{Ackable, Acker};
-use futures::{FutureExt, Stream, StreamExt, TryFutureExt, poll, stream::FuturesUnordered};
-use std::{collections::{BinaryHeap, VecDeque}, fmt, task::Poll};
+use futures::{poll, stream::FuturesUnordered, FutureExt, Stream, StreamExt, TryFutureExt};
+use std::{
+    collections::{BinaryHeap, VecDeque},
+    fmt,
+    task::Poll,
+};
 use tokio::{pin, select};
 use tower::{Service, ServiceExt};
 use tracing::Instrument;
@@ -114,19 +118,20 @@ where
 
                 limit -= 1;
                 if limit == 0 {
-                    break
+                    break;
                 }
             }
 
             let mut num_to_ack = 0;
             while let Some(pending_ack) = pending_acks.peek() {
                 if pending_ack.seq_no == seq_tail {
-                    let PendingAcknowledgement { ack_size, .. } = pending_acks.pop()
+                    let PendingAcknowledgement { ack_size, .. } = pending_acks
+                        .pop()
                         .expect("should not be here unless pending_acks is non-empty");
                     num_to_ack += ack_size;
                     seq_tail += 1;
                 } else {
-                    break
+                    break;
                 }
             }
 
