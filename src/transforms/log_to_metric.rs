@@ -31,8 +31,8 @@ pub struct CounterConfig {
     namespace: Option<String>,
     #[serde(default = "default_increment_by_value")]
     increment_by_value: bool,
-    #[serde(default = "default_absolute_kind")]
-    absolute_kind: bool,
+    #[serde(default = "default_kind")]
+    kind: MetricKind,
     tags: Option<IndexMap<String, String>>,
 }
 
@@ -94,8 +94,8 @@ const fn default_increment_by_value() -> bool {
     false
 }
 
-const fn default_absolute_kind() -> bool {
-    false
+const fn default_kind() -> MetricKind {
+    MetricKind::Incremental
 }
 
 #[derive(Debug, Clone)]
@@ -115,7 +115,7 @@ impl GenerateConfig for LogToMetricConfig {
                 name: None,
                 namespace: None,
                 increment_by_value: false,
-                absolute_kind: false,
+                kind: MetricKind::Incremental,
                 tags: None,
             })],
         })
@@ -246,18 +246,16 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 .transpose()?;
 
             let tags = render_tags(&counter.tags, event)?;
-            let kind = if counter.absolute_kind {
-                MetricKind::Absolute
-            } else {
-                MetricKind::Incremental
-            };
 
-            Ok(
-                Metric::new_with_metadata(name, kind, MetricValue::Counter { value }, metadata)
-                    .with_namespace(namespace)
-                    .with_tags(tags)
-                    .with_timestamp(timestamp),
+            Ok(Metric::new_with_metadata(
+                name,
+                counter.kind,
+                MetricValue::Counter { value },
+                metadata,
             )
+            .with_namespace(namespace)
+            .with_tags(tags)
+            .with_timestamp(timestamp))
         }
         MetricConfig::Histogram(hist) => {
             let value = value.to_string_lossy().parse().map_err(|error| {
@@ -595,7 +593,7 @@ mod tests {
             field = "amount"
             name = "amount_total"
             increment_by_value = true
-            absolute_kind = true
+            kind = "absolute"
             "#,
         );
 

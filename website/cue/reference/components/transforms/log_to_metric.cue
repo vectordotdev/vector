@@ -64,17 +64,20 @@ components: transforms: log_to_metric: {
 							default: false
 						}
 					}
-					absolute_kind: {
+					kind: {
 						description: """
-							If `true` the metric will be of kind `absolute`.
-							If `false` the metric will be of kind `incremental`.
+							The kind of the metric.
 							"""
 						required: false
 						common:   false
 						warnings: []
 						relevant_when: #"type = "counter""#
-						type: bool: {
-							default: false
+						type: string: {
+							enum: {
+								absolute:    "An absolute counter value."
+								incremental: "In incremental counter value."
+							}
+							default: "incremental"
 						}
 					}
 					name: {
