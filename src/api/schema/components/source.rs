@@ -83,11 +83,6 @@ impl Source {
         self.0.component_key.id()
     }
 
-    /// Source pipeline_id
-    pub async fn pipeline_id(&self) -> Option<&str> {
-        self.0.component_key.pipeline_str()
-    }
-
     /// Source type
     pub async fn component_type(&self) -> &str {
         self.get_component_type()
