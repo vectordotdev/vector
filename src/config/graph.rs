@@ -235,14 +235,20 @@ impl Graph {
     /// are no conflicting string representations, so this function reports any ambiguity as an
     /// error when creating the lookup map.
     pub fn input_map(&self) -> Result<HashMap<String, OutputId>, Vec<String>> {
-        let all_outputs = self.valid_inputs();
         let mut mapped: HashMap<String, OutputId> = HashMap::new();
-        for id in all_outputs {
-            if let Some(_other) = mapped.insert(id.to_string(), id) {
-                panic!("double");
+        let mut errors = HashSet::new();
+
+        for id in self.valid_inputs() {
+            if let Some(_other) = mapped.insert(id.to_string(), id.clone()) {
+                errors.insert(format!("Input specifier {} is ambiguous", id));
             }
         }
-        Ok(mapped)
+
+        if errors.is_empty() {
+            Ok(mapped)
+        } else {
+            Err(errors.into_iter().collect())
+        }
     }
 
     pub fn inputs_for(&self, node: &ComponentKey) -> Vec<OutputId> {
@@ -554,6 +560,52 @@ mod test {
         assert_eq!(
             Err(expected),
             graph.test_add_input("bad_log_sink", "log_to_log.not_errors")
+        );
+    }
+
+    #[test]
+    fn disallows_ambiguous_inputs() {
+        let mut graph = Graph::default();
+        // these all look like "foo.bar", but should only yield one error
+        graph.nodes.insert(
+            ComponentKey::global("foo.bar"),
+            Node::Source { ty: DataType::Any },
+        );
+        graph.nodes.insert(
+            ComponentKey::pipeline("foo", "bar"),
+            Node::Source { ty: DataType::Any },
+        );
+        graph.nodes.insert(
+            ComponentKey::global("foo"),
+            Node::Transform {
+                in_ty: DataType::Any,
+                out_ty: DataType::Any,
+                named_outputs: vec![String::from("bar")],
+            },
+        );
+
+        // make sure we return more than one
+        graph.nodes.insert(
+            ComponentKey::pipeline("baz", "errors"),
+            Node::Source { ty: DataType::Any },
+        );
+        graph.nodes.insert(
+            ComponentKey::global("baz"),
+            Node::Transform {
+                in_ty: DataType::Any,
+                out_ty: DataType::Any,
+                named_outputs: vec![String::from("errors")],
+            },
+        );
+
+        let mut errors = graph.input_map().unwrap_err();
+        errors.sort();
+        assert_eq!(
+            errors,
+            vec![
+                String::from("Input specifier baz.errors is ambiguous"),
+                String::from("Input specifier foo.bar is ambiguous"),
+            ]
         );
     }
 }
