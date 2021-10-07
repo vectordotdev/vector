@@ -156,7 +156,10 @@ impl DatadogArchivesSinkConfig {
                     self.bucket.clone(),
                 )?;
                 let svc = self
-                    .build_azure_sink(client.clone(), cx)
+                    .build_azure_sink(
+                        Arc::<azure_storage::blob::prelude::ContainerClient>::clone(&client),
+                        cx,
+                    )
                     .map_err(|error| format!("{}", error))?;
                 let healthcheck =
                     azure_common::config::build_healthcheck(self.bucket.clone(), client)?;
