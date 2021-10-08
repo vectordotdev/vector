@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.17.0"
+version = "0.18.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
