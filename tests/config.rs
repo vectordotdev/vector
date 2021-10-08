@@ -6,10 +6,10 @@ use vector::{
 };
 
 async fn load(config: &str, format: config::FormatHint) -> Result<Vec<String>, Vec<String>> {
-    match config::load_from_str(config, format, Default::default()) {
+    match config::load_from_str(config, format) {
         Ok(c) => {
             let diff = ConfigDiff::initial(&c);
-            let c2 = config::load_from_str(config, format, Default::default()).unwrap();
+            let c2 = config::load_from_str(config, format).unwrap();
             match (
                 config::warnings(&c2),
                 topology::builder::build_pieces(&c, &diff, HashMap::new()).await,
@@ -454,7 +454,7 @@ async fn bad_s3_region() {
         endpoint = "this shoudlnt work"
 
         [sinks.out4.batch]
-        max_size = 100000
+        max_bytes = 100000
         "#,
         Some(Format::Toml),
     )
@@ -697,7 +697,7 @@ async fn parses_sink_full_batch_bytes() {
         encoding = "json"
 
         [sinks.out.batch]
-        max_size = 100
+        max_bytes = 100
         timeout_secs = 10
         "#,
         Some(Format::Toml),

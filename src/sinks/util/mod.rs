@@ -3,7 +3,6 @@ pub mod batch;
 pub mod buffer;
 pub mod builder;
 pub mod compressor;
-pub mod concurrent_map;
 pub mod encoding;
 pub mod http;
 pub mod request_builder;
@@ -34,7 +33,6 @@ pub use buffer::vec::{EncodedLength, VecBuffer};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
 pub use builder::SinkBuilderExt;
 pub use compressor::Compressor;
-pub use concurrent_map::ConcurrentMap;
 pub use request_builder::RequestBuilder;
 pub use service::{
     Concurrency, ServiceBuilderExt, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,

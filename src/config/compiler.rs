@@ -20,14 +20,6 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         errors.extend(name_errors);
     }
 
-    if let Err(pipeline_errors) = validation::check_pipelines(&builder.pipelines) {
-        errors.extend(pipeline_errors);
-    }
-
-    if let Err(merge_errors) = builder.merge_pipelines() {
-        errors.extend(merge_errors);
-    }
-
     let expansions = expand_macros(&mut builder)?;
 
     expand_globs(&mut builder);
@@ -53,7 +45,6 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         transforms,
         tests,
         provider: _,
-        pipelines: _,
     } = builder;
 
     let graph = match Graph::new(&sources, &transforms, &sinks) {

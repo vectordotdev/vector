@@ -1,6 +1,4 @@
-use super::{
-    builder::ConfigBuilder, pipeline::Pipelines, ComponentKey, Config, OutputId, Resource,
-};
+use super::{builder::ConfigBuilder, ComponentKey, Config, OutputId, Resource};
 use std::collections::HashMap;
 
 /// Check that provide + topology config aren't present in the same builder, which is an error.
@@ -13,29 +11,6 @@ pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         ])
     } else {
         Ok(())
-    }
-}
-
-pub fn check_pipelines(pipelines: &Pipelines) -> Result<(), Vec<String>> {
-    let mut errors = Vec::new();
-
-    for (pipeline_id, pipeline) in pipelines.inner() {
-        if pipeline_id.contains('.') {
-            errors.push(format!(
-                "Pipeline name \"{}\" shouldn't container a '.'.",
-                pipeline_id
-            ));
-        }
-
-        if let Err(err) = check_names(pipeline.transforms.keys()) {
-            errors.extend(err);
-        }
-    }
-
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(errors)
     }
 }
 

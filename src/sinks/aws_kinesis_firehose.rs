@@ -156,7 +156,7 @@ impl KinesisFirehoseService {
         client: KinesisFirehoseClient,
         cx: SinkContext,
     ) -> crate::Result<impl Sink<Event, Error = ()>> {
-        let batch_config = config.batch.use_size_as_bytes()?;
+        let batch_config = config.batch;
 
         if batch_config.max_bytes.unwrap_or_default() > MAX_PAYLOAD_SIZE {
             return Err(Box::new(BuildError::BatchMaxSize));

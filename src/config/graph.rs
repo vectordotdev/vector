@@ -227,8 +227,7 @@ impl Graph {
     /// which of a few things that represents:
     ///
     ///   1. A component that's part of an expanded macro (e.g. `route.branch`)
-    ///   2. A component within a pipeline (e.g. `pipeline.name`)
-    ///   3. A named output of a branching transform (e.g. `name.errors`)
+    ///   2. A named output of a branching transform (e.g. `name.errors`)
     ///
     /// A naive way to do that is to compare the string representation of all valid inputs to the
     /// provided string and pick the one that matches. This works better if you can assume that there
@@ -572,11 +571,11 @@ mod test {
             Node::Source { ty: DataType::Any },
         );
         graph.nodes.insert(
-            ComponentKey::pipeline("foo", "bar"),
+            ComponentKey::from("foo.bar"),
             Node::Source { ty: DataType::Any },
         );
         graph.nodes.insert(
-            ComponentKey::global("foo"),
+            ComponentKey::from("foo"),
             Node::Transform {
                 in_ty: DataType::Any,
                 out_ty: DataType::Any,
@@ -586,7 +585,7 @@ mod test {
 
         // make sure we return more than one
         graph.nodes.insert(
-            ComponentKey::pipeline("baz", "errors"),
+            ComponentKey::from("baz.errors"),
             Node::Source { ty: DataType::Any },
         );
         graph.nodes.insert(

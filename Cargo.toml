@@ -302,7 +302,7 @@ tonic-build = { version = "0.5", default-features = false, features = ["transpor
 
 [dev-dependencies]
 approx = "0.5.0"
-assert_cmd = "2.0.1"
+assert_cmd = "2.0.2"
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
 libc = "0.2.103"
@@ -454,7 +454,7 @@ sources-exec = ["codecs"]
 sources-file = ["file-source"]
 sources-fluent = ["base64", "listenfd", "tokio-util/net", "rmpv", "rmp-serde", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "serde_bytes", "codecs"]
 sources-generator = ["fakedata", "codecs"]
-sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query"]
+sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "codecs"]
 sources-host_metrics = ["heim"]
 sources-http = ["sources-utils-http", "codecs", "sources-utils-http-query"]
 sources-internal_logs = []

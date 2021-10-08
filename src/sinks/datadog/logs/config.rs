@@ -1,14 +1,14 @@
 use super::service::LogApiRetry;
+use super::sink::{DatadogLogsJsonEncoding, LogSinkBuilder};
 use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
 use crate::http::HttpClient;
 use crate::sinks::datadog::logs::healthcheck::healthcheck;
 use crate::sinks::datadog::logs::service::LogApiService;
-use crate::sinks::datadog::logs::sink::LogSink;
 use crate::sinks::datadog::Region;
-use crate::sinks::util::encoding::EncodingConfigWithDefault;
+use crate::sinks::util::encoding::EncodingConfigFixed;
 use crate::sinks::util::service::ServiceBuilderExt;
-use crate::sinks::util::Concurrency;
 use crate::sinks::util::{BatchConfig, Compression, TowerRequestConfig};
+use crate::sinks::util::{BatchSettings, Concurrency};
 use crate::sinks::{Healthcheck, VectorSink};
 use crate::tls::{MaybeTlsSettings, TlsConfig};
 use futures::FutureExt;
@@ -16,14 +16,27 @@ use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use std::sync::Arc;
-use std::time::Duration;
 use tower::ServiceBuilder;
 use vector_core::config::proxy::ProxyConfig;
 
-const DEFAULT_REQUEST_LIMITS: TowerRequestConfig = {
-    TowerRequestConfig::const_new(Concurrency::Fixed(50), Concurrency::Fixed(50))
-        .rate_limit_num(250)
-};
+// The Datadog API has a hard limit of 5MB for uncompressed payloads. Above this
+// threshold the API will toss results. We previously serialized Events as they
+// came in -- a very CPU intensive process -- and to avoid that we only batch up
+// to 750KB below the max and then build our payloads. This does mean that in
+// some situations we'll kick out over-large payloads -- for instance, a string
+// of escaped double-quotes -- but we believe this should be very rare in
+// practice.
+pub const MAX_PAYLOAD_BYTES: usize = 5_000_000;
+pub const BATCH_GOAL_BYTES: usize = 4_250_000;
+pub const BATCH_MAX_EVENTS: usize = 1_000;
+pub const BATCH_DEFAULT_TIMEOUT_SECS: u64 = 5;
+
+const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
+    TowerRequestConfig::new(Concurrency::Fixed(50)).rate_limit_num(250);
+const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = BatchSettings::const_default()
+    .bytes(BATCH_GOAL_BYTES)
+    .events(BATCH_MAX_EVENTS)
+    .timeout(BATCH_DEFAULT_TIMEOUT_SECS);
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -39,7 +52,7 @@ pub struct DatadogLogsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    pub(crate) encoding: EncodingConfigWithDefault<Encoding>,
+    encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
     tls: Option<TlsConfig>,
 
     #[serde(default)]
@@ -50,14 +63,6 @@ pub struct DatadogLogsConfig {
 
     #[serde(default)]
     request: TowerRequestConfig,
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Json,
 }
 
 impl GenerateConfig for DatadogLogsConfig {
@@ -97,7 +102,16 @@ impl DatadogLogsConfig {
     ) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(self.default_api_key.clone().as_str());
         let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
-        let batch_timeout = self.batch.timeout_secs.map(Duration::from_secs);
+
+        // We forcefully cap the provided batch configuration to the size/log line limits imposed by
+        // the Datadog Logs API, but we still allow them to be lowered if need be.
+        let limited_batch = self
+            .batch
+            .limit_max_bytes(BATCH_GOAL_BYTES)
+            .limit_max_events(BATCH_MAX_EVENTS);
+        let batch = DEFAULT_BATCH_SETTINGS
+            .parse_config(limited_batch)?
+            .into_batcher_settings()?;
 
         let service = ServiceBuilder::new()
             .settings(request_limits, LogApiRetry)
@@ -106,11 +120,9 @@ impl DatadogLogsConfig {
                 self.get_uri(),
                 cx.globals.enterprise,
             ));
-        let sink = LogSink::new(service, cx, default_api_key)
-            .batch_timeout(batch_timeout)
+        let sink = LogSinkBuilder::new(service, cx, default_api_key, batch)
             .encoding(self.encoding.clone())
             .compression(self.compression.unwrap_or_default())
-            .log_schema(vector_core::config::log_schema())
             .build();
 
         Ok(VectorSink::Stream(Box::new(sink)))
