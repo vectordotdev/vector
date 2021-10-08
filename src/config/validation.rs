@@ -1,4 +1,4 @@
-use super::{builder::ConfigBuilder, ComponentKey, DataType, Resource};
+use super::{builder::ConfigBuilder, ComponentKey, Config, OutputId, Resource};
 use std::collections::HashMap;
 
 /// Check that provide + topology config aren't present in the same builder, which is an error.

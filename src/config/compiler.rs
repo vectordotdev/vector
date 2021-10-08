@@ -45,7 +45,6 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         transforms,
         tests,
         provider: _,
-        pipelines: _,
     } = builder;
 
     let graph = match Graph::new(&sources, &transforms, &sinks) {

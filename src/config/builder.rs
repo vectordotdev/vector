@@ -88,7 +88,7 @@ impl From<Config> for ConfigBuilder {
             sinks,
             transforms,
             provider: None,
-            tests: c.tests,
+            tests,
         }
     }
 }
