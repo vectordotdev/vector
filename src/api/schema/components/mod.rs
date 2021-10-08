@@ -24,7 +24,6 @@ use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 #[derive(Debug, Clone, Interface)]
 #[graphql(
     field(name = "component_id", type = "String"),
-    field(name = "pipeline_id", type = "Option<&str>"),
     field(name = "component_type", type = "String")
 )]
 pub enum Component {
@@ -208,16 +207,8 @@ impl ComponentsQuery {
     }
 
     /// Gets a configured component by component_key
-    async fn component_by_component_key(
-        &self,
-        pipeline_id: Option<String>,
-        component_id: String,
-    ) -> Option<Component> {
-        let key = if let Some(pipeline_id) = pipeline_id {
-            ComponentKey::pipeline(&pipeline_id, &component_id)
-        } else {
-            ComponentKey::global(&component_id)
-        };
+    async fn component_by_component_key(&self, component_id: String) -> Option<Component> {
+        let key = ComponentKey::global(&component_id);
         component_by_component_key(&key)
     }
 }

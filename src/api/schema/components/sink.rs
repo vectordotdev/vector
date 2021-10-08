@@ -82,11 +82,6 @@ impl Sink {
         self.get_component_key().id()
     }
 
-    /// Sink component_id
-    pub async fn pipeline_id(&self) -> Option<&str> {
-        self.get_component_key().pipeline_str()
-    }
-
     /// Sink type
     pub async fn component_type(&self) -> &str {
         &*self.get_component_type()

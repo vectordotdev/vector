@@ -121,8 +121,7 @@ impl Sink<Event> for TapSink {
                     debug!(
                         message = "Couldn't send log event.",
                         payload = ?payload,
-                        component_id = ?self.output_id.component.id(),
-                        component_scope = ?self.output_id.component.scope(),
+                        component_id = ?self.output_id,
                     );
 
                     break;

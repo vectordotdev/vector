@@ -425,7 +425,6 @@ pub async fn build_pieces(
                                 component_kind = "sink",
                                 component_type = typetag,
                                 component_id = %component_key.id(),
-                                component_scope = %component_key.scope(),
                                 // maintained for compatibility
                                 component_name = %component_key.id(),
                             );
@@ -437,7 +436,6 @@ pub async fn build_pieces(
                                 component_kind = "sink",
                                 component_type = typetag,
                                 component_id = %component_key.id(),
-                                component_scope = %component_key.scope(),
                                 // maintained for compatibility
                                 component_name = %component_key.id(),
                             );

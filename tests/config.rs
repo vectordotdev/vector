@@ -6,10 +6,10 @@ use vector::{
 };
 
 async fn load(config: &str, format: config::FormatHint) -> Result<Vec<String>, Vec<String>> {
-    match config::load_from_str(config, format, Default::default()) {
+    match config::load_from_str(config, format) {
         Ok(c) => {
             let diff = ConfigDiff::initial(&c);
-            let c2 = config::load_from_str(config, format, Default::default()).unwrap();
+            let c2 = config::load_from_str(config, format).unwrap();
             match (
                 config::warnings(&c2),
                 topology::builder::build_pieces(&c, &diff, HashMap::new()).await,
