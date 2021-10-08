@@ -98,20 +98,19 @@ impl Application {
 
         metrics::init_global().expect("metrics initialization failed");
 
+        let mut rt_builder = runtime::Builder::new_multi_thread();
+        rt_builder.enable_all().thread_name("vector-worker");
+
         if let Some(threads) = root_opts.threads {
             if threads < 1 {
                 error!("The `threads` argument must be greater or equal to 1.");
                 return Err(exitcode::CONFIG);
+            } else {
+                rt_builder.worker_threads(threads);
             }
         }
 
-        let rt = {
-            runtime::Builder::new_multi_thread()
-                .enable_all()
-                .thread_name("vector-worker")
-                .build()
-                .expect("Unable to create async runtime")
-        };
+        let rt = rt_builder.build().expect("Unable to create async runtime");
 
         let config = {
             let config_paths = root_opts.config_paths_with_formats();
