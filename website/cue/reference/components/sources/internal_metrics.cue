@@ -483,6 +483,18 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		buffer_byte_size: {
+			description:       "The number of bytes current in the buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_events: {
+			description:       "The number of events currently in the buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		buffer_discarded_events_total: {
 			description:       "The number of events dropped by this non-blocking buffer."
 			type:              "counter"

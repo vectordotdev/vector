@@ -631,6 +631,8 @@ components: sinks: [Name=string]: {
 		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
 		utilization:                          components.sources.internal_metrics.output.metrics.utilization
+		buffer_byte_size:                     components.sources.internal_metrics.output.metrics.buffer_byte_size
+		buffer_events:                        components.sources.internal_metrics.output.metrics.buffer_events
 		buffer_received_events_total:         components.sources.internal_metrics.output.metrics.buffer_received_events_total
 		buffer_received_bytes_total:          components.sources.internal_metrics.output.metrics.buffer_received_bytes_total
 		buffer_sent_events_total:             components.sources.internal_metrics.output.metrics.buffer_sent_events_total
