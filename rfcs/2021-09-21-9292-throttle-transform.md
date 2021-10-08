@@ -12,13 +12,14 @@ This RFC proposes the addition of a new transform that provides a user the abili
 ### In scope
 
 * Dropping logs to rate limit an event stream
-* Rate limit by both bytes (unserialized) and events
+* Rate limit by number of events
 * Exclude events with VRL conditions
-* Optionally specify buckets based on the value of a key in the event
+* Optionally specify buckets based on the value of a template string
 
 ### Out of scope
 
 * Apply backpressure as a form of rate limiting
+* Rate limit by size
 
 ## Pain
 
@@ -30,28 +31,22 @@ This RFC proposes the addition of a new transform that provides a user the abili
 ### User Experience
 
 The `throttle` transform can be used to rate limit specific subsets of your event stream to limit load on downstream services or to enforce quotas on users.
-You can enforce rate limits on events or their raw size, as well as excluding events based on a VRL condition to avoid dropping critical logs. Rate limits
+You can enforce rate limits on number of events, as well as excluding events based on a VRL condition to avoid dropping critical logs. Rate limits
 can be applied globally across all logs or by specifying a key to create buckets of events to rate limit more granularly.
 
-The initial implementation will shed load by dropping any events beyond the configured rate limit. This could be configured in the future to route events to
-a dead letter queue, or possibly apply backpressure to upstream sources.
+The initial implementation sheds load by dropping any events above the configured threshold.
 
 ### Implementation
 
-The `throttle` transform will leverage the existing [Governor](https://docs.rs/governor/0.3.2/governor/index.html) crate. We will expose the bytes or events
-per second as user-facing configuration (or expand to more time frames) and translate that into a `governor::Quota` for internal use. We should not expose
-the `Quota` directly to users to ensure ease of configuration for end users.
+The `throttle` transform will leverage the existing [Governor](https://docs.rs/governor/0.3.2/governor/index.html) crate.
 
 Config:
 
 ```rust
 pub struct ThrottleConfig {
-    // only one of *_threshold options
-    events_threshold: u32,
-    bytes_threshold: u32,
+    threshold: u32, // Throttle only on number of events
     window: f64,
-    // Template string
-    key: Option<String>,
+    key: Option<String>, // Template string
     exclude: Option<AnyCondition>,
 }
 ```
@@ -67,9 +62,6 @@ impl TaskTransform for Throttle {
     where
         Self: 'static,
     {
-	let quota = Quota::with_period(Duration::from_secs(self.window))
-            .unwrap()
-	    .allow_burst(self.threshold);
         let lim = RateLimiter::keyed(quota);
 
 	let mut flush_keys = tokio::time::interval(Duration::from_secs(self.window * 2);
@@ -135,7 +127,7 @@ impl TaskTransform for Throttle {
 
 ## Drawbacks
 
-* When rate limiting by `Bytes` in a transform it will be the unserialized form of the event, which will differ from what downstream sinks will actually receive
+* If we allow rate limiting by `Bytes` in this transform it will be the unserialized form of the event, which will differ from what downstream sinks will actually receive
 
 ## Prior Art
 
@@ -160,5 +152,6 @@ impl TaskTransform for Throttle {
 ## Future Improvements
 
 * Configure the transform with additional behaviors
+* Allow rate limiting against size
 * Batching multiple events through the rate limiter
 * Optionally persist rate limiter state across restarts
