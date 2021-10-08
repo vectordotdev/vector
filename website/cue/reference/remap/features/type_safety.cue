@@ -20,7 +20,7 @@ remap: features: type_safety: {
 				evaluated, type information is built up and used at compile-time to enforce type-safety. Let's look
 				at an example:
 
-				```ruby
+				```coffee
 				.foo # any
 				.foo = downcase!(.foo) # string
 				.foo = upcase(.foo) # string
@@ -39,7 +39,7 @@ remap: features: type_safety: {
 				To avoid error handling for argument errors, you can specify the types of your fields at the top
 				of your VRL script:
 
-				```ruby
+				```coffee
 				.foo = string!(.foo) # string
 
 				.foo = downcase(.foo) # string

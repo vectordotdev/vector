@@ -1,3 +1,4 @@
+use serde_json::{value::RawValue, Value};
 use std::{
     collections::{BTreeMap, BTreeSet},
     mem,
@@ -91,3 +92,20 @@ num!(i64);
 num!(i128);
 num!(f32);
 num!(f64);
+
+impl ByteSizeOf for Box<RawValue> {
+    fn allocated_bytes(&self) -> usize {
+        self.get().len()
+    }
+}
+
+impl ByteSizeOf for Value {
+    fn allocated_bytes(&self) -> usize {
+        match self {
+            Value::Null | Value::Bool(_) | Value::Number(_) => 0,
+            Value::String(s) => s.len(),
+            Value::Array(a) => a.iter().map(ByteSizeOf::size_of).sum(),
+            Value::Object(o) => o.iter().map(|(k, v)| k.size_of() + v.size_of()).sum(),
+        }
+    }
+}

@@ -65,6 +65,12 @@ pub trait Table: DynClone {
     /// # Errors
     /// Errors if the fields are not in the table.
     fn add_index(&mut self, case: Case, fields: &[&str]) -> Result<IndexHandle, String>;
+
+    /// Returns a list of the field names that are in each index
+    fn index_fields(&self) -> Vec<(Case, Vec<String>)>;
+
+    /// Returns true if the underlying data has changed and the table needs reloading.
+    fn needs_reload(&self) -> bool;
 }
 
 dyn_clone::clone_trait_object!(Table);

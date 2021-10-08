@@ -30,9 +30,9 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub sources: IndexMap<ComponentKey, SourceOuter>,
     #[serde(default)]
-    pub sinks: IndexMap<ComponentKey, SinkOuter>,
+    pub sinks: IndexMap<ComponentKey, SinkOuter<String>>,
     #[serde(default)]
-    pub transforms: IndexMap<ComponentKey, TransformOuter>,
+    pub transforms: IndexMap<ComponentKey, TransformOuter<String>>,
     #[serde(default)]
     pub tests: Vec<TestDefinition>,
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
@@ -53,20 +53,45 @@ impl Clone for ConfigBuilder {
 }
 
 impl From<Config> for ConfigBuilder {
-    fn from(c: Config) -> Self {
-        ConfigBuilder {
-            global: c.global,
+    fn from(config: Config) -> Self {
+        let Config {
+            global,
             #[cfg(feature = "api")]
-            api: c.api,
+            api,
             #[cfg(feature = "datadog-pipelines")]
-            datadog: c.datadog,
-            healthchecks: c.healthchecks,
-            enrichment_tables: c.enrichment_tables,
-            sources: c.sources,
-            sinks: c.sinks,
-            transforms: c.transforms,
+            datadog,
+            healthchecks,
+            enrichment_tables,
+            sources,
+            sinks,
+            transforms,
+            tests,
+            expansions: _,
+        } = config;
+
+        let transforms = transforms
+            .into_iter()
+            .map(|(key, transform)| (key, transform.map_inputs(ToString::to_string)))
+            .collect();
+
+        let sinks = sinks
+            .into_iter()
+            .map(|(key, sink)| (key, sink.map_inputs(ToString::to_string)))
+            .collect();
+
+        ConfigBuilder {
+            global,
+            #[cfg(feature = "api")]
+            api,
+            #[cfg(feature = "datadog-pipelines")]
+            datadog,
+            healthchecks,
+            enrichment_tables,
+            sources,
+            sinks,
+            transforms,
             provider: None,
-            tests: c.tests,
+            tests,
             pipelines: Default::default(),
         }
     }
@@ -100,9 +125,9 @@ impl ConfigBuilder {
             }
             for input in pipeline_transform.outputs.iter() {
                 if let Some(transform) = self.transforms.get_mut(input) {
-                    transform.inputs.push(component_id.clone());
+                    transform.inputs.push(component_id.to_string());
                 } else if let Some(sink) = self.sinks.get_mut(input) {
-                    sink.inputs.push(component_id.clone());
+                    sink.inputs.push(component_id.to_string());
                 } else {
                     errors.push(format!("Couldn't find transform or sink '{}'", input));
                 }
@@ -154,7 +179,10 @@ impl ConfigBuilder {
         inputs: &[&str],
         sink: S,
     ) {
-        let inputs = inputs.iter().map(ComponentKey::from).collect::<Vec<_>>();
+        let inputs = inputs
+            .iter()
+            .map(|value| value.to_string())
+            .collect::<Vec<_>>();
         let sink = SinkOuter::new(inputs, Box::new(sink));
 
         self.sinks.insert(ComponentKey::from(id.into()), sink);
@@ -168,7 +196,7 @@ impl ConfigBuilder {
     ) {
         let inputs = inputs
             .iter()
-            .map(|value| ComponentKey::from(value.to_string()))
+            .map(|value| value.to_string())
             .collect::<Vec<_>>();
         let transform = TransformOuter {
             inner: Box::new(transform),
@@ -194,6 +222,10 @@ impl ConfigBuilder {
         #[cfg(feature = "datadog-pipelines")]
         {
             self.datadog = with.datadog;
+            if self.datadog.enabled {
+                // enable other enterprise features
+                self.global.enterprise = true;
+            }
         }
 
         self.provider = with.provider;

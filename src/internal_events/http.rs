@@ -1,27 +1,65 @@
-// ## skip check-events ##
-
 use metrics::counter;
 use std::error::Error;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct HttpEventsReceived {
-    pub events_count: usize,
+pub struct HttpBytesReceived<'a> {
     pub byte_size: usize,
+    pub http_path: &'a str,
+    pub protocol: &'static str,
 }
 
-impl InternalEvent for HttpEventsReceived {
+impl InternalEvent for HttpBytesReceived<'_> {
     fn emit_logs(&self) {
         trace!(
-            message = "Received events.",
-            events_count = %self.events_count,
+            message = "Received bytes.",
             byte_size = %self.byte_size,
+            http_path = %self.http_path,
+            protocol = %self.protocol
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("component_received_events_total", self.events_count as u64);
-        counter!("events_in_total", self.events_count as u64);
+        counter!(
+            "component_received_bytes_total", self.byte_size as u64,
+            "http_path" => self.http_path.to_string(),
+            "protocol" => self.protocol,
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct HttpEventsReceived<'a> {
+    pub count: usize,
+    pub byte_size: usize,
+    pub http_path: &'a str,
+    pub protocol: &'static str,
+}
+
+impl InternalEvent for HttpEventsReceived<'_> {
+    fn emit_logs(&self) {
+        trace!(
+            message = "Received events.",
+            count = %self.count,
+            byte_size = %self.byte_size,
+            http_path = %self.http_path,
+            protocol = %self.protocol,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_received_events_total", self.count as u64,
+            "http_path" => self.http_path.to_string(),
+            "protocol" => self.protocol,
+        );
+        counter!(
+            "component_received_event_bytes_total",
+            self.byte_size as u64,
+            "http_path" => self.http_path.to_string(),
+            "protocol" => self.protocol,
+        );
+        counter!("events_in_total", self.count as u64);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
@@ -60,6 +98,7 @@ impl InternalEvent for HttpEventMissingMessage {
 
     fn emit_metrics(&self) {
         counter!("events_discarded_total", 1);
+        counter!("component_discarded_events_total", 1);
     }
 }
 
@@ -86,15 +125,22 @@ pub struct HttpDecompressError<'a> {
 
 impl<'a> InternalEvent for HttpDecompressError<'a> {
     fn emit_logs(&self) {
-        warn!(
+        error!(
             message = "Failed decompressing payload.",
             encoding= %self.encoding,
             error = %self.error,
+            stage = "receiving",
             internal_log_rate_secs = 10
         );
     }
 
     fn emit_metrics(&self) {
         counter!("parse_errors_total", 1);
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => "parse_failed",
+            "stage" => "receiving",
+            "encoding" => self.encoding.to_string(),
+        );
     }
 }

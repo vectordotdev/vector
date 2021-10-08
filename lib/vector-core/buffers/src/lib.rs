@@ -20,7 +20,8 @@ mod test;
 mod variant;
 
 use crate::bytes::{DecodeBytes, EncodeBytes};
-pub use acker::Acker;
+pub use acker::{Ackable, Acker};
+use core_common::byte_size_of::ByteSizeOf;
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
 use pin_project::pin_project;
 #[cfg(test)]
@@ -37,6 +38,7 @@ pub use variant::*;
 ///
 /// This function will fail only when creating a new disk buffer. Because of
 /// legacy reasons the error is not a type but a `String`.
+#[allow(clippy::needless_pass_by_value)]
 pub fn build<'a, T>(
     variant: Variant,
 ) -> Result<
@@ -48,7 +50,7 @@ pub fn build<'a, T>(
     String,
 >
 where
-    T: 'a + Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
+    T: 'a + ByteSizeOf + Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
     <T as EncodeBytes<T>>::Error: Debug,
     <T as DecodeBytes<T>>::Error: Debug + Display,
 {
@@ -123,7 +125,7 @@ where
 
 impl<'a, T> BufferInputCloner<T>
 where
-    T: 'a + Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
+    T: 'a + ByteSizeOf + Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
     <T as EncodeBytes<T>>::Error: Debug,
     <T as DecodeBytes<T>>::Error: Debug + Display,
 {
@@ -167,7 +169,7 @@ impl<S> DropWhenFull<S> {
     }
 }
 
-impl<T, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
+impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
     type Error = S::Error;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
