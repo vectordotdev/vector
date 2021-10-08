@@ -75,11 +75,10 @@ impl NewRelicMetric {
         metric_data.insert("name".to_owned(), m_name);
         metric_data.insert("type".to_owned(), m_type);
         metric_data.insert("value".to_owned(), m_value);
-        if let Some(ts) = m_timestamp.as_timestamp() {
-            metric_data.insert("timestamp".to_owned(), Value::from(ts.timestamp()));
-        }
-        else if let Value::Integer(i) = m_timestamp {
-            metric_data.insert("timestamp".to_owned(), Value::from(i));
+        match m_timestamp {
+            Value::Timestamp(ts) => { metric_data.insert("timestamp".to_owned(), Value::from(ts.timestamp())); },
+            Value::Integer(i) => { metric_data.insert("timestamp".to_owned(), Value::from(i)); },
+            _ => {}
         }
         let mut metric_store = NRMetricStore::new();
         metric_store.insert("metrics".to_owned(), vec!(metric_data));
@@ -168,7 +167,7 @@ impl NewRelicEvent {
                 nrevent.0.remove("message");
             }
         }
-        if let None = log.get("eventType") {
+        if let None = nrevent.0.get("eventType") {
             nrevent.0.insert("eventType".to_owned(), Value::from("VectorSink".to_owned()));
         }
         nrevent.to_json()
