@@ -1,5 +1,5 @@
 ---
-date: "2021-10-05"
+date: "2021-10-08"
 title: "0.17 Upgrade Guide"
 description: "An upgrade guide that addresses breaking changes in 0.17.0"
 authors: ["tobz"]

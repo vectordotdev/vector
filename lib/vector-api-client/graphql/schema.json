@@ -104,18 +104,6 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "pipelineId",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": null,
-              "isDeprecated": false,
               "name": "componentType",
               "type": {
                 "kind": "NON_NULL",
@@ -275,18 +263,6 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Pipeline id",
-              "isDeprecated": false,
-              "name": "pipelineId",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
               "description": "Errors processed metric",
               "isDeprecated": false,
               "name": "metric",
@@ -325,18 +301,6 @@
                   "name": "String",
                   "ofType": null
                 }
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": "Pipeline id",
-              "isDeprecated": false,
-              "name": "pipelineId",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
               }
             },
             {
@@ -385,18 +349,6 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Pipeline id",
-              "isDeprecated": false,
-              "name": "pipelineId",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
               "description": "Total incoming events metric",
               "isDeprecated": false,
               "name": "metric",
@@ -440,18 +392,6 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Pipeline id",
-              "isDeprecated": false,
-              "name": "pipelineId",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
               "description": "Events processed throughput",
               "isDeprecated": false,
               "name": "throughput",
@@ -490,18 +430,6 @@
                   "name": "String",
                   "ofType": null
                 }
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": "Pipeline id",
-              "isDeprecated": false,
-              "name": "pipelineId",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
               }
             },
             {
@@ -610,18 +538,6 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Pipeline id",
-              "isDeprecated": false,
-              "name": "pipelineId",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
               "description": "Bytes processed throughput",
               "isDeprecated": false,
               "name": "throughput",
@@ -660,18 +576,6 @@
                   "name": "String",
                   "ofType": null
                 }
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": "Pipeline id",
-              "isDeprecated": false,
-              "name": "pipelineId",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
               }
             },
             {
@@ -720,18 +624,6 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Pipeline id",
-              "isDeprecated": false,
-              "name": "pipelineId",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
               "description": "Events processed throughput",
               "isDeprecated": false,
               "name": "throughput",
@@ -770,18 +662,6 @@
                   "name": "String",
                   "ofType": null
                 }
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": "Pipeline id",
-              "isDeprecated": false,
-              "name": "pipelineId",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
               }
             },
             {
@@ -830,18 +710,6 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Pipeline id",
-              "isDeprecated": false,
-              "name": "pipelineId",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
               "description": "Received events throughput",
               "isDeprecated": false,
               "name": "throughput",
@@ -880,18 +748,6 @@
                   "name": "String",
                   "ofType": null
                 }
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": "Pipeline id",
-              "isDeprecated": false,
-              "name": "pipelineId",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
               }
             },
             {
@@ -940,18 +796,6 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Pipeline id",
-              "isDeprecated": false,
-              "name": "pipelineId",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
               "description": "Events processed throughput",
               "isDeprecated": false,
               "name": "throughput",
@@ -990,18 +834,6 @@
                   "name": "String",
                   "ofType": null
                 }
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": "Pipeline id",
-              "isDeprecated": false,
-              "name": "pipelineId",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
               }
             },
             {
@@ -2603,18 +2435,6 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Id of the pipeline associated with the log event",
-              "isDeprecated": false,
-              "name": "pipelineId",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
               "description": "Log message",
               "isDeprecated": false,
               "name": "message",
@@ -3580,16 +3400,6 @@
                 {
                   "defaultValue": null,
                   "description": null,
-                  "name": "pipelineId",
-                  "type": {
-                    "kind": "SCALAR",
-                    "name": "String",
-                    "ofType": null
-                  }
-                },
-                {
-                  "defaultValue": null,
-                  "description": null,
                   "name": "componentId",
                   "type": {
                     "kind": "NON_NULL",
@@ -3747,18 +3557,6 @@
                   "name": "String",
                   "ofType": null
                 }
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": "Sink component_id",
-              "isDeprecated": false,
-              "name": "pipelineId",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
               }
             },
             {
@@ -4190,18 +3988,6 @@
                   "name": "String",
                   "ofType": null
                 }
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": "Source pipeline_id",
-              "isDeprecated": false,
-              "name": "pipelineId",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
               }
             },
             {
@@ -6023,18 +5809,6 @@
                   "name": "String",
                   "ofType": null
                 }
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": "Transform component_id",
-              "isDeprecated": false,
-              "name": "pipelineId",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
               }
             },
             {

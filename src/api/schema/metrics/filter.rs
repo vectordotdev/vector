@@ -189,15 +189,7 @@ pub fn get_all_metrics(interval: i32) -> impl Stream<Item = Vec<Metric>> {
 pub fn by_component_key(component_key: &ComponentKey) -> Vec<Metric> {
     get_controller()
         .capture_metrics()
-        .filter_map(|m| {
-            if let Some(pipeline) = component_key.pipeline_str() {
-                m.tag_matches("component_id", component_key.id())
-                    && m.tag_matches("pipeline_id", pipeline)
-            } else {
-                m.tag_matches("component_id", component_key.id())
-            }
-            .then(|| m)
-        })
+        .filter_map(|m| m.tag_matches("component_id", component_key.id()).then(|| m))
         .collect()
 }
 

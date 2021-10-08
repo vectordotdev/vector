@@ -136,9 +136,9 @@ dependencies = [
 
 [[package]]
 name = "assert_cmd"
-version = "2.0.1"
+version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b800c4403e8105d959595e1f88119e78bc12bc874c4336973658b648a746ba93"
+checksum = "e996dc7940838b7ef1096b882e29ec30a3149a3a443cdc8dba19ed382eca1fe2"
 dependencies = [
  "bstr",
  "doc-comment",
@@ -5309,9 +5309,9 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.11.4"
+version = "0.11.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "246e9f61b9bb77df069a947682be06e31ac43ea37862e244a69f177694ea6d22"
+checksum = "51c732d463dd300362ffb44b7b125f299c23d2990411a4253824630ebc7467fb"
 dependencies = [
  "base64 0.13.0",
  "bytes 1.1.0",
@@ -7744,6 +7744,7 @@ dependencies = [
  "enrichment",
  "env-test-util",
  "futures 0.3.17",
+ "futures-util",
  "getset",
  "http",
  "hyper-proxy",
@@ -8045,8 +8046,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e68338db6becec24d3c7977b5bf8a48be992c934b5d07177e3931f5dc9b076c"
 dependencies = [
  "cfg-if 1.0.0",
- "serde",
- "serde_json",
  "wasm-bindgen-macro",
 ]
 

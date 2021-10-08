@@ -95,7 +95,7 @@ impl SinkConfig for InfluxDbLogsConfig {
         let healthcheck = self.healthcheck(client.clone())?;
 
         let batch = BatchSettings::default()
-            .bytes(bytesize::mib(1u64))
+            .bytes(1_000_000)
             .timeout(1)
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&TowerRequestConfig {
