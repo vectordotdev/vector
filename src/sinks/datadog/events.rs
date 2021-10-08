@@ -391,7 +391,7 @@ mod tests {
 
         let (expected, events) = random_events_with_stream(100, 10, None);
 
-        let mut events = events.map(|mut e| {
+        let events = events.map(|mut e| {
             e.as_mut_log()
                 .metadata_mut()
                 .set_datadog_api_key(Some(Arc::from("from_metadata")));
