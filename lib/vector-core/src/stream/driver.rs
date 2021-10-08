@@ -80,7 +80,7 @@ where
     ///
     /// # Errors
     ///
-    /// The return type is most to simplify caller code.
+    /// The return type is mostly to simplify caller code.
     /// An error is currently only returned if a service returns an error from `poll_ready`
     pub async fn run(self) -> Result<(), ()> {
         let mut in_flight = FuturesUnordered::new();
