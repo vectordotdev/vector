@@ -80,13 +80,8 @@ where
     ///
     /// # Errors
     ///
-    /// No errors are currently returned.  The return type is purely to simplify caller code, but may
-    /// return an error for a legitimate reason in the future.
-    ///
-    /// # Panics
-    ///
-    /// A service should not return an error from its `poll_ready` function. If it does,
-    /// this function will panic.
+    /// The return type is most to simplify caller code.
+    /// An error is currently only returned if a service returns an error from `poll_ready`
     pub async fn run(self) -> Result<(), ()> {
         let mut in_flight = FuturesUnordered::new();
         let mut pending_acks = BinaryHeap::new();
@@ -165,7 +160,10 @@ where
                     while !batch.is_empty() {
                         let svc = match poll!(service.ready()) {
                             Poll::Ready(Ok(svc)) => svc,
-                            Poll::Ready(Err(_)) => panic!("should not get error when waiting for svc readiness"),
+                            Poll::Ready(Err(_)) => {
+                                error!(message = "Service return error from `poll_ready()`.");
+                                return Err(())
+                            }
                             Poll::Pending => {
                                 next_batch = Some(batch);
                                 break
