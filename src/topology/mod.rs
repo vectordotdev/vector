@@ -16,7 +16,7 @@ mod test;
 
 use crate::{
     buffers::{self, EventStream},
-    config::{ComponentKey, Config, ConfigDiff},
+    config::{ComponentKey, Config, ConfigDiff, OutputId},
     event::Event,
     topology::{
         builder::Pieces,
@@ -41,7 +41,7 @@ type BuiltBuffer = (
     buffers::Acker,
 );
 
-type Outputs = HashMap<ComponentKey, fanout::ControlChannel>;
+type Outputs = HashMap<OutputId, fanout::ControlChannel>;
 
 // Watcher types for topology changes. These are currently specific to receiving
 // `Outputs`. This could be expanded in the future to send an enum of types if,

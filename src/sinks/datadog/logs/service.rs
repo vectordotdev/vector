@@ -134,7 +134,8 @@ impl Service<LogApiRequest> for LogApiService {
                     // From https://docs.datadoghq.com/api/latest/logs/:
                     //
                     // The status codes answered by the HTTP API are:
-                    // 200: OK
+                    // 200: OK (v1)
+                    // 202: Accepted (v2)
                     // 400: Bad request (likely an issue in the payload
                     //      formatting)
                     // 403: Permission issue (likely using an invalid API Key)
@@ -144,7 +145,7 @@ impl Service<LogApiRequest> for LogApiService {
                     match status {
                         StatusCode::BAD_REQUEST => Err(LogApiError::BadRequest),
                         StatusCode::FORBIDDEN => Ok(LogApiResponse::PermissionIssue),
-                        StatusCode::OK => Ok(LogApiResponse::Ok),
+                        StatusCode::OK | StatusCode::ACCEPTED => Ok(LogApiResponse::Ok),
                         StatusCode::PAYLOAD_TOO_LARGE => Err(LogApiError::PayloadTooLarge),
                         _ => Err(LogApiError::ServerError),
                     }

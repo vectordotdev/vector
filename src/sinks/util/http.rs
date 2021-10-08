@@ -1,8 +1,8 @@
 use super::{
     retries::{RetryAction, RetryLogic},
     sink::{self, ServiceLogic},
-    Batch, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
-    TowerRequestSettings,
+    Batch, ElementCount, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink,
+    TowerRequestConfig, TowerRequestSettings,
 };
 use crate::{
     buffers::Acker,
@@ -59,7 +59,7 @@ pub struct BatchedHttpSink<
     SL = sink::StdServiceLogic<http::Response<Bytes>>,
 > where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
     SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
 {
@@ -80,7 +80,7 @@ pub struct BatchedHttpSink<
 impl<T, B> BatchedHttpSink<T, B>
 where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     pub fn new(
@@ -107,7 +107,7 @@ where
 impl<T, B, RL, SL> BatchedHttpSink<T, B, RL, SL>
 where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     RL: RetryLogic<Response = http::Response<Bytes>, Error = HttpError> + Send + 'static,
     SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
@@ -152,7 +152,7 @@ where
 impl<T, B, RL, SL> Sink<Event> for BatchedHttpSink<T, B, RL, SL>
 where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
     RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
     SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
@@ -177,12 +177,7 @@ where
 
     fn start_send(self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
         let finalizers = event.metadata_mut().take_finalizers();
-        let byte_size = event.size_of();
         if let Some(item) = self.sink.encode_event(event) {
-            emit!(&EventsSent {
-                count: 1,
-                byte_size
-            });
             *self.project().slot = Some(EncodedEvent { item, finalizers });
         }
 
@@ -209,7 +204,7 @@ where
 pub struct PartitionHttpSink<T, B, K, RL = HttpRetryLogic>
 where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
@@ -230,7 +225,7 @@ where
 impl<T, B, K> PartitionHttpSink<T, B, K, HttpRetryLogic>
 where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
@@ -258,7 +253,7 @@ where
 impl<T, B, K, RL> PartitionHttpSink<T, B, K, RL>
 where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     RL: RetryLogic<Response = http::Response<Bytes>, Error = HttpError> + Send + 'static,
@@ -309,7 +304,7 @@ where
 impl<T, B, K, RL> Sink<Event> for PartitionHttpSink<T, B, K, RL>
 where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
@@ -335,12 +330,7 @@ where
 
     fn start_send(self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
         let finalizers = event.metadata_mut().take_finalizers();
-        let byte_size = event.size_of();
         if let Some(item) = self.sink.encode_event(event) {
-            emit!(&EventsSent {
-                count: 1,
-                byte_size
-            });
             *self.project().slot = Some(EncodedEvent { item, finalizers });
         }
 
@@ -383,7 +373,7 @@ impl<F, B> HttpBatchService<F, B> {
 impl<F, B> Service<B> for HttpBatchService<F, B>
 where
     F: Future<Output = crate::Result<hyper::Request<Vec<u8>>>> + Send + 'static,
-    B: Send + 'static,
+    B: ByteSizeOf + ElementCount + Send + 'static,
 {
     type Response = http::Response<Bytes>;
     type Error = crate::Error;
@@ -398,6 +388,8 @@ where
         let mut http_client = self.inner.clone();
 
         Box::pin(async move {
+            let events_count = body.element_count();
+            let events_bytes = body.size_of();
             let request = request_builder(body).await?;
             let byte_size = request.body().len();
             let request = request.map(Body::from);
@@ -414,13 +406,20 @@ where
                 .unwrap_or_else(|_| unreachable!())
                 .to_string();
 
-            emit!(&EndpointBytesSent {
-                byte_size,
-                protocol: scheme.unwrap_or(Scheme::HTTP).as_str(),
-                endpoint: &endpoint
-            });
-
             let response = http_client.call(request).await?;
+
+            if response.status().is_success() {
+                emit!(&EventsSent {
+                    count: events_count,
+                    byte_size: events_bytes,
+                });
+                emit!(&EndpointBytesSent {
+                    byte_size,
+                    protocol: scheme.unwrap_or(Scheme::HTTP).as_str(),
+                    endpoint: &endpoint
+                });
+            }
+
             let (parts, body) = response.into_parts();
             let mut body = body::aggregate(body).await?;
             Ok(hyper::Response::from_parts(
