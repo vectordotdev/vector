@@ -11,7 +11,7 @@ async fn load(config: &str, format: config::FormatHint) -> Result<Vec<String>, V
             let diff = ConfigDiff::initial(&c);
             let c2 = config::load_from_str(config, format).unwrap();
             match (
-                config::warnings(&c2.into()),
+                config::warnings(&c2),
                 topology::builder::build_pieces(&c, &diff, HashMap::new()).await,
             ) {
                 (warnings, Ok(_pieces)) => Ok(warnings),
@@ -219,10 +219,10 @@ async fn bad_inputs() {
 
     assert_eq!(
         vec![
-            "Input \"asdf\" for sink \"out\" doesn't match any components.",
             "Sink \"out\" has input \"in\" duplicated 2 times",
-            "Input \"qwerty\" for transform \"sample2\" doesn't match any components.",
             "Transform \"sample\" has no inputs",
+            "Input \"qwerty\" for transform \"sample2\" doesn't match any components.",
+            "Input \"asdf\" for sink \"out\" doesn't match any components.",
         ],
         err,
     );

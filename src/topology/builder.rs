@@ -5,7 +5,9 @@ use super::{
 };
 use crate::{
     buffers,
-    config::{ComponentKey, DataType, ProxyConfig, SinkContext, SourceContext, TransformContext},
+    config::{
+        ComponentKey, DataType, OutputId, ProxyConfig, SinkContext, SourceContext, TransformContext,
+    },
     event::Event,
     internal_events::{EventsReceived, EventsSent},
     shutdown::SourceShutdownCoordinator,
@@ -58,8 +60,8 @@ pub async fn load_enrichment_tables<'a>(
 }
 
 pub struct Pieces {
-    pub inputs: HashMap<ComponentKey, (buffers::BufferInputCloner<Event>, Vec<ComponentKey>)>,
-    pub outputs: HashMap<ComponentKey, fanout::ControlChannel>,
+    pub inputs: HashMap<ComponentKey, (buffers::BufferInputCloner<Event>, Vec<OutputId>)>,
+    pub outputs: HashMap<ComponentKey, HashMap<Option<String>, fanout::ControlChannel>>,
     pub tasks: HashMap<ComponentKey, Task>,
     pub source_tasks: HashMap<ComponentKey, Task>,
     pub healthchecks: HashMap<ComponentKey, Task>,
@@ -136,7 +138,7 @@ pub async fn build_pieces(
         };
         let server = Task::new(key.clone(), typetag, server);
 
-        outputs.insert(key.clone(), control);
+        outputs.insert(OutputId::from(key), control);
         tasks.insert(key.clone(), pump);
         source_tasks.insert(key.clone(), server);
     }
@@ -156,6 +158,8 @@ pub async fn build_pieces(
 
         let typetag = transform.inner.transform_type();
 
+        let mut named_outputs = transform.inner.named_outputs();
+
         let input_type = transform.inner.input_type();
         let transform = match transform.inner.build(&context).await {
             Err(error) => {
@@ -171,37 +175,100 @@ pub async fn build_pieces(
                 when_full: vector_core::buffers::WhenFull::Block,
             })
             .unwrap();
-        let input_rx = crate::utilization::wrap(Pin::new(input_rx));
+        let mut input_rx = crate::utilization::wrap(Pin::new(input_rx));
 
-        let (output, control) = Fanout::new();
+        let task = match transform {
+            Transform::Function(mut t) => {
+                let (output, control) = Fanout::new();
 
-        let transform = match transform {
-            Transform::Function(mut t) => input_rx
-                .filter(move |event| ready(filter_event_type(event, input_type)))
-                .ready_chunks(128) // 128 is an arbitrary, smallish constant
-                .inspect(|events| {
-                    emit!(&EventsReceived {
-                        count: events.len(),
-                        byte_size: events.iter().map(|e| e.size_of()).sum(),
+                let transform = input_rx
+                    .filter(move |event| ready(filter_event_type(event, input_type)))
+                    .ready_chunks(128) // 128 is an arbitrary, smallish constant
+                    .inspect(|events| {
+                        emit!(&EventsReceived {
+                            count: events.len(),
+                            byte_size: events.iter().map(|e| e.size_of()).sum(),
+                        });
+                    })
+                    .flat_map(move |events| {
+                        let mut output = Vec::with_capacity(events.len());
+                        let mut buf = Vec::with_capacity(4); // also an arbitrary,
+                                                             // smallish constant
+                        for v in events {
+                            t.transform(&mut buf, v);
+                            output.append(&mut buf);
+                        }
+                        emit!(&EventsSent {
+                            count: output.len(),
+                            byte_size: output.iter().map(|event| event.size_of()).sum(),
+                        });
+                        stream::iter(output.into_iter()).map(Ok)
+                    })
+                    .forward(output)
+                    .boxed()
+                    .map_ok(|_| {
+                        debug!("Finished.");
+                        TaskOutput::Transform
                     });
-                })
-                .flat_map(move |events| {
-                    let mut output = Vec::with_capacity(events.len());
-                    let mut buf = Vec::with_capacity(4); // also an arbitrary,
-                                                         // smallish constant
-                    for v in events {
-                        t.transform(&mut buf, v);
-                        output.append(&mut buf);
+
+                outputs.insert(OutputId::from(key), control);
+
+                Task::new(key.clone(), typetag, transform)
+            }
+            Transform::FallibleFunction(mut t) => {
+                let (mut output, control) = Fanout::new();
+                let (mut errors_output, errors_control) = Fanout::new();
+
+                let transform = async move {
+                    while let Some(event) = input_rx.next().await {
+                        if !filter_event_type(&event, input_type) {
+                            continue;
+                        }
+                        emit!(&EventsReceived {
+                            count: 1,
+                            byte_size: event.size_of(),
+                        });
+
+                        let mut buf = Vec::with_capacity(1);
+                        let mut err_buf = Vec::with_capacity(1);
+
+                        t.transform(&mut buf, &mut err_buf, event);
+                        // TODO: account for error outputs separately?
+                        emit!(&EventsSent {
+                            count: buf.len() + err_buf.len(),
+                            byte_size: buf.iter().map(|event| event.size_of()).sum::<usize>()
+                                + err_buf.iter().map(|event| event.size_of()).sum::<usize>(),
+                        });
+
+                        for event in buf {
+                            output.feed(event).await.expect("unit error");
+                        }
+                        output.flush().await.expect("unit error");
+                        for event in err_buf {
+                            errors_output.feed(event).await.expect("unit error");
+                        }
+                        errors_output.flush().await.expect("unit error");
                     }
-                    emit!(&EventsSent {
-                        count: output.len(),
-                        byte_size: output.iter().map(|event| event.size_of()).sum(),
-                    });
-                    stream::iter(output.into_iter()).map(Ok)
-                })
-                .forward(output)
-                .boxed(),
+
+                    debug!("Finished.");
+                    Ok(TaskOutput::Transform)
+                }
+                .boxed();
+
+                outputs.insert(OutputId::from(key), control);
+                // TODO: actually drive fanout creation from transform output declaration instead
+                // of relying on the one fallible function pattern we currently have
+                assert_eq!(1, named_outputs.len());
+                outputs.insert(
+                    OutputId::from((key, named_outputs.remove(0))),
+                    errors_control,
+                );
+
+                Task::new(key.clone(), typetag, transform)
+            }
             Transform::Task(t) => {
+                let (output, control) = Fanout::new();
+
                 let filtered = input_rx
                     .filter(move |event| ready(filter_event_type(event, input_type)))
                     .inspect(|event| {
@@ -210,7 +277,8 @@ pub async fn build_pieces(
                             byte_size: event.size_of(),
                         })
                     });
-                t.transform(Box::pin(filtered))
+                let transform = t
+                    .transform(Box::pin(filtered))
                     .map(Ok)
                     .forward(output.with(|event: Event| async {
                         emit!(&EventsSent {
@@ -220,16 +288,18 @@ pub async fn build_pieces(
                         Ok(event)
                     }))
                     .boxed()
+                    .map_ok(|_| {
+                        debug!("Finished.");
+                        TaskOutput::Transform
+                    });
+
+                outputs.insert(OutputId::from(key), control);
+
+                Task::new(key.clone(), typetag, transform)
             }
-        }
-        .map_ok(|_| {
-            debug!("Finished.");
-            TaskOutput::Transform
-        });
-        let task = Task::new(key.clone(), typetag, transform);
+        };
 
         inputs.insert(key.clone(), (input_tx, trans_inputs.clone()));
-        outputs.insert(key.clone(), control);
         tasks.insert(key.clone(), task);
     }
 
@@ -364,10 +434,18 @@ pub async fn build_pieces(
     // readonly.
     ENRICHMENT_TABLES.finish_load();
 
+    let mut finalized_outputs = HashMap::new();
+    for (id, output) in outputs {
+        let entry = finalized_outputs
+            .entry(id.component)
+            .or_insert_with(HashMap::new);
+        entry.insert(id.port, output);
+    }
+
     if errors.is_empty() {
         let pieces = Pieces {
             inputs,
-            outputs,
+            outputs: finalized_outputs,
             tasks,
             source_tasks,
             healthchecks,
