@@ -1,28 +1,36 @@
-use crate::{http::{HttpClient, HttpError}, internal_events::aws_s3::sink::S3EventsSent, serde::to_string, sinks::util::{Compression, retries::RetryLogic}};
+use crate::{
+    http::{HttpClient, HttpError},
+    sinks::util::{
+        retries::{RetryAction, RetryLogic},
+        Compression,
+    },
+};
 use bytes::Bytes;
-use futures::{future::BoxFuture, stream};
-use http::{Method, Request, Uri, header::{CONTENT_ENCODING, CONTENT_TYPE}, request::Builder};
+use futures::future::BoxFuture;
+use http::{
+    header::{CONTENT_ENCODING, CONTENT_TYPE},
+    Request, Response, Uri,
+};
 use hyper::Body;
-use md5::Digest;
-use mime::APPLICATION_JSON;
-use rusoto_core::{ByteStream, RusotoError};
-use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3};
-use std::{sync::Arc, task::{Context, Poll}};
+use std::{
+    sync::Arc,
+    task::{Context, Poll},
+};
 use tower::Service;
-use tracing_futures::Instrument;
 use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
 
+#[derive(Clone)]
 pub struct DatadogMetricsRetryLogic;
 
 impl RetryLogic for DatadogMetricsRetryLogic {
-	type Error = HttpError;
-	type Response = DatadogMetricsResponse;
+    type Error = HttpError;
+    type Response = DatadogMetricsResponse;
 
-	fn is_retriable_error(&self, error: &Self::Error) -> bool {
-		todo!()
-	}
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        todo!()
+    }
 
-	fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
         todo!()
     }
 }
@@ -30,29 +38,29 @@ impl RetryLogic for DatadogMetricsRetryLogic {
 #[derive(Debug, Clone)]
 pub struct DatadogMetricsRequest {
     pub body: Bytes,
-	pub uri: Uri,
-	pub api_key: Arc<str>,
-	pub compression: Compression,
-	pub finalizers: EventFinalizers,
-	pub batch_size: usize,
+    pub uri: Uri,
+    pub api_key: Arc<str>,
+    pub compression: Compression,
+    pub finalizers: EventFinalizers,
+    pub batch_size: usize,
 }
 
 impl DatadogMetricsRequest {
-	pub fn into_http_request(self) -> crate::Result<Request<Body>> {
-		let content_encoding = self.compression.content_encoding();
+    pub fn into_http_request(self) -> crate::Result<Request<Body>> {
+        let content_encoding = self.compression.content_encoding();
 
-		let request = Request::post(self.uri)
-			.header("DD-API-KEY", self.api_key.as_str())
-			.header(CONTENT_TYPE, APPLICATION_JSON);
+        let request = Request::post(self.uri)
+            .header("DD-API-KEY", self.api_key.as_ref())
+            .header(CONTENT_TYPE, "application/json");
 
-		let request = if let Some(value) = content_encoding {
-			request.header(CONTENT_ENCODING, value)
-		} else {
-			request
-		};
+        let request = if let Some(value) = content_encoding {
+            request.header(CONTENT_ENCODING, value)
+        } else {
+            request
+        };
 
-		request.body(self.body).map_err(Into::into)
-	}
+        request.body(Body::from(self.body)).map_err(Into::into)
+    }
 }
 
 impl Finalizable for DatadogMetricsRequest {
@@ -62,7 +70,12 @@ impl Finalizable for DatadogMetricsRequest {
 }
 
 #[derive(Debug)]
-pub struct DatadogMetricsResponse {
+pub struct DatadogMetricsResponse;
+
+impl From<Response<Body>> for DatadogMetricsResponse {
+    fn from(_response: Response<Body>) -> DatadogMetricsResponse {
+        DatadogMetricsResponse
+    }
 }
 
 impl AsRef<EventStatus> for DatadogMetricsResponse {
@@ -92,34 +105,15 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
     }
 
     fn call(&mut self, request: DatadogMetricsRequest) -> Self::Future {
-        let content_encoding = request.compression.content_encoding();
-
-		let request = Request::post(request.uri)
-			.header("DD-API-KEY", request.api_key.as_str())
-			.header(CONTENT_TYPE, APPLICATION_JSON);
-
-		let request = if let Some(value) = content_encoding {
-			request.header(CONTENT_ENCODING, value)
-		} else {
-			request
-		};
-
-		let client = self.client.clone();
+        let client = self.client.clone();
         Box::pin(async move {
-			let request = request.into_http_request()?;
+            let request = request.into_http_request()?;
 
-			client.call(request)
-				.await
-				.map(DatadogMetricsResponse::from)
-				.amp_err(Into::into)
+            client
+                .call(request)
+                .await
+                .map(DatadogMetricsResponse::from)
+                .map_err(Into::into)
         })
     }
-}
-
-fn bytes_to_bytestream(buf: Bytes) -> ByteStream {
-    // We _have_ to provide the size hint, because without it, Rusoto can't
-    // generate the Content-Length header which is required for the S3 PutObject
-    // API call.
-    let len = buf.len();
-    ByteStream::new_with_size(Box::pin(stream::once(async move { Ok(buf) })), len)
 }

@@ -10,7 +10,6 @@ use std::sync::Arc;
 pub mod events;
 pub mod logs;
 pub mod metrics;
-pub mod metrics2;
 
 type ApiKey = Arc<str>;
 

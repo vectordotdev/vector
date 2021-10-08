@@ -5,10 +5,8 @@ mod sink;
 
 use crate::config::SinkDescription;
 
-use self::config::DatadogMetricsConfig;
+pub use self::config::DatadogMetricsConfig;
 
 inventory::submit! {
     SinkDescription::new::<DatadogMetricsConfig>("datadog_metrics")
 }
-
-impl_generate_config_from_default!(DatadogMetricsConfig);
