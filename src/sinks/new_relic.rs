@@ -130,14 +130,40 @@ impl NewRelicEvent {
     }
 
     pub fn json_from_log(log: LogEvent) -> Option<Vec<u8>> {
-        let mut s = Self::new();
+        let mut nrevent = Self::new();
         for (k, v) in log.all_fields() {
-            s.0.insert(k, v.clone());
+            nrevent.0.insert(k, v.clone());
+        }
+        if let Some(message) = log.get("message") {
+            let message = message.to_string_lossy().replace("\\\"", "\"");
+            // If message contains a JSON string, parse it and insert all fields into self
+            if let serde_json::Result::Ok(json_map) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&message) {
+                for (k, v) in json_map {
+                    match v {
+                        serde_json::Value::String(s) => {
+                            nrevent.0.insert(k, Value::from(s));
+                        },
+                        serde_json::Value::Number(n) => {
+                            if n.is_f64() {
+                                nrevent.0.insert(k, Value::from(n.as_f64()));
+                            }
+                            else {
+                                nrevent.0.insert(k, Value::from(n.as_i64()));
+                            }
+                        },
+                        serde_json::Value::Bool(b) => {
+                            nrevent.0.insert(k, Value::from(b));
+                        },
+                        _ => {}
+                    }
+                }
+                nrevent.0.remove("message");
+            }
         }
         if let None = log.get("eventType") {
-            s.0.insert("eventType".to_owned(), Value::from("VectorSink".to_owned()));
+            nrevent.0.insert("eventType".to_owned(), Value::from("VectorSink".to_owned()));
         }
-        s.to_json()
+        nrevent.to_json()
     }
 }
 
@@ -152,14 +178,14 @@ impl NewRelicLog {
     }
 
     pub fn json_from_log(log: LogEvent) -> Option<Vec<u8>> {
-        let mut s = Self::new();
+        let mut nrlog = Self::new();
         for (k, v) in log.all_fields() {
-            s.0.insert(k, v.clone());
+            nrlog.0.insert(k, v.clone());
         }
         if let None = log.get("message") {
-            s.0.insert("message".to_owned(), Value::from("log from vector".to_owned()));
+            nrlog.0.insert("message".to_owned(), Value::from("log from vector".to_owned()));
         }
-        s.to_json()
+        nrlog.to_json()
     }
 }
 
@@ -239,6 +265,8 @@ impl HttpSink for NewRelicConfig {
         };
         encoding.apply_rules(&mut event);
 
+        println!("Encode event = {:#?}", event);
+
         match self.api {
             NewRelicApi::Events => {
                 if let Event::Log(log) = event {
@@ -273,26 +301,32 @@ impl HttpSink for NewRelicConfig {
         let uri = match self.api {
             NewRelicApi::Events => {
                 match self.region.as_ref().unwrap_or(&NewRelicRegion::Us) {
-                    //NewRelicRegion::Us => Uri::from_static("http://localhost:8888/events/us"),
-                    //NewRelicRegion::Eu => Uri::from_static("http://localhost:8888/events/eu"),
+                    NewRelicRegion::Us => Uri::from_static("http://localhost:8888/events/us"),
+                    NewRelicRegion::Eu => Uri::from_static("http://localhost:8888/events/eu"),
+                    /*
                     NewRelicRegion::Us => format!("https://insights-collector.newrelic.com/v1/accounts/{}/events", self.account_id).parse::<Uri>().unwrap(),
                     NewRelicRegion::Eu => format!("https://insights-collector.eu01.nr-data.net/v1/accounts/{}/events", self.account_id).parse::<Uri>().unwrap(),
+                    */
                 }
             },
             NewRelicApi::Metrics => {
                 match self.region.as_ref().unwrap_or(&NewRelicRegion::Us) {
-                    //NewRelicRegion::Us => Uri::from_static("http://localhost:8888/metrics/us"),
-                    //NewRelicRegion::Eu => Uri::from_static("http://localhost:8888/metrics/eu"),
+                    NewRelicRegion::Us => Uri::from_static("http://localhost:8888/metrics/us"),
+                    NewRelicRegion::Eu => Uri::from_static("http://localhost:8888/metrics/eu"),
+                    /*
                     NewRelicRegion::Us => Uri::from_static("https://metric-api.newrelic.com/metric/v1"),
                     NewRelicRegion::Eu => Uri::from_static("https://metric-api.eu.newrelic.com/metric/v1"),
+                    */
                 }
             },
             NewRelicApi::Logs => {
                 match self.region.as_ref().unwrap_or(&NewRelicRegion::Us) {
-                    //NewRelicRegion::Us => Uri::from_static("http://localhost:8888/logs/us"),
-                    //NewRelicRegion::Eu => Uri::from_static("http://localhost:8888/logs/eu"),
+                    NewRelicRegion::Us => Uri::from_static("http://localhost:8888/logs/us"),
+                    NewRelicRegion::Eu => Uri::from_static("http://localhost:8888/logs/eu"),
+                    /*
                     NewRelicRegion::Us => Uri::from_static("https://log-api.newrelic.com/log/v1"),
                     NewRelicRegion::Eu => Uri::from_static("https://log-api.eu.newrelic.com/log/v1"),
+                    */
                 }
             }
         };
