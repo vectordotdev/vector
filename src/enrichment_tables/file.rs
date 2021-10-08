@@ -4,8 +4,10 @@ use enrichment::{Case, Condition, IndexHandle, Table};
 use serde::{Deserialize, Serialize};
 use shared::{conversion::Conversion, datetime::TimeZone};
 use std::collections::{BTreeMap, HashMap};
+use std::fs;
 use std::hash::Hasher;
 use std::path::PathBuf;
+use std::time::SystemTime;
 use tracing::trace;
 use vrl::Value;
 
@@ -47,7 +49,7 @@ enum SchemaType {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq)]
-struct FileConfig {
+pub struct FileConfig {
     file: FileC,
     #[serde(default)]
     schema: HashMap<String, SchemaType>,
@@ -94,15 +96,11 @@ impl FileConfig {
             Some(SchemaType::String) | None => value.into(),
         })
     }
-}
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "file")]
-impl EnrichmentTableConfig for FileConfig {
-    async fn build(
+    fn load_file(
         &self,
-        globals: &crate::config::GlobalOptions,
-    ) -> crate::Result<Box<dyn Table + Send + Sync>> {
+        timezone: TimeZone,
+    ) -> crate::Result<(Vec<String>, Vec<Vec<Value>>, SystemTime)> {
         let Encoding::Csv {
             include_headers,
             delimiter,
@@ -134,7 +132,7 @@ impl EnrichmentTableConfig for FileConfig {
                 Ok(row?
                     .iter()
                     .enumerate()
-                    .map(|(idx, col)| self.parse_column(globals.timezone, &headers[idx], idx, col))
+                    .map(|(idx, col)| self.parse_column(timezone, &headers[idx], idx, col))
                     .collect::<Result<Vec<_>, String>>()?)
             })
             .collect::<crate::Result<Vec<_>>>()?;
@@ -145,7 +143,28 @@ impl EnrichmentTableConfig for FileConfig {
             headers
         );
 
-        Ok(Box::new(File::new(data, headers)))
+        let modified = fs::metadata(&self.file.path)?.modified()?;
+
+        Ok((headers, data, modified))
+    }
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "file")]
+impl EnrichmentTableConfig for FileConfig {
+    async fn build(
+        &self,
+        globals: &crate::config::GlobalOptions,
+    ) -> crate::Result<Box<dyn Table + Send + Sync>> {
+        let (headers, data, modified) = self.load_file(globals.timezone)?;
+
+        Ok(Box::new(File::new(
+            self.clone(),
+            globals.timezone,
+            modified,
+            data,
+            headers,
+        )))
     }
 }
 
@@ -157,6 +176,9 @@ impl_generate_config_from_default!(FileConfig);
 
 #[derive(Clone)]
 pub struct File {
+    config: FileConfig,
+    timezone: TimeZone,
+    last_modified: SystemTime,
     data: Vec<Vec<Value>>,
     headers: Vec<String>,
     indexes: Vec<(
@@ -167,8 +189,17 @@ pub struct File {
 }
 
 impl File {
-    pub fn new(data: Vec<Vec<Value>>, headers: Vec<String>) -> Self {
+    pub fn new(
+        config: FileConfig,
+        timezone: TimeZone,
+        last_modified: SystemTime,
+        data: Vec<Vec<Value>>,
+        headers: Vec<String>,
+    ) -> Self {
         Self {
+            config,
+            timezone,
+            last_modified,
             data,
             headers,
             indexes: Vec::new(),
@@ -446,6 +477,30 @@ impl Table for File {
             }
         }
     }
+
+    /// Returns a list of the field names that are in each index
+    fn index_fields(&self) -> Vec<(Case, Vec<String>)> {
+        self.indexes
+            .iter()
+            .map(|index| {
+                let (case, fields, _) = index;
+                (
+                    *case,
+                    fields
+                        .iter()
+                        .map(|idx| self.headers[*idx].clone())
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect::<Vec<_>>()
+    }
+
+    /// Checks the modified timestamp of the data file to see if data has changed.
+    fn needs_reload(&self) -> bool {
+        matches!(fs::metadata(&self.config.file.path)
+            .and_then(|metadata| metadata.modified()),
+            Ok(modified) if modified > self.last_modified)
+    }
 }
 
 impl std::fmt::Debug for File {
@@ -484,6 +539,9 @@ mod tests {
     #[test]
     fn finds_row() {
         let file = File::new(
+            Default::default(),
+            shared::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],
@@ -508,6 +566,9 @@ mod tests {
     #[test]
     fn duplicate_indexes() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             Vec::new(),
             vec![
                 "field1".to_string(),
@@ -526,6 +587,9 @@ mod tests {
     #[test]
     fn errors_on_missing_columns() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             Vec::new(),
             vec![
                 "field1".to_string(),
@@ -544,6 +608,9 @@ mod tests {
     #[test]
     fn finds_row_with_index() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],
@@ -570,6 +637,9 @@ mod tests {
     #[test]
     fn finds_rows_with_index_case_sensitive() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],
@@ -619,6 +689,9 @@ mod tests {
     #[test]
     fn selects_columns() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into(), "zoop".into()],
                 vec!["zirp".into(), "zurp".into(), "zork".into()],
@@ -661,6 +734,9 @@ mod tests {
     #[test]
     fn finds_rows_with_index_case_insensitive() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],
@@ -719,6 +795,9 @@ mod tests {
     #[test]
     fn finds_row_with_dates() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec![
                     "zip".into(),
@@ -758,6 +837,9 @@ mod tests {
     #[test]
     fn doesnt_find_row() {
         let file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],
@@ -779,6 +861,9 @@ mod tests {
     #[test]
     fn doesnt_find_row_with_index() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],

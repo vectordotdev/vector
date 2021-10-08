@@ -117,6 +117,11 @@ impl DiagnosticError for Error {
                 let mut vec = vec![Label::primary("undefined variable", self.span)];
                 let ident_chars = self.ident.as_ref().chars().collect::<Vec<_>>();
 
+                let mut builtin = vec![Ident::new("null"), Ident::new("true"), Ident::new("false")];
+                let mut idents = idents.clone();
+
+                idents.append(&mut builtin);
+
                 if let Some((idx, _)) = idents
                     .iter()
                     .map(|possible| {

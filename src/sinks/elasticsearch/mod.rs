@@ -370,7 +370,7 @@ impl SinkConfig for ElasticSearchConfig {
         let common = ElasticSearchCommon::parse_config(self)?;
         let compression = common.compression;
         let batch = BatchSettings::default()
-            .bytes(bytesize::mib(10u64))
+            .bytes(10_000_000)
             .timeout(1)
             .parse_config(self.batch)?;
         let request = self

@@ -50,7 +50,7 @@ Each component has a unique id and is prefixed with the type of the component, f
 
 Our second component, `sinks.out`, uses [`console` sink][console], which tells Vector to print the data to stdout, while the `encoding.codec` option tells Vector to print data as plain text (unencoded).
 
-The `inputs` option the `sinks.out` component tells Vector where this sink's events are coming from. In our case, events are received from our other component, the source with ID `in`.
+The `inputs` option of the `sinks.out` component tells Vector where this sink's events are coming from. In our case, events are received from our other component, the source with ID `in`.
 
 ## Hello world!
 

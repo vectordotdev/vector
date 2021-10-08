@@ -6,7 +6,7 @@ use crate::topology::{
 };
 use crate::{
     buffers,
-    config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Resource},
+    config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, OutputId, Resource},
     event::Event,
     shutdown::SourceShutdownCoordinator,
     topology::{builder::Pieces, task::TaskOutput},
@@ -26,7 +26,7 @@ use tracing::Instrument;
 #[allow(dead_code)]
 pub struct RunningTopology {
     inputs: HashMap<ComponentKey, buffers::BufferInputCloner<Event>>,
-    outputs: HashMap<ComponentKey, ControlChannel>,
+    outputs: HashMap<OutputId, ControlChannel>,
     source_tasks: HashMap<ComponentKey, TaskHandle>,
     tasks: HashMap<ComponentKey, TaskHandle>,
     shutdown_coordinator: SourceShutdownCoordinator,
@@ -515,7 +515,6 @@ impl RunningTopology {
             "sink",
             component_kind = "sink",
             component_id = %task.id(),
-            component_scope = %task.scope(),
             component_type = %task.typetag(),
             // maintained for compatibility
             component_name = %task.id(),
@@ -533,7 +532,6 @@ impl RunningTopology {
             "transform",
             component_kind = "transform",
             component_id = %task.id(),
-            component_scope = %task.scope(),
             component_type = %task.typetag(),
             // maintained for compatibility
             component_name = %task.id(),
@@ -551,7 +549,6 @@ impl RunningTopology {
             "source",
             component_kind = "source",
             component_id = %task.id(),
-            component_scope = %task.scope(),
             component_type = %task.typetag(),
             // maintained for compatibility
             component_name = %task.id(),
@@ -572,7 +569,7 @@ impl RunningTopology {
     }
 
     fn remove_outputs(&mut self, key: &ComponentKey) {
-        self.outputs.remove(key);
+        self.outputs.retain(|id, _output| &id.component != key);
     }
 
     async fn remove_inputs(&mut self, key: &ComponentKey) {
@@ -595,32 +592,37 @@ impl RunningTopology {
     }
 
     async fn setup_outputs(&mut self, key: &ComponentKey, new_pieces: &mut builder::Pieces) {
-        let mut output = new_pieces.outputs.remove(key).unwrap();
-
-        for (sink_key, sink) in &self.config.sinks {
-            if sink.inputs.iter().any(|i| i == key) {
-                // Sink may have been removed with the new config so it may not
-                // be present.
-                if let Some(input) = self.inputs.get(sink_key) {
-                    let _ = output
-                        .send(ControlMessage::Add(sink_key.clone(), input.get()))
-                        .await;
+        let outputs = new_pieces.outputs.remove(key).unwrap();
+        for (port, mut output) in outputs {
+            let id = OutputId {
+                component: key.clone(),
+                port,
+            };
+            for (sink_key, sink) in &self.config.sinks {
+                if sink.inputs.iter().any(|i| i == &id) {
+                    // Sink may have been removed with the new config so it may not
+                    // be present.
+                    if let Some(input) = self.inputs.get(sink_key) {
+                        let _ = output
+                            .send(ControlMessage::Add(sink_key.clone(), input.get()))
+                            .await;
+                    }
                 }
             }
-        }
-        for (transform_key, transform) in &self.config.transforms {
-            if transform.inputs.iter().any(|i| i == key) {
-                // Transform may have been removed with the new config so it may
-                // not be present.
-                if let Some(input) = self.inputs.get(transform_key) {
-                    let _ = output
-                        .send(ControlMessage::Add(transform_key.clone(), input.get()))
-                        .await;
+            for (transform_key, transform) in &self.config.transforms {
+                if transform.inputs.iter().any(|i| i == &id) {
+                    // Transform may have been removed with the new config so it may
+                    // not be present.
+                    if let Some(input) = self.inputs.get(transform_key) {
+                        let _ = output
+                            .send(ControlMessage::Add(transform_key.clone(), input.get()))
+                            .await;
+                    }
                 }
             }
-        }
 
-        self.outputs.insert(key.clone(), output);
+            self.outputs.insert(id.clone(), output);
+        }
     }
 
     async fn setup_inputs(&mut self, key: &ComponentKey, new_pieces: &mut builder::Pieces) {
@@ -631,7 +633,7 @@ impl RunningTopology {
             let _ = self
                 .outputs
                 .get_mut(&input)
-                .unwrap()
+                .expect("unknown output")
                 .send(ControlMessage::Add(key.clone(), tx.get()))
                 .await;
         }

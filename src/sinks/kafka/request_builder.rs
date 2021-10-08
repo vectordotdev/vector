@@ -27,7 +27,7 @@ impl KafkaRequestBuilder {
             topic,
         };
         let mut body = vec![];
-        self.encoder.encode_event(event, &mut body).ok()?;
+        self.encoder.encode_input(event, &mut body).ok()?;
 
         Some(KafkaRequest { body, metadata })
     }

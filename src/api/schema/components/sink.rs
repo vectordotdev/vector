@@ -5,7 +5,7 @@ use crate::{
         metrics::{self, IntoSinkMetrics},
         sort,
     },
-    config::ComponentKey,
+    config::{ComponentKey, OutputId},
     filter_check,
 };
 use async_graphql::{Enum, InputObject, Object};
@@ -15,7 +15,7 @@ use std::cmp;
 pub struct Data {
     pub component_key: ComponentKey,
     pub component_type: String,
-    pub inputs: Vec<ComponentKey>,
+    pub inputs: Vec<OutputId>,
 }
 
 #[derive(Debug, Clone)]
@@ -82,11 +82,6 @@ impl Sink {
         self.get_component_key().id()
     }
 
-    /// Sink component_id
-    pub async fn pipeline_id(&self) -> Option<&str> {
-        self.get_component_key().pipeline_str()
-    }
-
     /// Sink type
     pub async fn component_type(&self) -> &str {
         &*self.get_component_type()
@@ -97,12 +92,10 @@ impl Sink {
         self.0
             .inputs
             .iter()
-            .filter_map(
-                |component_key| match state::component_by_component_key(component_key) {
-                    Some(Component::Source(s)) => Some(s),
-                    _ => None,
-                },
-            )
+            .filter_map(|output_id| match state::component_by_output_id(output_id) {
+                Some(Component::Source(s)) => Some(s),
+                _ => None,
+            })
             .collect()
     }
 
@@ -111,12 +104,10 @@ impl Sink {
         self.0
             .inputs
             .iter()
-            .filter_map(
-                |component_key| match state::component_by_component_key(component_key) {
-                    Some(Component::Transform(t)) => Some(t),
-                    _ => None,
-                },
-            )
+            .filter_map(|output_id| match state::component_by_output_id(output_id) {
+                Some(Component::Transform(t)) => Some(t),
+                _ => None,
+            })
             .collect()
     }
 

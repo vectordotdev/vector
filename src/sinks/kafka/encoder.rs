@@ -1,6 +1,5 @@
-use crate::config::log_schema;
 use crate::event::Event;
-use crate::sinks::util::encoding::Encoder;
+use crate::sinks::util::encoding::{Encoder, StandardJsonEncoding, StandardTextEncoding};
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 
@@ -11,26 +10,11 @@ pub enum Encoding {
     Json,
 }
 
-impl Encoder for Encoding {
-    fn encode_event(&self, event: Event, writer: &mut dyn Write) -> std::io::Result<()> {
+impl Encoder<Event> for Encoding {
+    fn encode_input(&self, event: Event, writer: &mut dyn Write) -> std::io::Result<usize> {
         match self {
-            Encoding::Json => {
-                match event {
-                    Event::Log(log) => serde_json::to_writer(writer, &log)?,
-                    Event::Metric(metric) => serde_json::to_writer(writer, &metric)?,
-                }
-                Ok(())
-            }
-            Encoding::Text => match event {
-                Event::Log(log) => {
-                    let message = log
-                        .get(log_schema().message_key())
-                        .map(|v| v.as_bytes().to_vec())
-                        .unwrap_or_default();
-                    writer.write_all(&message)
-                }
-                Event::Metric(metric) => writer.write_all(&metric.to_string().into_bytes()),
-            },
+            Encoding::Json => StandardJsonEncoding.encode_input(event, writer),
+            Encoding::Text => StandardTextEncoding.encode_input(event, writer),
         }
     }
 }
