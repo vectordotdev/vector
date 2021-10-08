@@ -70,31 +70,38 @@ type NRMetricStore = HashMap<String, Vec<NRKeyValData>>;
 pub struct NewRelicMetric(Vec<NRMetricStore>);
 
 impl NewRelicMetric {
-    pub fn new(m_name: Value, m_type: Value, m_value: Value) -> Self {
+    pub fn new(m_name: Value, m_type: Value, m_value: Value, m_timestamp: Value) -> Self {
         let mut metric_data = NRKeyValData::new();
         metric_data.insert("name".to_owned(), m_name);
         metric_data.insert("type".to_owned(), m_type);
         metric_data.insert("value".to_owned(), m_value);
+        if let Some(ts) = m_timestamp.as_timestamp() {
+            metric_data.insert("timestamp".to_owned(), Value::from(ts.timestamp()));
+        }
+        else if let Value::Integer(i) = m_timestamp {
+            metric_data.insert("timestamp".to_owned(), Value::from(i));
+        }
         let mut metric_store = NRMetricStore::new();
         metric_store.insert("metrics".to_owned(), vec!(metric_data));
         Self(vec!(metric_store))
     }
     
-    //TODO: add timestamp
     pub fn json_from_metric(metric: Metric) -> Option<Vec<u8>> {
         match metric.value() {
             MetricValue::Gauge { value } => {
                 Self::new(
                     Value::from(metric.name().to_owned()),
                     Value::from("gauge".to_owned()),
-                    Value::from(*value)
+                    Value::from(*value),
+                    Value::from(metric.timestamp().unwrap())
                 ).to_json()
             },
             MetricValue::Counter { value } => {
                 Self::new(
                     Value::from(metric.name().to_owned()),
                     Value::from("count".to_owned()),
-                    Value::from(*value)
+                    Value::from(*value),
+                    Value::from(metric.timestamp().unwrap())
                 ).to_json()
             },
             _ => {
@@ -103,14 +110,15 @@ impl NewRelicMetric {
         }
     }
 
-    //TODO: add timestamp
     pub fn json_from_log(log: LogEvent) -> Option<Vec<u8>> {
         if let Some(m_name) = log.get("name") {
             if let Some(m_value) = log.get("value") {
                 if let Some(m_type) = log.get("type") {
-                    let m_type_str = m_type.to_string_lossy();
-                    if m_type_str == "count" || m_type_str == "gauge" {
-                        return Self::new(m_name.clone(), m_type.clone(), m_value.clone()).to_json();
+                    if let Some(m_timestamp) = log.get("timestamp") {
+                        let m_type_str = m_type.to_string_lossy();
+                        if m_type_str == "count" || m_type_str == "gauge" {
+                            return Self::new(m_name.clone(), m_type.clone(), m_value.clone(), m_timestamp.clone()).to_json();
+                        }
                     }
                 }
             }
