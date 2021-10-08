@@ -77,7 +77,7 @@ components: transforms: log_to_metric: {
 								absolute:    "An absolute counter value."
 								incremental: "In incremental counter value."
 							}
-							syntax: "literal"
+							syntax:  "literal"
 							default: "incremental"
 						}
 					}
