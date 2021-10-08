@@ -20,11 +20,13 @@ pub struct LokiBatch {
 
 impl From<Vec<LokiRecord>> for LokiBatch {
     fn from(events: Vec<LokiRecord>) -> Self {
-        events.into_iter().fold(Self::default(), |mut res, item| {
+        let mut result = events.into_iter().fold(Self::default(), |mut res, item| {
             res.stream.extend(item.labels.into_iter());
             res.values.push(item.event);
             res
-        })
+        });
+        result.values.sort_by_key(|e| e.timestamp);
+        result
     }
 }
 

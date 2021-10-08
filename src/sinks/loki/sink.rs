@@ -91,7 +91,6 @@ impl RequestBuilder {
         key: PartitionKey,
         value: Vec<LokiRecord>,
     ) -> crate::Result<http::Request<hyper::Body>> {
-        let tenant_id = key.tenant_id;
         let batch = LokiBatch::from(value);
         let body = serde_json::json!({ "streams": [batch] });
         let body = serde_json::to_vec(&body)?;
@@ -102,7 +101,7 @@ impl RequestBuilder {
 
         let mut req = http::Request::post(&self.uri).header("Content-Type", "application/json");
 
-        if let Some(tenant_id) = tenant_id {
+        if let Some(tenant_id) = key.tenant_id {
             req = req.header("X-Scope-OrgID", tenant_id);
         }
 
@@ -313,7 +312,9 @@ impl StreamSink for LokiSink {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let io_bandwidth = 64;
         let (io_tx, io_rx) = mpsc::channel::<Request<Body>>(io_bandwidth);
-        let service = tower::ServiceBuilder::new().service(LokiService::new(self.client.clone()));
+        let service = tower::ServiceBuilder::new()
+            .concurrency_limit(1)
+            .service(LokiService::new(self.client.clone()));
         let io = run_io(io_rx, service, self.acker).in_current_span();
         let _ = tokio::spawn(io);
 
