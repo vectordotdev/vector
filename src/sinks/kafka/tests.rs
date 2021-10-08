@@ -4,7 +4,6 @@ mod integration_test {
     use crate::event::Value;
     use crate::kafka::KafkaCompression;
     use crate::sinks::kafka::config::{KafkaRole, KafkaSinkConfig};
-    use crate::sinks::kafka::encoder::Encoding;
     use crate::sinks::kafka::sink::KafkaSink;
     use crate::sinks::kafka::*;
     use crate::sinks::util::encoding::EncodingConfig;
