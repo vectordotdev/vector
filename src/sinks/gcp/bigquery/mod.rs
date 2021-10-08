@@ -1,23 +1,27 @@
+mod models;
+mod retry;
+
+use self::models::{InsertAllRequest, InsertAllRequestRows};
+use self::retry::{BigqueryRetryLogic, BigqueryServiceLogic};
+
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    http::{HttpClient, HttpError},
+    http::HttpClient,
     sinks::{
         util::{
             batch::{BatchConfig, BatchSettings},
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
-            retries::{RetryAction, RetryLogic},
-            sink, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
+            http::{BatchedHttpSink, HttpSink},
+            BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, UriParseError, VectorSink,
     },
     tls::{TlsOptions, TlsSettings},
 };
-use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
-use http::{StatusCode, Uri};
+use http::Uri;
 use hyper::{Body, Request};
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
@@ -128,7 +132,7 @@ impl SinkConfig for BigquerySinkConfig {
             batch_settings.timeout,
             client,
             cx.acker(),
-            sink::StdServiceLogic::default(),
+            BigqueryServiceLogic::default(),
         )
         .sink_map_err(|error| error!(message = "Fatal gcp_bigquery sink error.", %error));
 
@@ -246,46 +250,6 @@ impl HttpSink for BigquerySink {
     }
 }
 
-#[derive(Debug, Default, Clone)]
-struct BigqueryRetryLogic {
-    inner: HttpRetryLogic,
-}
-
-impl RetryLogic for BigqueryRetryLogic {
-    type Error = HttpError;
-    type Response = http::Response<Bytes>;
-
-    fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        self.inner.is_retriable_error(error)
-    }
-
-    // If ignore_unknown_values is set and the schema of the events inserted is wrong, bigquery
-    // will still return a 200. We have to look in the response to determine if the schema was
-    // wrong.
-    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
-        match response.status() {
-            StatusCode::OK => {
-                let resp: InsertAllResponse = match serde_json::from_slice(response.body()) {
-                    Ok(resp) => resp,
-                    Err(e) => {
-                        return RetryAction::DontRetry(format!(
-                            "failed to deserialize response: {}",
-                            e.to_string()
-                        ))
-                    }
-                };
-
-                if resp.contains_no_such_field_error() {
-                    RetryAction::DontRetry("incorrect data".into())
-                } else {
-                    RetryAction::Successful
-                }
-            }
-            _ => self.inner.should_retry_response(response),
-        }
-    }
-}
-
 async fn healthcheck(
     client: HttpClient,
     uri: Uri,
@@ -303,95 +267,6 @@ async fn healthcheck(
 
     let response = client.send(request).await?;
     healthcheck_response(creds, not_found_error)(response)
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct InsertAllRequestRows {
-    /// [Optional] A unique ID for each row. BigQuery uses this property to detect duplicate insertion requests on a best-effort basis.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub insert_id: Option<String>,
-    /// Represents a single JSON object.
-    pub json: BoxedRawValue,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct InsertAllRequest {
-    /// [Optional] Accept rows that contain values that do not match the schema. The unknown values are ignored. Default is false, which treats unknown values as errors.
-    ignore_unknown_values: bool,
-    /// The resource type of the response.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    kind: Option<String>,
-    /// The rows to insert.
-    rows: Vec<InsertAllRequestRows>,
-    /// [Optional] Insert all valid rows of a request, even if invalid rows exist. The default value is false, which causes the entire request to fail if any invalid rows exist.
-    skip_invalid_rows: bool,
-    /// If specified, treats the destination table as a base template, and inserts the rows into an instance table named \"{destination}{templateSuffix}\". BigQuery will manage creation of the instance table, using the schema of the base template table. See https://cloud.google.com
-    #[serde(skip_serializing_if = "Option::is_none")]
-    template_suffix: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct InsertAllResponse {
-    /// An array of errors for rows that were not inserted.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub insert_errors: Option<Vec<InsertErrors>>,
-    /// The resource type of the response.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub kind: Option<String>,
-}
-
-impl InsertAllResponse {
-    fn contains_no_such_field_error(&self) -> bool {
-        match &self.insert_errors {
-            None => return false,
-            // iterate over errors, look for "no such field" error message
-            Some(ref insert_all_errors) => {
-                for insert_all_error in insert_all_errors {
-                    if let Some(ref row_errors) = insert_all_error.errors {
-                        for row_error in row_errors {
-                            if let Some(msg) = &row_error.message {
-                                if msg.contains(&"no such field") {
-                                    return true;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        false
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct InsertErrors {
-    /// Error information for the row indicated by the index property.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub errors: Option<Vec<ErrorProto>>,
-    /// The index of the row that error applies to.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub index: Option<i32>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ErrorProto {
-    /// Debugging information. This property is internal to Google and should not be used.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub debug_info: Option<String>,
-    /// Specifies where the error occurred, if present.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub location: Option<String>,
-    /// A human-readable description of the error.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub message: Option<String>,
-    /// A short error code that summarizes the error.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub reason: Option<String>,
 }
 
 #[cfg(test)]
@@ -432,7 +307,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn happy_warp() {
+    async fn insert_events_warp() {
         trace_init();
 
         let visited = Arc::new(AtomicBool::new(false));
@@ -442,6 +317,69 @@ mod integration_tests {
 
             future::ok::<_, Infallible>(warp::reply::with_status("Code: 200", StatusCode::OK))
         });
+        let server = warp::serve(routes).bind("0.0.0.0:8123".parse::<SocketAddr>().unwrap());
+        tokio::spawn(server);
+
+        let host = String::from("http://localhost:8123");
+
+        let config = BigquerySinkConfig {
+            endpoint: host.parse().unwrap(),
+            project: "test".into(),
+            dataset: "test".into(),
+            table: "test".into(),
+            ignore_unknown_values: false,
+            skip_invalid_rows: false,
+            template_suffix: None,
+            batch: BatchConfig {
+                max_events: Some(1),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let (sink, _hc) = config
+            .build(SinkContext::new_test())
+            .await
+            .expect("failed to build bigquery sink");
+
+        let (input_event, mut receiver) = make_event();
+
+        sink.run(stream::once(future::ready(input_event)))
+            .await
+            .expect("Sending events failed");
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+    }
+
+    #[tokio::test]
+    async fn incorrect_schema_warp() {
+        trace_init();
+
+        let visited = Arc::new(AtomicBool::new(false));
+        let custom = warp::any().map(move || {
+            assert!(!visited.load(Ordering::SeqCst), "Should not retry request.");
+            visited.store(true, Ordering::SeqCst);
+            http::Response::builder().body(
+                r#"
+{
+    "insertErrors": [
+        {
+            "errors": [
+                {
+                    "debugInfo": "",
+                    "location": "host",
+                    "message": "no such field: host.",
+                    "reason": "invalid"
+                }
+            ],
+            "index": 0
+        }
+    ],
+    "kind": "bigquery#tableDataInsertAllResponse"
+}"#,
+            )
+        });
+
+        let routes = warp::post().and(custom);
         let server = warp::serve(routes).bind("0.0.0.0:8124".parse::<SocketAddr>().unwrap());
         tokio::spawn(server);
 
@@ -472,6 +410,6 @@ mod integration_tests {
             .await
             .expect("failed to run stream");
 
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Failed));
     }
 }
