@@ -7,6 +7,7 @@ pub struct BufferEventsReceived {
 }
 
 impl InternalEvent for BufferEventsReceived {
+    #[allow(clippy::cast_precision_loss)]
     fn emit_metrics(&self) {
         counter!("buffer_received_events_total", self.count);
         counter!("buffer_received_bytes_total", self.byte_size as u64);
@@ -21,6 +22,7 @@ pub struct BufferEventsSent {
 }
 
 impl InternalEvent for BufferEventsSent {
+    #[allow(clippy::cast_precision_loss)]
     fn emit_metrics(&self) {
         counter!("buffer_sent_events_total", self.count);
         counter!("buffer_sent_bytes_total", self.byte_size as u64);
