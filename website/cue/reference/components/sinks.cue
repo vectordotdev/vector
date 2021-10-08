@@ -472,7 +472,7 @@ components: sinks: [Name=string]: {
 								*Batches* are flushed when 1 of 2 conditions are met:
 
 								1. The batch age meets or exceeds the configured `timeout_secs`.
-								2. The batch size meets or exceeds the configured `max_size` or `max_events`.
+								2. The batch size meets or exceeds the configured `max_bytes` or `max_events`.
 
 								*Buffers* are controlled via the [`buffer.*`](#buffer) options.
 								"""#

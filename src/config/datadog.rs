@@ -1,4 +1,4 @@
-use super::{ComponentKey, Config, SinkOuter, SourceOuter};
+use super::{ComponentKey, Config, OutputId, SinkOuter, SourceOuter};
 use crate::{
     sinks::datadog::metrics::DatadogConfig, sources::internal_metrics::InternalMetricsConfig,
 };
@@ -58,7 +58,7 @@ pub fn try_attach(config: &mut Config) -> bool {
 
     info!("Datadog API key provided. Internal metrics will be sent to Datadog.");
 
-    let internal_metrics_id = ComponentKey::from(INTERNAL_METRICS_KEY);
+    let internal_metrics_id = OutputId::from(ComponentKey::from(INTERNAL_METRICS_KEY));
     let datadog_metrics_id = ComponentKey::from(DATADOG_METRICS_KEY);
 
     // Create an internal metrics source. We're using a distinct source here and not
@@ -70,7 +70,7 @@ pub fn try_attach(config: &mut Config) -> bool {
     internal_metrics.scrape_interval_secs(config.datadog.reporting_interval_secs);
 
     config.sources.insert(
-        internal_metrics_id.clone(),
+        internal_metrics_id.component.clone(),
         SourceOuter::new(internal_metrics),
     );
 
