@@ -47,6 +47,15 @@ impl enrichment::Table for TestEnrichmentTable {
     ) -> Result<enrichment::IndexHandle, String> {
         Ok(enrichment::IndexHandle(1))
     }
+
+    fn index_fields(&self) -> Vec<(enrichment::Case, Vec<String>)> {
+        Vec::new()
+    }
+
+    /// Returns true if the underlying data has changed and the table needs reloading.
+    fn needs_reload(&self) -> bool {
+        false
+    }
 }
 
 pub(crate) fn test_enrichment_table() -> enrichment::TableRegistry {
