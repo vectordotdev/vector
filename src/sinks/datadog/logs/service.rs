@@ -1,6 +1,8 @@
 use crate::http::HttpClient;
 use crate::sinks::util::retries::RetryLogic;
+use crate::sinks::util::Compression;
 use futures::future::BoxFuture;
+use http::header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE};
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use snafu::Snafu;
@@ -8,6 +10,7 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use tower::Service;
 use tracing::Instrument;
+use vector_core::buffers::Ackable;
 use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
 
 #[derive(Debug, Default, Clone)]
@@ -29,12 +32,17 @@ impl RetryLogic for LogApiRetry {
 
 #[derive(Debug, Clone)]
 pub struct LogApiRequest {
-    pub(crate) serialized_payload_bytes_len: usize,
-    pub(crate) payload_members_len: usize,
-    pub(crate) api_key: Arc<str>,
-    pub(crate) is_compressed: bool,
-    pub(crate) body: Vec<u8>,
-    pub(crate) finalizers: EventFinalizers,
+    pub batch_size: usize,
+    pub api_key: Arc<str>,
+    pub compression: Compression,
+    pub body: Vec<u8>,
+    pub finalizers: EventFinalizers,
+}
+
+impl Ackable for LogApiRequest {
+    fn ack_size(&self) -> usize {
+        self.batch_size
+    }
 }
 
 impl Finalizable for LogApiRequest {
@@ -106,7 +114,7 @@ impl Service<LogApiRequest> for LogApiService {
     fn call(&mut self, request: LogApiRequest) -> Self::Future {
         let mut client = self.client.clone();
         let http_request = Request::post(&self.uri)
-            .header("Content-Type", "application/json")
+            .header(CONTENT_TYPE, "application/json")
             .header(
                 "DD-EVP-ORIGIN",
                 if self.enterprise {
@@ -117,15 +125,17 @@ impl Service<LogApiRequest> for LogApiService {
             )
             .header("DD-EVP-ORIGIN-VERSION", crate::get_version())
             .header("DD-API-KEY", request.api_key.to_string());
-        let http_request = if request.is_compressed {
-            http_request.header("Content-Encoding", "gzip")
+
+        let http_request = if let Some(ce) = request.compression.content_encoding() {
+            http_request.header(CONTENT_ENCODING, ce)
         } else {
             http_request
         };
+
         let http_request = http_request
-            .header("Content-Length", request.body.len())
+            .header(CONTENT_LENGTH, request.body.len())
             .body(Body::from(request.body))
-            .expect("TODO");
+            .expect("building HTTP request failed unexpectedly");
 
         Box::pin(async move {
             match client.call(http_request).in_current_span().await {

@@ -736,7 +736,6 @@ mod integration_test {
             BatchConfig {
                 max_bytes: Some(1000),
                 max_events: None,
-                max_size: None,
                 timeout_secs: None
             },
             indexmap::indexmap! {
@@ -756,7 +755,6 @@ mod integration_test {
             BatchConfig {
                 max_bytes: None,
                 max_events: Some(10),
-                max_size: None,
                 timeout_secs: Some(2),
             },
             indexmap::indexmap! {}.into_iter().collect(),
@@ -772,7 +770,6 @@ mod integration_test {
             BatchConfig {
                 max_bytes: None,
                 max_events: Some(10),
-                max_size: None,
                 timeout_secs: None
             },
             indexmap::indexmap! {
@@ -792,7 +789,6 @@ mod integration_test {
             BatchConfig {
                 max_bytes: None,
                 max_events: None,
-                max_size: None,
                 timeout_secs: Some(10),
             },
             indexmap::indexmap! {

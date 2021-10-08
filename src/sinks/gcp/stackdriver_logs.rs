@@ -109,7 +109,7 @@ impl SinkConfig for StackdriverConfig {
         let creds = self.auth.make_credentials(Scope::LoggingWrite).await?;
 
         let batch = BatchSettings::default()
-            .bytes(bytesize::kib(5000u64))
+            .bytes(5_000_000)
             .timeout(1)
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&TowerRequestConfig {

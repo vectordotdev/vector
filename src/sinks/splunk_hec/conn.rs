@@ -49,7 +49,7 @@ where
     validate_host(endpoint)?;
 
     let batch_settings = BatchSettings::default()
-        .bytes(bytesize::mib(1u64))
+        .bytes(1_000_000)
         .timeout(1)
         .parse_config(batch_config)?;
     let request_settings = request_config.unwrap_with(&TowerRequestConfig::default());
@@ -423,35 +423,6 @@ mod tests {
         assert_eq!(
             err.to_string(),
             "Host must include a scheme (https:// or http://)"
-        )
-    }
-
-    #[tokio::test]
-    async fn test_build_sink_invalid_batch_config_returns_error() {
-        let invalid_batch_config = BatchConfig {
-            max_bytes: Some(1000),
-            max_events: None,
-            max_size: Some(10),
-            timeout_secs: None,
-        };
-
-        let err = build_sink(
-            StubSink::default(),
-            &TowerRequestConfig::default(),
-            &None,
-            &ProxyConfig::default(),
-            invalid_batch_config,
-            Compression::None,
-            Acker::Null,
-            "http://localhost:36448",
-            "token",
-        )
-        .err()
-        .unwrap();
-
-        assert_eq!(
-            err.to_string(),
-            "Cannot configure both `max_bytes` and `max_size`"
         )
     }
 
