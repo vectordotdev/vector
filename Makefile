@@ -209,9 +209,6 @@ check-build-tools:
 ifeq (, $(shell which cargo))
 	$(error "Please install Rust: https://www.rust-lang.org/tools/install")
 endif
-ifeq (, $(shell which cue))
-	$(error "Please install Cue: https://cuelang.org/docs/install/")
-endif
 
 ##@ Cross Compiling
 .PHONY: cross-enable

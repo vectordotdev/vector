@@ -5,7 +5,7 @@ use crate::{
         metrics::{self, IntoTransformMetrics},
         sort,
     },
-    config::ComponentKey,
+    config::{ComponentKey, OutputId},
     filter_check,
 };
 use async_graphql::{Enum, InputObject, Object};
@@ -15,7 +15,7 @@ use std::cmp;
 pub struct Data {
     pub component_key: ComponentKey,
     pub component_type: String,
-    pub inputs: Vec<ComponentKey>,
+    pub inputs: Vec<OutputId>,
 }
 
 #[derive(Debug, Clone)]
@@ -56,11 +56,6 @@ impl Transform {
         self.0.component_key.id()
     }
 
-    /// Transform component_id
-    pub async fn pipeline_id(&self) -> Option<&str> {
-        self.0.component_key.pipeline_str()
-    }
-
     /// Transform type
     pub async fn component_type(&self) -> &str {
         &*self.get_component_type()
@@ -71,19 +66,19 @@ impl Transform {
         self.0
             .inputs
             .iter()
-            .filter_map(
-                |component_key| match state::component_by_component_key(component_key) {
-                    Some(Component::Source(s)) => Some(s),
-                    _ => None,
-                },
-            )
+            .filter_map(|output_id| match state::component_by_output_id(output_id) {
+                Some(Component::Source(s)) => Some(s),
+                _ => None,
+            })
             .collect()
     }
 
     /// Transform outputs
     pub async fn transforms(&self) -> Vec<Transform> {
         state::filter_components(|(_component_key, components)| match components {
-            Component::Transform(t) if t.0.inputs.contains(&self.0.component_key) => {
+            Component::Transform(t)
+                if t.0.inputs.contains(&OutputId::from(&self.0.component_key)) =>
+            {
                 Some(t.clone())
             }
             _ => None,
@@ -93,7 +88,9 @@ impl Transform {
     /// Sink outputs
     pub async fn sinks(&self) -> Vec<sink::Sink> {
         state::filter_components(|(_component_key, components)| match components {
-            Component::Sink(s) if s.0.inputs.contains(&self.0.component_key) => Some(s.clone()),
+            Component::Sink(s) if s.0.inputs.contains(&OutputId::from(&self.0.component_key)) => {
+                Some(s.clone())
+            }
             _ => None,
         })
     }
