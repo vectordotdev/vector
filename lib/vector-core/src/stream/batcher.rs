@@ -225,7 +225,11 @@ pub struct BatcherSettings {
 }
 
 impl BatcherSettings {
-    pub const fn new(timeout: Duration, size_limit: NonZeroUsize, item_limit: NonZeroUsize) -> Self {
+    pub const fn new(
+        timeout: Duration,
+        size_limit: NonZeroUsize,
+        item_limit: NonZeroUsize,
+    ) -> Self {
         BatcherSettings {
             timeout,
             size_limit: size_limit.get(),

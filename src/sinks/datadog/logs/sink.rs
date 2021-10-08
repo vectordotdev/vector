@@ -41,7 +41,12 @@ pub struct LogSinkBuilder<S> {
 }
 
 impl<S> LogSinkBuilder<S> {
-    pub fn new(service: S, context: SinkContext, default_api_key: Arc<str>, batch_settings: BatcherSettings) -> Self {
+    pub fn new(
+        service: S,
+        context: SinkContext,
+        default_api_key: Arc<str>,
+        batch_settings: BatcherSettings,
+    ) -> Self {
         Self {
             encoding: Default::default(),
             service,

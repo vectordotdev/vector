@@ -502,7 +502,7 @@ impl RequestConfig {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{config::ProxyConfig, sinks::util::service::Concurrency, test_util::next_addr};
+    use crate::{config::ProxyConfig, test_util::next_addr};
     use futures::{future::ready, StreamExt};
     use hyper::{
         service::{make_service_fn, service_fn},

@@ -7,8 +7,8 @@ use crate::sinks::datadog::logs::service::LogApiService;
 use crate::sinks::datadog::Region;
 use crate::sinks::util::encoding::EncodingConfigFixed;
 use crate::sinks::util::service::ServiceBuilderExt;
-use crate::sinks::util::{BatchSettings, Concurrency};
 use crate::sinks::util::{BatchConfig, Compression, TowerRequestConfig};
+use crate::sinks::util::{BatchSettings, Concurrency};
 use crate::sinks::{Healthcheck, VectorSink};
 use crate::tls::{MaybeTlsSettings, TlsConfig};
 use futures::FutureExt;
@@ -33,8 +33,7 @@ pub const BATCH_DEFAULT_TIMEOUT_SECS: u64 = 5;
 
 const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
     TowerRequestConfig::new(Concurrency::Fixed(50)).rate_limit_num(250);
-const DEFAULT_BATCH_SETTINGS: BatchSettings<()> =
-    BatchSettings::const_default()
+const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = BatchSettings::const_default()
     .bytes(BATCH_GOAL_BYTES)
     .events(BATCH_MAX_EVENTS)
     .timeout(BATCH_DEFAULT_TIMEOUT_SECS);
@@ -106,7 +105,8 @@ impl DatadogLogsConfig {
 
         // We forcefully cap the provided batch configuration to the size/log line limits imposed by
         // the Datadog Logs API, but we still allow them to be lowered if need be.
-        let limited_batch = self.batch
+        let limited_batch = self
+            .batch
             .limit_max_bytes(BATCH_GOAL_BYTES)
             .limit_max_events(BATCH_MAX_EVENTS);
         let batch = DEFAULT_BATCH_SETTINGS

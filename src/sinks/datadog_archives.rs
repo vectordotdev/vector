@@ -4,7 +4,6 @@ use std::{
     convert::TryFrom,
     io::{self, Write},
     sync::atomic::{AtomicU32, Ordering},
-    time::Duration,
 };
 
 use bytes::{BufMut, Bytes, BytesMut};
@@ -19,7 +18,6 @@ use uuid::Uuid;
 use vector_core::{
     config::{log_schema, LogSchema},
     event::{Event, EventFinalizers, Finalizable},
-    stream::BatcherSettings,
 };
 
 use crate::sinks::s3_common;
@@ -44,12 +42,18 @@ use crate::{
     template::Template,
 };
 
-use super::util::{BatchSettings, Compression, RequestBuilder, encoding::{Encoder, StandardEncodings}};
+use super::util::{
+    batch::BatchError,
+    encoding::{Encoder, StandardEncodings},
+    BatchSettings, Compression, RequestBuilder,
+};
 
 const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
     TowerRequestConfig::new(Concurrency::Fixed(50)).rate_limit_num(250);
-const DEFAULT_BATCH_SETTINGS: BatchSettings<()> =
-    BatchSettings::const_default().timeout(900).bytes(100_000_000).events(25_000);
+const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = BatchSettings::const_default()
+    .timeout(900)
+    .bytes(100_000_000)
+    .events(25_000);
 const DEFAULT_COMPRESSION: Compression = Compression::gzip_default();
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -108,6 +112,8 @@ enum ConfigError {
     UnsupportedService { service: String },
     #[snafu(display("Unsupported storage class: {}", storage_class))]
     UnsupportedStorageClass { storage_class: String },
+    #[snafu(display("Invalid batch configuration: {}", source))]
+    InvalidBatchConfiguration { source: BatchError },
 }
 
 const KEY_TEMPLATE: &str = "/dt=%Y%m%d/hour=%H/";
@@ -154,7 +160,9 @@ impl DatadogArchivesSinkConfig {
 
         // We use the default batch settings directly as we don't support allowing users to change
         // the batching behavior, as it could negatively impact performance.
-        let batcher_settings = DEFAULT_BATCH_SETTINGS.into_batcher_settings()?;
+        let batcher_settings = DEFAULT_BATCH_SETTINGS
+            .into_batcher_settings()
+            .map_err(|source| ConfigError::InvalidBatchConfiguration { source })?;
 
         let partitioner = DatadogArchivesSinkConfig::build_partitioner();
 

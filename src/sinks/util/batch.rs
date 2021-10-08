@@ -8,7 +8,7 @@ use std::num::NonZeroUsize;
 use std::time::Duration;
 use vector_core::stream::BatcherSettings;
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Snafu, PartialEq)]
 pub enum BatchError {
     #[snafu(display("This sink does not allow setting `max_bytes`"))]
     BytesNotAllowed,
@@ -41,7 +41,7 @@ impl BatchConfig {
                 return Self {
                     max_bytes: Some(limit),
                     ..self
-                }
+                };
             }
         }
 
@@ -54,7 +54,7 @@ impl BatchConfig {
                 return Self {
                     max_events: Some(limit),
                     ..self
-                }
+                };
             }
         }
 
