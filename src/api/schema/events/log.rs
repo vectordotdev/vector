@@ -36,11 +36,6 @@ impl Log {
         self.component_key.id()
     }
 
-    /// Id of the pipeline associated with the log event
-    async fn pipeline_id(&self) -> Option<&str> {
-        self.component_key.pipeline_str()
-    }
-
     /// Log message
     async fn message(&self) -> Option<String> {
         self.get_message()
