@@ -13,7 +13,7 @@ releases: "0.17.0": {
 
 	* One new component:
 		* [`splunk_hec_metrics` sink](\(urls.vector_splunk_hec_metrics_sink)) for sending metrics to Splunk
-	* [Adaptive Concurrency](/highlights/TODO) enabled by default to maximize throughput for HTTP-based sinks
+	* [Adaptive Concurrency](/highlights/2021-10-06-arc-default) enabled by default to maximize throughput for HTTP-based sinks
 	* An enhancement to the `host_metrics`](\(urls.vector_host_metrics_source)) to fetch memory and CPU metrics for cgroups
 	* New VRL functions: [find](\(urls.vrl_functions)/#find), [unique](\(urls.vrl_functions)/#unique), and, a set of functions for dynamically looking up event fields, [get](\(urls.vrl_functions)/#get), [set](\(urls.vrl_functions)/#set), and [remove](\(urls.vrl_functions)/#remove).
 
