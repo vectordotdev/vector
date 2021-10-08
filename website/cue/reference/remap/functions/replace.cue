@@ -4,6 +4,8 @@ remap: functions: replace: {
 	category: "String"
 	description: """
 		Replaces all matching instances of `pattern` in the `value`.
+
+		The `pattern` argument accepts regular expression capture groups.
 		"""
 
 	arguments: [
