@@ -116,7 +116,7 @@ impl SinkConfig for BigquerySinkConfig {
         let sink = BigquerySink::from_config(self).await?;
         let batch_settings = BatchSettings::default()
             // BigQuery has a max request size of 10MB
-            .bytes(bytesize::mib(8u64))
+            .bytes(bytesize::mib(8u64).into())
             .events(1000)
             .timeout(1)
             .parse_config(self.batch)?;
