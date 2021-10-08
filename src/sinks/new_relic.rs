@@ -309,3 +309,5 @@ impl HttpSink for NewRelicConfig {
         Ok(request)
     }
 }
+
+//TODO: tests
