@@ -6,7 +6,7 @@ mod integration_test {
     use crate::sinks::kafka::config::{KafkaRole, KafkaSinkConfig};
     use crate::sinks::kafka::sink::KafkaSink;
     use crate::sinks::kafka::*;
-    use crate::sinks::util::encoding::EncodingConfig;
+    use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
     use crate::sinks::util::{BatchConfig, StreamSink};
     use crate::{
         buffers::Acker,
@@ -34,7 +34,7 @@ mod integration_test {
             bootstrap_servers: "localhost:9091".into(),
             topic: topic.clone(),
             key_field: None,
-            encoding: EncodingConfig::from(Encoding::Text),
+            encoding: EncodingConfig::from(StandardEncodings::Text),
             batch: BatchConfig::default(),
             compression: KafkaCompression::None,
             auth: KafkaAuthConfig::default(),
@@ -86,7 +86,7 @@ mod integration_test {
             bootstrap_servers: "localhost:9091".to_string(),
             topic: format!("{}-%Y%m%d", topic),
             compression: KafkaCompression::None,
-            encoding: Encoding::Text.into(),
+            encoding: StandardEncodings::Text.into(),
             key_field: None,
             auth: KafkaAuthConfig {
                 sasl: None,
@@ -237,7 +237,7 @@ mod integration_test {
             bootstrap_servers: server.to_string(),
             topic: format!("{}-%Y%m%d", topic),
             key_field: None,
-            encoding: EncodingConfig::from(Encoding::Text),
+            encoding: EncodingConfig::from(StandardEncodings::Text),
             batch: BatchConfig::default(),
             compression,
             auth: kafka_auth.clone(),
