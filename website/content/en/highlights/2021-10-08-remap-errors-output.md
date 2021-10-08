@@ -60,7 +60,7 @@ Given a config of:
 
 You would expect to see output like the following:
 
-```
+```json
 {"foo":"baz","message":"valid message","processed":true,"timestamp":"2021-10-08T18:04:09.269236640Z"}
 {"foo":"baz","message":"valid message","processed":true,"timestamp":"2021-10-08T18:04:10.269192981Z"}
 invalid message
