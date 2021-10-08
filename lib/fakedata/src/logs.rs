@@ -221,7 +221,7 @@ fn random_in_range(min: usize, max: usize) -> usize {
 }
 
 fn random_from_array<T: ?Sized>(v: &'static [&'static T]) -> &'static T {
-    &v[thread_rng().gen_range(0..v.len())]
+    v[thread_rng().gen_range(0..v.len())]
 }
 
 fn random_from_array_copied<T: Copy>(v: &[T]) -> T {
