@@ -458,7 +458,6 @@ async fn fetch_stream(stream: String, tenant: &str) -> (Vec<i64>, Vec<String>) {
         "http://localhost:3100/loki/api/v1/query_range?query={}&direction=forward",
         query
     );
-    println!("query: {}", query);
 
     let res = reqwest::Client::new()
         .get(&query)

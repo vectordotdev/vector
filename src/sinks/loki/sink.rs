@@ -8,7 +8,7 @@ use crate::internal_events::{
     LokiOutOfOrderEventRewritten, TemplateRenderingFailed,
 };
 use crate::sinks::util::buffer::loki::{
-    GlobalTimestamps, Labels, LokiBatch, LokiEvent, LokiRecord, PartitionKey,
+    GlobalTimestamps, LokiBatch, LokiEvent, LokiRecord, PartitionKey,
 };
 use crate::sinks::util::encoding::{EncodingConfig, EncodingConfiguration};
 use crate::sinks::util::UriSerde;
@@ -203,28 +203,12 @@ impl EventEncoder {
     }
 }
 
-struct FilterEncoderCache {
-    partition: Option<(PartitionKey, Labels)>,
-    latest_timestamp: Option<i64>,
-    global_timestamps: GlobalTimestamps,
-}
-
-impl FilterEncoderCache {
-    fn update(&mut self, record: &LokiRecord) {
-        let partition = &record.partition;
-        if self.latest_timestamp.is_none() {
-            self.partition = Some((record.partition.clone(), record.labels.clone()));
-            self.latest_timestamp = self.global_timestamps.take(partition);
-        }
-    }
-}
-
 #[pin_project]
 struct FilterEncoder<St> {
     #[pin]
     input: St,
     encoder: EventEncoder,
-    cache: FilterEncoderCache,
+    global_timestamps: GlobalTimestamps,
     out_of_order_action: OutOfOrderAction,
 }
 
@@ -238,11 +222,7 @@ impl<St> FilterEncoder<St> {
         Self {
             input,
             encoder,
-            cache: FilterEncoderCache {
-                partition: None,
-                latest_timestamp: None,
-                global_timestamps,
-            },
+            global_timestamps,
             out_of_order_action,
         }
     }
@@ -265,10 +245,10 @@ where
             Poll::Ready(Some(item)) => {
                 let mut item = this.encoder.encode_event(item);
 
-                this.cache.update(&item);
+                let partition = &item.partition;
+                let latest_timestamp = this.global_timestamps.take(partition);
 
-                // TODO: gauge/count of labels.
-                let latest_timestamp = this.cache.latest_timestamp.unwrap_or(item.event.timestamp);
+                let latest_timestamp = latest_timestamp.unwrap_or(item.event.timestamp);
 
                 if item.event.timestamp < latest_timestamp {
                     match this.out_of_order_action {
@@ -283,6 +263,8 @@ where
                         }
                     }
                 } else {
+                    this.global_timestamps
+                        .insert(partition.clone(), item.event.timestamp);
                     Poll::Ready(Some(item))
                 }
             }
@@ -361,23 +343,18 @@ impl StreamSink for LokiSink {
         tokio::pin!(batcher);
 
         while let Some(batch_join) = batcher.next().await {
-            match batch_join {
-                Ok(batch_request) => match batch_request {
-                    Ok(request) => {
-                        if io_tx.send(request).await.is_err() {
-                            error!("Sink I/O channel should not be closed before sink itself is closed.");
-                            return Err(());
-                        }
-                    }
-                    Err(error) => {
-                        error!("Sink was unable to construct a payload body: {}", error);
-                        return Err(());
-                    }
-                },
-                Err(error) => {
-                    error!("Task failed to properly join: {}", error);
-                    return Err(());
-                }
+            let request = batch_join
+                .map_err(|err| {
+                    error!("Task failed to properly join: {}", err);
+                    ()
+                })?
+                .map_err(|err| {
+                    error!("Sink was unable to construct a payload body: {}", err);
+                    ()
+                })?;
+            if io_tx.send(request).await.is_err() {
+                error!("Sink I/O channel should not be closed before sink itself is closed.");
+                return Err(());
             }
         }
 
@@ -412,5 +389,82 @@ where
             acker.ack(size);
         }
         seqno += 1;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{EventEncoder, FilterEncoder, KeyPartitioner};
+    use crate::config::log_schema;
+    use crate::sinks::loki::config::{Encoding, OutOfOrderAction};
+    use crate::sinks::util::buffer::loki::GlobalTimestamps;
+    use crate::sinks::util::encoding::EncodingConfig;
+    use crate::test_util::random_lines;
+    use futures::stream::Stream;
+    use std::collections::HashMap;
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
+    use vector_core::event::Event;
+
+    async fn collect<St, E>(mut input: St, abort_after: usize) -> Vec<E>
+    where
+        St: Stream<Item = E> + std::marker::Unpin,
+    {
+        let mut stream = Pin::new(&mut input);
+        let noop_waker = futures::task::noop_waker();
+        let mut cx = Context::from_waker(&noop_waker);
+        let mut res = Vec::new();
+        let mut none_count: usize = 0;
+        loop {
+            match stream.as_mut().poll_next(&mut cx) {
+                Poll::Pending => {}
+                Poll::Ready(None) => {
+                    none_count += 1;
+                    if none_count >= abort_after {
+                        return res;
+                    }
+                }
+                Poll::Ready(Some(item)) => {
+                    none_count = 0;
+                    res.push(item);
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn filter_encoder_drop() {
+        let encoder = EventEncoder {
+            key_partitioner: KeyPartitioner::new(None),
+            encoding: EncodingConfig::from(Encoding::Json),
+            labels: HashMap::default(),
+            remove_label_fields: false,
+            remove_timestamp: false,
+        };
+        let base = chrono::Utc::now();
+        let events = random_lines(100)
+            .take(20)
+            .map(Event::from)
+            .enumerate()
+            .map(|(i, mut event)| {
+                let log = event.as_mut_log();
+                let ts = if i % 5 == 1 {
+                    base
+                } else {
+                    base + chrono::Duration::seconds(i as i64)
+                };
+                log.insert(log_schema().timestamp_key(), ts);
+                event
+            })
+            .collect::<Vec<_>>();
+        let mut stream = futures::stream::iter(events);
+        let filter = FilterEncoder::new(
+            &mut stream,
+            encoder,
+            GlobalTimestamps::default(),
+            OutOfOrderAction::Drop,
+        );
+        let result = collect(filter, 2).await;
+        assert_eq!(result.len(), 17);
     }
 }
