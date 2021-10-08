@@ -22,6 +22,7 @@ components: sources: heroku_logs: {
 
 	features: {
 		multiline: enabled: false
+		codecs: enabled:    true
 		receive: {
 			from: {
 				service: services.heroku
