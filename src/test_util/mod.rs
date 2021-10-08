@@ -305,6 +305,7 @@ pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     output.lines().map(|s| s.to_owned()).collect()
 }
 
+#[cfg(feature = "sources-aws_s3")]
 pub fn lines_from_zst_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     trace!(message = "Reading zst file.", path = %path.as_ref().display());
     let mut file = File::open(path).unwrap();
