@@ -105,9 +105,9 @@ where
         pin!(batched_input);
 
         loop {
-            // We poll our in-flight futures until no more of them are ready, which lets us queue up
-            // as many completions as we can at once, and then ack as many messages as we possibly
-            // can in a single shot.
+            // We'll poll up to 1024 in-flight futures, which lets us queue up multiple completions
+            // in a single turn of the loop, while only doing a single call to `ack`, which is far more
+            // efficient in scenarios where the `Driver` has a very high rate of input.
             //
             // Crucially, we aren't awaiting on the stream here, but simply calling its `poll_next`
             // method, which means we won't go to sleep if `in_flight` has no more ready futures and
