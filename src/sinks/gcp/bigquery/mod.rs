@@ -29,6 +29,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use snafu::{ResultExt, Snafu};
 use uuid::Uuid;
+use std::convert::TryInto;
 
 const NAME: &str = "gcp_bigquery";
 const ENDPOINT: &str = "https://bigquery.googleapis.com";
@@ -59,16 +60,12 @@ fn default_endpoint() -> String {
 const MIN_INITIAL_BACKOFF_SECS: u64 = 30;
 
 fn default_request_config() -> TowerRequestConfig {
-    let mut conf = TowerRequestConfig::default();
-    conf.retry_initial_backoff_secs = Some(MIN_INITIAL_BACKOFF_SECS);
-    conf
+    TowerRequestConfig { retry_initial_backoff_secs: Some(MIN_INITIAL_BACKOFF_SECS), ..Default::default() }
 }
 
 const MAX_BATCH_SIZE_MB: u64 = 8;
 fn default_batch_config() -> BatchConfig {
-    let mut conf = BatchConfig::default();
-    conf.max_bytes = Some(MAX_BATCH_SIZE_MB as usize);
-    conf
+    BatchConfig { max_bytes: Some(MAX_BATCH_SIZE_MB as usize), ..Default::default() }
 }
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -143,7 +140,7 @@ impl SinkConfig for BigquerySinkConfig {
         let batch_settings = BatchSettings::default()
             // BigQuery has a max request size of 10MB, setting to 8MB gives sufficient padding to
             // include the additional metadata required by the insert request
-            .bytes(bytesize::kib(8000u64))
+            .bytes(bytesize::kib(8000u64).try_into().unwrap())
             .timeout(1)
             .parse_config(self.batch)?;
 
