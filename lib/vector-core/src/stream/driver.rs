@@ -160,8 +160,8 @@ where
                     while !batch.is_empty() {
                         let svc = match poll!(service.ready()) {
                             Poll::Ready(Ok(svc)) => svc,
-                            Poll::Ready(Err(_)) => {
-                                error!(message = "Service return error from `poll_ready()`.");
+                            Poll::Ready(Err(err)) => {
+                                error!(message = "Service return error from `poll_ready()`.", ?err);
                                 return Err(())
                             }
                             Poll::Pending => {

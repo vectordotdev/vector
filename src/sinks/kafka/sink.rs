@@ -3,10 +3,9 @@ use super::config::KafkaSinkConfig;
 use crate::event::Event;
 use crate::kafka::KafkaStatisticsContext;
 use crate::sinks::kafka::config::QUEUED_MIN_MESSAGES;
-use crate::sinks::kafka::encoder::Encoding;
 use crate::sinks::kafka::request_builder::KafkaRequestBuilder;
 use crate::sinks::kafka::service::KafkaService;
-use crate::sinks::util::encoding::EncodingConfig;
+use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
 use crate::sinks::util::{builder::SinkBuilderExt, StreamSink};
 use crate::template::{Template, TemplateParseError};
 use async_trait::async_trait;
@@ -33,7 +32,7 @@ pub enum BuildError {
 }
 
 pub struct KafkaSink {
-    encoding: EncodingConfig<Encoding>,
+    encoding: EncodingConfig<StandardEncodings>,
     acker: Acker,
     service: KafkaService,
     topic: Template,

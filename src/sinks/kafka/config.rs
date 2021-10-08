@@ -1,9 +1,8 @@
 use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
 use crate::kafka::{KafkaAuthConfig, KafkaCompression};
 use crate::serde::to_string;
-use crate::sinks::kafka::encoder::Encoding;
 use crate::sinks::kafka::sink::{healthcheck, KafkaSink};
-use crate::sinks::util::encoding::EncodingConfig;
+use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
 use crate::sinks::util::BatchConfig;
 use crate::sinks::{Healthcheck, VectorSink};
 use futures::FutureExt;
@@ -18,7 +17,7 @@ pub(crate) struct KafkaSinkConfig {
     pub bootstrap_servers: String,
     pub topic: String,
     pub key_field: Option<String>,
-    pub encoding: EncodingConfig<Encoding>,
+    pub encoding: EncodingConfig<StandardEncodings>,
     /// These batching options will **not** override librdkafka_options values.
     #[serde(default)]
     pub batch: BatchConfig,
@@ -142,7 +141,7 @@ impl GenerateConfig for KafkaSinkConfig {
             bootstrap_servers: "10.14.22.123:9092,10.14.23.332:9092".to_owned(),
             topic: "topic-1234".to_owned(),
             key_field: Some("user_id".to_owned()),
-            encoding: Encoding::Json.into(),
+            encoding: StandardEncodings::Json.into(),
             batch: Default::default(),
             compression: KafkaCompression::None,
             auth: Default::default(),

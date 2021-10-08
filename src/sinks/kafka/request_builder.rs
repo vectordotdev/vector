@@ -1,8 +1,7 @@
 use crate::event::{Event, Finalizable, Value};
 use crate::internal_events::KafkaHeaderExtractionFailed;
-use crate::sinks::kafka::encoder::Encoding;
 use crate::sinks::kafka::service::{KafkaRequest, KafkaRequestMetadata};
-use crate::sinks::util::encoding::{Encoder, EncodingConfig};
+use crate::sinks::util::encoding::{Encoder, EncodingConfig, StandardEncodings};
 use crate::template::Template;
 use bytes::Bytes;
 use rdkafka::message::OwnedHeaders;
@@ -12,7 +11,7 @@ pub struct KafkaRequestBuilder {
     pub key_field: Option<String>,
     pub headers_field: Option<String>,
     pub topic_template: Template,
-    pub encoder: EncodingConfig<Encoding>,
+    pub encoder: EncodingConfig<StandardEncodings>,
     pub log_schema: &'static LogSchema,
 }
 
