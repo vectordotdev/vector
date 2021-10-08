@@ -9,7 +9,7 @@ releases: "0.16.0": {
 
 	The Vector team is pleased to announce version 0.16.0!
 
-	Be sure to check out the [upgrade guide](/highlights/2021-07-21-0-16-upgrade-guide) for breaking changes in this release.
+	Be sure to check out the [upgrade guide](/highlights/2021-08-25-0-16-upgrade-guide) for breaking changes in this release.
 
 	This release includes:
 
