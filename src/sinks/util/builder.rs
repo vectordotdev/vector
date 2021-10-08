@@ -1,18 +1,16 @@
-use std::{fmt, future::Future, io, num::NonZeroUsize, pin::Pin, sync::Arc, time::Duration};
+use std::{fmt, future::Future, hash::Hash, num::NonZeroUsize, pin::Pin, sync::Arc};
 
 use futures_util::Stream;
 use tower::Service;
 use vector_core::{
     buffers::{Ackable, Acker},
-    event::{Event, EventStatus, Finalizable},
+    event::{EventStatus, Finalizable},
     partition::Partitioner,
-    stream::{
-        batcher::{Batcher, ExpirationQueue},
-        driver::Driver,
-    },
+    stream::{Batcher, BatcherSettings, ConcurrentMap, Driver, ExpirationQueue},
+    ByteSizeOf,
 };
 
-use super::{encoding::Encoder, Compression, Compressor, ConcurrentMap, RequestBuilder};
+use super::RequestBuilder;
 
 impl<T: ?Sized> SinkBuilderExt for T where T: Stream {}
 
@@ -25,21 +23,15 @@ pub trait SinkBuilderExt: Stream {
     fn batched<P>(
         self,
         partitioner: P,
-        batch_timeout: Duration,
-        batch_item_limit: NonZeroUsize,
-        batch_allocation_limit: Option<NonZeroUsize>,
+        settings: BatcherSettings,
     ) -> Batcher<Self, P, ExpirationQueue<P::Key>>
     where
-        Self: Sized + Unpin,
+        Self: Stream<Item = P::Item> + Sized + Unpin,
         P: Partitioner + Unpin,
+        P::Key: Eq + Hash + Clone,
+        P::Item: ByteSizeOf,
     {
-        Batcher::new(
-            self,
-            partitioner,
-            batch_timeout,
-            batch_item_limit,
-            batch_allocation_limit,
-        )
+        Batcher::new(self, partitioner, settings)
     }
 
     /// Maps the items in the stream concurrently, up to the configured limit.
@@ -67,49 +59,34 @@ pub trait SinkBuilderExt: Stream {
     /// self-describing, as it imposes no concurrency limit, and `Some(n)` limits this stage to `n`
     /// concurrent operations at any given time.
     ///
-    /// Encoding and compression are handled internally, deferring to the builder are the necessary
+    /// Encoding and compression are handled internally, deferring to the builder at the necessary
     /// checkpoints for adjusting the event before encoding/compression, as well as generating the
     /// correct request object with the result of encoding/compressing the events.
-    fn request_builder<B, I, E>(
+    fn request_builder<B>(
         self,
         limit: Option<NonZeroUsize>,
         builder: B,
-        encoding: E,
-        compression: Compression,
-    ) -> ConcurrentMap<Self, io::Result<B::Request>>
+    ) -> ConcurrentMap<Self, Result<B::Request, B::Error>>
     where
         Self: Sized,
-        Self: Stream<Item = I>,
-        B: RequestBuilder<I> + Send + Sync + 'static,
-        B::Events: IntoIterator<Item = Event>,
-        B::Payload: From<Vec<u8>>,
+        Self::Item: Send + 'static,
+        B: RequestBuilder<<Self as Stream>::Item> + Send + Sync + 'static,
+        B::Error: Send,
         B::Request: Send,
-        I: Send + 'static,
-        E: Encoder + Send + Sync + 'static,
     {
         let builder = Arc::new(builder);
-        let encoder = Arc::new(encoding);
 
         self.concurrent_map(limit, move |input| {
             let builder = Arc::clone(&builder);
-            let encoder = Arc::clone(&encoder);
-            let mut compressor = Compressor::from(compression);
 
             Box::pin(async move {
                 // Split the input into metadata and events.
                 let (metadata, events) = builder.split_input(input);
 
-                // Encode/compress each event.
-                for event in events.into_iter() {
-                    // In practice, encoding should be infallible, since we're typically using `Vec<T>`
-                    // as the write target, but the `std::io::Write` interface _is_ fallible, and
-                    // technically we might run out of memory when allocating for the vector, so we
-                    // pass the error through.
-                    let _ = encoder.encode_event(event, &mut compressor)?;
-                }
+                // Encode the events.
+                let payload = builder.encode_events(events)?;
 
                 // Now build the actual request.
-                let payload = compressor.into_inner().into();
                 Ok(builder.build_request(metadata, payload))
             })
         })

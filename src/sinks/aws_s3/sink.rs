@@ -1,3 +1,5 @@
+use std::io;
+
 use crate::{
     event::Event,
     sinks::{
@@ -27,8 +29,18 @@ pub struct S3RequestOptions {
 impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
     type Metadata = (String, usize, EventFinalizers);
     type Events = Vec<Event>;
+    type Encoder = EncodingConfig<StandardEncodings>;
     type Payload = Bytes;
     type Request = S3Request;
+    type Error = io::Error; // TODO: this is ugly.
+
+    fn compression(&self) -> Compression {
+        self.compression
+    }
+
+    fn encoder(&self) -> &Self::Encoder {
+        &self.encoding
+    }
 
     fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
         let (partition_key, mut events) = input;
@@ -55,6 +67,7 @@ impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
             .unwrap_or_else(|| self.compression.extension().into());
         let key = format!("{}/{}.{}", key, filename, extension);
 
+        // TODO: move this into `.request_builder(...)` closure?
         trace!(
             message = "Sending events.",
             bytes = ?payload.len(),
