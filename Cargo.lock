@@ -7527,7 +7527,6 @@ name = "vector"
 version = "0.18.0"
 dependencies = [
  "approx",
- "arc-swap",
  "assert_cmd",
  "async-compression",
  "async-graphql",
