@@ -28,8 +28,8 @@ use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use snafu::{ResultExt, Snafu};
-use uuid::Uuid;
 use std::convert::TryInto;
+use uuid::Uuid;
 
 const NAME: &str = "gcp_bigquery";
 const ENDPOINT: &str = "https://bigquery.googleapis.com";
@@ -60,12 +60,18 @@ fn default_endpoint() -> String {
 const MIN_INITIAL_BACKOFF_SECS: u64 = 30;
 
 fn default_request_config() -> TowerRequestConfig {
-    TowerRequestConfig { retry_initial_backoff_secs: Some(MIN_INITIAL_BACKOFF_SECS), ..Default::default() }
+    TowerRequestConfig {
+        retry_initial_backoff_secs: Some(MIN_INITIAL_BACKOFF_SECS),
+        ..Default::default()
+    }
 }
 
 const MAX_BATCH_SIZE_MB: u64 = 8;
 fn default_batch_config() -> BatchConfig {
-    BatchConfig { max_bytes: Some(MAX_BATCH_SIZE_MB as usize), ..Default::default() }
+    BatchConfig {
+        max_bytes: Some(MAX_BATCH_SIZE_MB as usize),
+        ..Default::default()
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Default)]
