@@ -65,7 +65,9 @@ pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-tokenizer")]
 pub mod tokenizer;
 
-pub use vector_core::transform::{FunctionTransform, TaskTransform, Transform};
+pub use vector_core::transform::{
+    FallibleFunctionTransform, FunctionTransform, TaskTransform, Transform,
+};
 
 #[derive(Debug, Snafu)]
 enum BuildError {

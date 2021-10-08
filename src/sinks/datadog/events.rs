@@ -22,6 +22,7 @@ use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{sync::Arc, time::Duration};
+use vector_core::ByteSizeOf;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -74,7 +75,7 @@ impl DatadogEventsConfig {
         timeout: Duration,
     ) -> crate::Result<(VectorSink, Healthcheck)>
     where
-        O: 'static,
+        O: ByteSizeOf + 'static,
         B: Batch<Output = Vec<O>> + std::marker::Send + 'static,
         B::Output: std::marker::Send + Clone,
         B::Input: std::marker::Send,

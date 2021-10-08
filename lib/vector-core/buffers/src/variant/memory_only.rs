@@ -2,7 +2,7 @@ use crate::WhenFull;
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum Variant {
     Memory {
         max_events: usize,

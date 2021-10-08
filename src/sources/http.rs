@@ -522,10 +522,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
-            DecodingConfig::new(
-                None,
-                Some(Box::new(JsonParserConfig::new_with_options(true))),
-            ),
+            DecodingConfig::new(None, Some(Box::new(JsonParserConfig::new()))),
         )
         .await;
 

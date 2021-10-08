@@ -14,6 +14,7 @@ components: sources: exec: {
 
 	features: {
 		multiline: enabled: false
+		codecs: enabled:    true
 		receive: {
 			from: {
 				service: services.exec

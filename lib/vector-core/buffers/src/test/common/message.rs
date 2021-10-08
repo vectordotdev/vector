@@ -1,5 +1,6 @@
 use crate::bytes::{DecodeBytes, EncodeBytes};
 use bytes::{Buf, BufMut};
+use core_common::byte_size_of::ByteSizeOf;
 use quickcheck::{Arbitrary, Gen};
 use std::{fmt, mem};
 
@@ -11,6 +12,12 @@ pub struct Message {
 impl Message {
     pub(crate) fn new(id: u64) -> Self {
         Message { id }
+    }
+}
+
+impl ByteSizeOf for Message {
+    fn allocated_bytes(&self) -> usize {
+        0
     }
 }
 
