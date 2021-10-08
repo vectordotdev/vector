@@ -92,6 +92,7 @@ impl NewRelicMetric {
                     Value::from(metric.name().to_owned()),
                     Value::from("gauge".to_owned()),
                     Value::from(*value),
+                    //TODO: check Some instead of unwraping
                     Value::from(metric.timestamp().unwrap())
                 ).to_json()
             },
@@ -100,6 +101,7 @@ impl NewRelicMetric {
                     Value::from(metric.name().to_owned()),
                     Value::from("count".to_owned()),
                     Value::from(*value),
+                    //TODO: check Some instead of unwraping
                     Value::from(metric.timestamp().unwrap())
                 ).to_json()
             },
@@ -272,7 +274,8 @@ impl HttpSink for NewRelicConfig {
         };
         encoding.apply_rules(&mut event);
 
-        println!("Encode event = {:#?}", event);
+        //TODO: remove this before production
+        info!("Encode event = {:#?}", event);
 
         match self.api {
             NewRelicApi::Events => {
