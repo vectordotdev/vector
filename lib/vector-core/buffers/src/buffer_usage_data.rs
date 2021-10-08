@@ -9,7 +9,6 @@ use crate::internal_events::{
 };
 use crate::WhenFull;
 
-
 pub enum BufferMaxSize {
     Events(usize),
     Bytes(usize),
@@ -24,7 +23,6 @@ pub struct BufferUsageData {
     max_size_bytes: Option<usize>,
     max_size_events: Option<usize>,
 }
-
 
 impl BufferUsageData {
     pub fn new(when_full: WhenFull, span: Span, max_size: BufferMaxSize) -> Arc<Self> {
