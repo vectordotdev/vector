@@ -20,6 +20,7 @@ use crate::{
     },
     tls::{TlsOptions, TlsSettings},
 };
+use bytesize::ByteSize;
 use futures::{FutureExt, SinkExt};
 use http::Uri;
 use hyper::{Body, Request};
@@ -55,6 +56,21 @@ fn default_endpoint() -> String {
     ENDPOINT.to_string()
 }
 
+const MIN_INITIAL_BACKOFF_SECS: u64 = 30;
+
+fn default_request_config() -> TowerRequestConfig {
+    let mut conf = TowerRequestConfig::default();
+    conf.retry_initial_backoff_secs = Some(MIN_INITIAL_BACKOFF_SECS);
+    conf
+}
+
+const MAX_BATCH_SIZE_MB: u64 = 8;
+fn default_batch_config() -> BatchConfig {
+    let mut conf = BatchConfig::default();
+    conf.max_bytes = Some(MAX_BATCH_SIZE_MB as usize);
+    conf
+}
+
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct BigquerySinkConfig {
@@ -70,7 +86,7 @@ pub struct BigquerySinkConfig {
     #[serde(default)]
     skip_invalid_rows: bool,
     template_suffix: Option<String>,
-    #[serde(default)]
+    #[serde(default = "default_request_config")]
     request: TowerRequestConfig,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
@@ -79,7 +95,7 @@ pub struct BigquerySinkConfig {
     encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(flatten)]
     auth: Option<GcpAuthConfig>,
-    #[serde(default)]
+    #[serde(default = "default_batch_config")]
     batch: BatchConfig,
     tls: Option<TlsOptions>,
 }
@@ -110,16 +126,37 @@ impl SinkConfig for BigquerySinkConfig {
             retry_initial_backoff_secs: Some(30),
             ..Default::default()
         });
+
+        let retry_initial_backoff_secs = request_settings.retry_initial_backoff_secs.as_secs();
+        if retry_initial_backoff_secs < MIN_INITIAL_BACKOFF_SECS {
+            return Err(format!(
+                "provided inital backoff seconds is too low for BigQuery: {}, min is {}",
+                retry_initial_backoff_secs, MIN_INITIAL_BACKOFF_SECS
+            )
+            .into());
+        }
+
         let tls_settings = TlsSettings::from_options(&self.tls)?;
 
         let client = HttpClient::new(tls_settings, cx.proxy())?;
         let sink = BigquerySink::from_config(self).await?;
         let batch_settings = BatchSettings::default()
-            // BigQuery has a max request size of 10MB
-            .bytes(bytesize::mib(8u64).into())
-            .events(1000)
+            // BigQuery has a max request size of 10MB, setting to 8MB gives sufficient padding to
+            // include the additional metadata required by the insert request
+            .bytes(bytesize::kib(8000u64))
             .timeout(1)
             .parse_config(self.batch)?;
+
+        let batch_bytes = batch_settings.size.bytes as u64;
+
+        if batch_bytes > bytesize::mb(MAX_BATCH_SIZE_MB) {
+            return Err(format!(
+                "provided batch size is too big for BigQuery: {}, max is {}",
+                ByteSize::b(batch_bytes),
+                ByteSize::mb(MAX_BATCH_SIZE_MB)
+            )
+            .into());
+        }
 
         let uri = sink.uri("").expect("failed to parse uri");
         let healthcheck = healthcheck(client.clone(), uri, sink.creds.clone()).boxed();
@@ -321,7 +358,6 @@ mod integration_tests {
         tokio::spawn(server);
 
         let host = String::from("http://localhost:8123");
-
         let config = BigquerySinkConfig {
             endpoint: host.parse().unwrap(),
             project: "test".into(),
@@ -332,10 +368,12 @@ mod integration_tests {
             template_suffix: None,
             batch: BatchConfig {
                 max_events: Some(1),
-                ..Default::default()
+                ..default_batch_config()
             },
-            ..Default::default()
+            request: default_request_config(),
+            ..BigquerySinkConfig::default()
         };
+
         let (sink, _hc) = config
             .build(SinkContext::new_test())
             .await
@@ -384,7 +422,6 @@ mod integration_tests {
         tokio::spawn(server);
 
         let host = String::from("http://localhost:8124");
-
         let config = BigquerySinkConfig {
             endpoint: host.parse().unwrap(),
             project: "test".into(),
@@ -395,10 +432,12 @@ mod integration_tests {
             template_suffix: None,
             batch: BatchConfig {
                 max_events: Some(1),
-                ..Default::default()
+                ..default_batch_config()
             },
-            ..Default::default()
+            request: default_request_config(),
+            ..BigquerySinkConfig::default()
         };
+
         let (sink, _hc) = config
             .build(SinkContext::new_test())
             .await
