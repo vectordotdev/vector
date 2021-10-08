@@ -691,6 +691,7 @@ mod integration_tests {
     use crate::config::SourceContext;
     use crate::docker::docker;
     use crate::sources::fluent::FluentConfig;
+    use crate::test_util::components::{self, SOURCE_TESTS, TCP_SOURCE_TAGS};
     use crate::test_util::{collect_ready, next_addr_for_ip, trace_init, wait_for_tcp};
     use crate::Pipeline;
     use bollard::{
@@ -771,6 +772,8 @@ mod integration_tests {
         let events = collect_ready(out).await;
 
         remove_container(&docker, &container.id).await;
+
+        SOURCE_TESTS.assert(&TCP_SOURCE_TAGS);
 
         assert!(!events.is_empty());
         assert_eq!(events[0].as_log()["tag"], "dummy.0".into());
@@ -876,6 +879,8 @@ mod integration_tests {
 
         remove_container(&docker, &container.id).await;
 
+        SOURCE_TESTS.assert(&TCP_SOURCE_TAGS);
+
         assert!(!events.is_empty());
         assert_eq!(events[0].as_log()["tag"], "dummy".into());
         assert_eq!(events[0].as_log()["message"], "dummy".into());
@@ -917,6 +922,7 @@ mod integration_tests {
     }
 
     async fn source() -> (mpsc::Receiver<Event>, SocketAddr) {
+        components::init();
         let (sender, recv) = Pipeline::new_test();
         let address = next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
         tokio::spawn(async move {
