@@ -8,7 +8,7 @@
 use crate::event::{Event, Metric, MetricValue};
 use crate::metrics::{self, Controller};
 use crate::sinks::VectorSink;
-use futures::{stream, SinkExt, Stream, StreamExt};
+use futures::{stream, SinkExt, Stream};
 use lazy_static::lazy_static;
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -176,11 +176,23 @@ pub async fn run_sink_event(sink: VectorSink, event: Event, tags: &[&str]) {
 }
 
 /// Convenience wrapper for running sinks with `send_all`
-pub async fn sink_send_all(sink: VectorSink, events: Vec<Event>, tags: &[&str]) {
+pub async fn sink_send_all<I>(sink: VectorSink, events: I, tags: &[&str])
+where
+    I: IntoIterator<Item = Event>,
+    I::IntoIter: Send,
+{
+    sink_send_stream(sink, stream::iter(events.into_iter().map(Ok)), tags).await
+}
+
+/// Convenience wrapper for running sinks with a stream of events
+pub async fn sink_send_stream<S>(sink: VectorSink, mut events: S, tags: &[&str])
+where
+    S: Stream<Item = Result<Event, ()>> + Send + Unpin,
+{
     init();
     sink.into_sink()
-        .send_all(&mut stream::iter(events).map(Ok))
+        .send_all(&mut events)
         .await
-        .expect("Sending events to sink failed");
+        .expect("Sending event stream to sink failed");
     SINK_TESTS.assert(tags);
 }

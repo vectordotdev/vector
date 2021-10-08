@@ -116,7 +116,7 @@ mod tests {
             Event, Metric,
         },
         sinks::util::test::{build_test_server, load_sink},
-        test_util,
+        test_util::{self, components},
     };
     use chrono::{offset::TimeZone, Utc};
     use indoc::indoc;
@@ -203,7 +203,7 @@ mod tests {
         ];
 
         let len = metrics.len();
-        let _ = sink.run(stream::iter(metrics)).await.unwrap();
+        components::run_sink(sink, stream::iter(metrics), &["endpoint"]).await;
 
         let output = rx.take(len).collect::<Vec<_>>().await;
         assert_eq!(

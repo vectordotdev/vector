@@ -573,11 +573,9 @@ mod integration_tests {
         sinks::splunk_hec::conn::integration_test_helpers::get_token,
         test_util::components,
     };
-    use futures::stream;
     use serde_json::Value as JsonValue;
     use shared::btreemap;
     use std::convert::TryFrom;
-    use std::future::ready;
     use vector_core::event::{BatchNotifier, BatchStatus};
     const USERNAME: &str = "admin";
     const PASSWORD: &str = "password";

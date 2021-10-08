@@ -1111,11 +1111,11 @@ mod integration_tests {
         tls::{self, TlsOptions},
     };
     use chrono::Utc;
-    use futures::{stream, StreamExt};
+    use futures::StreamExt;
     use http::{Request, StatusCode};
     use hyper::Body;
     use serde_json::{json, Value};
-    use std::{fs::File, future::ready, io::Read};
+    use std::{fs::File, io::Read};
     use vector_core::event::{BatchNotifier, BatchStatus, LogEvent};
 
     const SINK_TAGS: [&str; 1] = ["endpoint"];

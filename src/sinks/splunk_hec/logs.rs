@@ -485,7 +485,6 @@ mod integration_tests {
 
         let (messages, events) = random_lines_with_stream(100, 10, None);
         components::run_sink(sink, events, &SINK_TAGS).await;
-        sink.run(events).await.unwrap();
 
         let mut found_all = false;
         for _ in 0..20 {

@@ -398,9 +398,7 @@ mod tests {
             Ok(e)
         });
 
-        components::init();
-        let _ = sink.into_sink().send_all(&mut events).await.unwrap();
-        components::SINK_TESTS.assert(&SINK_TAGS);
+        components::sink_send_stream(sink, events, &SINK_TAGS).await;
         let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
         for (i, val) in output.iter().enumerate() {

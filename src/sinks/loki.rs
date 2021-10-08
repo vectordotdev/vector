@@ -536,8 +536,8 @@ mod integration_tests {
     };
     use bytes::Bytes;
     use chrono::{DateTime, Duration, Utc};
-    use futures::{stream, StreamExt};
     use std::convert::TryFrom;
+    use std::sync::Arc;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
     const SINK_TAGS: [&str; 1] = ["endpoint"];
@@ -571,7 +571,7 @@ mod integration_tests {
         (stream, sink)
     }
 
-    fn add_batch_notifier(events: &[Event], batch: BatchNotifier) -> Vec<Event> {
+    fn add_batch_notifier(events: &[Event], batch: Arc<BatchNotifier>) -> Vec<Event> {
         events
             .iter()
             .map(|event| event.clone().into_log().with_batch_notifier(&batch).into())
@@ -589,7 +589,7 @@ mod integration_tests {
             .clone()
             .into_iter()
             .map(move |line| Event::from(LogEvent::from(line).with_batch_notifier(&batch)));
-        components::sink_send_all(sink, events, &SINK_TAGS);
+        components::sink_send_all(sink, events, &SINK_TAGS).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let (_, outputs) = fetch_stream(stream.to_string(), "default").await;

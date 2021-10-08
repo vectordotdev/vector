@@ -248,7 +248,7 @@ mod tests {
     use indoc::indoc;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
-    const SINK_TAGS: [&str; 1] = ["endpoint"];
+    pub(super) const SINK_TAGS: [&str; 1] = ["endpoint"];
 
     type Receiver = mpsc::Receiver<(Parts, bytes::Bytes)>;
 
@@ -715,7 +715,7 @@ mod integration_tests {
 
         let events = vec![Event::Log(event1), Event::Log(event2)];
 
-        components::run_sink(sink, stream::iter(events), &SINK_TAGS).await;
+        components::run_sink(sink, stream::iter(events), &tests::SINK_TAGS).await;
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 

@@ -255,7 +255,7 @@ mod integration_tests {
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (input, events) = random_events_with_stream(100, 100, Some(batch));
-        components::run_sink(sink, events, &["endpoint"]);
+        components::run_sink(sink, events, &["endpoint"]).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let response = pull_messages(&subscription, 1000).await;

@@ -281,16 +281,12 @@ mod integration_tests {
     use crate::{
         config::{log_schema, SinkConfig, SinkContext},
         sinks::util::encoding::TimestampFormat,
-        test_util::{
-            components::{self, SINK_TESTS},
-            random_string, trace_init,
-        },
+        test_util::{components, random_string, trace_init},
     };
     use futures::{future, stream};
     use serde_json::Value;
     use std::{
         convert::Infallible,
-        future::ready,
         net::SocketAddr,
         sync::{
             atomic::{AtomicBool, Ordering},
