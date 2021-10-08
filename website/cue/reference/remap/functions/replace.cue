@@ -59,5 +59,12 @@ remap: functions: replace: {
 				"""#
 			return: "Pineapples and Bananas"
 		},
+		{
+			title: "Replace with capture groups"
+			source: #"""
+				replace("foo123bar", r'foo(?P<num>\d+)bar', "$num")
+				"""#
+			return: "123"
+		},
 	]
 }
