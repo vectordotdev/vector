@@ -1,5 +1,5 @@
 use core_common::internal_event::InternalEvent;
-use metrics::counter;
+use metrics::{counter, decrement_gauge, increment_gauge};
 
 pub struct BufferEventsReceived {
     pub count: u64,
@@ -10,6 +10,8 @@ impl InternalEvent for BufferEventsReceived {
     fn emit_metrics(&self) {
         counter!("buffer_received_events_total", self.count);
         counter!("buffer_received_bytes_total", self.byte_size as u64);
+        increment_gauge!("buffer_events", self.count as f64);
+        increment_gauge!("buffer_byte_size", self.byte_size as f64);
     }
 }
 
@@ -22,6 +24,8 @@ impl InternalEvent for BufferEventsSent {
     fn emit_metrics(&self) {
         counter!("buffer_sent_events_total", self.count);
         counter!("buffer_sent_bytes_total", self.byte_size as u64);
+        decrement_gauge!("buffer_events", self.count as f64);
+        decrement_gauge!("buffer_byte_size", self.byte_size as f64);
     }
 }
 
