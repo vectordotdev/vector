@@ -5,7 +5,7 @@ remap: functions: replace: {
 	description: """
 		Replaces all matching instances of `pattern` in the `value`.
 
-		The `pattern` argument accepts regular expression capture groups.
+		The `pattern` argument accepts regular expression capture groups. Note that `$foo` is interpreted in a Vector configuration file, instead use `$$foo`.
 		"""
 
 	arguments: [
