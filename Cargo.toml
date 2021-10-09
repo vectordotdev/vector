@@ -276,7 +276,7 @@ twox-hash = { version = "1.6.1", default-features = false }
 url = { version = "2.2.2", default-features = false, features = ["serde"] }
 uuid = { version = "0.8.2", default-features = false, features = ["serde", "v4"], optional = true }
 warp = { version = "0.3.1", default-features = false, optional = true }
-zstd = { version = "0.6", default-features = false }
+zstd = { version = "0.6", default-features = false, optional = true }
 cfg-if = { version = "1.0.0", default-features = false }
 tonic = { version = "0.5", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls"] }
 data-encoding = { version = "2.2", default-features = false, features = ["std"], optional = true }
@@ -442,7 +442,7 @@ sources-metrics = [
 sources-apache_metrics = []
 sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "infer", "sources-utils-tls", "warp", "codecs"]
-sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid", "codecs"]
+sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid", "codecs", "zstd"]
 sources-datadog = ["snap", "sources-utils-tls", "warp", "sources-utils-http-error", "codecs"]
 sources-dnstap = ["base64", "data-encoding", "trust-dns-proto", "dnsmsg-parser", "tonic-build", "prost-build"]
 sources-docker_logs = ["docker"]
@@ -631,7 +631,7 @@ sinks-honeycomb = []
 sinks-http = []
 sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
 sinks-influxdb = []
-sinks-kafka = ["rdkafka"]
+sinks-kafka = ["rdkafka", "zstd"]
 sinks-logdna = []
 sinks-loki = ["uuid"]
 sinks-nats = ["async-nats"]
