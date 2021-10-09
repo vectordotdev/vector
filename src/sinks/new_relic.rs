@@ -65,13 +65,15 @@ where
     fn to_json(event: T) -> Option<Vec<u8>> {
         match Self::try_from(event) {
             Ok(model) => {
-                if let Ok(mut json) = serde_json::to_vec(&model) {
-                    json.push(b'\n');
-                    Some(json)
-                }
-                else {
-                    info!("Failed generating JSON");
-                    None
+                match serde_json::to_vec(&model) {
+                    Ok(mut json) => {
+                        json.push(b'\n');
+                        Some(json)
+                    },
+                    Err(e) => {
+                        info!("Failed generating JSON: {}", e);
+                        None
+                    }
                 }
             },
             Err(e) => {
