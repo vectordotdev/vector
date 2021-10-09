@@ -13,7 +13,10 @@ use crate::{
 use futures::{future, FutureExt, SinkExt};
 use http::{Request, Uri};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    convert::TryFrom
+};
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
@@ -55,12 +58,28 @@ pub struct NewRelicConfig {
     pub tls: Option<TlsOptions>,
 }
 
-pub trait ToJSON : Serialize {
-    fn to_json(&self) -> Option<Vec<u8>> {
-        let mut json = serde_json::to_vec(self).ok()?;
-        json.push(b'\n');
-        Some(json)
-    }
+pub trait ToJSON<T>: Serialize + TryFrom<T>
+where
+    <Self as TryFrom<T>>::Error: std::fmt::Display
+{
+    fn to_json(event: T) -> Option<Vec<u8>> {
+        match Self::try_from(event) {
+            Ok(model) => {
+                if let Ok(mut json) = serde_json::to_vec(&model) {
+                    json.push(b'\n');
+                    Some(json)
+                }
+                else {
+                    info!("Failed generating JSON");
+                    None
+                }
+            },
+            Err(e) => {
+                info!("Failed converting: {}", e);
+                None
+            }
+        }
+    } 
 }
 
 type NRKeyValData = HashMap<String, Value>;
@@ -84,51 +103,39 @@ impl NewRelicMetric {
         metric_store.insert("metrics".to_owned(), vec!(metric_data));
         Self(vec!(metric_store))
     }
-    
-    pub fn json_from_metric(metric: Metric) -> Option<Vec<u8>> {
+}
+
+impl ToJSON<Metric> for NewRelicMetric {}
+
+impl TryFrom<Metric> for NewRelicMetric {
+    type Error = &'static str;
+
+    fn try_from(metric: Metric) -> Result<Self, Self::Error> {
         match metric.value() {
             MetricValue::Gauge { value } => {
-                Self::new(
+                Ok(Self::new(
                     Value::from(metric.name().to_owned()),
                     Value::from("gauge".to_owned()),
                     Value::from(*value),
                     //TODO: check Some instead of unwraping
                     Value::from(metric.timestamp().unwrap())
-                ).to_json()
+                ))
             },
             MetricValue::Counter { value } => {
-                Self::new(
+                Ok(Self::new(
                     Value::from(metric.name().to_owned()),
                     Value::from("count".to_owned()),
                     Value::from(*value),
                     //TODO: check Some instead of unwraping
                     Value::from(metric.timestamp().unwrap())
-                ).to_json()
+                ))
             },
             _ => {
-                None
+                Err("Unrecognized metric type")
             }
         }
-    }
-
-    pub fn json_from_log(log: LogEvent) -> Option<Vec<u8>> {
-        if let Some(m_name) = log.get("name") {
-            if let Some(m_value) = log.get("value") {
-                if let Some(m_type) = log.get("type") {
-                    if let Some(m_timestamp) = log.get("timestamp") {
-                        let m_type_str = m_type.to_string_lossy();
-                        if m_type_str == "count" || m_type_str == "gauge" {
-                            return Self::new(m_name.clone(), m_type.clone(), m_value.clone(), m_timestamp.clone()).to_json();
-                        }
-                    }
-                }
-            }
-        }
-        None
     }
 }
-
-impl ToJSON for NewRelicMetric {}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NewRelicEvent(NRKeyValData);
@@ -137,8 +144,14 @@ impl NewRelicEvent {
     pub fn new() -> Self {
         Self(NRKeyValData::new())
     }
+}
 
-    pub fn json_from_log(log: LogEvent) -> Option<Vec<u8>> {
+impl ToJSON<LogEvent> for NewRelicEvent {}
+
+impl TryFrom<LogEvent> for NewRelicEvent {
+    type Error = &'static str;
+
+    fn try_from(log: LogEvent) -> Result<Self, Self::Error> {
         let mut nrevent = Self::new();
         for (k, v) in log.all_fields() {
             nrevent.0.insert(k, v.clone());
@@ -172,11 +185,9 @@ impl NewRelicEvent {
         if let None = nrevent.0.get("eventType") {
             nrevent.0.insert("eventType".to_owned(), Value::from("VectorSink".to_owned()));
         }
-        nrevent.to_json()
+        Ok(nrevent)
     }
 }
-
-impl ToJSON for NewRelicEvent {}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NewRelicLog(NRKeyValData);
@@ -185,8 +196,14 @@ impl NewRelicLog {
     pub fn new() -> Self {
         Self(NRKeyValData::new())
     }
+}
 
-    pub fn json_from_log(log: LogEvent) -> Option<Vec<u8>> {
+impl ToJSON<LogEvent> for NewRelicLog {}
+
+impl TryFrom<LogEvent> for NewRelicLog {
+    type Error = &'static str;
+
+    fn try_from(log: LogEvent) -> Result<Self, Self::Error> {
         let mut nrlog = Self::new();
         for (k, v) in log.all_fields() {
             nrlog.0.insert(k, v.clone());
@@ -194,11 +211,9 @@ impl NewRelicLog {
         if let None = log.get("message") {
             nrlog.0.insert("message".to_owned(), Value::from("log from vector".to_owned()));
         }
-        nrlog.to_json()
+        Ok(nrlog)
     }
 }
-
-impl ToJSON for NewRelicLog {}
 
 inventory::submit! {
     SinkDescription::new::<NewRelicConfig>("new_relic")
@@ -280,27 +295,28 @@ impl HttpSink for NewRelicConfig {
         match self.api {
             NewRelicApi::Events => {
                 if let Event::Log(log) = event {
-                    NewRelicEvent::json_from_log(log)
+                    NewRelicEvent::to_json(log)
                 }
                 else {
+                    info!("Received Metric while expecting events, ignoring");
                     None
                 }
             },
             NewRelicApi::Metrics => {
-                match event {
-                    Event::Log(log) => {
-                        NewRelicMetric::json_from_log(log)
-                    },
-                    Event::Metric(metric) => {
-                        NewRelicMetric::json_from_metric(metric)
-                    }
+                if let Event::Metric(metric) = event {
+                    NewRelicMetric::to_json(metric)
+                }
+                else {
+                    info!("Received LogEvent while expecting metrics, ignoring");
+                    None
                 }
             },
             NewRelicApi::Logs => {
                 if let Event::Log(log) = event {
-                    NewRelicLog::json_from_log(log)
+                    NewRelicLog::to_json(log)
                 }
                 else {
+                    info!("Received Metric while expecting logs, ignoring");
                     None
                 }
             }
