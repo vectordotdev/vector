@@ -5,7 +5,6 @@ use crate::{
     topology::{self, RunningTopology},
     trace, unit_test, validate,
 };
-use cfg_if::cfg_if;
 use futures::StreamExt;
 use std::{collections::HashMap, path::PathBuf};
 use tokio::{
@@ -233,22 +232,19 @@ impl Application {
             tokio::spawn(heartbeat::heartbeat());
 
             // Configure the API server, if applicable.
-            cfg_if! (
-                if #[cfg(feature = "api")] {
-                    // Assigned to prevent the API terminating when falling out of scope.
-                    let api_server = if api_config.enabled {
-                        emit!(&ApiStarted {
-                            addr: api_config.address.unwrap(),
-                            playground: api_config.playground
-                        });
+            #[cfg(feature = "api")]
+            // Assigned to prevent the API terminating when falling out of scope.
+            let api_server = if api_config.enabled {
+                emit!(&ApiStarted {
+                    addr: api_config.address.unwrap(),
+                    playground: api_config.playground
+                });
 
-                        Some(api::Server::start(topology.config(), topology.watch()))
-                    } else {
-                        info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
-                        None
-                    };
-                }
-            );
+                Some(api::Server::start(topology.config(), topology.watch()))
+            } else {
+                info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
+                None
+            };
 
             let mut sources_finished = topology.sources_finished();
 
