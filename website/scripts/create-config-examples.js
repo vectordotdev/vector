@@ -221,6 +221,21 @@ const makeUseCaseExamples = (component) => {
         }
       }
 
+      // Strip the "log" or "metric" key in the example output
+      let output;
+
+      if (example.output) {
+        if (example.output['log']) {
+          output = example.output['log'];
+        } else if (example.output['metric']) {
+          output = example.output['metric'];
+        } else {
+          output = example.output;
+        }
+      } else {
+        output = example.output;
+      }
+
       useCase = {
         title: example.title,
         description: example.description,
@@ -230,7 +245,7 @@ const makeUseCaseExamples = (component) => {
           json: toJson(exampleConfig),
         },
         input: example.input,
-        output: example.output,
+        output: output,
       }
 
       useCases.push(useCase);
@@ -248,7 +263,6 @@ const main = () => {
     const data = fs.readFileSync(cueJsonOutput, 'utf8');
     const docs = JSON.parse(data);
     const components = docs.components;
-
 
     console.log(chalk.blue("Creating example configurations for all Vector components..."));
 
@@ -320,19 +334,6 @@ const main = () => {
           };
         }
 
-        // A debugging statement to make sure things are going basically as planned
-        if (debug) {
-          const debugComponent = "aws_ec2_metadata";
-          const debugKind = "transforms";
-
-          if (componentType === debugComponent && kind === debugKind) {
-            console.log(
-              chalk.blue(`Printing debug JSON for the ${debugComponent} ${debugKind.substring(0, debugKind.length - 1)}...`));
-
-            console.log(JSON.stringify(advancedExampleConfig, null, 2));
-          }
-        }
-
         docs['components'][kind][componentType]['examples'] = useCaseExamples;
 
         docs['components'][kind][componentType]['example_configs'] = {
@@ -350,10 +351,20 @@ const main = () => {
       }
     }
 
+
+    // A debugging statement to make sure things are going basically as planned
+    if (debug) {
+      console.log(docs['components']['sources']['syslog']['examples']);
+    }
+
+
     console.log(chalk.green("Success. Finished generating examples for all components."));
     console.log(chalk.blue(`Writing generated examples as JSON to ${cueJsonOutput}...`));
 
-    fs.writeFileSync(cueJsonOutput, JSON.stringify(docs), 'utf8');
+    // Write back to the JSON file only when not in debug mode
+    if (!debug) {
+      fs.writeFileSync(cueJsonOutput, JSON.stringify(docs), 'utf8');
+    }
 
     console.log(chalk.green(`Success. Finished writing example configs to ${cueJsonOutput}.`));
   } catch (err) {
