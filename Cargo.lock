@@ -7602,7 +7602,6 @@ dependencies = [
  "mlua",
  "mongodb",
  "nix 0.22.2",
- "no-proxy",
  "nom 7.0.0",
  "notify",
  "num-format",
