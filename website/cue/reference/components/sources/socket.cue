@@ -27,10 +27,7 @@ components: sources: socket: {
 					ssl: "optional"
 				}
 			}
-			receive_buffer_bytes: {
-				enabled:       true
-				relevant_when: "mode = `tcp` or mode = `udp`"
-			}
+			receive_buffer_bytes: enabled: true
 			keepalive: enabled: true
 			tls: {
 				enabled:                true
@@ -84,17 +81,6 @@ components: sources: socket: {
 			type: string: {
 				default: "host"
 				syntax:  "literal"
-			}
-		}
-		max_length: {
-			common:        true
-			description:   "The maximum bytes size of incoming messages before they are discarded."
-			relevant_when: "mode = `unix_datagram`"
-			required:      false
-			warnings: []
-			type: uint: {
-				default: 102400
-				unit:    "bytes"
 			}
 		}
 		mode: {

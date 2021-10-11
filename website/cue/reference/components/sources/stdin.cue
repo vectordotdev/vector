@@ -21,6 +21,8 @@ components: sources: stdin: {
 				interface: stdin: {}
 			}
 
+			receive_buffer_bytes: enabled: true
+
 			tls: enabled: false
 		}
 	}

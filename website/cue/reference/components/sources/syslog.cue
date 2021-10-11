@@ -25,10 +25,7 @@ components: sources: syslog: {
 					ssl: "optional"
 				}
 			}
-			receive_buffer_bytes: {
-				enabled:       true
-				relevant_when: "mode = `tcp` or mode = `udp`"
-			}
+			receive_buffer_bytes: enabled: true
 			keepalive: enabled: true
 			tls: sources.socket.features.receive.tls
 		}
@@ -74,6 +71,7 @@ components: sources: syslog: {
 		max_length: {
 			common:      true
 			description: "The maximum bytes size of incoming messages before they are discarded."
+			relevant_when: "mode = `tcp` or `unix`"
 			required:    false
 			warnings: []
 			type: uint: {

@@ -30,10 +30,7 @@ components: sources: statsd: {
 					ssl: "optional"
 				}
 			}
-			receive_buffer_bytes: {
-				enabled:       true
-				relevant_when: "mode = `tcp` or mode = `udp`"
-			}
+			receive_buffer_bytes: enabled: true
 			keepalive: enabled: true
 			tls: enabled:       false
 		}

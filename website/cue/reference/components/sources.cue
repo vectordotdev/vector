@@ -222,7 +222,7 @@ components: sources: [Name=string]: {
 			if features.receive.receive_buffer_bytes != _|_ {
 				receive_buffer_bytes: {
 					common:      false
-					description: "Configures the receive buffer size using the `SO_RCVBUF` option on the socket."
+					description: "Initializes the receive buffer capacity and sets the `SO_RCVBUF` option if a socket is used."
 					required:    false
 					type: uint: {
 						default: null
