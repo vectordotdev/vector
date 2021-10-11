@@ -5,7 +5,7 @@ use crate::{
     internal_events::{ConnectionOpen, OpenGauge, UnixSocketError, UnixSocketFileDeleteError},
     shutdown::ShutdownSignal,
     sources::{util::tcp_error::TcpError, Source},
-    Pipeline,
+    unix, Pipeline,
 };
 use bytes::Bytes;
 use futures::{FutureExt, SinkExt, StreamExt};
@@ -27,6 +27,7 @@ use tracing_futures::Instrument;
 pub fn build_unix_stream_source(
     listen_path: PathBuf,
     decoder: codecs::Decoder,
+    receive_buffer_bytes: Option<usize>,
     handle_events: impl Fn(&mut [Event], Option<Bytes>, usize) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
     out: Pipeline,
@@ -49,6 +50,14 @@ pub fn build_unix_stream_source(
                 Ok(socket) => socket,
             };
 
+            if let Some(receive_buffer_bytes) = receive_buffer_bytes {
+                if let Err(error) =
+                    unix::stream::set_receive_buffer_size(&socket, receive_buffer_bytes)
+                {
+                    warn!(message = "Failed configuring receive buffer size on Unix socket.", %error);
+                }
+            }
+
             let listen_path = listen_path.clone();
 
             let span = info_span!("connection");
@@ -68,7 +77,11 @@ pub fn build_unix_stream_source(
                 path.map(|p| p.to_string_lossy().into_owned().into());
 
             let stream = socket.allow_read_until(shutdown.clone().map(|_| ()));
-            let mut stream = FramedRead::new(stream, decoder.clone());
+            let mut stream = if let Some(receive_buffer_bytes) = receive_buffer_bytes {
+                FramedRead::with_capacity(stream, decoder.clone(), receive_buffer_bytes)
+            } else {
+                FramedRead::new(stream, decoder.clone())
+            };
 
             let connection_open = connection_open.clone();
             let mut out = out.clone();

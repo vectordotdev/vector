@@ -36,7 +36,7 @@ pub async fn firehose(
             })
             .map_err(reject::custom)?;
 
-        let mut stream = FramedRead::new(bytes.as_ref(), decoder.clone());
+        let mut stream = FramedRead::with_capacity(bytes.as_ref(), decoder.clone(), bytes.len());
         loop {
             match stream.next().await {
                 Some(Ok((events, byte_size))) => {

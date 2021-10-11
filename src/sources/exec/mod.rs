@@ -347,7 +347,13 @@ async fn run_command(
         let stderr = stderr.allow_read_until(shutdown.clone().map(|_| ()));
         let stderr_reader = BufReader::new(stderr);
 
-        spawn_reader_thread(stderr_reader, decoder.clone(), STDERR, sender.clone());
+        spawn_reader_thread(
+            stderr_reader,
+            decoder.clone(),
+            config.maximum_buffer_size_bytes,
+            STDERR,
+            sender.clone(),
+        );
     }
 
     let stdout = child
@@ -361,7 +367,13 @@ async fn run_command(
 
     let pid = child.id();
 
-    spawn_reader_thread(stdout_reader, decoder.clone(), STDOUT, sender);
+    spawn_reader_thread(
+        stdout_reader,
+        decoder.clone(),
+        config.maximum_buffer_size_bytes,
+        STDOUT,
+        sender,
+    );
 
     'send: while let Some(((events, byte_size), stream)) = receiver.recv().await {
         emit!(&ExecEventsReceived {
@@ -491,6 +503,7 @@ fn handle_event(
 fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     reader: BufReader<R>,
     decoder: codecs::Decoder,
+    receive_buffer_bytes: usize,
     origin: &'static str,
     sender: Sender<((SmallVec<[Event; 1]>, usize), &'static str)>,
 ) {
@@ -498,7 +511,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     Box::pin(tokio::spawn(async move {
         debug!("Start capturing {} command output.", origin);
 
-        let mut stream = FramedRead::new(reader, decoder);
+        let mut stream = FramedRead::with_capacity(reader, decoder, receive_buffer_bytes);
         while let Some(result) = stream.next().await {
             match result {
                 Ok(next) => {
@@ -609,11 +622,12 @@ mod tests {
         trace_init();
 
         let buf = Cursor::new("hello world\nhello rocket 🚀");
+        let receive_buffer_bytes = buf.get_ref().len();
         let reader = BufReader::new(buf);
         let decoder = codecs::Decoder::default();
         let (sender, mut receiver) = channel(1024);
 
-        spawn_reader_thread(reader, decoder, STDOUT, sender);
+        spawn_reader_thread(reader, decoder, receive_buffer_bytes, STDOUT, sender);
 
         let mut counter = 0;
         if let Some(((events, byte_size), origin)) = receiver.recv().await {

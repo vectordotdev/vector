@@ -54,7 +54,10 @@ pub enum Mode {
         receive_buffer_bytes: Option<usize>,
     },
     #[cfg(unix)]
-    Unix { path: PathBuf },
+    Unix {
+        path: PathBuf,
+        receive_buffer_bytes: Option<usize>,
+    },
 }
 
 impl SyslogConfig {
@@ -124,14 +127,16 @@ impl SourceConfig for SyslogConfig {
                 receive_buffer_bytes,
             } => Ok(udp(
                 address,
-                self.max_length,
                 host_key,
                 receive_buffer_bytes,
                 cx.shutdown,
                 cx.out,
             )),
             #[cfg(unix)]
-            Mode::Unix { path } => {
+            Mode::Unix {
+                path,
+                receive_buffer_bytes,
+            } => {
                 let decoder = Decoder::new(
                     Box::new(OctetCountingCodec::new_with_max_length(self.max_length)),
                     Box::new(SyslogParser),
@@ -140,6 +145,7 @@ impl SourceConfig for SyslogConfig {
                 Ok(build_unix_stream_source(
                     path,
                     decoder,
+                    receive_buffer_bytes,
                     move |events, host, byte_size| {
                         handle_events(events, &host_key, host, byte_size)
                     },
@@ -193,7 +199,6 @@ impl TcpSource for SyslogTcpSource {
 
 pub fn udp(
     addr: SocketAddr,
-    _max_length: usize,
     host_key: String,
     receive_buffer_bytes: Option<usize>,
     shutdown: ShutdownSignal,

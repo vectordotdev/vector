@@ -141,7 +141,7 @@ async fn generator_source(
 
         let line = format.generate_line(n);
 
-        let mut stream = FramedRead::new(line.as_bytes(), decoder.clone());
+        let mut stream = FramedRead::with_capacity(line.as_bytes(), decoder.clone(), line.len());
         while let Some(next) = stream.next().await {
             match next {
                 Ok((events, _byte_size)) => {

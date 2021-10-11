@@ -79,6 +79,8 @@ pub mod trigger;
 pub mod types;
 pub mod udp;
 pub mod unit_test;
+#[cfg(unix)]
+pub mod unix;
 pub(crate) mod utilization;
 pub mod validate;
 #[cfg(windows)]

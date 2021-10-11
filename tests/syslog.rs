@@ -87,6 +87,7 @@ async fn test_unix_stream_syslog() {
         "in",
         SyslogConfig::from_mode(Mode::Unix {
             path: in_path.clone(),
+            receive_buffer_bytes: None,
         }),
     );
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));

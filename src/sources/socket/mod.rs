@@ -116,8 +116,8 @@ impl SourceConfig for SocketConfig {
                 let decoder = config.decoding.build()?;
                 Ok(unix::unix_datagram(
                     config.path,
-                    config.max_length,
                     host_key,
+                    config.receive_buffer_bytes,
                     decoder,
                     cx.shutdown,
                     cx.out,
@@ -133,6 +133,7 @@ impl SourceConfig for SocketConfig {
                     config.path,
                     host_key,
                     decoder,
+                    config.receive_buffer_bytes,
                     cx.shutdown,
                     cx.out,
                 ))

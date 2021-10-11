@@ -4,7 +4,7 @@ use crate::{
     internal_events::{SocketMode, SocketReceiveError, UnixSocketFileDeleteError},
     shutdown::ShutdownSignal,
     sources::{util::tcp_error::TcpError, Source},
-    Pipeline,
+    unix, Pipeline,
 };
 use bytes::{Bytes, BytesMut};
 use futures::{SinkExt, StreamExt};
@@ -19,8 +19,8 @@ use tracing::field;
 /// syslog source).
 pub fn build_unix_datagram_source(
     listen_path: PathBuf,
-    max_length: usize,
     decoder: codecs::Decoder,
+    receive_buffer_bytes: Option<usize>,
     handle_events: impl Fn(&mut [Event], Option<Bytes>, usize) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
     out: Pipeline,
@@ -29,7 +29,15 @@ pub fn build_unix_datagram_source(
         let socket = UnixDatagram::bind(&listen_path).expect("Failed to bind to datagram socket");
         info!(message = "Listening.", path = ?listen_path, r#type = "unix_datagram");
 
-        let result = listen(socket, max_length, decoder, shutdown, handle_events, out).await;
+        let result = listen(
+            socket,
+            decoder,
+            receive_buffer_bytes,
+            shutdown,
+            handle_events,
+            out,
+        )
+        .await;
 
         // Delete socket file.
         if let Err(error) = remove_file(&listen_path) {
@@ -45,16 +53,26 @@ pub fn build_unix_datagram_source(
 
 async fn listen(
     socket: UnixDatagram,
-    max_length: usize,
     decoder: codecs::Decoder,
+    receive_buffer_bytes: Option<usize>,
     mut shutdown: ShutdownSignal,
     handle_events: impl Fn(&mut [Event], Option<Bytes>, usize) + Clone + Send + Sync + 'static,
     out: Pipeline,
 ) -> Result<(), ()> {
     let mut out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
-    let mut buf = BytesMut::with_capacity(max_length);
+
+    if let Some(receive_buffer_bytes) = receive_buffer_bytes {
+        if let Err(error) = unix::datagram::set_receive_buffer_size(&socket, receive_buffer_bytes) {
+            warn!(message = "Failed configuring receive buffer size on Unix socket.", %error);
+        }
+    }
+
+    // This is based on the maximum capacity of UDP datagrams.
+    const DEFAULT_CAPACITY: usize = 64 * 1024;
+    let capacity = receive_buffer_bytes.unwrap_or(DEFAULT_CAPACITY);
+    let mut buf = BytesMut::with_capacity(capacity);
     loop {
-        buf.resize(max_length, 0);
+        buf.resize(capacity, 0);
         tokio::select! {
             recv = socket.recv_from(&mut buf) => {
                 let (byte_size, address) = recv.map_err(|error| {
@@ -76,7 +94,7 @@ async fn listen(
                 let received_from: Option<Bytes> =
                     path.map(|p| p.to_string_lossy().into_owned().into());
 
-                let mut stream = FramedRead::new(payload.as_ref(), decoder.clone());
+                let mut stream = FramedRead::with_capacity(payload.as_ref(), decoder.clone(), payload.len());
 
                 loop {
                     match stream.next().await {

@@ -12,6 +12,7 @@ use std::path::PathBuf;
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct UnixConfig {
     pub path: PathBuf,
+    pub receive_buffer_bytes: Option<usize>,
 }
 
 pub fn statsd_unix(config: UnixConfig, shutdown: ShutdownSignal, out: Pipeline) -> Source {
@@ -23,6 +24,7 @@ pub fn statsd_unix(config: UnixConfig, shutdown: ShutdownSignal, out: Pipeline) 
     build_unix_stream_source(
         config.path,
         decoder,
+        config.receive_buffer_bytes,
         |_events, _host, _byte_size| {},
         shutdown,
         out,

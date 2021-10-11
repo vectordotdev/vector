@@ -210,7 +210,7 @@ async fn kafka_source(
                 let offset_key = &offset_key;
                 let headers_key = &headers_key;
 
-                let mut stream = FramedRead::new(payload, decoder.clone());
+                let mut stream = FramedRead::with_capacity(payload, decoder.clone(), payload.len());
                 let mut stream = stream! {
                     loop {
                         match stream.next().await {

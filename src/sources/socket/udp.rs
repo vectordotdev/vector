@@ -21,9 +21,6 @@ use tokio_util::udp::UdpFramed;
 pub struct UdpConfig {
     #[get_copy = "pub"]
     address: SocketAddr,
-    #[serde(default = "crate::serde::default_max_length")]
-    #[get_copy = "pub"]
-    max_length: usize,
     #[get = "pub"]
     host_key: Option<String>,
     #[get_copy = "pub"]
@@ -37,7 +34,6 @@ impl UdpConfig {
     pub fn from_address(address: SocketAddr) -> Self {
         Self {
             address,
-            max_length: crate::serde::default_max_length(),
             host_key: None,
             receive_buffer_bytes: None,
             decoding: Default::default(),

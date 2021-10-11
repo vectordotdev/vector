@@ -120,7 +120,8 @@ async fn nats_source(
     let stream = get_subscription_stream(subscription).take_until(shutdown);
     pin_mut!(stream);
     while let Some(msg) = stream.next().await {
-        let mut stream = FramedRead::new(msg.data.as_ref(), decoder.clone());
+        let mut stream =
+            FramedRead::with_capacity(msg.data.as_ref(), decoder.clone(), msg.data.len());
         while let Some(next) = stream.next().await {
             match next {
                 Ok((events, byte_size)) => {

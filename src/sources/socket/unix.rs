@@ -17,9 +17,8 @@ use std::path::PathBuf;
 #[serde(deny_unknown_fields)]
 pub struct UnixConfig {
     pub path: PathBuf,
-    #[serde(default = "crate::serde::default_max_length")]
-    pub max_length: usize,
     pub host_key: Option<String>,
+    pub receive_buffer_bytes: Option<usize>,
     #[serde(flatten, default)]
     pub decoding: DecodingConfig,
 }
@@ -28,8 +27,8 @@ impl UnixConfig {
     pub fn new(path: PathBuf) -> Self {
         Self {
             path,
-            max_length: crate::serde::default_max_length(),
             host_key: None,
+            receive_buffer_bytes: None,
             decoding: Default::default(),
         }
     }
@@ -65,16 +64,16 @@ fn handle_events(
 
 pub(super) fn unix_datagram(
     path: PathBuf,
-    max_length: usize,
     host_key: String,
+    receive_buffer_bytes: Option<usize>,
     decoder: Decoder,
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> Source {
     build_unix_datagram_source(
         path,
-        max_length,
         decoder,
+        receive_buffer_bytes,
         move |events, received_from, byte_size| {
             handle_events(events, &host_key, received_from, byte_size)
         },
@@ -87,12 +86,14 @@ pub(super) fn unix_stream(
     path: PathBuf,
     host_key: String,
     decoder: Decoder,
+    receive_buffer_bytes: Option<usize>,
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> Source {
     build_unix_stream_source(
         path,
         decoder,
+        receive_buffer_bytes,
         move |events, received_from, byte_size| {
             handle_events(events, &host_key, received_from, byte_size)
         },

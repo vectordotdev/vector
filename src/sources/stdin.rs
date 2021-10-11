@@ -13,24 +13,13 @@ use serde::{Deserialize, Serialize};
 use std::{io, thread};
 use tokio_util::{codec::FramedRead, io::StreamReader};
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Default, Derivative, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct StdinConfig {
-    #[serde(default = "crate::serde::default_max_length")]
-    pub max_length: usize,
     pub host_key: Option<String>,
+    pub receive_buffer_bytes: Option<usize>,
     #[serde(flatten)]
     pub decoding: DecodingConfig,
-}
-
-impl Default for StdinConfig {
-    fn default() -> Self {
-        StdinConfig {
-            max_length: crate::serde::default_max_length(),
-            host_key: Default::default(),
-            decoding: Default::default(),
-        }
-    }
 }
 
 inventory::submit! {
@@ -106,12 +95,19 @@ where
         }
     });
 
+    let receive_buffer_bytes = config.receive_buffer_bytes;
+
     Ok(Box::pin(async move {
         let mut out =
             out.sink_map_err(|error| error!(message = "Unable to send event to out.", %error));
 
         let stream = StreamReader::new(receiver);
-        let mut stream = FramedRead::new(stream, decoder).take_until(shutdown);
+        let mut stream = if let Some(receive_buffer_bytes) = receive_buffer_bytes {
+            FramedRead::with_capacity(stream, decoder, receive_buffer_bytes)
+        } else {
+            FramedRead::new(stream, decoder)
+        }
+        .take_until(shutdown);
         let result = stream! {
             loop {
                 match stream.next().await {

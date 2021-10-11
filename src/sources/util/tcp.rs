@@ -214,7 +214,11 @@ async fn handle_stream<T>(
         }
     }
 
-    let mut reader = FramedRead::new(socket, source.decoder());
+    let mut reader = if let Some(receive_buffer_bytes) = receive_buffer_bytes {
+        FramedRead::with_capacity(socket, source.decoder(), receive_buffer_bytes)
+    } else {
+        FramedRead::new(socket, source.decoder())
+    };
 
     loop {
         tokio::select! {
