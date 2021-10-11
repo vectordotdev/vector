@@ -4,27 +4,51 @@
 //! the buffer, all records having the same stream label set are grouped
 //! together for more efficient output.
 
+use crate::sinks::util::encoding::Encoder;
 use dashmap::DashMap;
 use serde::{ser::SerializeSeq, Serialize};
 use std::collections::HashMap;
+use std::io;
 use std::sync::Arc;
+use vector_core::event::{EventFinalizers, Finalizable};
 use vector_core::ByteSizeOf;
 
 pub type Labels = Vec<(String, String)>;
+
+#[derive(Clone, Default)]
+pub struct LokiBatchEncoder;
+
+impl Encoder<Vec<LokiRecord>> for LokiBatchEncoder {
+    fn encode_input(
+        &self,
+        input: Vec<LokiRecord>,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<usize> {
+        let batch = LokiBatch::from(input);
+        let body = serde_json::json!({ "streams": [batch] });
+        let body = serde_json::to_vec(&body)?;
+        writer.write(&body)
+    }
+}
 
 #[derive(Debug, Default, Serialize)]
 pub struct LokiBatch {
     stream: HashMap<String, String>,
     values: Vec<LokiEvent>,
+    #[serde(skip)]
+    finalizers: EventFinalizers,
 }
 
 impl From<Vec<LokiRecord>> for LokiBatch {
     fn from(events: Vec<LokiRecord>) -> Self {
-        let mut result = events.into_iter().fold(Self::default(), |mut res, item| {
-            res.stream.extend(item.labels.into_iter());
-            res.values.push(item.event);
-            res
-        });
+        let mut result = events
+            .into_iter()
+            .fold(Self::default(), |mut res, mut item| {
+                res.finalizers.merge(item.take_finalizers());
+                res.stream.extend(item.labels.into_iter());
+                res.values.push(item.event);
+                res
+            });
         result.values.sort_by_key(|e| e.timestamp);
         result
     }
@@ -59,6 +83,7 @@ pub struct LokiRecord {
     pub partition: PartitionKey,
     pub labels: Labels,
     pub event: LokiEvent,
+    pub finalizers: EventFinalizers,
 }
 
 impl ByteSizeOf for LokiRecord {
@@ -68,6 +93,12 @@ impl ByteSizeOf for LokiRecord {
                 res + item.0.allocated_bytes() + item.1.allocated_bytes()
             })
             + self.event.allocated_bytes()
+    }
+}
+
+impl Finalizable for LokiRecord {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
     }
 }
 

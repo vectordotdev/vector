@@ -1,36 +1,34 @@
 use super::config::{Encoding, LokiConfig, OutOfOrderAction};
-use super::service::LokiService;
+use super::service::{LokiRequest, LokiService};
 use crate::config::log_schema;
 use crate::config::SinkContext;
-use crate::http::{Auth, HttpClient};
+use crate::http::HttpClient;
 use crate::internal_events::{
     LokiEventUnlabeled, LokiEventsProcessed, LokiOutOfOrderEventDropped,
     LokiOutOfOrderEventRewritten, TemplateRenderingFailed,
 };
 use crate::sinks::util::buffer::loki::{
-    GlobalTimestamps, LokiBatch, LokiEvent, LokiRecord, PartitionKey,
+    GlobalTimestamps, LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey,
 };
+use crate::sinks::util::builder::SinkBuilderExt;
 use crate::sinks::util::encoding::{EncodingConfig, EncodingConfiguration};
-use crate::sinks::util::UriSerde;
+use crate::sinks::util::{BatchSettings, Compression, RequestBuilder};
 use crate::template::Template;
-use futures::stream::{BoxStream, Stream, StreamExt};
-use http::Request;
-use hyper::Body;
+use futures::stream::{BoxStream, Stream};
+use futures::StreamExt;
 use pin_project::pin_project;
 use shared::encode_logfmt;
+use snafu::Snafu;
 use std::collections::HashMap;
 use std::num::NonZeroUsize;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use tokio::sync::mpsc;
-use tower::{Service, ServiceExt};
-use tracing_futures::Instrument;
 use vector_core::buffers::Acker;
-use vector_core::event::{self, Event, EventStatus, Value};
+use vector_core::event::{self, Event, EventFinalizers, Finalizable, Value};
 use vector_core::partition::Partitioner;
 use vector_core::sink::StreamSink;
-use vector_core::stream::batcher::Batcher;
+use vector_core::stream::BatcherSettings;
 
 #[derive(Clone)]
 pub struct KeyPartitioner(Option<Template>);
@@ -60,6 +58,7 @@ impl Partitioner for KeyPartitioner {
     }
 }
 
+#[derive(Default)]
 struct RecordPartitionner;
 
 impl Partitioner for RecordPartitionner {
@@ -72,47 +71,78 @@ impl Partitioner for RecordPartitionner {
 }
 
 #[derive(Clone)]
-pub struct RequestBuilder {
-    uri: String,
-    auth: Option<Auth>,
+pub struct LokiRequestBuilder {
+    compression: Compression,
+    encoder: LokiBatchEncoder,
 }
 
-impl RequestBuilder {
-    pub fn new(endpoint: UriSerde, auth: Option<Auth>) -> Self {
-        let uri = format!("{}loki/api/v1/push", endpoint.uri);
+#[derive(Debug, Snafu)]
+pub enum RequestBuildError {
+    #[snafu(display("Encoded payload is greater than the max limit."))]
+    PayloadTooBig,
+    #[snafu(display("Failed to build payload with error: {}", error))]
+    Io { error: std::io::Error },
+}
 
-        Self { uri, auth }
+impl From<std::io::Error> for RequestBuildError {
+    fn from(error: std::io::Error) -> RequestBuildError {
+        RequestBuildError::Io { error }
     }
 }
 
-impl RequestBuilder {
-    fn build(
-        &self,
-        key: PartitionKey,
-        value: Vec<LokiRecord>,
-    ) -> crate::Result<http::Request<hyper::Body>> {
-        let batch = LokiBatch::from(value);
-        let body = serde_json::json!({ "streams": [batch] });
-        let body = serde_json::to_vec(&body)?;
+impl Default for LokiRequestBuilder {
+    fn default() -> Self {
+        Self {
+            compression: Compression::None,
+            encoder: LokiBatchEncoder::default(),
+        }
+    }
+}
 
+impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
+    type Metadata = (Option<String>, usize, EventFinalizers);
+    type Events = Vec<LokiRecord>;
+    type Encoder = LokiBatchEncoder;
+    type Payload = Vec<u8>;
+    type Request = LokiRequest;
+    type Error = RequestBuildError;
+
+    fn compression(&self) -> Compression {
+        self.compression
+    }
+
+    fn encoder(&self) -> &Self::Encoder {
+        &self.encoder
+    }
+
+    fn split_input(
+        &self,
+        input: (PartitionKey, Vec<LokiRecord>),
+    ) -> (Self::Metadata, Self::Events) {
+        let (key, mut events) = input;
+        let batch_size = events.len();
+        let finalizers = events
+            .iter_mut()
+            .fold(EventFinalizers::default(), |mut acc, x| {
+                acc.merge(x.take_finalizers());
+                acc
+            });
+
+        ((key.tenant_id, batch_size, finalizers), events)
+    }
+
+    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+        let (tenant_id, batch_size, finalizers) = metadata;
         emit!(&LokiEventsProcessed {
-            byte_size: body.len(),
+            byte_size: payload.len(),
         });
 
-        let mut req = http::Request::post(&self.uri).header("Content-Type", "application/json");
-
-        if let Some(tenant_id) = key.tenant_id {
-            req = req.header("X-Scope-OrgID", tenant_id);
+        LokiRequest {
+            batch_size,
+            finalizers,
+            payload,
+            tenant_id,
         }
-
-        let body = hyper::Body::from(body);
-        let mut req = req.body(body).unwrap();
-
-        if let Some(auth) = &self.auth {
-            auth.apply(&mut req);
-        }
-
-        Ok(req)
     }
 }
 
@@ -156,6 +186,7 @@ impl EventEncoder {
 
     pub(super) fn encode_event(&self, mut event: Event) -> LokiRecord {
         let tenant_id = self.key_partitioner.partition(&event);
+        let finalizers = event.take_finalizers();
         let mut labels = self.build_labels(&event);
         self.remove_label_fields(&mut event);
 
@@ -198,6 +229,7 @@ impl EventEncoder {
             labels,
             event: LokiEvent { timestamp, event },
             partition,
+            finalizers,
         }
     }
 }
@@ -276,13 +308,12 @@ where
 #[derive(Clone)]
 pub struct LokiSink {
     acker: Acker,
-    client: HttpClient,
-    request_builder: RequestBuilder,
+    request_builder: LokiRequestBuilder,
     pub(super) encoder: EventEncoder,
-    max_batch_size: usize,
-    max_batch_bytes: usize,
+    batch_settings: BatcherSettings,
     timeout: Duration,
     out_of_order_action: OutOfOrderAction,
+    service: LokiService,
 }
 
 impl LokiSink {
@@ -290,8 +321,7 @@ impl LokiSink {
     pub fn new(config: LokiConfig, client: HttpClient, cx: SinkContext) -> crate::Result<Self> {
         Ok(Self {
             acker: cx.acker(),
-            client,
-            request_builder: RequestBuilder::new(config.endpoint, config.auth),
+            request_builder: LokiRequestBuilder::default(),
             encoder: EventEncoder {
                 key_partitioner: KeyPartitioner::new(config.tenant_id),
                 encoding: config.encoding,
@@ -299,24 +329,17 @@ impl LokiSink {
                 remove_label_fields: config.remove_label_fields,
                 remove_timestamp: config.remove_timestamp,
             },
-            max_batch_size: config.batch.max_size.unwrap_or(100_000),
-            max_batch_bytes: config.batch.max_bytes.unwrap_or(102_400),
+            batch_settings: BatchSettings::<()>::default()
+                .parse_config(config.batch)?
+                .into_batcher_settings()?,
             timeout: Duration::from_secs(config.batch.timeout_secs.unwrap_or(1)),
             out_of_order_action: config.out_of_order_action,
+            service: LokiService::new(client, config.endpoint, config.auth),
         })
     }
-}
 
-#[async_trait::async_trait]
-impl StreamSink for LokiSink {
-    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let io_bandwidth = 64;
-        let (io_tx, io_rx) = mpsc::channel::<Request<Body>>(io_bandwidth);
-        let service = tower::ServiceBuilder::new()
-            .concurrency_limit(1)
-            .service(LokiService::new(self.client.clone()));
-        let io = run_io(io_rx, service, self.acker).in_current_span();
-        let _ = tokio::spawn(io);
+    async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let service = tower::ServiceBuilder::new().service(self.service);
 
         let filter = FilterEncoder::new(
             input,
@@ -325,71 +348,28 @@ impl StreamSink for LokiSink {
             self.out_of_order_action.clone(),
         );
 
-        let record_partitionner = RecordPartitionner;
-        let request_builder = self.request_builder.clone();
+        let sink = filter
+            .batched(RecordPartitionner::default(), self.batch_settings)
+            .request_builder(NonZeroUsize::new(1), self.request_builder.clone())
+            .filter_map(|request| async move {
+                match request {
+                    Err(e) => {
+                        error!("Failed to build Loki request: {:?}.", e);
+                        None
+                    }
+                    Ok(req) => Some(req),
+                }
+            })
+            .into_driver(service, self.acker);
 
-        let batcher = Batcher::new(
-            filter,
-            record_partitionner,
-            self.timeout,
-            NonZeroUsize::new(self.max_batch_size).unwrap(),
-            NonZeroUsize::new(self.max_batch_bytes),
-        )
-        .map(|(key, value)| {
-            let builder = request_builder.clone();
-            tokio::spawn(async move { builder.build(key, value) })
-        })
-        .buffered(io_bandwidth);
-
-        tokio::pin!(batcher);
-
-        while let Some(batch_join) = batcher.next().await {
-            let request = batch_join
-                .map_err(|err| {
-                    error!("Task failed to properly join: {}", err);
-                    ()
-                })?
-                .map_err(|err| {
-                    error!("Sink was unable to construct a payload body: {}", err);
-                    ()
-                })?;
-            if io_tx.send(request).await.is_err() {
-                error!("Sink I/O channel should not be closed before sink itself is closed.");
-                return Err(());
-            }
-        }
-
-        Ok(())
+        sink.run().await
     }
 }
 
-async fn run_io<S>(mut rx: mpsc::Receiver<http::Request<Body>>, mut service: S, acker: Acker)
-where
-    S: Service<http::Request<Body>>,
-    S::Future: Send + 'static,
-    S::Response: AsRef<EventStatus> + Send + 'static,
-    S::Error: std::fmt::Debug + Into<crate::Error> + Send,
-{
-    let mut seqno = 0;
-    while let Some(req) = rx.recv().await {
-        let svc = service
-            .ready()
-            .await
-            .expect("should not get error when waiting for svc readiness");
-        let size = req.body().size_hint().0;
-        let result = svc
-            .call(req)
-            .instrument(info_span!("request", request_id = %seqno))
-            .await
-            .map(|res| *res.as_ref())
-            .map_err(|error| {
-                error!("Sink IO failed with error: {:?}.", error);
-                EventStatus::Failed
-            });
-        if result.is_ok() {
-            acker.ack(size);
-        }
-        seqno += 1;
+#[async_trait::async_trait]
+impl StreamSink for LokiSink {
+    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        self.run_inner(input).await
     }
 }
 
