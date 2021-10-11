@@ -11,6 +11,7 @@
 //! If an event produces no labels, this can happen if the template
 //! does not match, we will add a default label `{agent="vector"}`.
 mod config;
+mod event;
 mod healthcheck;
 #[cfg(feature = "loki-integration-tests")]
 #[cfg(test)]

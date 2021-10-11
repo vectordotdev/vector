@@ -1,4 +1,5 @@
 use super::config::{Encoding, LokiConfig, OutOfOrderAction};
+use super::event::{GlobalTimestamps, LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey};
 use super::service::{LokiRequest, LokiService};
 use crate::config::log_schema;
 use crate::config::SinkContext;
@@ -6,9 +7,6 @@ use crate::http::HttpClient;
 use crate::internal_events::{
     LokiEventUnlabeled, LokiEventsProcessed, LokiOutOfOrderEventDropped,
     LokiOutOfOrderEventRewritten, TemplateRenderingFailed,
-};
-use crate::sinks::util::buffer::loki::{
-    GlobalTimestamps, LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey,
 };
 use crate::sinks::util::builder::SinkBuilderExt;
 use crate::sinks::util::encoding::{EncodingConfig, EncodingConfiguration};
@@ -378,7 +376,7 @@ mod tests {
     use super::{EventEncoder, FilterEncoder, KeyPartitioner};
     use crate::config::log_schema;
     use crate::sinks::loki::config::{Encoding, OutOfOrderAction};
-    use crate::sinks::util::buffer::loki::GlobalTimestamps;
+    use crate::sinks::loki::event::GlobalTimestamps;
     use crate::sinks::util::encoding::EncodingConfig;
     use crate::test_util::random_lines;
     use futures::stream::Stream;
