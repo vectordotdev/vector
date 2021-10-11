@@ -3,13 +3,14 @@ mod udp;
 #[cfg(unix)]
 mod unix;
 
+#[cfg(unix)]
+use crate::serde::{default_framing_message_based, default_framing_stream_based};
 use crate::{
     codecs::DecodingConfig,
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
-    serde::{default_framing_message_based, default_framing_stream_based},
     sources::util::TcpSource,
     tls::MaybeTlsSettings,
 };
@@ -192,7 +193,9 @@ mod test {
         Pipeline,
     };
     use bytes::Bytes;
-    use futures::{channel::mpsc::Receiver, stream, StreamExt};
+    #[cfg(unix)]
+    use futures::channel::mpsc::Receiver;
+    use futures::{stream, StreamExt};
     use std::{
         net::{SocketAddr, UdpSocket},
         sync::{
