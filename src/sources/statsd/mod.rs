@@ -292,6 +292,7 @@ mod test {
         let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
         let config = StatsdConfig::Unix(UnixConfig {
             path: in_path.clone(),
+            receive_buffer_bytes: None,
         });
         let (sender, mut receiver) = mpsc::channel(200);
         tokio::spawn(async move {
