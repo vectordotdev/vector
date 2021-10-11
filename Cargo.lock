@@ -7543,7 +7543,6 @@ dependencies = [
  "bollard",
  "bytes 1.1.0",
  "bytesize",
- "cfg-if 1.0.0",
  "chrono",
  "cidr-utils",
  "colored",
