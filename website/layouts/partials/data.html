@@ -703,9 +703,9 @@
   {{ with .vrl_real_world_examples }}
   <div class="flex flex-col divide-y dark:divide-gray-700">
     {{ range . }}
-    {{ $input := dict "message" .input.log.message | jsonify (dict "indent" " ") }}
+    {{ $input := dict "message" .input.log.message | jsonify (dict "indent" "  ") }}
     {{ $vrlSourceCode := highlight .source "toml" "" }}
-    {{ $output := .output | jsonify (dict "indent" " ") }}
+    {{ $output := .output | jsonify (dict "indent" "  ") }}
     {{ $outputCode := highlight $output "json" "" }}
     <div class="py-3 px-5">
       <span class="font-semibold tracking-tight">
@@ -715,7 +715,7 @@
 
       <div class="mt-3 flex flex-col space-y-2">
         {{ with .input.log }}
-        {{ $json := . | jsonify (dict "indent" " ") }}
+        {{ $json := . | jsonify (dict "indent" "  ") }}
         {{ $code := highlight $json "json" "" }}
         <span>
           Given this <a href="/docs/about/under-the-hood/architecture/data-model/log">Vector log event</a>...
@@ -724,7 +724,7 @@
         {{ end }}
 
         {{ with .input.metric }}
-        {{ $json := . | jsonify (dict "indent" " ") }}
+        {{ $json := . | jsonify (dict "indent" "  ") }}
         {{ $code := highlight $json "json" "" }}
         <span>
           Given this <a href="/docs/about/under-the-hood/architecture/data-model/metric">Vector metric event</a>...
@@ -858,7 +858,7 @@
               {{/* Example event (log or metric) */}}
               {{ with .input }}
               {{ with .log }} {{/* Log event */}}
-              {{ $json := . | jsonify (dict "indent" " ") }}
+              {{ $json := . | jsonify (dict "indent" "  ") }}
               <div>
                 <span class="tracking-tighter font-semibold text-sm">
                   Log event
@@ -869,7 +869,7 @@
               {{ end }}
 
               {{ with .metric }} {{/* Metric event */}}
-              {{ $json := . | jsonify (dict "indent" " ") }}
+              {{ $json := . | jsonify (dict "indent" "  ") }}
               <div>
                 <span class="tracking-tighter font-semibold text-sm">
                   Metric event
@@ -1441,7 +1441,7 @@
 
   <div x-show="open" class="mt-3 text-sm flex flex-col space-y-2">
     {{ range .examples }}
-    {{ $json := . | jsonify (dict "indent" " ") }}
+    {{ $json := . | jsonify (dict "indent" "  ") }}
     {{ highlight $json "json" "" }}
     {{ end }}
   </div>
@@ -1449,7 +1449,7 @@
 {{ end }}
 
 {{ define "config-array-examples" }}
-{{ $json := .examples | jsonify (dict "indent" " ") }}
+{{ $json := .examples | jsonify (dict "indent" "  ") }}
 <div x-data="{ open: false }" class="mt-2.5 border rounded py-2 px-3 dark:border-gray-700">
   <span class="flex justify-between items-center">
     <span class="text-sm">
@@ -1916,7 +1916,7 @@
 
 {{ define "code" }}
 {{ if reflect.IsMap . }} {{/* If a map or array, highlight as JSON */}}
-{{ $json := . | jsonify (dict "indent" " ") }}
+{{ $json := . | jsonify (dict "indent" "  ") }}
 {{ highlight $json "json" "" }}
 {{ else if reflect.IsSlice . }}
 {{ $json := . | jsonify }}

@@ -2676,7 +2676,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "mach",
- "nix 0.20.1",
+ "nix 0.20.2",
  "pin-utils",
  "uom",
  "winapi 0.3.9",
@@ -2758,7 +2758,7 @@ dependencies = [
  "heim-runtime",
  "libc",
  "macaddr",
- "nix 0.20.1",
+ "nix 0.20.2",
  "widestring",
  "winapi 0.3.9",
 ]
@@ -3946,9 +3946,9 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.20.1"
+version = "0.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df8e5e343312e7fbeb2a52139114e9e702991ef9c2aea6817ff2440b35647d56"
+checksum = "f5e06129fb611568ef4e868c14b326274959aa70ff7776e9d55323531c374945"
 dependencies = [
  "bitflags",
  "cc",
@@ -7305,7 +7305,7 @@ version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f559b464de2e2bdabcac6a210d12e9b5a5973c251e102c44c585c71d51bd78e"
 dependencies = [
- "cfg-if 1.0.0",
+ "cfg-if 0.1.10",
  "static_assertions",
 ]
 
@@ -7524,11 +7524,9 @@ checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
 
 [[package]]
 name = "vector"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
- "anyhow",
  "approx",
- "arc-swap",
  "assert_cmd",
  "async-compression",
  "async-graphql",
@@ -7545,7 +7543,6 @@ dependencies = [
  "bollard",
  "bytes 1.1.0",
  "bytesize",
- "cfg-if 1.0.0",
  "chrono",
  "cidr-utils",
  "colored",
@@ -7604,7 +7601,6 @@ dependencies = [
  "mlua",
  "mongodb",
  "nix 0.22.2",
- "no-proxy",
  "nom 7.0.0",
  "notify",
  "num-format",
@@ -7614,8 +7610,6 @@ dependencies = [
  "openssl",
  "openssl-probe",
  "percent-encoding",
- "pest",
- "pest_derive",
  "pin-project 1.0.8",
  "portpicker",
  "postgres-openssl",
