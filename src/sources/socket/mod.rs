@@ -4,10 +4,12 @@ mod udp;
 mod unix;
 
 use crate::{
+    codecs::DecodingConfig,
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
+    serde::{default_framing_message_based, default_framing_stream_based},
     sources::util::TcpSource,
     tls::MaybeTlsSettings,
 };
@@ -80,7 +82,9 @@ impl SourceConfig for SocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self.mode.clone() {
             Mode::Tcp(config) => {
-                let decoder = config.decoding().build()?;
+                let decoder =
+                    DecodingConfig::new(config.framing().clone(), config.decoding().clone())
+                        .build()?;
                 let tcp = tcp::RawTcpSource::new(config.clone(), decoder);
                 let tls = MaybeTlsSettings::from_config(config.tls(), true)?;
                 tcp.run(
@@ -98,7 +102,9 @@ impl SourceConfig for SocketConfig {
                     .host_key()
                     .clone()
                     .unwrap_or_else(|| log_schema().host_key().to_string());
-                let decoder = config.decoding().build()?;
+                let decoder =
+                    DecodingConfig::new(config.framing().clone(), config.decoding().clone())
+                        .build()?;
                 Ok(udp::udp(
                     config.address(),
                     host_key,
@@ -113,7 +119,11 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
-                let decoder = config.decoding.build()?;
+                let decoder = DecodingConfig::new(
+                    config.framing.unwrap_or_else(default_framing_message_based),
+                    config.decoding.clone(),
+                )
+                .build()?;
                 Ok(unix::unix_datagram(
                     config.path,
                     config.max_length,
@@ -128,7 +138,11 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
-                let decoder = config.decoding.build()?;
+                let decoder = DecodingConfig::new(
+                    config.framing.unwrap_or_else(default_framing_stream_based),
+                    config.decoding.clone(),
+                )
+                .build()?;
                 Ok(unix::unix_stream(
                     config.path,
                     host_key,
@@ -164,7 +178,7 @@ impl SourceConfig for SocketConfig {
 mod test {
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
-        codecs::{DecodingConfig, NewlineDelimitedDecoderConfig},
+        codecs::NewlineDelimitedDecoderConfig,
         config::{
             log_schema, ComponentKey, GlobalOptions, SinkContext, SourceConfig, SourceContext,
         },
@@ -260,11 +274,8 @@ mod test {
         let addr = next_addr();
 
         let mut config = TcpConfig::from_address(addr.into());
-        config.set_decoding(DecodingConfig::new(
-            Some(Box::new(
-                NewlineDelimitedDecoderConfig::new_with_max_length(10),
-            )),
-            None,
+        config.set_framing(Box::new(
+            NewlineDelimitedDecoderConfig::new_with_max_length(10),
         ));
 
         let server = SocketConfig::from(config)

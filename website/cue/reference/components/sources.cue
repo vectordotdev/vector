@@ -75,7 +75,7 @@ components: sources: [Name=string]: {
 			if features.codecs.enabled {
 				framing: {
 					common:      false
-					description: "Configures in which way incoming byte sequences are split up into byte frames."
+					description: "Configures in which way incoming byte sequences are split up into byte frames. Defaults to `bytes` on message based sources and to `newline_delimited` on stream based sources."
 					required:    false
 					type: object: options: {
 						method: {
@@ -83,7 +83,7 @@ components: sources: [Name=string]: {
 							required:    true
 							type: string: {
 								enum: {
-									bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between packets for UDP or between segments for TCP)."
+									bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
 									character_delimited: "Byte frames which are delimited by a chosen character."
 									length_delimited:    "Byte frames whose length is encoded in a header."
 									newline_delimited:   "Byte frames which are delimited by a newline character."

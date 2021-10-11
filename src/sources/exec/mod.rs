@@ -1,9 +1,10 @@
 use crate::{
     async_read::VecAsyncReadExt,
-    codecs::{self, DecodingConfig},
+    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{ExecCommandExecuted, ExecEventsReceived, ExecFailed, ExecTimeout},
+    serde::{default_decoding, default_framing_message_based, default_framing_stream_based},
     shutdown::ShutdownSignal,
     sources::util::TcpError,
     Pipeline,
@@ -38,8 +39,10 @@ pub struct ExecConfig {
     pub include_stderr: bool,
     #[serde(default = "default_maximum_buffer_size")]
     pub maximum_buffer_size_bytes: usize,
-    #[serde(default, flatten)]
-    pub decoding: DecodingConfig,
+    #[serde(default)]
+    framing: Option<Box<dyn FramingConfig>>,
+    #[serde(default = "default_decoding")]
+    decoding: Box<dyn ParserConfig>,
 }
 
 // TODO: Would be nice to combine the scheduled and streaming config with the mode enum once
@@ -87,7 +90,8 @@ impl Default for ExecConfig {
             working_directory: None,
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
-            decoding: Default::default(),
+            framing: None,
+            decoding: default_decoding(),
         }
     }
 }
@@ -173,10 +177,17 @@ impl SourceConfig for ExecConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         self.validate()?;
         let hostname = get_hostname();
-        let decoder = self.decoding.build()?;
         match &self.mode {
             Mode::Scheduled => {
                 let exec_interval_secs = self.exec_interval_secs_or_default();
+                let decoder = DecodingConfig::new(
+                    self.framing
+                        .clone()
+                        .unwrap_or_else(default_framing_message_based),
+                    self.decoding.clone(),
+                )
+                .build()?;
+
                 Ok(Box::pin(run_scheduled(
                     self.clone(),
                     hostname,
@@ -189,6 +200,14 @@ impl SourceConfig for ExecConfig {
             Mode::Streaming => {
                 let respawn_on_exit = self.respawn_on_exit_or_default();
                 let respawn_interval_secs = self.respawn_interval_secs_or_default();
+                let decoder = DecodingConfig::new(
+                    self.framing
+                        .clone()
+                        .unwrap_or_else(default_framing_stream_based),
+                    self.decoding.clone(),
+                )
+                .build()?;
+
                 Ok(Box::pin(run_streaming(
                     self.clone(),
                     hostname,
@@ -587,7 +606,8 @@ mod tests {
             working_directory: Some(PathBuf::from("/tmp")),
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
-            decoding: Default::default(),
+            framing: None,
+            decoding: default_decoding(),
         };
 
         let command = build_command(&config);
@@ -698,7 +718,8 @@ mod tests {
             working_directory: None,
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
-            decoding: Default::default(),
+            framing: None,
+            decoding: default_decoding(),
         }
     }
 }
