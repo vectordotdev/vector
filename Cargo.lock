@@ -7526,9 +7526,7 @@ checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
 name = "vector"
 version = "0.18.0"
 dependencies = [
- "anyhow",
  "approx",
- "arc-swap",
  "assert_cmd",
  "async-compression",
  "async-graphql",
@@ -7545,7 +7543,6 @@ dependencies = [
  "bollard",
  "bytes 1.1.0",
  "bytesize",
- "cfg-if 1.0.0",
  "chrono",
  "cidr-utils",
  "colored",
@@ -7604,7 +7601,6 @@ dependencies = [
  "mlua",
  "mongodb",
  "nix 0.22.2",
- "no-proxy",
  "nom 7.0.0",
  "notify",
  "num-format",
@@ -7614,8 +7610,6 @@ dependencies = [
  "openssl",
  "openssl-probe",
  "percent-encoding",
- "pest",
- "pest_derive",
  "pin-project 1.0.8",
  "portpicker",
  "postgres-openssl",
