@@ -54,7 +54,7 @@ impl SinkConfig for HoneycombConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let batch_settings = BatchSettings::default()
-            .bytes(bytesize::kib(100u64))
+            .bytes(100_000)
             .timeout(1)
             .parse_config(self.batch)?;
 
