@@ -16,13 +16,14 @@ components: sources: socket: {
 
 	features: {
 		multiline: enabled: false
+		codecs: enabled:    true
 		receive: {
 			from: {
 				service: services.socket_client
 				interface: socket: {
 					direction: "incoming"
 					port:      _port
-					protocols: ["tcp", "unix", "udp"]
+					protocols: ["tcp", "unix_datagram", "unix_stream", "udp"]
 					ssl: "optional"
 				}
 			}
@@ -86,9 +87,10 @@ components: sources: socket: {
 			}
 		}
 		max_length: {
-			common:      true
-			description: "The maximum bytes size of incoming messages before they are discarded."
-			required:    false
+			common:        true
+			description:   "The maximum bytes size of incoming messages before they are discarded."
+			relevant_when: "mode = `unix_datagram`"
+			required:      false
 			warnings: []
 			type: uint: {
 				default: 102400
@@ -111,7 +113,7 @@ components: sources: socket: {
 		}
 		path: {
 			description:   "The unix socket path. *This should be an absolute path*."
-			relevant_when: "mode = `unix`"
+			relevant_when: "mode = `unix_datagram` or `unix_stream`"
 			required:      true
 			warnings: []
 			type: string: {
@@ -122,7 +124,7 @@ components: sources: socket: {
 		shutdown_timeout_secs: {
 			common:        false
 			description:   "The timeout before a connection is forcefully closed during shutdown."
-			relevant_when: "mode = `tcp``"
+			relevant_when: "mode = `tcp`"
 			required:      false
 			warnings: []
 			type: uint: {
@@ -168,5 +170,6 @@ components: sources: socket: {
 		connection_send_errors_total:     components.sources.internal_metrics.output.metrics.connection_send_errors_total
 		connection_send_ack_errors_total: components.sources.internal_metrics.output.metrics.connection_send_ack_errors_total
 		connection_shutdown_total:        components.sources.internal_metrics.output.metrics.connection_shutdown_total
+		component_received_events_total:  components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }

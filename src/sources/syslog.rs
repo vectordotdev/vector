@@ -1,33 +1,32 @@
-use super::util::{SocketListenAddr, TcpSource};
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
-use crate::udp;
 use crate::{
+    codecs::{self, BytesCodec, OctetCountingCodec, SyslogParser},
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
-    event::{Event, Value},
-    internal_events::{SyslogEventReceived, SyslogUdpReadError, SyslogUdpUtf8Error},
+    event::Event,
+    internal_events::SyslogEventReceived,
+    internal_events::SyslogUdpReadError,
     shutdown::ShutdownSignal,
+    sources::util::{SocketListenAddr, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
-    Pipeline,
+    udp, Pipeline,
 };
-use bytes::{Buf, Bytes, BytesMut};
-use chrono::{Datelike, Utc};
-use futures::{SinkExt, StreamExt};
+use bytes::Bytes;
+use chrono::Utc;
+#[cfg(unix)]
+use codecs::Decoder;
+use futures::{FutureExt, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::io;
+use smallvec::SmallVec;
 use std::net::SocketAddr;
 #[cfg(unix)]
 use std::path::PathBuf;
-use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use tokio::net::UdpSocket;
-use tokio_util::{
-    codec::{BytesCodec, Decoder, LinesCodec, LinesCodecError},
-    udp::UdpFramed,
-};
+use tokio_util::udp::UdpFramed;
 
 #[derive(Deserialize, Serialize, Debug)]
 // TODO: add back when serde-rs/serde#1358 is addressed
@@ -35,7 +34,7 @@ use tokio_util::{
 pub struct SyslogConfig {
     #[serde(flatten)]
     mode: Mode,
-    #[serde(default = "default_max_length")]
+    #[serde(default = "crate::serde::default_max_length")]
     max_length: usize,
     /// The host key of the log. (This differs from `hostname`)
     host_key: Option<String>,
@@ -58,16 +57,12 @@ pub enum Mode {
     Unix { path: PathBuf },
 }
 
-pub fn default_max_length() -> usize {
-    bytesize::kib(100u64) as usize
-}
-
 impl SyslogConfig {
     pub fn from_mode(mode: Mode) -> Self {
         Self {
             mode,
             host_key: None,
-            max_length: default_max_length(),
+            max_length: crate::serde::default_max_length(),
         }
     }
 }
@@ -86,7 +81,7 @@ impl GenerateConfig for SyslogConfig {
                 receive_buffer_bytes: None,
             },
             host_key: None,
-            max_length: default_max_length(),
+            max_length: crate::serde::default_max_length(),
         })
         .unwrap()
     }
@@ -136,14 +131,22 @@ impl SourceConfig for SyslogConfig {
                 cx.out,
             )),
             #[cfg(unix)]
-            Mode::Unix { path } => Ok(build_unix_stream_source(
-                path,
-                SyslogDecoder::new(self.max_length),
-                host_key,
-                cx.shutdown,
-                cx.out,
-                |host_key, default_host, line| Some(event_from_str(host_key, default_host, line)),
-            )),
+            Mode::Unix { path } => {
+                let decoder = Decoder::new(
+                    Box::new(OctetCountingCodec::new_with_max_length(self.max_length)),
+                    Box::new(SyslogParser),
+                );
+
+                Ok(build_unix_stream_source(
+                    path,
+                    decoder,
+                    move |events, host, byte_size| {
+                        handle_events(events, &host_key, host, byte_size)
+                    },
+                    cx.shutdown,
+                    cx.out,
+                ))
+            }
         }
     }
 
@@ -172,223 +175,19 @@ struct SyslogTcpSource {
 }
 
 impl TcpSource for SyslogTcpSource {
-    type Error = LinesCodecError;
-    type Decoder = SyslogDecoder;
+    type Error = codecs::Error;
+    type Item = SmallVec<[Event; 1]>;
+    type Decoder = codecs::Decoder;
 
     fn decoder(&self) -> Self::Decoder {
-        SyslogDecoder::new(self.max_length)
+        codecs::Decoder::new(
+            Box::new(OctetCountingCodec::new_with_max_length(self.max_length)),
+            Box::new(SyslogParser),
+        )
     }
 
-    fn build_event(&self, frame: String, host: Bytes) -> Option<Event> {
-        Some(event_from_str(&self.host_key, Some(host), &frame))
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum State {
-    NotDiscarding,
-    Discarding(usize),
-    DiscardingToEol,
-}
-
-/// Decodes according to `Octet Counting` in https://tools.ietf.org/html/rfc6587
-#[derive(Clone, Debug)]
-struct SyslogDecoder {
-    other: LinesCodec,
-    octet_decoding: Option<State>,
-}
-
-impl SyslogDecoder {
-    fn new(max_length: usize) -> Self {
-        Self {
-            other: LinesCodec::new_with_max_length(max_length),
-            octet_decoding: None,
-        }
-    }
-
-    fn octet_decode(
-        &mut self,
-        state: State,
-        src: &mut BytesMut,
-    ) -> Result<Option<String>, LinesCodecError> {
-        // Encoding scheme:
-        //
-        // len ' ' data
-        // |    |  | len number of bytes that contain syslog message
-        // |    |
-        // |    | Separating whitespace
-        // |
-        // | ASCII decimal number of unknown length
-
-        let space_pos = src.iter().position(|&b| b == b' ');
-
-        // If we are discarding, discard to the next newline.
-        let newline_pos = src.iter().position(|&b| b == b'\n');
-
-        match (state, newline_pos, space_pos) {
-            (State::Discarding(chars), _, _) if src.len() >= chars => {
-                // We have a certain number of chars to discard.
-                // There are enough chars in this frame to discard
-                src.advance(chars);
-                self.octet_decoding = None;
-                Err(LinesCodecError::Io(io::Error::new(
-                    io::ErrorKind::Other,
-                    "Frame length limit exceeded",
-                )))
-            }
-
-            (State::Discarding(chars), _, _) => {
-                // We have a certain number of chars to discard.
-                // There aren't enough in this frame so we need to discard
-                // The entire frame and adjust the amount to discard accordingly.
-                self.octet_decoding = Some(State::Discarding(src.len() - chars));
-                src.advance(src.len());
-                Ok(None)
-            }
-
-            (State::DiscardingToEol, Some(offset), _) => {
-                // When discarding we keep discarding to the next newline.
-                src.advance(offset + 1);
-                self.octet_decoding = None;
-                Err(LinesCodecError::Io(io::Error::new(
-                    io::ErrorKind::Other,
-                    "Frame length limit exceeded",
-                )))
-            }
-
-            (State::DiscardingToEol, None, _) => {
-                // There is no newline in this frame. Since we don't have a set number of
-                // chars we want to discard, we need to discard to the next newline.
-                // Advance as far as we can to discard the entire frame.
-                src.advance(src.len());
-                Ok(None)
-            }
-
-            (State::NotDiscarding, _, Some(space_pos)) if space_pos < self.other.max_length() => {
-                // Everything looks good. We aren't discarding, we have a space that is not beyond our
-                // maximum length. Attempt to parse the bytes as a number which will hopefully
-                // give us a sensible length for our message.
-                let len: usize = match std::str::from_utf8(&src[..space_pos])
-                    .map_err(|_| ())
-                    .and_then(|num| num.parse().map_err(|_| ()))
-                {
-                    Ok(len) => len,
-                    Err(_) => {
-                        // It was not a sensible number.
-                        // Advance the buffer past the erroneous bytes
-                        // to prevent us getting stuck in an infinite loop.
-                        src.advance(space_pos + 1);
-                        self.octet_decoding = None;
-                        return Err(LinesCodecError::Io(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Unable to decode message len as number",
-                        )));
-                    }
-                };
-
-                let from = space_pos + 1;
-                let to = from + len;
-
-                if len > self.other.max_length() {
-                    // The length is greater than we want.
-                    // We need to discard the entire message.
-                    self.octet_decoding = Some(State::Discarding(len));
-                    src.advance(space_pos + 1);
-
-                    Ok(None)
-                } else if let Some(msg) = src.get(from..to) {
-                    let s = match std::str::from_utf8(msg) {
-                        Ok(s) => s.to_string(),
-                        Err(_) => {
-                            // The data was not valid UTF8 :-(.
-                            // Advance the buffer past the erroneous bytes
-                            // to prevent us getting stuck in an infinite loop.
-                            src.advance(to);
-                            self.octet_decoding = None;
-                            return Err(LinesCodecError::Io(io::Error::new(
-                                io::ErrorKind::InvalidData,
-                                "Unable to decode message as UTF8",
-                            )));
-                        }
-                    };
-
-                    // We have managed to read the entire message as valid UTF8!
-                    src.advance(to);
-                    self.octet_decoding = None;
-                    Ok(Some(s))
-                } else {
-                    // We have an acceptable number of bytes in this message, but all the data
-                    // was not in the frame, return None to indicate we want more data before we
-                    // do anything else.
-                    Ok(None)
-                }
-            }
-
-            (State::NotDiscarding, Some(newline_pos), _) => {
-                // Beyond maximum length, advance to the newline.
-                src.advance(newline_pos + 1);
-                Err(LinesCodecError::Io(io::Error::new(
-                    io::ErrorKind::Other,
-                    "Frame length limit exceeded",
-                )))
-            }
-
-            (State::NotDiscarding, None, _) if src.len() < self.other.max_length() => {
-                // We aren't discarding, but there is no useful character to tell us what to do next,
-                // we are still not beyond the max length, so just return None to indicate we need to
-                // wait for more data.
-                Ok(None)
-            }
-
-            (State::NotDiscarding, None, _) => {
-                // There is no newline in this frame and we have more data than we want to handle.
-                // Advance as far as we can to discard the entire frame.
-                self.octet_decoding = Some(State::DiscardingToEol);
-                src.advance(src.len());
-                Ok(None)
-            }
-        }
-    }
-
-    /// None if this is not octet counting encoded
-    fn checked_decode(
-        &mut self,
-        src: &mut BytesMut,
-    ) -> Option<Result<Option<String>, LinesCodecError>> {
-        if let Some(&first_byte) = src.get(0) {
-            if (49..=57).contains(&first_byte) {
-                // First character is non zero number so we can assume that
-                // octet count framing is used.
-                trace!("Octet counting encoded event detected.");
-                self.octet_decoding = Some(State::NotDiscarding);
-            }
-        }
-
-        self.octet_decoding
-            .map(|state| self.octet_decode(state, src))
-    }
-}
-
-impl Decoder for SyslogDecoder {
-    type Item = String;
-    type Error = LinesCodecError;
-
-    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        if let Some(ret) = self.checked_decode(src) {
-            ret
-        } else {
-            // Octet counting isn't used so fallback to newline codec.
-            self.other.decode(src)
-        }
-    }
-
-    fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        if let Some(ret) = self.checked_decode(buf) {
-            ret
-        } else {
-            // Octet counting isn't used so fallback to newline codec.
-            self.other.decode_eof(buf)
-        }
+    fn handle_events(&self, events: &mut [Event], host: Bytes, byte_size: usize) {
+        handle_events(events, &self.host_key, Some(host), byte_size);
     }
 }
 
@@ -419,139 +218,100 @@ pub fn udp(
             r#type = "udp"
         );
 
-        let _ = UdpFramed::new(socket, BytesCodec::new())
-            .take_until(shutdown)
-            .filter_map(|frame| {
-                let host_key = host_key.clone();
-                async move {
-                    match frame {
-                        Ok((bytes, received_from)) => {
-                            let received_from = received_from.ip().to_string().into();
-
-                            std::str::from_utf8(&bytes)
-                                .map_err(|error| emit!(SyslogUdpUtf8Error { error }))
-                                .ok()
-                                .map(|s| Ok(event_from_str(&host_key, Some(received_from), s)))
-                        }
-                        Err(error) => {
-                            emit!(SyslogUdpReadError { error });
-                            None
-                        }
+        UdpFramed::new(
+            socket,
+            codecs::Decoder::new(Box::new(BytesCodec::new()), Box::new(SyslogParser)),
+        )
+        .take_until(shutdown)
+        .filter_map(|frame| {
+            let host_key = host_key.clone();
+            async move {
+                match frame {
+                    Ok(((mut events, byte_size), received_from)) => {
+                        let received_from = received_from.ip().to_string().into();
+                        handle_events(&mut events, &host_key, Some(received_from), byte_size);
+                        Some(events.remove(0))
+                    }
+                    Err(error) => {
+                        emit!(&SyslogUdpReadError { error });
+                        None
                     }
                 }
-            })
-            .forward(out)
-            .await;
-
-        info!("Finished sending.");
-        Ok(())
+            }
+        })
+        .map(Ok)
+        .forward(out)
+        .inspect(|_| info!("Finished sending."))
+        .await
     })
 }
 
-/// Function used to resolve the year for syslog messages that don't include the year.
-/// If the current month is January, and the syslog message is for December, it will take the previous year.
-/// Otherwise, take the current year.
-fn resolve_year((month, _date, _hour, _min, _sec): IncompleteDate) -> i32 {
-    let now = Utc::now();
-    if now.month() == 1 && month == 12 {
-        now.year() - 1
-    } else {
-        now.year()
-    }
+fn handle_events(
+    events: &mut [Event],
+    host_key: &str,
+    default_host: Option<Bytes>,
+    byte_size: usize,
+) {
+    assert_eq!(
+        events.len(),
+        1,
+        "Syslog parser parses exactly one message from a byte string.",
+    );
+
+    enrich_syslog_event(&mut events[0], host_key, default_host, byte_size);
 }
 
-/**
-* Function to pass to build_unix_stream_source, specific to the Unix mode of the syslog source.
-* Handles the logic of parsing and decoding the syslog message format.
-**/
-// TODO: many more cases to handle:
-// octet framing (i.e. num bytes as ascii string prefix) with and without delimiters
-// null byte delimiter in place of newline
-fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Event {
-    let line = line.trim();
-    let parsed = syslog_loose::parse_message_with_year(line, resolve_year);
-    let mut event = Event::from(parsed.msg);
+fn enrich_syslog_event(
+    event: &mut Event,
+    host_key: &str,
+    default_host: Option<Bytes>,
+    byte_size: usize,
+) {
+    let log = event.as_mut_log();
 
-    // Add source type
-    event
-        .as_mut_log()
-        .insert(log_schema().source_type_key(), Bytes::from("syslog"));
+    log.insert(log_schema().source_type_key(), Bytes::from("syslog"));
 
-    if let Some(default_host) = default_host.clone() {
-        event.as_mut_log().insert("source_ip", default_host);
+    if let Some(default_host) = &default_host {
+        log.insert("source_ip", default_host.clone());
     }
 
-    let parsed_hostname = parsed.hostname.map(|x| Bytes::from(x.to_owned()));
+    let parsed_hostname = log.get("hostname").map(|hostname| hostname.as_bytes());
     if let Some(parsed_host) = parsed_hostname.or(default_host) {
-        event.as_mut_log().insert(host_key, parsed_host);
+        log.insert(host_key, parsed_host);
     }
 
-    let timestamp = parsed
-        .timestamp
-        .map(|ts| ts.into())
+    let timestamp = log
+        .get("timestamp")
+        .and_then(|timestamp| timestamp.as_timestamp().cloned())
         .unwrap_or_else(Utc::now);
-    event
-        .as_mut_log()
-        .insert(log_schema().timestamp_key(), timestamp);
+    log.insert(log_schema().timestamp_key(), timestamp);
 
-    insert_fields_from_syslog(&mut event, parsed);
-
-    emit!(SyslogEventReceived {
-        byte_size: line.len()
-    });
+    emit!(&SyslogEventReceived { byte_size });
 
     trace!(
         message = "Processing one event.",
         event = ?event
     );
-
-    event
-}
-
-fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
-    let log = event.as_mut_log();
-
-    if let Some(host) = parsed.hostname {
-        log.insert("hostname", host.to_string());
-    }
-    if let Some(severity) = parsed.severity {
-        log.insert("severity", severity.as_str().to_owned());
-    }
-    if let Some(facility) = parsed.facility {
-        log.insert("facility", facility.as_str().to_owned());
-    }
-    if let Protocol::RFC5424(version) = parsed.protocol {
-        log.insert("version", version as i64);
-    }
-    if let Some(app_name) = parsed.appname {
-        log.insert("appname", app_name.to_owned());
-    }
-    if let Some(msg_id) = parsed.msgid {
-        log.insert("msgid", msg_id.to_owned());
-    }
-    if let Some(procid) = parsed.procid {
-        let value: Value = match procid {
-            ProcId::PID(pid) => pid.into(),
-            ProcId::Name(name) => name.to_string().into(),
-        };
-        log.insert("procid", value);
-    }
-
-    for element in parsed.structured_data.into_iter() {
-        for (name, value) in element.params.into_iter() {
-            let key = format!("{}.{}", element.id, name);
-            log.insert(key, value.to_string());
-        }
-    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{config::log_schema, event::Event};
-    use bytes::BufMut;
+    use crate::{codecs::Parser, config::log_schema, event::Event};
     use chrono::prelude::*;
     use shared::assert_event_data_eq;
+
+    fn event_from_bytes(
+        host_key: &str,
+        default_host: Option<Bytes>,
+        bytes: Bytes,
+    ) -> Option<Event> {
+        let byte_size = bytes.len();
+        let parser = SyslogParser;
+        let mut events = parser.parse(bytes).ok()?;
+        handle_events(&mut events, host_key, default_host, byte_size);
+        Some(events.remove(0))
+    }
 
     #[test]
     fn generate_config() {
@@ -716,7 +476,10 @@ mod test {
             expected.insert("procid", 8449);
         }
 
-        assert_event_data_eq!(event_from_str(&"host".to_string(), None, &raw), expected);
+        assert_event_data_eq!(
+            event_from_bytes(&"host".to_string(), None, raw.into()).unwrap(),
+            expected
+        );
     }
 
     #[test]
@@ -744,7 +507,7 @@ mod test {
             expected.insert("procid", 8449);
         }
 
-        let event = event_from_str(&"host".to_string(), None, &raw);
+        let event = event_from_bytes(&"host".to_string(), None, raw.into()).unwrap();
         assert_event_data_eq!(event, expected);
 
         let raw = format!(
@@ -752,7 +515,7 @@ mod test {
             r#"[incorrect x=]"#, msg
         );
 
-        let event = event_from_str(&"host".to_string(), None, &raw);
+        let event = event_from_bytes(&"host".to_string(), None, raw.into()).unwrap();
         assert_event_data_eq!(event, expected);
     }
 
@@ -771,7 +534,7 @@ mod test {
             r#"[empty]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, &msg);
+        let event = event_from_bytes(&"host".to_string(), None, msg.into()).unwrap();
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
@@ -779,7 +542,7 @@ mod test {
             r#"[non_empty x="1"][empty]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, &msg);
+        let event = event_from_bytes(&"host".to_string(), None, msg.into()).unwrap();
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
@@ -787,7 +550,7 @@ mod test {
             r#"[empty][non_empty x="1"]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, &msg);
+        let event = event_from_bytes(&"host".to_string(), None, msg.into()).unwrap();
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
@@ -795,7 +558,7 @@ mod test {
             r#"[empty not_really="testing the test"]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, &msg);
+        let event = event_from_bytes(&"host".to_string(), None, msg.into()).unwrap();
         assert!(!there_is_map_called_empty(event));
     }
 
@@ -808,8 +571,8 @@ mod test {
         let cleaned = r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar"#;
 
         assert_event_data_eq!(
-            event_from_str(&"host".to_string(), None, raw),
-            event_from_str(&"host".to_string(), None, cleaned)
+            event_from_bytes(&"host".to_string(), None, raw.to_owned().into()).unwrap(),
+            event_from_bytes(&"host".to_string(), None, cleaned.to_owned().into()).unwrap()
         );
     }
 
@@ -817,7 +580,7 @@ mod test {
     fn syslog_ng_default_network() {
         let msg = "i am foobar";
         let raw = format!(r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {}"#, msg);
-        let event = event_from_str(&"host".to_string(), None, &raw);
+        let event = event_from_bytes(&"host".to_string(), None, raw.into()).unwrap();
 
         let mut expected = Event::from(msg);
         {
@@ -847,7 +610,7 @@ mod test {
             r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="8979" x-info="http://www.rsyslog.com"] {}"#,
             msg
         );
-        let event = event_from_str(&"host".to_string(), None, &raw);
+        let event = event_from_bytes(&"host".to_string(), None, raw.into()).unwrap();
 
         let mut expected = Event::from(msg);
         {
@@ -902,126 +665,9 @@ mod test {
             expected.insert("origin.x-info", "http://www.rsyslog.com");
         }
 
-        assert_event_data_eq!(event_from_str(&"host".to_string(), None, &raw), expected);
-    }
-
-    #[test]
-    fn non_octet_decode_works_with_multiple_frames() {
-        let mut decoder = SyslogDecoder::new(128);
-        let mut buffer = BytesMut::with_capacity(16);
-
-        buffer.put(&b"<57>Mar 25 21:47:46 gleichner6005 quaerat[2444]: There were "[..]);
-        let result = decoder.decode(&mut buffer);
-        assert_eq!(Ok(None), result.map_err(|_| true));
-
-        buffer.put(&b"8 penguins in the shop.\n"[..]);
-        let result = decoder.decode(&mut buffer);
-        assert_eq!(
-            Ok(Some("<57>Mar 25 21:47:46 gleichner6005 quaerat[2444]: There were 8 penguins in the shop.".to_string())),
-            result.map_err(|_| true)
+        assert_event_data_eq!(
+            event_from_bytes(&"host".to_string(), None, raw.into()).unwrap(),
+            expected
         );
-    }
-
-    #[test]
-    fn octet_decode_works_with_multiple_frames() {
-        let mut decoder = SyslogDecoder::new(30);
-        let mut buffer = BytesMut::with_capacity(16);
-
-        buffer.put(&b"28 abcdefghijklm"[..]);
-        let result = decoder.decode(&mut buffer);
-        assert_eq!(Ok(None), result.map_err(|_| false));
-
-        // Sending another frame starting with a number should not cause it to
-        // try to decode a new message.
-        buffer.put(&b"3 nopqrstuvwxyz"[..]);
-        let result = decoder.decode(&mut buffer);
-        assert_eq!(
-            Ok(Some("abcdefghijklm3 nopqrstuvwxyz".to_string())),
-            result.map_err(|_| false)
-        );
-    }
-
-    #[test]
-    fn octet_decode_moves_past_invalid_length() {
-        let mut decoder = SyslogDecoder::new(16);
-        let mut buffer = BytesMut::with_capacity(16);
-
-        // An invalid syslog message that starts with a digit so we think it is starting with the len.
-        buffer.put(&b"232>1 zork"[..]);
-        let result = decoder.decode(&mut buffer);
-
-        assert!(result.is_err());
-        assert_eq!(b"zork"[..], buffer);
-    }
-
-    #[test]
-    fn octet_decode_moves_past_invalid_utf8() {
-        let mut decoder = SyslogDecoder::new(16);
-        let mut buffer = BytesMut::with_capacity(16);
-
-        // An invalid syslog message containing invalid utf8 bytes.
-        buffer.put(&[b'4', b' ', 0xf0, 0x28, 0x8c, 0xbc][..]);
-        let result = decoder.decode(&mut buffer);
-
-        assert!(result.is_err());
-        assert_eq!(b""[..], buffer);
-    }
-
-    #[test]
-    fn octet_decode_moves_past_exceeded_frame_length() {
-        let mut decoder = SyslogDecoder::new(16);
-        let mut buffer = BytesMut::with_capacity(32);
-
-        buffer.put(&b"32thisshouldbelongerthanthmaxframeasizewhichmeansthesyslogparserwillnotbeabletodecodeit\n"[..]);
-        let result = decoder.decode(&mut buffer);
-
-        assert!(result.is_err());
-        assert_eq!(b""[..], buffer);
-    }
-
-    #[test]
-    fn octet_decode_rejects_exceeded_frame_length() {
-        let mut decoder = SyslogDecoder::new(16);
-        let mut buffer = BytesMut::with_capacity(32);
-
-        buffer.put(&b"26 abcdefghijklmnopqrstuvwxyzand here we are"[..]);
-        let result = decoder.decode(&mut buffer);
-        assert_eq!(Ok(None), result.map_err(|_| false));
-        let result = decoder.decode(&mut buffer);
-
-        assert!(result.is_err());
-        assert_eq!(b"and here we are"[..], buffer);
-    }
-
-    #[test]
-    fn octet_decode_rejects_exceeded_frame_length_multiple_frames() {
-        let mut decoder = SyslogDecoder::new(16);
-        let mut buffer = BytesMut::with_capacity(32);
-
-        buffer.put(&b"26 abc"[..]);
-        let _result = decoder.decode(&mut buffer);
-
-        buffer.put(&b"defghijklmnopqrstuvwxyzand here we are"[..]);
-        let result = decoder.decode(&mut buffer);
-
-        println!("{:?}", result);
-        assert!(result.is_err());
-        assert_eq!(b"and here we are"[..], buffer);
-    }
-
-    #[test]
-    fn octet_decode_moves_past_exceeded_frame_length_multiple_frames() {
-        let mut decoder = SyslogDecoder::new(16);
-        let mut buffer = BytesMut::with_capacity(32);
-
-        buffer.put(&b"32thisshouldbelongerthanthmaxframeasizewhichmeansthesyslogparserwillnotbeabletodecodeit"[..]);
-        let _ = decoder.decode(&mut buffer);
-
-        assert_eq!(decoder.octet_decoding, Some(State::DiscardingToEol));
-        buffer.put(&b"wemustcontinuetodiscard\n32 something valid"[..]);
-        let result = decoder.decode(&mut buffer);
-
-        assert!(result.is_err());
-        assert_eq!(b"32 something valid"[..], buffer);
     }
 }

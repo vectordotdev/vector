@@ -64,6 +64,23 @@ components: transforms: log_to_metric: {
 							default: false
 						}
 					}
+					kind: {
+						description: """
+							The kind of the metric.
+							"""
+						required: false
+						common:   false
+						warnings: []
+						relevant_when: #"type = "counter""#
+						type: string: {
+							enum: {
+								absolute:    "An absolute counter value."
+								incremental: "In incremental counter value."
+							}
+							syntax:  "literal"
+							default: "incremental"
+						}
+					}
 					name: {
 						description: "The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`."
 						required:    false
@@ -363,8 +380,8 @@ components: transforms: log_to_metric: {
 		{
 			title: "Set"
 			notes: """
-				In this example we'll demonstrate how to use sets. Sets are primarly a Statsd concept
-				that represent the number of unique values seens for a given metric.
+				In this example we'll demonstrate how to use sets. Sets are primarily a Statsd concept
+				that represent the number of unique values seen for a given metric.
 				The idea is that you pass the unique/high-cardinality value as the metric value
 				and the metric store will count the number of unique values seen.
 				"""

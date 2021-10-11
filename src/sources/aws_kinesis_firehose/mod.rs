@@ -1,4 +1,5 @@
 use crate::{
+    codecs::DecodingConfig,
     config::{DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
     tls::{MaybeTlsSettings, TlsConfig},
 };
@@ -18,6 +19,8 @@ pub struct AwsKinesisFirehoseConfig {
     access_key: Option<String>,
     tls: Option<TlsConfig>,
     record_compression: Option<Compression>,
+    #[serde(default)]
+    decoding: DecodingConfig,
 }
 
 #[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -47,6 +50,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         let svc = filters::firehose(
             self.access_key.clone(),
             self.record_compression.unwrap_or_default(),
+            self.decoding.build()?,
             cx.out,
         );
 
@@ -90,6 +94,7 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
             access_key: None,
             tls: None,
             record_compression: None,
+            decoding: Default::default(),
         })
         .unwrap()
     }
@@ -99,6 +104,7 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
 mod tests {
     use super::*;
     use crate::{
+        codecs::BytesDecoderConfig,
         event::Event,
         log_event,
         test_util::{collect_ready, next_addr, wait_for_tcp},
@@ -132,6 +138,7 @@ mod tests {
                 tls: None,
                 access_key,
                 record_compression,
+                decoding: DecodingConfig::new(Some(Box::new(BytesDecoderConfig)), None),
             }
             .build(SourceContext::new_test(sender))
             .await
@@ -222,28 +229,26 @@ mod tests {
     async fn aws_kinesis_firehose_forwards_events() {
         // example CloudWatch Logs subscription event
         let record = r#"
-{
-  "messageType": "DATA_MESSAGE",
-  "owner": "071959437513",
-  "logGroup": "/jesse/test",
-  "logStream": "test",
-  "subscriptionFilters": [
-    "Destination"
-  ],
-  "logEvents": [
-    {
-      "id": "35683658089614582423604394983260738922885519999578275840",
-      "timestamp": 1600110569039,
-      "message": "{\"bytes\":26780,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"157.130.216.193\",\"method\":\"PUT\",\"protocol\":\"HTTP/1.0\",\"referer\":\"https://www.principalcross-platform.io/markets/ubiquitous\",\"request\":\"/expedite/convergence\",\"source_type\":\"stdin\",\"status\":301,\"user-identifier\":\"-\"}"
-    },
-    {
-      "id": "35683658089659183914001456229543810359430816722590236673",
-      "timestamp": 1600110569041,
-      "message": "{\"bytes\":17707,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"109.81.244.252\",\"method\":\"GET\",\"protocol\":\"HTTP/2.0\",\"referer\":\"http://www.investormission-critical.io/24/7/vortals\",\"request\":\"/scale/functionalities/optimize\",\"source_type\":\"stdin\",\"status\":502,\"user-identifier\":\"feeney1708\"}"
-    }
-  ]
-}
-"#.as_bytes();
+            {
+                "messageType": "DATA_MESSAGE",
+                "owner": "071959437513",
+                "logGroup": "/jesse/test",
+                "logStream": "test",
+                "subscriptionFilters": ["Destination"],
+                "logEvents": [
+                    {
+                        "id": "35683658089614582423604394983260738922885519999578275840",
+                        "timestamp": 1600110569039,
+                        "message": "{\"bytes\":26780,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"157.130.216.193\",\"method\":\"PUT\",\"protocol\":\"HTTP/1.0\",\"referer\":\"https://www.principalcross-platform.io/markets/ubiquitous\",\"request\":\"/expedite/convergence\",\"source_type\":\"stdin\",\"status\":301,\"user-identifier\":\"-\"}"
+                    },
+                    {
+                        "id": "35683658089659183914001456229543810359430816722590236673",
+                        "timestamp": 1600110569041,
+                        "message": "{\"bytes\":17707,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"109.81.244.252\",\"method\":\"GET\",\"protocol\":\"HTTP/2.0\",\"referer\":\"http://www.investormission-critical.io/24/7/vortals\",\"request\":\"/scale/functionalities/optimize\",\"source_type\":\"stdin\",\"status\":502,\"user-identifier\":\"feeney1708\"}"
+                    }
+                ]
+            }
+        "#.as_bytes();
 
         let gziped_record = {
             let mut buf = Vec::new();
@@ -355,28 +360,25 @@ mod tests {
     async fn aws_kinesis_firehose_forwards_events_gzip_request() {
         // example CloudWatch Logs subscription event
         let record = r#"
-{
-  "messageType": "DATA_MESSAGE",
-  "owner": "071959437513",
-  "logGroup": "/jesse/test",
-  "logStream": "test",
-  "subscriptionFilters": [
-    "Destination"
-  ],
-  "logEvents": [
-    {
-      "id": "35683658089614582423604394983260738922885519999578275840",
-      "timestamp": 1600110569039,
-      "message": "{\"bytes\":26780,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"157.130.216.193\",\"method\":\"PUT\",\"protocol\":\"HTTP/1.0\",\"referer\":\"https://www.principalcross-platform.io/markets/ubiquitous\",\"request\":\"/expedite/convergence\",\"source_type\":\"stdin\",\"status\":301,\"user-identifier\":\"-\"}"
-    },
-    {
-      "id": "35683658089659183914001456229543810359430816722590236673",
-      "timestamp": 1600110569041,
-      "message": "{\"bytes\":17707,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"109.81.244.252\",\"method\":\"GET\",\"protocol\":\"HTTP/2.0\",\"referer\":\"http://www.investormission-critical.io/24/7/vortals\",\"request\":\"/scale/functionalities/optimize\",\"source_type\":\"stdin\",\"status\":502,\"user-identifier\":\"feeney1708\"}"
-    }
-  ]
-}
-"#;
+            {
+                "messageType": "DATA_MESSAGE",
+                "owner": "071959437513",
+                "logGroup": "/jesse/test",
+                "logStream": "test",
+                "subscriptionFilters": ["Destination"],
+                "logEvents": [
+                    {
+                        "id": "35683658089614582423604394983260738922885519999578275840",
+                        "timestamp": 1600110569039,
+                        "message": "{\"bytes\":26780,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"157.130.216.193\",\"method\":\"PUT\",\"protocol\":\"HTTP/1.0\",\"referer\":\"https://www.principalcross-platform.io/markets/ubiquitous\",\"request\":\"/expedite/convergence\",\"source_type\":\"stdin\",\"status\":301,\"user-identifier\":\"-\"}"
+                    },
+                    {
+                        "id": "35683658089659183914001456229543810359430816722590236673",
+                        "timestamp": 1600110569041,
+                        "message": "{\"bytes\":17707,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"109.81.244.252\",\"method\":\"GET\",\"protocol\":\"HTTP/2.0\",\"referer\":\"http://www.investormission-critical.io/24/7/vortals\",\"request\":\"/scale/functionalities/optimize\",\"source_type\":\"stdin\",\"status\":502,\"user-identifier\":\"feeney1708\"}"
+                    }
+                ]
+        }"#;
 
         let (rx, addr) = source(None, None).await;
 

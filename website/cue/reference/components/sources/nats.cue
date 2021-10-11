@@ -9,6 +9,7 @@ components: sources: nats: {
 			from: components._nats.features.collect.from
 		}
 		multiline: enabled: false
+		codecs: enabled:    true
 	}
 
 	classes: {
@@ -54,8 +55,10 @@ components: sources: nats: {
 	}
 
 	telemetry: metrics: {
-		processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
+		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
+		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:          components.sources.internal_metrics.output.metrics.processed_events_total
+		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 
 	how_it_works: components._nats.how_it_works

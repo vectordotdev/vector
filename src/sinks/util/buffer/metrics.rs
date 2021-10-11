@@ -24,11 +24,11 @@ pub struct MetricsBuffer {
 }
 
 impl MetricsBuffer {
-    pub fn new(settings: BatchSize<Self>) -> Self {
+    pub const fn new(settings: BatchSize<Self>) -> Self {
         Self::with_capacity(settings.events)
     }
 
-    fn with_capacity(max_events: usize) -> Self {
+    const fn with_capacity(max_events: usize) -> Self {
         Self {
             metrics: None,
             max_events,
@@ -46,7 +46,6 @@ impl Batch for MetricsBuffer {
     ) -> Result<BatchSettings<Self>, BatchError> {
         Ok(config
             .disallow_max_bytes()?
-            .use_size_as_events()?
             .get_settings_or_default(defaults))
     }
 
@@ -845,7 +844,7 @@ mod test {
             MetricValue::AggregatedHistogram {
                 buckets: vector_core::buckets![
                     1.0 => cfactor,
-                    2.0f64.powf(bpower) => cfactor * 2,
+                    bpower.exp2() => cfactor * 2,
                     4.0f64.powf(bpower) => cfactor * 4
                 ],
                 count: 7 * cfactor,

@@ -1,10 +1,11 @@
-use super::{filter_result_sync, FilterList, HostMetricsConfig};
+use super::{filter_result_sync, FilterList, HostMetrics};
 use crate::event::metric::Metric;
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use shared::btreemap;
-use std::io::{self};
+use snafu::{ResultExt, Snafu};
+use std::io::{self, Read};
 use std::num::ParseIntError;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -16,19 +17,40 @@ const MICROSECONDS: f64 = 1.0 / 1_000_000.0;
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(default)]
-pub(super) struct CgroupsConfig {
+pub(super) struct CGroupsConfig {
     #[derivative(Default(value = "100"))]
     levels: usize,
-    base: Option<PathBuf>,
+    pub(super) base: Option<PathBuf>,
     groups: FilterList,
 }
 
-impl HostMetricsConfig {
+#[derive(Debug, Snafu)]
+enum CGroupsError {
+    #[snafu(display("Could not open cgroup data file {:?}.", filename))]
+    Opening {
+        filename: PathBuf,
+        source: io::Error,
+    },
+    #[snafu(display("Could not read cgroup data file {:?}.", filename))]
+    Reading {
+        filename: PathBuf,
+        source: io::Error,
+    },
+    #[snafu(display("Could not parse cgroup data file {:?}.", filename))]
+    Parsing {
+        filename: PathBuf,
+        source: ParseIntError,
+    },
+}
+
+type CGroupsResult<T> = Result<T, CGroupsError>;
+
+impl HostMetrics {
     pub async fn cgroups_metrics(&self) -> Vec<Metric> {
         let now = Utc::now();
         let mut buffer = String::new();
         let mut output = Vec::new();
-        if let Some(root) = CGroup::root(self.cgroups.base.as_deref()) {
+        if let Some(root) = self.root_cgroup.clone() {
             self.recurse_cgroup(&mut output, now, root, 1, &mut buffer)
                 .await;
         }
@@ -50,7 +72,7 @@ impl HostMetricsConfig {
             };
             if let Some(cpu) = filter_result_sync(
                 cgroup.load_cpu(buffer).await,
-                "Failed to load/parse cgroups CPU statistics",
+                "Failed to load cgroups CPU statistics.",
             ) {
                 result.push(self.counter(
                     "cgroup_cpu_usage_seconds_total",
@@ -72,10 +94,10 @@ impl HostMetricsConfig {
                 ));
             }
 
-            if !cgroup.is_root() {
+            if cgroup.has_memory_controller && !cgroup.is_root() {
                 if let Some(current) = filter_result_sync(
                     cgroup.load_memory_current(buffer).await,
-                    "Failed to load/parse cgroups current memory",
+                    "Failed to load cgroups current memory.",
                 ) {
                     result.push(self.gauge(
                         "cgroup_memory_current_bytes",
@@ -87,7 +109,7 @@ impl HostMetricsConfig {
 
                 if let Some(stat) = filter_result_sync(
                     cgroup.load_memory_stat(buffer).await,
-                    "Failed to load/parse cgroups memory statistics",
+                    "Failed to load cgroups memory statistics.",
                 ) {
                     result.push(self.gauge(
                         "cgroup_memory_anon_bytes",
@@ -104,12 +126,12 @@ impl HostMetricsConfig {
                 }
             }
 
-            if level < self.cgroups.levels {
+            if level < self.config.cgroups.levels {
                 if let Some(children) =
-                    filter_result_sync(cgroup.children().await, "Failed to load cgroups children")
+                    filter_result_sync(cgroup.children().await, "Failed to load cgroups children.")
                 {
                     for child in children {
-                        if self.cgroups.groups.contains_path(Some(&child.name)) {
+                        if self.config.cgroups.groups.contains_path(Some(&child.name)) {
                             self.recurse_cgroup(result, now, child, level + 1, buffer)
                                 .await;
                         }
@@ -120,14 +142,17 @@ impl HostMetricsConfig {
     }
 }
 
-#[derive(Debug)]
-struct CGroup {
+#[derive(Clone, Debug)]
+pub(super) struct CGroup {
     root: PathBuf,
     name: PathBuf,
+    has_memory_controller: bool,
 }
 
+const CGROUP_CONTROLLERS: &str = "cgroup.controllers";
+
 impl CGroup {
-    fn root<P: AsRef<Path>>(base_group: Option<P>) -> Option<CGroup> {
+    pub(super) fn root<P: AsRef<Path>>(base_group: Option<P>) -> Option<CGroup> {
         // There are three standard possibilities for cgroups setups
         // (`BASE` below is normally `/sys/fs/cgroup`, but containers
         // sometimes have `/sys` mounted elsewhere):
@@ -149,61 +174,102 @@ impl CGroup {
         // for that group.
 
         let base_dir = join_path(heim::os::linux::sysfs_root(), "fs/cgroup");
-        let hybrid_root = join_path(&base_dir, "unified");
 
-        let base_dir = is_dir(&hybrid_root)
-            .then(|| hybrid_root)
-            .or_else(|| is_file(join_path(&base_dir, "cgroup.procs")).then(|| base_dir));
+        let (base_dir, controllers_file) = {
+            let hybrid_root = join_path(&base_dir, "unified");
+            let test_file = join_path(&hybrid_root, CGROUP_CONTROLLERS);
+            if is_file(&test_file) {
+                (hybrid_root, test_file)
+            } else {
+                let test_file = join_path(&base_dir, CGROUP_CONTROLLERS);
+                if is_file(&test_file) {
+                    (base_dir, test_file)
+                } else {
+                    return None;
+                }
+            }
+        };
 
-        base_dir.and_then(|root| match base_group {
+        debug!(message = "Detected cgroup base directory.", ?base_dir);
+
+        let controllers = load_controllers(&controllers_file)
+            .map_err(
+                |error| error!(message = "Could not load root cgroup controllers list.", %error, ?controllers_file),
+            )
+            .ok()?;
+        let has_memory_controller = controllers.iter().any(|name| name == "memory");
+        if !has_memory_controller {
+            warn!(
+                message =
+                    "CGroups memory controller is not active, there will be no memory metrics."
+            );
+        }
+
+        match base_group {
             Some(group) => {
                 let group = group.as_ref();
-                let root = join_path(root, group);
+                let root = join_path(base_dir, group);
                 is_dir(&root).then(|| CGroup {
                     root,
                     name: group.into(),
+                    has_memory_controller,
                 })
             }
             None => Some(CGroup {
-                root,
+                root: base_dir,
                 name: "/".into(),
+                has_memory_controller,
             }),
-        })
+        }
     }
 
     fn is_root(&self) -> bool {
         self.name == Path::new("/")
     }
 
-    async fn load_cpu(&self, buffer: &mut String) -> io::Result<CpuStat> {
-        buffer.clear();
-        File::open(self.make_path("cpu.stat"))
-            .await?
-            .read_to_string(buffer)
-            .await?;
-        buffer.parse().map_err(map_parse_error)
+    async fn load_cpu(&self, buffer: &mut String) -> CGroupsResult<CpuStat> {
+        self.open_read_parse("cpu.stat", buffer).await
     }
 
     fn make_path(&self, filename: impl AsRef<Path>) -> PathBuf {
         join_path(&self.root, filename)
     }
 
-    async fn load_memory_current(&self, buffer: &mut String) -> io::Result<u64> {
+    async fn open_read(
+        &self,
+        filename: impl AsRef<Path>,
+        buffer: &mut String,
+    ) -> CGroupsResult<PathBuf> {
         buffer.clear();
-        File::open(self.make_path("memory.current"))
-            .await?
+        let filename = self.make_path(filename);
+        File::open(&filename)
+            .await
+            .with_context(|| Opening {
+                filename: filename.clone(),
+            })?
             .read_to_string(buffer)
-            .await?;
-        buffer.trim().parse().map_err(map_parse_error)
+            .await
+            .with_context(|| Reading {
+                filename: filename.clone(),
+            })?;
+        Ok(filename)
     }
 
-    async fn load_memory_stat(&self, buffer: &mut String) -> io::Result<MemoryStat> {
-        buffer.clear();
-        File::open(self.make_path("memory.stat"))
-            .await?
-            .read_to_string(buffer)
-            .await?;
-        buffer.parse().map_err(map_parse_error)
+    async fn open_read_parse<T: FromStr<Err = ParseIntError>>(
+        &self,
+        filename: impl AsRef<Path>,
+        buffer: &mut String,
+    ) -> CGroupsResult<T> {
+        let filename = self.open_read(filename, buffer).await?;
+        buffer.trim().parse().with_context(|| Parsing { filename })
+    }
+
+    async fn load_memory_current(&self, buffer: &mut String) -> CGroupsResult<u64> {
+        self.open_read_parse("memory.current", buffer).await
+    }
+
+    async fn load_memory_stat(&self, buffer: &mut String) -> CGroupsResult<MemoryStat> {
+        self.open_read_parse("memory.stat", buffer).await
     }
 
     async fn children(&self) -> io::Result<Vec<CGroup>> {
@@ -212,12 +278,28 @@ impl CGroup {
         while let Some(entry) = dir.next_entry().await? {
             let root = entry.path();
             if is_dir(&root) {
-                let name = join_name(&self.name, entry.file_name());
-                result.push(CGroup { root, name });
+                result.push(CGroup {
+                    root,
+                    name: join_name(&self.name, entry.file_name()),
+                    has_memory_controller: self.has_memory_controller,
+                });
             }
         }
         Ok(result)
     }
+}
+
+fn load_controllers(filename: &Path) -> CGroupsResult<Vec<String>> {
+    let mut buffer = String::new();
+    std::fs::File::open(&filename)
+        .with_context(|| Opening {
+            filename: filename.to_path_buf(),
+        })?
+        .read_to_string(&mut buffer)
+        .with_context(|| Reading {
+            filename: filename.to_path_buf(),
+        })?;
+    Ok(buffer.trim().split(' ').map(Into::into).collect())
 }
 
 macro_rules! define_stat_struct {
@@ -261,10 +343,6 @@ define_stat_struct! { MemoryStat(
     file,
 )}
 
-fn map_parse_error(error: ParseIntError) -> io::Error {
-    io::Error::new(io::ErrorKind::InvalidData, error)
-}
-
 fn is_dir(path: impl AsRef<Path>) -> bool {
     std::fs::metadata(path.as_ref())
         .map(|metadata| metadata.is_dir())
@@ -304,7 +382,7 @@ fn join_name(base_name: &Path, filename: impl AsRef<Path>) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::super::tests::{count_name, count_tag};
-    use super::super::HostMetricsConfig;
+    use super::super::{HostMetrics, HostMetricsConfig};
     use super::{join_name, join_path};
     use pretty_assertions::assert_eq;
     use std::path::{Path, PathBuf};
@@ -322,7 +400,7 @@ mod tests {
     #[tokio::test]
     async fn generates_cgroups_metrics() {
         let config: HostMetricsConfig = toml::from_str(r#"collectors = ["cgroups"]"#).unwrap();
-        let metrics = config.cgroups_metrics().await;
+        let metrics = HostMetrics::new(config).cgroups_metrics().await;
 
         assert!(!metrics.is_empty());
         assert_eq!(count_tag(&metrics, "cgroup"), metrics.len());

@@ -1,4 +1,5 @@
-{{/* This partial is for pretty much all structured data (VRL stuff, CLI, API, component configs/output/telemetry, etc.) */}}
+{{/* This partial is for pretty much all structured data (VRL stuff, CLI, API, component configs/output/telemetry, etc.)
+*/}}
 {{ $ctx := . }}
 <div class="relative no-prose border dark:border-gray-700 rounded-md shadow">
   {{/* Source/transform/sink config */}}
@@ -23,7 +24,7 @@
           {{ if $v.required }}
           {{ partial "badge.html" (dict "word" "required" "color" "red") }}
           {{ else }}
-          {{ partial "badge.html" (dict "word" "optional" "color" "gray") }}
+          {{ partial "badge.html" (dict "word" "optional" "color" "blue") }}
           {{ end }}
 
           {{ range $k, $v := $v.type }}
@@ -35,6 +36,16 @@
           {{ end }}
           {{ else }}
           {{ partial "badge.html" (dict "word" $k "color" "gray") }}
+          {{ end }}
+
+          {{ with $v.syntax }}
+          {{ if eq . "remap_boolean_expression" }}
+          {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#boolean-expressions") }}
+          {{ else if eq . "remap_program" }}
+          {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#program") }}
+          {{ else }}
+          {{ partial "badge.html" (dict "word" . "color" "gray") }}
+          {{ end }}
           {{ end }}
 
           {{ if $v.enum }}
@@ -50,72 +61,44 @@
 
       {{ range $k, $v := $v.type }}
       {{ if eq $k "object" }} {{/* Object (with sub-configs) */}}
-      <div class="mt-4 border dark:border-gray-700 rounded flex flex-col divide-y dark:divide-gray-700">
-        {{ range $k, $v := $v.options }}
-        <div class="py-3 px-4">
-          <span class="flex justify-between items-center">
-            <span class="font-mono font-semibold">
-              {{ $text := printf "%s.%s" $name $k }}
-              {{ partial "heading.html" (dict "text" $text "level" 4 "anchor" true "icon" false "id" $text) }}
-            </span>
-
-            <span class="flex space-x-1">
-              {{ if $v.required  }}
-              {{ partial "badge.html" (dict "word" "required" "color" "red") }}
-              {{ else }}
-              {{ partial "badge.html" (dict "word" "optional" "color" "blue") }}
-              {{ end }}
-
-              {{ range $k, $v := $v.type }}
-              {{ partial "badge.html" (dict "word" $k "color" "gray") }}
-
-              {{ with $v.enum }}
-              {{ partial "badge.html" (dict "word" "enum" "color" "yellow") }}
-              {{ end }}
-
-              {{ with $v.syntax }}
-              {{ partial "badge.html" (dict "word" $v.syntax "color" "gray") }}
-              {{ end }}
-              {{ end }}
-            </span>
+      <div class="mt-4">
+        {{ template "config-object" (dict "name" $name "config" $v "level" 4) }}
+      </div>
+      {{ else if eq $k "array" }} {{/* Array */}}
+      {{ with $v.items }}
+      <div class="mt-3 border rounded py-2 px-3 dark:border-gray-700">
+        {{ range $k, $v := . }}
+        {{ range $k, $v := . }}
+        <span class="flex justify-between items-center">
+          <span class="font-semibold">
+            Array
           </span>
 
-          <div class="mt-4 prose dark:prose-dark max-w-none leading-snug">
-            {{ $v.description | markdownify }}
-          </div>
+          <span class="flex items-center space-x-1">
+            {{ partial "badge.html" (dict "word" $k "color" "gray") }}
+            {{ partial "badge.html" (dict "word" $v.syntax "color" "gray") }}
+          </span>
+        </span>
 
-          {{/* "Relevant when" conditions */}}
-          {{ with .relevant_when }}
-          <div class="mt-2">
-            <span>
-              Relevant when: <code>{{ . }}</code>
-            </span>
-          </div>
-          {{ end }}
-          {{/* Default value */}}
-          {{ range $k, $v := $v.type }}
-          {{ with $v.enum }}
-          <div class="mt-4">
-            <span class="font-semibold">
-              Enum options
-            </span>
-
-            <div class="mt-2 prose dark:prose-dark max-w-none">
-              {{ template "enum-options-table" . }}
-            </div>
-          </div>
-          {{ end }}
-
-
-          {{ if or $v.default (eq $v.default false) }}
-          <div class="mt-4">
-            {{ template "default" . }}
-          </div>
-          {{ end }}
-          {{ end }}
-        </div>
+        {{ with $v.examples }}
+        {{ template "config-array-examples" (dict "examples" .) }}
+        {{ end }}
+        {{ end }}
         {{ end }}
       </div>
+      {{ end }}
+      {{ else }} {{/* Non-arrays/objects */}}
+      {{ if eq $v.syntax "template" }}
+      <div class="mt-4 text-sm">
+        <strong>Note</strong>: This parameter supports Vector's
+        <a href="/docs/reference/configuration/template-syntax">template syntax</a>, which enables you to use
+        dynamic per-event values.
+      </div>
+      {{ end }}
+
+      {{ with $v.examples }}
+      {{ template "config-examples" (dict "examples" .) }}
+      {{ end }}
       {{ end }}
 
       {{/* Enum */}}
@@ -137,45 +120,6 @@
         </div>
       </div>
       {{ end }}
-
-      {{/* Array */}}
-      {{ if eq $k "array" }}
-      {{ with $v.items }}
-      <div class="mt-3 border rounded py-2 px-3 dark:border-gray-700">
-        {{ range $k, $v := . }}
-        {{ range $k, $v := . }}
-        <span class="flex justify-between items-center">
-          <span class="font-semibold">
-            Array
-          </span>
-
-          <span class="flex items-center space-x-1">
-            {{ partial "badge.html" (dict "word" $k "color" "gray") }}
-            {{ partial "badge.html" (dict "word" $v.syntax "color" "gray") }}
-          </span>
-        </span>
-
-        {{ with $v.examples }}
-        {{ $json := . | jsonify (dict "indent" "  ") }}
-        <div x-data="{ open: false }" class="mt-2.5 border rounded py-2 px-3 dark:border-gray-700">
-          <span class="flex justify-between items-center">
-            <span class="text-sm">
-              Examples
-            </span>
-
-            {{ template "config-toggler" (dict "size" 4) }}
-          </span>
-
-          <div x-show="open" class="mt-3 text-sm flex flex-col space-y-2">
-            {{ highlight $json "json" "" }}
-          </div>
-        </div>
-        {{ end }}
-        {{ end }}
-        {{ end }}
-      </div>
-      {{ end }}
-      {{ end }}
       {{ end }}
 
       {{/* Default value */}}
@@ -185,6 +129,15 @@
         {{ template "default" . }}
       </div>
       {{ end }}
+      {{ end }}
+
+      {{/* "Relevant when" conditions */}}
+      {{ with .relevant_when }}
+      <div class="mt-2 text-sm flex justify-end">
+        <span>
+          Relevant when: <code>{{ . }}</code>
+        </span>
+      </div>
       {{ end }}
     </div>
     {{ end }}
@@ -197,8 +150,10 @@
   <div class="py-4 px-6 flex items-center">
     <div class="mr-8 flex-shrink-0">
       {{/* Heroicon: outline/exclamation */}}
-      <svg xmlns="http://www.w3.org/2000/svg" class="text-yellow-500 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      <svg xmlns="http://www.w3.org/2000/svg" class="text-yellow-500 h-6 w-6" fill="none" viewBox="0 0 24 24"
+        stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
       </svg>
     </div>
     <div class="flex flex-col space-y-4 overflow-x-auto">
@@ -221,7 +176,9 @@
       <a href="/docs/about/under-the-hood/architecture/data-model/metric">
         {{/* Heroicon: solid/question-mark-circle */}}
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+          <path fill-rule="evenodd"
+            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z"
+            clip-rule="evenodd" />
         </svg>
       </a>
     </span>
@@ -238,7 +195,9 @@
       <a href="/docs/about/under-the-hood/architecture/data-model/log">
         {{/* Heroicon: solid/question-mark-circle */}}
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+          <path fill-rule="evenodd"
+            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z"
+            clip-rule="evenodd" />
         </svg>
       </a>
     </span>
@@ -278,7 +237,8 @@
       <div class="py-2.5 px-3.5 border rounded dark:border-gray-700">
         <div class="flex space-x-2">
           {{ range $formats }}
-          <button @click="$store.global.setFormat('{{ . }}')" :class="{ 'text-secondary dark:text-primary': $store.global.isFormat('{{ . }}') }" class="font-semibold">
+          <button @click="$store.global.setFormat('{{ . }}')"
+            :class="{ 'text-secondary dark:text-primary': $store.global.isFormat('{{ . }}') }" class="font-semibold">
             {{ . | upper }}
           </button>
           {{ end }}
@@ -309,7 +269,8 @@
   <div class="py-4 px-6">
     {{ with .metrics }}
     <span class="flex items-center justify-between">
-      {{ partial "heading.html" (dict "text" "Metrics" "level" 3 "id" "telemetry-metrics" "href" "#telemetry-metrics") }}
+      {{ partial "heading.html" (dict "text" "Metrics" "level" 3 "id" "telemetry-metrics" "href" "#telemetry-metrics")
+      }}
 
       <a href="/docs/about/under-the-hood/architecture/data-model/metric">
         link
@@ -341,8 +302,10 @@
   {{ with .component_warnings }}
   <div class="no-prose py-4 px-6 flex items-center">
     <div class="mr-8 flex-shrink-0">
-      <svg xmlns="http://www.w3.org/2000/svg" class="text-red-400 h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      <svg xmlns="http://www.w3.org/2000/svg" class="text-red-400 h-7 w-7" fill="none" viewBox="0 0 24 24"
+        stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
       </svg>
     </div>
     <div class="flex flex-col space-y-4 overflow-x-auto">
@@ -368,7 +331,7 @@
 
         <span class="flex space-x-1">
           {{ if $v.common }}
-          {{ partial "badge.html"  (dict "word" "common" "color" "blue") }}
+          {{ partial "badge.html" (dict "word" "common" "color" "blue") }}
           {{ end }}
 
           {{ if $v.required }}
@@ -571,6 +534,8 @@
     {{ $func := index site.Data.docs.remap.functions .name }}
     {{ $infallible := not $func.internal_failure_reasons }}
     {{ $args := $func.arguments }}
+    {{ $requiredArgs := where $args "required" true }}
+    {{ $optionalArgs := where $args "required" false }}
     {{ $lastArg := sub (len $args) 1 }}
     {{ $return := $func.return }}
     <div class="py-4 px-6">
@@ -586,85 +551,87 @@
           {{ if $infallible }}
           {{ partial "badge.html" (dict "word" "infallible" "color" "blue") }}
           {{ else }}
-          {{ partial "badge.html" (dict "word" "fallible" "color" "red") }}
+          {{ partial "badge.html" (dict "word" "fallible" "color" "yellow") }}
           {{ end }}
         </span>
       </span>
 
       {{/* Function description */}}
-      <div class="mt-4 prose prose-md dark:prose-dark max-w-none leading-snug">
+      <div class="mt-6 prose prose-md dark:prose-dark max-w-none">
         {{ $func.description | markdownify }}
       </div>
 
       {{/* Function spec, etc. */}}
       {{ $id := printf "%s-function-spec" $name }}
-      <div class="mt-3 border rounded-md py-3 px-4 dark:border-gray-700">
+      <div class="mt-6">
         <span>
           {{ partial "heading.html" (dict "text" "Function spec" "level" 4 "id" $id "toc_hide" true) }}
         </span>
 
         <div class="my-2 font-mono text-sm bg-dark dark:bg-black px-3.5 py-2.5 rounded text-gray-100">
-          <span class="text-primary dark:text-primary font-semibold">{{ $name }}</span>(
-            {{- range $idx, $arg := $args -}}
-            {{ $isLast := eq $idx $lastArg -}}
-            <span class="{{ if .required }} font-bold text-secondary dark:text-primary{{ else }} text-indigo-500 dark:text-indigo-300{{ end }}">
-              {{- .name -}}
-            </span>:
-            <span class="text-gray-200"><{{ delimit .type `<span class="text-grey-500"> | </span>` }}></span>{{ if not $isLast }}, {{ end -}}
-            {{ end -}}
-          )
+          <span class="text-primary-dark dark:text-primary font-semibold">{{ $name }}</span>(
+          {{- $lastArg := sub (len $requiredArgs) 1 -}}
+          {{- range $idx, $arg := $requiredArgs -}}
+          {{ $isLast := eq $idx $lastArg -}}
+          <span class="font-bold text-secondary dark:text-primary">
+            {{- .name -}}
+          </span>:
+          <span class="text-gray-200">
+            <{{ delimit .type `<span class="text-grey-500"> |
+          </span>` }}></span>{{ if not $isLast }}, {{ end -}}
+          {{ end -}}
+          {{- if gt (len $optionalArgs) 0 -}},
+          [{{- $lastArg := sub (len $optionalArgs) 1 -}}
+          {{- range $idx, $arg := $optionalArgs -}}
+          {{ $isLast := eq $idx $lastArg -}}
+          <span class="text-indigo-500 dark:text-indigo-300">
+            {{- .name -}}
+          </span>:
+          <span class="text-gray-200">
+            <{{ delimit .type `<span class="text-grey-500"> |
+          </span>` }}></span>{{ if not $isLast }}, {{ end -}}
+          {{ end -}}]{{ end }})
           {{- with $return -}}
           <div class="ml-3">
-            <span class="font-extrabold">::</span> <span class="text-gray-200"><{{ delimit .types " | " }}></span>
+            <span class="font-extrabold">::</span> <span class="text-gray-200">
+              <{{ delimit .types " | " }}>
+            </span>{{ if not $infallible }}, &lt;error>{{ end }}
           </div>
           {{- end -}}
         </div>
-
-        {{/* Function arguments */}}
-        {{ with $args }}
-        <div class="mt-2 prose dark:prose-dark max-w-none">
-          {{ template "vrl-function-args" . }}
-        </div>
-        {{ end }}
 
         <div class="mt-3 flex flex-row-reverse">
           {{ template "vrl-function-legend" }}
         </div>
 
-        {{ with $func.examples }}
-        {{ $id := printf "%s-examples" $name }}
-        <div x-data="{ open: location.hash.startsWith('#{{ $id }}') }" class="mt-4 border rounded py-2 px-3 dark:border-gray-700">
-          <span class="flex justify-between items-center">
-            {{ partial "heading.html" (dict "text" "Examples" "level" 4 "id" $id "toc_hide" true) }}
-
-            {{ template "config-toggler" (dict "size" 4) }}
-          </span>
-
-          <div x-show="open" class="pt-4 flex flex-col space-y-5 overflow-x-scroll">
-            {{ range . }}
-            {{ template "vrl-function-example" (dict "name" $name "ctx" .) }}
-            {{ end }}
-          </div>
+        {{/* Function arguments */}}
+        {{ with $args }}
+        <div class="mt-6 prose dark:prose-dark max-w-none">
+          {{ template "vrl-function-args" . }}
         </div>
         {{ end }}
 
+        {{/* Function notices */}}
         {{ with $func.notices }}
-        <div class="mt-3 border rounded border-yellow-400 py-3 px-4">
-          <span class="block font-semibold">
-            Notices
+        {{ $id := printf "%s-notices" $name }}
+        <div class="mt-6">
+          <span>
+            {{ partial "heading.html" (dict "text" "Notices" "level" 4 "id" $id "toc_hide" true) }}
           </span>
 
-          <span class="my-2 block font-sm">
+          <span class="mt-2 text-sm prose prose-md dark:prose-dark max-w-none">
             This function has special behavior that you should be aware of.
           </span>
 
           <div class="mt-1.5 flex flex-col space-y-2">
             {{ range . }}
-            <div class="flex space-x-5">
+            <div class="flex space-x-5 items-center">
               <div class="flex-shrink-0 py-1">
-                {{/* Heroicon: outline/exclamation */}}
-                <svg xmlns="http://www.w3.org/2000/svg" class="text-yellow-500 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                {{/* Heroicon: outline/exclamation-circle */}}
+                <svg xmlns="http://www.w3.org/2000/svg" class="text-yellow-500 h-5 w-5" fill="none" viewBox="0 0 24 24"
+                  stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
 
@@ -672,6 +639,56 @@
                 {{ . | markdownify }}
               </div>
             </div>
+            {{ end }}
+          </div>
+        </div>
+        {{ end }}
+
+        {{/* Function errors */}}
+        {{ with $func.internal_failure_reasons }}
+        {{ $id := printf "%s-errors" $name }}
+        <div class="mt-6">
+          <span>
+            {{ partial "heading.html" (dict "text" "Errors" "level" 4 "id" $id "toc_hide" true) }}
+          </span>
+
+          <span class="mt-2 text-sm prose prose-md dark:prose-dark max-w-none">
+            The <code>{{ $name }}</code> function is <strong>fallible</strong>, which means that
+            <a href="/docs/reference/vrl/errors">error handling</a> is required for these errors:
+          </span>
+
+          <div class="mt-1.5">
+            {{ range . }}
+            <div class="flex space-x-5 items-center">
+              <div class="flex-shrink-0 py-1">
+                {{/* Heroicon: outline/exclamation */}}
+                <svg xmlns="http://www.w3.org/2000/svg" class="text-red-400 h-5 w-5" fill="none" viewBox="0 0 24 24"
+                  stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+
+              <div class="prose prose-sm dark:prose-dark max-w-none leading-snug">
+                {{ . | markdownify }}
+              </div>
+            </div>
+            {{ end }}
+          </div>
+        </div>
+        {{ end }}
+
+        {{/* Function examples */}}
+        {{ with $func.examples }}
+        {{ $id := printf "%s-examples" $name }}
+        <div class="mt-6">
+          <span>
+            {{ partial "heading.html" (dict "text" "Examples" "level" 4 "id" $id "toc_hide" true) }}
+          </span>
+
+          <div class="mt-2 flex flex-col space-y-4">
+            {{ range . }}
+            {{ template "vrl-function-example" (dict "name" $name "ctx" .) }}
             {{ end }}
           </div>
         </div>
@@ -722,7 +739,7 @@
         {{ $vrlSourceCode }}
 
         {{ if .raises }}
-        {{ $errorCode := highlight .raises.compiletime "ruby" "" }}
+        {{ $errorCode := highlight .raises.compiletime "rust" "" }}
         <span>
           ...you should see this error:
         </span>
@@ -775,8 +792,10 @@
         <div class="mt-3">
           <span class="flex items-center space-x-1.5">
             {{/* Heroicon: outline/zoom-in */}}
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-indigo-500 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-indigo-500 dark:text-indigo-400" fill="none"
+              viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
             </svg>
 
             {{ partial "heading.html" (dict "text" "Rationale" "level" 4 "id" $id "toc_hide" true) }}
@@ -793,8 +812,10 @@
         <div class="mt-3">
           <span class="flex items-center space-x-1.5">
             {{/* Heroicon: outline/trending-up */}}
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-blue-500 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-blue-500 dark:text-blue-400" fill="none"
+              viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
             </svg>
 
             {{ partial "heading.html" (dict "text" "Resolution" "level" 4 "id" $id "toc_hide" true) }}
@@ -808,12 +829,15 @@
 
         {{ with $error.examples }}
         {{ $id := printf "error-%s-examples" $code }}
-        <div x-data="{ open: location.hash.startsWith('#error-{{ $code }}') }" class="mt-5 rounded-md px-3 py-2 dark:border-gray-700 border">
+        <div x-data="{ open: location.hash.startsWith('#error-{{ $code }}') }"
+          class="mt-5 rounded-md px-3 py-2 dark:border-gray-700 border">
           <span class="flex justify-between items-center">
             <span class="flex items-center space-x-2">
               {{/* Heroicon: outline/code */}}
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-secondary dark:text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-secondary dark:text-primary" fill="none"
+                viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
               </svg>
 
               {{ partial "heading.html" (dict "text" "Examples" "level" 4 "toc_hide" true "id" $id) }}
@@ -822,7 +846,8 @@
             {{ template "vrl-toggler" }}
           </span>
 
-          <div x-show="open" class="mt-2 flex flex-col divide-y dark:divide-gray-700 border rounded dark:border-gray-700">
+          <div x-show="open"
+            class="mt-2 flex flex-col divide-y dark:divide-gray-700 border rounded dark:border-gray-700">
             {{ range . }}
             {{ $id := printf "error-%s-example-%s" $code (.title | urlize) }}
             <div class="flex flex-col space-y-1 py-2.5 px-4 rounded-sm dark:border-gray-700">
@@ -861,7 +886,7 @@
                   VRL program
                 </span>
 
-                {{ highlight . "ruby" "" }}
+                {{ highlight . "coffee" "" }}
               </div>
               {{ end }}
 
@@ -909,7 +934,7 @@
 
       <div class="mt-2 border rounded p-4 dark:border-gray-700">
         <div>
-          {{ highlight .source "ruby" "" }}
+          {{ highlight .source "coffee" "" }}
         </div>
 
         {{ with .definitions }}
@@ -992,7 +1017,7 @@
             </span>
 
             <div class="mt-1">
-              {{ highlight .source "ruby" "" }}
+              {{ highlight .source "coffee" "" }}
             </div>
           </div>
 
@@ -1011,13 +1036,17 @@
           <div class="mt-4 flex items-center space-x-2 justify-end">
             <span>
               {{/* Heroicon: outline/light-bulb */}}
-              <svg xmlns="http://www.w3.org/2000/svg" class="text-yellow-500 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              <svg xmlns="http://www.w3.org/2000/svg" class="text-yellow-500 h-4 w-4" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </span>
 
             <span class="text-sm">
-              Learn more about the <a href="{{ $link }}" class="font-mono font-semibold text-secondary dark:text-primary hover:text-primary dark:hover:text-secondary">{{ $name }}</a> function
+              Learn more about the <a href="{{ $link }}"
+                class="font-mono font-semibold text-secondary dark:text-primary hover:text-primary dark:hover:text-secondary">{{
+                $name }}</a> function
             </span>
           </div>
         </div>
@@ -1085,7 +1114,7 @@
 
         <div class="mt-2 flex flex-col space-y-2 text-sm">
           {{ range . }}
-          {{ highlight . "ruby" "" }}
+          {{ highlight . "coffee" "" }}
           {{ end }}
         </div>
       </div>
@@ -1400,16 +1429,54 @@
 </table>
 {{ end }}
 
+{{ define "config-examples" }}
+<div x-data="{ open: false }" class="mt-2.5 border rounded py-2 px-3 dark:border-gray-700">
+  <span class="flex justify-between items-center">
+    <span class="text-sm">
+      Examples
+    </span>
+
+    {{ template "config-toggler" (dict "size" 4) }}
+  </span>
+
+  <div x-show="open" class="mt-3 text-sm flex flex-col space-y-2">
+    {{ range .examples }}
+    {{ $json := . | jsonify (dict "indent" "  ") }}
+    {{ highlight $json "json" "" }}
+    {{ end }}
+  </div>
+</div>
+{{ end }}
+
+{{ define "config-array-examples" }}
+{{ $json := .examples | jsonify (dict "indent" "  ") }}
+<div x-data="{ open: false }" class="mt-2.5 border rounded py-2 px-3 dark:border-gray-700">
+  <span class="flex justify-between items-center">
+    <span class="text-sm">
+      Examples
+    </span>
+
+    {{ template "config-toggler" (dict "size" 4) }}
+  </span>
+
+  <div x-show="open" class="mt-3 text-sm flex flex-col space-y-2">
+    {{ highlight $json "json" "" }}
+  </div>
+</div>
+{{ end }}
+
 {{ define "config-toggler" }}
 {{ $size := .size | default 4 }}
 <a @click="open = !open" class="cursor-pointer">
   {{/* Heroicon: outline/chevron-down */}}
-  <svg x-show="!open" xmlns="http://www.w3.org/2000/svg" class="h-{{ $size }} w-{{ $size }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <svg x-show="!open" xmlns="http://www.w3.org/2000/svg" class="h-{{ $size }} w-{{ $size }}" fill="none"
+    viewBox="0 0 24 24" stroke="currentColor">
     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
   </svg>
 
   {{/* Heroicon: outline/chevron-up */}}
-  <svg x-show="open" xmlns="http://www.w3.org/2000/svg" class="h-{{ $size }} w-{{ $size }}"fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <svg x-show="open" xmlns="http://www.w3.org/2000/svg" class="h-{{ $size }} w-{{ $size }}" fill="none"
+    viewBox="0 0 24 24" stroke="currentColor">
     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
   </svg>
 </a>
@@ -1427,7 +1494,9 @@
 {{ define "vrl-function-example" }}
 {{ $id := printf "%s-examples-%s" .name (.ctx.title | urlize) }}
 <div>
-  {{ partial "heading.html" (dict "text" .ctx.title "level" 5 "id" $id "toc_hide" true) }}
+  <span>
+    {{ partial "heading.html" (dict "text" .ctx.title "level" 5 "id" $id "toc_hide" true) }}
+  </span>
 
   <div class="flex flex-col space-y-2">
     <div>
@@ -1594,8 +1663,10 @@
 {{ define "vrl-function-legend" }}
 {{/* Heroicon: outline/map */}}
 <div class="flex items-center space-x-2">
-  <svg xmlns="http://www.w3.org/2000/svg" class="text-gray-400 dark:text-gray-300 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+  <svg xmlns="http://www.w3.org/2000/svg" class="text-gray-400 dark:text-gray-300 h-4 w-4" fill="none"
+    viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+      d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
   </svg>
 
   <span class="font-mono text-xs text-secondary dark:text-primary font-semibold">
@@ -1612,41 +1683,69 @@
 </div>
 {{ end }}
 
+{{ define "vrl-function-arg-row" }}
+{{ $color := cond .required "text-secondary dark:text-primary" "text-indigo-500 dark:text-indigo-300" }}
+<tr>
+  <td>
+    <span class="font-mono {{ $color }}{{ if .required }} font-bold{{ end }}">
+      {{ .name }}
+    </span>
+  </td>
+  <td>
+    <span class="font-mono">
+      {{ range .type }}
+      {{ . }}<br />
+      {{ end }}
+    </span>
+  </td>
+  <td class="leading-snug">
+    {{ .description | markdownify }}
+  </td>
+  <td class="overflow-auto">
+    {{ with .default }}
+    <code>{{ . }}</code>
+    {{ end }}
+  </td>
+  <td>
+    {{ if .required }}
+    <span>yes</span>
+    {{ else }}
+    <span>no</span>
+    {{ end }}
+  </td>
+</tr>
+{{ end }}
+
 {{ define "vrl-function-args" }}
+{{ $required := where . "required" true }}
+{{ $optional := where . "required" false }}
 <table class="table-fixed">
   <thead>
     <tr>
-      <th class="w-1/5">
+      <th class="w-1/6">
         Argument
       </th>
-      <th class="w-1/5">
+      <th class="w-1/6">
         Type
       </th>
-      <th class="w-3/5">
+      <th class="w-1/2">
         Description
+      </th>
+      <th class="w-1/6">
+        Default
+      </th>
+      <th>
+        Required?
       </th>
     </tr>
   </thead>
   <tbody>
-    {{ range . }}
-    {{ $color := cond .required "text-secondary dark:text-primary" "text-indigo-500 dark:text-indigo-300" }}
-    <tr>
-      <td>
-        <span class="font-mono {{ $color }}{{ if .required }} font-bold{{ end }}">
-          {{ .name }}
-        </span>
-      </td>
-      <td>
-        <span class="font-mono">
-          {{ range .type }}
-          {{ . }}<br />
-          {{ end }}
-        </span>
-      </td>
-      <td class="leading-snug">
-        {{ .description | markdownify }}
-      </td>
-    </tr>
+    {{ range $required }}
+    {{ template "vrl-function-arg-row" . }}
+    {{ end }}
+
+    {{ range $optional }}
+    {{ template "vrl-function-arg-row" . }}
     {{ end }}
   </tbody>
 </table>
@@ -1655,12 +1754,16 @@
 {{ define "vrl-toggler" }}
 <button @click="open = !open">
   {{/* Heroicon: outline/chevron-down */}}
-  <svg x-show="!open" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600 dark:text-gray-400 hover:text-secondary dark:hover:text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <svg x-show="!open" xmlns="http://www.w3.org/2000/svg"
+    class="h-4 w-4 text-gray-600 dark:text-gray-400 hover:text-secondary dark:hover:text-primary" fill="none"
+    viewBox="0 0 24 24" stroke="currentColor">
     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
   </svg>
 
   {{/* Heroicon: outline/chevron-up */}}
-  <svg x-show="open" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600 dark:text-gray-400 hover:text-secondary dark:hover:text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <svg x-show="open" xmlns="http://www.w3.org/2000/svg"
+    class="h-4 w-4 text-gray-600 dark:text-gray-400 hover:text-secondary dark:hover:text-primary" fill="none"
+    viewBox="0 0 24 24" stroke="currentColor">
     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
   </svg>
 </button>
@@ -1713,11 +1816,114 @@
 </div>
 {{ end }}
 
+{{ define "config-object" }}
+{{ $prefix := .name }}
+{{ $level := .level }}
+{{ $innerLevel := add $level 1 }}
+<div class="border dark:border-gray-700 rounded flex flex-col divide-y dark:divide-gray-700">
+  {{ range $k, $v := .config.options }}
+  {{ $name := printf "%s.%s" $prefix $k }}
+  <div class="py-3 px-4">
+    <div class="flex justify-between items-center">
+      <span>
+        {{ partial "heading.html" (dict "text" $name "level" $level "anchor" true "icon" false "mono" true) }}
+      </span>
+
+      <span class="flex space-x-1">
+        {{ if .config.common }}
+        {{ partial "badge.html" (dict "word" "common" "color" "blue") }}
+        {{ end }}
+
+        {{ if .config.required }}
+        {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+        {{ else }}
+        {{ partial "badge.html" (dict "word" "optional" "color" "blue") }}
+        {{ end }}
+
+        {{ range $k, $v := $v.type }}
+        {{ $isArray := eq $k "array" }}
+        {{ if $isArray }}
+        {{ range $k, $v := $v.items.type }}
+        {{ $name := printf "[%s]" $k }}
+        {{ partial "badge.html" (dict "word" $name "color" "gray") }}
+        {{ end }}
+        {{ else }}
+        {{ partial "badge.html" (dict "word" $k "color" "gray") }}
+        {{ end }}
+
+        {{ with $v.syntax }}
+        {{ if eq . "remap_boolean_expression" }}
+        {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#boolean-expressions") }}
+        {{ else if eq . "remap_program" }}
+        {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#program") }}
+        {{ else }}
+        {{ partial "badge.html" (dict "word" . "color" "gray") }}
+        {{ end }}
+        {{ end }}
+
+        {{ if $v.enum }}
+        {{ partial "badge.html" (dict "word" "enum" "color" "yellow") }}
+        {{ end }}
+        {{ end }}
+      </span>
+    </div>
+
+    <div class="mt-4 prose dark:prose-dark max-w-none leading-snug">
+      {{ $v.description | markdownify }}
+    </div>
+
+    {{ with $v.relevant_when }}
+    <div class="mt-2">
+      <span>
+        Relevant when: <code>{{ . }}</code>
+      </span>
+    </div>
+    {{ end }}
+
+    {{ range $k, $v := $v.type }}
+    {{ if eq $k "object" }}
+    <div class="mt-4">
+      {{ template "config-object" (dict "name" $name "config" $v "level" $innerLevel) }}
+    </div>
+    {{ end }}
+
+    {{ with $v.enum }}
+    <div class="mt-4">
+      <span class="font-semibold">
+        Enum options
+      </span>
+
+      <div class="mt-2 prose dark:prose-dark max-w-none">
+        {{ template "enum-options-table" . }}
+      </div>
+    </div>
+    {{ end }}
+
+    {{ with $v.examples }}
+    {{ template "config-examples" (dict "examples" .) }}
+    {{ end }}
+
+    {{ if or $v.default (eq $v.default false) }}
+    <div class="mt-4">
+      {{ template "default" . }}
+    </div>
+    {{ end }}
+    {{ end }}
+  </div>
+  {{ end }}
+</div>
+{{ end }}
+
 {{ define "code" }}
-{{ if or (reflect.IsMap .) (reflect.IsSlice .) }}
+{{ if reflect.IsMap . }} {{/* If a map or array, highlight as JSON */}}
 {{ $json := . | jsonify (dict "indent" "  ") }}
 {{ highlight $json "json" "" }}
-{{ else }}
+{{ else if reflect.IsSlice . }}
+{{ $json := . | jsonify }}
+{{ highlight $json "json" "" }}
+{{ else if hasPrefix . "```" }} {{/* If a code sample, translate into Markdown */}}
+{{ . | markdownify }}
+{{ else }} {{/* If just a plain old string, use Ruby syntax highlighting as a best guess */}}
 {{ highlight . "ruby" "" }}
 {{ end }}
 {{ end }}

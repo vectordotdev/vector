@@ -1,6 +1,8 @@
-use super::InternalEvent;
+// ## skip check-events ##
+
 use crate::tls::TlsError;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct TcpSocketConnectionEstablished {

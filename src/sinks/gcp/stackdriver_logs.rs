@@ -109,7 +109,7 @@ impl SinkConfig for StackdriverConfig {
         let creds = self.auth.make_credentials(Scope::LoggingWrite).await?;
 
         let batch = BatchSettings::default()
-            .bytes(bytesize::kib(5000u64))
+            .bytes(5_000_000)
             .timeout(1)
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&TowerRequestConfig {
@@ -162,7 +162,7 @@ impl HttpSink for StackdriverSink {
             let value = template
                 .render_string(&event)
                 .map_err(|error| {
-                    emit!(TemplateRenderingFailed {
+                    emit!(&TemplateRenderingFailed {
                         error,
                         field: Some("resource.labels"),
                         drop_event: true,
@@ -175,7 +175,7 @@ impl HttpSink for StackdriverSink {
             .config
             .log_name(&event)
             .map_err(|error| {
-                emit!(TemplateRenderingFailed {
+                emit!(&TemplateRenderingFailed {
                     error,
                     field: Some("log_id"),
                     drop_event: true,

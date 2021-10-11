@@ -1,40 +1,104 @@
 use crate::partition::Partitioner;
-use crate::time::Timer;
+use crate::time::KeyedTimer;
 use crate::ByteSizeOf;
+use futures::ready;
 use futures::stream::Stream;
 use pin_project::pin_project;
 use std::collections::HashMap;
-use std::hash::BuildHasherDefault;
-use std::mem;
+use std::hash::{BuildHasherDefault, Hash};
 use std::num::NonZeroUsize;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use tokio::time::{interval, Interval, MissedTickBehavior};
+use std::{cmp, mem};
+use tokio_util::time::delay_queue::Key;
+use tokio_util::time::DelayQueue;
 use twox_hash::XxHash64;
 
-/// A [`Timer`] for [`Batch`]
-///
-/// A `Batch` implementation must be rigged to flush every so often on a
-/// timer. Absent any particular concerns this timer will serve most
-/// purposes. It stores an internal notion of when it was started and how "wide"
-/// away from that start time can drift before the timer has elapsed.
-pub struct BatcherTimer {
-    interval: Interval,
+/// A `KeyedTimer` based on `DelayQueue`.
+pub struct ExpirationQueue<K> {
+    /// The timeout to give each new key entry
+    timeout: Duration,
+    /// The queue of expirations
+    expirations: DelayQueue<K>,
+    /// The Key -> K mapping, allows for resets
+    expiration_map: HashMap<K, Key>,
 }
 
-impl BatcherTimer {
-    #[allow(dead_code)]
-    pub fn new(period: Duration) -> Self {
-        let mut interval = interval(period);
-        interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
-        Self { interval }
+impl<K> ExpirationQueue<K> {
+    /// Creates a new `ExpirationQueue`.
+    ///
+    /// `timeout` is used for all insertions and resets.
+    pub fn new(timeout: Duration) -> Self {
+        Self {
+            timeout,
+            expirations: DelayQueue::new(),
+            expiration_map: HashMap::default(),
+        }
+    }
+
+    /// The number of current subtimers in the queue.
+    ///
+    /// Includes subtimers which have expired but have not yet been removed via
+    /// calls to `poll_expired`.
+    pub fn len(&self) -> usize {
+        self.expirations.len()
+    }
+
+    /// Returns `true` if the queue has a length of 0.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 
-impl Timer for BatcherTimer {
-    fn poll_elapsed(&mut self, cx: &mut Context) -> Poll<()> {
-        self.interval.poll_tick(cx).map(|_| ())
+impl<K> KeyedTimer<K> for ExpirationQueue<K>
+where
+    K: Eq + Hash + Clone,
+{
+    fn clear(&mut self) {
+        self.expirations.clear();
+        self.expiration_map.clear();
+    }
+
+    fn insert(&mut self, item_key: K) {
+        if let Some(expiration_key) = self.expiration_map.get(&item_key) {
+            // We already have an expiration entry for this item key, so
+            // just reset the expiration.
+            self.expirations.reset(expiration_key, self.timeout);
+        } else {
+            // This is a yet-unseen item key, so create a new expiration
+            // entry.
+            let expiration_key = self.expirations.insert(item_key.clone(), self.timeout);
+            assert!(self
+                .expiration_map
+                .insert(item_key, expiration_key)
+                .is_none());
+        }
+    }
+
+    fn poll_expired(&mut self, cx: &mut Context) -> Poll<Option<K>> {
+        match ready!(self.expirations.poll_expired(cx)) {
+            // No expirations yet.
+            None => Poll::Ready(None),
+            Some(expiration) => match expiration {
+                // We shouldn't really ever hit this error arm, as `DelayQueue`
+                // doesn't actually return ever return an error, but it's part
+                // of the type signature so we must abide.
+                Err(e) => {
+                    error!(
+                        "caught unexpected error while polling for expired batches: {}",
+                        e
+                    );
+                    Poll::Pending
+                }
+                Ok(expiration) => {
+                    // An item has expired, so remove it from the map and return
+                    // it.
+                    assert!(self.expiration_map.remove(expiration.get_ref()).is_some());
+                    Poll::Ready(Some(expiration.into_inner()))
+                }
+            },
+        }
     }
 }
 
@@ -69,24 +133,33 @@ where
 {
     /// Create a new Batch instance
     ///
-    /// Creates a new batch instance with specific element and allocation
-    /// limits. The element limit is a maximum cap on the number of `I`
-    /// instances. The allocation limit is a soft-max on the number of allocated
-    /// bytes stored in this batch, not taking into account overhead from this
-    /// structure itself. Caller is responsible for ensuring that `I` will fit
-    /// inside the allocation limit.
+    /// Creates a new batch instance with specific element and allocation limits. The element limit
+    /// is a maximum cap on the number of `I` instances. The allocation limit is a soft-max on the
+    /// number of allocated bytes stored in this batch, not taking into account overhead from this
+    /// structure itself.
     ///
-    /// # Panics
-    ///
-    /// This function will panic if the allocation limit will not store at least
-    /// 1 instance of `I`, as measured by `mem::size_of`.
+    /// If `allocation_limit` is smaller than the size of `I` as reported by `std::mem::size_of`,
+    /// then the allocation limit will be raised such that the batch can hold a single instance of
+    /// `I`.  Likewise, `element_limit` will be raised such that it is always at least 1, ensuring
+    /// that a new batch can be pushed into.
     fn new(element_limit: usize, allocation_limit: usize) -> Self {
-        assert!(allocation_limit >= mem::size_of::<I>());
+        // SAFETY: `element_limit` is always non-zero because `BatcherSettings` can only be
+        // constructed with `NonZeroUsize` versions of allocation limit/item limit.  `Batch` is also
+        // only constructable via `Batcher`.
+
+        // TODO: This may need to be reworked, because it's subtly wrong as-is.
+        // ByteSizeOf::size_of() always returns the size of the type itself, plus any "allocated
+        // bytes".  Thus, there are times when an item will be bigger than simply the size of the
+        // type itself (aka mem::size_of::<I>()) and thus than type of item would never fit in a
+        // batch where the `allocation_limit` is at or lower than the size of that item.
+        //
+        // We're counteracting this here by ensuring that the element limit is always at least 1.
+        let allocation_limit = cmp::max(allocation_limit, mem::size_of::<I>());
         Self {
             allocated_bytes: 0,
             element_limit,
             allocation_limit,
-            elements: Vec::with_capacity(element_limit),
+            elements: Vec::with_capacity(128),
         }
     }
 
@@ -137,25 +210,53 @@ where
     }
 }
 
+/// Controls the behavior of the batcher in terms of batch size and flush interval.
+///
+/// This is a temporary solution for pushing in a fixed settings structure so we don't have to worry
+/// about misordering parameters and what not.  At some point, we will pull
+/// `BatchConfig`/`BatchSettings`/`BatchSize` out of `vector` and move them into `vector_core`, and
+/// make it more generalized. We can't do that yet, though, until we've converted all of the sinks
+/// with their various specialized batch buffers.
+#[derive(Copy, Clone, Debug)]
+pub struct BatcherSettings {
+    timeout: Duration,
+    size_limit: usize,
+    item_limit: usize,
+}
+
+impl BatcherSettings {
+    pub const fn new(
+        timeout: Duration,
+        size_limit: NonZeroUsize,
+        item_limit: NonZeroUsize,
+    ) -> Self {
+        BatcherSettings {
+            timeout,
+            size_limit: size_limit.get(),
+            item_limit: item_limit.get(),
+        }
+    }
+}
+
 #[pin_project]
-pub struct Batcher<St, Prt, T>
+pub struct Batcher<St, Prt, KT>
 where
     Prt: Partitioner,
 {
-    /// The timer to maintain periodic flushes from this `Batcher`
-    timer: T,
-    /// The maximum number of items that are allowed per-batch
-    batch_item_limit: usize,
     /// The total number of bytes a single batch in this struct is allowed to
     /// hold.
     batch_allocation_limit: usize,
+    /// The maximum number of items that are allowed per-batch
+    batch_item_limit: usize,
     /// The store of live batches. Note that the key here is an option type,
     /// on account of the interface of `Prt`.
-    batches: HashMap<Option<Prt::Key>, Batch<Prt::Item>, BuildHasherDefault<XxHash64>>,
+    batches: HashMap<Prt::Key, Batch<Prt::Item>, BuildHasherDefault<XxHash64>>,
     /// The store of 'closed' batches. When this is not empty it will be
     /// preferentially flushed prior to consuming any new items from the
     /// underlying stream.
-    closed_batches: Vec<(Option<Prt::Key>, Vec<Prt::Item>)>,
+    closed_batches: Vec<(Prt::Key, Vec<Prt::Item>)>,
+    /// The queue of pending batch expirations
+    timer: KT,
     /// The partitioner for this `Batcher`
     partitioner: Prt,
     #[pin]
@@ -163,22 +264,44 @@ where
     stream: St,
 }
 
-impl<St, Prt, T> Batcher<St, Prt, T>
+impl<St, Prt> Batcher<St, Prt, ExpirationQueue<Prt::Key>>
 where
-    St: Stream + Unpin,
+    St: Stream<Item = Prt::Item> + Unpin,
     Prt: Partitioner + Unpin,
+    Prt::Key: Eq + Hash + Clone,
+    Prt::Item: ByteSizeOf,
 {
-    pub fn new(
+    pub fn new(stream: St, partitioner: Prt, settings: BatcherSettings) -> Self {
+        Self {
+            batch_allocation_limit: settings.size_limit,
+            batch_item_limit: settings.item_limit,
+            batches: HashMap::default(),
+            closed_batches: Vec::default(),
+            timer: ExpirationQueue::new(settings.timeout),
+            partitioner,
+            stream,
+        }
+    }
+}
+
+impl<St, Prt, KT> Batcher<St, Prt, KT>
+where
+    St: Stream<Item = Prt::Item> + Unpin,
+    Prt: Partitioner + Unpin,
+    Prt::Key: Eq + Hash + Clone,
+    Prt::Item: ByteSizeOf,
+{
+    pub fn with_timer(
         stream: St,
         partitioner: Prt,
-        timer: T,
+        timer: KT,
         batch_item_limit: NonZeroUsize,
         batch_allocation_limit: Option<NonZeroUsize>,
     ) -> Self {
         Self {
-            batch_item_limit: batch_item_limit.get(),
             batch_allocation_limit: batch_allocation_limit
                 .map_or(usize::max_value(), NonZeroUsize::get),
+            batch_item_limit: batch_item_limit.get(),
             batches: HashMap::default(),
             closed_batches: Vec::default(),
             timer,
@@ -188,14 +311,15 @@ where
     }
 }
 
-impl<St, Prt, T> Stream for Batcher<St, Prt, T>
+impl<St, Prt, KT> Stream for Batcher<St, Prt, KT>
 where
     St: Stream<Item = Prt::Item> + Unpin,
     Prt: Partitioner + Unpin,
+    Prt::Key: Eq + Hash + Clone,
     Prt::Item: ByteSizeOf,
-    T: Timer,
+    KT: KeyedTimer<Prt::Key>,
 {
-    type Item = (Option<Prt::Key>, Vec<Prt::Item>);
+    type Item = (Prt::Key, Vec<Prt::Item>);
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.stream.size_hint()
@@ -208,21 +332,28 @@ where
                 return Poll::Ready(this.closed_batches.pop());
             }
             match this.stream.as_mut().poll_next(cx) {
-                Poll::Pending => match this.timer.poll_elapsed(cx) {
-                    Poll::Pending => return Poll::Pending,
-                    Poll::Ready(()) => {
-                        this.closed_batches.extend(
-                            this.batches
-                                .drain()
-                                .map(|(key, batch)| (key, batch.into_inner())),
-                        );
+                Poll::Pending => match this.timer.poll_expired(cx) {
+                    // Unlike normal streams, `DelayQueue` can return `None`
+                    // here but still be usable later if more entries are added.
+                    Poll::Pending | Poll::Ready(None) => return Poll::Pending,
+                    Poll::Ready(Some(item_key)) => {
+                        let batch = this
+                            .batches
+                            .remove(&item_key)
+                            .expect("batch should exist if it is set to expire");
+                        this.closed_batches.push((item_key, batch.into_inner()));
+
                         continue;
                     }
                 },
                 Poll::Ready(None) => {
-                    // Now that the underlying stream is closed we need to clear
-                    // out our batches.
+                    // Now that the underlying stream is closed, we need to
+                    // clear out our batches, including all expiration
+                    // entries. If we had any batches to hand over, we have to
+                    // continue looping so the caller can drain them all before
+                    // we finish.
                     if !this.batches.is_empty() {
+                        this.timer.clear();
                         this.closed_batches.extend(
                             this.batches
                                 .drain()
@@ -243,37 +374,24 @@ where
                             // push the item in and loop back around.
                             batch.push(item);
                         } else {
-                            match this.timer.poll_elapsed(cx) {
-                                Poll::Pending => {
-                                    // There's no space in the partition batch
-                                    // but the timer hasn't fired yet. Swap out
-                                    // the existing, full partition batch for a
-                                    // new one, push the old one into
-                                    // closed_batches.
-                                    let nb = Batch::new(item_limit, alloc_limit).with(item);
-                                    let batch = mem::replace(batch, nb);
-                                    this.closed_batches.push((item_key, batch.into_inner()));
-                                }
-                                Poll::Ready(()) => {
-                                    // The global timer has elapsed. Close all
-                                    // batches, including the one we have a
-                                    // mutable ref to, and then insert a brand
-                                    // new batch with `item` in it.
-                                    this.closed_batches.extend(
-                                        this.batches
-                                            .drain()
-                                            .map(|(key, batch)| (key, batch.into_inner())),
-                                    );
-                                    // With all batches closed put the item into
-                                    // a new batch.
-                                    let batch = Batch::new(item_limit, alloc_limit).with(item);
-                                    this.batches.insert(item_key, batch);
-                                }
-                            }
+                            let new_batch = Batch::new(item_limit, alloc_limit).with(item);
+                            let batch = mem::replace(batch, new_batch);
+
+                            // The batch for this partition key was set to
+                            // expire, but now it's overflowed and must be
+                            // pushed out, so now we reset the batch timeout.
+                            this.timer.insert(item_key.clone());
+
+                            this.closed_batches.push((item_key, batch.into_inner()));
                         }
                     } else {
+                        // We have no batch yet for this partition key, so
+                        // create one and create the expiration entries as well.
+                        // This allows the batch to expire before filling up,
+                        // and vise versa.
                         let batch = Batch::new(item_limit, alloc_limit).with(item);
-                        this.batches.insert(item_key, batch);
+                        this.batches.insert(item_key.clone(), batch);
+                        this.timer.insert(item_key);
                     }
                 }
             }
@@ -284,56 +402,87 @@ where
 #[cfg(test)]
 mod test {
     use crate::partition::Partitioner;
-    use crate::stream::batcher::Batcher;
-    use crate::time::Timer;
-    use futures::task::noop_waker;
+    use crate::stream::batcher::{Batcher, ExpirationQueue};
+    use crate::time::KeyedTimer;
     use futures::{stream, Stream};
     use pin_project::pin_project;
     use proptest::prelude::*;
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
     use std::num::{NonZeroU8, NonZeroUsize};
     use std::pin::Pin;
     use std::task::{Context, Poll};
+    use std::time::Duration;
+    use tokio::pin;
+    use tokio::time::advance;
 
     #[derive(Debug)]
-    /// A test timer
+    /// A test keyed timer
     ///
-    /// This timer implements `Timer` and is rigged up in such a way that it
-    /// doesn't _actually_ tell time but instead uses a set of canned responses
-    /// for whether deadlines have elapsed or not. This allows us to include the
-    /// notion of time in our property tests below.
+    /// This timer implements `KeyedTimer` and is rigged up in such a way that
+    /// it doesn't _actually_ tell time but instead uses a set of canned
+    /// responses for whether deadlines have elapsed or not. This allows us to
+    /// include the notion of time in our property tests below.
     struct TestTimer {
-        responses: Vec<Poll<()>>,
+        responses: Vec<Poll<Option<u8>>>,
+        valid_keys: HashSet<u8>,
     }
 
     impl TestTimer {
-        fn new(responses: Vec<Poll<()>>) -> Self {
-            Self { responses }
+        fn new(responses: Vec<Poll<Option<u8>>>) -> Self {
+            Self {
+                responses,
+                valid_keys: HashSet::new(),
+            }
         }
     }
 
-    impl Timer for TestTimer {
-        fn poll_elapsed(&mut self, _cx: &mut Context) -> Poll<()> {
-            self.responses.pop().unwrap_or(Poll::Pending)
+    impl KeyedTimer<u8> for TestTimer {
+        fn clear(&mut self) {
+            self.valid_keys.clear();
+        }
+
+        fn insert(&mut self, item_key: u8) {
+            self.valid_keys.insert(item_key);
+        }
+
+        fn poll_expired(&mut self, _cx: &mut Context) -> Poll<Option<u8>> {
+            match self.responses.pop() {
+                Some(Poll::Pending) => unreachable!(),
+                None | Some(Poll::Ready(None)) => Poll::Ready(None),
+                Some(Poll::Ready(Some(k))) => {
+                    if self.valid_keys.contains(&k) {
+                        Poll::Ready(Some(k))
+                    } else {
+                        Poll::Ready(None)
+                    }
+                }
+            }
         }
     }
 
     fn arb_timer() -> impl Strategy<Value = TestTimer> {
-        Vec::<bool>::arbitrary()
+        // The timer always returns a `Poll::Ready` and never a `Poll::Pending`.
+        Vec::<(bool, u8)>::arbitrary()
             .prop_map(|v| {
                 v.into_iter()
-                    .map(|i| if i { Poll::Pending } else { Poll::Ready(()) })
+                    .map(|(b, k)| {
+                        if b {
+                            Poll::Ready(Some(k))
+                        } else {
+                            Poll::Ready(None)
+                        }
+                    })
                     .collect()
             })
             .prop_map(TestTimer::new)
     }
 
-    #[pin_project]
-    #[derive(Debug)]
     /// A test partitioner
     ///
     /// This partitioner is nothing special. It has a large-ish key space but
     /// not so large that we'll never see batches accumulate properly.
+    #[pin_project]
+    #[derive(Debug)]
     struct TestPartitioner {
         key_space: NonZeroU8,
     }
@@ -343,9 +492,9 @@ mod test {
         type Key = u8;
 
         #[allow(clippy::cast_possible_truncation)]
-        fn partition(&self, item: &Self::Item) -> Option<Self::Key> {
+        fn partition(&self, item: &Self::Item) -> Self::Key {
             let key = *item % u64::from(self.key_space.get());
-            Some(key as Self::Key)
+            key as Self::Key
         }
     }
 
@@ -372,8 +521,8 @@ mod test {
 
             let item_limit = NonZeroUsize::new(item_limit as usize).unwrap();
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
-            let batcher = Batcher::new(&mut stream, partitioner, timer,
-                                       item_limit, Some(allocation_limit));
+            let batcher = Batcher::with_timer(&mut stream, partitioner, timer,
+                                              item_limit, Some(allocation_limit));
             let batcher_size_hint = batcher.size_hint();
 
             assert_eq!(stream_size_hint, batcher_size_hint);
@@ -389,18 +538,19 @@ mod test {
                                      timer in arb_timer()) {
             // Asserts that for every received batch the size is always less
             // than the expected limit.
-            let waker = noop_waker();
-            let mut cx = Context::from_waker(&waker);
+            let noop_waker = futures::task::noop_waker();
+            let mut cx = Context::from_waker(&noop_waker);
 
+            let mut stream = stream::iter(stream.into_iter());
             let item_limit = NonZeroUsize::new(item_limit as usize).unwrap();
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
-            let mut stream = stream::iter(stream.into_iter());
-            let mut batcher = Batcher::new(&mut stream, partitioner, timer,
-                                           item_limit, Some(allocation_limit));
-            let mut pin = Pin::new(&mut batcher);
+            let mut batcher = Batcher::with_timer(&mut stream, partitioner,
+                                                  timer, item_limit,
+                                                  Some(allocation_limit));
+            let mut batcher = Pin::new(&mut batcher);
 
             loop {
-                match pin.as_mut().poll_next(&mut cx) {
+                match batcher.as_mut().poll_next(&mut cx) {
                     Poll::Pending => {}
                     Poll::Ready(None) => {
                         break;
@@ -426,7 +576,7 @@ mod test {
     fn separate_partitions(
         stream: Vec<u64>,
         partitioner: &TestPartitioner,
-    ) -> HashMap<Option<u8>, Vec<u64>> {
+    ) -> HashMap<u8, Vec<u64>> {
         let mut map = stream
             .into_iter()
             .map(|item| {
@@ -435,7 +585,7 @@ mod test {
             })
             .fold(
                 HashMap::default(),
-                |mut acc: HashMap<Option<u8>, Vec<u64>>, (key, item)| {
+                |mut acc: HashMap<u8, Vec<u64>>, (key, item)| {
                     let arr: &mut Vec<u64> = acc.entry(key).or_insert_with(Vec::default);
                     arr.push(item);
                     acc
@@ -457,20 +607,21 @@ mod test {
             // Asserts that for every received batch received the elements in
             // the batch are not reordered within a batch. No claim is made on
             // when batches themselves will issue, batch sizes etc.
+            let noop_waker = futures::task::noop_waker();
+            let mut cx = Context::from_waker(&noop_waker);
+
             let mut partitions = separate_partitions(stream.clone(), &partitioner);
 
-            let waker = noop_waker();
-            let mut cx = Context::from_waker(&waker);
-
-            let item_limit = NonZeroUsize::new(item_limit as usize).unwrap();
             let mut stream = stream::iter(stream.into_iter());
+            let item_limit = NonZeroUsize::new(item_limit as usize).unwrap();
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
-            let mut batcher = Batcher::new(&mut stream, partitioner, timer,
-                                           item_limit, Some(allocation_limit));
-            let mut pin = Pin::new(&mut batcher);
+            let mut batcher = Batcher::with_timer(&mut stream, partitioner,
+                                                  timer, item_limit,
+                                                  Some(allocation_limit));
+            let mut batcher = Pin::new(&mut batcher);
 
             loop {
-                match pin.as_mut().poll_next(&mut cx) {
+                match batcher.as_mut().poll_next(&mut cx) {
                     Poll::Pending => {}
                     Poll::Ready(None) => {
                         break;
@@ -500,20 +651,21 @@ mod test {
                                      timer in arb_timer()) {
             // Asserts that for every received batch the sum of all batch sizes
             // equals the number of stream elements.
-            let waker = noop_waker();
-            let mut cx = Context::from_waker(&waker);
+            let noop_waker = futures::task::noop_waker();
+            let mut cx = Context::from_waker(&noop_waker);
 
-            let item_limit = NonZeroUsize::new(item_limit as usize).unwrap();
             let total_items = stream.len();
             let mut stream = stream::iter(stream.into_iter());
+            let item_limit = NonZeroUsize::new(item_limit as usize).unwrap();
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
-            let mut batcher = Batcher::new(&mut stream, partitioner, timer,
-                                           item_limit, Some(allocation_limit));
-            let mut pin = Pin::new(&mut batcher);
+            let mut batcher = Batcher::with_timer(&mut stream, partitioner,
+                                                  timer, item_limit,
+                                                  Some(allocation_limit));
+            let mut batcher = Pin::new(&mut batcher);
 
             let mut observed_items = 0;
             loop {
-                match pin.as_mut().poll_next(&mut cx) {
+                match batcher.as_mut().poll_next(&mut cx) {
                     Poll::Pending => {}
                     Poll::Ready(None) => {
                         // inner stream has shut down, ensure we passed every
@@ -528,5 +680,63 @@ mod test {
                 }
             }
         }
+    }
+
+    #[tokio::test(start_paused = true)]
+    #[allow(clippy::semicolon_if_nothing_returned)] // https://github.com/rust-lang/rust-clippy/issues/7438
+    async fn expiration_queue_impl_keyed_timer() {
+        // Asserts that ExpirationQueue properly implements KeyedTimer. We are
+        // primarily concerned with whether expiration is properly observed.
+        let timeout = Duration::from_millis(100); // 1/10 of a second, an
+                                                  // eternity
+
+        let mut expiration_queue: ExpirationQueue<u8> = ExpirationQueue::new(timeout);
+
+        // If the queue is empty assert that when we poll for expired entries
+        // nothing comes back.
+        assert_eq!(0, expiration_queue.len());
+        let result = single_poll(|cx| expiration_queue.poll_expired(cx));
+        assert_eq!(result, Poll::Ready(None));
+
+        // Insert an item key into the queue. Assert that the size of the queue
+        // has grown, assert that the queue still does not believe the item has expired, and _then_
+        // advance time enough to allow it to expire, and assert that it has.
+        expiration_queue.insert(128);
+        assert_eq!(1, expiration_queue.len());
+
+        let result = single_poll(|cx| expiration_queue.poll_expired(cx));
+        assert_eq!(result, Poll::Pending);
+
+        advance(timeout + Duration::from_nanos(1)).await;
+        let result = single_poll(|cx| expiration_queue.poll_expired(cx));
+        assert_eq!(result, Poll::Ready(Some(128)));
+        let result = single_poll(|cx| expiration_queue.poll_expired(cx));
+        assert_eq!(result, Poll::Ready(None));
+
+        // Now we poll assured that the queue has emptied out again.
+        assert_eq!(0, expiration_queue.len());
+        let result = single_poll(|cx| expiration_queue.poll_expired(cx));
+        assert_eq!(result, Poll::Ready(None));
+
+        // Finally, blitz a handful of items into the queue, assert its size,
+        // clear the queue and assert it as being empty.
+        expiration_queue.insert(128);
+        expiration_queue.insert(64);
+        expiration_queue.insert(32);
+        assert_eq!(3, expiration_queue.len());
+        expiration_queue.clear();
+        assert_eq!(0, expiration_queue.len());
+        let result = single_poll(|cx| expiration_queue.poll_expired(cx));
+        assert_eq!(result, Poll::Ready(None));
+    }
+
+    fn single_poll<T, F>(mut f: F) -> Poll<T>
+    where
+        F: FnMut(&mut Context<'_>) -> Poll<T>,
+    {
+        let noop_waker = futures::task::noop_waker();
+        let mut cx = Context::from_waker(&noop_waker);
+
+        f(&mut cx)
     }
 }

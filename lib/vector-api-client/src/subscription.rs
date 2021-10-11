@@ -243,22 +243,18 @@ pub async fn connect_subscription_client(
 
     // Forwarded received messages back upstream to the GraphQL server
     tokio::spawn(async move {
-        loop {
-            if let Some(p) = send_rx.recv().await {
-                let _ = ws_tx
-                    .send(Message::Text(serde_json::to_string(&p).unwrap()))
-                    .await;
-            }
+        while let Some(p) = send_rx.recv().await {
+            let _ = ws_tx
+                .send(Message::Text(serde_json::to_string(&p).unwrap()))
+                .await;
         }
     });
 
     // Forward received messages to the receiver channel.
     tokio::spawn(async move {
-        loop {
-            if let Some(Ok(Message::Text(m))) = ws_rx.next().await {
-                if let Ok(p) = serde_json::from_str::<Payload>(&m) {
-                    let _ = recv_tx.send(p);
-                }
+        while let Some(Ok(Message::Text(m))) = ws_rx.next().await {
+            if let Ok(p) = serde_json::from_str::<Payload>(&m) {
+                let _ = recv_tx.send(p);
             }
         }
     });

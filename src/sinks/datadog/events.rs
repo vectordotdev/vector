@@ -22,6 +22,7 @@ use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{sync::Arc, time::Duration};
+use vector_core::ByteSizeOf;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -35,7 +36,7 @@ pub struct DatadogEventsConfig {
     tls: Option<TlsConfig>,
 
     #[serde(default)]
-    request: TowerRequestConfig<Concurrency>,
+    request: TowerRequestConfig,
 }
 
 fn default_site() -> String {
@@ -74,7 +75,7 @@ impl DatadogEventsConfig {
         timeout: Duration,
     ) -> crate::Result<(VectorSink, Healthcheck)>
     where
-        O: 'static,
+        O: ByteSizeOf + 'static,
         B: Batch<Output = Vec<O>> + std::marker::Send + 'static,
         B::Output: std::marker::Send + Clone,
         B::Input: std::marker::Send,
@@ -121,7 +122,7 @@ impl SinkConfig for DatadogEventsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         // Datadog Event API doesn't support batching.
         let batch_settings = BatchSettings::default()
-            .bytes(bytesize::kib(100u64))
+            .bytes(100_000)
             .events(1)
             .timeout(0)
             .parse_config(BatchConfig::default())?;
@@ -171,7 +172,7 @@ impl DatadogEventsService {
                     "title",
                 ]
                 .iter()
-                .map(|field| vec![PathComponent::Key(field.to_string())])
+                .map(|field| vec![PathComponent::Key((*field).into())])
                 .collect(),
             ),
             // DataDog Event API requires unix timestamp.
@@ -197,7 +198,7 @@ impl HttpSink for DatadogEventsService {
         let log = event.as_mut_log();
 
         if !log.contains("title") {
-            emit!(DatadogEventsFieldInvalid { field: "title" });
+            emit!(&DatadogEventsFieldInvalid { field: "title" });
             return None;
         }
 
@@ -205,7 +206,7 @@ impl HttpSink for DatadogEventsService {
             if let Some(message) = log.remove(log_schema().message_key()) {
                 log.insert("text", message);
             } else {
-                emit!(DatadogEventsFieldInvalid {
+                emit!(&DatadogEventsFieldInvalid {
                     field: log_schema().message_key()
                 });
                 return None;
@@ -248,7 +249,7 @@ impl HttpSink for DatadogEventsService {
         assert_eq!(events.len(), 1);
         let body = serde_json::to_vec(&events.pop().expect("One event"))?;
 
-        emit!(DatadogEventsProcessed {
+        emit!(&DatadogEventsProcessed {
             byte_size: body.len(),
         });
 

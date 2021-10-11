@@ -58,10 +58,8 @@ impl Function for ToFloat {
             },
             Example {
                 title: "timestamp",
-                source: "to_float!(t'2020-01-01T00:00:00Z')",
-                result: Err(
-                    r#"function call error for "to_float" at (0:34): unable to coerce "timestamp" into "float""#,
-                ),
+                source: "to_float(t'2020-01-01T00:00:00.100Z')",
+                result: Ok("1577836800.1"),
             },
             Example {
                 title: "array",
@@ -87,7 +85,12 @@ impl Function for ToFloat {
         ]
     }
 
-    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _ctx: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(ToFloatFn { value }))
@@ -110,6 +113,7 @@ impl Expression for ToFloatFn {
             Integer(v) => Ok((v as f64).into()),
             Boolean(v) => Ok(NotNan::new(if v { 1.0 } else { 0.0 }).unwrap().into()),
             Null => Ok(0.0.into()),
+            Timestamp(v) => Ok((v.timestamp_nanos() as f64 / 1_000_000_000_f64).into()),
             Bytes(v) => Conversion::Float
                 .convert(v)
                 .map_err(|e| e.to_string().into()),
@@ -120,9 +124,9 @@ impl Expression for ToFloatFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         TypeDef::new()
             .with_fallibility(
-                self.value.type_def(state).has_kind(
-                    Kind::Bytes | Kind::Timestamp | Kind::Array | Kind::Object | Kind::Regex,
-                ),
+                self.value
+                    .type_def(state)
+                    .has_kind(Kind::Bytes | Kind::Array | Kind::Object | Kind::Regex),
             )
             .float()
     }
@@ -131,6 +135,7 @@ impl Expression for ToFloatFn {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::prelude::*;
 
     test_function![
         to_float => ToFloat;
@@ -145,6 +150,12 @@ mod tests {
             args: func_args![value: 20],
             want: Ok(20.0),
             tdef: TypeDef::new().infallible().float(),
+        }
+
+        timestamp {
+             args: func_args![value: Utc.ymd(2014, 7, 8).and_hms_milli(9, 10, 11, 12)],
+             want: Ok(1404810611.012),
+             tdef: TypeDef::new().infallible().float(),
         }
     ];
 }

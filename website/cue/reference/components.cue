@@ -49,8 +49,9 @@ components: {
 
 		configuration: #Schema
 
-		// `description` describes the components with a single paragraph.
-		// It is used for SEO purposes and should be full of relevant keywords.
+		// `description` describes the components with a single paragraph. It
+		// should be 1-3 sentences.  It is used for SEO purposes and should be
+		// full of relevant keywords.
 		description?: =~"[.]$"
 
 		env_vars: #EnvVars
@@ -168,6 +169,7 @@ components: {
 			collect?:  #FeaturesCollect
 			generate?: #FeaturesGenerate
 			multiline: #FeaturesMultiline
+			codecs?:   #FeaturesCodecs
 			encoding?: #FeaturesEncoding
 			receive?:  #FeaturesReceive
 		}
@@ -266,6 +268,10 @@ components: {
 		enabled: bool
 	}
 
+	#FeaturesCodecs: {
+		enabled: bool
+	}
+
 	#FeaturesEncoding: {
 		enabled: bool
 	}
@@ -350,7 +356,7 @@ components: {
 					enabled: bool
 
 					if enabled {
-						default: #EncodingCodec | null
+						batched: bool | *false
 						enum:    [#EncodingCodec, ...#EncodingCodec] | null
 					}
 				}
@@ -966,7 +972,7 @@ components: {
 					The global URL to proxy HTTPS requests through.
 
 					If another HTTPS proxy is set in the configuration file or at a component level,
-					this one will be overriden.
+					this one will be overridden.
 
 					The lowercase variant has priority over the uppercase one.
 					"""
@@ -981,19 +987,23 @@ components: {
 					List of hosts to avoid proxying globally.
 
 					Allowed patterns here include:
-						- Domain names. For example, `example.com` will match requests to to `example.com`
-						- Wildcard domains. For example, `.example.com` will match requests to `example.com` and its subdomains
-						- IP addresses. For example, `127.0.0.1` will match requests to 127.0.0.1
-						- CIDR blocks. For example, `192.168.0.0./16` will match requests to any IP addresses in this range
-						- `*` will match all hosts
 
-					If another no_proxy value is set in the configuration file or at a component level, this one will be overridden.
+					Pattern | Example match
+					:-------|:-------------
+					Domain names | `example.com` matches requests to `example.com`
+					Wildcard domains | `.example.come` matches requests to `example.com` and its subdomains
+					IP addresses | `127.0.0.1` matches requests to `127.0.0.1`
+					[CIDR](\(urls.cidr)) blocks | `192.168.0.0./16` matches requests to any IP addresses in this range
+					Splat | `*` matches all hosts
+
+					If another `no_proxy` value is set in the configuration file or at a component level, this
+					one is overridden.
 
 					The lowercase variant has priority over the uppercase one.
 					"""
 				type: string: {
 					default: null
-					examples: ["localhost,.exampl.com,192.168.0.0./16", "*"]
+					examples: ["localhost,.example.com,192.168.0.0./16", "*"]
 					syntax: "literal"
 				}
 			}
@@ -1177,11 +1187,6 @@ components: {
 				processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
 				processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
 			}
-		}
-
-		telemetry: metrics: {
-			// Default metrics for each component
-			utilization: components.sources.internal_metrics.output.metrics.utilization
 		}
 
 		how_it_works: {

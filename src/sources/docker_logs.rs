@@ -449,7 +449,7 @@ impl DockerLogsSource {
                             let id = actor.id.unwrap();
                             let attributes = actor.attributes.unwrap();
 
-                            emit!(DockerLogsContainerEventReceived { container_id: &id, action: &action });
+                            emit!(&DockerLogsContainerEventReceived { container_id: &id, action: &action });
 
                             let id = ContainerId::new(id);
 
@@ -481,7 +481,7 @@ impl DockerLogsSource {
                                 _ => {},
                             };
                         }
-                        Some(Err(error)) => emit!(DockerLogsCommunicationError{error,container_id:None}),
+                        Some(Err(error)) => emit!(&DockerLogsCommunicationError{error,container_id:None}),
                         None => {
                             // TODO: this could be fixed, but should be tried with some timeoff and exponential backoff
                             error!(message = "Docker log event stream has ended unexpectedly.");
@@ -536,12 +536,12 @@ impl EventStreamBuilder {
                         this.run_event_stream(info).await;
                         return;
                     }
-                    Err(error) => emit!(DockerLogsTimestampParseFailed {
+                    Err(error) => emit!(&DockerLogsTimestampParseFailed {
                         error,
                         container_id: id.as_str()
                     }),
                 },
-                Err(error) => emit!(DockerLogsContainerMetadataFetchFailed {
+                Err(error) => emit!(&DockerLogsContainerMetadataFetchFailed {
                     error,
                     container_id: id.as_str()
                 }),
@@ -573,7 +573,7 @@ impl EventStreamBuilder {
         });
 
         let stream = self.core.docker.logs(info.id.as_str(), options);
-        emit!(DockerLogsContainerWatch {
+        emit!(&DockerLogsContainerWatch {
             container_id: info.id.as_str()
         });
 
@@ -598,14 +598,14 @@ impl EventStreamBuilder {
                             DockerError::DockerResponseServerError { status_code, .. }
                                 if *status_code == http::StatusCode::NOT_IMPLEMENTED =>
                             {
-                                emit!(DockerLogsLoggingDriverUnsupported {
+                                emit!(&DockerLogsLoggingDriverUnsupported {
                                     error,
                                     container_id: info.id.as_str(),
                                 });
                                 Err(ErrorPersistence::Permanent)
                             }
                             _ => {
-                                emit!(DockerLogsCommunicationError {
+                                emit!(&DockerLogsCommunicationError {
                                     error,
                                     container_id: Some(info.id.as_str())
                                 });
@@ -641,7 +641,7 @@ impl EventStreamBuilder {
             .await;
 
         // End of stream
-        emit!(DockerLogsContainerUnwatch {
+        emit!(&DockerLogsContainerUnwatch {
             container_id: info.id.as_str()
         });
 
@@ -702,7 +702,7 @@ struct ContainerState {
 
 impl ContainerState {
     /// It's ContainerLogInfo pair must be created exactly once.
-    fn new_running() -> Self {
+    const fn new_running() -> Self {
         ContainerState {
             info: None,
             running: true,
@@ -719,7 +719,7 @@ impl ContainerState {
         self.running = false;
     }
 
-    fn is_running(&self) -> bool {
+    const fn is_running(&self) -> bool {
         self.running
     }
 
@@ -759,7 +759,7 @@ struct ContainerLogInfo {
 impl ContainerLogInfo {
     /// Container docker ID
     /// Unix timestamp of event which created this struct
-    fn new(id: ContainerId, metadata: ContainerMetadata, created: DateTime<Utc>) -> Self {
+    const fn new(id: ContainerId, metadata: ContainerMetadata, created: DateTime<Utc>) -> Self {
         ContainerLogInfo {
             id,
             created,
@@ -830,7 +830,7 @@ impl ContainerLogInfo {
             }
             Err(error) => {
                 // Received bad timestamp, if any at all.
-                emit!(DockerLogsTimestampParseFailed {
+                emit!(&DockerLogsTimestampParseFailed {
                     error,
                     container_id: self.id.as_str()
                 });
@@ -888,7 +888,7 @@ impl ContainerLogInfo {
                 let prefix_path = PathIter::new("label").collect::<Vec<_>>();
                 for (key, value) in self.metadata.labels.iter() {
                     let mut path = prefix_path.clone();
-                    path.push(PathComponent::Key(key.clone()));
+                    path.push(PathComponent::Key(key.clone().into()));
                     log_event.insert_path(path, value.clone());
                 }
             }
@@ -953,7 +953,7 @@ impl ContainerLogInfo {
         // other cases were handled earlier.
         let event = Event::Log(log_event);
 
-        emit!(DockerLogsEventReceived {
+        emit!(&DockerLogsEventReceived {
             byte_size,
             container_id: self.id.as_str(),
             container_name: &self.metadata.name_str

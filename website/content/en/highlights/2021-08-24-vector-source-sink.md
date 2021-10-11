@@ -100,7 +100,7 @@ communication.
 
 [source]: https://vector.dev/docs/reference/configuration/sources/vector/
 [sink]: https://vector.dev/docs/reference/configuration/sinks/vector/
-[#2070]: https://github.com/timberio/vector/issues/2070
-[#5124]: https://github.com/timberio/vector/issues/5124
-[#6646]: https://github.com/timberio/vector/issues/6646
-[#6032]: https://github.com/timberio/vector/pull/6032
+[#2070]: https://github.com/vectordotdev/vector/issues/2070
+[#5124]: https://github.com/vectordotdev/vector/issues/5124
+[#6646]: https://github.com/vectordotdev/vector/issues/6646
+[#6032]: https://github.com/vectordotdev/vector/pull/6032

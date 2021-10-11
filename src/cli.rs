@@ -31,7 +31,7 @@ impl Opts {
         Opts::from_clap(&app.get_matches())
     }
 
-    pub fn log_level(&self) -> &'static str {
+    pub const fn log_level(&self) -> &'static str {
         let (quiet_level, verbose_level) = match self.sub_command {
             Some(SubCommand::Validate(_))
             | Some(SubCommand::Graph(_))
@@ -150,11 +150,6 @@ pub struct RootOpts {
     /// Watch for changes in configuration file, and reload accordingly.
     #[structopt(short, long, env = "VECTOR_WATCH_CONFIG")]
     pub watch_config: bool,
-
-    /// Send internal tracing spans to a local APM-enabled Datadog agent with
-    /// a granularity matching the current log level. This is experimental.
-    #[structopt(long, env = "VECTOR_ENABLE_DATADOG_TRACING", takes_value(false))]
-    pub enable_datadog_tracing: bool,
 }
 
 impl RootOpts {

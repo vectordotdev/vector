@@ -44,7 +44,12 @@ impl Function for Log {
         ]
     }
 
-    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        info: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let levels = vec![
             "trace".into(),
             "debug".into(),
@@ -62,6 +67,7 @@ impl Function for Log {
         let rate_limit_secs = arguments.optional("rate_limit_secs");
 
         Ok(Box::new(LogFn {
+            span: info.span,
             value,
             level,
             rate_limit_secs,
@@ -71,6 +77,7 @@ impl Function for Log {
 
 #[derive(Debug, Clone)]
 struct LogFn {
+    span: vrl::diagnostic::Span,
     value: Box<dyn Expression>,
     level: Bytes,
     rate_limit_secs: Option<Box<dyn Expression>>,
@@ -85,11 +92,21 @@ impl Expression for LogFn {
         };
 
         match self.level.as_ref() {
-            b"trace" => trace!(message = %value, internal_log_rate_secs = rate_limit_secs),
-            b"debug" => debug!(message = %value, internal_log_rate_secs = rate_limit_secs),
-            b"warn" => warn!(message = %value, internal_log_rate_secs = rate_limit_secs),
-            b"error" => error!(message = %value, internal_log_rate_secs = rate_limit_secs),
-            _ => info!(message = %value, internal_log_rate_secs = rate_limit_secs),
+            b"trace" => {
+                trace!(message = %value, internal_log_rate_secs = rate_limit_secs, vrl_position = self.span.start())
+            }
+            b"debug" => {
+                debug!(message = %value, internal_log_rate_secs = rate_limit_secs, vrl_position = self.span.start())
+            }
+            b"warn" => {
+                warn!(message = %value, internal_log_rate_secs = rate_limit_secs, vrl_position = self.span.start())
+            }
+            b"error" => {
+                error!(message = %value, internal_log_rate_secs = rate_limit_secs, vrl_position = self.span.start())
+            }
+            _ => {
+                info!(message = %value, internal_log_rate_secs = rate_limit_secs, vrl_position = self.span.start())
+            }
         }
 
         Ok(Value::Null)

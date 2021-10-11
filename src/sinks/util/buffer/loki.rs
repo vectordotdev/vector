@@ -8,7 +8,10 @@ use super::{
     err_event_too_large, json::BoxedRawValue, Batch, BatchConfig, BatchError, BatchSettings,
     BatchSize, PushResult,
 };
-use crate::sinks::loki::OutOfOrderAction;
+use crate::{
+    internal_events::{LokiOutOfOrderEventDropped, LokiOutOfOrderEventRewritten, LokiUniqueStream},
+    sinks::loki::OutOfOrderAction,
+};
 use dashmap::DashMap;
 use serde_json::{json, value::to_raw_value};
 use std::collections::HashMap;
@@ -101,7 +104,7 @@ pub struct LokiBuffer {
 }
 
 impl LokiBuffer {
-    pub fn new(
+    pub const fn new(
         settings: BatchSize<Self>,
         global_timestamps: GlobalTimestamps,
         out_of_order_action: OutOfOrderAction,
@@ -118,7 +121,7 @@ impl LokiBuffer {
         }
     }
 
-    fn is_full(&self) -> bool {
+    const fn is_full(&self) -> bool {
         self.num_bytes >= self.settings.bytes || self.num_items >= self.settings.events
     }
 }
@@ -131,9 +134,7 @@ impl Batch for LokiBuffer {
         config: BatchConfig,
         defaults: BatchSettings<Self>,
     ) -> Result<BatchSettings<Self>, BatchError> {
-        Ok(config
-            .use_size_as_events()?
-            .get_settings_or_default(defaults))
+        Ok(config.get_settings_or_default(defaults))
     }
 
     fn push(&mut self, mut item: Self::Input) -> PushResult<Self::Input> {
@@ -146,6 +147,7 @@ impl Batch for LokiBuffer {
             self.partition = Some((item.partition.clone(), item.labels.clone()));
             self.latest_timestamp = Some(self.global_timestamps.take(partition));
         }
+        // TODO: gauge/count of labels.
         let latest_timestamp = self
             .latest_timestamp
             .unwrap()
@@ -153,17 +155,11 @@ impl Batch for LokiBuffer {
         if item.event.timestamp < latest_timestamp {
             match self.out_of_order_action {
                 OutOfOrderAction::Drop => {
-                    warn!(
-                        msg = "Received out-of-order event; dropping event.",
-                        internal_log_rate_secs = 30
-                    );
+                    emit!(&LokiOutOfOrderEventDropped);
                     return PushResult::Ok(self.is_full());
                 }
                 OutOfOrderAction::RewriteTimestamp => {
-                    warn!(
-                        msg = "Received out-of-order event, rewriting timestamp.",
-                        internal_log_rate_secs = 30
-                    );
+                    emit!(&LokiOutOfOrderEventRewritten);
                     item.event.timestamp = latest_timestamp;
                 }
             }
@@ -224,6 +220,10 @@ impl Batch for LokiBuffer {
     }
 
     fn finish(self) -> Self::Output {
+        if self.is_empty() {
+            return json!({ "streams": [] });
+        }
+
         let (partition, labels) = self.partition.expect("Batch is empty");
 
         let mut events = self.stream;
@@ -240,6 +240,9 @@ impl Batch for LokiBuffer {
         let stream = to_raw_value(&labels).expect("JSON encoding should never fail");
 
         self.global_timestamps.insert(partition, latest_timestamp);
+        if self.latest_timestamp == Some(None) {
+            emit!(&LokiUniqueStream);
+        }
 
         json!({
             "streams": vec![json!({
@@ -270,6 +273,18 @@ mod tests {
         );
         // Does the output JSON match what we expect?
         assert_eq!(json, expected_json);
+    }
+
+    #[test]
+    fn insert_nothing() {
+        let buffer = LokiBuffer::new(
+            BatchSettings::default().size,
+            Default::default(),
+            Default::default(),
+        );
+        assert_eq!(buffer.num_items, 0);
+        assert!(buffer.stream.is_empty());
+        test_finish(buffer, r#"{"streams":[]}"#);
     }
 
     #[test]

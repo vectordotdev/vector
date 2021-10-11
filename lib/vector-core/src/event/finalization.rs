@@ -260,7 +260,8 @@ pub enum BatchStatus {
 }
 
 impl BatchStatus {
-    /// Update this status with another batch's delivery status, and return the result.
+    /// Update this status with another batch's delivery status, and return the
+    /// result.
     #[allow(clippy::match_same_arms)] // False positive: https://github.com/rust-lang/rust-clippy/issues/860
     fn update(self, status: EventStatus) -> Self {
         match (self, status) {
@@ -281,21 +282,24 @@ impl BatchStatus {
 #[derivative(Default)]
 #[repr(u8)]
 pub enum EventStatus {
-    /// All copies of this event were dropped without being finalized (the default).
+    /// All copies of this event were dropped without being finalized (the
+    /// default).
     #[derivative(Default)]
     Dropped,
     /// All copies of this event were delivered successfully.
     Delivered,
     /// At least one copy of this event encountered a retriable error.
     Errored,
-    /// At least one copy of this event encountered a permanent failure or rejection.
+    /// At least one copy of this event encountered a permanent failure or
+    /// rejection.
     Failed,
     /// This status has been recorded and should not be updated.
     Recorded,
 }
 
 impl EventStatus {
-    /// Update this status with another event's finalization status and return the result.
+    /// Update this status with another event's finalization status and return
+    /// the result.
     ///
     /// # Panics
     ///

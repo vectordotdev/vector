@@ -1,3 +1,4 @@
+use pretty_assertions::assert_eq;
 use std::collections::HashMap;
 use vector::{
     config::{self, ConfigDiff, Format},
@@ -5,12 +6,12 @@ use vector::{
 };
 
 async fn load(config: &str, format: config::FormatHint) -> Result<Vec<String>, Vec<String>> {
-    match config::load_from_str(config, format, Default::default()) {
+    match config::load_from_str(config, format) {
         Ok(c) => {
             let diff = ConfigDiff::initial(&c);
-            let c2 = config::load_from_str(config, format, Default::default()).unwrap();
+            let c2 = config::load_from_str(config, format).unwrap();
             match (
-                config::warnings(&c2.into()),
+                config::warnings(&c2),
                 topology::builder::build_pieces(&c, &diff, HashMap::new()).await,
             ) {
                 (warnings, Ok(_pieces)) => Ok(warnings),
@@ -178,7 +179,7 @@ async fn bad_type() {
     feature = "sinks-socket"
 ))]
 #[tokio::test]
-async fn nonexistant_input() {
+async fn bad_inputs() {
     let err = load(
         r#"
         [sources.in]
@@ -187,6 +188,15 @@ async fn nonexistant_input() {
         address = "127.0.0.1:1235"
 
         [transforms.sample]
+        type = "sample"
+        inputs = []
+        rate = 10
+        key_field = "message"
+        exclude = """
+            contains!(.message, "error")
+        """
+
+        [transforms.sample2]
         type = "sample"
         inputs = ["qwerty"]
         rate = 10
@@ -198,7 +208,7 @@ async fn nonexistant_input() {
         [sinks.out]
         type = "socket"
         mode = "tcp"
-        inputs = ["asdf"]
+        inputs = ["asdf", "in", "in"]
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,
@@ -208,11 +218,13 @@ async fn nonexistant_input() {
     .unwrap_err();
 
     assert_eq!(
-        err,
         vec![
-            "Sink \"out\" has no inputs",
-            "Transform \"sample\" has no inputs"
-        ]
+            "Sink \"out\" has input \"in\" duplicated 2 times",
+            "Transform \"sample\" has no inputs",
+            "Input \"qwerty\" for transform \"sample2\" doesn't match any components.",
+            "Input \"asdf\" for sink \"out\" doesn't match any components.",
+        ],
+        err,
     );
 }
 
@@ -442,7 +454,7 @@ async fn bad_s3_region() {
         endpoint = "this shoudlnt work"
 
         [sinks.out4.batch]
-        max_size = 100000
+        max_bytes = 100000
         "#,
         Some(Format::Toml),
     )
@@ -685,7 +697,7 @@ async fn parses_sink_full_batch_bytes() {
         encoding = "json"
 
         [sinks.out.batch]
-        max_size = 100
+        max_bytes = 100
         timeout_secs = 10
         "#,
         Some(Format::Toml),

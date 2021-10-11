@@ -9,21 +9,25 @@ weight: 4
 ## Installation
 
 ```shell
-brew tap timberio/brew && brew install vector
+brew tap vectordotdev/brew && brew install vector
 ```
 
 ## Other actions
 
 {{< tabs default="Upgrade Vector" >}}
 {{< tab title="Upgrade Vector" >}}
+
 ```shell
 brew update && brew upgrade vector
 ```
+
 {{< /tab >}}
 {{< tab title="Uninstall Vector" >}}
+
 ```shell
 brew remove vector
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 

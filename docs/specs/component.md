@@ -12,9 +12,11 @@ interpreted as described in [RFC 2119].
 1. [Introduction](#introduction)
 1. [Scope](#scope)
 1. [How to read this document](#how-to-read-this-document)
+1. [Naming](#naming)
+   1. [Source and sink naming](#source-and-sink-naming)
+   1. [Transform naming](#transform-naming)
 1. [Configuration](#configuration)
    1. [Options](#options)
-      1. [`address`](#address)
       1. [`endpoint(s)`](#endpoints)
 1. [Instrumentation](#instrumentation)
    1. [Batching](#batching)
@@ -48,7 +50,26 @@ This document is written from the broad perspective of a Vector component.
 Unless otherwise stated, a section applies to all component types (sources,
 transforms, and sinks).
 
+## Naming
+
+To align with the [logical boundaries of components], component naming MUST
+follow the following guidelines.
+
+### Source and sink naming
+
+* MUST only contain ASCII alphanumeric, lowercase, and underscores
+* MUST be a noun named after the protocol or service that the component integrates with
+* MAY be suffixed with the event type, `logs`, `metrics`, or `traces` (e.g., `kubernetes_logs`, `apache_metrics`)
+
+### Transform naming
+
+* MUST only contain ASCII alphanumeric, lowercase, and underscores
+* MUST be a verb describing the broad purpose of the transform (e.g., `route`, `sample`, `delegate`)
+
 ## Configuration
+
+This section extends the [Configuration Specification] for component specific
+configuration.
 
 ### Options
 
@@ -63,7 +84,8 @@ representing multiple endpoints.
 
 Vector components MUST be instrumented for optimal observability and monitoring.
 This is required to drive various interfaces that Vector users depend on to
-manage Vector installations in mission critical production environments.
+manage Vector installations in mission critical production environments. This
+section extends the [Instrumentation Specification].
 
 ### Batching
 
@@ -88,7 +110,7 @@ There is leeway in the implementation of these events:
 * Components MAY emit events for batches of Vector events for performance
   reasons, but the resulting telemetry state MUST be equivalent to emitting
   individual events. For example, emitting the `EventsReceived` event for 10
-  events MUST increment the `received_events_total` counter by 10.
+  events MUST increment the `component_received_events_total` counter by 10.
 
 #### BytesReceived
 
@@ -108,7 +130,7 @@ from the upstream source and before the creation of a Vector event.
   * `http_path` - If relevant, the HTTP path, excluding query strings.
   * `socket` - If relevant, the socket number that bytes were received from.
 * Metrics
-  * MUST increment the `received_bytes_total` counter by the defined value with
+  * MUST increment the `component_received_bytes_total` counter by the defined value with
     the defined properties as metric tags.
 * Logs
   * MUST log a `Bytes received.` message at the `trace` level with the
@@ -123,9 +145,9 @@ or receiving one or more Vector events.
   * `count` - The count of Vector events.
   * `byte_size` - The cumulative in-memory byte size of all events received.
 * Metrics
-  * MUST increment the `received_events_total` counter by the defined `quantity`
+  * MUST increment the `component_received_events_total` counter by the defined `quantity`
     property with the other properties as metric tags.
-  * MUST increment the `received_event_bytes_total` counter by the defined
+  * MUST increment the `component_received_event_bytes_total` counter by the defined
     `byte_size` property with the other properties as metric tags.
 * Logs
   * MUST log a `Events received.` message at the `trace` level with the
@@ -133,17 +155,16 @@ or receiving one or more Vector events.
 
 #### EventsSent
 
-*All components* MUST emit an `EventsSent` event immediately before sending the
-event down stream. This should happen before any transmission preparation, such
-as encoding.
+*All components* MUST emit an `EventsSent` event immediately after
+sending the events down stream, if the transmission was successful.
 
 * Properties
   * `count` - The count of Vector events.
   * `byte_size` - The cumulative in-memory byte size of all events sent.
 * Metrics
-  * MUST increment the `sent_events_total` counter by the defined value with the
+  * MUST increment the `component_sent_events_total` counter by the defined value with the
     defined properties as metric tags.
-  * MUST increment the `sent_event_bytes_total` counter by the event's byte size
+  * MUST increment the `component_sent_event_bytes_total` counter by the event's byte size
     in JSON representation.
 * Logs
   * MUST log a `Events sent.` message at the `trace` level with the
@@ -152,7 +173,7 @@ as encoding.
 #### BytesSent
 
 *Sinks* MUST emit a `BytesSent` event immediately after sending bytes to the
-downstream target regardless if the transmission was successful or not.
+downstream target, if the transmission was successful.
 
 * Properties
   * `byte_size`
@@ -163,15 +184,15 @@ downstream target regardless if the transmission was successful or not.
     * For files, the total number of bytes written to the file excluding the
       delimiter.
   * `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
-    `unix`, `http`, `http`, `file`, etc.)
+    `unix`, `http`, `https`, `file`, etc.)
   * `endpoint` - If relevant, the endpoint that the bytes were sent to. For
     HTTP, this MUST be the host and path only, excluding the query string.
   * `file` - If relevant, the absolute path of the file.
 * Metrics
-  * MUST increment the `sent_bytes_total` counter by the defined value with the
+  * MUST increment the `component_sent_bytes_total` counter by the defined value with the
     defined properties as metric tags.
 * Logs
-  * MUST log a `Bytes received.` message at the `trace` level with the
+  * MUST log a `Bytes sent.` message at the `trace` level with the
     defined properties as key-value pairs. It MUST NOT be rate limited.
 
 #### Error
@@ -186,21 +207,27 @@ implement since errors are specific to the component.
 
 * Properties
   * `error` - The specifics of the error condition, such as system error code, etc.
-  * `stage` - The stage at which the error occurred. MUST be one of
-    `receiving`, `processing`, or `sending`. This MAY be omitted from
-    being represented explicitly in the event data when the error may
-    only happen at one stage, but MUST be included in the emitted logs
-    and metrics as if it were present.
+  * `error_type` - The type of error condition. This MUST be one of the types
+    listed in the `error_type` enum list in the cue docs.
+  * `stage` - The stage at which the error occurred. This MUST be one of
+    `receiving`, `processing`, or `sending`.
+  * If any of the above properties are implicit to the specific error
+    type, they MAY be omitted from being represented explicitly in the
+    event fields. However, they MUST still be included in the emitted
+    logs and metrics, as specified below, as if they were present.
 * Metrics
-  * MUST increment the `errors_total` counter by 1 with the defined properties
+  * MUST increment the `component_errors_total` counter by 1 with the defined properties
     as metric tags.
-  * MUST increment the `discarded_events_total` counter by the number of Vector
+  * MUST increment the `component_discarded_events_total` counter by the number of Vector
     events discarded if the error resulted in discarding (dropping) events.
 * Logs
   * MUST log a message at the `error` level with the defined properties
     as key-value pairs. It SHOULD be rate limited to 10 seconds.
 
+[Configuration Specification]: configuration.md
 [high user experience expectations]: https://github.com/timberio/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md
+[Instrumentation Specification]: instrumentation.md
+[logical boundaries of components]: ../USER_EXPERIENCE_DESIGN.md#logical-boundaries
 [Pull request #8383]: https://github.com/timberio/vector/pull/8383/
 [RFC 2064]: https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 [RFC 2119]: https://datatracker.ietf.org/doc/html/rfc2119

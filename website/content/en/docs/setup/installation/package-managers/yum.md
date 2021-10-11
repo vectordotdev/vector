@@ -27,14 +27,18 @@ sudo yum install vector
 
 {{< tabs default="Upgrade Vector" >}}
 {{< tab title="Upgrade Vector" >}}
+
 ```shell
 sudo yum upgrade vector
 ```
+
 {{< /tab >}}
 {{< tab title="Uninstall Vector" >}}
+
 ```shell
 sudo yum remove vector
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 

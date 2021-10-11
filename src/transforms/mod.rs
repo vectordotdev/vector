@@ -65,7 +65,9 @@ pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-tokenizer")]
 pub mod tokenizer;
 
-pub use vector_core::transform::{FunctionTransform, TaskTransform, Transform};
+pub use vector_core::transform::{
+    FallibleFunctionTransform, FunctionTransform, TaskTransform, Transform,
+};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -92,7 +94,7 @@ mod test {
     // this function -- but flagging this function off for bench flags will
     // issue a unused warnings about the import above.
     #[allow(dead_code)]
-    pub(crate) fn transform_one(ft: &mut dyn FunctionTransform, event: Event) -> Option<Event> {
+    pub fn transform_one(ft: &mut dyn FunctionTransform, event: Event) -> Option<Event> {
         let mut buf = Vec::with_capacity(1);
         ft.transform(&mut buf, event);
         assert!(buf.len() < 2);

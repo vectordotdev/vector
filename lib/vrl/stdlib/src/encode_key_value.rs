@@ -1,8 +1,6 @@
-use std::collections::BTreeMap;
-use std::fmt::Write;
+use shared::encode_key_value;
 use std::result::Result;
 use vrl::prelude::*;
-use Value::{Array, Boolean, Object};
 
 #[derive(Clone, Copy, Debug)]
 pub struct EncodeKeyValue;
@@ -42,7 +40,12 @@ impl Function for EncodeKeyValue {
         ]
     }
 
-    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _ctx: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
         let fields = arguments.optional("fields_ordering");
 
@@ -129,13 +132,14 @@ impl Expression for EncodeKeyValueFn {
         let field_delimiter = value.try_bytes_utf8_lossy()?;
         let flatten_boolean = self.flatten_boolean.resolve(ctx)?.try_boolean()?;
 
-        Ok(encode(
+        Ok(encode_key_value::to_string(
             object,
             &fields[..],
             &key_value_delimiter,
             &field_delimiter,
             flatten_boolean,
         )
+        .expect("Should always succeed.")
         .into())
     }
 
@@ -144,121 +148,6 @@ impl Expression for EncodeKeyValueFn {
             .bytes()
             .with_fallibility(self.fields.is_some())
     }
-}
-
-fn encode_string(output: &mut String, str: &str) {
-    let needs_quoting = str.chars().any(char::is_whitespace);
-
-    if needs_quoting {
-        output.write_char('"').unwrap();
-    }
-
-    for c in str.chars() {
-        match c {
-            '\\' => output.write_str(r#"\\"#).unwrap(),
-            '"' => output.write_str(r#"\""#).unwrap(),
-            '\n' => output.write_str(r#"\\n"#).unwrap(),
-            _ => output.write_char(c).unwrap(),
-        }
-    }
-
-    if needs_quoting {
-        output.write_char('"').unwrap();
-    }
-}
-
-fn encode_value(output: &mut String, value: &Value) {
-    match value {
-        Value::Bytes(b) => {
-            let val = String::from_utf8_lossy(b);
-            encode_string(output, &val)
-        }
-        _ => encode_string(output, &value.to_string()),
-    }
-}
-
-fn flatten<'a>(
-    input: impl IntoIterator<Item = (String, Value)> + 'a,
-    parent_key: String,
-    separator: char,
-    depth: usize,
-) -> Box<dyn Iterator<Item = (String, Value)> + 'a> {
-    let iter = input.into_iter().map(move |(key, value)| {
-        let new_key = if depth > 0 {
-            format!("{}{}{}", parent_key, separator, key)
-        } else {
-            key
-        };
-
-        match value {
-            Object(map) => flatten(map, new_key, separator, depth + 1),
-            Array(array) => {
-                let array_map: BTreeMap<_, _> = array
-                    .into_iter()
-                    .enumerate()
-                    .map(|(key, value)| (key.to_string(), value))
-                    .collect();
-                flatten(array_map, new_key, separator, depth + 1)
-            }
-            _ => Box::new(std::iter::once((new_key, value)))
-                as Box<dyn Iterator<Item = (std::string::String, vrl::Value)>>,
-        }
-    });
-
-    Box::new(iter.flatten())
-}
-
-fn encode_field<'a>(output: &mut String, key: &str, value: &Value, key_value_delimiter: &'a str) {
-    encode_string(output, key);
-    output.write_str(key_value_delimiter).unwrap();
-    encode_value(output, value)
-}
-
-pub fn encode<'a>(
-    input: BTreeMap<String, Value>,
-    fields: &[String],
-    key_value_delimiter: &'a str,
-    field_delimiter: &'a str,
-    flatten_boolean: bool,
-) -> String {
-    let mut output = String::new();
-
-    let mut input: BTreeMap<_, _> = flatten(input, String::from(""), '.', 0).collect();
-
-    for field in fields.iter() {
-        match (input.remove(field), flatten_boolean) {
-            (Some(Boolean(false)), true) => (),
-            (Some(Boolean(true)), true) => {
-                encode_string(&mut output, field);
-                output.write_str(field_delimiter).unwrap();
-            }
-            (Some(val), _) => {
-                encode_field(&mut output, field, &val, key_value_delimiter);
-                output.write_str(field_delimiter).unwrap();
-            }
-            (None, _) => (),
-        };
-    }
-
-    for (key, value) in input.iter() {
-        match (value, flatten_boolean) {
-            (Boolean(false), true) => (),
-            (Boolean(true), true) => {
-                encode_string(&mut output, key);
-                output.write_str(field_delimiter).unwrap();
-            }
-            (_, _) => {
-                encode_field(&mut output, key, value, key_value_delimiter);
-                output.write_str(field_delimiter).unwrap();
-            }
-        };
-    }
-
-    if output.ends_with(field_delimiter) {
-        output.truncate(output.len() - field_delimiter.len())
-    }
-
-    output
 }
 
 #[cfg(test)]

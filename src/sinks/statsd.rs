@@ -205,7 +205,7 @@ fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<Vec<u8>
             }
         }
         _ => {
-            emit!(StatsdInvalidMetricReceived {
+            emit!(&StatsdInvalidMetricReceived {
                 value: metric.value(),
                 kind: &metric.kind(),
             });

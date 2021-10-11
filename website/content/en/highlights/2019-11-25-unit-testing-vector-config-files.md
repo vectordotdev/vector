@@ -93,7 +93,7 @@ We're eager to hear your feedback! Unit testing, as a `beta` feature, is still
 in an early phase and we need case studies and comments in order to ensure it
 works well for everyone. Please let us know what you think either in our
 [community chat](https://chat.vector.dev/) or by
-[raising an issue](https://github.com/timberio/vector/issues/new).
+[raising an issue](https://github.com/vectordotdev/vector/issues/new).
 
 [docs.reference.tests]: /docs/reference/configuration/tests
 [docs.sinks.aws_cloudwatch_logs]: /docs/reference/configuration/sinks/aws_cloudwatch_logs

@@ -3,9 +3,9 @@ use super::api;
 #[cfg(feature = "datadog-pipelines")]
 use super::datadog;
 use super::{
-    compiler, pipeline::Pipelines, provider, ComponentId, Config, EnrichmentTableConfig,
-    EnrichmentTableOuter, HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter,
-    TestDefinition, TransformOuter,
+    compiler, provider, ComponentKey, Config, EnrichmentTableConfig, EnrichmentTableOuter,
+    HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter, TestDefinition,
+    TransformOuter,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -25,18 +25,16 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub healthchecks: HealthcheckOptions,
     #[serde(default)]
-    pub enrichment_tables: IndexMap<ComponentId, EnrichmentTableOuter>,
+    pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
     #[serde(default)]
-    pub sources: IndexMap<ComponentId, SourceOuter>,
+    pub sources: IndexMap<ComponentKey, SourceOuter>,
     #[serde(default)]
-    pub sinks: IndexMap<ComponentId, SinkOuter>,
+    pub sinks: IndexMap<ComponentKey, SinkOuter<String>>,
     #[serde(default)]
-    pub transforms: IndexMap<ComponentId, TransformOuter>,
+    pub transforms: IndexMap<ComponentKey, TransformOuter<String>>,
     #[serde(default)]
     pub tests: Vec<TestDefinition>,
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
-    #[serde(default)]
-    pub pipelines: Pipelines,
 }
 
 impl Clone for ConfigBuilder {
@@ -52,21 +50,45 @@ impl Clone for ConfigBuilder {
 }
 
 impl From<Config> for ConfigBuilder {
-    fn from(c: Config) -> Self {
-        ConfigBuilder {
-            global: c.global,
+    fn from(config: Config) -> Self {
+        let Config {
+            global,
             #[cfg(feature = "api")]
-            api: c.api,
+            api,
             #[cfg(feature = "datadog-pipelines")]
-            datadog: c.datadog,
-            healthchecks: c.healthchecks,
-            enrichment_tables: c.enrichment_tables,
-            sources: c.sources,
-            sinks: c.sinks,
-            transforms: c.transforms,
+            datadog,
+            healthchecks,
+            enrichment_tables,
+            sources,
+            sinks,
+            transforms,
+            tests,
+            expansions: _,
+        } = config;
+
+        let transforms = transforms
+            .into_iter()
+            .map(|(key, transform)| (key, transform.map_inputs(ToString::to_string)))
+            .collect();
+
+        let sinks = sinks
+            .into_iter()
+            .map(|(key, sink)| (key, sink.map_inputs(ToString::to_string)))
+            .collect();
+
+        ConfigBuilder {
+            global,
+            #[cfg(feature = "api")]
+            api,
+            #[cfg(feature = "datadog-pipelines")]
+            datadog,
+            healthchecks,
+            enrichment_tables,
+            sources,
+            sinks,
+            transforms,
             provider: None,
-            tests: c.tests,
-            pipelines: c.pipelines,
+            tests,
         }
     }
 }
@@ -92,14 +114,14 @@ impl ConfigBuilder {
         enrichment_table: E,
     ) {
         self.enrichment_tables.insert(
-            ComponentId::from(name.into()),
+            ComponentKey::from(name.into()),
             EnrichmentTableOuter::new(Box::new(enrichment_table)),
         );
     }
 
     pub fn add_source<S: SourceConfig + 'static, T: Into<String>>(&mut self, id: T, source: S) {
         self.sources
-            .insert(ComponentId::from(id.into()), SourceOuter::new(source));
+            .insert(ComponentKey::from(id.into()), SourceOuter::new(source));
     }
 
     pub fn add_sink<S: SinkConfig + 'static, T: Into<String>>(
@@ -108,10 +130,13 @@ impl ConfigBuilder {
         inputs: &[&str],
         sink: S,
     ) {
-        let inputs = inputs.iter().map(ComponentId::from).collect::<Vec<_>>();
+        let inputs = inputs
+            .iter()
+            .map(|value| value.to_string())
+            .collect::<Vec<_>>();
         let sink = SinkOuter::new(inputs, Box::new(sink));
 
-        self.sinks.insert(ComponentId::from(id.into()), sink);
+        self.sinks.insert(ComponentKey::from(id.into()), sink);
     }
 
     pub fn add_transform<T: TransformConfig + 'static, S: Into<String>>(
@@ -122,7 +147,7 @@ impl ConfigBuilder {
     ) {
         let inputs = inputs
             .iter()
-            .map(|value| ComponentId::from(value.to_string()))
+            .map(|value| value.to_string())
             .collect::<Vec<_>>();
         let transform = TransformOuter {
             inner: Box::new(transform),
@@ -130,11 +155,7 @@ impl ConfigBuilder {
         };
 
         self.transforms
-            .insert(ComponentId::from(id.into()), transform);
-    }
-
-    pub fn set_pipelines(&mut self, pipelines: Pipelines) {
-        self.pipelines = pipelines;
+            .insert(ComponentKey::from(id.into()), transform);
     }
 
     pub fn append(&mut self, with: Self) -> Result<(), Vec<String>> {
@@ -148,6 +169,10 @@ impl ConfigBuilder {
         #[cfg(feature = "datadog-pipelines")]
         {
             self.datadog = with.datadog;
+            if self.datadog.enabled {
+                // enable other enterprise features
+                self.global.enterprise = true;
+            }
         }
 
         self.provider = with.provider;
@@ -220,5 +245,17 @@ impl ConfigBuilder {
         self.tests.extend(with.tests);
 
         Ok(())
+    }
+
+    #[cfg(test)]
+    pub fn from_toml(input: &str) -> Self {
+        crate::config::format::deserialize(input, Some(crate::config::format::Format::Toml))
+            .unwrap()
+    }
+
+    #[cfg(test)]
+    pub fn from_json(input: &str) -> Self {
+        crate::config::format::deserialize(input, Some(crate::config::format::Format::Json))
+            .unwrap()
     }
 }

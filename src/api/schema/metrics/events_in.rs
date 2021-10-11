@@ -1,3 +1,4 @@
+use crate::config::ComponentKey;
 use crate::event::{Metric, MetricValue};
 use async_graphql::Object;
 use chrono::{DateTime, Utc};
@@ -5,7 +6,7 @@ use chrono::{DateTime, Utc};
 pub struct EventsInTotal(Metric);
 
 impl EventsInTotal {
-    pub fn new(m: Metric) -> Self {
+    pub const fn new(m: Metric) -> Self {
         Self(m)
     }
 
@@ -41,7 +42,7 @@ impl From<Metric> for EventsInTotal {
 }
 
 pub struct ComponentEventsInTotal {
-    component_id: String,
+    component_key: ComponentKey,
     metric: Metric,
 }
 
@@ -49,12 +50,13 @@ impl ComponentEventsInTotal {
     /// Returns a new `ComponentEventsInTotal` struct, which is a GraphQL type. The
     /// component id is hoisted for clear field resolution in the resulting payload.
     pub fn new(metric: Metric) -> Self {
-        let component_id = metric.tag_value("component_id").expect(
+        let component_key = metric.tag_value("component_id").expect(
             "Returned a metric without a `component_id`, which shouldn't happen. Please report.",
         );
+        let component_key = ComponentKey::from(component_key);
 
         Self {
-            component_id,
+            component_key,
             metric,
         }
     }
@@ -64,7 +66,7 @@ impl ComponentEventsInTotal {
 impl ComponentEventsInTotal {
     /// Component id
     async fn component_id(&self) -> &str {
-        &self.component_id
+        self.component_key.id()
     }
 
     /// Total incoming events metric
@@ -74,15 +76,15 @@ impl ComponentEventsInTotal {
 }
 
 pub struct ComponentEventsInThroughput {
-    component_id: String,
+    component_key: ComponentKey,
     throughput: i64,
 }
 
 impl ComponentEventsInThroughput {
     /// Returns a new `ComponentEventsInThroughput`, set to the provided id/throughput values.
-    pub fn new(component_id: String, throughput: i64) -> Self {
+    pub const fn new(component_key: ComponentKey, throughput: i64) -> Self {
         Self {
-            component_id,
+            component_key,
             throughput,
         }
     }
@@ -92,7 +94,7 @@ impl ComponentEventsInThroughput {
 impl ComponentEventsInThroughput {
     /// Component id
     async fn component_id(&self) -> &str {
-        &self.component_id
+        self.component_key.id()
     }
 
     /// Events processed throughput

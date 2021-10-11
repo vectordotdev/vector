@@ -40,15 +40,15 @@ components: sinks: blackhole: {
 	}
 
 	configuration: {
-		print_amount: {
+		print_interval_secs: {
 			common:      false
-			description: "The number of events that must be received in order to print a summary of activity."
+			description: "The number of seconds between reporting a summary of activity."
 			required:    false
 			warnings: []
 			type: uint: {
-				default: 1000
-				examples: [1000]
-				unit: null
+				default: 1
+				examples: [10]
+				unit: "seconds"
 			}
 		}
 		rate: {

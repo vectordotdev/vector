@@ -1,10 +1,10 @@
-use super::InternalEvent;
 use metrics::gauge;
 use std::hint;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct ConnectionOpen {

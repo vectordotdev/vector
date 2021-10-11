@@ -39,7 +39,7 @@ remap: concepts: event: {
 				[Path expressions](\(urls.vrl_path_expressions)) enable you to access values inside
 				the event:
 
-				```ruby
+				```coffee
 				.kubernetes.pod_id
 				```
 				"""

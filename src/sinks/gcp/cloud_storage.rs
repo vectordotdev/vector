@@ -126,7 +126,7 @@ enum Encoding {
 }
 
 impl Encoding {
-    fn content_type(self) -> &'static str {
+    const fn content_type(self) -> &'static str {
         match self {
             Self::Text => "text/plain",
             Self::Ndjson => "application/x-ndjson",
@@ -208,7 +208,7 @@ impl GcsSink {
         let encoding = config.encoding.clone();
 
         let batch = BatchSettings::default()
-            .bytes(bytesize::mib(10u64))
+            .bytes(10_000_000)
             .timeout(300)
             .parse_config(config.batch)?;
 
@@ -404,7 +404,7 @@ fn encode_event(
     let key = key_prefix
         .render_string(&event)
         .map_err(|error| {
-            emit!(TemplateRenderingFailed {
+            emit!(&TemplateRenderingFailed {
                 error,
                 field: Some("key_prefix"),
                 drop_event: true,

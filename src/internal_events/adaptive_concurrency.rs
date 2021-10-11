@@ -1,6 +1,6 @@
-use super::InternalEvent;
 use metrics::histogram;
 use std::time::Duration;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct AdaptiveConcurrencyLimit {

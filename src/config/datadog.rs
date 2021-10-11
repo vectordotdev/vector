@@ -1,4 +1,4 @@
-use super::{ComponentId, Config, SinkOuter, SourceOuter};
+use super::{ComponentKey, Config, OutputId, SinkOuter, SourceOuter};
 use crate::{
     sinks::datadog::metrics::DatadogConfig, sources::internal_metrics::InternalMetricsConfig,
 };
@@ -32,12 +32,12 @@ impl Default for Options {
 }
 
 /// By default, the Datadog feature is enabled.
-fn default_enabled() -> bool {
+const fn default_enabled() -> bool {
     false
 }
 
 /// By default, report to Datadog every 5 seconds.
-fn default_reporting_interval_secs() -> u64 {
+const fn default_reporting_interval_secs() -> u64 {
     5
 }
 
@@ -58,8 +58,8 @@ pub fn try_attach(config: &mut Config) -> bool {
 
     info!("Datadog API key provided. Internal metrics will be sent to Datadog.");
 
-    let internal_metrics_id = ComponentId::from(INTERNAL_METRICS_KEY);
-    let datadog_metrics_id = ComponentId::from(DATADOG_METRICS_KEY);
+    let internal_metrics_id = OutputId::from(ComponentKey::from(INTERNAL_METRICS_KEY));
+    let datadog_metrics_id = ComponentKey::from(DATADOG_METRICS_KEY);
 
     // Create an internal metrics source. We're using a distinct source here and not
     // attempting to reuse an existing one, due to the use of a custom namespace to
@@ -70,7 +70,7 @@ pub fn try_attach(config: &mut Config) -> bool {
     internal_metrics.scrape_interval_secs(config.datadog.reporting_interval_secs);
 
     config.sources.insert(
-        internal_metrics_id.clone(),
+        internal_metrics_id.component.clone(),
         SourceOuter::new(internal_metrics),
     );
 
@@ -109,10 +109,10 @@ mod tests {
 
         assert!(!config
             .sources
-            .contains_key(&ComponentId::from(INTERNAL_METRICS_KEY)));
+            .contains_key(&ComponentKey::from(INTERNAL_METRICS_KEY)));
         assert!(!config
             .sinks
-            .contains_key(&ComponentId::from(DATADOG_METRICS_KEY)));
+            .contains_key(&ComponentKey::from(DATADOG_METRICS_KEY)));
     }
 
     #[test]
@@ -127,10 +127,10 @@ mod tests {
 
         assert!(config
             .sources
-            .contains_key(&ComponentId::from(INTERNAL_METRICS_KEY)));
+            .contains_key(&ComponentKey::from(INTERNAL_METRICS_KEY)));
         assert!(config
             .sinks
-            .contains_key(&ComponentId::from(DATADOG_METRICS_KEY)));
+            .contains_key(&ComponentKey::from(DATADOG_METRICS_KEY)));
     }
 
     #[test]

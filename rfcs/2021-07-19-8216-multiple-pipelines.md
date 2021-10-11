@@ -221,10 +221,6 @@ How does this position us for success in the future?
 
 - With this representation, we'll be able add access control by, for example, declaring the pipelines inside the configuration files to limit the reachable components. We would also be able to specify a quota for each pipeline.
 
-## Prior Art
-
-_TODO_
-
 ## Drawbacks
 
 - Why should we not do this?

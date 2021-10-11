@@ -31,7 +31,7 @@ pub enum InnerBuffer {
 }
 
 impl Buffer {
-    pub fn new(settings: BatchSize<Self>, compression: Compression) -> Self {
+    pub const fn new(settings: BatchSize<Self>, compression: Compression) -> Self {
         Self {
             inner: None,
             num_items: 0,
@@ -48,13 +48,7 @@ impl Buffer {
             let buffer = Vec::with_capacity(bytes);
             match compression {
                 Compression::None => InnerBuffer::Plain(buffer),
-                Compression::Gzip(level) => {
-                    let level = level.unwrap_or(GZIP_FAST);
-                    InnerBuffer::Gzip(GzEncoder::new(
-                        buffer,
-                        flate2::Compression::new(level as u32),
-                    ))
-                }
+                Compression::Gzip(level) => InnerBuffer::Gzip(GzEncoder::new(buffer, level)),
             }
         })
     }
@@ -90,9 +84,7 @@ impl Batch for Buffer {
         config: BatchConfig,
         defaults: BatchSettings<Self>,
     ) -> Result<BatchSettings<Self>, BatchError> {
-        Ok(config
-            .use_size_as_bytes()?
-            .get_settings_or_default(defaults))
+        Ok(config.get_settings_or_default(defaults))
     }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {

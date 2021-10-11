@@ -75,6 +75,9 @@ run-production-site-locally:
 	make setup cue-build production-build
 	python -m http.server 8000 --directory ./public --bind 127.0.0.1
 
+# Local dev build with no link checking and no Yarn dependency fetching
+quick-build: clean structured-data production-build
+
 # Full local builds without Algolia updates (for debugging, link checking, etc.)
 local-production-build: clean setup structured-data production-build run-link-checker
 

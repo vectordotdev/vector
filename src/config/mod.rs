@@ -26,9 +26,9 @@ pub mod component;
 pub mod datadog;
 mod diff;
 pub mod format;
+mod graph;
 mod id;
 mod loading;
-mod pipeline;
 pub mod provider;
 mod unit_test;
 mod validation;
@@ -38,10 +38,10 @@ pub mod watcher;
 pub use builder::ConfigBuilder;
 pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
-pub use id::ComponentId;
+pub use id::{ComponentKey, ComponentScope, OutputId};
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
-    load_pipelines_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
+    merge_path_lists, process_paths, CONFIG_PATHS,
 };
 pub use unit_test::build_unit_tests_main as build_unit_tests;
 pub use validation::warnings;
@@ -78,15 +78,11 @@ impl<'a> From<&'a ConfigPath> for &'a PathBuf {
 }
 
 impl ConfigPath {
-    pub fn as_dir(&self) -> Option<&PathBuf> {
+    pub const fn as_dir(&self) -> Option<&PathBuf> {
         match self {
             Self::Dir(path) => Some(path),
             _ => None,
         }
-    }
-
-    pub fn pipeline_dir(&self) -> Option<PathBuf> {
-        self.as_dir().map(|path| path.join("pipelines"))
     }
 }
 
@@ -98,13 +94,12 @@ pub struct Config {
     #[cfg(feature = "datadog-pipelines")]
     pub datadog: datadog::Options,
     pub healthchecks: HealthcheckOptions,
-    pub sources: IndexMap<ComponentId, SourceOuter>,
-    pub sinks: IndexMap<ComponentId, SinkOuter>,
-    pub transforms: IndexMap<ComponentId, TransformOuter>,
-    pub enrichment_tables: IndexMap<ComponentId, EnrichmentTableOuter>,
-    pub pipelines: IndexMap<String, pipeline::Pipeline>,
+    pub sources: IndexMap<ComponentKey, SourceOuter>,
+    pub sinks: IndexMap<ComponentKey, SinkOuter<OutputId>>,
+    pub transforms: IndexMap<ComponentKey, TransformOuter<OutputId>>,
+    pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
     tests: Vec<TestDefinition>,
-    expansions: IndexMap<ComponentId, Vec<ComponentId>>,
+    expansions: IndexMap<ComponentKey, Vec<ComponentKey>>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
@@ -164,7 +159,7 @@ pub struct SourceOuter {
     pub(super) inner: Box<dyn SourceConfig>,
 }
 
-fn default_acknowledgements() -> bool {
+const fn default_acknowledgements() -> bool {
     false
 }
 
@@ -194,7 +189,7 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
 }
 
 pub struct SourceContext {
-    pub id: ComponentId,
+    pub key: ComponentKey,
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
@@ -205,14 +200,14 @@ pub struct SourceContext {
 impl SourceContext {
     #[cfg(test)]
     pub fn new_shutdown(
-        id: &ComponentId,
+        key: &ComponentKey,
         out: Pipeline,
     ) -> (Self, crate::shutdown::SourceShutdownCoordinator) {
         let mut shutdown = crate::shutdown::SourceShutdownCoordinator::default();
-        let (shutdown_signal, _) = shutdown.register_source(id);
+        let (shutdown_signal, _) = shutdown.register_source(key);
         (
             Self {
-                id: id.clone(),
+                key: key.clone(),
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out,
@@ -226,7 +221,7 @@ impl SourceContext {
     #[cfg(test)]
     pub fn new_test(out: Pipeline) -> Self {
         Self {
-            id: ComponentId::from("default"),
+            key: ComponentKey::from("default"),
             globals: GlobalOptions::default(),
             shutdown: ShutdownSignal::noop(),
             out,
@@ -241,8 +236,9 @@ pub type SourceDescription = ComponentDescription<Box<dyn SourceConfig>>;
 inventory::collect!(SourceDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct SinkOuter {
-    pub inputs: Vec<ComponentId>,
+pub struct SinkOuter<T> {
+    #[serde(default = "Default::default")] // https://github.com/serde-rs/serde/issues/1541
+    pub inputs: Vec<T>,
     // We are accepting this option for backward compatibility.
     healthcheck_uri: Option<UriSerde>,
 
@@ -264,8 +260,8 @@ pub struct SinkOuter {
     pub inner: Box<dyn SinkConfig>,
 }
 
-impl SinkOuter {
-    pub fn new(inputs: Vec<ComponentId>, inner: Box<dyn SinkConfig>) -> SinkOuter {
+impl<T> SinkOuter<T> {
+    pub fn new(inputs: Vec<T>, inner: Box<dyn SinkConfig>) -> SinkOuter<T> {
         SinkOuter {
             inputs,
             buffer: Default::default(),
@@ -276,7 +272,7 @@ impl SinkOuter {
         }
     }
 
-    pub fn resources(&self, id: &ComponentId) -> Vec<Resource> {
+    pub fn resources(&self, id: &ComponentKey) -> Vec<Resource> {
         let mut resources = self.inner.resources();
         resources.append(&mut self.buffer.resources(&id.to_string()));
         resources
@@ -286,7 +282,9 @@ impl SinkOuter {
         if self.healthcheck_uri.is_some() && self.healthcheck.uri.is_some() {
             warn!("Both `healthcheck.uri` and `healthcheck_uri` options are specified. Using value of `healthcheck.uri`.")
         } else if self.healthcheck_uri.is_some() {
-            warn!("`healthcheck_uri` option has been deprecated, use `healthcheck.uri` instead. ")
+            warn!(
+                "The `healthcheck_uri` option has been deprecated, use `healthcheck.uri` instead."
+            )
         }
         SinkHealthcheckOptions {
             uri: self
@@ -298,8 +296,24 @@ impl SinkOuter {
         }
     }
 
-    pub fn proxy(&self) -> &ProxyConfig {
+    pub const fn proxy(&self) -> &ProxyConfig {
         &self.proxy
+    }
+
+    fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> SinkOuter<U> {
+        let inputs = self.inputs.iter().map(f).collect();
+        self.with_inputs(inputs)
+    }
+
+    fn with_inputs<U>(self, inputs: Vec<U>) -> SinkOuter<U> {
+        SinkOuter {
+            inputs,
+            inner: self.inner,
+            buffer: self.buffer,
+            healthcheck: self.healthcheck,
+            healthcheck_uri: self.healthcheck_uri,
+            proxy: self.proxy,
+        }
     }
 }
 
@@ -375,11 +389,11 @@ impl SinkContext {
         self.acker.clone()
     }
 
-    pub fn globals(&self) -> &GlobalOptions {
+    pub const fn globals(&self) -> &GlobalOptions {
         &self.globals
     }
 
-    pub fn proxy(&self) -> &ProxyConfig {
+    pub const fn proxy(&self) -> &ProxyConfig {
         &self.proxy
     }
 }
@@ -389,10 +403,25 @@ pub type SinkDescription = ComponentDescription<Box<dyn SinkConfig>>;
 inventory::collect!(SinkDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct TransformOuter {
-    pub inputs: Vec<ComponentId>,
+pub struct TransformOuter<T> {
+    #[serde(default = "Default::default")] // https://github.com/serde-rs/serde/issues/1541
+    pub inputs: Vec<T>,
     #[serde(flatten)]
     pub inner: Box<dyn TransformConfig>,
+}
+
+impl<T> TransformOuter<T> {
+    fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> TransformOuter<U> {
+        let inputs = self.inputs.iter().map(f).collect();
+        self.with_inputs(inputs)
+    }
+
+    fn with_inputs<U>(self, inputs: Vec<U>) -> TransformOuter<U> {
+        TransformOuter {
+            inputs,
+            inner: self.inner,
+        }
+    }
 }
 
 pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
@@ -440,11 +469,11 @@ pub enum Protocol {
 }
 
 impl Resource {
-    pub fn tcp(addr: SocketAddr) -> Self {
+    pub const fn tcp(addr: SocketAddr) -> Self {
         Self::Port(addr, Protocol::Tcp)
     }
 
-    pub fn udp(addr: SocketAddr) -> Self {
+    pub const fn udp(addr: SocketAddr) -> Self {
         Self::Port(addr, Protocol::Udp)
     }
 
@@ -520,7 +549,7 @@ pub struct TestDefinition {
     #[serde(default)]
     pub outputs: Vec<TestOutput>,
     #[serde(default)]
-    pub no_outputs_from: Vec<ComponentId>,
+    pub no_outputs_from: Vec<ComponentKey>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -535,7 +564,7 @@ pub enum TestInputValue {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TestInput {
-    pub insert_at: ComponentId,
+    pub insert_at: ComponentKey,
     #[serde(default = "default_test_input_type", rename = "type")]
     pub type_str: String,
     pub value: Option<String>,
@@ -550,7 +579,7 @@ fn default_test_input_type() -> String {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TestOutput {
-    pub extract_from: ComponentId,
+    pub extract_from: ComponentKey,
     pub conditions: Option<Vec<conditions::AnyCondition>>,
 }
 
@@ -562,7 +591,7 @@ impl Config {
     /// Expand a logical component id (i.e. from the config file) into the ids of the
     /// components it was expanded to as part of the macro process. Does not check that the
     /// identifier is otherwise valid.
-    pub fn get_inputs(&self, identifier: &ComponentId) -> Vec<ComponentId> {
+    pub fn get_inputs(&self, identifier: &ComponentKey) -> Vec<ComponentKey> {
         self.expansions
             .get(identifier)
             .cloned()
@@ -577,7 +606,7 @@ impl Config {
     feature = "transforms-json_parser"
 ))]
 mod test {
-    use super::{builder::ConfigBuilder, format, load_from_str, ComponentId, Format};
+    use super::{builder::ConfigBuilder, format, load_from_str, ComponentKey, Format};
     use indoc::indoc;
     use std::path::PathBuf;
 
@@ -595,7 +624,6 @@ mod test {
                   encoding = "json"
             "#},
             Some(Format::Toml),
-            Default::default(),
         )
         .unwrap();
 
@@ -619,7 +647,6 @@ mod test {
                   encoding = "json"
             "#},
             Some(Format::Toml),
-            Default::default(),
         )
         .unwrap();
 
@@ -653,7 +680,6 @@ mod test {
                   encoding = "json"
             "#},
             Some(Format::Toml),
-            Default::default(),
         )
         .unwrap();
 
@@ -714,9 +740,9 @@ mod test {
         assert!(config.global.proxy.http.is_some());
         assert!(config.global.proxy.https.is_none());
         assert_eq!(Some(PathBuf::from("/foobar")), config.global.data_dir);
-        assert!(config.sources.contains_key(&ComponentId::from("in")));
-        assert!(config.sinks.contains_key(&ComponentId::from("out")));
-        assert!(config.transforms.contains_key(&ComponentId::from("foo")));
+        assert!(config.sources.contains_key(&ComponentKey::from("in")));
+        assert!(config.sinks.contains_key(&ComponentKey::from("out")));
+        assert!(config.transforms.contains_key(&ComponentKey::from("foo")));
         assert_eq!(config.tests.len(), 1);
     }
 
@@ -792,7 +818,7 @@ mod test {
         assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
         assert_eq!(config.global.proxy.https, Some("http://other:3128".into()));
         assert!(config.global.proxy.no_proxy.matches("localhost"));
-        let source = config.sources.get(&ComponentId::from("in")).unwrap();
+        let source = config.sources.get(&ComponentKey::from("in")).unwrap();
         assert_eq!(source.proxy.http, Some("http://server:3128".into()));
         assert_eq!(source.proxy.https, Some("http://other:3128".into()));
         assert!(source.proxy.no_proxy.matches("localhost"));
@@ -824,7 +850,7 @@ mod test {
         .unwrap();
         assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
         assert_eq!(config.global.proxy.https, None);
-        let source = config.sources.get(&ComponentId::from("in")).unwrap();
+        let source = config.sources.get(&ComponentKey::from("in")).unwrap();
         assert_eq!(source.proxy.http, Some("http://server:3128".into()));
         assert_eq!(source.proxy.https, Some("http://other:3128".into()));
         assert!(source.proxy.no_proxy.matches("localhost"));
@@ -964,7 +990,6 @@ mod resource_tests {
                   encoding = "json"
             "#},
             Some(Format::Toml),
-            Default::default(),
         )
         .is_err());
     }
