@@ -90,7 +90,7 @@ components: sinks: clickhouse: {
 		}}
 		database: {
 			common:      true
-			description: "The database that contains the stable that data will be inserted into."
+			description: "The database that contains the table that data will be inserted into."
 			required:    false
 			warnings: []
 			type: string: {
