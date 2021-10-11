@@ -192,7 +192,7 @@ mod test {
         Pipeline,
     };
     use bytes::Bytes;
-    use futures::{stream, StreamExt};
+    use futures::{channel::mpsc::Receiver, stream, StreamExt};
     use std::{
         net::{SocketAddr, UdpSocket},
         sync::{
@@ -243,6 +243,29 @@ mod test {
 
         let event = rx.next().await.unwrap();
         assert_eq!(event.as_log()[log_schema().host_key()], "127.0.0.1".into());
+    }
+
+    #[tokio::test]
+    async fn tcp_splits_on_newline() {
+        let (tx, rx) = Pipeline::new_test();
+        let addr = next_addr();
+
+        let server = SocketConfig::from(TcpConfig::from_address(addr.into()))
+            .build(SourceContext::new_test(tx))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+
+        wait_for_tcp(addr).await;
+        send_lines(addr, vec!["foo\nbar".to_owned()].into_iter())
+            .await
+            .unwrap();
+
+        let events = collect_n(rx, 2).await;
+
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].as_log()[log_schema().message_key()], "foo".into());
+        assert_eq!(events[1].as_log()[log_schema().message_key()], "bar".into());
     }
 
     #[tokio::test]
@@ -563,20 +586,16 @@ mod test {
     }
 
     #[tokio::test]
-    async fn udp_multiple_messages() {
+    async fn udp_message_preserves_newline() {
         let (tx, rx) = Pipeline::new_test();
         let address = init_udp(tx).await;
 
-        send_lines_udp(address, vec!["test\ntest2".to_string()]);
-        let events = collect_n(rx, 2).await;
+        send_lines_udp(address, vec!["foo\nbar".to_string()]);
+        let events = collect_n(rx, 1).await;
 
         assert_eq!(
             events[0].as_log()[log_schema().message_key()],
-            "test".into()
-        );
-        assert_eq!(
-            events[1].as_log()[log_schema().message_key()],
-            "test2".into()
+            "foo\nbar".into()
         );
     }
 
@@ -730,42 +749,13 @@ mod test {
     }
 
     #[cfg(unix)]
-    async fn unix_message(stream: bool) {
+    async fn unix_message(message: &str, stream: bool) -> Receiver<Event> {
         let (tx, rx) = Pipeline::new_test();
         let path = init_unix(tx, stream).await;
 
-        unix_send_lines(stream, path, &["test"]).await;
+        unix_send_lines(stream, path, &[message]).await;
 
-        let events = collect_n(rx, 1).await;
-
-        assert_eq!(1, events.len());
-        assert_eq!(
-            events[0].as_log()[log_schema().message_key()],
-            "test".into()
-        );
-        assert_eq!(
-            events[0].as_log()[log_schema().source_type_key()],
-            "socket".into()
-        );
-    }
-
-    #[cfg(unix)]
-    async fn unix_multiple_messages(stream: bool) {
-        let (tx, rx) = Pipeline::new_test();
-        let path = init_unix(tx, stream).await;
-
-        unix_send_lines(stream, path, &["test\ntest2"]).await;
-        let events = collect_n(rx, 2).await;
-
-        assert_eq!(2, events.len());
-        assert_eq!(
-            events[0].as_log()[log_schema().message_key()],
-            "test".into()
-        );
-        assert_eq!(
-            events[1].as_log()[log_schema().message_key()],
-            "test2".into()
-        );
+        rx
     }
 
     #[cfg(unix)]
@@ -806,7 +796,7 @@ mod test {
         socket.connect(path).unwrap();
 
         for line in lines {
-            socket.send(format!("{}\n", line).as_bytes()).await.unwrap();
+            socket.send(line.as_bytes()).await.unwrap();
         }
         socket.shutdown(std::net::Shutdown::Both).unwrap();
     }
@@ -814,13 +804,35 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_datagram_message() {
-        unix_message(false).await
+        let rx = unix_message("test", false).await;
+        let events = collect_n(rx, 1).await;
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key()],
+            "test".into()
+        );
+        assert_eq!(
+            events[0].as_log()[log_schema().source_type_key()],
+            "socket".into()
+        );
     }
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn unix_datagram_multiple_messages() {
-        unix_multiple_messages(false).await
+    async fn unix_datagram_message_preserves_newline() {
+        let rx = unix_message("foo\nbar", false).await;
+        let events = collect_n(rx, 1).await;
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key()],
+            "foo\nbar".into()
+        );
+        assert_eq!(
+            events[0].as_log()[log_schema().source_type_key()],
+            "socket".into()
+        );
     }
 
     #[cfg(unix)]
@@ -853,13 +865,37 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_stream_message() {
-        unix_message(true).await
+        let rx = unix_message("test", true).await;
+        let events = collect_n(rx, 1).await;
+
+        assert_eq!(1, events.len());
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key()],
+            "test".into()
+        );
+        assert_eq!(
+            events[0].as_log()[log_schema().source_type_key()],
+            "socket".into()
+        );
     }
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn unix_stream_multiple_messages() {
-        unix_multiple_messages(true).await
+    async fn unix_stream_message_splits_on_newline() {
+        let rx = unix_message("foo\nbar", true).await;
+        let events = collect_n(rx, 2).await;
+
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].as_log()[log_schema().message_key()], "foo".into());
+        assert_eq!(
+            events[0].as_log()[log_schema().source_type_key()],
+            "socket".into()
+        );
+        assert_eq!(events[1].as_log()[log_schema().message_key()], "bar".into());
+        assert_eq!(
+            events[1].as_log()[log_schema().source_type_key()],
+            "socket".into()
+        );
     }
 
     #[cfg(unix)]
