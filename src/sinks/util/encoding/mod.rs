@@ -64,6 +64,7 @@ pub use config::EncodingConfig;
 mod fixed;
 pub use fixed::EncodingConfigFixed;
 mod with_default;
+
 pub use with_default::EncodingConfigWithDefault;
 
 use crate::{

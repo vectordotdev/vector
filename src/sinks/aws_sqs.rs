@@ -27,6 +27,7 @@ use std::{
 };
 use tower::Service;
 use tracing_futures::Instrument;
+use vector_core::ByteSizeOf;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -267,6 +268,7 @@ fn encode_event(
     message_group_id: &Option<Template>,
     message_deduplication_id: &Option<Template>,
 ) -> Option<EncodedEvent<SendMessageEntry>> {
+    let byte_size = event.size_of();
     encoding.apply_rules(&mut event);
 
     let message_group_id = match message_group_id {
@@ -307,11 +309,14 @@ fn encode_event(
         Encoding::Json => serde_json::to_string(&log).expect("Error encoding event as json."),
     };
 
-    Some(EncodedEvent::new(SendMessageEntry {
-        message_body,
-        message_group_id,
-        message_deduplication_id,
-    }))
+    Some(EncodedEvent::new(
+        SendMessageEntry {
+            message_body,
+            message_group_id,
+            message_deduplication_id,
+        },
+        byte_size,
+    ))
 }
 
 #[cfg(test)]

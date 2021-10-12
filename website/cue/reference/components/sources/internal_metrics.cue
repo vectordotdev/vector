@@ -498,27 +498,27 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags & {
 				file: {
-					description: "The file from which the event originates."
+					description: "The file from which the data originated."
 					required:    false
 				}
 				uri: {
-					description: "The sanitized URI from which the event originates."
+					description: "The sanitized URI from which the data originated."
 					required:    false
 				}
 				container_name: {
-					description: "The name of the container from which the event originates."
+					description: "The name of the container from which the data originated."
 					required:    false
 				}
 				pod_name: {
-					description: "The name of the pod from which the event originates."
+					description: "The name of the pod from which the data originated."
 					required:    false
 				}
 				peer_addr: {
-					description: "The IP from which the event originates."
+					description: "The IP from which the data originated."
 					required:    false
 				}
 				peer_path: {
-					description: "The pathname from which the event originates."
+					description: "The pathname from which the data originated."
 					required:    false
 				}
 				mode: _mode
