@@ -108,6 +108,50 @@ inventory::submit! {
 
 impl_generate_config_from_default!(ElasticSearchConfig);
 
+// <<<<<<< HEAD
+// =======
+// #[async_trait::async_trait]
+// #[typetag::serde(name = "elasticsearch")]
+// impl SinkConfig for ElasticSearchConfig {
+//     async fn build(
+//         &self,
+//         cx: SinkContext,
+//     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+//         let common = ElasticSearchCommon::parse_config(self)?;
+//         let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
+//
+//         let healthcheck = common.healthcheck(client.clone()).boxed();
+//
+//         let common = ElasticSearchCommon::parse_config(self)?;
+//         let compression = common.compression;
+//         let batch = BatchSettings::default()
+//             .bytes(10_000_000)
+//             .timeout(1)
+//             .parse_config(self.batch)?;
+//         let request = self
+//             .request
+//             .tower
+//             .unwrap_with(&TowerRequestConfig::default());
+//
+//         let sink = BatchedHttpSink::with_logic(
+//             common,
+//             Buffer::new(batch.size, compression),
+//             ElasticSearchRetryLogic,
+//             request,
+//             batch.timeout,
+//             client,
+//             cx.acker(),
+//             ElasticSearchServiceLogic,
+//         )
+//         .sink_map_err(|error| error!(message = "Fatal elasticsearch sink error.", %error));
+//
+//         Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
+//     }
+//
+//     fn input_type(&self) -> DataType {
+//         DataType::Any
+//     }
+// >>>>>>> master
 
 
 #[derive(Debug)]

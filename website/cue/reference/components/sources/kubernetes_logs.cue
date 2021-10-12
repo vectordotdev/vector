@@ -157,6 +157,15 @@ components: sources: kubernetes_logs: {
 							syntax:  "literal"
 						}
 					}
+					pod_owner: {
+						common:      false
+						description: "Event field for Pod owner reference."
+						required:    false
+						type: string: {
+							default: "kubernetes.pod_owner"
+							syntax:  "literal"
+						}
+					}
 				}
 			}
 		}
