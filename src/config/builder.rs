@@ -3,9 +3,9 @@ use super::api;
 #[cfg(feature = "datadog-pipelines")]
 use super::datadog;
 use super::{
-    compiler, provider, ComponentKey, Config, EnrichmentTableConfig, EnrichmentTableOuter,
-    HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter, TestDefinition,
-    TransformOuter,
+    builder_hash::ConfigBuilderHash, compiler, provider, ComponentKey, Config,
+    EnrichmentTableConfig, EnrichmentTableOuter, HealthcheckOptions, SinkConfig, SinkOuter,
+    SourceConfig, SourceOuter, TestDefinition, TransformOuter,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -245,6 +245,11 @@ impl ConfigBuilder {
         self.tests.extend(with.tests);
 
         Ok(())
+    }
+
+    /// Converts the `ConfigBuilder` to a `ConfigBuilderHash`, for use with hashing.
+    pub fn to_hash(&self) -> ConfigBuilderHash {
+        self.clone().into()
     }
 
     #[cfg(test)]

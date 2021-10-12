@@ -20,6 +20,7 @@ pub use vector_core::transform::{DataType, ExpandType, TransformConfig, Transfor
 
 pub mod api;
 mod builder;
+mod builder_hash;
 mod compiler;
 pub mod component;
 #[cfg(feature = "datadog-pipelines")]
@@ -854,6 +855,82 @@ mod test {
         assert_eq!(source.proxy.http, Some("http://server:3128".into()));
         assert_eq!(source.proxy.https, Some("http://other:3128".into()));
         assert!(source.proxy.no_proxy.matches("localhost"));
+    }
+
+    #[test]
+    fn order_independent_sha256_hashes() {
+        let config1: ConfigBuilder = format::deserialize(
+            indoc! {r#"
+                data_dir = "/tmp"
+                
+                [api]
+                    enabled = true
+                
+                [sources.file]
+                    type = "file"
+                    ignore_older_secs = 600
+                    include = ["/var/log/**/*.log"]
+                    read_from = "beginning"
+                
+                [sources.internal_metrics]
+                    type = "internal_metrics"
+                    namespace = "pipelines"
+                
+                [transforms.filter]
+                    type = "filter"
+                    inputs = ["internal_metrics"]
+                    condition = """
+                        .name == "processed_bytes_total"
+                    """
+                
+                [sinks.datadog_metrics]
+                    type = "console"
+                    inputs = ["filter"]
+                    target = "stdout"
+                    encoding.codec = "json"
+            "#},
+            Some(Format::Toml),
+        )
+        .unwrap();
+
+        let config2: ConfigBuilder = format::deserialize(
+            indoc! {r#"
+                data_dir = "/tmp"
+            
+                [sources.internal_metrics]
+                    type = "internal_metrics"
+                    namespace = "pipelines"
+                
+                [sources.file]
+                    type = "file"
+                    ignore_older_secs = 600
+                    include = ["/var/log/**/*.log"]
+                    read_from = "beginning"
+                
+                [transforms.filter]
+                    type = "filter"
+                    inputs = ["internal_metrics"]
+                    condition = """
+                        .name == "processed_bytes_total"
+                    """
+                
+                [sinks.datadog_metrics]
+                    type = "console"
+                    inputs = ["filter"]
+                    target = "stdout"
+                    encoding.codec = "json"
+
+                [api]
+                    enabled = true
+            "#},
+            Some(Format::Toml),
+        )
+        .unwrap();
+
+        assert_eq!(
+            config1.to_hash().sha256_hex(),
+            config2.to_hash().sha256_hex()
+        )
     }
 }
 
