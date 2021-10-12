@@ -634,9 +634,9 @@ components: sinks: [Name=string]: {
 		buffer_byte_size:                     components.sources.internal_metrics.output.metrics.buffer_byte_size
 		buffer_events:                        components.sources.internal_metrics.output.metrics.buffer_events
 		buffer_received_events_total:         components.sources.internal_metrics.output.metrics.buffer_received_events_total
-		buffer_received_bytes_total:          components.sources.internal_metrics.output.metrics.buffer_received_bytes_total
+		buffer_received_event_bytes_total:    components.sources.internal_metrics.output.metrics.buffer_received_event_bytes_total
 		buffer_sent_events_total:             components.sources.internal_metrics.output.metrics.buffer_sent_events_total
-		buffer_sent_bytes_total:              components.sources.internal_metrics.output.metrics.buffer_sent_bytes_total
+		buffer_sent_event_bytes_total:        components.sources.internal_metrics.output.metrics.buffer_sent_event_bytes_total
 		buffer_discarded_events_total:        components.sources.internal_metrics.output.metrics.buffer_discarded_events_total
 	}
 }
