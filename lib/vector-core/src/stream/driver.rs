@@ -1,12 +1,14 @@
-use std::{collections::BinaryHeap, fmt};
-
+use crate::event::{EventStatus, Finalizable};
 use buffers::{Ackable, Acker};
-use futures::{stream::FuturesUnordered, FutureExt, Stream, StreamExt, TryFutureExt};
-use tokio::{pin, select, task::JoinError};
+use futures::{poll, stream::FuturesUnordered, FutureExt, Stream, StreamExt, TryFutureExt};
+use std::{
+    collections::{BinaryHeap, VecDeque},
+    fmt,
+    task::Poll,
+};
+use tokio::{pin, select};
 use tower::{Service, ServiceExt};
 use tracing::Instrument;
-
-use crate::event::{EventStatus, Finalizable};
 
 #[derive(Eq)]
 struct PendingAcknowledgement {
@@ -78,11 +80,13 @@ where
     ///
     /// # Errors
     ///
-    /// No errors are currently returned.  The return type is purely to simplify caller code, but may
-    /// return an error for a legitimate reason in the future.
+    /// The return type is mostly to simplify caller code.
+    /// An error is currently only returned if a service returns an error from `poll_ready`
     pub async fn run(self) -> Result<(), ()> {
         let mut in_flight = FuturesUnordered::new();
         let mut pending_acks = BinaryHeap::new();
+        let mut next_batch: Option<VecDeque<St::Item>> = None;
+
         let mut seq_head: u64 = 0;
         let mut seq_tail: u64 = 0;
 
@@ -92,9 +96,50 @@ where
             acker,
         } = self;
 
-        pin!(input);
+        let batched_input = input.ready_chunks(1024);
+        pin!(batched_input);
 
         loop {
+            // We'll poll up to 1024 in-flight futures, which lets us queue up multiple completions
+            // in a single turn of the loop, while only doing a single call to `ack`, which is far more
+            // efficient in scenarios where the `Driver` has a very high rate of input.
+            //
+            // Crucially, we aren't awaiting on the stream here, but simply calling its `poll_next`
+            // method, which means we won't go to sleep if `in_flight` has no more ready futures and
+            // there are no more incoming events.  Thus, we _still_ fall through to our normal
+            // select below to ensure we're awaiting in a way that lets us go to sleep.  This manual
+            // drain is just an optimized path for cases where the driver is managing tens or
+            // hundreds of thousands of in-flight requests at a time, and needs to be a little more
+            // efficient with the work it does each loop.
+            let mut limit = 1024;
+            while let Some(Some((seq_no, ack_size))) = in_flight.next().now_or_never() {
+                trace!(message = "Sending request.", seq_no, ack_size);
+                pending_acks.push(PendingAcknowledgement { seq_no, ack_size });
+
+                limit -= 1;
+                if limit == 0 {
+                    break;
+                }
+            }
+
+            let mut num_to_ack = 0;
+            while let Some(pending_ack) = pending_acks.peek() {
+                if pending_ack.seq_no == seq_tail {
+                    let PendingAcknowledgement { ack_size, .. } = pending_acks
+                        .pop()
+                        .expect("should not be here unless pending_acks is non-empty");
+                    num_to_ack += ack_size;
+                    seq_tail += 1;
+                } else {
+                    break;
+                }
+            }
+
+            if num_to_ack > 0 {
+                trace!(message = "Acking events.", ack_size = num_to_ack);
+                acker.ack(num_to_ack);
+            }
+
             select! {
                 // Using `biased` ensures we check the branches in the order they're written, and
                 // the way they're ordered is to ensure that we're reacting to completed requests as
@@ -102,80 +147,66 @@ where
                 biased;
 
                 // One of our service calls has completed.
-                Some(result) = in_flight.next() => {
-                    // Rebind so we can annotate the type, otherwise the compiler is inexplicably angry.
-                    let result: Result<(u64, usize), JoinError> = result;
-                    match result {
-                        Ok((seq_no, ack_size)) => {
-                            trace!(message = "Sending request.", seq_no, ack_size);
-                            pending_acks.push(PendingAcknowledgement { seq_no, ack_size });
+                Some((seq_no, ack_size)) = in_flight.next() => {
+                    trace!(message = "Sending request.", seq_no, ack_size);
+                    pending_acks.push(PendingAcknowledgement { seq_no, ack_size });
+                }
 
-                            let mut num_to_ack = 0;
-                            while let Some(pending_ack) = pending_acks.peek() {
-                                if pending_ack.seq_no == seq_tail {
-                                    let PendingAcknowledgement { ack_size, .. } = pending_acks.pop()
-                                        .expect("should not be here unless pending_acks is non-empty");
-                                    num_to_ack += ack_size;
-                                    seq_tail += 1;
-                                } else {
-                                    break
-                                }
-                            }
+                // We've got an input batch to process.
+                _ = async {}, if next_batch.is_some() => {
+                    let mut batch = next_batch.take()
+                        .expect("batch should be populated");
 
-                            if num_to_ack > 0 {
-                                trace!(message = "Acking events.", ack_size = num_to_ack);
-                                acker.ack(num_to_ack);
+                    while !batch.is_empty() {
+                        let svc = match poll!(service.ready()) {
+                            Poll::Ready(Ok(svc)) => svc,
+                            Poll::Ready(Err(err)) => {
+                                error!(message = "Service return error from `poll_ready()`.", ?err);
+                                return Err(())
                             }
-                        },
-                        Err(e) => {
-                            if e.is_panic() {
-                                error!("driver service call unexpectedly panicked");
-                            }
+                            Poll::Pending => {
+                                next_batch = Some(batch);
+                                break
+                            },
+                        };
 
-                            if e.is_cancelled() {
-                                error!("driver service call unexpectedly cancelled");
-                            }
-                        },
+                        let mut req = batch.pop_front().expect("batch should not be empty");
+                        let seqno = seq_head;
+                        seq_head += 1;
+
+                        trace!(
+                            message = "Submitting service request.",
+                            in_flight_requests = in_flight.len()
+                        );
+                        let ack_size = req.ack_size();
+                        let finalizers = req.take_finalizers();
+
+                        let fut = svc.call(req)
+                            .err_into()
+                            .map(move |result: Result<Svc::Response, Svc::Error>| {
+                                let status = match result {
+                                    Err(error) => {
+                                        error!(message = "Service call failed.", ?error, seqno);
+                                        EventStatus::Failed
+                                    },
+                                    Ok(response) => {
+                                        trace!(message = "Service call succeeded.", seqno);
+                                        *response.as_ref()
+                                    }
+                                };
+                                finalizers.update_status(status);
+                                (seqno, ack_size)
+                            })
+                            .instrument(info_span!("request", request_id = %seqno));
+
+                        in_flight.push(fut);
                     }
                 }
 
-                // We've received an item from the input stream.
-                Some(req) = input.next() => {
-                    // Rebind the variable to avoid a bug with the pattern matching
-                    // in `select!`: https://github.com/tokio-rs/tokio/issues/4076
-                    let mut req = req;
-                    let seqno = seq_head;
-                    seq_head += 1;
-
-                    trace!(
-                        message = "Submitting service request.",
-                        in_flight_requests = in_flight.len()
-                    );
-                    let ack_size = req.ack_size();
-                    let finalizers = req.take_finalizers();
-
-                    let svc = service.ready().await.expect("should not get error when waiting for svc readiness");
-                    let fut = svc.call(req)
-                        .err_into()
-                        .map(move |result: Result<Svc::Response, Svc::Error>| {
-                            let status = match result {
-                                Err(error) => {
-                                    error!(message = "Service call failed.", ?error, seqno);
-                                    EventStatus::Failed
-                                },
-                                Ok(response) => {
-                                    trace!(message = "Service call succeeded.", seqno);
-                                    *response.as_ref()
-                                }
-                            };
-                            finalizers.update_status(status);
-
-                            (seqno, ack_size)
-                        })
-                        .instrument(info_span!("request", request_id = %seqno));
-
-                    let handle = tokio::spawn(fut);
-                    in_flight.push(handle);
+                // We've received some items from the input stream.
+                Some(reqs) = batched_input.next() => {
+                    let reqs = reqs;
+                    next_batch = Some(reqs.into());
                 }
 
                 else => {
