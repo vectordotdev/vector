@@ -62,8 +62,7 @@ pub fn try_attach(config: &mut Config) -> bool {
     let datadog_metrics_id = ComponentKey::from(DATADOG_METRICS_KEY);
 
     // Create an internal metrics source. We're using a distinct source here and not
-    // attempting to reuse an existing one, due to the use of a custom namespace to
-    // satisfy reporting to Datadog.
+    // attempting to reuse an existing one, to configure it according to enterprise requirements.
     let mut internal_metrics = InternalMetricsConfig::enterprise(config.hash.sha256_hex());
 
     // Override default scrape interval.
