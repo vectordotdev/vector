@@ -1,7 +1,6 @@
-# RFC 958 - 2021-10-12 - Automatic namespacing
+# RFC 958 - 2021-10-12 - Automatic configuration namespacing
 
-Or how to load the sink `foo` from `${CONFIG_DIR}/sinks/foo.toml`.
-This can be seen as a prior work regarding the pipeline feature.
+The RFC covers the ability to implicitly namespace Vector configuration based on the configuration directory structure. This provides an easy mechanism for organizing large Vector configuration, something that will become more pronounced as Vector introduces the upcoming Pipelines feature.
 
 ## Context
 
@@ -9,14 +8,14 @@ This can be seen as a prior work regarding the pipeline feature.
 
 ## Cross cutting concerns
 
-- Link to any ongoing or future work relevant to this change.
+None
 
 ## Scope
 
 ### In scope
 
-- How configuration files could be splitted into folders
-- How configuration should be loaded
+- Implicit namespacing based on Vector's configuration directory structure
+- How and where configuration is loaded and namespaced
 
 ### Out of scope
 
@@ -29,6 +28,7 @@ This can be seen as a prior work regarding the pipeline feature.
 
 ## Proposal
 
+To solve for above, we'd like to introduce implicit configuration namespacing based on Vector's configuration directory structure. This aligns the community behind an opinionated method for organizing Vector's configuration, making it easy for users to split up their configuration files and collaborate with others on their team.
 ### User Experience
 
 - When loading Vector's configuration using `--config-dir` (let say `--config-dir /etc/vector`), every type of component (`sources`, `transforms`, `sinks` but also `enrichment_tables` and `tests`) can be declared in subfolders, in seperate files, with there filenames being their component ID.
