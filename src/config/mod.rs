@@ -887,7 +887,7 @@ mod test {
                         .name == "processed_bytes_total"
                     """
                 
-                [sinks.datadog_metrics]
+                [sinks.out]
                     type = "console"
                     inputs = ["filter"]
                     target = "stdout"
@@ -918,7 +918,7 @@ mod test {
                         .name == "processed_bytes_total"
                     """
                 
-                [sinks.datadog_metrics]
+                [sinks.out]
                     type = "console"
                     inputs = ["filter"]
                     target = "stdout"
