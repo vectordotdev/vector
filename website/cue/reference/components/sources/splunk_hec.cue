@@ -118,5 +118,6 @@ components: sources: splunk_hec: {
 		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 		requests_received_total:              components.sources.internal_metrics.output.metrics.requests_received_total
 		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
 	}
 }
