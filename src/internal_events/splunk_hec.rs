@@ -66,15 +66,27 @@ mod source {
     use vector_core::internal_event::InternalEvent;
 
     #[derive(Debug)]
-    pub struct SplunkHecEventReceived;
+    pub struct SplunkHecEventsReceived {
+        pub count: u64,
+        pub byte_size: usize,
+    }
 
-    impl InternalEvent for SplunkHecEventReceived {
+    impl InternalEvent for SplunkHecEventsReceived {
         fn emit_logs(&self) {
-            trace!(message = "Received one event.");
+            trace!(
+                message = "Received events.",
+                count = %self.count,
+                byte_size = %self.byte_size,
+            );
         }
 
         fn emit_metrics(&self) {
-            counter!("component_received_events_total", 1);
+            counter!("component_received_events_total", self.count);
+            counter!(
+                "component_received_event_bytes_total",
+                self.byte_size as u64
+            );
+            // deprecated
             counter!("events_in_total", 1);
         }
     }

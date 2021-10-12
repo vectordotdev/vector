@@ -2,7 +2,7 @@ use crate::{
     config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
     event::{Event, LogEvent, Value},
     internal_events::{
-        SplunkHecEventReceived, SplunkHecRequestBodyInvalid, SplunkHecRequestError,
+        SplunkHecEventsReceived, SplunkHecRequestBodyInvalid, SplunkHecRequestError,
         SplunkHecRequestReceived,
     },
     tls::{MaybeTlsSettings, TlsConfig},
@@ -22,6 +22,7 @@ use std::{
     io::Read,
     net::{Ipv4Addr, SocketAddr},
 };
+use vector_core::ByteSizeOf;
 
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -470,7 +471,10 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             de.extract(log, &mut json);
         }
 
-        emit!(&SplunkHecEventReceived);
+        emit!(&SplunkHecEventsReceived {
+            count: 1,
+            byte_size: event.size_of(),
+        });
         self.events += 1;
 
         Ok(event)
@@ -634,7 +638,10 @@ fn raw_event(
         .as_mut_log()
         .try_insert(log_schema().source_type_key(), Bytes::from("splunk_hec"));
 
-    emit!(&SplunkHecEventReceived);
+    emit!(&SplunkHecEventsReceived {
+        count: 1,
+        byte_size: event.size_of(),
+    });
 
     Ok(event)
 }
