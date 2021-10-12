@@ -174,9 +174,8 @@ where
         if self.batch_size >= 100 {
             self.flush();
         }
-        self.buffer_usage_data.increment_received_event_count(1);
         self.buffer_usage_data
-            .increment_received_byte_size(event_size);
+            .increment_received_event_count_and_byte_size(1, event_size);
 
         None
     }

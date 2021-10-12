@@ -161,8 +161,8 @@ where
             let byte_size = buffer.len();
             match T::decode(buffer) {
                 Ok(event) => {
-                    this.buffer_usage_data.increment_sent_event_count(1);
-                    this.buffer_usage_data.increment_sent_byte_size(byte_size);
+                    this.buffer_usage_data
+                        .increment_sent_event_count_and_byte_size(1, byte_size);
                     Poll::Ready(Some(event))
                 }
                 Err(error) => {

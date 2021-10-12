@@ -89,8 +89,7 @@ where
                 let buffer_usage_data = BufferUsageData::new(when_full, span);
                 let tx = BufferInputCloner::Memory(tx, when_full, Some(buffer_usage_data.clone()));
                 let rx = rx.inspect(move |item: &T| {
-                    buffer_usage_data.increment_sent_event_count(1);
-                    buffer_usage_data.increment_sent_byte_size(item.size_of());
+                    buffer_usage_data.increment_sent_event_count_and_byte_size(1, item.size_of());
                 });
 
                 Ok((tx, Box::new(rx), Acker::Null))
@@ -245,8 +244,7 @@ impl<T: ByteSizeOf, S: Sink<T> + Unpin> Sink<T> for MemoryBufferInput<S> {
             }
         }
         if let Some(buffer_usage_data) = &self.buffer_usage_data {
-            buffer_usage_data.increment_received_event_count(1);
-            buffer_usage_data.increment_received_byte_size(item.size_of());
+            buffer_usage_data.increment_received_event_count_and_byte_size(1, item.size_of());
         }
         self.project().inner.start_send(item)
     }

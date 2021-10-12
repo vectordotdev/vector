@@ -60,21 +60,15 @@ impl BufferUsageData {
         buffer_usage_data
     }
 
-    pub fn increment_received_event_count(&self, count: u64) {
+    pub fn increment_received_event_count_and_byte_size(&self, count: u64, byte_size: usize) {
         self.received_event_count
             .fetch_add(count, Ordering::Relaxed);
-    }
-
-    pub fn increment_received_byte_size(&self, byte_size: usize) {
         self.received_byte_size
             .fetch_add(byte_size, Ordering::Relaxed);
     }
 
-    pub fn increment_sent_event_count(&self, count: u64) {
+    pub fn increment_sent_event_count_and_byte_size(&self, count: u64, byte_size: usize) {
         self.sent_event_count.fetch_add(count, Ordering::Relaxed);
-    }
-
-    pub fn increment_sent_byte_size(&self, byte_size: usize) {
         self.sent_byte_size.fetch_add(byte_size, Ordering::Relaxed);
     }
 
