@@ -179,7 +179,7 @@ fn add_headers(events: &mut [Event], headers_config: &[String], headers: HeaderM
 mod tests {
     use super::SimpleHttpConfig;
     use crate::{
-        codecs::{FramingConfig, JsonParserConfig, ParserConfig},
+        codecs::{FramingConfig, JsonParserConfig, NewlineDelimitedDecoderConfig, ParserConfig},
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus, Value},
         serde::{default_decoding, default_framing_message_based},
@@ -311,6 +311,39 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn http_preserves_newlines() {
+        trace_init();
+
+        let body = "foo\nbar";
+
+        let (rx, addr) = source(
+            vec![],
+            vec![],
+            "http_path",
+            "/",
+            true,
+            EventStatus::Delivered,
+            true,
+            None,
+            None,
+        )
+        .await;
+
+        let mut events = spawn_ok_collect_n(send(addr, body), rx, 1).await;
+
+        assert_eq!(events.len(), 1);
+
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log[log_schema().message_key()], "foo\nbar".into());
+            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(log["http_path"], "/".into());
+        }
+    }
+
+    #[tokio::test]
     async fn http_multiline_text() {
         trace_init();
 
@@ -324,7 +357,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
-            None,
+            Some(Box::new(NewlineDelimitedDecoderConfig::new())),
             None,
         )
         .await;
@@ -364,7 +397,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
-            None,
+            Some(Box::new(NewlineDelimitedDecoderConfig::new())),
             None,
         )
         .await;
@@ -535,7 +568,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
-            None,
+            Some(Box::new(NewlineDelimitedDecoderConfig::new())),
             Some(Box::new(JsonParserConfig::new())),
         )
         .await;
