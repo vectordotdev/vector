@@ -33,7 +33,7 @@ components: sinks: kafka: {
 				enabled: true
 				codec: {
 					enabled: true
-					enum: ["json", "text"]
+					enum: ["json", "text", "ndjson"]
 				}
 			}
 			request: enabled: false
@@ -133,6 +133,17 @@ components: sinks: kafka: {
 			warnings: []
 			type: string: {
 				examples: ["topic-1234", "logs-{{unit}}-%Y-%m-%d"]
+				syntax: "literal"
+			}
+		}
+		headers_key: {
+			common:      false
+			description: "The log field name to use for the Kafka headers. If ommited, no headers will be written."
+			required:    false
+			warnings: []
+			type: string: {
+				default: null
+				examples: ["headers"]
 				syntax: "literal"
 			}
 		}

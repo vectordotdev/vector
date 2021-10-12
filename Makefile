@@ -166,6 +166,7 @@ environment-push: environment-prepare ## Publish a new version of the container 
 
 ##@ Building
 .PHONY: build
+build: check-build-tools
 build: export CFLAGS += -g0 -O3
 build: ## Build the project in release mode (Supports `ENVIRONMENT=true`)
 	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features ${DEFAULT_FEATURES}
@@ -202,6 +203,12 @@ build-armv7-unknown-linux-musleabihf: target/armv7-unknown-linux-musleabihf/rele
 .PHONY: build-graphql-schema
 build-graphql-schema: ## Generate the `schema.json` for Vector's GraphQL API
 	${MAYBE_ENVIRONMENT_EXEC} cargo run --bin graphql-schema --no-default-features --features=default-no-api-client
+
+.PHONY: check-build-tools
+check-build-tools:
+ifeq (, $(shell which cargo))
+	$(error "Please install Rust: https://www.rust-lang.org/tools/install")
+endif
 
 ##@ Cross Compiling
 .PHONY: cross-enable
@@ -627,7 +634,7 @@ check-all: check-kubernetes-yaml
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
-	${MAYBE_ENVIRONMENT_EXEC} cargo hack check --each-feature --exclude-features "sources-utils-http sources-utils-tcp-keepalive sources-utils-tcp-socket sources-utils-tls sources-utils-udp sources-utils-unix sinks-utils-udp"
+	${MAYBE_ENVIRONMENT_EXEC} cargo hack check --each-feature --exclude-features "sources-utils-http sources-utils-http-encoding sources-utils-http-prelude sources-utils-http-query sources-utils-tcp-keepalive sources-utils-tcp-socket sources-utils-tls sources-utils-udp sources-utils-unix sinks-utils-udp"
 
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy
@@ -678,7 +685,7 @@ check-kubernetes-yaml: ## Check that the generated Kubernetes YAML configs are u
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/kubernetes-yaml.sh check
 
 check-events: ## Check that events satisfy patterns set in https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events.sh
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events
 
 ##@ Rustdoc
 build-rustdoc: ## Build Vector's Rustdocs

@@ -30,7 +30,12 @@ impl Function for EncodeBase64 {
         ]
     }
 
-    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _ctx: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
         let padding = arguments.optional("padding");
         let charset = arguments.optional("charset");

@@ -6,18 +6,39 @@ use tokio_util::codec::Decoder;
 /// Config used to build a `NewlineDelimitedCodec`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct NewlineDelimitedDecoderConfig {
+    #[serde(default)]
+    newline_delimited: NewlineDelimitedDecoderOptions,
+}
+
+/// Options for building a `NewlineDelimitedCodec`.
+#[derive(Debug, Clone, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
+pub struct NewlineDelimitedDecoderOptions {
     /// The maximum length of the byte buffer.
     ///
     /// This length does *not* include the trailing delimiter.
     #[serde(default = "crate::serde::default_max_length")]
+    #[derivative(Default(value = "crate::serde::default_max_length()"))]
     max_length: usize,
+}
+
+impl NewlineDelimitedDecoderOptions {
+    /// Creates a `NewlineDelimitedDecoderOptions` with a maximum frame length limit.
+    pub const fn new_with_max_length(max_length: usize) -> Self {
+        Self { max_length }
+    }
 }
 
 impl NewlineDelimitedDecoderConfig {
     /// Creates a new `NewlineDelimitedDecoderConfig`.
     pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// Creates a `NewlineDelimitedCodec` with a maximum frame length limit.
+    pub const fn new_with_max_length(max_length: usize) -> Self {
         Self {
-            max_length: crate::serde::default_max_length(),
+            newline_delimited: { NewlineDelimitedDecoderOptions::new_with_max_length(max_length) },
         }
     }
 }
@@ -26,7 +47,7 @@ impl NewlineDelimitedDecoderConfig {
 impl FramingConfig for NewlineDelimitedDecoderConfig {
     fn build(&self) -> crate::Result<BoxedFramer> {
         Ok(Box::new(NewlineDelimitedCodec::new_with_max_length(
-            self.max_length,
+            self.newline_delimited.max_length,
         )))
     }
 }
@@ -37,14 +58,14 @@ pub struct NewlineDelimitedCodec(CharacterDelimitedCodec);
 
 impl NewlineDelimitedCodec {
     /// Creates a new `NewlineDelimitedCodec`.
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self(CharacterDelimitedCodec::new('\n'))
     }
 
     /// Creates a `NewlineDelimitedCodec` with a maximum frame length limit.
     ///
     /// Any frames longer than `max_length` bytes will be discarded entirely.
-    pub const fn new_with_max_length(max_length: usize) -> Self {
+    pub fn new_with_max_length(max_length: usize) -> Self {
         Self(CharacterDelimitedCodec::new_with_max_length(
             '\n', max_length,
         ))

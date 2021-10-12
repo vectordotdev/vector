@@ -1,3 +1,5 @@
+// ## skip check-events ##
+
 use metrics::counter;
 use std::fmt::Debug;
 use vector_core::internal_event::InternalEvent;

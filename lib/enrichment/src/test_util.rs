@@ -25,6 +25,13 @@ impl DummyEnrichmentTable {
             indexes,
         }
     }
+
+    pub(crate) fn new_with_data(data: BTreeMap<String, Value>) -> Self {
+        Self {
+            data,
+            indexes: Default::default(),
+        }
+    }
 }
 
 impl Table for DummyEnrichmentTable {
@@ -53,6 +60,14 @@ impl Table for DummyEnrichmentTable {
         indexes.push(fields.iter().map(|s| (*s).to_string()).collect());
         Ok(IndexHandle(indexes.len() - 1))
     }
+
+    fn index_fields(&self) -> Vec<(Case, Vec<String>)> {
+        Vec::new()
+    }
+
+    fn needs_reload(&self) -> bool {
+        false
+    }
 }
 
 /// Create a table registry with dummy data
@@ -64,6 +79,23 @@ pub(crate) fn get_table_registry() -> TableRegistry {
     tables.insert("dummy2".to_string(), Box::new(DummyEnrichmentTable::new()));
 
     registry.load(tables);
+
+    registry
+}
+
+/// Create a table registry with dummy data
+pub(crate) fn get_table_registry_with_tables(
+    tables: Vec<(String, DummyEnrichmentTable)>,
+) -> TableRegistry {
+    let registry = TableRegistry::default();
+
+    let mut tablesmap: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
+
+    for (name, table) in tables.into_iter() {
+        tablesmap.insert(name, Box::new(table) as Box<dyn Table + Send + Sync>);
+    }
+
+    registry.load(tablesmap);
 
     registry
 }

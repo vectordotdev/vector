@@ -4,6 +4,8 @@ remap: functions: replace: {
 	category: "String"
 	description: """
 		Replaces all matching instances of `pattern` in the `value`.
+
+		The `pattern` argument accepts regular expression capture groups. Note that `$foo` is interpreted in a Vector configuration file, instead use `$$foo`.
 		"""
 
 	arguments: [
@@ -58,6 +60,13 @@ remap: functions: replace: {
 				replace("Bananas and Bananas", "Bananas", "Pineapples", count: 1)
 				"""#
 			return: "Pineapples and Bananas"
+		},
+		{
+			title: "Replace with capture groups"
+			source: #"""
+				replace("foo123bar", r'foo(?P<num>\d+)bar', "$num")
+				"""#
+			return: "123"
 		},
 	]
 }

@@ -26,9 +26,9 @@ pub mod component;
 pub mod datadog;
 mod diff;
 pub mod format;
+mod graph;
 mod id;
 mod loading;
-mod pipeline;
 pub mod provider;
 mod unit_test;
 mod validation;
@@ -38,10 +38,10 @@ pub mod watcher;
 pub use builder::ConfigBuilder;
 pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
-pub use id::{ComponentKey, ComponentScope};
+pub use id::{ComponentKey, ComponentScope, OutputId};
 pub use loading::{
-    load, load_builder_and_pipelines_from_paths, load_from_paths, load_from_paths_with_provider,
-    load_from_str, merge_path_lists, process_paths, CONFIG_PATHS,
+    load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
+    merge_path_lists, process_paths, CONFIG_PATHS,
 };
 pub use unit_test::build_unit_tests_main as build_unit_tests;
 pub use validation::warnings;
@@ -52,14 +52,10 @@ pub use vector_core::config::{log_schema, LogSchema};
 /// Once this is done, configurations can be correctly loaded using
 /// configured log schema defaults.
 /// If deny is set, will panic if schema has already been set.
-pub fn init_log_schema(
-    config_paths: &[ConfigPath],
-    pipeline_paths: &[PathBuf],
-    deny_if_set: bool,
-) -> Result<(), Vec<String>> {
+pub fn init_log_schema(config_paths: &[ConfigPath], deny_if_set: bool) -> Result<(), Vec<String>> {
     vector_core::config::init_log_schema(
         || {
-            let (builder, _) = load_builder_and_pipelines_from_paths(config_paths, pipeline_paths)?;
+            let (builder, _) = load_builder_from_paths(config_paths)?;
             Ok(builder.global.log_schema)
         },
         deny_if_set,
@@ -88,10 +84,6 @@ impl ConfigPath {
             _ => None,
         }
     }
-
-    pub fn pipeline_dir(&self) -> Option<PathBuf> {
-        self.as_dir().map(|path| path.join("pipelines"))
-    }
 }
 
 #[derive(Debug, Default)]
@@ -103,8 +95,8 @@ pub struct Config {
     pub datadog: datadog::Options,
     pub healthchecks: HealthcheckOptions,
     pub sources: IndexMap<ComponentKey, SourceOuter>,
-    pub sinks: IndexMap<ComponentKey, SinkOuter>,
-    pub transforms: IndexMap<ComponentKey, TransformOuter>,
+    pub sinks: IndexMap<ComponentKey, SinkOuter<OutputId>>,
+    pub transforms: IndexMap<ComponentKey, TransformOuter<OutputId>>,
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
     tests: Vec<TestDefinition>,
     expansions: IndexMap<ComponentKey, Vec<ComponentKey>>,
@@ -244,9 +236,9 @@ pub type SourceDescription = ComponentDescription<Box<dyn SourceConfig>>;
 inventory::collect!(SourceDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct SinkOuter {
-    #[serde(default)]
-    pub inputs: Vec<ComponentKey>,
+pub struct SinkOuter<T> {
+    #[serde(default = "Default::default")] // https://github.com/serde-rs/serde/issues/1541
+    pub inputs: Vec<T>,
     // We are accepting this option for backward compatibility.
     healthcheck_uri: Option<UriSerde>,
 
@@ -268,8 +260,8 @@ pub struct SinkOuter {
     pub inner: Box<dyn SinkConfig>,
 }
 
-impl SinkOuter {
-    pub fn new(inputs: Vec<ComponentKey>, inner: Box<dyn SinkConfig>) -> SinkOuter {
+impl<T> SinkOuter<T> {
+    pub fn new(inputs: Vec<T>, inner: Box<dyn SinkConfig>) -> SinkOuter<T> {
         SinkOuter {
             inputs,
             buffer: Default::default(),
@@ -290,7 +282,9 @@ impl SinkOuter {
         if self.healthcheck_uri.is_some() && self.healthcheck.uri.is_some() {
             warn!("Both `healthcheck.uri` and `healthcheck_uri` options are specified. Using value of `healthcheck.uri`.")
         } else if self.healthcheck_uri.is_some() {
-            warn!("`healthcheck_uri` option has been deprecated, use `healthcheck.uri` instead. ")
+            warn!(
+                "The `healthcheck_uri` option has been deprecated, use `healthcheck.uri` instead."
+            )
         }
         SinkHealthcheckOptions {
             uri: self
@@ -304,6 +298,22 @@ impl SinkOuter {
 
     pub const fn proxy(&self) -> &ProxyConfig {
         &self.proxy
+    }
+
+    fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> SinkOuter<U> {
+        let inputs = self.inputs.iter().map(f).collect();
+        self.with_inputs(inputs)
+    }
+
+    fn with_inputs<U>(self, inputs: Vec<U>) -> SinkOuter<U> {
+        SinkOuter {
+            inputs,
+            inner: self.inner,
+            buffer: self.buffer,
+            healthcheck: self.healthcheck,
+            healthcheck_uri: self.healthcheck_uri,
+            proxy: self.proxy,
+        }
     }
 }
 
@@ -393,11 +403,25 @@ pub type SinkDescription = ComponentDescription<Box<dyn SinkConfig>>;
 inventory::collect!(SinkDescription);
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct TransformOuter {
-    #[serde(default)]
-    pub inputs: Vec<ComponentKey>,
+pub struct TransformOuter<T> {
+    #[serde(default = "Default::default")] // https://github.com/serde-rs/serde/issues/1541
+    pub inputs: Vec<T>,
     #[serde(flatten)]
     pub inner: Box<dyn TransformConfig>,
+}
+
+impl<T> TransformOuter<T> {
+    fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> TransformOuter<U> {
+        let inputs = self.inputs.iter().map(f).collect();
+        self.with_inputs(inputs)
+    }
+
+    fn with_inputs<U>(self, inputs: Vec<U>) -> TransformOuter<U> {
+        TransformOuter {
+            inputs,
+            inner: self.inner,
+        }
+    }
 }
 
 pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
@@ -600,7 +624,6 @@ mod test {
                   encoding = "json"
             "#},
             Some(Format::Toml),
-            Default::default(),
         )
         .unwrap();
 
@@ -624,7 +647,6 @@ mod test {
                   encoding = "json"
             "#},
             Some(Format::Toml),
-            Default::default(),
         )
         .unwrap();
 
@@ -658,7 +680,6 @@ mod test {
                   encoding = "json"
             "#},
             Some(Format::Toml),
-            Default::default(),
         )
         .unwrap();
 
@@ -969,7 +990,6 @@ mod resource_tests {
                   encoding = "json"
             "#},
             Some(Format::Toml),
-            Default::default(),
         )
         .is_err());
     }

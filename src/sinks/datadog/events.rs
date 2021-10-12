@@ -22,6 +22,7 @@ use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{sync::Arc, time::Duration};
+use vector_core::ByteSizeOf;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -74,7 +75,7 @@ impl DatadogEventsConfig {
         timeout: Duration,
     ) -> crate::Result<(VectorSink, Healthcheck)>
     where
-        O: 'static,
+        O: ByteSizeOf + 'static,
         B: Batch<Output = Vec<O>> + std::marker::Send + 'static,
         B::Output: std::marker::Send + Clone,
         B::Input: std::marker::Send,
@@ -121,7 +122,7 @@ impl SinkConfig for DatadogEventsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         // Datadog Event API doesn't support batching.
         let batch_settings = BatchSettings::default()
-            .bytes(bytesize::kib(100u64))
+            .bytes(100_000)
             .events(1)
             .timeout(0)
             .parse_config(BatchConfig::default())?;
@@ -171,7 +172,7 @@ impl DatadogEventsService {
                     "title",
                 ]
                 .iter()
-                .map(|field| vec![PathComponent::Key(field.to_string())])
+                .map(|field| vec![PathComponent::Key((*field).into())])
                 .collect(),
             ),
             // DataDog Event API requires unix timestamp.

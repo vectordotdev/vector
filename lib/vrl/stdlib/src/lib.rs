@@ -52,6 +52,8 @@ mod format_int;
 mod format_number;
 #[cfg(feature = "format_timestamp")]
 mod format_timestamp;
+#[cfg(feature = "get")]
+mod get;
 #[cfg(feature = "get_env_var")]
 mod get_env_var;
 #[cfg(feature = "get_hostname")]
@@ -178,10 +180,16 @@ mod parse_xml;
 mod push;
 #[cfg(feature = "redact")]
 mod redact;
+#[cfg(feature = "remove")]
+mod remove;
 #[cfg(feature = "replace")]
 mod replace;
+#[cfg(feature = "reverse_dns")]
+mod reverse_dns;
 #[cfg(feature = "round")]
 mod round;
+#[cfg(feature = "set")]
+mod set;
 #[cfg(feature = "sha1")]
 mod sha1;
 #[cfg(feature = "sha2")]
@@ -202,6 +210,8 @@ mod strip_ansi_escape_codes;
 mod strip_whitespace;
 #[cfg(feature = "tag_types_externally")]
 mod tag_types_externally;
+#[cfg(feature = "tally")]
+mod tally;
 #[cfg(feature = "timestamp")]
 mod timestamp;
 #[cfg(feature = "to_bool")]
@@ -293,6 +303,8 @@ pub use format_int::FormatInt;
 pub use format_number::FormatNumber;
 #[cfg(feature = "format_timestamp")]
 pub use format_timestamp::FormatTimestamp;
+#[cfg(feature = "get")]
+pub use get::Get;
 #[cfg(feature = "get_env_var")]
 pub use get_env_var::GetEnvVar;
 #[cfg(feature = "get_hostname")]
@@ -411,10 +423,16 @@ pub use push::Push;
 pub use r#match::Match;
 #[cfg(feature = "redact")]
 pub use redact::Redact;
+#[cfg(feature = "remove")]
+pub use remove::Remove;
 #[cfg(feature = "replace")]
 pub use replace::Replace;
+#[cfg(feature = "reverse_dns")]
+pub use reverse_dns::ReverseDns;
 #[cfg(feature = "round")]
 pub use round::Round;
+#[cfg(feature = "set")]
+pub use set::Set;
 #[cfg(feature = "sha2")]
 pub use sha2::Sha2;
 #[cfg(feature = "sha3")]
@@ -433,6 +451,8 @@ pub use strip_ansi_escape_codes::StripAnsiEscapeCodes;
 pub use strip_whitespace::StripWhitespace;
 #[cfg(feature = "tag_types_externally")]
 pub use tag_types_externally::TagTypesExternally;
+#[cfg(feature = "tally")]
+pub use tally::Tally;
 #[cfg(feature = "timestamp")]
 pub use timestamp::Timestamp;
 #[cfg(feature = "to_bool")]
@@ -520,6 +540,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(FormatNumber),
         #[cfg(feature = "format_timestamp")]
         Box::new(FormatTimestamp),
+        #[cfg(feature = "get")]
+        Box::new(Get),
         #[cfg(feature = "get_env_var")]
         Box::new(GetEnvVar),
         #[cfg(feature = "get_hostname")]
@@ -642,10 +664,16 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Push),
         #[cfg(feature = "redact")]
         Box::new(Redact),
+        #[cfg(feature = "remove")]
+        Box::new(Remove),
         #[cfg(feature = "replace")]
         Box::new(Replace),
+        #[cfg(feature = "reverse_dns")]
+        Box::new(ReverseDns),
         #[cfg(feature = "round")]
         Box::new(Round),
+        #[cfg(feature = "set")]
+        Box::new(Set),
         #[cfg(feature = "sha1")]
         Box::new(Sha1),
         #[cfg(feature = "sha2")]
@@ -664,6 +692,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(StripAnsiEscapeCodes),
         #[cfg(feature = "strip_whitespace")]
         Box::new(StripWhitespace),
+        #[cfg(feature = "tally")]
+        Box::new(Tally),
         #[cfg(feature = "tag_types_externally")]
         Box::new(TagTypesExternally),
         #[cfg(feature = "timestamp")]

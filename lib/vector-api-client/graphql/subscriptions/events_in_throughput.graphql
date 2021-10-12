@@ -1,3 +1,0 @@
-subscription EventsInThroughputSubscription($interval: Int!) {
-    eventsInThroughput(interval: $interval)
-}

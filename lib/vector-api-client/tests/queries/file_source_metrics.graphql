@@ -14,8 +14,8 @@ query FileSourceMetricsQuery($after: String, $before: String, $first: Int, $last
                                     processedEventsTotal {
                                         processedEventsTotal
                                     }
-                                    eventsInTotal {
-                                        eventsInTotal
+                                    receivedEventsTotal {
+                                        receivedEventsTotal
                                     }
                                 }
                             }

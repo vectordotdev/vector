@@ -46,7 +46,6 @@ impl Batch for MetricsBuffer {
     ) -> Result<BatchSettings<Self>, BatchError> {
         Ok(config
             .disallow_max_bytes()?
-            .use_size_as_events()?
             .get_settings_or_default(defaults))
     }
 

@@ -1,8 +1,11 @@
 pub mod adaptive_concurrency;
 pub mod batch;
 pub mod buffer;
+pub mod builder;
+pub mod compressor;
 pub mod encoding;
 pub mod http;
+pub mod request_builder;
 pub mod retries;
 pub mod service;
 pub mod sink;
@@ -28,6 +31,9 @@ pub use buffer::json::{BoxedRawValue, JsonArrayBuffer};
 pub use buffer::partition::Partition;
 pub use buffer::vec::{EncodedLength, VecBuffer};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
+pub use builder::SinkBuilderExt;
+pub use compressor::Compressor;
+pub use request_builder::RequestBuilder;
 pub use service::{
     Concurrency, ServiceBuilderExt, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
     TowerRequestLayer, TowerRequestSettings,
@@ -121,4 +127,21 @@ pub fn encode_namespace<'a>(
     namespace
         .map(|namespace| format!("{}{}{}", namespace, delimiter, name))
         .unwrap_or_else(|| name.into_owned())
+}
+
+/// Marker trait for types that can hold a batch of events
+pub trait ElementCount {
+    fn element_count(&self) -> usize;
+}
+
+impl<T> ElementCount for Vec<T> {
+    fn element_count(&self) -> usize {
+        self.len()
+    }
+}
+
+impl ElementCount for serde_json::Value {
+    fn element_count(&self) -> usize {
+        1
+    }
 }

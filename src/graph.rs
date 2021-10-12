@@ -42,19 +42,6 @@ pub struct Opts {
         use_delimiter(true)
     )]
     pub config_dirs: Vec<PathBuf>,
-
-    /// Read pipeline configuration from files in one or more directories.
-    /// File format is detected from the file name.
-    ///
-    /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
-    #[structopt(
-        name = "pipeline-dir",
-        short = "P",
-        long,
-        env = "VECTOR_PIPELINE_DIR",
-        use_delimiter(true)
-    )]
-    pub pipeline_dirs: Vec<PathBuf>,
 }
 
 impl Opts {
@@ -82,7 +69,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
         None => return exitcode::CONFIG,
     };
 
-    let config = match config::load_from_paths(&paths, &opts.pipeline_dirs) {
+    let config = match config::load_from_paths(&paths) {
         Ok(config) => config,
         Err(errs) => {
             for err in errs {
@@ -102,7 +89,14 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
         dot += &format!("  \"{}\" [shape=diamond]\n", id);
 
         for input in transform.inputs.iter() {
-            dot += &format!("  \"{}\" -> \"{}\"\n", input, id);
+            if let Some(port) = &input.port {
+                dot += &format!(
+                    "  \"{}\" -> \"{}\" [label=\"{}\"]\n",
+                    input.component, id, port
+                );
+            } else {
+                dot += &format!("  \"{}\" -> \"{}\"\n", input, id);
+            }
         }
     }
 
@@ -110,7 +104,14 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
         dot += &format!("  \"{}\" [shape=invtrapezium]\n", id);
 
         for input in &sink.inputs {
-            dot += &format!("  \"{}\" -> \"{}\"\n", input, id);
+            if let Some(port) = &input.port {
+                dot += &format!(
+                    "  \"{}\" -> \"{}\" [label=\"{}\"]\n",
+                    input.component, id, port
+                );
+            } else {
+                dot += &format!("  \"{}\" -> \"{}\"\n", input, id);
+            }
         }
     }
 

@@ -87,7 +87,7 @@ pub struct GrokParser {
     field: String,
     drop_field: bool,
     types: HashMap<String, Conversion>,
-    paths: HashMap<String, Vec<PathComponent>>,
+    paths: HashMap<String, Vec<PathComponent<'static>>>,
 }
 
 impl Clone for GrokParser {
@@ -119,7 +119,9 @@ impl FunctionTransform for GrokParser {
                             if let Some(path) = self.paths.get(name) {
                                 event.insert_path(path.to_vec(), value);
                             } else {
-                                let path = PathIter::new(name).collect::<Vec<_>>();
+                                let path = PathIter::new(name)
+                                    .map(|component| component.into_static())
+                                    .collect::<Vec<_>>();
                                 self.paths.insert(name.to_string(), path.clone());
                                 event.insert_path(path, value);
                             }

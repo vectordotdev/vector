@@ -1,5 +1,7 @@
 use crate::config::SinkContext;
 use crate::sinks::s3_common::sink::S3Sink;
+use crate::sinks::util::encoding::StandardEncodings;
+use crate::sinks::util::BatchSettings;
 use crate::{
     config::{DataType, GenerateConfig, ProxyConfig, SinkConfig},
     rusoto::{AwsAuthentication, RegionOrEndpoint},
@@ -11,8 +13,8 @@ use crate::{
             service::S3Service,
         },
         util::{
-            encoding::EncodingConfig, BatchConfig, BatchSettings, Compression, Concurrency,
-            ServiceBuilderExt, TowerRequestConfig,
+            encoding::EncodingConfig, BatchConfig, Compression, Concurrency, ServiceBuilderExt,
+            TowerRequestConfig,
         },
         Healthcheck,
     },
@@ -20,22 +22,16 @@ use crate::{
 use rusoto_s3::S3Client;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
-use std::num::NonZeroUsize;
 use tower::ServiceBuilder;
 use vector_core::sink::VectorSink;
 
-const DEFAULT_REQUEST_LIMITS: TowerRequestConfig = {
-    TowerRequestConfig::const_new(Concurrency::Fixed(50), Concurrency::Fixed(50))
-        .rate_limit_num(250)
-};
+use super::sink::S3RequestOptions;
 
-// I'm not happy about having to impl Batch for (), but we're not using the whole nested Batch
-// thing, and I really just want batch settings detached from the types that will use them. :/
-const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = {
-    BatchSettings::const_default()
-        .bytes(10_000_000)
-        .timeout(300)
-};
+const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
+    TowerRequestConfig::new(Concurrency::Fixed(50)).rate_limit_num(250);
+const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = BatchSettings::const_default()
+    .bytes(10_000_000)
+    .timeout(300);
 
 const DEFAULT_KEY_PREFIX: &str = "date=%F/";
 const DEFAULT_FILENAME_TIME_FORMAT: &str = "%s";
@@ -53,7 +49,7 @@ pub struct S3SinkConfig {
     pub options: S3Options,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub encoding: EncodingConfig<Encoding>,
+    pub encoding: EncodingConfig<StandardEncodings>,
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
     #[serde(default)]
@@ -66,24 +62,6 @@ pub struct S3SinkConfig {
     pub auth: AwsAuthentication,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Text,
-    Ndjson,
-}
-
-#[derive(Clone)]
-pub struct S3RequestOptions {
-    pub bucket: String,
-    pub filename_time_format: String,
-    pub filename_append_uuid: bool,
-    pub filename_extension: Option<String>,
-    pub api_options: S3Options,
-    pub encoding: EncodingConfig<Encoding>,
-    pub compression: Compression,
-}
-
 impl GenerateConfig for S3SinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -94,7 +72,7 @@ impl GenerateConfig for S3SinkConfig {
             filename_extension: None,
             options: S3Options::default(),
             region: RegionOrEndpoint::default(),
-            encoding: Encoding::Text.into(),
+            encoding: StandardEncodings::Text.into(),
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
@@ -136,7 +114,9 @@ impl S3SinkConfig {
             .service(S3Service::new(client));
 
         // Configure our partitioning/batching.
-        let batch_settings = DEFAULT_BATCH_SETTINGS.parse_config(self.batch)?;
+        let batch_settings = DEFAULT_BATCH_SETTINGS
+            .parse_config(self.batch)?
+            .into_batcher_settings()?;
         let key_prefix = self
             .key_prefix
             .as_ref()
@@ -144,10 +124,6 @@ impl S3SinkConfig {
             .unwrap_or_else(|| DEFAULT_KEY_PREFIX.into())
             .try_into()?;
         let partitioner = KeyPartitioner::new(key_prefix);
-        let batch_size_bytes = NonZeroUsize::new(batch_settings.size.bytes);
-        let batch_size_events = NonZeroUsize::new(batch_settings.size.events)
-            .ok_or("batch events must be greater than 0")?;
-        let batch_timeout = batch_settings.timeout;
 
         // And now collect all of the S3-specific options and configuration knobs.
         let filename_time_format = self
@@ -169,15 +145,7 @@ impl S3SinkConfig {
             compression: self.compression,
         };
 
-        let sink = S3Sink::new(
-            cx,
-            service,
-            request_options,
-            partitioner,
-            batch_size_bytes,
-            batch_size_events,
-            batch_timeout,
-        );
+        let sink = S3Sink::new(cx, service, request_options, partitioner, batch_settings);
 
         Ok(VectorSink::Stream(Box::new(sink)))
     }

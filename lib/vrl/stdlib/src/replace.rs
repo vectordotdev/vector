@@ -50,10 +50,20 @@ impl Function for Replace {
                 source: r#"replace("foobar", r'o|a', "i")"#,
                 result: Ok("fiibir"),
             },
+            Example {
+                title: "replace with capture group",
+                source: r#"replace("foo123bar", r'foo(?P<num>\d+)bar', "$num")"#,
+                result: Ok(r#""123""#),
+            },
         ]
     }
 
-    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _ctx: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
         let pattern = arguments.required("pattern");
         let with = arguments.required("with");
