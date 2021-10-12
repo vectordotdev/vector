@@ -17,7 +17,7 @@ itertools = { version = "0.10.1", default-features = false }
 serde_json = { version = "1.0.68", default-features = false }
 percent-encoding = { version = "2.1.0", default-features = false }
 bytes = { version = "1.1.0", default-features = false }
-strum_macros = { version = "0.21", default-features = false }
+strum_macros = { version = "0.22", default-features = false }
 tracing = { version = "0.1.29", default-features = false }
 snafu = { version = "0.6", default-features = false }
 ordered-float = { version = "2", default-features = false }

@@ -25,6 +25,7 @@ pub struct FieldsSpec {
     pub pod_labels: String,
     pub pod_annotations: String,
     pub pod_node_name: String,
+    pub pod_owner: String,
     pub container_name: String,
     pub container_id: String,
     pub container_image: String,
@@ -41,6 +42,7 @@ impl Default for FieldsSpec {
             pod_labels: "kubernetes.pod_labels".to_owned(),
             pod_annotations: "kubernetes.pod_annotations".to_owned(),
             pod_node_name: "kubernetes.pod_node_name".to_owned(),
+            pod_owner: "kubernetes.pod_owner".to_owned(),
             container_name: "kubernetes.container_name".to_owned(),
             container_id: "kubernetes.container_id".to_owned(),
             container_image: "kubernetes.container_image".to_owned(),
@@ -131,6 +133,13 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
         if let Some(val) = val {
             log.insert(key, val.to_owned());
         }
+    }
+
+    if let Some(owner_references) = &metadata.owner_references {
+        log.insert(
+            &fields_spec.pod_owner,
+            format!("{}/{}", owner_references[0].kind, owner_references[0].name),
+        );
     }
 
     if let Some(labels) = &metadata.labels {

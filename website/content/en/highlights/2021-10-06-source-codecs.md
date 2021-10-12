@@ -48,4 +48,4 @@ used with `decoding` option specified above. See the [docs][http_source_framing]
 for other framing options.
 
 [http_source_framing]: /docs/reference/configuration/sources/http/#framing
-[9404]: https://github.com/vectordotdev/vector/issues/9404).
+[9404]: https://github.com/vectordotdev/vector/issues/9404

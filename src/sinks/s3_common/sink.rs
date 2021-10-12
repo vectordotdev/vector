@@ -32,10 +32,10 @@ impl<Svc, RB> S3Sink<Svc, RB> {
         batcher_settings: BatcherSettings,
     ) -> Self {
         Self {
+            partitioner,
             acker: cx.acker(),
             service,
             request_builder,
-            partitioner,
             batcher_settings,
         }
     }

@@ -513,11 +513,7 @@ async fn build_unit_test(
                     );
                 }
                 Err(err) => {
-                    errors.push(format!(
-                        "failed to build transform '{}': {:#}",
-                        id,
-                        anyhow::anyhow!(err)
-                    ));
+                    errors.push(format!("failed to build transform '{}': {:#}", id, err));
                 }
             }
         }
