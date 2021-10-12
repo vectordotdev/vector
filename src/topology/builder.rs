@@ -133,7 +133,6 @@ pub async fn build_pieces(
         let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(key);
 
         let context = SourceContext {
-            config_id: config.id.clone(),
             key: key.clone(),
             globals: config.global.clone(),
             shutdown: shutdown_signal,

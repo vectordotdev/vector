@@ -89,7 +89,6 @@ impl ConfigPath {
 
 #[derive(Debug, Default)]
 pub struct Config {
-    pub id: String,
     pub global: GlobalOptions,
     #[cfg(feature = "api")]
     pub api: api::Options,
@@ -191,7 +190,6 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
 }
 
 pub struct SourceContext {
-    pub config_id: String,
     pub key: ComponentKey,
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
@@ -210,7 +208,6 @@ impl SourceContext {
         let (shutdown_signal, _) = shutdown.register_source(key);
         (
             Self {
-                config_id: "".to_string(),
                 key: key.clone(),
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
@@ -225,7 +222,6 @@ impl SourceContext {
     #[cfg(test)]
     pub fn new_test(out: Pipeline) -> Self {
         Self {
-            config_id: "".to_string(),
             key: ComponentKey::from("default"),
             globals: GlobalOptions::default(),
             shutdown: ShutdownSignal::noop(),
