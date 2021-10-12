@@ -21,19 +21,11 @@ This can be seen as a prior work regarding the pipeline feature.
 ### Out of scope
 
 - How components configuration should work
-
-
-
-- List work that is completely out of scope. Use this to keep discussions focused. Please note the "future changes" section at the bottom.
+- How components should work
 
 ## Pain
 
 - The actual configuration files can become big and it can become hard to follow when looking for components.
-
-
-
-- What internal or external *pain* are we solving?
-- Do not cover benefits of your change, this is covered in the "Rationale" section.
 
 ## Proposal
 
@@ -56,9 +48,6 @@ type = "anything"
 
 - Any duplicate component ID (like `sinks/foo.toml` and `sinks/foo.json`) will error.
 - If Vector's configuration is loaded using a specific file (`--config /etc/vector/vector.toml` for example), Vector will keep its default behavior and only load this file.
-
-- Explain your change as if you were describing it to a Vector user. We should be able to share this section with a Vector user to solicit feedback.
-- Does this change break backward compatibility? If so, what should users do to upgrade?
 
 ### Implementation
 
@@ -101,13 +90,11 @@ Why is this change worth it?
 - The new pipeline 2.0 will require such a feature in order to to load the transforms and the inner pipelines.
 - This would allow to an admin to allow users to write the files in the `transforms` folder and not read the files in `sinks` folder.
 
-What is the impact of not doing this?
-
-
-
 How does this position us for success in the future?
 
 - Pipeline 2.0 will rely on splitting the configuration file into compound transforms. Splitting the configuration that way will allow to have a dedicated folder or file for the definition of those transforms.
+
+> What is the impact of not doing this?
 
 ## Drawbacks
 
@@ -121,13 +108,13 @@ What kind on ongoing burden does this place on the team?
 
 ## Prior Art
 
-- List prior art, the good and bad.
-- Why can't we simply use or copy them?
+> - List prior art, the good and bad.
+> - Why can't we simply use or copy them?
 
 ## Alternatives
 
-- What other approaches have been considered and why did you not choose them?
-- How about not doing this at all?
+> - What other approaches have been considered and why did you not choose them?
+> - How about not doing this at all?
 
 ## Outstanding Questions
 
@@ -148,4 +135,4 @@ Note: This can be filled out during the review process.
 
 ## Future Improvements
 
-- List any future improvements. Use this to keep your "plan of attack" scope small and project a sound design.
+- Add the Pipeline 2.0 feature
