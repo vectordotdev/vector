@@ -22,8 +22,8 @@ pub struct GeneratorConfig {
     #[serde(alias = "batch_interval", default = "default_interval")]
     #[derivative(Default(value = "default_interval()"))]
     interval: f64,
-    #[serde(default = "usize::max_value")]
-    #[derivative(Default(value = "usize::max_value()"))]
+    #[serde(default = "default_count")]
+    #[derivative(Default(value = "default_count()"))]
     count: usize,
     #[serde(flatten)]
     format: OutputFormat,
@@ -37,6 +37,10 @@ pub struct GeneratorConfig {
 
 const fn default_interval() -> f64 {
     1.0
+}
+
+const fn default_count() -> usize {
+    isize::MAX as usize
 }
 
 #[derive(Debug, PartialEq, Snafu)]
