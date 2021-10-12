@@ -65,6 +65,22 @@ mod source {
     use metrics::counter;
     use vector_core::internal_event::InternalEvent;
 
+    pub struct SplunkHecBytesReceived<'a, 'b> {
+        pub byte_size: usize,
+        pub protocol: &'b str,
+        pub http_path: &'a str,
+    }
+
+    impl<'a, 'b> InternalEvent for SplunkHecBytesReceived<'a, 'b> {
+        fn emit_logs(&self) {
+            trace!(message = "Bytes received.", byte_size = %self.byte_size, protocol = %self.protocol, http_path = %self.http_path);
+        }
+
+        fn emit_metrics(&self) {
+            counter!("component_received_bytes_total", self.byte_size as u64);
+        }
+    }
+
     #[derive(Debug)]
     pub struct SplunkHecEventsReceived {
         pub count: u64,

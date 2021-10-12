@@ -2,8 +2,8 @@ use crate::{
     config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
     event::{Event, LogEvent, Value},
     internal_events::{
-        SplunkHecEventsReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
-        SplunkHecRequestReceived,
+        SplunkHecBytesReceived, SplunkHecEventsReceived, SplunkHecRequestBodyInvalidError,
+        SplunkHecRequestError, SplunkHecRequestReceived,
     },
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
@@ -142,6 +142,7 @@ impl SourceConfig for SplunkConfig {
 /// Shared data for responding to requests.
 struct SplunkSource {
     valid_credentials: Vec<String>,
+    protocol: String,
 }
 
 impl SplunkSource {
@@ -151,10 +152,15 @@ impl SplunkSource {
             .iter()
             .flatten()
             .chain(config.token.iter());
+        let protocol = match config.tls {
+            Some(_) => "https".to_string(),
+            None => "http".to_string(),
+        };
         SplunkSource {
             valid_credentials: valid_tokens
                 .map(|token| format!("Splunk {}", token))
                 .collect(),
+            protocol,
         }
     }
 
@@ -167,6 +173,7 @@ impl SplunkSource {
             .and(splunk_channel_query_param)
             .map(|header: Option<String>, query_param| header.or(query_param));
 
+        let protocol = self.protocol.clone();
         warp::post()
             .and(path!("event").or(path!("event" / "1.0")))
             .and(self.authorization())
@@ -175,6 +182,7 @@ impl SplunkSource {
             .and(warp::header::optional::<String>("X-Forwarded-For"))
             .and(self.gzip())
             .and(warp::body::bytes())
+            .and(warp::path::full())
             .and_then(
                 move |_,
                       _,
@@ -182,10 +190,16 @@ impl SplunkSource {
                       remote: Option<SocketAddr>,
                       xff: Option<String>,
                       gzip: bool,
-                      body: Bytes| {
+                      body: Bytes,
+                      path: warp::path::FullPath| {
                     let mut out = out
                         .clone()
                         .sink_map_err(|_| Rejection::from(ApiError::ServerShutdown));
+                    emit!(&SplunkHecBytesReceived {
+                        byte_size: body.len(),
+                        http_path: path.as_str(),
+                        protocol: protocol.as_str(),
+                    });
                     async move {
                         let reader: Box<dyn Read + Send> = if gzip {
                             Box::new(MultiGzDecoder::new(body.reader()))
@@ -227,6 +241,7 @@ impl SplunkSource {
                     .ok_or_else(|| Rejection::from(ApiError::MissingChannel))
             });
 
+        let protocol = self.protocol.clone();
         warp::post()
             .and(path!("raw" / "1.0").or(path!("raw")))
             .and(self.authorization())
@@ -235,6 +250,7 @@ impl SplunkSource {
             .and(warp::header::optional::<String>("X-Forwarded-For"))
             .and(self.gzip())
             .and(warp::body::bytes())
+            .and(warp::path::full())
             .and_then(
                 move |_,
                       _,
@@ -242,8 +258,14 @@ impl SplunkSource {
                       remote: Option<SocketAddr>,
                       xff: Option<String>,
                       gzip: bool,
-                      body: Bytes| {
+                      body: Bytes,
+                      path: warp::path::FullPath| {
                     let out = out.clone();
+                    emit!(&SplunkHecBytesReceived {
+                        byte_size: body.len(),
+                        http_path: path.as_str(),
+                        protocol: protocol.as_str(),
+                    });
                     async move {
                         let event = future::ready(raw_event(body, gzip, channel, remote, xff));
                         futures::stream::once(event)
