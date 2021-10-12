@@ -1,6 +1,7 @@
 use super::{ComponentKey, Config, OutputId, SinkOuter, SourceOuter};
 use crate::{
-    sinks::datadog::metrics::DatadogConfig, sources::internal_metrics::InternalMetricsConfig,
+    sinks::datadog::metrics::DatadogConfig,
+    sources::internal_metrics::{InternalMetricsConfig, TagsConfig},
 };
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -65,6 +66,7 @@ pub fn try_attach(config: &mut Config) -> bool {
     // attempting to reuse an existing one, due to the use of a custom namespace to
     // satisfy reporting to Datadog.
     let mut internal_metrics = InternalMetricsConfig::namespace("pipelines");
+    internal_metrics.tags_config(TagsConfig::default().with_host().with_config_id_key());
 
     // Override default scrape interval.
     internal_metrics.scrape_interval_secs(config.datadog.reporting_interval_secs);

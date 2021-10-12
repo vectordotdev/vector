@@ -52,6 +52,7 @@ impl Clone for ConfigBuilder {
 impl From<Config> for ConfigBuilder {
     fn from(config: Config) -> Self {
         let Config {
+            id: _,
             global,
             #[cfg(feature = "api")]
             api,

@@ -32,6 +32,11 @@ impl InternalMetricsConfig {
     pub fn scrape_interval_secs(&mut self, value: u64) {
         self.scrape_interval_secs = value;
     }
+
+    /// Set the tags configuration.
+    pub fn tags_config(&mut self, tags: TagsConfig) {
+        self.tags = tags;
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
@@ -40,6 +45,19 @@ impl InternalMetricsConfig {
 pub struct TagsConfig {
     host_key: Option<String>,
     pid_key: Option<String>,
+    config_id_key: Option<String>,
+}
+
+impl TagsConfig {
+    pub fn with_host(mut self) -> Self {
+        self.host_key = Some("host".to_owned());
+        self
+    }
+
+    pub fn with_config_id_key(mut self) -> Self {
+        self.config_id_key = Some("config_id".to_owned());
+        self
+    }
 }
 
 inventory::submit! {
@@ -59,6 +77,8 @@ impl SourceConfig for InternalMetricsConfig {
         }
         let interval = time::Duration::from_secs(self.scrape_interval_secs);
         let namespace = self.namespace.clone();
+        let config_id_key = self.tags.config_id_key.to_owned();
+
         let host_key = self.tags.host_key.as_deref().and_then(|tag| {
             if tag.is_empty() {
                 None
@@ -73,10 +93,12 @@ impl SourceConfig for InternalMetricsConfig {
                 .and_then(|tag| if tag.is_empty() { None } else { Some("pid") });
         Ok(Box::pin(run(
             namespace,
+            config_id_key,
             host_key,
             pid_key,
             Controller::get()?,
             interval,
+            cx.config_id,
             cx.out,
             cx.shutdown,
         )))
@@ -93,10 +115,12 @@ impl SourceConfig for InternalMetricsConfig {
 
 async fn run(
     namespace: Option<String>,
+    config_id_key: Option<String>,
     host_key: Option<&str>,
     pid_key: Option<&str>,
     controller: &Controller,
     interval: time::Duration,
+    config_id: String,
     out: Pipeline,
     shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
@@ -117,6 +141,9 @@ async fn run(
                 metric = metric.with_namespace(namespace.as_ref());
             }
 
+            if let Some(config_id_key) = &config_id_key {
+                metric.insert_tag(config_id_key.to_owned(), config_id.clone());
+            }
             if let Some(host_key) = host_key {
                 if let Ok(hostname) = &hostname {
                     metric.insert_tag(host_key.to_owned(), hostname.to_owned());

@@ -32,6 +32,10 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         errors.extend(type_errors);
     }
 
+    // Generate an ID for the Config based off of the SHA256 hash for the builder. This will
+    // be used in enterprise scenarios to differentiate between user supplied config.
+    let id = builder.to_hash().sha256_hex();
+
     let ConfigBuilder {
         global,
         #[cfg(feature = "api")]
@@ -78,6 +82,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
 
     if errors.is_empty() {
         let config = Config {
+            id,
             global,
             #[cfg(feature = "api")]
             api,
