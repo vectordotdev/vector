@@ -528,7 +528,6 @@ mod integration_tests {
     use crate::{
         config::SourceContext,
         docker::docker,
-        test_util::components::{self, SOURCE_TESTS, TCP_SOURCE_TAGS},
         test_util::{collect_n, next_addr_for_ip, trace_init, wait_for_tcp},
         tls::TlsOptions,
         Pipeline,
@@ -612,8 +611,6 @@ output.logstash:
             .unwrap();
 
         remove_container(&docker, &container.id).await;
-
-        SOURCE_TESTS.assert(&TCP_SOURCE_TAGS);
 
         assert!(!events.is_empty());
 
@@ -710,8 +707,6 @@ output {
 
         remove_container(&docker, &container.id).await;
 
-        SOURCE_TESTS.assert(&TCP_SOURCE_TAGS);
-
         assert!(!events.is_empty());
 
         let log = events[0].as_log();
@@ -757,7 +752,6 @@ output {
     }
 
     async fn source(tls: Option<TlsConfig>) -> (mpsc::Receiver<Event>, SocketAddr) {
-        components::init();
         let (sender, recv) = Pipeline::new_test();
         let address = next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
         tokio::spawn(async move {
