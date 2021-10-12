@@ -2,13 +2,12 @@ mod retry;
 mod config;
 mod common;
 mod request_builder;
-mod encoder;
 mod sink;
 mod service;
+mod encoder;
 
 pub use common::*;
 pub use config::*;
-pub use encoder::Encoding;
 
 use self::retry::{ElasticSearchRetryLogic, ElasticSearchServiceLogic};
 use crate::{
@@ -46,6 +45,8 @@ use vector_core::event::{Event, Value};
 use crate::event::{EventRef, LogEvent};
 // use crate::sinks::elasticsearch::ParseError::AwsCredentialsGenerateFailed;
 
+
+
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 pub enum ElasticSearchAuth {
@@ -66,7 +67,7 @@ impl Default for ElasticSearchMode {
     }
 }
 
-#[derive(Derivative, Deserialize, Serialize, Clone, Copy, Debug)]
+#[derive(Derivative, Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum BulkAction {
     Index,
@@ -164,7 +165,7 @@ pub enum ElasticSearchCommonMode {
 }
 
 impl ElasticSearchCommonMode {
-    fn index<'a>(&self, event: impl Into<EventRef<'a>>) -> Option<String> {
+    fn index(&self, log: &LogEvent) -> Option<String> {
         match self {
             Self::Normal { index, .. } => index
                 .render_string(log)

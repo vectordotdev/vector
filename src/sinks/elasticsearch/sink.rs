@@ -5,53 +5,84 @@ use vector_core::partition::Partitioner;
 use std::num::NonZeroUsize;
 use std::time::Duration;
 use futures::StreamExt;
-use crate::sinks::elasticsearch::request_builder::ElasticsearchRequestBuilder;
+use crate::sinks::elasticsearch::request_builder::{ElasticsearchRequestBuilder, ProcessedEvent};
 use crate::buffers::Acker;
+use crate::sinks::elasticsearch::service::ElasticSearchService;
+use crate::sinks::elasticsearch::{BulkAction, Encoding};
+use crate::transforms::metric_to_log::MetricToLog;
+use vector_core::stream::BatcherSettings;
+use async_trait::async_trait;
+use crate::sinks::util::encoding::EncodingConfigWithDefault;
+use rusoto_credential::AwsCredentials;
 
+#[derive(Clone, Eq, Hash, PartialEq)]
+pub struct PartitionKey {
+    index: String,
+    bulk_action: BulkAction,
+}
 
-pub struct NullPartitioner;
-impl Partitioner for NullPartitioner {
-    type Item = Event;
-    type Key = ();
+pub struct ElasticSearchPartitioner;
 
-    fn partition(&self, _item: &Self::Item) -> Self::Key {
-        ()
+impl Partitioner for ElasticSearchPartitioner {
+    type Item = ProcessedEvent;
+    type Key = PartitionKey;
+
+    fn partition(&self, item: &ProcessedEvent) -> Self::Key {
+        //TODO: remove the allocation here?
+        todo!()
+
     }
 }
 
 pub struct ElasticSearchSink {
-    batch_timeout: Duration,
-    batch_size_bytes: Option<NonZeroUsize>,
-    batch_size_events: NonZeroUsize,
-    request_builder: ElasticsearchRequestBuilder,
-    compression: Compression,
-    service: ElasticSearchService,
-    acker: Acker,
+    pub batch_settings: BatcherSettings,
+    // batch_timeout: Duration,
+    pub batch_size_bytes: Option<NonZeroUsize>,
+    pub batch_size_events: NonZeroUsize,
+    pub request_builder: ElasticsearchRequestBuilder,
+    pub compression: Compression,
+    pub service: ElasticSearchService,
+    pub acker: Acker,
+    pub metric_to_log: MetricToLog,
+    pub encoding: EncodingConfigWithDefault<Encoding>,
 }
 
 impl ElasticSearchSink {
-    pub fn run_inner(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    pub async fn run_inner(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
 
         let request_builder_concurrency_limit = NonZeroUsize::new(50);
 
         let sink = input
-            .batched(NullPartitioner,
-                self.batch_timeout,
-            self.batch_size_events,
-            self.batch_settings.size.bytes
+            // .filter_map(|event| async move {
+            //     let log = match event {
+            //         Event::Log(log) => Some(log),
+            //         Event::Metric(metric) => self.metric_to_log.transform_one(metric),
+            //     };
+            // })
+            .scan(self.metric_to_log, |metric_to_log, event| async move {
+                Some(event)
+            })
+            .filter_map(|log|async move {
+                let event:ProcessedEvent = todo!();
+                Some(event)
+            })
+            .batched(ElasticSearchPartitioner,
+                self.batch_settings,
             )
             .filter_map(|(_, batch)|async move {
-                Some(batch)
+                let aws_creds:Option<AwsCredentials> = todo!();
+                Some(super::request_builder::Input{
+                    aws_credentials: aws_creds,
+                    events: batch
+                })
             })
             .request_builder(
                 request_builder_concurrency_limit,
                 self.request_builder,
-                self.encoding,
-                self.compression,
             ).filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        error!("Failed to build S3 request: {:?}.", e);
+                        error!("Failed to build Elasticsearch request: {:?}.", e);
                         None
                     }
                     Ok(req) => Some(req),
@@ -67,7 +98,7 @@ impl ElasticSearchSink {
 
 #[async_trait]
 impl StreamSink for ElasticSearchSink {
-    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }
 }

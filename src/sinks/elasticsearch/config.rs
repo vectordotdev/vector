@@ -4,7 +4,6 @@ use crate::sinks::util::encoding::EncodingConfigWithDefault;
 use crate::config::{SinkConfig, SinkContext, DataType};
 use crate::sinks::{Healthcheck, VectorSink};
 use crate::template::Template;
-use crate::sinks::elasticsearch::encoder::Encoding;
 use crate::event::{LogEvent, Event, Value, EventRef};
 use crate::sinks::util::http::RequestConfig;
 use indexmap::map::IndexMap;
@@ -16,8 +15,8 @@ use crate::config::log_schema;
 use std::convert::TryFrom;
 use crate::sinks::elasticsearch::{BatchActionTemplate, IndexTemplate};
 use snafu::ResultExt;
-use crate::internal_events::TemplateRenderingFailed;
 use serde::{Serialize, Deserialize};
+use crate::internal_events::TemplateRenderingFailed;
 
 /// The field name for the timestamp required by data stream mode
 const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
@@ -60,6 +59,14 @@ pub struct ElasticSearchConfig {
     pub normal: Option<NormalConfig>,
     pub data_stream: Option<DataStreamConfig>,
     pub metrics: Option<MetricToLogConfig>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum Encoding {
+    #[derivative(Default)]
+    Default,
 }
 
 impl ElasticSearchConfig {
@@ -215,9 +222,9 @@ impl DataStreamConfig {
             return;
         }
 
-        let dtype = self.dtype(&log);
-        let dataset = self.dataset(&log);
-        let namespace = self.namespace(&log);
+        let dtype = self.dtype(&*log);
+        let dataset = self.dataset(&*log);
+        let namespace = self.namespace(&*log);
 
 
         let existing = log
@@ -242,7 +249,7 @@ impl DataStreamConfig {
         }
     }
 
-    pub fn index<'a>(&self, log: &LogEvent) -> Option<String> {
+    pub fn index(&self, log: &LogEvent) -> Option<String> {
         let (dtype, dataset, namespace) = if !self.auto_routing {
             (
                 self.dtype(log)?,

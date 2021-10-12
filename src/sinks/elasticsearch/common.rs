@@ -1,6 +1,6 @@
 use crate::transforms::metric_to_log::MetricToLog;
 use crate::http::{HttpClient, Auth, MaybeAuth};
-use crate::sinks::elasticsearch::{finish_signer, ElasticSearchAuth, ElasticSearchConfig, ParseError, maybe_set_id, ElasticSearchCommonMode};
+use crate::sinks::elasticsearch::{finish_signer, ElasticSearchAuth, ElasticSearchConfig, ParseError, maybe_set_id, ElasticSearchCommonMode, Encoding};
 use rusoto_core::signature::SignedRequestPayload;
 use crate::sinks::util::http::{HttpSink, RequestConfig};
 use crate::event::Event;
@@ -15,7 +15,6 @@ use snafu::ResultExt;
 use serde_json::json;
 use crate::rusoto;
 use crate::sinks::util::encoding::{EncodingConfigWithDefault, EncodingConfiguration};
-use crate::sinks::elasticsearch::encoder::Encoding;
 use std::collections::HashMap;
 use rusoto_core::Region;
 use super::{Request, InvalidHost};

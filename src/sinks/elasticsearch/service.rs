@@ -1,17 +1,18 @@
 use crate::buffers::Ackable;
 use bytes::Bytes;
-use crate::event::{EventFinalizers, Finalizable};
+use crate::event::{EventFinalizers, Finalizable, EventStatus};
 use hyper::service::Service;
 use std::task::{Context, Poll};
 use crate::http::HttpClient;
-use crate::http;
 use futures::future::BoxFuture;
-use hyper::Body;
+use hyper::{Body, Request};
 use futures::FutureExt;
 use tracing::Instrument;
 
 pub struct ElasticSearchRequest {
-    http_request: http::Request<Vec<u8>>
+    pub http_request: Request<Vec<u8>>,
+    pub finalizers: EventFinalizers,
+    pub batch_size: usize,
 }
 
 
@@ -31,8 +32,18 @@ pub struct ElasticSearchService {
     http_client: HttpClient
 }
 
+pub struct ElasticSearchResponse {
+
+}
+
+impl AsRef<EventStatus> for ElasticSearchResponse {
+    fn as_ref(&self) -> &EventStatus {
+        todo!()
+    }
+}
+
 impl Service<ElasticSearchRequest> for ElasticSearchService {
-    type Response = ();
+    type Response = ElasticSearchResponse;
     type Error = ();
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -42,9 +53,10 @@ impl Service<ElasticSearchRequest> for ElasticSearchService {
 
     fn call(&mut self, req: ElasticSearchRequest) -> Self::Future {
         let http_req = req.http_request.map(Body::from);
+        let mut http_client = self.http_client.clone();
         Box::pin(async move {
-            self.http_client.call(http_req).await;
-            Ok(())
+            http_client.call(http_req).await;
+            Ok(ElasticSearchResponse{})
         })
     }
 }
