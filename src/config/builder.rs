@@ -249,7 +249,7 @@ impl ConfigBuilder {
     }
 
     #[cfg(feature = "datadog-pipelines")]
-    /// Converts the `ConfigBuilder` to a `ConfigBuilderHash`, for use with hashing.
+    /// Converts the `ConfigBuilder` to a `ConfigHash`, for use with hashing.
     pub fn to_hash(&self) -> ConfigHash {
         self.clone().into()
     }
