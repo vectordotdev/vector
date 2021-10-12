@@ -438,7 +438,6 @@ mod tests {
             Ok(indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sources.source0]
-                max_length = 102400
                 type = "stdin"
 
                 [transforms.transform0]
@@ -471,7 +470,6 @@ mod tests {
             Ok(indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sources.source0]
-                max_length = 102400
                 type = "stdin"
 
                 [transforms.transform0]
@@ -504,7 +502,6 @@ mod tests {
             Ok(indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sources.source0]
-                max_length = 102400
                 type = "stdin"
 
                 [sinks.sink0]
