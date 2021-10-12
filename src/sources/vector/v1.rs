@@ -238,6 +238,7 @@ mod test {
 
         let server = config
             .build(SourceContext {
+                config_id: "".to_owned(),
                 key: ComponentKey::from("default"),
                 globals: GlobalOptions::default(),
                 shutdown,
@@ -276,6 +277,7 @@ mod test {
 
         let server = config
             .build(SourceContext {
+                config_id: "".to_owned(),
                 key: ComponentKey::from("default"),
                 globals: GlobalOptions::default(),
                 shutdown,

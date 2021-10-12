@@ -520,6 +520,7 @@ mod test {
 
         let server = SocketConfig::from(UdpConfig::from_address(address))
             .build(SourceContext {
+                config_id: "".to_owned(),
                 key: source_key.clone(),
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
