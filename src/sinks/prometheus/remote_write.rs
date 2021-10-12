@@ -25,6 +25,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::task;
 use tower::ServiceBuilder;
+use vector_core::ByteSizeOf;
 
 #[derive(Debug, Snafu)]
 enum Errors {
@@ -102,6 +103,7 @@ impl SinkConfig for RemoteWriteConfig {
 
             PartitionBatchSink::new(service, buffer, batch.timeout, cx.acker())
                 .with_flat_map(move |event: Event| {
+                    let byte_size = event.size_of();
                     stream::iter(normalizer.apply(event).map(|event| {
                         let tenant_id = tenant_id.as_ref().and_then(|template| {
                             template
@@ -116,7 +118,10 @@ impl SinkConfig for RemoteWriteConfig {
                                 .ok()
                         });
                         let key = PartitionKey { tenant_id };
-                        Ok(EncodedEvent::new(PartitionInnerBuffer::new(event, key)))
+                        Ok(EncodedEvent::new(
+                            PartitionInnerBuffer::new(event, key),
+                            byte_size,
+                        ))
                     }))
                 })
                 .sink_map_err(

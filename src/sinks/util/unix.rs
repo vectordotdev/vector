@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{path::PathBuf, pin::Pin, sync::Arc, time::Duration};
 use tokio::{net::UnixStream, time::sleep};
+use vector_core::ByteSizeOf;
 
 #[derive(Debug, Snafu)]
 pub enum UnixError {
@@ -137,10 +138,15 @@ impl StreamSink for UnixSink {
         let encode_event = Arc::clone(&self.encode_event);
         let mut input = input
             .map(|mut event| {
+                let byte_size = event.size_of();
                 let finalizers = event.metadata_mut().take_finalizers();
                 encode_event(event)
-                    .map(|item| EncodedEvent { item, finalizers })
-                    .unwrap_or_else(|| EncodedEvent::new(Bytes::new()))
+                    .map(|item| EncodedEvent {
+                        item,
+                        finalizers,
+                        byte_size,
+                    })
+                    .unwrap_or_else(|| EncodedEvent::new(Bytes::new(), 0))
             })
             .peekable();
 

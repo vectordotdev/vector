@@ -289,7 +289,7 @@ Name | Description
 | `sinks-sematext_logs`                                | Enables building the [`sematext_logs` sink](/docs/reference/configuration/sinks/sematext_logs)
 | `sinks-sematext_metrics`                             | Enables building the [`sematext_metrics` sink](/docs/reference/configuration/sinks/sematext_metrics)
 | `sinks-socket`                                       | Enables building the [`socket` sink](/docs/reference/configuration/sinks/socket)
-| `sinks-splunk_hec`                                   | Enables building the [`splunk_hec` sink](/docs/reference/configuration/sinks/splunk_hec)
+| `sinks-splunk_hec`                                 | Enables building the [`splunk_hec_logs` sink](/docs/reference/configuration/sinks/splunk_hec_logs)
 | `sinks-statsd`                                       | Enables building the [`statsd` sink](/docs/reference/configuration/sinks/statsd)
 | `sinks-vector`                                       | Enables building the [`vector` sink](/docs/reference/configuration/sinks/vector)
 {{< /details >}}

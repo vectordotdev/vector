@@ -26,6 +26,7 @@ use std::{
     task::{Context, Poll},
 };
 use tower::Service;
+use vector_core::ByteSizeOf;
 
 #[derive(Clone)]
 pub struct CloudWatchMetricsSvc {
@@ -145,15 +146,19 @@ impl CloudWatchMetricsSvc {
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
             .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error))
             .with_flat_map(move |event: Event| {
-                stream::iter(normalizer.apply(event).map(|mut metric| {
-                    let namespace = metric
-                        .take_namespace()
-                        .take()
-                        .unwrap_or_else(|| default_namespace.clone());
-                    Ok(EncodedEvent::new(PartitionInnerBuffer::new(
-                        metric, namespace,
-                    )))
-                }))
+                stream::iter({
+                    let byte_size = event.size_of();
+                    normalizer.apply(event).map(|mut metric| {
+                        let namespace = metric
+                            .take_namespace()
+                            .take()
+                            .unwrap_or_else(|| default_namespace.clone());
+                        Ok(EncodedEvent::new(
+                            PartitionInnerBuffer::new(metric, namespace),
+                            byte_size,
+                        ))
+                    })
+                })
             });
 
         Ok(super::VectorSink::Sink(Box::new(sink)))
