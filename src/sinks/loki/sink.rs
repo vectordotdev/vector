@@ -242,7 +242,7 @@ struct FilterEncoder<St> {
 }
 
 impl<St> FilterEncoder<St> {
-    fn new(
+    const fn new(
         input: St,
         encoder: EventEncoder,
         global_timestamps: GlobalTimestamps,
