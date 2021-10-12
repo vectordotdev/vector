@@ -31,8 +31,8 @@ components: sources: statsd: {
 				}
 			}
 			receive_buffer_bytes: enabled: true
-			keepalive: enabled: true
-			tls: enabled:       false
+			keepalive: enabled:            true
+			tls: enabled:                  false
 		}
 	}
 

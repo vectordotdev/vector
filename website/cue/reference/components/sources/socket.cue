@@ -28,7 +28,7 @@ components: sources: socket: {
 				}
 			}
 			receive_buffer_bytes: enabled: true
-			keepalive: enabled: true
+			keepalive: enabled:            true
 			tls: {
 				enabled:                true
 				can_enable:             true
