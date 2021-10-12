@@ -15,8 +15,7 @@ use std::time::Duration;
 #[derive(Deserialize, Default, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct ThrottleConfig {
-    events_threshold: Option<u32>,
-    bytes_threshold: Option<u32>,
+    threshold: u32,
     window: f64,
     key_field: Option<String>,
     exclude: Option<AnyCondition>,
@@ -57,13 +56,7 @@ pub struct Throttle {
 
 impl Throttle {
     pub fn new(config: &ThrottleConfig) -> crate::Result<Self> {
-        let threshold = match (config.events_threshold, config.bytes_threshold) {
-            (Some(events), None) => events,
-            (None, Some(bytes)) => bytes,
-            _ => return Err(Box::new(ConfigError::EventsAndBytes)),
-        };
-
-        let threshold = match NonZeroU32::new(threshold) {
+        let threshold = match NonZeroU32::new(config.threshold) {
             Some(threshold) => threshold,
             None => return Err(Box::new(ConfigError::NonZero)),
         };
@@ -132,10 +125,6 @@ impl TaskTransform for Throttle {
 
 #[derive(Debug, Snafu)]
 pub enum ConfigError {
-    #[snafu(display(
-        "must provide exactly one of `events_threshold` or `bytes_threshold` configuration"
-    ))]
-    EventsAndBytes,
     #[snafu(display("`events_threshold`, `bytes_threshold`, and `window` must be non-zero"))]
     NonZero,
 }
