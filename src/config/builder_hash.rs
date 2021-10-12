@@ -31,6 +31,18 @@ pub struct ConfigBuilderHash {
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
 }
 
+impl Clone for ConfigBuilderHash {
+    fn clone(&self) -> Self {
+        // This is a hack around the issue of cloning
+        // trait objects. So instead to clone the config
+        // we first serialize it into JSON, then back from
+        // JSON. Originally we used TOML here but TOML does not
+        // support serializing `None`.
+        let json = serde_json::to_value(self).unwrap();
+        serde_json::from_value(json).unwrap()
+    }
+}
+
 impl From<ConfigBuilder> for ConfigBuilderHash {
     fn from(cb: ConfigBuilder) -> Self {
         Self {

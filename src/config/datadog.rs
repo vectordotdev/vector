@@ -1,6 +1,7 @@
 use super::{ComponentKey, Config, OutputId, SinkOuter, SourceOuter};
 use crate::{
-    sinks::datadog::metrics::DatadogConfig, sources::internal_metrics::InternalMetricsConfig,
+    config::ConfigBuilder, sinks::datadog::metrics::DatadogConfig,
+    sources::internal_metrics::InternalMetricsConfig,
 };
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -43,7 +44,7 @@ const fn default_reporting_interval_secs() -> u64 {
 
 /// Augment configuration with observability via Datadog if the feature is enabled and
 /// an API key is provided.
-pub fn try_attach(config: &mut Config) -> bool {
+pub fn attach(mut config: Config) -> Config {
     // Return early if an API key is missing, or the feature isn't enabled.
     let api_key = match (&config.datadog.api_key, config.datadog.enabled) {
         // API key provided explicitly.
@@ -51,9 +52,9 @@ pub fn try_attach(config: &mut Config) -> bool {
         // No API key; attempt to get it from the environment.
         (None, true) => match env::var("DATADOG_API_KEY").or_else(|_| env::var("DD_API_KEY")) {
             Ok(api_key) => api_key,
-            _ => return false,
+            _ => return config,
         },
-        _ => return false,
+        _ => return config,
     };
 
     info!("Datadog API key provided. Internal metrics will be sent to Datadog.");
@@ -61,10 +62,13 @@ pub fn try_attach(config: &mut Config) -> bool {
     let internal_metrics_id = OutputId::from(ComponentKey::from(INTERNAL_METRICS_KEY));
     let datadog_metrics_id = ComponentKey::from(DATADOG_METRICS_KEY);
 
+    // Get a hash of the loaded configuration by casting back to a `ConfigBuilder`.
+    let config_builder: ConfigBuilder = config.into();
+
     // Create an internal metrics source. We're using a distinct source here and not
     // attempting to reuse an existing one, due to the use of a custom namespace to
     // satisfy reporting to Datadog.
-    let mut internal_metrics = InternalMetricsConfig::namespace("pipelines");
+    let mut internal_metrics = InternalMetricsConfig::enterprise(config_builder.to_hash());
 
     // Override default scrape interval.
     internal_metrics.scrape_interval_secs(config.datadog.reporting_interval_secs);
@@ -82,7 +86,7 @@ pub fn try_attach(config: &mut Config) -> bool {
         SinkOuter::new(vec![internal_metrics_id], Box::new(datadog_metrics)),
     );
 
-    true
+    config
 }
 
 #[cfg(test)]
@@ -105,7 +109,7 @@ mod tests {
         let mut config = Config::default();
 
         // Attaching config without an API enabled should avoid wiring up components.
-        assert!(!try_attach(&mut config));
+        assert!(!attach(&mut config));
 
         assert!(!config
             .sources
@@ -123,7 +127,7 @@ mod tests {
         config.datadog.enabled = true;
         config.datadog.api_key = Some("xxx".to_string());
 
-        assert!(try_attach(&mut config));
+        assert!(attach(&mut config));
 
         assert!(config
             .sources

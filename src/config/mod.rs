@@ -37,6 +37,7 @@ mod vars;
 pub mod watcher;
 
 pub use builder::ConfigBuilder;
+pub use builder_hash::ConfigBuilderHash;
 pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
 pub use id::{ComponentKey, ComponentScope, OutputId};
