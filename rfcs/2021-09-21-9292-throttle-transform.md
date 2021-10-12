@@ -1,6 +1,7 @@
 # RFC 9292 - 2021-09-21 - `throttle` transform
 
-This RFC proposes the addition of a new transform that provides a user the ability to control the throughput of specific event streams.
+This RFC proposes the addition of a new transform that provides a user the ability
+to control the throughput of specific event streams.
 
 ## Context
 
@@ -13,7 +14,7 @@ This RFC proposes the addition of a new transform that provides a user the abili
 
 * Dropping logs to rate limit an event stream
 * Rate limit by number of events
-* Exclude events with VRL conditions
+* Exclude events with conditions
 * Optionally specify buckets based on the value of a template string
 
 ### Out of scope
@@ -23,22 +24,28 @@ This RFC proposes the addition of a new transform that provides a user the abili
 
 ## Pain
 
-* Users lack the necessary tooling to control throughput which can cause excessive costs and negatively impact downstream services due to increased load
+* Users lack the necessary tooling to control throughput which can cause excessive
+costs and negatively impact downstream services due to increased load
 * Admins cannot set quotas for users/usergroups utilizing Vector
 
 ## Proposal
 
 ### User Experience
 
-The `throttle` transform can be used to rate limit specific subsets of your event stream to limit load on downstream services or to enforce quotas on users.
-You can enforce rate limits on number of events, as well as excluding events based on a VRL condition to avoid dropping critical logs. Rate limits
-can be applied globally across all logs or by specifying a key to create buckets of events to rate limit more granularly.
+The `throttle` transform can be used to rate limit specific subsets of your event
+stream to limit load on downstream services or to enforce quotas on users.
+You can enforce rate limits on number of events, as well as excluding events based
+on a VRL condition to avoid dropping critical logs. Rate limits
+can be applied globally across all logs or by specifying a key to create buckets
+of events to rate limit more granularly.
 
-The initial implementation sheds load by dropping any events above the configured threshold.
+The initial implementation sheds load by dropping any events above the configured
+threshold.
 
 ### Implementation
 
-The `throttle` transform will leverage the existing [Governor](https://docs.rs/governor/0.3.2/governor/index.html) crate.
+The `throttle` transform will leverage the existing
+[Governor](https://docs.rs/governor/0.3.2/governor/index.html) crate.
 
 Config:
 
@@ -122,12 +129,15 @@ impl TaskTransform for Throttle {
 
 ## Rationale
 
-* Controlling throughput provides better reliability for downstream services which can be critical in observability platforms
-* Setting granular quotas is invaluable as an administrator running Vector for a number of users to ensure fair use of the pipeline
+* Controlling throughput provides better reliability for downstream services
+which can be critical in observability platforms
+* Setting granular quotas is invaluable as an administrator running Vector
+for a number of users to ensure fair use of the pipeline
 
 ## Drawbacks
 
-* If we allow rate limiting by `Bytes` in this transform it will be the unserialized form of the event, which will differ from what downstream sinks will actually receive
+* If we allow rate limiting by `Bytes` in this transform it will be the unserialized
+form of the event, which will differ from what downstream sinks will actually receive
 
 ## Prior Art
 
@@ -142,7 +152,11 @@ impl TaskTransform for Throttle {
 
 ## Outstanding Questions
 
-* ~~Rate limiting seems like it could be generically a `sink` concern and implemented as a composable part of our `sink` pattern. This could give more "accurate" serialized sizes and possibly be easier to manage for administrators (depending on needs). If rate limiting is also a `sink` concern should it only be implemented there or also available as a `transform`?~~ We may additionally add this to sinks, but this transform has value on its own.
+* ~~Rate limiting seems like it could be generically a `sink` concern and implemented as a
+composable part of our `sink` pattern. This could give more "accurate" serialized sizes and
+possibly be easier to manage for administrators (depending on needs). If rate limiting is
+also a `sink` concern should it only be implemented there or also available as a `transform`?~~
+We may additionally add this to sinks, but this transform has value on its own.
 
 ## Plan Of Attack
 
