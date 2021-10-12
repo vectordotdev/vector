@@ -125,6 +125,6 @@ impl TaskTransform for Throttle {
 
 #[derive(Debug, Snafu)]
 pub enum ConfigError {
-    #[snafu(display("`events_threshold`, `bytes_threshold`, and `window` must be non-zero"))]
+    #[snafu(display("`threshold`, and `window` must be non-zero"))]
     NonZero,
 }
