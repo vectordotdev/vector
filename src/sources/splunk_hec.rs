@@ -2,7 +2,7 @@ use crate::{
     config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
     event::{Event, LogEvent, Value},
     internal_events::{
-        SplunkHecEventsReceived, SplunkHecRequestBodyInvalid, SplunkHecRequestError,
+        SplunkHecEventsReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
         SplunkHecRequestReceived,
     },
     tls::{MaybeTlsSettings, TlsConfig},
@@ -495,7 +495,7 @@ impl<'de, R: JsonRead<'de>> Iterator for EventIterator<'de, R> {
                 }
             }
             Some(Err(error)) => {
-                emit!(&SplunkHecRequestBodyInvalid {
+                emit!(&SplunkHecRequestBodyInvalidError {
                     error: error.into()
                 });
                 Some(Err(
@@ -603,7 +603,7 @@ fn raw_event(
             Ok(0) => return Err(ApiError::NoData.into()),
             Ok(_) => Value::from(Bytes::from(data)),
             Err(error) => {
-                emit!(&SplunkHecRequestBodyInvalid { error });
+                emit!(&SplunkHecRequestBodyInvalidError { error });
                 return Err(ApiError::InvalidDataFormat { event: 0 }.into());
             }
         }

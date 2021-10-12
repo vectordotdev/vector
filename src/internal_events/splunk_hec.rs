@@ -111,20 +111,24 @@ mod source {
     }
 
     #[derive(Debug)]
-    pub struct SplunkHecRequestBodyInvalid {
+    pub struct SplunkHecRequestBodyInvalidError {
         pub error: std::io::Error,
     }
 
-    impl InternalEvent for SplunkHecRequestBodyInvalid {
+    impl InternalEvent for SplunkHecRequestBodyInvalidError {
         fn emit_logs(&self) {
             error!(
                 message = "Invalid request body.",
                 error = ?self.error,
+                error_type = "parse_failed",
+                stage = "processing",
                 internal_log_rate_secs = 10
             );
         }
 
-        fn emit_metrics(&self) {}
+        fn emit_metrics(&self) {
+            counter!("component_errors_total", 1, "error_type" => "parse_failed", "stage" => "processing")
+        }
     }
 
     #[derive(Debug)]
@@ -137,12 +141,15 @@ mod source {
             error!(
                 message = "Error processing request.",
                 error = ?self.error,
+                error_type = "http_error",
+                stage = "receiving",
                 internal_log_rate_secs = 10
             );
         }
 
         fn emit_metrics(&self) {
             counter!("http_request_errors_total", 1);
+            counter!("component_errors_total", 1, "error_type" => "http_error", "stage" => "receiving")
         }
     }
 }
