@@ -1648,7 +1648,7 @@ dependencies = [
  "serde_json",
  "shared",
  "snafu",
- "strum_macros 0.21.1",
+ "strum_macros 0.22.0",
  "thiserror",
  "tracing 0.1.29",
  "vrl-compiler",
@@ -3214,9 +3214,9 @@ dependencies = [
 
 [[package]]
 name = "k8s-openapi"
-version = "0.13.0"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "748acc444200aa3528dc131a8048e131a9e75a611a52d152e276e99199313d1a"
+checksum = "4f8de9873b904e74b3533f77493731ee26742418077503683db44e1b3c54aa5c"
 dependencies = [
  "base64 0.13.0",
  "bytes 1.1.0",
@@ -6496,9 +6496,9 @@ dependencies = [
 
 [[package]]
 name = "strum_macros"
-version = "0.21.1"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d06aaeeee809dbc59eb4556183dd927df67db1540de5be8d3ec0b6636358a5ec"
+checksum = "339f799d8b549e3744c7ac7feb216383e4005d94bdb22561b3ab8f3b808ae9fb"
 dependencies = [
  "heck",
  "proc-macro2 1.0.29",
@@ -6677,18 +6677,18 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.29"
+version = "1.0.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "602eca064b2d83369e2b2f34b09c70b605402801927c65c11071ac911d299b88"
+checksum = "854babe52e4df1653706b98fcfc05843010039b406875930a70e4d9644e5c417"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.29"
+version = "1.0.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bad553cc2c78e8de258400763a647e80e6d1b31ee237275d756f6836d204494c"
+checksum = "aa32fd3f627f367fe16f893e2597ae3c05020f8bba2666a4e6ea73d377e5714b"
 dependencies = [
  "proc-macro2 1.0.29",
  "quote 1.0.9",
@@ -7305,7 +7305,7 @@ version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f559b464de2e2bdabcac6a210d12e9b5a5973c251e102c44c585c71d51bd78e"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "static_assertions",
 ]
 
@@ -7526,9 +7526,7 @@ checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
 name = "vector"
 version = "0.18.0"
 dependencies = [
- "anyhow",
  "approx",
- "arc-swap",
  "assert_cmd",
  "async-compression",
  "async-graphql",
@@ -7545,7 +7543,6 @@ dependencies = [
  "bollard",
  "bytes 1.1.0",
  "bytesize",
- "cfg-if 1.0.0",
  "chrono",
  "cidr-utils",
  "colored",
@@ -7604,7 +7601,6 @@ dependencies = [
  "mlua",
  "mongodb",
  "nix 0.22.2",
- "no-proxy",
  "nom 7.0.0",
  "notify",
  "num-format",
@@ -7614,8 +7610,6 @@ dependencies = [
  "openssl",
  "openssl-probe",
  "percent-encoding",
- "pest",
- "pest_derive",
  "pin-project 1.0.8",
  "portpicker",
  "postgres-openssl",
