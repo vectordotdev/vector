@@ -69,7 +69,7 @@ fn default_request_config() -> TowerRequestConfig {
 const MAX_BATCH_SIZE_MB: u64 = 8;
 fn default_batch_config() -> BatchConfig {
     BatchConfig {
-        max_bytes: Some(MAX_BATCH_SIZE_MB as usize),
+        max_bytes: Some(bytesize::mib(MAX_BATCH_SIZE_MB) as usize),
         ..Default::default()
     }
 }
@@ -146,17 +146,17 @@ impl SinkConfig for BigquerySinkConfig {
         let batch_settings = BatchSettings::default()
             // BigQuery has a max request size of 10MB, setting to 8MB gives sufficient padding to
             // include the additional metadata required by the insert request
-            .bytes(bytesize::kib(8000u64).try_into().unwrap())
+            .bytes(bytesize::mib(MAX_BATCH_SIZE_MB).try_into().unwrap())
             .timeout(1)
             .parse_config(self.batch)?;
 
         let batch_bytes = batch_settings.size.bytes as u64;
 
-        if batch_bytes > bytesize::mb(MAX_BATCH_SIZE_MB) {
+        if batch_bytes > bytesize::mib(MAX_BATCH_SIZE_MB) {
             return Err(format!(
                 "provided batch size is too big for BigQuery: {}, max is {}",
                 ByteSize::b(batch_bytes),
-                ByteSize::mb(MAX_BATCH_SIZE_MB)
+                ByteSize::mib(MAX_BATCH_SIZE_MB)
             )
             .into());
         }
