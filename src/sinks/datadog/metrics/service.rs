@@ -26,11 +26,11 @@ impl RetryLogic for DatadogMetricsRetryLogic {
     type Error = HttpError;
     type Response = DatadogMetricsResponse;
 
-    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
         todo!()
     }
 
-    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
+    fn should_retry_response(&self, _response: &Self::Response) -> RetryAction {
         todo!()
     }
 }
@@ -39,6 +39,7 @@ impl RetryLogic for DatadogMetricsRetryLogic {
 pub struct DatadogMetricsRequest {
     pub body: Bytes,
     pub uri: Uri,
+    pub content_type: Arc<str>,
     pub api_key: Arc<str>,
     pub compression: Compression,
     pub finalizers: EventFinalizers,
@@ -51,7 +52,7 @@ impl DatadogMetricsRequest {
 
         let request = Request::post(self.uri)
             .header("DD-API-KEY", self.api_key.as_ref())
-            .header(CONTENT_TYPE, "application/json");
+            .header(CONTENT_TYPE, self.content_type.as_ref());
 
         let request = if let Some(value) = content_encoding {
             request.header(CONTENT_ENCODING, value)
@@ -110,7 +111,7 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
             let request = request.into_http_request()?;
 
             client
-                .call(request)
+                .send(request)
                 .await
                 .map(DatadogMetricsResponse::from)
                 .map_err(Into::into)

@@ -1,5 +1,8 @@
 use std::{cmp, mem};
 
+use core_common::byte_size_of::ByteSizeOf;
+use serde::{Deserialize, Serialize};
+
 const AGENT_DEFAULT_BIN_LIMIT: u16 = 4096;
 const AGENT_DEFAULT_EPS: f64 = 1.0 / 128.0;
 const AGENT_DEFAULT_MIN_VALUE: f64 = 1.0e-9;
@@ -37,6 +40,7 @@ fn lower_bound(gamma_v: f64, bias: i32, k: i16) -> f64 {
     pow_gamma(gamma_v, (k as i32 - bias) as f64)
 }
 
+#[derive(Clone, Debug)]
 struct Config {
     bin_limit: u16,
     // gamma_ln is the natural log of gamma_v, used to speed up calculating log base gamma.
@@ -139,8 +143,8 @@ impl Default for Config {
     }
 }
 
-#[derive(Clone, Copy)]
-struct Bin {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Bin {
     k: i16,
     n: u16,
 }
@@ -177,8 +181,11 @@ impl Bin {
 /// emit useful default quantiles, rather than having to ship the buckets -- upper bound and count
 /// -- to a downstream system that might have no native way to do the same thing, basically
 /// providing no value as they have no way to render useful data from them.
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AgentDDSketch {
+    #[serde(skip)]
     config: Config,
+    #[serde(with = "bin_serialization")]
     bins: Vec<Bin>,
     count: u32,
     min: f64,
@@ -205,12 +212,48 @@ impl AgentDDSketch {
         }
     }
 
-    fn config(&self) -> &Config {
-        &self.config
+    /// Creates a new `AgentDDSketch` based on the given inputs.
+    ///
+    /// This is _only_ useful for constructing a sketch from the raw components when the sketch has
+    /// passed through the transform boundary into Lua/VRL and needs to be reconstructed.
+    ///
+    /// This is a light code smell, as our intention is to rigorously mediate access and mutation of
+    /// a sketch through `AgentDDSketch` and the provided methods.
+    pub fn from_raw(
+        count: u32,
+        min: f64,
+        max: f64,
+        sum: f64,
+        avg: f64,
+        keys: &[i16],
+        counts: &[u16],
+    ) -> Option<AgentDDSketch> {
+        let bin_map = BinMap {
+            keys: keys.into(),
+            counts: counts.into(),
+        };
+        bin_map.into_bins().map(|bins| Self {
+            config: Config::default(),
+            bins,
+            count,
+            min,
+            max,
+            sum,
+            avg,
+        })
     }
 
+    #[allow(dead_code)]
     fn bin_count(&self) -> usize {
         self.bins.len()
+    }
+
+    pub fn bins(&self) -> &[Bin] {
+        &self.bins
+    }
+
+    pub fn bin_map(&self) -> BinMap {
+        BinMap::from_bins(&self.bins)
     }
 
     /// Whether or not this sketch is empty.
@@ -221,6 +264,43 @@ impl AgentDDSketch {
     /// Number of samples currently represented by this sketch.
     pub fn count(&self) -> u32 {
         self.count
+    }
+
+    /// Minimum value seen by this sketch.
+    ///
+    /// Returns `None` if the sketch is empty.
+    pub fn min(&self) -> Option<f64> {
+        self.is_empty().then(|| self.min)
+    }
+
+    /// Maximum value seen by this sketch.
+    ///
+    /// Returns `None` if the sketch is empty.
+    pub fn max(&self) -> Option<f64> {
+        self.is_empty().then(|| self.max)
+    }
+
+    /// Sum of all values seen by this sketch.
+    ///
+    /// Returns `None` if the sketch is empty.
+    pub fn sum(&self) -> Option<f64> {
+        self.is_empty().then(|| self.sum)
+    }
+
+    /// Average value seen by this sketch.
+    ///
+    /// Returns `None` if the sketch is empty.
+    pub fn avg(&self) -> Option<f64> {
+        self.is_empty().then(|| self.avg)
+    }
+
+    pub fn clear(&mut self) {
+        self.count = 0;
+        self.min = f64::MAX;
+        self.max = f64::MIN;
+        self.avg = 0.0;
+        self.sum = 0.0;
+        self.bins.clear();
     }
 
     fn adjust_basic_stats(&mut self, v: f64, n: u32) {
@@ -511,6 +591,101 @@ impl AgentDDSketch {
     }
 }
 
+impl PartialEq for AgentDDSketch {
+    fn eq(&self, other: &Self) -> bool {
+        // We skip checking the configuration because we don't allow creating configurations by
+        // hand, and it's always locked to the constants used by the Datadog Agent.
+        self.count == other.count
+            && self.min == other.min
+            && self.max == other.max
+            && self.sum == other.sum
+            && self.avg == other.avg
+            && self.bins == other.bins
+    }
+}
+
+impl Eq for AgentDDSketch {}
+
+impl ByteSizeOf for AgentDDSketch {
+    fn allocated_bytes(&self) -> usize {
+        self.bins.len() * mem::size_of::<Bin>()
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct BinMap {
+    #[serde(rename = "k")]
+    pub keys: Vec<i16>,
+    #[serde(rename = "n")]
+    pub counts: Vec<u16>,
+}
+
+impl BinMap {
+    pub fn from_bins<B>(bins: B) -> BinMap
+    where
+        B: AsRef<[Bin]>,
+    {
+        let (keys, counts) =
+            bins.as_ref()
+                .iter()
+                .fold((Vec::new(), Vec::new()), |(mut keys, mut counts), bin| {
+                    keys.push(bin.k);
+                    counts.push(bin.n);
+
+                    (keys, counts)
+                });
+
+        BinMap { keys, counts }
+    }
+
+    pub fn into_parts(self) -> (Vec<i16>, Vec<u16>) {
+        (self.keys, self.counts)
+    }
+
+    pub fn into_bins(self) -> Option<Vec<Bin>> {
+        if self.keys.len() != self.counts.len() {
+            None
+        } else {
+            Some(
+                self.keys
+                    .into_iter()
+                    .zip(self.counts.into_iter())
+                    .map(|(k, n)| Bin { k, n })
+                    .collect(),
+            )
+        }
+    }
+}
+
+pub(self) mod bin_serialization {
+    use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
+
+    use super::{Bin, BinMap};
+
+    pub fn serialize<S>(bins: &Vec<Bin>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // We use a custom serializer here because while the summary stat fields are (de)serialized
+        // fine using the default derive implementation, we have to split the bins into an array of
+        // keys and an array of counts.  This is to keep serializing as close as possible to the
+        // Protocol Buffers definition that the Datadog Agent uses.
+        let bin_map = BinMap::from_bins(bins);
+        bin_map.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<Bin>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let bin_map: BinMap = Deserialize::deserialize(deserializer)?;
+        bin_map
+            .into_bins()
+            .ok_or("keys and counts must match in length")
+            .map_err(D::Error::custom)
+    }
+}
+
 fn rank(count: u32, q: f64) -> f64 {
     round_to_even(q * (count - 1) as f64)
 }
@@ -714,6 +889,24 @@ mod tests {
         samples.sort();
 
         samples
+    }
+
+    #[test]
+    fn test_ddsketch_clear() {
+        let mut sketch1 = AgentDDSketch::with_agent_defaults();
+        let mut sketch2 = AgentDDSketch::with_agent_defaults();
+
+        assert_eq!(sketch1, sketch2);
+        assert!(sketch1.is_empty());
+        assert!(sketch2.is_empty());
+
+        sketch2.insert(3.14);
+        assert_ne!(sketch1, sketch2);
+        assert!(!sketch2.is_empty());
+
+        sketch2.clear();
+        assert_eq!(sketch1, sketch2);
+        assert!(sketch2.is_empty());
     }
 
     #[test]

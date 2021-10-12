@@ -1,5 +1,5 @@
 use super::{BatchNotifier, EventFinalizer, EventMetadata};
-use crate::metrics::Handle;
+use crate::metrics::{AgentDDSketch, Handle};
 use crate::ByteSizeOf;
 use chrono::{DateTime, Utc};
 use getset::{Getters, MutGetters};
@@ -78,15 +78,24 @@ impl ByteSizeOf for MetricName {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Debug, Deserialize, Getters, PartialEq, Serialize)]
 pub struct MetricData {
+    #[getset(get = "pub")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp: Option<DateTime<Utc>>,
 
+    #[getset(get = "pub")]
     pub kind: MetricKind,
 
+    #[getset(get = "pub")]
     #[serde(flatten)]
     pub value: MetricValue,
+}
+
+impl PartialOrd for MetricData {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.timestamp.partial_cmp(&other.timestamp)
+    }
 }
 
 impl ByteSizeOf for MetricData {
@@ -132,7 +141,7 @@ impl From<MetricKind> for vrl_core::Value {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 /// A `MetricValue` is the container for the actual value of a metric.
 pub enum MetricValue {
@@ -166,6 +175,13 @@ pub enum MetricValue {
         count: u32,
         sum: f64,
     },
+    /// A Sketch represents a data structure that typically can answer questions about the
+    /// cumulative distribution of the contained samples in space-efficient way.  They represent the
+    /// data in a way that queries over it have bounded error guarantees without needing to hold
+    /// every single sample in memory.  They are also, typically, able to be merged with other
+    /// sketches of the same type such that client-side _and_ server-side aggregation can be
+    /// accomplished without loss of accuracy in the queries.
+    Sketch { sketch: MetricSketch },
 }
 
 impl ByteSizeOf for MetricValue {
@@ -176,6 +192,7 @@ impl ByteSizeOf for MetricValue {
             Self::Distribution { samples, .. } => samples.allocated_bytes(),
             Self::AggregatedHistogram { buckets, .. } => buckets.allocated_bytes(),
             Self::AggregatedSummary { quantiles, .. } => quantiles.allocated_bytes(),
+            Self::Sketch { sketch } => sketch.allocated_bytes(),
         }
     }
 }
@@ -305,14 +322,14 @@ pub fn zip_quantiles(
 impl From<MetricValue> for vrl_core::Value {
     fn from(value: MetricValue) -> Self {
         match value {
-            MetricValue::Counter { .. } => "counter",
-            MetricValue::Gauge { .. } => "gauge",
-            MetricValue::Set { .. } => "set",
-            MetricValue::Distribution { .. } => "distribution",
-            MetricValue::AggregatedHistogram { .. } => "aggregated histogram",
-            MetricValue::AggregatedSummary { .. } => "aggregated summary",
+            MetricValue::Counter { .. } => "counter".into(),
+            MetricValue::Gauge { .. } => "gauge".into(),
+            MetricValue::Set { .. } => "set".into(),
+            MetricValue::Distribution { .. } => "distribution".into(),
+            MetricValue::AggregatedHistogram { .. } => "aggregated histogram".into(),
+            MetricValue::AggregatedSummary { .. } => "aggregated summary".into(),
+            MetricValue::Sketch { sketch } => sketch.into(),
         }
-        .into()
     }
 }
 
@@ -323,6 +340,36 @@ pub enum StatisticKind {
     /// Corresponds to DataDog's Distribution Metric
     /// <https://docs.datadoghq.com/developers/metrics/types/?tab=distribution#definition>
     Summary,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum MetricSketch {
+    /// DDSketch implementation based on the Datadog Agent.
+    ///
+    /// While DDSketch has open-source implementations based on the white paper, the version used in
+    /// the Datadog Agent itself is subtly different.  This version is suitable for sending directly
+    /// to Datadog's sketch ingest endpoint.
+    AgentDDSketch(AgentDDSketch),
+}
+
+impl ByteSizeOf for MetricSketch {
+    fn allocated_bytes(&self) -> usize {
+        match self {
+            Self::AgentDDSketch(ddsketch) => ddsketch.allocated_bytes(),
+        }
+    }
+}
+
+/// Convert the Metric sketch into a vrl value.
+/// Currently vrl can only read the type of the value and doesn't consider
+/// any actual metric values.
+#[cfg(feature = "vrl")]
+impl From<MetricSketch> for vrl_core::Value {
+    fn from(value: MetricSketch) -> Self {
+        match value {
+            MetricSketch::AgentDDSketch(_) => "agent dd sketch".into(),
+        }
+    }
 }
 
 impl Metric {
@@ -689,6 +736,11 @@ impl MetricValue {
                 *count = 0;
                 *sum = 0.0;
             }
+            Self::Sketch { sketch } => match sketch {
+                MetricSketch::AgentDDSketch(ddsketch) => {
+                    ddsketch.clear();
+                }
+            },
         }
     }
 
@@ -881,6 +933,29 @@ impl Display for Metric {
                 write_list(fmt, " ", quantiles, |fmt, quantile| {
                     write!(fmt, "{}@{}", quantile.q, quantile.value)
                 })
+            }
+            MetricValue::Sketch { sketch } => {
+                let quantiles = [0.5, 0.75, 0.9, 0.99]
+                    .iter()
+                    .map(|q| Quantile { q: *q, value: 0.0 })
+                    .collect::<Vec<_>>();
+
+                match sketch {
+                    MetricSketch::AgentDDSketch(ddsketch) => {
+                        write!(
+                            fmt,
+                            "count={} sum={:?} min={:?} max={:?} avg={:?} ",
+                            ddsketch.count(),
+                            ddsketch.sum(),
+                            ddsketch.min(),
+                            ddsketch.max(),
+                            ddsketch.avg()
+                        )?;
+                        write_list(fmt, " ", quantiles, |fmt, q| {
+                            write!(fmt, "{}={:?}", q.as_percentile(), ddsketch.quantile(q.q))
+                        })
+                    }
+                }
             }
         }
     }

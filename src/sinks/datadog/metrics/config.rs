@@ -5,7 +5,6 @@ use crate::{
         datadog::{healthcheck, Region},
         util::{
             batch::{BatchConfig, BatchSettings},
-            retries::RetryLogic,
             Compression, Concurrency, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, UriParseError, VectorSink,
@@ -13,6 +12,7 @@ use crate::{
 };
 use futures::FutureExt;
 use http::{uri::InvalidUri, Uri};
+use hyper::Body;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tower::ServiceBuilder;
@@ -25,7 +25,7 @@ use super::{
 
 // TODO: revisit our concurrency and batching defaults
 const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
-    TowerRequestConfig::const_new(Concurrency::None, Concurrency::None).retry_attempts(5);
+    TowerRequestConfig::new(Concurrency::None).retry_attempts(5);
 
 const DEFAULT_BATCH_SETTINGS: BatchSettings<()> =
     BatchSettings::const_default().events(20).timeout(1);
@@ -46,6 +46,7 @@ enum BuildError {
 pub enum DatadogMetricsEndpoint {
     Series,
     Distribution,
+    Sketch,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -74,7 +75,7 @@ impl_generate_config_from_default!(DatadogMetricsConfig);
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = HttpClient::new(None, cx.proxy())?;
+        let client = HttpClient::<Body>::new(None, cx.proxy())?;
 
         let client = self.build_client(&cx.proxy)?;
         let healthcheck = self.build_healthcheck(client.clone());
@@ -121,10 +122,12 @@ impl DatadogMetricsConfig {
         let base_uri = self.get_base_agent_endpoint();
         let series_endpoint = build_uri(&base_uri, "/api/v1/series")?;
         let distribution_endpoint = build_uri(&base_uri, "/api/v1/distribution_points")?;
+        let sketch_endpoint = build_uri(&base_uri, "/api/beta/sketches")?;
 
         Ok(vec![
             (DatadogMetricsEndpoint::Series, series_endpoint),
             (DatadogMetricsEndpoint::Distribution, distribution_endpoint),
+            (DatadogMetricsEndpoint::Sketch, sketch_endpoint),
         ])
     }
 
@@ -158,7 +161,9 @@ impl DatadogMetricsConfig {
     }
 
     fn build_sink(&self, client: HttpClient, cx: SinkContext) -> crate::Result<VectorSink> {
-        let batch = DEFAULT_BATCH_SETTINGS.parse_config(self.batch)?;
+        let batcher_settings = DEFAULT_BATCH_SETTINGS
+            .parse_config(self.batch)?
+            .into_batcher_settings()?;
 
         let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
         let metric_endpoints = self.generate_metric_endpoints()?;
@@ -166,7 +171,13 @@ impl DatadogMetricsConfig {
             .settings(request_limits, DatadogMetricsRetryLogic)
             .service(DatadogMetricsService::new(client));
 
-        let sink = DatadogMetricsSink::new(cx, service, metric_endpoints, self.compression);
+        let sink = DatadogMetricsSink::new(
+            cx,
+            service,
+            metric_endpoints,
+            self.compression,
+            batcher_settings,
+        );
 
         Ok(VectorSink::Stream(Box::new(sink)))
     }

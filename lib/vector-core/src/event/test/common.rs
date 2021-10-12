@@ -5,7 +5,10 @@ use crate::event::{
 use bytes::Bytes;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use quickcheck::{empty_shrinker, Arbitrary, Gen};
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    iter,
+};
 
 const MAX_F64_SIZE: f64 = 1_000_000.0;
 const MAX_ARRAY_SIZE: usize = 4;
@@ -302,6 +305,15 @@ impl Arbitrary for MetricValue {
                         }),
                 )
             }
+            // Property testing a sketch doesn't actually make any sense, I don't think.
+            //
+            // We can't extract the values used to build it, which is by design, so all we could do
+            // is mess with the internal buckets, which isn't even exposed (and absolutely shouldn't
+            // be) and doing that is gauranteed to mess with the sketch in non-obvious ways thatn
+            // would ot occur if we were actually seeding it with real samples.
+            MetricValue::Sketch { sketch } => Box::new(iter::once(MetricValue::Sketch {
+                sketch: sketch.clone(),
+            })),
         }
     }
 }

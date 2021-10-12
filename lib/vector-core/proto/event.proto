@@ -59,6 +59,7 @@ message Metric {
     Distribution2 distribution2 = 12;
     AggregatedHistogram2 aggregated_histogram2 = 13;
     AggregatedSummary2 aggregated_summary2 = 14;
+    Sketch sketch = 15;
   }
   string namespace = 11;
 }
@@ -130,4 +131,20 @@ message AggregatedSummary2 {
 message SummaryQuantile {
   double upper_limit = 1;
   double value = 2;
+}
+
+message Sketch {
+  message AgentDDSketch {
+    uint32 count = 1;
+    double min = 2;
+    double max = 3;
+    double sum = 4;
+    double avg = 5;
+    repeated sint32 k = 6;
+    repeated uint32 n = 7;
+  }
+
+  oneof sketch {
+    AgentDDSketch agent_dd_sketch = 1;
+  }
 }
