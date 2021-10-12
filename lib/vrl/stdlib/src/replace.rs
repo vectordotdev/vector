@@ -50,6 +50,11 @@ impl Function for Replace {
                 source: r#"replace("foobar", r'o|a', "i")"#,
                 result: Ok("fiibir"),
             },
+            Example {
+                title: "replace with capture group",
+                source: r#"replace("foo123bar", r'foo(?P<num>\d+)bar', "$num")"#,
+                result: Ok(r#""123""#),
+            },
         ]
     }
 
