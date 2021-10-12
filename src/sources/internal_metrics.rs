@@ -1,7 +1,5 @@
 use crate::{
-    config::{
-        log_schema, ConfigBuilderHash, DataType, SourceConfig, SourceContext, SourceDescription,
-    },
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     metrics::Controller,
     shutdown::ShutdownSignal,
     Pipeline,
@@ -19,15 +17,15 @@ pub struct InternalMetricsConfig {
     scrape_interval_secs: u64,
     tags: TagsConfig,
     namespace: Option<String>,
-    config_hash: Option<ConfigBuilderHash>,
+    config_hash: Option<String>,
 }
 
 impl InternalMetricsConfig {
     /// Return an internal metrics config with enterprise reporting defaults.
-    pub fn enterprise(config_hash: ConfigBuilderHash) -> Self {
+    pub fn enterprise<T: Into<String>>(config_hash: T) -> Self {
         Self {
             namespace: Some("pipelines".to_owned()),
-            config_hash: Some(config_hash),
+            config_hash: Some(config_hash.into()),
             ..Self::default()
         }
     }
@@ -63,7 +61,7 @@ impl SourceConfig for InternalMetricsConfig {
         }
         let interval = time::Duration::from_secs(self.scrape_interval_secs);
         let namespace = self.namespace.clone();
-        let config_hash = self.config_hash.map(|hash| hash.sha256_hex());
+        let config_hash = self.config_hash.clone();
         let host_key = self.tags.host_key.as_deref().and_then(|tag| {
             if tag.is_empty() {
                 None

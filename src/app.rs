@@ -174,9 +174,7 @@ impl Application {
                 config.healthchecks.set_require_healthy(require_healthy);
 
                 #[cfg(feature = "datadog-pipelines")]
-                {
-                    config = config::datadog::attach(config);
-                }
+                config::datadog::try_attach(&mut config);
 
                 let diff = config::ConfigDiff::initial(&config);
                 let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
@@ -259,9 +257,7 @@ impl Application {
                                         new_config.healthchecks.set_require_healthy(opts.require_healthy);
 
                                         #[cfg(feature = "datadog-pipelines")]
-                                        {
-                                            new_config = config::datadog::attach(new_config);
-                                        }
+                                        config::datadog::try_attach(&mut new_config);
 
                                         match topology
                                             .reload_config_and_respawn(new_config)
@@ -304,9 +300,7 @@ impl Application {
                                     new_config.healthchecks.set_require_healthy(opts.require_healthy);
 
                                     #[cfg(feature = "datadog-pipelines")]
-                                    {
-                                        new_config = config::datadog::attach(new_config);
-                                    }
+                                    config::datadog::try_attach(&mut new_config);
 
                                     match topology
                                         .reload_config_and_respawn(new_config)

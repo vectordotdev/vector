@@ -32,6 +32,9 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         errors.extend(type_errors);
     }
 
+    #[cfg(feature = "datadog-pipelines")]
+    let hash = builder.to_hash();
+
     let ConfigBuilder {
         global,
         #[cfg(feature = "api")]
@@ -83,6 +86,8 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             api,
             #[cfg(feature = "datadog-pipelines")]
             datadog,
+            #[cfg(feature = "datadog-pipelines")]
+            hash,
             healthchecks,
             enrichment_tables,
             sources,

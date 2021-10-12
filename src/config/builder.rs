@@ -1,12 +1,12 @@
 #[cfg(feature = "api")]
 use super::api;
-#[cfg(feature = "datadog-pipelines")]
-use super::datadog;
 use super::{
-    builder_hash::ConfigBuilderHash, compiler, provider, ComponentKey, Config,
-    EnrichmentTableConfig, EnrichmentTableOuter, HealthcheckOptions, SinkConfig, SinkOuter,
-    SourceConfig, SourceOuter, TestDefinition, TransformOuter,
+    compiler, provider, ComponentKey, Config, EnrichmentTableConfig, EnrichmentTableOuter,
+    HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter, TestDefinition,
+    TransformOuter,
 };
+#[cfg(feature = "datadog-pipelines")]
+use super::{datadog, hash::ConfigHash};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use vector_core::{config::GlobalOptions, default_data_dir, transform::TransformConfig};
@@ -64,6 +64,7 @@ impl From<Config> for ConfigBuilder {
             transforms,
             tests,
             expansions: _,
+            ..
         } = config;
 
         let transforms = transforms
@@ -247,8 +248,9 @@ impl ConfigBuilder {
         Ok(())
     }
 
+    #[cfg(feature = "datadog-pipelines")]
     /// Converts the `ConfigBuilder` to a `ConfigBuilderHash`, for use with hashing.
-    pub fn to_hash(&self) -> ConfigBuilderHash {
+    pub fn to_hash(&self) -> ConfigHash {
         self.clone().into()
     }
 

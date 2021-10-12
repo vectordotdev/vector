@@ -20,7 +20,6 @@ pub use vector_core::transform::{DataType, ExpandType, TransformConfig, Transfor
 
 pub mod api;
 mod builder;
-mod builder_hash;
 mod compiler;
 pub mod component;
 #[cfg(feature = "datadog-pipelines")]
@@ -28,6 +27,8 @@ pub mod datadog;
 mod diff;
 pub mod format;
 mod graph;
+#[cfg(feature = "datadog-pipelines")]
+mod hash;
 mod id;
 mod loading;
 pub mod provider;
@@ -37,9 +38,9 @@ mod vars;
 pub mod watcher;
 
 pub use builder::ConfigBuilder;
-pub use builder_hash::ConfigBuilderHash;
 pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
+pub use hash::ConfigHash;
 pub use id::{ComponentKey, ComponentScope, OutputId};
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
@@ -90,11 +91,13 @@ impl ConfigPath {
 
 #[derive(Debug, Default)]
 pub struct Config {
-    pub global: GlobalOptions,
     #[cfg(feature = "api")]
     pub api: api::Options,
     #[cfg(feature = "datadog-pipelines")]
+    pub hash: ConfigHash,
+    #[cfg(feature = "datadog-pipelines")]
     pub datadog: datadog::Options,
+    pub global: GlobalOptions,
     pub healthchecks: HealthcheckOptions,
     pub sources: IndexMap<ComponentKey, SourceOuter>,
     pub sinks: IndexMap<ComponentKey, SinkOuter<OutputId>>,
