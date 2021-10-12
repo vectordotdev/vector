@@ -174,6 +174,7 @@ impl Application {
                 config.healthchecks.set_require_healthy(require_healthy);
 
                 #[cfg(feature = "datadog-pipelines")]
+                // Augment config to enable observability within Datadog, if applicable.
                 config::datadog::try_attach(&mut config);
 
                 let diff = config::ConfigDiff::initial(&config);
