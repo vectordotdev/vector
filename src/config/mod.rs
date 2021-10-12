@@ -40,6 +40,7 @@ pub mod watcher;
 pub use builder::ConfigBuilder;
 pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
+#[cfg(feature = "datadog-pipelines")]
 pub use hash::ConfigHash;
 pub use id::{ComponentKey, ComponentScope, OutputId};
 pub use loading::{
@@ -862,6 +863,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "datadog-pipelines")]
     fn order_independent_sha256_hashes() {
         let config1: ConfigBuilder = format::deserialize(
             indoc! {r#"
