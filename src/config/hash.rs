@@ -9,6 +9,9 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use vector_core::config::GlobalOptions;
 
+/// A `ConfigHash` represents a stable, hashable representation of user supplied
+/// configuration. It's based on `ConfigBuilder`, but uses a `BTreeMap` instead of an `IndexMap`
+/// where relevant to provide a stable serialization order to sibling keys.
 #[derive(Deserialize, Serialize, Debug, Default)]
 pub struct ConfigHash {
     #[serde(flatten)]
