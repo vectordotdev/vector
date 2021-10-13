@@ -1106,6 +1106,7 @@ components: sources: internal_metrics: {
 			required:    true
 			enum: {
 				"delete_failed":               "The file deletion failed."
+				"encode_failed":               "The encode operation failed."
 				"field_missing":               "The event field was missing."
 				"glob_failed":                 "The glob pattern match operation failed."
 				"http_error":                  "The HTTP request resulted in an error code."

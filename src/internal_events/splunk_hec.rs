@@ -27,11 +27,14 @@ impl InternalEvent for SplunkEventEncodeError {
         error!(
             message = "Error encoding Splunk HEC event to JSON.",
             error = ?self.error,
+            error_type = "encode_failed",
+            stage = "processing",
             internal_log_rate_secs = 30,
         );
     }
 
     fn emit_metrics(&self) {
+        counter!("component_errors_total", 1, "error_type" => "encode_failed", "stage" => "processing");
         counter!("encode_errors_total", 1);
     }
 }
