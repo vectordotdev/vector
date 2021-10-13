@@ -1,4 +1,4 @@
-use crate::conditions::AnyCondition;
+use crate::conditions::{AnyCondition, Condition};
 use crate::config::{DataType, TransformConfig, TransformContext, TransformDescription};
 use crate::event::Event;
 use crate::transforms::{TaskTransform, Transform};
@@ -30,8 +30,8 @@ impl_generate_config_from_default!(ThrottleConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "throttle")]
 impl TransformConfig for ThrottleConfig {
-    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Throttle::new(self).map(Transform::task)
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        Throttle::new(self, context).map(Transform::task)
     }
 
     fn input_type(&self) -> DataType {
@@ -47,15 +47,15 @@ impl TransformConfig for ThrottleConfig {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Throttle {
     quota: Quota,
     key_field: Option<String>,
-    exclude: Option<AnyCondition>,
+    exclude: Option<Box<dyn Condition>>,
 }
 
 impl Throttle {
-    pub fn new(config: &ThrottleConfig) -> crate::Result<Self> {
+    pub fn new(config: &ThrottleConfig, context: &TransformContext) -> crate::Result<Self> {
         let threshold = match NonZeroU32::new(config.threshold) {
             Some(threshold) => threshold,
             None => return Err(Box::new(ConfigError::NonZero)),
@@ -67,11 +67,16 @@ impl Throttle {
             Some(quota) => quota.allow_burst(threshold),
             None => return Err(Box::new(ConfigError::NonZero)),
         };
+        let exclude = config
+            .exclude
+            .as_ref()
+            .map(|condition| condition.build(&context.enrichment_tables))
+            .transpose()?;
 
         Ok(Self {
             quota,
             key_field: None,
-            exclude: None,
+            exclude,
         })
     }
 }
@@ -84,7 +89,7 @@ impl TaskTransform for Throttle {
     where
         Self: 'static,
     {
-        let limiter = RateLimiter::direct(self.quota);
+        let limiter = RateLimiter::keyed(self.quota);
 
         let mut flush_stream = tokio::time::interval(Duration::from_millis(1000));
 
@@ -100,16 +105,30 @@ impl TaskTransform for Throttle {
                         match maybe_event {
                             None => true,
                             Some(event) => {
-                                match limiter.check() {
-                                    Ok(()) => {
+                                if let Some(condition) = self.exclude.as_ref() {
+                                    if condition.check(&event) {
                                         output.push(event);
-                                        false
+                                    } else {
+                                        match limiter.check_key(&"default") {
+                                            Ok(()) => {
+                                                output.push(event);
+                                            }
+                                            _ => {
+                                                // Dropping event
+                                            }
+                                        }
                                     }
-                                    _ => {
-                                        // Dropping event
-                                        false
+                                } else {
+                                    match limiter.check_key(&"default") {
+                                        Ok(()) => {
+                                            output.push(event);
+                                        }
+                                        _ => {
+                                            // Dropping event
+                                        }
                                     }
                                 }
+                                false
                             }
                         }
                     }
