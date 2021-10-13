@@ -18,7 +18,7 @@ async fn drop_when_full() {
 
         let mut tx = Box::pin(DropWhenFull::new(
             tx,
-            BufferUsageData::new(WhenFull::DropNewest, Span::none()),
+            BufferUsageData::new(WhenFull::DropNewest, Span::none(), None, None),
         ));
 
         assert_eq!(tx.as_mut().poll_ready(cx), Poll::Ready(Ok(())));

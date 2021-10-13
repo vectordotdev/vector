@@ -47,6 +47,7 @@ pub struct BufferCreated {
 }
 
 impl InternalEvent for BufferCreated {
+    #[allow(clippy::cast_precision_loss)]
     fn emit_metrics(&self) {
         if let Some(max_size) = self.max_size_events {
             gauge!("buffer_max_event_size", max_size as f64);
