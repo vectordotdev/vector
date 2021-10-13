@@ -9,11 +9,6 @@ use crate::internal_events::{
 };
 use crate::WhenFull;
 
-pub enum BufferMaxSize {
-    Events(usize),
-    Bytes(usize),
-}
-
 pub struct BufferUsageData {
     received_event_count: AtomicU64,
     received_byte_size: AtomicUsize,
@@ -25,15 +20,15 @@ pub struct BufferUsageData {
 }
 
 impl BufferUsageData {
-    pub fn new(when_full: WhenFull, span: Span, max_size: BufferMaxSize) -> Arc<Self> {
+    pub fn new(
+        when_full: WhenFull,
+        span: Span,
+        max_size_bytes: Option<usize>,
+        max_size_events: Option<usize>,
+    ) -> Arc<Self> {
         let dropped_event_count = match when_full {
             WhenFull::Block => None,
             WhenFull::DropNewest => Some(AtomicU64::new(0)),
-        };
-
-        let (max_size_bytes, max_size_events) = match max_size {
-            BufferMaxSize::Events(max) => (None, Some(max)),
-            BufferMaxSize::Bytes(max) => (Some(max), None),
         };
 
         let buffer_usage_data = Arc::new(Self {

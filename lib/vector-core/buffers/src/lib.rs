@@ -21,7 +21,7 @@ mod internal_events;
 mod test;
 mod variant;
 
-use crate::buffer_usage_data::{BufferMaxSize, BufferUsageData};
+use crate::buffer_usage_data::BufferUsageData;
 use crate::bytes::{DecodeBytes, EncodeBytes};
 pub use acker::{Ackable, Acker};
 use core_common::byte_size_of::ByteSizeOf;
@@ -71,8 +71,7 @@ where
             ..
         } => {
             let buffer_dir = format!("{}_buffer", id);
-            let buffer_usage_data =
-                BufferUsageData::new(when_full, span, BufferMaxSize::Bytes(max_size));
+            let buffer_usage_data = BufferUsageData::new(when_full, span, Some(max_size), None);
             let (tx, rx, acker) =
                 disk::open(&data_dir, &buffer_dir, max_size, buffer_usage_data.clone())
                     .map_err(|error| error.to_string())?;
@@ -88,7 +87,7 @@ where
             let (tx, rx) = mpsc::channel(max_events);
             if instrument {
                 let buffer_usage_data =
-                    BufferUsageData::new(when_full, span, BufferMaxSize::Events(max_events));
+                    BufferUsageData::new(when_full, span, None, Some(max_events));
                 let tx = BufferInputCloner::Memory(tx, when_full, Some(buffer_usage_data.clone()));
                 let rx = rx.inspect(move |item: &T| {
                     buffer_usage_data.increment_sent_event_count_and_byte_size(1, item.size_of());
