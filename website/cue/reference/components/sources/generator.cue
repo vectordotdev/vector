@@ -18,7 +18,10 @@ components: sources: generator: {
 
 	features: {
 		multiline: enabled: false
-		codecs: enabled:    true
+		codecs: {
+			enabled:         true
+			default_framing: "`bytes`"
+		}
 		generate: {}
 	}
 

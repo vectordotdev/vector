@@ -21,7 +21,10 @@ components: sources: datadog_agent: {
 
 	features: {
 		multiline: enabled: false
-		codecs: enabled:    true
+		codecs: {
+			enabled:         true
+			default_framing: "`bytes`"
+		}
 		receive: {
 			from: {
 				service: services.datadog_agent

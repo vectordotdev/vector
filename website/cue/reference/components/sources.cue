@@ -75,13 +75,15 @@ components: sources: [Name=string]: {
 			if features.codecs.enabled {
 				framing: {
 					common:      false
-					description: "Configures in which way incoming byte sequences are split up into byte frames. Defaults to `bytes` on message based sources and to `newline_delimited` on stream based sources."
+					description: "Configures in which way incoming byte sequences are split up into byte frames."
 					required:    false
 					type: object: options: {
 						method: {
 							description: "The framing method."
-							required:    true
+							required:    false
+							common:      true
 							type: string: {
+								default: features.codecs.default_framing
 								enum: {
 									bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
 									character_delimited: "Byte frames which are delimited by a chosen character."
@@ -162,8 +164,10 @@ components: sources: [Name=string]: {
 					type: object: options: {
 						codec: {
 							description: "The decoding method."
-							required:    true
+							required:    false
+							common:      true
 							type: string: {
+								default: "`bytes`"
 								enum: {
 									bytes:  "Events containing the byte frame as-is."
 									json:   "Events being parsed from a JSON string."
