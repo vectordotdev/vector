@@ -63,7 +63,6 @@ impl From<Config> for ConfigBuilder {
             sinks,
             transforms,
             tests,
-            expansions: _,
             ..
         } = config;
 
