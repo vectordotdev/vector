@@ -75,8 +75,8 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, io, sync::Arc};
 use crate::event::LogEvent;
-use crate::transforms::metric_to_log::MetricToLog;
-use std::io::Write;
+
+
 
 pub trait Encoder<T> {
     /// Encodes the input into the provided writer.

@@ -1,14 +1,14 @@
-use crate::sinks::util::{StreamSink, SinkBuilderExt, BatchSettings, Compression};
+use crate::sinks::util::{StreamSink, SinkBuilderExt, Compression};
 use futures::stream::BoxStream;
 use crate::event::{Event, LogEvent};
-use vector_core::partition::{Partitioner, NullPartitioner};
+use vector_core::partition::{NullPartitioner};
 use std::num::NonZeroUsize;
-use std::time::Duration;
+
 use futures::{StreamExt, TryFutureExt};
 use crate::sinks::elasticsearch::request_builder::ElasticsearchRequestBuilder;
 use crate::buffers::Acker;
 use crate::sinks::elasticsearch::service::ElasticSearchService;
-use crate::sinks::elasticsearch::{BulkAction, Encoding, ElasticSearchCommonMode, maybe_set_id};
+use crate::sinks::elasticsearch::{BulkAction, Encoding, ElasticSearchCommonMode};
 use crate::transforms::metric_to_log::MetricToLog;
 use vector_core::stream::BatcherSettings;
 use async_trait::async_trait;
@@ -19,7 +19,7 @@ use crate::sinks::elasticsearch::encoder::ProcessedEvent;
 use vector_core::ByteSizeOf;
 use crate::event::Value;
 use crate::rusoto;
-use futures::FutureExt;
+
 use std::sync::Arc;
 use crate::rusoto::AwsCredentialsProvider;
 

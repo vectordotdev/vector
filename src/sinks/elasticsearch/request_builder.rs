@@ -1,6 +1,6 @@
 use crate::sinks::util::{RequestBuilder, Compression};
-use crate::event::Event;
-use crate::sinks::elasticsearch::{finish_signer, BulkAction};
+
+
 use rusoto_core::signature::{SignedRequest, SignedRequestPayload};
 use rusoto_core::credential::AwsCredentials;
 use headers::{HeaderName, HeaderValue};
@@ -8,7 +8,7 @@ use http::Uri;
 use crate::sinks::elasticsearch::encoder::{ElasticSearchEncoder, ProcessedEvent};
 use vector_core::ByteSizeOf;
 use crate::sinks::elasticsearch::service::ElasticSearchRequest;
-use crate::sinks::elasticsearch::sink::BatchedEvents;
+
 use crate::sinks::util::http::RequestConfig;
 use crate::http::Auth;
 use http::Request;
@@ -66,7 +66,7 @@ impl RequestBuilder<Input> for ElasticsearchRequestBuilder {
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
         let mut builder = Request::post(&self.bulk_uri);
 
-        let http_req = if let Some(aws_credentials) = metadata.aws_credentials {
+        let _http_req = if let Some(aws_credentials) = metadata.aws_credentials {
             let mut request = self.create_signed_request("POST", &self.bulk_uri, true);
 
             request.add_header("Content-Type", "application/x-ndjson");

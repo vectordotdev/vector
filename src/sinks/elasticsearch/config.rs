@@ -1,10 +1,10 @@
-use crate::sinks::util::{Buffer, Compression, BatchConfig};
+use crate::sinks::util::{Compression, BatchConfig};
 use crate::sinks::elasticsearch::{ElasticSearchCommon, ElasticSearchMode, ElasticSearchAuth, ElasticSearchCommonMode};
 use crate::sinks::util::encoding::EncodingConfigWithDefault;
 use crate::config::{SinkConfig, SinkContext, DataType};
 use crate::sinks::{Healthcheck, VectorSink};
 use crate::template::Template;
-use crate::event::{LogEvent, Event, Value, EventRef};
+use crate::event::{LogEvent, Value, EventRef};
 use crate::sinks::util::http::RequestConfig;
 use indexmap::map::IndexMap;
 use crate::rusoto::RegionOrEndpoint;
@@ -281,9 +281,9 @@ impl DataStreamConfig {
 impl SinkConfig for ElasticSearchConfig {
     async fn build(
         &self,
-        cx: SinkContext,
+        _cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let common = ElasticSearchCommon::parse_config(self)?;
+        let _common = ElasticSearchCommon::parse_config(self)?;
 
 
         todo!()

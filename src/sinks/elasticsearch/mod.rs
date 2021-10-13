@@ -9,39 +9,31 @@ mod encoder;
 pub use common::*;
 pub use config::*;
 
-use self::retry::{ElasticSearchRetryLogic, ElasticSearchServiceLogic};
+
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{SinkConfig, SinkDescription},
     emit,
-    http::{Auth, HttpClient, MaybeAuth},
-    internal_events::{ElasticSearchEventEncoded, TemplateRenderingFailed},
-    rusoto::{self, region_from_endpoint, AwsAuthentication, RegionOrEndpoint},
-    sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpSink, RequestConfig},
-        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
-    },
+    internal_events::{TemplateRenderingFailed},
+    rusoto::{self, AwsAuthentication},
     template::{Template, TemplateParseError},
-    tls::{TlsOptions, TlsSettings},
-    transforms::metric_to_log::{MetricToLog, MetricToLogConfig},
 };
-use futures::{FutureExt, SinkExt};
+use futures::{FutureExt};
 use http::{
     header::{HeaderName, HeaderValue},
     uri::InvalidUri,
-    Request, StatusCode, Uri,
+    Request,
 };
-use hyper::Body;
-use indexmap::IndexMap;
-use rusoto_core::Region;
+
+
+
 use rusoto_credential::{CredentialsError, ProvideAwsCredentials};
-use rusoto_signature::{SignedRequest, SignedRequestPayload};
+use rusoto_signature::{SignedRequest};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use snafu::{ResultExt, Snafu};
-use std::collections::{BTreeMap, HashMap};
+
 use std::convert::TryFrom;
-use vector_core::event::{Event, Value};
+
 use crate::event::{EventRef, LogEvent};
 // use crate::sinks::elasticsearch::ParseError::AwsCredentialsGenerateFailed;
 

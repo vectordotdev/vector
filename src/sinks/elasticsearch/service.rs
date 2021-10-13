@@ -1,5 +1,5 @@
 use crate::buffers::Ackable;
-use bytes::Bytes;
+
 use crate::event::{EventFinalizers, Finalizable, EventStatus};
 use hyper::service::Service;
 use std::task::{Context, Poll};
@@ -7,7 +7,7 @@ use crate::http::HttpClient;
 use futures::future::BoxFuture;
 use hyper::{Body, Request};
 use futures::FutureExt;
-use tracing::Instrument;
+
 
 pub struct ElasticSearchRequest {
     pub http_request: Request<Vec<u8>>,
@@ -47,7 +47,7 @@ impl Service<ElasticSearchRequest> for ElasticSearchService {
     type Error = ();
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
