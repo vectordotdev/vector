@@ -2,7 +2,7 @@ use crate::{
     config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
     event::{Event, LogEvent, Value},
     internal_events::{
-        SplunkHecBytesReceived, SplunkHecEventsReceived, SplunkHecRequestBodyInvalidError,
+        EventsReceived, SplunkHecBytesReceived, SplunkHecRequestBodyInvalidError,
         SplunkHecRequestError, SplunkHecRequestReceived,
     },
     tls::{MaybeTlsSettings, TlsConfig},
@@ -493,7 +493,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             de.extract(log, &mut json);
         }
 
-        emit!(&SplunkHecEventsReceived {
+        emit!(&EventsReceived {
             count: 1,
             byte_size: event.size_of(),
         });
@@ -660,7 +660,7 @@ fn raw_event(
         .as_mut_log()
         .try_insert(log_schema().source_type_key(), Bytes::from("splunk_hec"));
 
-    emit!(&SplunkHecEventsReceived {
+    emit!(&EventsReceived {
         count: 1,
         byte_size: event.size_of(),
     });

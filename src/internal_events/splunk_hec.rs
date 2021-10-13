@@ -82,32 +82,6 @@ mod source {
     }
 
     #[derive(Debug)]
-    pub struct SplunkHecEventsReceived {
-        pub count: u64,
-        pub byte_size: usize,
-    }
-
-    impl InternalEvent for SplunkHecEventsReceived {
-        fn emit_logs(&self) {
-            trace!(
-                message = "Received events.",
-                count = %self.count,
-                byte_size = %self.byte_size,
-            );
-        }
-
-        fn emit_metrics(&self) {
-            counter!("component_received_events_total", self.count);
-            counter!(
-                "component_received_event_bytes_total",
-                self.byte_size as u64
-            );
-            // deprecated
-            counter!("events_in_total", 1);
-        }
-    }
-
-    #[derive(Debug)]
     pub struct SplunkHecRequestReceived<'a> {
         pub path: &'a str,
     }
