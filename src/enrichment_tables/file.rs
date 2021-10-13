@@ -58,7 +58,7 @@ impl FileConfig {
     ) -> Result<Value, String> {
         use chrono::TimeZone;
 
-        Ok(match self.schema.get(column) {
+        Ok(match self.schema.get(column).map(|format| format.trim()) {
             Some(format) if format == "date" => Value::Timestamp(
                 chrono::FixedOffset::east(0)
                     .from_utc_datetime(
@@ -521,8 +521,8 @@ mod tests {
     #[test]
     fn parse_column() {
         let mut schema = HashMap::new();
-        schema.insert("col1".to_string(), "string".to_string());
-        schema.insert("col2".to_string(), "date".to_string());
+        schema.insert("col1".to_string(), " string ".to_string());
+        schema.insert("col2".to_string(), " date ".to_string());
         schema.insert("col3".to_string(), "date|%m/%d/%Y".to_string());
         schema.insert("col4".to_string(), "timestamp|%+".to_string());
         schema.insert("col5".to_string(), "int".to_string());
