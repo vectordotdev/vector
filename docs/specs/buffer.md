@@ -31,7 +31,7 @@ Vector buffers MUST be instrumented for optimal observability and monitoring. Th
 
 #### `BufferEventsReceived`
 
-*All buffers* MUST emit a `BufferEventsReceived` event after receiving one or more Vector events. *Disk buffers* MUST emit a `BufferEventsReceived` event upon creation to include potential persisted events.
+*All buffers* MUST emit a `BufferEventsReceived` event after receiving one or more Vector events. *All buffers* MUST emit a `BufferEventsReceived` event upon startup if there are existing events in the buffer.
 
 * Properties
   * `count` - the number of received events
