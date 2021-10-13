@@ -22,6 +22,9 @@ thread_local!(
 /// The standard set of tags for all `TcpSource`-based sources.
 pub const TCP_SOURCE_TAGS: [&str; 2] = ["peer_addr", "protocol"];
 
+/// The standard set of tags for all sinks that write a file.
+pub const FILE_SINK_TAGS: [&str; 2] = ["file", "protocol"];
+
 /// The standard set of tags for all `HttpSink`-based sinks.
 pub const HTTP_SINK_TAGS: [&str; 1] = ["endpoint"];
 
