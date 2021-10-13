@@ -23,6 +23,7 @@ use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, future::ready, task::Poll};
 use tower::Service;
+use vector_core::ByteSizeOf;
 
 #[derive(Clone)]
 struct SematextMetricsService {
@@ -153,11 +154,12 @@ impl SematextMetricsService {
                 sink::StdServiceLogic::default(),
             )
             .with_flat_map(move |event: Event| {
-                stream::iter(
+                stream::iter({
+                    let byte_size = event.size_of();
                     normalizer
                         .apply(event)
-                        .map(|item| Ok(EncodedEvent::new(item))),
-                )
+                        .map(|item| Ok(EncodedEvent::new(item, byte_size)))
+                })
             })
             .sink_map_err(|error| error!(message = "Fatal sematext metrics sink error.", %error));
 
@@ -219,6 +221,7 @@ fn encode_events(
     metrics: Vec<Metric>,
 ) -> EncodedEvent<String> {
     let mut output = String::new();
+    let byte_size = metrics.iter().map(|metric| metric.size_of()).sum();
     for metric in metrics.into_iter() {
         let (series, data, _metadata) = metric.into_parts();
         let namespace = series
@@ -252,7 +255,7 @@ fn encode_events(
     }
 
     output.pop();
-    EncodedEvent::new(output)
+    EncodedEvent::new(output, byte_size)
 }
 
 fn to_fields(label: String, value: f64) -> HashMap<String, Field> {

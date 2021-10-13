@@ -17,6 +17,9 @@ thread_local!(
     static EVENTS_RECORDED: RefCell<HashSet<String>> = RefCell::new(Default::default());
 );
 
+/// The standard set of tags for all `TcpSource`-based sources.
+pub const TCP_SOURCE_TAGS: [&str; 2] = ["peer_addr", "protocol"];
+
 /// This struct is used to describe a set of component tests.
 pub struct ComponentTests {
     /// The list of event (suffixes) that must be emitted by the component
@@ -33,10 +36,10 @@ lazy_static! {
         events: &["BytesReceived", "EventsReceived", "EventsSent"],
         tagged_counters: &[
             "component_received_bytes_total",
-            "component_received_events_total",
-            "component_received_event_bytes_total",
         ],
         untagged_counters: &[
+            "component_received_events_total",
+            "component_received_event_bytes_total",
             "component_sent_events_total",
             "component_sent_event_bytes_total",
         ],

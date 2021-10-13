@@ -141,7 +141,9 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 	]
 
 	telemetry: metrics: {
-		events_discarded_total:  components.sources.internal_metrics.output.metrics.events_discarded_total
-		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
+		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		events_discarded_total:           components.sources.internal_metrics.output.metrics.events_discarded_total
+		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

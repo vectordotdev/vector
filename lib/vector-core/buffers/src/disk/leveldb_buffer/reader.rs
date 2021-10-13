@@ -1,5 +1,5 @@
 use super::Key;
-use crate::bytes::DecodeBytes;
+use crate::{buffer_usage_data::BufferUsageData, bytes::DecodeBytes};
 use bytes::Bytes;
 use futures::{task::AtomicWaker, Stream};
 use leveldb::database::{
@@ -81,6 +81,8 @@ where
     // Pending read from the LevelDB datasbase
     pub(crate) pending_read: Option<JoinHandle<Vec<(Key, Vec<u8>)>>>,
     pub(crate) phantom: PhantomData<T>,
+    /// Atomic structure for recording buffer metadata
+    pub(crate) buffer_usage_data: Arc<BufferUsageData>,
 }
 
 // Writebatch isn't Send, but the leveldb docs explicitly say that it's okay to
@@ -156,8 +158,13 @@ where
             this.read_offset = key.0 + 1;
 
             let buffer: Bytes = Bytes::from(value);
+            let byte_size = buffer.len();
             match T::decode(buffer) {
-                Ok(event) => Poll::Ready(Some(event)),
+                Ok(event) => {
+                    this.buffer_usage_data
+                        .increment_sent_event_count_and_byte_size(1, byte_size);
+                    Poll::Ready(Some(event))
+                }
                 Err(error) => {
                     error!(message = "Error deserializing event.", %error);
                     debug_assert!(false);
