@@ -5,7 +5,7 @@ use crate::{
         SourceDescription,
     },
     event::{Event, Value},
-    serde::{default_decoding, default_framing_message_based},
+    serde::{default_decoding, default_framing_stream_based},
     sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
 };
@@ -32,7 +32,7 @@ pub struct SimpleHttpConfig {
     path: String,
     #[serde(default = "default_path_key")]
     path_key: String,
-    #[serde(default = "default_framing_message_based")]
+    #[serde(default = "default_framing_stream_based")]
     framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
     decoding: Box<dyn ParserConfig>,
@@ -53,7 +53,7 @@ impl GenerateConfig for SimpleHttpConfig {
             path_key: "path".to_string(),
             path: "/".to_string(),
             strict_path: true,
-            framing: default_framing_message_based(),
+            framing: default_framing_stream_based(),
             decoding: default_decoding(),
         })
         .unwrap()
@@ -179,10 +179,10 @@ fn add_headers(events: &mut [Event], headers_config: &[String], headers: HeaderM
 mod tests {
     use super::SimpleHttpConfig;
     use crate::{
-        codecs::{FramingConfig, JsonParserConfig, NewlineDelimitedDecoderConfig, ParserConfig},
+        codecs::{BytesDecoderConfig, FramingConfig, JsonParserConfig, ParserConfig},
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus, Value},
-        serde::{default_decoding, default_framing_message_based},
+        serde::{default_decoding, default_framing_stream_based},
         test_util::{components, next_addr, spawn_collect_n, trace_init, wait_for_tcp},
         Pipeline,
     };
@@ -230,7 +230,7 @@ mod tests {
                 strict_path,
                 path_key,
                 path,
-                framing: framing.unwrap_or_else(default_framing_message_based),
+                framing: framing.unwrap_or_else(default_framing_stream_based),
                 decoding: decoding.unwrap_or_else(default_decoding),
             }
             .build(context)
@@ -311,39 +311,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn http_preserves_newlines() {
-        trace_init();
-
-        let body = "foo\nbar";
-
-        let (rx, addr) = source(
-            vec![],
-            vec![],
-            "http_path",
-            "/",
-            true,
-            EventStatus::Delivered,
-            true,
-            None,
-            None,
-        )
-        .await;
-
-        let mut events = spawn_ok_collect_n(send(addr, body), rx, 1).await;
-
-        assert_eq!(events.len(), 1);
-
-        {
-            let event = events.remove(0);
-            let log = event.as_log();
-            assert_eq!(log[log_schema().message_key()], "foo\nbar".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
-            assert_eq!(log["http_path"], "/".into());
-        }
-    }
-
-    #[tokio::test]
     async fn http_multiline_text() {
         trace_init();
 
@@ -357,7 +324,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
-            Some(Box::new(NewlineDelimitedDecoderConfig::new())),
+            None,
             None,
         )
         .await;
@@ -397,7 +364,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
-            Some(Box::new(NewlineDelimitedDecoderConfig::new())),
+            None,
             None,
         )
         .await;
@@ -416,6 +383,39 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[log_schema().message_key()], "test body 2".into());
+            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(log["http_path"], "/".into());
+        }
+    }
+
+    #[tokio::test]
+    async fn http_bytes_codec_preserves_newlines() {
+        trace_init();
+
+        let body = "foo\nbar";
+
+        let (rx, addr) = source(
+            vec![],
+            vec![],
+            "http_path",
+            "/",
+            true,
+            EventStatus::Delivered,
+            true,
+            Some(Box::new(BytesDecoderConfig::new())),
+            None,
+        )
+        .await;
+
+        let mut events = spawn_ok_collect_n(send(addr, body), rx, 1).await;
+
+        assert_eq!(events.len(), 1);
+
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log[log_schema().message_key()], "foo\nbar".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());
             assert_eq!(log["http_path"], "/".into());
@@ -568,7 +568,7 @@ mod tests {
             true,
             EventStatus::Delivered,
             true,
-            Some(Box::new(NewlineDelimitedDecoderConfig::new())),
+            None,
             Some(Box::new(JsonParserConfig::new())),
         )
         .await;
