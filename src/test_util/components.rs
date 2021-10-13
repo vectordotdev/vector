@@ -23,7 +23,7 @@ thread_local!(
 pub const TCP_SOURCE_TAGS: [&str; 2] = ["peer_addr", "protocol"];
 
 /// The standard set of tags for all `HttpSink`-based sinks.
-pub const HTTP_SINK_TAGS: [&str; 1] = ["endpoint"];
+pub const HTTP_SINK_TAGS: [&str; 2] = ["endpoint", "protocol"];
 
 /// This struct is used to describe a set of component tests.
 pub struct ComponentTests {
