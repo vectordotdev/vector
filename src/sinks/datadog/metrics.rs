@@ -27,6 +27,7 @@ use std::{
     future::ready,
     sync::atomic::{AtomicI64, Ordering::SeqCst},
 };
+use vector_core::ByteSizeOf;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -240,9 +241,14 @@ fn encode_metric(
     mut metric: Metric,
 ) -> Result<EncodedEvent<PartitionInnerBuffer<Metric, DatadogEndpoint>>, ()> {
     let endpoint = DatadogEndpoint::from_metric(&metric);
+    let byte_size = metric.size_of();
     let finalizers = metric.metadata_mut().take_finalizers();
     let item = PartitionInnerBuffer::new(metric, endpoint);
-    Ok(EncodedEvent { item, finalizers })
+    Ok(EncodedEvent {
+        item,
+        finalizers,
+        byte_size,
+    })
 }
 
 impl DatadogSink {

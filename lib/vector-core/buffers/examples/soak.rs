@@ -15,6 +15,7 @@ use tokio::{
     pin, select,
     time::{interval, sleep},
 };
+use tracing::Span;
 
 #[derive(Clone, Copy)]
 pub struct Message<const N: usize> {
@@ -123,7 +124,8 @@ async fn main() {
         when_full: WhenFull::DropNewest,
     };
 
-    let (writer, reader, acker) = buffers::build(variant).expect("failed to create buffer");
+    let (writer, reader, acker) =
+        buffers::build(variant, Span::none()).expect("failed to create buffer");
     let _ = tokio::spawn(async move {
         let mut id = 0;
         let mut writer = writer.get();

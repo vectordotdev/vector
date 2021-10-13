@@ -32,15 +32,12 @@
 //! it to notify the consumer that the request has succeeded.
 
 use super::{
-    batch::{Batch, FinalizersBatch, PushResult, StatefulBatch},
+    batch::{Batch, EncodedBatch, FinalizersBatch, PushResult, StatefulBatch},
     buffer::{Partition, PartitionBuffer, PartitionInnerBuffer},
     service::{Map, ServiceBuilderExt},
     EncodedEvent,
 };
-use crate::{
-    buffers::Acker,
-    event::{EventFinalizers, EventStatus},
-};
+use crate::{buffers::Acker, event::EventStatus, internal_events::EventsSent};
 use futures::{
     future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream, TryFutureExt,
 };
@@ -161,11 +158,9 @@ where
     }
 
     fn start_send(self: Pin<&mut Self>, item: EncodedEvent<B::Input>) -> Result<(), Self::Error> {
-        let EncodedEvent { item, finalizers } = item;
-        self.project().inner.start_send(EncodedEvent {
-            item: PartitionInnerBuffer::new(item, ()),
-            finalizers,
-        })
+        self.project()
+            .inner
+            .start_send(item.map(|item| PartitionInnerBuffer::new(item, ())))
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -370,8 +365,8 @@ where
                     this.lingers.remove(partition);
 
                     let batch_size = batch.num_items();
-                    let (batch, finalizers) = batch.finish();
-                    let future = tokio::spawn(this.service.call(batch, batch_size, finalizers));
+                    let batch = batch.finish();
+                    let future = tokio::spawn(this.service.call(batch, batch_size));
 
                     if let Some(map) = this.in_flight.as_mut() {
                         map.insert(partition.clone(), future.map(|_| ()).fuse().boxed());
@@ -493,12 +488,13 @@ where
         self.service.poll_ready(cx).map_err(Into::into)
     }
 
-    fn call(
-        &mut self,
-        req: Request,
-        batch_size: usize,
-        finalizers: EventFinalizers,
-    ) -> BoxFuture<'static, ()> {
+    fn call(&mut self, batch: EncodedBatch<Request>, batch_size: usize) -> BoxFuture<'static, ()> {
+        let EncodedBatch {
+            items,
+            finalizers,
+            count,
+            byte_size,
+        } = batch;
         let seqno = self.seq_head;
         self.seq_head += 1;
 
@@ -515,10 +511,15 @@ where
         );
         let logic = self.logic.clone();
         self.service
-            .call(req)
+            .call(items)
             .err_into()
             .map(move |result| {
-                logic.update_finalizers(result, finalizers);
+                let status = logic.result_status(result);
+                finalizers.update_status(status);
+                if status == EventStatus::Delivered {
+                    emit!(&EventsSent { count, byte_size });
+                    // TODO: Emit a BytesSent event here too
+                }
 
                 // If the rx end is dropped we still completed
                 // the request so this is a weird case that we can
@@ -571,16 +572,7 @@ where
 
 pub trait ServiceLogic: Clone {
     type Response: Response;
-
     fn result_status(&self, result: crate::Result<Self::Response>) -> EventStatus;
-
-    fn update_finalizers(
-        &self,
-        result: crate::Result<Self::Response>,
-        finalizers: EventFinalizers,
-    ) {
-        finalizers.update_status(self.result_status(result));
-    }
 }
 
 #[derive(Derivative)]
@@ -679,7 +671,7 @@ mod tests {
 
         let _ = buffered
             .sink_map_err(drop)
-            .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item))))
+            .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item, 0))))
             .await
             .unwrap();
 
@@ -722,7 +714,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(EncodedEvent::new(0)),
+            sink.start_send_unpin(EncodedEvent::new(0, 0)),
             Ok(())
         ));
         assert!(matches!(
@@ -730,7 +722,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(EncodedEvent::new(1)),
+            sink.start_send_unpin(EncodedEvent::new(1, 0)),
             Ok(())
         ));
         assert!(matches!(
@@ -738,7 +730,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(EncodedEvent::new(2)),
+            sink.start_send_unpin(EncodedEvent::new(2, 0)),
             Ok(())
         ));
 
@@ -770,7 +762,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(EncodedEvent::new(3)),
+            sink.start_send_unpin(EncodedEvent::new(3, 0)),
             Ok(())
         ));
         assert!(matches!(
@@ -778,7 +770,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(EncodedEvent::new(4)),
+            sink.start_send_unpin(EncodedEvent::new(4, 0)),
             Ok(())
         ));
         assert!(matches!(
@@ -786,7 +778,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(EncodedEvent::new(5)),
+            sink.start_send_unpin(EncodedEvent::new(5, 0)),
             Ok(())
         ));
 
@@ -841,7 +833,7 @@ mod tests {
 
         let _ = buffered
             .sink_map_err(drop)
-            .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item))))
+            .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item, 0))))
             .await
             .unwrap();
 
@@ -876,7 +868,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            buffered.start_send_unpin(EncodedEvent::new(0)),
+            buffered.start_send_unpin(EncodedEvent::new(0, 0)),
             Ok(())
         ));
         assert!(matches!(
@@ -884,7 +876,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            buffered.start_send_unpin(EncodedEvent::new(1)),
+            buffered.start_send_unpin(EncodedEvent::new(1, 0)),
             Ok(())
         ));
 
@@ -914,7 +906,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            buffered.start_send_unpin(EncodedEvent::new(0)),
+            buffered.start_send_unpin(EncodedEvent::new(0, 0)),
             Ok(())
         ));
         assert!(matches!(
@@ -922,7 +914,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            buffered.start_send_unpin(EncodedEvent::new(1)),
+            buffered.start_send_unpin(EncodedEvent::new(1, 0)),
             Ok(())
         ));
 
@@ -954,7 +946,7 @@ mod tests {
         let sink = PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item))))
+            .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item, 0))))
             .await
             .unwrap();
 
@@ -985,7 +977,7 @@ mod tests {
 
         let input = vec![Partitions::A, Partitions::B];
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item))))
+            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
             .await
             .unwrap();
 
@@ -1010,7 +1002,7 @@ mod tests {
 
         let input = vec![Partitions::A, Partitions::B, Partitions::A, Partitions::B];
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item))))
+            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
             .await
             .unwrap();
 
@@ -1045,7 +1037,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(EncodedEvent::new(1)),
+            sink.start_send_unpin(EncodedEvent::new(1, 0)),
             Ok(())
         ));
         assert!(matches!(sink.poll_flush_unpin(&mut cx), Poll::Pending));
@@ -1077,10 +1069,16 @@ mod tests {
             }
         });
         let mut sink = ServiceSink::new(svc, acker);
+        let req = |items: u8| EncodedBatch {
+            items,
+            finalizers: Default::default(),
+            count: items as usize,
+            byte_size: 1,
+        };
 
         // send some initial requests
-        let mut fut1 = sink.call(1, 1, Default::default());
-        let mut fut2 = sink.call(2, 2, Default::default());
+        let mut fut1 = sink.call(req(1), 1);
+        let mut fut2 = sink.call(req(2), 2);
 
         assert_eq!(ack_counter.load(Relaxed), 0);
 
@@ -1092,8 +1090,8 @@ mod tests {
         assert_eq!(ack_counter.load(Relaxed), 3);
 
         // send one request that will error and one normal
-        let mut fut3 = sink.call(3, 3, Default::default()); // i will error
-        let mut fut4 = sink.call(4, 4, Default::default());
+        let mut fut3 = sink.call(req(3), 3); // I will error
+        let mut fut4 = sink.call(req(4), 4);
 
         // make sure they all "worked"
         assert!(matches!(fut3.poll_unpin(&mut cx), Poll::Ready(())));
@@ -1135,7 +1133,7 @@ mod tests {
             .map(|i| (0, i))
             .chain((0..20).into_iter().map(|i| (1, i)));
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item))))
+            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
             .await
             .unwrap();
 

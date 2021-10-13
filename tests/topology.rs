@@ -1,6 +1,9 @@
 mod support;
 
-use crate::support::{sink, sink_failing_healthcheck, source, transform, MockSourceConfig};
+use crate::support::{
+    sink, sink_failing_healthcheck, sink_with_data, source, source_with_data, transform,
+    MockSourceConfig,
+};
 use futures::{future, stream, FutureExt, SinkExt, StreamExt};
 use std::{
     collections::HashMap,
@@ -475,6 +478,43 @@ async fn topology_swap_transform_is_atomic() {
         send_total.load(Ordering::Acquire),
         recv_total.load(Ordering::Acquire)
     );
+}
+
+#[tokio::test]
+async fn topology_rebuild_connected() {
+    vector::trace::init(true, false, "info");
+
+    let (_in1, source1) = source_with_data("v1");
+    let (_out1, sink1) = sink_with_data(10, "v1");
+
+    let mut config = Config::builder();
+    config.add_source("in1", source1);
+    config.add_sink("out1", &["in1"], sink1);
+
+    let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
+
+    let (mut in1, source1) = source_with_data("v2");
+    let (out1, sink1) = sink_with_data(10, "v2");
+
+    let mut config = Config::builder();
+    config.add_source("in1", source1);
+    config.add_sink("out1", &["in1"], sink1);
+
+    assert!(topology
+        .reload_config_and_respawn(config.build().unwrap())
+        .await
+        .unwrap());
+    sleep(Duration::from_millis(10)).await;
+
+    let event1 = Event::from("this");
+    let event2 = Event::from("that");
+    let h_out1 = tokio::spawn(out1.collect::<Vec<_>>());
+    in1.send(event1.clone()).await.unwrap();
+    in1.send(event2.clone()).await.unwrap();
+    topology.stop().await;
+
+    let res = h_out1.await.unwrap();
+    assert_eq!(vec![event1, event2], res);
 }
 
 #[tokio::test]
