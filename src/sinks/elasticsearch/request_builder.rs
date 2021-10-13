@@ -14,6 +14,8 @@ use crate::http::Auth;
 use http::Request;
 use std::collections::HashMap;
 use rusoto_core::Region;
+use crate::sinks::util::encoding::Encoder;
+use crate::event::{EventFinalizers, Finalizable};
 
 pub struct ElasticsearchRequestBuilder {
     pub bulk_uri: Uri,
@@ -21,14 +23,8 @@ pub struct ElasticsearchRequestBuilder {
     pub http_auth: Option<Auth>,
     pub query_params: HashMap<String, String>,
     pub region: Region,
-}
-
-
-
-impl ByteSizeOf for ProcessedEvent {
-    fn allocated_bytes(&self) -> usize {
-        todo!()
-    }
+    pub compression: Compression,
+    pub encoder: ElasticSearchEncoder,
 }
 
 pub struct Input {
@@ -37,7 +33,9 @@ pub struct Input {
 }
 
 pub struct Metadata {
-    aws_credentials: Option<AwsCredentials>
+    aws_credentials: Option<AwsCredentials>,
+    finalizers: EventFinalizers,
+    batch_size: usize
 }
 
 impl RequestBuilder<Input> for ElasticsearchRequestBuilder {
@@ -49,16 +47,18 @@ impl RequestBuilder<Input> for ElasticsearchRequestBuilder {
     type Error = std::io::Error;
 
     fn compression(&self) -> Compression {
-        todo!()
+        self.compression
     }
 
     fn encoder(&self) -> &Self::Encoder {
-        todo!()
+        &self.encoder
     }
 
-    fn split_input(&self, input: Input) -> (Self::Metadata, Self::Events) {
+    fn split_input(&self, mut input: Input) -> (Self::Metadata, Self::Events) {
         let metadata = Metadata {
-            aws_credentials: input.aws_credentials
+            aws_credentials: input.aws_credentials,
+            finalizers: input.events.take_finalizers(),
+            batch_size: input.events.len()
         };
         (metadata, input.events)
     }
@@ -66,7 +66,7 @@ impl RequestBuilder<Input> for ElasticsearchRequestBuilder {
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
         let mut builder = Request::post(&self.bulk_uri);
 
-        let _http_req = if let Some(aws_credentials) = metadata.aws_credentials {
+        let http_request = if let Some(aws_credentials) = metadata.aws_credentials {
             let mut request = self.create_signed_request("POST", &self.bulk_uri, true);
 
             request.add_header("Content-Type", "application/x-ndjson");
@@ -108,8 +108,11 @@ impl RequestBuilder<Input> for ElasticsearchRequestBuilder {
 
             builder.body(payload).expect("Invalid http request value used")
         };
-        // http::Request<Vec<u8>>
-        todo!()
+        ElasticSearchRequest {
+            http_request,
+            finalizers: metadata.finalizers,
+            batch_size: metadata.batch_size
+        }
     }
 }
 

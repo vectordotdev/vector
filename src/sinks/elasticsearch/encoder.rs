@@ -1,5 +1,5 @@
 use crate::sinks::util::encoding::{Encoder, as_tracked_write};
-use crate::event::{LogEvent};
+use crate::event::{LogEvent, Finalizable, EventFinalizers};
 use std::io::Write;
 
 use crate::sinks::elasticsearch::{ElasticSearchCommonMode, BulkAction};
@@ -9,6 +9,7 @@ use crate::internal_events::ElasticSearchEventEncoded;
 
 
 use std::io;
+use vector_core::ByteSizeOf;
 
 pub struct ProcessedEvent {
     pub index: String,
@@ -17,9 +18,21 @@ pub struct ProcessedEvent {
     pub id: Option<String>
 }
 
+impl Finalizable for ProcessedEvent {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.log.metadata_mut().take_finalizers()
+    }
+}
+
+impl ByteSizeOf for ProcessedEvent {
+    fn allocated_bytes(&self) -> usize {
+        self.index.allocated_bytes() + self.log.allocated_bytes() + self.id.allocated_bytes()
+    }
+}
+
 pub struct ElasticSearchEncoder {
-    mode: ElasticSearchCommonMode,
-    doc_type: String,
+    pub mode: ElasticSearchCommonMode,
+    pub doc_type: String,
 }
 
 impl Encoder<Vec<ProcessedEvent>> for ElasticSearchEncoder {

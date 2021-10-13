@@ -20,7 +20,6 @@ use rusoto_core::Region;
 use super::{Request, InvalidHost};
 use crate::sinks::HealthcheckError;
 
-//TODO: Why is this not clone?
 #[derive(Debug)]
 pub struct ElasticSearchCommon {
     pub base_url: String,
@@ -37,51 +36,6 @@ pub struct ElasticSearchCommon {
     pub request: RequestConfig,
     pub query_params: HashMap<String, String>,
     pub metric_to_log: MetricToLog,
-}
-
-impl ElasticSearchCommon {
-    fn encode_log(&self, _event: Event) -> Option<Vec<u8>> {
-        // let index = self.mode.index(&event)?;
-        //
-        // let mut log = if let Some(cfg) = self.mode.as_data_stream_config() {
-        //     cfg.remap_timestamp(cfg.sync_fields(log))
-        // } else {
-        //     event
-        // };
-        //
-        // let bulk_action = self.mode.bulk_action(&event)?;
-        //
-        // let mut action = json!({
-        //     bulk_action.as_str(): {
-        //         "_index": index,
-        //         "_type": self.doc_type,
-        //     }
-        // });
-        //
-        // maybe_set_id(
-        //     self.id_key.as_ref(),
-        //     action.pointer_mut(bulk_action.as_json_pointer()).unwrap(),
-        //     &mut event,
-        // );
-        //
-        // let mut body = serde_json::to_vec(&action).unwrap();
-        // body.push(b'\n');
-        //
-        // self.encoding.apply_rules(&mut event);
-        //
-        // serde_json::to_writer(&mut body, &event.into_log()).unwrap();
-        // body.push(b'\n');
-        //
-        // emit!(&ElasticSearchEventEncoded {
-        //     byte_size: body.len(),
-        //     index,
-        // });
-        //
-        // Some(body)
-
-        // this logic was moved to Encoder
-        todo!()
-    }
 }
 
 impl ElasticSearchCommon {
@@ -210,66 +164,66 @@ impl ElasticSearchCommon {
     }
 }
 
-//TODO: This might be used by other sinks?
-#[async_trait::async_trait]
-impl HttpSink for ElasticSearchCommon {
-    type Input = Vec<u8>;
-    type Output = Vec<u8>;
-
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
-        let log = match event {
-            Event::Log(log) => Some(log),
-            Event::Metric(metric) => self.metric_to_log.transform_one(metric),
-        };
-        log.and_then(|log| self.encode_log(log.into()))
-    }
-
-    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
-        let mut builder = Request::post(&self.bulk_uri);
-
-        if let Some(credentials_provider) = &self.credentials {
-            let mut request = self.signed_request("POST", &self.bulk_uri, true);
-
-            request.add_header("Content-Type", "application/x-ndjson");
-
-            if let Some(ce) = self.compression.content_encoding() {
-                request.add_header("Content-Encoding", ce);
-            }
-
-            for (header, value) in &self.request.headers {
-                request.add_header(header, value);
-            }
-
-            request.set_payload(Some(events));
-
-            // mut builder?
-            builder = finish_signer(&mut request, credentials_provider, builder).await?;
-
-            // The SignedRequest ends up owning the body, so we have
-            // to play games here
-            let body = request.payload.take().unwrap();
-            match body {
-                SignedRequestPayload::Buffer(body) => {
-                    builder.body(body.to_vec()).map_err(Into::into)
-                }
-                _ => unreachable!(),
-            }
-        } else {
-            builder = builder.header("Content-Type", "application/x-ndjson");
-
-            if let Some(ce) = self.compression.content_encoding() {
-                builder = builder.header("Content-Encoding", ce);
-            }
-
-            for (header, value) in &self.request.headers {
-                builder = builder.header(&header[..], &value[..]);
-            }
-
-            if let Some(auth) = &self.authorization {
-                builder = auth.apply_builder(builder);
-            }
-
-            builder.body(events).map_err(Into::into)
-        }
-    }
-}
+//
+// #[async_trait::async_trait]
+// impl HttpSink for ElasticSearchCommon {
+//     type Input = Vec<u8>;
+//     type Output = Vec<u8>;
+//
+//     fn encode_event(&self, event: Event) -> Option<Self::Input> {
+//         let log = match event {
+//             Event::Log(log) => Some(log),
+//             Event::Metric(metric) => self.metric_to_log.transform_one(metric),
+//         };
+//         log.and_then(|log| self.encode_log(log.into()))
+//     }
+//
+//     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
+//         let mut builder = Request::post(&self.bulk_uri);
+//
+//         if let Some(credentials_provider) = &self.credentials {
+//             let mut request = self.signed_request("POST", &self.bulk_uri, true);
+//
+//             request.add_header("Content-Type", "application/x-ndjson");
+//
+//             if let Some(ce) = self.compression.content_encoding() {
+//                 request.add_header("Content-Encoding", ce);
+//             }
+//
+//             for (header, value) in &self.request.headers {
+//                 request.add_header(header, value);
+//             }
+//
+//             request.set_payload(Some(events));
+//
+//             // mut builder?
+//             builder = finish_signer(&mut request, credentials_provider, builder).await?;
+//
+//             // The SignedRequest ends up owning the body, so we have
+//             // to play games here
+//             let body = request.payload.take().unwrap();
+//             match body {
+//                 SignedRequestPayload::Buffer(body) => {
+//                     builder.body(body.to_vec()).map_err(Into::into)
+//                 }
+//                 _ => unreachable!(),
+//             }
+//         } else {
+//             builder = builder.header("Content-Type", "application/x-ndjson");
+//
+//             if let Some(ce) = self.compression.content_encoding() {
+//                 builder = builder.header("Content-Encoding", ce);
+//             }
+//
+//             for (header, value) in &self.request.headers {
+//                 builder = builder.header(&header[..], &value[..]);
+//             }
+//
+//             if let Some(auth) = &self.authorization {
+//                 builder = auth.apply_builder(builder);
+//             }
+//
+//             builder.body(events).map_err(Into::into)
+//         }
+//     }
+// }

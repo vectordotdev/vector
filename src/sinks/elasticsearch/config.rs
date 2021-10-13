@@ -1,4 +1,4 @@
-use crate::sinks::util::{Compression, BatchConfig, BatchSettings};
+use crate::sinks::util::{Compression, BatchConfig, BatchSettings, Buffer};
 use crate::sinks::elasticsearch::{ElasticSearchCommon, ElasticSearchMode, ElasticSearchAuth, ElasticSearchCommonMode};
 use crate::sinks::util::encoding::EncodingConfigWithDefault;
 use crate::config::{SinkConfig, SinkContext, DataType};
@@ -25,6 +25,7 @@ use vector_core::stream::BatcherSettings;
 use std::time::Duration;
 use std::num::NonZeroUsize;
 use crate::sinks::elasticsearch::service::ElasticSearchService;
+use crate::sinks::elasticsearch::encoder::ElasticSearchEncoder;
 
 /// The field name for the timestamp required by data stream mode
 const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
@@ -294,7 +295,7 @@ impl SinkConfig for ElasticSearchConfig {
         let common = ElasticSearchCommon::parse_config(self)?;
 
         let http_client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
-        let batch_settings = BatchSettings::default()
+        let batch_settings = BatchSettings::<Buffer>::default()
             .bytes(10_000_000)
             .timeout(1)
             .parse_config(self.batch)?;
@@ -305,12 +306,19 @@ impl SinkConfig for ElasticSearchConfig {
             NonZeroUsize::new(batch_settings.size.events).expect("Batch events should not be 0")
         );
 
+        let encoder = ElasticSearchEncoder {
+            mode: common.mode.clone(),
+            doc_type: common.doc_type
+        };
+
         let request_builder = ElasticsearchRequestBuilder {
             bulk_uri: common.bulk_uri,
-            http_request_config: self.request,
+            http_request_config: self.request.clone(),
             http_auth: common.authorization,
             query_params: common.query_params,
-            region: common.region
+            region: common.region,
+            compression: self.compression,
+            encoder
         };
 
         let service = ElasticSearchService { http_client };
@@ -320,7 +328,7 @@ impl SinkConfig for ElasticSearchConfig {
             request_builder,
             compression: self.compression,
             service,
-            acker: cx.acker,
+            acker: cx.acker(),
             metric_to_log: common.metric_to_log,
             encoding: self.encoding.clone(),
             mode: common.mode,
@@ -341,5 +349,59 @@ impl SinkConfig for ElasticSearchConfig {
 
     fn sink_type(&self) -> &'static str {
         "elasticsearch"
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        event::{Event, Metric, MetricKind, MetricValue, Value},
+        sinks::util::retries::{RetryAction, RetryLogic},
+    };
+    use bytes::Bytes;
+    use http::{Response, StatusCode};
+    use pretty_assertions::assert_eq;
+    use serde_json::json;
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<ElasticSearchConfig>();
+    }
+
+    #[test]
+    fn parse_aws_auth() {
+        toml::from_str::<ElasticSearchConfig>(
+            r#"
+            endpoint = ""
+            auth.strategy = "aws"
+            auth.assume_role = "role"
+        "#,
+        )
+            .unwrap();
+
+        toml::from_str::<ElasticSearchConfig>(
+            r#"
+            endpoint = ""
+            auth.strategy = "aws"
+        "#,
+        )
+            .unwrap();
+    }
+
+    #[test]
+    fn parse_mode() {
+        let config = toml::from_str::<ElasticSearchConfig>(
+            r#"
+            endpoint = ""
+            mode = "data_stream"
+            data_stream.type = "synthetics"
+        "#,
+        )
+            .unwrap();
+        assert!(matches!(config.mode, ElasticSearchMode::DataStream));
+        assert!(config.data_stream.is_some());
     }
 }

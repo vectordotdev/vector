@@ -144,7 +144,7 @@ async fn get_aws_credentials(provider: &AwsCredentialsProvider) -> Option<AwsCre
 //     }
 // }
 
-fn process_log(mut log: LogEvent, mode: &ElasticSearchCommonMode, id_key_field: &Option<String>) -> Option<ProcessedEvent> {
+pub fn process_log(mut log: LogEvent, mode: &ElasticSearchCommonMode, id_key_field: &Option<String>) -> Option<ProcessedEvent> {
     let index = mode.index(&log)?;
     let bulk_action = mode.bulk_action(&log)?;
 

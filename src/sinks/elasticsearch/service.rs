@@ -29,7 +29,7 @@ impl Finalizable for ElasticSearchRequest {
 }
 
 pub struct ElasticSearchService {
-    http_client: HttpClient
+    pub http_client: HttpClient
 }
 
 pub struct ElasticSearchResponse {
@@ -38,7 +38,8 @@ pub struct ElasticSearchResponse {
 
 impl AsRef<EventStatus> for ElasticSearchResponse {
     fn as_ref(&self) -> &EventStatus {
-        todo!()
+        //TODO: use the correct status
+        &EventStatus::Delivered
     }
 }
 
