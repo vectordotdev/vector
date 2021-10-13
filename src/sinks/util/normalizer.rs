@@ -1,29 +1,22 @@
-use std::{pin::Pin, task::{Context, Poll, ready}};
+use std::{pin::Pin, task::{Context, Poll}};
 
-use futures_util::Stream;
+use futures_util::{Stream, ready};
 use vector_core::event::Metric;
 
 use super::buffer::metrics::{MetricNormalize, MetricNormalizer};
 
-pub struct Normalizer<St, N>
-where
-	N: MetricNormalize,
-{
+pub struct Normalizer<St, N> {
 	stream: St,
-	normalizer: MetricNormalizer<N>,
+	normalizer: N,
+	metric_set: MetricSet,
 }
 
-impl<St, N> Normalizer<St, N>
-where
-	N: MetricNormalize,
-{
-	pub fn new(stream: St) -> Normalizer<St, N>
-	where
-		N: MetricNormalize,
-	{
+impl<St, N> Normalizer<St, N> {
+	pub fn new(stream: St, normalizer: N) -> Self {
 		Self {
 			stream,
-			normalizer: MetricNormalizer::default(),
+			normalizer,
+			metric_set: MetricSet::default(),
 		}
 	}
 }
@@ -37,5 +30,6 @@ where
 
 	fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let metric = ready!(self.stream.poll_next(cx));
+		let result = N::apply_state(&mut self.metric_set, metric);
     }
 }

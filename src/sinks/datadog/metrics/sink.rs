@@ -61,6 +61,7 @@ where
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let sink = input
             .filter_map(|event| ready(event.try_into_metric()))
+            .normalize(DatadogMetricNormalizer)
             .batched(DatadogMetricsTypePartitioner, self.batch_settings);
         //.into_driver(self.service, self.acker);
 
