@@ -122,15 +122,15 @@ impl NormalConfig {
 #[serde(rename_all = "snake_case")]
 pub struct DataStreamConfig {
     #[serde(rename = "type", default = "DataStreamConfig::default_type")]
-    dtype: Template,
+    pub dtype: Template,
     #[serde(default = "DataStreamConfig::default_dataset")]
-    dataset: Template,
+    pub dataset: Template,
     #[serde(default = "DataStreamConfig::default_namespace")]
-    namespace: Template,
+    pub namespace: Template,
     #[serde(default = "DataStreamConfig::default_auto_routing")]
-    auto_routing: bool,
+    pub auto_routing: bool,
     #[serde(default = "DataStreamConfig::default_sync_fields")]
-    sync_fields: bool,
+    pub sync_fields: bool,
 }
 
 impl Default for DataStreamConfig {

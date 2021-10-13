@@ -323,23 +323,23 @@ mod tests {
     fn removes_and_sets_id_from_custom_field() {
         let id_key = Some("foo");
         let mut log = LogEvent::from("butts");
-        log.as_mut_log().insert("foo", "bar");
+        log.insert("foo", "bar");
         let mut action = json!({});
 
         maybe_set_id(id_key, &mut action, &mut log);
 
         assert_eq!(json!({"_id": "bar"}), action);
-        assert_eq!(None, event.as_log().get("foo"));
+        assert_eq!(None, log.get("foo"));
     }
 
     #[test]
     fn doesnt_set_id_when_field_missing() {
         let id_key = Some("foo");
-        let mut event = Event::from("butts");
-        event.as_mut_log().insert("not_foo", "bar");
+        let mut log = LogEvent::from("butts");
+        log.insert("not_foo", "bar");
         let mut action = json!({});
 
-        maybe_set_id(id_key, &mut action, &mut event);
+        maybe_set_id(id_key, &mut action, &mut log);
 
         assert_eq!(json!({}), action);
     }
@@ -347,11 +347,11 @@ mod tests {
     #[test]
     fn doesnt_set_id_when_not_configured() {
         let id_key: Option<&str> = None;
-        let mut event = Event::from("butts");
-        event.as_mut_log().insert("foo", "bar");
+        let mut log = LogEvent::from("butts");
+        log.insert("foo", "bar");
         let mut action = json!({});
 
-        maybe_set_id(id_key, &mut action, &mut event);
+        maybe_set_id(id_key, &mut action, &mut log);
 
         assert_eq!(json!({}), action);
     }

@@ -24,19 +24,19 @@ use crate::sinks::HealthcheckError;
 #[derive(Debug)]
 pub struct ElasticSearchCommon {
     pub base_url: String,
-    id_key: Option<String>,
-    bulk_uri: Uri,
-    authorization: Option<Auth>,
-    credentials: Option<rusoto::AwsCredentialsProvider>,
-    encoding: EncodingConfigWithDefault<Encoding>,
-    mode: ElasticSearchCommonMode,
-    doc_type: String,
-    tls_settings: TlsSettings,
-    compression: Compression,
-    region: Region,
-    request: RequestConfig,
-    query_params: HashMap<String, String>,
-    metric_to_log: MetricToLog,
+    pub id_key: Option<String>,
+    pub bulk_uri: Uri,
+    pub authorization: Option<Auth>,
+    pub credentials: Option<rusoto::AwsCredentialsProvider>,
+    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub mode: ElasticSearchCommonMode,
+    pub doc_type: String,
+    pub tls_settings: TlsSettings,
+    pub compression: Compression,
+    pub region: Region,
+    pub request: RequestConfig,
+    pub query_params: HashMap<String, String>,
+    pub metric_to_log: MetricToLog,
 }
 
 impl ElasticSearchCommon {
@@ -175,7 +175,7 @@ impl ElasticSearchCommon {
         })
     }
 
-    fn signed_request(&self, method: &str, uri: &Uri, use_params: bool) -> SignedRequest {
+    pub fn signed_request(&self, method: &str, uri: &Uri, use_params: bool) -> SignedRequest {
         let mut request = SignedRequest::new(method, "es", &self.region, uri.path());
         request.set_hostname(uri.host().map(|host| host.into()));
         if use_params {
@@ -186,7 +186,7 @@ impl ElasticSearchCommon {
         request
     }
 
-    async fn healthcheck(self, client: HttpClient) -> crate::Result<()> {
+    pub async fn healthcheck(self, client: HttpClient) -> crate::Result<()> {
         let mut builder = Request::get(format!("{}/_cluster/health", self.base_url));
 
         match &self.credentials {
