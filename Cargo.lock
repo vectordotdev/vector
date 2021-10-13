@@ -1190,12 +1190,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "count-write"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ced507ab50aa0123e2c54db8b5f44fdfee04b1c93744d69e924307945fe57a85"
-
-[[package]]
 name = "cpufeatures"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7553,7 +7547,6 @@ dependencies = [
  "cidr-utils",
  "colored",
  "console-subscriber",
- "count-write",
  "criterion",
  "crossterm 0.21.0",
  "csv",

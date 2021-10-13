@@ -1,11 +1,11 @@
 use crate::sinks::util::{StreamSink, SinkBuilderExt, BatchSettings, Compression};
 use futures::stream::BoxStream;
 use crate::event::Event;
-use vector_core::partition::Partitioner;
+use vector_core::partition::{Partitioner, NullPartitioner};
 use std::num::NonZeroUsize;
 use std::time::Duration;
 use futures::StreamExt;
-use crate::sinks::elasticsearch::request_builder::{ElasticsearchRequestBuilder, ProcessedEvent};
+use crate::sinks::elasticsearch::request_builder::ElasticsearchRequestBuilder;
 use crate::buffers::Acker;
 use crate::sinks::elasticsearch::service::ElasticSearchService;
 use crate::sinks::elasticsearch::{BulkAction, Encoding};
@@ -14,29 +14,46 @@ use vector_core::stream::BatcherSettings;
 use async_trait::async_trait;
 use crate::sinks::util::encoding::EncodingConfigWithDefault;
 use rusoto_credential::AwsCredentials;
+use futures::future;
+use crate::sinks::elasticsearch::encoder::ProcessedEvent;
+use vector_core::ByteSizeOf;
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct PartitionKey {
-    index: String,
-    bulk_action: BulkAction,
+    pub index: String,
+    pub bulk_action: BulkAction,
 }
 
-pub struct ElasticSearchPartitioner;
+// pub struct ElasticSearchPartitioner;
+//
+// impl Partitioner for ElasticSearchPartitioner {
+//     type Item = ProcessedEvent;
+//     type Key = PartitionKey;
+//
+//     fn partition(&self, item: &ProcessedEvent) -> Self::Key {
+//
+//         // remove the allocation here?
+//         PartitionKey {
+//             index: item.index.clone(),
+//             bulk_action: BulkAction::Index
+//         }
+//
+//     }
+// }
 
-impl Partitioner for ElasticSearchPartitioner {
-    type Item = ProcessedEvent;
-    type Key = PartitionKey;
+pub struct BatchedEvents {
+    pub key: PartitionKey,
+    pub events: Vec<ProcessedEvent>
+}
 
-    fn partition(&self, item: &ProcessedEvent) -> Self::Key {
-        //TODO: remove the allocation here?
+impl ByteSizeOf for BatchedEvents {
+    fn allocated_bytes(&self) -> usize {
         todo!()
-
     }
 }
 
 pub struct ElasticSearchSink {
     pub batch_settings: BatcherSettings,
-    // batch_timeout: Duration,
     pub batch_size_bytes: Option<NonZeroUsize>,
     pub batch_size_events: NonZeroUsize,
     pub request_builder: ElasticsearchRequestBuilder,
@@ -48,28 +65,39 @@ pub struct ElasticSearchSink {
 }
 
 impl ElasticSearchSink {
-    pub async fn run_inner(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    pub async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
 
         let request_builder_concurrency_limit = NonZeroUsize::new(50);
 
         let sink = input
-            // .filter_map(|event| async move {
-            //     let log = match event {
-            //         Event::Log(log) => Some(log),
-            //         Event::Metric(metric) => self.metric_to_log.transform_one(metric),
-            //     };
-            // })
-            .scan(self.metric_to_log, |metric_to_log, event| async move {
-                Some(event)
+            .scan(self.metric_to_log, |metric_to_log, event| {
+                future::ready(Some(match event {
+                    Event::Metric(metric) => metric_to_log.transform_one(metric),
+                    Event::Log(log) => Some(log)
+                }))
             })
+            .filter_map(|x|async move {x})
             .filter_map(|log|async move {
+                // if let Some(cfg) = self.mode.as_data_stream_config() {
+                //     cfg.sync_fields(&mut event.log);
+                //     cfg.remap_timestamp(&mut event.log);
+                // };
+                // maybe_set_id(
+                //     self.id_key.as_ref(),
+                //     action.pointer_mut(event.bulk_action.as_json_pointer()).unwrap(),
+                //     &mut event.log,
+                // );
                 let event:ProcessedEvent = todo!();
                 Some(event)
             })
-            .batched(ElasticSearchPartitioner,
-                self.batch_settings,
-            )
-            .filter_map(|(_, batch)|async move {
+            // .batched(ElasticSearchPartitioner,
+            //     self.batch_settings,
+            // )
+            // .map(|(key, events)| {
+            //     BatchedEvents { key, events }
+            // })
+            .batched(NullPartitioner::new(), self.batch_settings)
+            .filter_map(|(partition, batch)|async move {
                 let aws_creds:Option<AwsCredentials> = todo!();
                 Some(super::request_builder::Input{
                     aws_credentials: aws_creds,

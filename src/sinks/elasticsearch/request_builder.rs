@@ -5,18 +5,25 @@ use rusoto_core::signature::{SignedRequest, SignedRequestPayload};
 use rusoto_core::credential::AwsCredentials;
 use headers::{HeaderName, HeaderValue};
 use http::Uri;
-use crate::sinks::elasticsearch::encoder::ElasticSearchEncoder;
+use crate::sinks::elasticsearch::encoder::{ElasticSearchEncoder, ProcessedEvent};
 use vector_core::ByteSizeOf;
 use crate::sinks::elasticsearch::service::ElasticSearchRequest;
+use crate::sinks::elasticsearch::sink::BatchedEvents;
+use crate::sinks::util::http::RequestConfig;
+use crate::http::Auth;
+use http::Request;
+use std::collections::HashMap;
+use rusoto_core::Region;
 
 pub struct ElasticsearchRequestBuilder {
     bulk_uri: Uri,
+    http_request_config: RequestConfig,
+    http_auth: Option<Auth>,
+    query_params: HashMap<String, String>,
+    region: Region,
 }
 
-pub struct ProcessedEvent {
-    index: String,
-    bulk_action: BulkAction,
-}
+
 
 impl ByteSizeOf for ProcessedEvent {
     fn allocated_bytes(&self) -> usize {
@@ -56,62 +63,67 @@ impl RequestBuilder<Input> for ElasticsearchRequestBuilder {
         (metadata, input.events)
     }
 
-    // fn encode_events(&self, events: Self::Events) -> Result<Self::Payload, Self::Error> {
-    //     let mut compressor = Compressor::from(self.compression());
-    //     let _ = self.encoder().encode_input(events, &mut compressor)?;
-    //
-    //     let payload = compressor.into_inner().into();
-    //     Ok(payload)
-    // }
-
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        todo!();
-        // let (maybe_credentials,) = metadata;
-        // let mut builder = Request::post(&self.bulk_uri);
-        //
-        // if let Some(credentials) = maybe_credentials {
-        //     let mut request = self.signed_request("POST", &self.bulk_uri, true);
-        //
-        //     request.add_header("Content-Type", "application/x-ndjson");
-        //
-        //     if let Some(ce) = self.compression.content_encoding() {
-        //         request.add_header("Content-Encoding", ce);
-        //     }
-        //
-        //     for (header, value) in &self.request.headers {
-        //         request.add_header(header, value);
-        //     }
-        //
-        //     request.set_payload(Some(events));
-        //     builder = sign_request(&mut request, &credentials, builder);
-        //
-        //     // The SignedRequest ends up owning the body, so we have
-        //     // to play games here
-        //     let body = request.payload.take().unwrap();
-        //     match body {
-        //         SignedRequestPayload::Buffer(body) => {
-        //             builder.body(body.to_vec()).map_err(Into::into)
-        //         }
-        //         _ => unreachable!(),
-        //     }
-        // } else {
-        //     builder = builder.header("Content-Type", "application/x-ndjson");
-        //
-        //     if let Some(ce) = self.compression.content_encoding() {
-        //         builder = builder.header("Content-Encoding", ce);
-        //     }
-        //
-        //     for (header, value) in &self.request.headers {
-        //         builder = builder.header(&header[..], &value[..]);
-        //     }
-        //
-        //     if let Some(auth) = &self.authorization {
-        //         builder = auth.apply_builder(builder);
-        //     }
-        //
-        //     builder.body(events).map_err(Into::into)
-        // }
+        let mut builder = Request::post(&self.bulk_uri);
+
+        let http_req = if let Some(aws_credentials) = metadata.aws_credentials {
+            let mut request = self.create_signed_request("POST", &self.bulk_uri, true);
+
+            request.add_header("Content-Type", "application/x-ndjson");
+
+            if let Some(ce) = self.compression().content_encoding() {
+                request.add_header("Content-Encoding", ce);
+            }
+
+            for (header, value) in &self.http_request_config.headers {
+                request.add_header(header, value);
+            }
+
+            request.set_payload(Some(payload));
+            builder = sign_request(&mut request, &aws_credentials, builder);
+
+            // The SignedRequest ends up owning the body, so we have
+            // to play games here
+            let body = request.payload.take().unwrap();
+            match body {
+                SignedRequestPayload::Buffer(body) => {
+                    builder.body(body.to_vec()).expect("Invalid http request value used")
+                }
+                _ => unreachable!(),
+            }
+        } else {
+            builder = builder.header("Content-Type", "application/x-ndjson");
+
+            if let Some(ce) = self.compression().content_encoding() {
+                builder = builder.header("Content-Encoding", ce);
+            }
+
+            for (header, value) in &self.http_request_config.headers {
+                builder = builder.header(&header[..], &value[..]);
+            }
+
+            if let Some(auth) = &self.http_auth {
+                builder = auth.apply_builder(builder);
+            }
+
+            builder.body(payload).expect("Invalid http request value used")
+        };
         // http::Request<Vec<u8>>
+        todo!()
+    }
+}
+
+impl ElasticsearchRequestBuilder {
+
+    fn create_signed_request(&self, method: &str, uri: &Uri, use_params: bool) -> SignedRequest {
+        let mut request = SignedRequest::new(method, "es", &self.region, uri.path());
+        request.set_hostname(uri.host().map(|host| host.into()));
+        if use_params {
+            for (key, value) in &self.query_params {
+                request.add_param(key, value);
+            }
+        }
+        request
     }
 }
 

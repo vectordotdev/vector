@@ -186,7 +186,6 @@ impl ElasticSearchCommon {
         request
     }
 
-    //TODO: migrate away from HttpClient?
     async fn healthcheck(self, client: HttpClient) -> crate::Result<()> {
         let mut builder = Request::get(format!("{}/_cluster/health", self.base_url));
 

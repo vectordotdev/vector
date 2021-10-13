@@ -66,6 +66,7 @@ pub use fixed::EncodingConfigFixed;
 mod with_default;
 
 pub use with_default::EncodingConfigWithDefault;
+pub use codec::as_tracked_write;
 
 use crate::{
     event::{Event, PathComponent, PathIter, Value},

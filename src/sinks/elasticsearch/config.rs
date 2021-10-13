@@ -217,7 +217,7 @@ impl DataStreamConfig {
             .ok()
     }
 
-    pub fn sync_fields<'a, T>(&self, log: &mut LogEvent) {
+    pub fn sync_fields(&self, log: &mut LogEvent) {
         if !self.sync_fields {
             return;
         }
