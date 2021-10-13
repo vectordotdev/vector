@@ -1,20 +1,14 @@
 use crate::Error;
 use futures::FutureExt;
-use std::{
-    cmp,
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll},
-    time::Duration,
-};
+use std::{borrow::Cow, cmp, future::Future, pin::Pin, task::{Context, Poll}, time::Duration};
 use tokio::time::{sleep, Sleep};
 use tower::{retry::Policy, timeout::error::Elapsed};
 
 pub enum RetryAction {
     /// Indicate that this request should be retried with a reason
-    Retry(String),
+    Retry(Cow<'static, str>),
     /// Indicate that this request should not be retried with a reason
-    DontRetry(String),
+    DontRetry(Cow<'static, str>),
     /// Indicate that this request should not be retried but the request was successful
     Successful,
 }

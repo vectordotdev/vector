@@ -19,6 +19,7 @@ pub mod udp;
 #[cfg(all(any(feature = "sinks-socket", feature = "sinks-statsd"), unix))]
 pub mod unix;
 pub mod uri;
+pub mod normalizer;
 
 use crate::event::{Event, EventFinalizers};
 use bytes::Bytes;
@@ -34,7 +35,8 @@ pub use buffer::vec::{EncodedLength, VecBuffer};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
 pub use builder::SinkBuilderExt;
 pub use compressor::Compressor;
-pub use request_builder::RequestBuilder;
+pub use normalizer::Normalizer;
+pub use request_builder::{RequestBuilder, StatefulRequestBuilder};
 pub use service::{
     Concurrency, ServiceBuilderExt, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
     TowerRequestLayer, TowerRequestSettings,

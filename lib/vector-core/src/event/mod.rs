@@ -118,6 +118,16 @@ impl Event {
         }
     }
 
+    /// Fallibly coerces self into a `LogEvent`
+    ///
+    /// If the event is a `LogEvent`, then `Some(log_event)` is returned, otherwise `None`.
+    pub fn try_into_log(self) -> Option<LogEvent> {
+        match self {
+            Event::Log(log) => Some(log),
+            _ => None,
+        }
+    }
+
     /// Return self as a `Metric`
     ///
     /// # Panics
@@ -151,6 +161,16 @@ impl Event {
         match self {
             Event::Metric(metric) => metric,
             _ => panic!("Failed type coercion, {:?} is not a metric", self),
+        }
+    }
+
+    /// Fallibly coerces self into a `Metric`
+    ///
+    /// If the event is a `Metric`, then `Some(metric)` is returned, otherwise `None`.
+    pub fn try_into_metric(self) -> Option<Metric> {
+        match self {
+            Event::Metric(metric) => Some(metric),
+            _ => None,
         }
     }
 

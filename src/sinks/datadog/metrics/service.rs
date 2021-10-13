@@ -1,58 +1,33 @@
 use crate::{
-    http::{HttpClient, HttpError},
-    sinks::util::{
-        retries::{RetryAction, RetryLogic},
-        Compression,
-    },
+    http::{HttpClient, HttpError, BuildRequest, CallRequest},
+    sinks::util::Compression,
 };
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
 use futures::future::BoxFuture;
-use http::{
-    header::{CONTENT_ENCODING, CONTENT_TYPE},
-    Request, Response, Uri,
-};
+use http::{Request, Response, StatusCode, Uri, header::{CONTENT_ENCODING, CONTENT_TYPE, HeaderValue}};
 use hyper::Body;
-use std::{
-    sync::Arc,
-    task::{Context, Poll},
-};
+use snafu::ResultExt;
+use std::task::{Context, Poll};
 use tower::Service;
-use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
-
-#[derive(Clone)]
-pub struct DatadogMetricsRetryLogic;
-
-impl RetryLogic for DatadogMetricsRetryLogic {
-    type Error = HttpError;
-    type Response = DatadogMetricsResponse;
-
-    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
-        todo!()
-    }
-
-    fn should_retry_response(&self, _response: &Self::Response) -> RetryAction {
-        todo!()
-    }
-}
+use vector_core::{buffers::Ackable, event::{EventFinalizers, EventStatus, Finalizable}};
 
 #[derive(Debug, Clone)]
 pub struct DatadogMetricsRequest {
-    pub body: Bytes,
+    pub payload: Bytes,
     pub uri: Uri,
-    pub content_type: Arc<str>,
-    pub api_key: Arc<str>,
+    pub content_type: &'static str,
     pub compression: Compression,
     pub finalizers: EventFinalizers,
     pub batch_size: usize,
 }
 
 impl DatadogMetricsRequest {
-    pub fn into_http_request(self) -> crate::Result<Request<Body>> {
+    pub fn into_http_request(self, api_key: HeaderValue) -> http::Result<Request<Body>> {
         let content_encoding = self.compression.content_encoding();
 
         let request = Request::post(self.uri)
-            .header("DD-API-KEY", self.api_key.as_ref())
-            .header(CONTENT_TYPE, self.content_type.as_ref());
+            .header(CONTENT_TYPE, self.content_type)
+            .header("DD-API-KEY", api_key);
 
         let request = if let Some(value) = content_encoding {
             request.header(CONTENT_ENCODING, value)
@@ -60,7 +35,13 @@ impl DatadogMetricsRequest {
             request
         };
 
-        request.body(Body::from(self.body)).map_err(Into::into)
+        request.body(Body::from(self.payload))
+    }
+}
+
+impl Ackable for DatadogMetricsRequest {
+    fn ack_size(&self) -> usize {
+        self.batch_size
     }
 }
 
@@ -71,11 +52,15 @@ impl Finalizable for DatadogMetricsRequest {
 }
 
 #[derive(Debug)]
-pub struct DatadogMetricsResponse;
+pub struct DatadogMetricsResponse {
+    status_code: StatusCode,
+}
 
 impl From<Response<Body>> for DatadogMetricsResponse {
-    fn from(_response: Response<Body>) -> DatadogMetricsResponse {
-        DatadogMetricsResponse
+    fn from(response: Response<Body>) -> DatadogMetricsResponse {
+        DatadogMetricsResponse {
+            status_code: response.status(),
+        }
     }
 }
 
@@ -88,33 +73,44 @@ impl AsRef<EventStatus> for DatadogMetricsResponse {
 #[derive(Clone)]
 pub struct DatadogMetricsService {
     client: HttpClient,
+    api_key: HeaderValue,
 }
 
 impl DatadogMetricsService {
-    pub const fn new(client: HttpClient) -> Self {
-        DatadogMetricsService { client }
+    pub fn new(client: HttpClient, api_key: &str) -> Self {
+        DatadogMetricsService {
+            client,
+            api_key: HeaderValue::from_str(api_key)
+                .expect("API key should be only valid ASCII characters"),
+        }
     }
 }
 
 impl Service<DatadogMetricsRequest> for DatadogMetricsService {
-    type Response = DatadogMetricsResponse;
-    type Error = crate::Error;
+    type Response = http::Response<Bytes>;
+    type Error = HttpError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
+    fn poll_ready(&mut self, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+        self.client.poll_ready(cx)
     }
 
     fn call(&mut self, request: DatadogMetricsRequest) -> Self::Future {
         let client = self.client.clone();
-        Box::pin(async move {
-            let request = request.into_http_request()?;
+        let api_key = self.api_key.clone();
 
-            client
-                .send(request)
-                .await
-                .map(DatadogMetricsResponse::from)
-                .map_err(Into::into)
+        Box::pin(async move {
+            let request = request.into_http_request(api_key)
+                .context(BuildRequest)?;
+            let response = client.send(request).await?;
+            let (parts, body) = response.into_parts();
+            let mut body = hyper::body::aggregate(body).await
+                .context(CallRequest)?;
+
+            Ok(hyper::Response::from_parts(
+                parts,
+                body.copy_to_bytes(body.remaining()),
+            ))
         })
     }
 }

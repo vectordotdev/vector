@@ -1,15 +1,4 @@
-use crate::{
-    config::{DataType, SinkConfig, SinkContext},
-    http::HttpClient,
-    sinks::{
-        datadog::{healthcheck, Region},
-        util::{
-            batch::{BatchConfig, BatchSettings},
-            Compression, Concurrency, ServiceBuilderExt, TowerRequestConfig,
-        },
-        Healthcheck, UriParseError, VectorSink,
-    },
-};
+use crate::{config::{DataType, SinkConfig, SinkContext}, http::HttpClient, sinks::{Healthcheck, UriParseError, VectorSink, datadog::{healthcheck, Region}, util::{Compression, Concurrency, ServiceBuilderExt, TowerRequestConfig, batch::{BatchConfig, BatchSettings}, http::HttpRetryLogic}}};
 use futures::FutureExt;
 use http::{uri::InvalidUri, Uri};
 use hyper::Body;
@@ -19,7 +8,7 @@ use tower::ServiceBuilder;
 use vector_core::config::proxy::ProxyConfig;
 
 use super::{
-    service::{DatadogMetricsRetryLogic, DatadogMetricsService},
+    service::DatadogMetricsService,
     sink::DatadogMetricsSink,
 };
 
@@ -27,11 +16,17 @@ use super::{
 const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
     TowerRequestConfig::new(Concurrency::None).retry_attempts(5);
 
+// This default is centered around "series" data, which should be the lion's share of what we
+// process.  Given that a single series, when encoded, is in the 150-300 byte range, we can fit a
+// lot of these into a single request, something like 150-200K series.  Simply to be a little more
+// conservative, though, we use 100K here.  This will also get a little more tricky when it comes to
+// distributions and sketches, but we're going to have to implement incremental encoding to handle
+// "we've exceeded our maximum payload size, split this batch" scenarios anyways.
 const DEFAULT_BATCH_SETTINGS: BatchSettings<()> =
-    BatchSettings::const_default().events(20).timeout(1);
+    BatchSettings::const_default().events(100000).timeout(2);
 
-const MAXIMUM_SERIES_PAYLOAD_COMPRESSED_SIZE: usize = 3_200_000;
-const MAXIMUM_SERIES_PAYLOAD_SIZE: usize = 62_914_560;
+pub const MAXIMUM_SERIES_PAYLOAD_COMPRESSED_SIZE: usize = 3_200_000;
+pub const MAXIMUM_SERIES_PAYLOAD_SIZE: usize = 62_914_560;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -47,6 +42,16 @@ pub enum DatadogMetricsEndpoint {
     Series,
     Distribution,
     Sketch,
+}
+
+impl DatadogMetricsEndpoint {
+    pub fn content_type(&self) -> &'static str {
+        match self {
+            DatadogMetricsEndpoint::Series => "application/json",
+            DatadogMetricsEndpoint::Distribution => "application/json",
+            DatadogMetricsEndpoint::Sketch => "application/x-protobuf",
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -168,8 +173,8 @@ impl DatadogMetricsConfig {
         let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
         let metric_endpoints = self.generate_metric_endpoints()?;
         let service = ServiceBuilder::new()
-            .settings(request_limits, DatadogMetricsRetryLogic)
-            .service(DatadogMetricsService::new(client));
+            .settings(request_limits, HttpRetryLogic)
+            .service(DatadogMetricsService::new(client, self.api_key.as_str()));
 
         let sink = DatadogMetricsSink::new(
             cx,

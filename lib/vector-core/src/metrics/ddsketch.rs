@@ -893,7 +893,7 @@ mod tests {
 
     #[test]
     fn test_ddsketch_clear() {
-        let mut sketch1 = AgentDDSketch::with_agent_defaults();
+        let sketch1 = AgentDDSketch::with_agent_defaults();
         let mut sketch2 = AgentDDSketch::with_agent_defaults();
 
         assert_eq!(sketch1, sketch2);

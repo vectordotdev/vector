@@ -110,6 +110,12 @@ impl EventFinalizers {
     }
 }
 
+impl Finalizable for EventFinalizers {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        mem::take(self)
+    }
+}
+
 /// An event finalizer is the shared data required to handle tracking
 /// the status of an event, and updating the status of a batch with that
 /// when the event is dropped.

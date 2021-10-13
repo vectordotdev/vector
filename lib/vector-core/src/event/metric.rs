@@ -1,4 +1,4 @@
-use super::{BatchNotifier, EventFinalizer, EventMetadata};
+use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable};
 use crate::metrics::{AgentDDSketch, Handle};
 use crate::ByteSizeOf;
 use chrono::{DateTime, Utc};
@@ -34,6 +34,12 @@ impl ByteSizeOf for Metric {
         self.series.allocated_bytes()
             + self.data.allocated_bytes()
             + self.metadata.allocated_bytes()
+    }
+}
+
+impl Finalizable for Metric {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.metadata.take_finalizers()
     }
 }
 
