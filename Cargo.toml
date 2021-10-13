@@ -795,6 +795,7 @@ required-features = ["statistic-benches"]
 
 [[bench]]
 name = "transform"
+path = "benches/transform/main.rs"
 harness = false
 test = false
 required-features = ["transform-benches"]
