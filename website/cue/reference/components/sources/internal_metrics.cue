@@ -483,6 +483,48 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		buffer_byte_size: {
+			description:       "The number of bytes current in the buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_events: {
+			description:       "The number of events currently in the buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_discarded_events_total: {
+			description:       "The number of events dropped by this non-blocking buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_received_event_bytes_total: {
+			description:       "The number of bytes received by this buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_received_events_total: {
+			description:       "The number of events received by this buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_sent_event_bytes_total: {
+			description:       "The number of bytes sent by this buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_sent_events_total: {
+			description:       "The number of events sent by this buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		component_received_bytes_total: {
 			description:       "The number of raw bytes accepted by this component from source origins."
 			type:              "counter"

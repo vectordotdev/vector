@@ -14,7 +14,6 @@ use crate::{
 };
 use futures::{future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
-use std::pin::Pin;
 use std::{
     collections::HashMap,
     future::ready,
@@ -165,13 +164,15 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx, _) =
-            vector_core::buffers::build(vector_core::buffers::Variant::Memory {
+        let (input_tx, input_rx, _) = vector_core::buffers::build(
+            vector_core::buffers::Variant::Memory {
                 max_events: 100,
                 when_full: vector_core::buffers::WhenFull::Block,
-            })
-            .unwrap();
-        let input_rx = crate::utilization::wrap(Pin::new(input_rx));
+                instrument: false,
+            },
+            tracing::Span::none(),
+        )
+        .unwrap();
 
         let (output, control) = Fanout::new();
 
@@ -249,7 +250,15 @@ pub async fn build_pieces(
         let (tx, rx, acker) = if let Some(buffer) = buffers.remove(key) {
             buffer
         } else {
-            let buffer = sink.buffer.build(&config.global.data_dir, key);
+            let buffer_span = error_span!(
+                "sink",
+                component_kind = "sink",
+                component_id = %key.id(),
+                component_scope = %key.scope(),
+                component_type = typetag,
+                component_name = %key.id(),
+            );
+            let buffer = sink.buffer.build(&config.global.data_dir, key, buffer_span);
             match buffer {
                 Err(error) => {
                     errors.push(format!("Sink \"{}\": {}", key, error));
