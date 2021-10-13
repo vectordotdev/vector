@@ -1,22 +1,27 @@
 use crate::sinks::util::{StreamSink, SinkBuilderExt, BatchSettings, Compression};
 use futures::stream::BoxStream;
-use crate::event::Event;
+use crate::event::{Event, LogEvent};
 use vector_core::partition::{Partitioner, NullPartitioner};
 use std::num::NonZeroUsize;
 use std::time::Duration;
-use futures::StreamExt;
+use futures::{StreamExt, TryFutureExt};
 use crate::sinks::elasticsearch::request_builder::ElasticsearchRequestBuilder;
 use crate::buffers::Acker;
 use crate::sinks::elasticsearch::service::ElasticSearchService;
-use crate::sinks::elasticsearch::{BulkAction, Encoding};
+use crate::sinks::elasticsearch::{BulkAction, Encoding, ElasticSearchCommonMode, maybe_set_id};
 use crate::transforms::metric_to_log::MetricToLog;
 use vector_core::stream::BatcherSettings;
 use async_trait::async_trait;
 use crate::sinks::util::encoding::EncodingConfigWithDefault;
-use rusoto_credential::AwsCredentials;
+use rusoto_credential::{ProvideAwsCredentials, AwsCredentials};
 use futures::future;
 use crate::sinks::elasticsearch::encoder::ProcessedEvent;
 use vector_core::ByteSizeOf;
+use crate::event::Value;
+use crate::rusoto;
+use futures::FutureExt;
+use std::sync::Arc;
+use crate::rusoto::AwsCredentialsProvider;
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct PartitionKey {
@@ -43,7 +48,7 @@ pub struct PartitionKey {
 
 pub struct BatchedEvents {
     pub key: PartitionKey,
-    pub events: Vec<ProcessedEvent>
+    pub events: Vec<ProcessedEvent>,
 }
 
 impl ByteSizeOf for BatchedEvents {
@@ -62,12 +67,18 @@ pub struct ElasticSearchSink {
     pub acker: Acker,
     pub metric_to_log: MetricToLog,
     pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub mode: ElasticSearchCommonMode,
+    pub id_key_field: Option<String>,
+    pub aws_credentials_provider: Option<rusoto::AwsCredentialsProvider>,
 }
 
 impl ElasticSearchSink {
     pub async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-
         let request_builder_concurrency_limit = NonZeroUsize::new(50);
+
+        let mode = self.mode;
+        let id_key_field = self.id_key_field;
+        let aws_credentials_provider = Arc::new(self.aws_credentials_provider);
 
         let sink = input
             .scan(self.metric_to_log, |metric_to_log, event| {
@@ -76,52 +87,84 @@ impl ElasticSearchSink {
                     Event::Log(log) => Some(log)
                 }))
             })
-            .filter_map(|x|async move {x})
-            .filter_map(|log|async move {
-                // if let Some(cfg) = self.mode.as_data_stream_config() {
-                //     cfg.sync_fields(&mut event.log);
-                //     cfg.remap_timestamp(&mut event.log);
-                // };
-                // maybe_set_id(
-                //     self.id_key.as_ref(),
-                //     action.pointer_mut(event.bulk_action.as_json_pointer()).unwrap(),
-                //     &mut event.log,
-                // );
-                let event:ProcessedEvent = todo!();
-                Some(event)
+            .filter_map(|x| async move { x })
+            .filter_map(move |log| {
+                future::ready(process_log(log, &mode, &id_key_field))
             })
-            // .batched(ElasticSearchPartitioner,
-            //     self.batch_settings,
-            // )
-            // .map(|(key, events)| {
-            //     BatchedEvents { key, events }
-            // })
             .batched(NullPartitioner::new(), self.batch_settings)
-            .filter_map(|(partition, batch)|async move {
-                let aws_creds:Option<AwsCredentials> = todo!();
-                Some(super::request_builder::Input{
-                    aws_credentials: aws_creds,
-                    events: batch
-                })
+            .filter_map(move |(_, batch)| {
+                let aws_credentials_provider = aws_credentials_provider.clone();
+                async move {
+                    let aws_credentials = match &*aws_credentials_provider {
+                        Some(provider) => {
+                            Some(get_aws_credentials(provider).await?)
+                        },
+                        None => None
+                    };
+                    Some(super::request_builder::Input {
+                        aws_credentials,
+                        events: batch,
+                    })
+                }
             })
             .request_builder(
                 request_builder_concurrency_limit,
                 self.request_builder,
             ).filter_map(|request| async move {
-                match request {
-                    Err(e) => {
-                        error!("Failed to build Elasticsearch request: {:?}.", e);
-                        None
-                    }
-                    Ok(req) => Some(req),
+            match request {
+                Err(e) => {
+                    error!("Failed to build Elasticsearch request: {:?}.", e);
+                    None
                 }
-            })
+                Ok(req) => Some(req),
+            }
+        })
             .into_driver(self.service, self.acker);
 
         sink.run().await
     }
 }
 
+async fn get_aws_credentials(provider: &AwsCredentialsProvider) -> Option<AwsCredentials> {
+    Some(match provider.credentials().await {
+        Ok(creds) => creds,
+        Err(err) => {
+            error!(message = "Failed to obtain AWS credentials", error=?err);
+            return None;
+        }
+    })
+}
+// struct GetCredentials {
+//     pub aws_credentials_provider: Option<rusoto::AwsCredentialsProvider>
+// }
+//
+// impl GetCredentials {
+//     pub async fn get_credentials(&mut self) -> Option<Option<AwsCredentials>> {
+//         self.aws_credentials_provider.credentials().await
+//     }
+// }
+
+fn process_log(mut log: LogEvent, mode: &ElasticSearchCommonMode, id_key_field: &Option<String>) -> Option<ProcessedEvent> {
+    let index = mode.index(&log)?;
+    let bulk_action = mode.bulk_action(&log)?;
+
+    if let Some(cfg) = mode.as_data_stream_config() {
+        cfg.sync_fields(&mut log);
+        cfg.remap_timestamp(&mut log);
+    };
+    let id = if let Some(Value::Bytes(key)) =
+    id_key_field.as_ref().and_then(|key| log.remove(key)) {
+        Some(String::from_utf8_lossy(&key).into_owned())
+    } else {
+        None
+    };
+    Some(ProcessedEvent {
+        index,
+        bulk_action,
+        log,
+        id,
+    })
+}
 
 
 #[async_trait]
