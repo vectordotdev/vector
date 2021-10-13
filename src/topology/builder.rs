@@ -363,6 +363,7 @@ pub async fn build_pieces(
         } else {
             let buffer_type = match sink.buffer {
                 buffers::BufferConfig::Memory { .. } => "memory",
+                #[cfg(feature = "disk-buffer")]
                 buffers::BufferConfig::Disk { .. } => "disk",
             };
             let buffer_span = error_span!(
