@@ -12,6 +12,10 @@ interpreted as described in [RFC 2119].
 
 <!-- /MarkdownTOC -->
 
+## Scope
+
+This specification addresses direct buffer development and does not cover aspects that buffers inherit "for free". For example, this specification does not cover global context, such as component_id, that all buffers receive in their telemetry by nature of being attached to a Vector component.
+
 ## Instrumentation
 
 Vector buffers MUST be instrumented for optimal observability and monitoring. This is required to drive various interfaces that Vector users depend on to manage Vector installations in mission critical production environments. This section extends the [Instrumentation Specification].
