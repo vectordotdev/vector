@@ -19,6 +19,9 @@ thread_local!(
     static EVENTS_RECORDED: RefCell<HashSet<String>> = RefCell::new(Default::default());
 );
 
+/// The standard set of tags for sources that communicate over HTTP.
+pub const HTTP_SOURCE_TAGS: [&str; 2] = ["endpoint", "protocol"];
+
 /// The standard set of tags for all `TcpSource`-based sources.
 pub const TCP_SOURCE_TAGS: [&str; 2] = ["peer_addr", "protocol"];
 

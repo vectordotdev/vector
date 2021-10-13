@@ -25,6 +25,32 @@ impl InternalEvent for EventsReceived {
 }
 
 #[derive(Debug)]
+pub struct HttpClientBytesReceived<'a> {
+    pub byte_size: usize,
+    pub protocol: &'a str,
+    pub endpoint: &'a str,
+}
+
+impl InternalEvent for HttpClientBytesReceived<'_> {
+    fn emit_logs(&self) {
+        trace!(
+            message = "Bytes received.",
+            byte_size = %self.byte_size,
+            protocol = %self.protocol,
+            endpoint = %self.endpoint,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_received_bytes_total", self.byte_size as u64,
+            "protocol" => self.protocol.to_owned(),
+            "endpoint" => self.endpoint.to_owned(),
+        );
+    }
+}
+
+#[derive(Debug)]
 pub struct EventsSent {
     pub count: usize,
     pub byte_size: usize,
