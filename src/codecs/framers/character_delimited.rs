@@ -51,7 +51,7 @@ impl CharacterDelimitedCodec {
     pub fn new(delimiter: char) -> Self {
         CharacterDelimitedCodec {
             delimiter,
-            max_length: crate::serde::default_max_length(),
+            max_length: usize::max(),
             is_discarding: false,
             next_index: 0,
         }
