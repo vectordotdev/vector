@@ -1,16 +1,18 @@
-use crate::sinks::elasticsearch::{ElasticSearchConfig, ElasticSearchCommon, ElasticSearchMode, DataStreamConfig};
+use crate::sinks::elasticsearch::{ElasticSearchConfig, ElasticSearchCommon, ElasticSearchMode, DataStreamConfig, ElasticSearchAuth};
 use crate::event::{LogEvent, Event, Value, Metric, MetricKind, MetricValue};
 use crate::sinks::elasticsearch::encoder::{ElasticSearchEncoder, ProcessedEvent};
-use crate::sinks::util::encoding::Encoder;
+use crate::sinks::util::encoding::{Encoder, EncodingConfigWithDefault};
 use crate::sinks::elasticsearch::sink::process_log;
 use std::collections::BTreeMap;
 use crate::template::Template;
 use std::convert::TryFrom;
-use http::{Response, StatusCode};
+use http::{Response, StatusCode, Uri};
 use bytes::Bytes;
 use crate::sinks::elasticsearch::retry::ElasticSearchRetryLogic;
 use crate::sinks::util::retries::{RetryLogic, RetryAction};
 use super::BulkAction;
+use crate::rusoto::AwsAuthentication;
+use crate::sinks::util::BatchConfig;
 
 #[test]
 fn sets_create_action_when_configured() {
@@ -187,128 +189,137 @@ fn decode_bulk_action_error() {
     assert!(action.is_none());
 }
 
-    #[test]
-    fn decode_bulk_action() {
-        let config = ElasticSearchConfig {
-            bulk_action: Some(String::from("create")),
-            index: Some(String::from("vector")),
-            endpoint: String::from("https://example.com"),
+#[test]
+fn decode_bulk_action() {
+    let config = ElasticSearchConfig {
+        bulk_action: Some(String::from("create")),
+        index: Some(String::from("vector")),
+        endpoint: String::from("https://example.com"),
+        ..Default::default()
+    };
+    let es = ElasticSearchCommon::parse_config(&config).unwrap();
+
+    let log = LogEvent::from("hello there");
+    let action = es.mode.bulk_action(&log).unwrap();
+    assert!(matches!(action, BulkAction::Create));
+}
+
+#[test]
+fn encode_datastream_mode_no_sync() {
+    use crate::config::log_schema;
+    use chrono::{TimeZone, Utc};
+
+    let config = ElasticSearchConfig {
+        index: Some(String::from("vector")),
+        endpoint: String::from("https://example.com"),
+        mode: ElasticSearchMode::DataStream,
+        data_stream: Some(DataStreamConfig {
+            namespace: Template::try_from("something").unwrap(),
+            sync_fields: false,
             ..Default::default()
-        };
-        let es = ElasticSearchCommon::parse_config(&config).unwrap();
+        }),
+        ..Default::default()
+    };
 
-        let log = LogEvent::from("hello there");
-        let action = es.mode.bulk_action(&log).unwrap();
-        assert!(matches!(action, BulkAction::Create));
-    }
+    let es = ElasticSearchCommon::parse_config(&config).unwrap();
 
-    #[test]
-    fn encode_datastream_mode_no_sync() {
-        use crate::config::log_schema;
-        use chrono::{TimeZone, Utc};
+    let mut log = LogEvent::from("hello there");
+    log.insert("data_stream", data_stream_body());
+    log.insert(
+        log_schema().timestamp_key(),
+        Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
+    );
 
-        let config = ElasticSearchConfig {
-            index: Some(String::from("vector")),
-            endpoint: String::from("https://example.com"),
-            mode: ElasticSearchMode::DataStream,
-            data_stream: Some(DataStreamConfig {
-                namespace: Template::try_from("something").unwrap(),
-                sync_fields: false,
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
+    let encoder = ElasticSearchEncoder {
+        mode: es.mode.clone(),
+        doc_type: es.doc_type,
+    };
+    let mut encoded = vec![];
+    let encoded_size = encoder.encode_input(vec![
+        process_log(log, &es.mode, &None).unwrap()
+    ], &mut encoded).unwrap();
 
-        let es = ElasticSearchCommon::parse_config(&config).unwrap();
-
-        let mut log = LogEvent::from("hello there");
-        log.insert("data_stream", data_stream_body());
-        log.insert(
-            log_schema().timestamp_key(),
-            Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
-        );
-
-        let encoder = ElasticSearchEncoder {
-            mode: es.mode.clone(),
-            doc_type: es.doc_type,
-        };
-        let mut encoded = vec![];
-        let encoded_size = encoder.encode_input(vec![
-            process_log(log, &es.mode, &None).unwrap()
-        ], &mut encoded).unwrap();
-
-        let expected = r#"{"create":{"_index":"synthetics-testing-something","_type":"_doc"}}
+    let expected = r#"{"create":{"_index":"synthetics-testing-something","_type":"_doc"}}
 {"@timestamp":"2020-12-01T01:02:03Z","data_stream":{"dataset":"testing","type":"synthetics"},"message":"hello there"}
 "#;
-        assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
-        assert_eq!(encoded.len(), encoded_size);
-    }
+    assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
+    assert_eq!(encoded.len(), encoded_size);
+}
 
-    #[test]
-    fn handles_error_response() {
-        let json = "{\"took\":185,\"errors\":true,\"items\":[{\"index\":{\"_index\":\"test-hgw28jv10u\",\"_type\":\"log_lines\",\"_id\":\"3GhQLXEBE62DvOOUKdFH\",\"status\":400,\"error\":{\"type\":\"illegal_argument_exception\",\"reason\":\"mapper [message] of different type, current_type [long], merged_type [text]\"}}}]}";
-        let response = Response::builder()
-            .status(StatusCode::OK)
-            .body(Bytes::from(json))
-            .unwrap();
-        let logic = ElasticSearchRetryLogic;
-        assert!(matches!(
+#[test]
+fn handles_error_response() {
+    let json = "{\"took\":185,\"errors\":true,\"items\":[{\"index\":{\"_index\":\"test-hgw28jv10u\",\"_type\":\"log_lines\",\"_id\":\"3GhQLXEBE62DvOOUKdFH\",\"status\":400,\"error\":{\"type\":\"illegal_argument_exception\",\"reason\":\"mapper [message] of different type, current_type [long], merged_type [text]\"}}}]}";
+    let response = Response::builder()
+        .status(StatusCode::OK)
+        .body(Bytes::from(json))
+        .unwrap();
+    let logic = ElasticSearchRetryLogic;
+    assert!(matches!(
             logic.should_retry_response(&response),
             RetryAction::DontRetry(_)
         ));
-    }
-//
-//     #[test]
-//     fn allows_using_excepted_fields() {
-//         let config = ElasticSearchConfig {
-//             index: Some(String::from("{{ idx }}")),
-//             encoding: EncodingConfigWithDefault {
-//                 except_fields: Some(vec!["idx".to_string(), "timestamp".to_string()]),
-//                 ..Default::default()
-//             },
-//             endpoint: String::from("https://example.com"),
-//             ..Default::default()
-//         };
-//         let es = ElasticSearchCommon::parse_config(&config).unwrap();
-//
-//         let mut event = Event::from("hello there");
-//         event.as_mut_log().insert("foo", "bar");
-//         event.as_mut_log().insert("idx", "purple");
-//
-//         let encoded = es.encode_event(event).unwrap();
-//         let expected = r#"{"index":{"_index":"purple","_type":"_doc"}}
-// {"foo":"bar","message":"hello there"}
-// "#;
-//         assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
-//     }
-//
-//     #[test]
-//     fn validate_host_header_on_aws_requests() {
-//         let config = ElasticSearchConfig {
-//             auth: Some(ElasticSearchAuth::Aws(AwsAuthentication::Default {})),
-//             endpoint: "http://abc-123.us-east-1.es.amazonaws.com".into(),
-//             batch: BatchConfig {
-//                 max_events: Some(1),
-//                 ..Default::default()
-//             },
-//             ..Default::default()
-//         };
-//
-//         let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
-//
-//         let signed_request = common.signed_request(
-//             "POST",
-//             &"http://abc-123.us-east-1.es.amazonaws.com"
-//                 .parse::<Uri>()
-//                 .unwrap(),
-//             true,
-//         );
-//
-//         assert_eq!(
-//             signed_request.hostname(),
-//             "abc-123.us-east-1.es.amazonaws.com".to_string()
-//         );
-//     }
+}
+
+#[test]
+fn allows_using_excepted_fields() {
+    let config = ElasticSearchConfig {
+        index: Some(String::from("{{ idx }}")),
+        encoding: EncodingConfigWithDefault {
+            except_fields: Some(vec!["idx".to_string(), "timestamp".to_string()]),
+            ..Default::default()
+        },
+        endpoint: String::from("https://example.com"),
+        ..Default::default()
+    };
+    let es = ElasticSearchCommon::parse_config(&config).unwrap();
+
+    let mut log = LogEvent::from("hello there");
+    log.insert("foo", "bar");
+    log.insert("idx", "purple");
+
+    let encoder = ElasticSearchEncoder {
+        mode: es.mode.clone(),
+        doc_type: es.doc_type,
+    };
+    let mut encoded = vec![];
+    let encoded_size = encoder.encode_input(vec![
+        process_log(log, &es.mode, &None).unwrap()
+    ], &mut encoded).unwrap();
+
+    let expected = r#"{"index":{"_index":"purple","_type":"_doc"}}
+{"foo":"bar","message":"hello there"}
+"#;
+    assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
+    assert_eq!(encoded.len(), encoded_size);
+}
+
+#[test]
+fn validate_host_header_on_aws_requests() {
+    let config = ElasticSearchConfig {
+        auth: Some(ElasticSearchAuth::Aws(AwsAuthentication::Default {})),
+        endpoint: "http://abc-123.us-east-1.es.amazonaws.com".into(),
+        batch: BatchConfig {
+            max_events: Some(1),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
+
+    let signed_request = common.signed_request(
+        "POST",
+        &"http://abc-123.us-east-1.es.amazonaws.com"
+            .parse::<Uri>()
+            .unwrap(),
+        true,
+    );
+
+    assert_eq!(
+        signed_request.hostname(),
+        "abc-123.us-east-1.es.amazonaws.com".to_string()
+    );
+}
 
 
 
