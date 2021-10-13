@@ -868,27 +868,27 @@ mod test {
         let config1: ConfigBuilder = format::deserialize(
             indoc! {r#"
                 data_dir = "/tmp"
-                
+
                 [api]
                     enabled = true
-                
+
                 [sources.file]
                     type = "file"
                     ignore_older_secs = 600
                     include = ["/var/log/**/*.log"]
                     read_from = "beginning"
-                
+
                 [sources.internal_metrics]
                     type = "internal_metrics"
                     namespace = "pipelines"
-                
+
                 [transforms.filter]
                     type = "filter"
                     inputs = ["internal_metrics"]
                     condition = """
                         .name == "processed_bytes_total"
                     """
-                
+
                 [sinks.out]
                     type = "console"
                     inputs = ["filter"]
@@ -902,24 +902,24 @@ mod test {
         let config2: ConfigBuilder = format::deserialize(
             indoc! {r#"
                 data_dir = "/tmp"
-            
+
                 [sources.internal_metrics]
                     type = "internal_metrics"
                     namespace = "pipelines"
-                
+
                 [sources.file]
                     type = "file"
                     ignore_older_secs = 600
                     include = ["/var/log/**/*.log"]
                     read_from = "beginning"
-                
+
                 [transforms.filter]
                     type = "filter"
                     inputs = ["internal_metrics"]
                     condition = """
                         .name == "processed_bytes_total"
                     """
-                
+
                 [sinks.out]
                     type = "console"
                     inputs = ["filter"]
