@@ -1,5 +1,3 @@
-// ## skip check-events ##
-
 use crate::event::metric::{MetricKind, MetricValue};
 use metrics::counter;
 use serde_json::Error;
