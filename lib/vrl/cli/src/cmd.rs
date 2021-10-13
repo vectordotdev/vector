@@ -107,6 +107,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
         })?;
 
         for mut object in objects {
+            //for _ in 0..1000000 {
             let result = execute(&mut object, &program, &tz).map(|v| {
                 if opts.print_object {
                     object.to_string()
@@ -119,6 +120,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
                 Ok(ok) => println!("{}", ok),
                 Err(err) => eprintln!("{}", err),
             }
+            //}
         }
 
         Ok(())
@@ -135,16 +137,20 @@ fn repl(objects: Vec<Value>, timezone: &TimeZone) -> Result<(), Error> {
 }
 
 fn execute(
-    object: &mut impl Target,
+    _object: &mut impl Target,
     program: &Program,
-    timezone: &TimeZone,
+    _timezone: &TimeZone,
 ) -> Result<Value, Error> {
     let state = state::Runtime::default();
     let mut runtime = Runtime::new(state);
 
-    runtime
-        .resolve(object, program, timezone)
-        .map_err(Error::Runtime)
+    let vm = runtime.compile(program).unwrap();
+
+    println!("{:#?}", vm.dissassemble());
+    Ok(Value::Null)
+    // runtime
+    //    .resolve(object, program, timezone)
+    //   .map_err(Error::Runtime)
 }
 
 fn serde_to_vrl(value: serde_json::Value) -> Value {

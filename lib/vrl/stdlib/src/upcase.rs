@@ -1,4 +1,4 @@
-use vrl::prelude::*;
+use vrl::{prelude::*, Vm};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Upcase;
@@ -33,6 +33,12 @@ impl Function for Upcase {
         let value = arguments.required("value");
 
         Ok(Box::new(UpcaseFn { value }))
+    }
+
+    fn call(&self, vm: &mut Vm) {
+        let stack = vm.stack_mut();
+        let value = stack.pop().unwrap();
+        stack.push(value.try_bytes_utf8_lossy().unwrap().to_uppercase().into())
     }
 }
 

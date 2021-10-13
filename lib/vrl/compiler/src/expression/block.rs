@@ -42,6 +42,14 @@ impl Expression for Block {
 
         type_def.with_fallibility(fallible)
     }
+
+    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        for expr in &self.inner {
+            expr.dump(vm)?;
+        }
+
+        Ok(())
+    }
 }
 
 impl fmt::Display for Block {

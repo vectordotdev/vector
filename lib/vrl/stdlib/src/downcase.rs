@@ -1,4 +1,4 @@
-use vrl::prelude::*;
+use vrl::{prelude::*, Vm};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Downcase;
@@ -33,6 +33,12 @@ impl Function for Downcase {
             source: r#"downcase("FOO 2 BAR")"#,
             result: Ok("foo 2 bar"),
         }]
+    }
+
+    fn call(&self, vm: &mut Vm) {
+        let stack = vm.stack_mut();
+        let value = stack.pop().unwrap();
+        stack.push(value.try_bytes_utf8_lossy().unwrap().to_lowercase().into())
     }
 }
 

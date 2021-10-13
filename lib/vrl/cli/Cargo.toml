@@ -32,3 +32,4 @@ path = "../stdlib"
 [features]
 default = ["repl"]
 repl = ["lazy_static", "prettytable-rs", "regex", "rustyline", "webbrowser"]
+

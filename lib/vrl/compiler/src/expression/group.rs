@@ -23,6 +23,10 @@ impl Expression for Group {
     fn type_def(&self, state: &State) -> TypeDef {
         self.inner.type_def(state)
     }
+
+    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        self.inner.dump(vm)
+    }
 }
 
 impl fmt::Display for Group {

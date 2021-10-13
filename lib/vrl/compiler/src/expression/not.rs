@@ -44,6 +44,13 @@ impl Expression for Not {
     fn type_def(&self, state: &State) -> TypeDef {
         self.inner.type_def(state).boolean()
     }
+
+    fn dump(&self, vm: &mut crate::vm::Vm) -> std::result::Result<(), String> {
+        self.inner.dump(vm)?;
+        vm.write_chunk(crate::vm::OpCode::Not);
+
+        Ok(())
+    }
 }
 
 impl fmt::Display for Not {

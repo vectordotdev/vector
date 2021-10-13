@@ -21,6 +21,10 @@ impl Expression for Abort {
     fn type_def(&self, _: &State) -> TypeDef {
         TypeDef::new().infallible().null()
     }
+
+    fn dump(&self, _vm: &mut crate::vm::Vm) -> Result<(), String> {
+        todo!()
+    }
 }
 
 impl fmt::Display for Abort {

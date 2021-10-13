@@ -55,6 +55,10 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     /// An expression is allowed to fail, which aborts the running program.
     fn resolve(&self, ctx: &mut Context) -> Resolved;
 
+    fn dump(&self, _vm: &mut crate::vm::Vm) -> Result<(), String> {
+        Ok(())
+    }
+
     /// Resolve an expression to a value without any context, if possible.
     ///
     /// This returns `Some` for static expressions, or `None` for dynamic expressions.
@@ -178,6 +182,24 @@ impl Expression for Expr {
             Noop(v) => v.type_def(state),
             Unary(v) => v.type_def(state),
             Abort(v) => v.type_def(state),
+        }
+    }
+
+    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        use Expr::*;
+
+        match self {
+            Literal(v) => v.dump(vm),
+            Container(v) => v.dump(vm),
+            IfStatement(v) => v.dump(vm),
+            Op(v) => v.dump(vm),
+            Assignment(v) => v.dump(vm),
+            Query(v) => v.dump(vm),
+            FunctionCall(v) => v.dump(vm),
+            Variable(v) => v.dump(vm),
+            Noop(v) => v.dump(vm),
+            Unary(v) => v.dump(vm),
+            Abort(v) => v.dump(vm),
         }
     }
 }

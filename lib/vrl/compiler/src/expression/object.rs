@@ -1,7 +1,10 @@
 use crate::expression::{Expr, Resolved};
+use crate::vm::OpCode;
 use crate::{Context, Expression, State, TypeDef, Value};
 use std::collections::BTreeMap;
 use std::{fmt, ops::Deref};
+
+use super::Literal;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Object {
@@ -51,6 +54,22 @@ impl Expression for Object {
         let fallible = type_defs.values().any(TypeDef::is_fallible);
 
         TypeDef::new().object(type_defs).with_fallibility(fallible)
+    }
+
+    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        for (key, value) in &self.inner {
+            let keyidx = vm.add_constant(Literal::String(key.clone().into()));
+
+            vm.write_chunk(OpCode::Constant);
+            vm.write_primitive(keyidx);
+
+            value.dump(vm)?;
+        }
+
+        vm.write_chunk(OpCode::CreateObject);
+        vm.write_primitive(self.inner.len());
+
+        Ok(())
     }
 }
 

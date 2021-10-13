@@ -54,6 +54,17 @@ impl Expression for Container {
             Object(v) => v.type_def(state),
         }
     }
+
+    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        use Variant::*;
+
+        match &self.variant {
+            Group(v) => v.dump(vm),
+            Block(v) => v.dump(vm),
+            Array(v) => v.dump(vm),
+            Object(v) => v.dump(vm),
+        }
+    }
 }
 
 impl fmt::Display for Container {

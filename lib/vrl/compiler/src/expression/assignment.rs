@@ -3,6 +3,7 @@ use crate::parser::{
     ast::{self, Ident},
     Node,
 };
+use crate::vm::OpCode;
 use crate::{Context, Expression, Span, State, TypeDef, Value};
 use diagnostic::{DiagnosticError, Label, Note};
 use lookup::LookupBuf;
@@ -152,6 +153,10 @@ impl Expression for Assignment {
     fn type_def(&self, state: &State) -> TypeDef {
         self.variant.type_def(state)
     }
+
+    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        self.variant.dump(vm)
+    }
 }
 
 impl fmt::Display for Assignment {
@@ -241,7 +246,7 @@ impl Target {
         }
     }
 
-    fn insert(&self, value: Value, ctx: &mut Context) {
+    pub fn insert(&self, value: Value, ctx: &mut Context) {
         use Target::*;
 
         match self {
@@ -399,6 +404,42 @@ where
             Single { expr, .. } => expr.type_def(state),
             Infallible { expr, .. } => expr.type_def(state).infallible(),
         }
+    }
+
+    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        match self {
+            Variant::Single { target, expr } => {
+                expr.dump(vm)?;
+                vm.write_chunk(OpCode::SetPath);
+
+                let variable = match target {
+                    Target::External(Some(path)) => crate::vm::Variable::External(path.clone()),
+                    _ => unimplemented!("nothing else supported"),
+                };
+
+                let target = vm.get_target(&variable);
+                vm.write_primitive(target);
+            }
+            Variant::Infallible {
+                ok,
+                err: _,
+                expr,
+                default: _,
+            } => {
+                // This isn't handling the error case yet.
+                expr.dump(vm)?;
+                vm.write_chunk(OpCode::SetPath);
+
+                let variable = match ok {
+                    Target::External(Some(path)) => crate::vm::Variable::External(path.clone()),
+                    _ => unimplemented!("nothing else supported"),
+                };
+
+                let target = vm.get_target(&variable);
+                vm.write_primitive(target);
+            }
+        }
+        Ok(())
     }
 }
 

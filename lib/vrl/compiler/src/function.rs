@@ -3,6 +3,7 @@ use crate::expression::{
 };
 use crate::parser::Node;
 use crate::value::Kind;
+use crate::vm::Vm;
 use crate::{Span, Value};
 use diagnostic::{DiagnosticError, Label, Note};
 use std::collections::{BTreeMap, HashMap};
@@ -53,6 +54,8 @@ pub trait Function: Sync + fmt::Debug {
     fn parameters(&self) -> &'static [Parameter] {
         &[]
     }
+
+    fn call(&self, _vm: &mut Vm) {}
 }
 
 // -----------------------------------------------------------------------------

@@ -59,6 +59,13 @@ impl Expression for Predicate {
 
         type_def.with_fallibility(fallible)
     }
+
+    fn dump(&self, vm: &mut crate::vm::Vm) -> std::result::Result<(), String> {
+        for inner in &self.inner {
+            inner.dump(vm)?;
+        }
+        Ok(())
+    }
 }
 
 impl fmt::Display for Predicate {

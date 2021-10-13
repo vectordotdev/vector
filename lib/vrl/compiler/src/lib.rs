@@ -9,6 +9,7 @@ pub mod function;
 pub mod state;
 pub mod type_def;
 pub mod value;
+pub mod vm;
 
 pub(crate) use diagnostic::Span;
 pub(crate) use state::Compiler as State;

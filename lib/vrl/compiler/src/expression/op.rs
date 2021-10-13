@@ -235,6 +235,29 @@ impl Expression for Op {
                 .scalar(K::Integer | K::Float),
         }
     }
+
+    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        self.lhs.dump(vm)?;
+        self.rhs.dump(vm)?;
+        vm.write_chunk(match self.opcode {
+            ast::Opcode::Mul => crate::vm::OpCode::Multiply,
+            ast::Opcode::Div => crate::vm::OpCode::Divide,
+            ast::Opcode::Add => crate::vm::OpCode::Add,
+            ast::Opcode::Sub => crate::vm::OpCode::Subtract,
+            ast::Opcode::Rem => todo!(),
+            ast::Opcode::Or => todo!(),
+            ast::Opcode::And => todo!(),
+            ast::Opcode::Err => todo!(),
+            ast::Opcode::Ne => crate::vm::OpCode::NotEqual,
+            ast::Opcode::Eq => crate::vm::OpCode::Equal,
+            ast::Opcode::Ge => crate::vm::OpCode::GreaterEqual,
+            ast::Opcode::Gt => crate::vm::OpCode::Greater,
+            ast::Opcode::Le => crate::vm::OpCode::LessEqual,
+            ast::Opcode::Lt => crate::vm::OpCode::Less,
+            ast::Opcode::Merge => todo!(),
+        });
+        Ok(())
+    }
 }
 
 impl fmt::Display for Op {

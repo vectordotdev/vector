@@ -5,6 +5,7 @@ use crate::{value::Kind, Context, Expression, Function, Resolved, Span, State, T
 
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 use std::fmt;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct FunctionCall {
@@ -25,6 +26,9 @@ pub struct FunctionCall {
 
     // used for equality check
     ident: &'static str,
+
+    function_id: usize,
+    arguments: Arc<Vec<Node<FunctionArgument>>>,
 }
 
 impl FunctionCall {
@@ -39,7 +43,11 @@ impl FunctionCall {
         let (ident_span, ident) = ident.take();
 
         // Check if function exists.
-        let function = match funcs.iter().find(|f| f.identifier() == ident.as_ref()) {
+        let (function_id, function) = match funcs
+            .iter()
+            .enumerate()
+            .find(|(_pos, f)| f.identifier() == ident.as_ref())
+        {
             Some(function) => function,
             None => {
                 let idents = funcs
@@ -89,8 +97,8 @@ impl FunctionCall {
             .collect::<Vec<_>>();
 
         let mut maybe_fallible_arguments = false;
-        for node in arguments {
-            let (argument_span, argument) = node.take();
+        for node in &arguments {
+            let (argument_span, argument) = node.clone().take();
 
             let parameter = match argument.keyword() {
                 // positional argument
@@ -192,6 +200,8 @@ impl FunctionCall {
             arguments_fmt,
             arguments_dbg,
             ident: function.identifier(),
+            function_id,
+            arguments: Arc::new(arguments),
         })
     }
 
@@ -206,13 +216,15 @@ impl FunctionCall {
             arguments_fmt: vec![],
             arguments_dbg: vec![],
             ident: "noop",
+            arguments: Arc::new(Vec::new()),
+            function_id: 0,
         }
     }
 }
 
 impl Expression for FunctionCall {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.expr.resolve(ctx).map_err(|err| match err {
+        (*self.expr).resolve(ctx).map_err(|err| match err {
             ExpressionError::Abort { .. } => {
                 panic!("abort errors must only be defined by `abort` statement")
             }
@@ -306,6 +318,17 @@ impl Expression for FunctionCall {
         }
 
         type_def
+    }
+
+    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        for argument in &*self.arguments {
+            argument.inner().dump(vm)?;
+        }
+
+        vm.write_chunk(crate::vm::OpCode::Call);
+        vm.write_primitive(self.function_id);
+
+        Ok(())
     }
 }
 

@@ -14,6 +14,7 @@ use std::io::{self, Read};
 use std::path::PathBuf;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Terminate};
+use vrl_compiler::vm::Vm;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -58,6 +59,7 @@ impl TransformConfig for RemapConfig {
 pub struct Remap {
     program: Program,
     runtime: Runtime,
+    vm: Vm,
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
@@ -93,9 +95,15 @@ impl Remap {
         )
         .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
 
+        // println!("{:?}", program);
+        // println!("{:#?}", self.vm.dissassemble());
+        let mut runtime = Runtime::default();
+        let vm = runtime.compile(&program)?;
+
         Ok(Remap {
             program,
-            runtime: Runtime::default(),
+            runtime,
+            vm,
             timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
@@ -114,6 +122,7 @@ impl Clone for Remap {
             program: self.program.clone(),
             runtime: Runtime::default(),
             timezone: self.timezone,
+            vm: self.vm.clone(),
             drop_on_error: self.drop_on_error,
             drop_on_abort: self.drop_on_abort,
         }
@@ -141,6 +150,29 @@ impl FunctionTransform for Remap {
 
         let mut target: VrlTarget = event.into();
 
+        let functions = vrl_stdlib::all();
+        let result = self
+            .runtime
+            .run_vm(&mut self.vm, &mut target, &self.timezone, &functions);
+
+        match result {
+            Ok(_) => {
+                for event in target.into_events() {
+                    output.push(event)
+                }
+            }
+            Err(_) => {
+                emit!(&RemapMappingAbort {
+                    event_dropped: self.drop_on_abort,
+                });
+
+                if !self.drop_on_abort {
+                    output.push(original_event.expect("event will be set"))
+                }
+            }
+        }
+
+        /*
         let result = self
             .runtime
             .resolve(&mut target, &self.program, &self.timezone);
@@ -172,6 +204,7 @@ impl FunctionTransform for Remap {
                 }
             }
         }
+        */
     }
 }
 

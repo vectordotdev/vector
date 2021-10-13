@@ -117,6 +117,17 @@ impl Expression for Query {
             Container(container) => container.type_def(state).at_path(self.path.clone()),
         }
     }
+
+    fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        vm.write_chunk(crate::vm::OpCode::GetPath);
+        let variable = match self.target {
+            Target::External => crate::vm::Variable::External(self.path.clone()),
+            _ => unimplemented!("Only external vars for now"),
+        };
+        let target = vm.get_target(&variable);
+        vm.write_primitive(target);
+        Ok(())
+    }
 }
 
 impl fmt::Display for Query {
