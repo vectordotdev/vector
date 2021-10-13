@@ -114,10 +114,15 @@ impl SourceConfig for SocketConfig {
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
                 let decoder = config.decoding.build()?;
+                let max_length = config.max_length;
+                let receive_buffer_bytes = config
+                    .receive_buffer_bytes
+                    .map(|receive_buffer_bytes| std::cmp::min(receive_buffer_bytes, max_length))
+                    .unwrap_or(max_length);
                 Ok(unix::unix_datagram(
                     config.path,
                     host_key,
-                    config.receive_buffer_bytes,
+                    receive_buffer_bytes,
                     decoder,
                     cx.shutdown,
                     cx.out,

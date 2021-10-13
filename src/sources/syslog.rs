@@ -125,13 +125,20 @@ impl SourceConfig for SyslogConfig {
             Mode::Udp {
                 address,
                 receive_buffer_bytes,
-            } => Ok(udp(
-                address,
-                host_key,
-                receive_buffer_bytes,
-                cx.shutdown,
-                cx.out,
-            )),
+            } => {
+                let receive_buffer_bytes = receive_buffer_bytes
+                    .map(|receive_buffer_bytes| {
+                        std::cmp::min(receive_buffer_bytes, self.max_length)
+                    })
+                    .unwrap_or(self.max_length);
+                Ok(udp(
+                    address,
+                    host_key,
+                    receive_buffer_bytes,
+                    cx.shutdown,
+                    cx.out,
+                ))
+            }
             #[cfg(unix)]
             Mode::Unix {
                 path,
@@ -200,7 +207,7 @@ impl TcpSource for SyslogTcpSource {
 pub fn udp(
     addr: SocketAddr,
     host_key: String,
-    receive_buffer_bytes: Option<usize>,
+    receive_buffer_bytes: usize,
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> super::Source {
@@ -211,10 +218,8 @@ pub fn udp(
             .await
             .expect("Failed to bind to UDP listener socket");
 
-        if let Some(receive_buffer_bytes) = receive_buffer_bytes {
-            if let Err(error) = udp::set_receive_buffer_size(&socket, receive_buffer_bytes) {
-                warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
-            }
+        if let Err(error) = udp::set_receive_buffer_size(&socket, receive_buffer_bytes) {
+            warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
         }
 
         info!(

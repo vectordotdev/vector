@@ -20,7 +20,7 @@ use tracing::field;
 pub fn build_unix_datagram_source(
     listen_path: PathBuf,
     decoder: codecs::Decoder,
-    receive_buffer_bytes: Option<usize>,
+    receive_buffer_bytes: usize,
     handle_events: impl Fn(&mut [Event], Option<Bytes>, usize) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
     out: Pipeline,
@@ -54,25 +54,20 @@ pub fn build_unix_datagram_source(
 async fn listen(
     socket: UnixDatagram,
     decoder: codecs::Decoder,
-    receive_buffer_bytes: Option<usize>,
+    receive_buffer_bytes: usize,
     mut shutdown: ShutdownSignal,
     handle_events: impl Fn(&mut [Event], Option<Bytes>, usize) + Clone + Send + Sync + 'static,
     out: Pipeline,
 ) -> Result<(), ()> {
     let mut out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
 
-    if let Some(receive_buffer_bytes) = receive_buffer_bytes {
-        if let Err(error) = unix::datagram::set_receive_buffer_size(&socket, receive_buffer_bytes) {
-            warn!(message = "Failed configuring receive buffer size on Unix socket.", %error);
-        }
+    if let Err(error) = unix::datagram::set_receive_buffer_size(&socket, receive_buffer_bytes) {
+        warn!(message = "Failed configuring receive buffer size on Unix socket.", %error);
     }
 
-    // This is based on the maximum capacity of UDP datagrams.
-    const DEFAULT_CAPACITY: usize = 64 * 1024;
-    let capacity = receive_buffer_bytes.unwrap_or(DEFAULT_CAPACITY);
-    let mut buf = BytesMut::with_capacity(capacity);
+    let mut buf = BytesMut::with_capacity(receive_buffer_bytes);
     loop {
-        buf.resize(capacity, 0);
+        buf.resize(receive_buffer_bytes, 0);
         tokio::select! {
             recv = socket.recv_from(&mut buf) => {
                 let (byte_size, address) = recv.map_err(|error| {

@@ -440,6 +440,9 @@ mod tests {
                 [sources.source0]
                 type = "stdin"
 
+                [sources.source0.decoding]
+                codec = "bytes"
+
                 [transforms.transform0]
                 inputs = ["source0"]
                 drop_field = true
@@ -472,6 +475,9 @@ mod tests {
                 [sources.source0]
                 type = "stdin"
 
+                [sources.source0.decoding]
+                codec = "bytes"
+
                 [transforms.transform0]
                 inputs = ["source0"]
                 drop_field = true
@@ -503,6 +509,9 @@ mod tests {
 
                 [sources.source0]
                 type = "stdin"
+
+                [sources.source0.decoding]
+                codec = "bytes"
 
                 [sinks.sink0]
                 inputs = ["source0"]

@@ -17,6 +17,8 @@ use std::path::PathBuf;
 #[serde(deny_unknown_fields)]
 pub struct UnixConfig {
     pub path: PathBuf,
+    #[serde(default = "crate::serde::default_max_length")]
+    pub max_length: usize,
     pub host_key: Option<String>,
     pub receive_buffer_bytes: Option<usize>,
     #[serde(flatten, default)]
@@ -27,6 +29,7 @@ impl UnixConfig {
     pub fn new(path: PathBuf) -> Self {
         Self {
             path,
+            max_length: crate::serde::default_max_length(),
             host_key: None,
             receive_buffer_bytes: None,
             decoding: Default::default(),
@@ -65,7 +68,7 @@ fn handle_events(
 pub(super) fn unix_datagram(
     path: PathBuf,
     host_key: String,
-    receive_buffer_bytes: Option<usize>,
+    receive_buffer_bytes: usize,
     decoder: Decoder,
     shutdown: ShutdownSignal,
     out: Pipeline,
