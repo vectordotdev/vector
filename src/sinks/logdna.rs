@@ -296,6 +296,7 @@ mod tests {
     use crate::{
         config::SinkConfig,
         sinks::util::test::{build_test_server_status, load_sink},
+        test_util::components::{self, HTTP_SINK_TAGS},
         test_util::{next_addr, random_lines, trace_init},
     };
     use futures::{channel::mpsc, stream, StreamExt};
@@ -401,7 +402,11 @@ mod tests {
         }
         drop(batch);
 
+        components::init();
         sink.run(stream::iter(events)).await.unwrap();
+        if batch_status == BatchStatus::Delivered {
+            components::SINK_TESTS.assert(&HTTP_SINK_TAGS);
+        }
 
         assert_eq!(receiver.try_recv(), Ok(batch_status));
 

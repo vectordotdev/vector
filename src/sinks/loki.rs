@@ -528,13 +528,16 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        config::SinkConfig, sinks::util::test::load_sink, sinks::VectorSink, template::Template,
-        test_util::random_lines,
+        config::SinkConfig,
+        sinks::util::test::load_sink,
+        sinks::VectorSink,
+        template::Template,
+        test_util::{components, components::HTTP_SINK_TAGS, random_lines},
     };
     use bytes::Bytes;
     use chrono::{DateTime, Duration, Utc};
-    use futures::{stream, StreamExt};
     use std::convert::TryFrom;
+    use std::sync::Arc;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
     async fn build_sink(encoding: &str) -> (uuid::Uuid, VectorSink) {
@@ -566,6 +569,13 @@ mod integration_tests {
         (stream, sink)
     }
 
+    fn add_batch_notifier(events: &[Event], batch: Arc<BatchNotifier>) -> Vec<Event> {
+        events
+            .iter()
+            .map(|event| event.clone().into_log().with_batch_notifier(&batch).into())
+            .collect()
+    }
+
     #[tokio::test]
     async fn text() {
         let (stream, sink) = build_sink("text").await;
@@ -577,11 +587,7 @@ mod integration_tests {
             .clone()
             .into_iter()
             .map(move |line| Event::from(LogEvent::from(line).with_batch_notifier(&batch)));
-        let _ = sink
-            .into_sink()
-            .send_all(&mut stream::iter(events).map(Ok))
-            .await
-            .unwrap();
+        components::sink_send_all(sink, events, &HTTP_SINK_TAGS).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
@@ -600,13 +606,7 @@ mod integration_tests {
             .map(Event::from)
             .collect::<Vec<_>>();
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        let _ = sink
-            .into_sink()
-            .send_all(&mut stream::iter(events.clone().into_iter().map(
-                move |event| Ok(event.into_log().with_batch_notifier(&batch).into()),
-            )))
-            .await
-            .unwrap();
+        components::sink_send_all(sink, add_batch_notifier(&events, batch), &HTTP_SINK_TAGS).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
@@ -632,13 +632,7 @@ mod integration_tests {
             })
             .collect::<Vec<_>>();
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        let _ = sink
-            .into_sink()
-            .send_all(&mut stream::iter(events.clone().into_iter().map(
-                move |event| Ok(event.into_log().with_batch_notifier(&batch).into()),
-            )))
-            .await
-            .unwrap();
+        components::sink_send_all(sink, add_batch_notifier(&events, batch), &HTTP_SINK_TAGS).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
@@ -658,13 +652,7 @@ mod integration_tests {
             .map(Event::from)
             .collect::<Vec<_>>();
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        let _ = sink
-            .into_sink()
-            .send_all(&mut stream::iter(events.clone().into_iter().map(
-                move |event| Ok(event.into_log().with_batch_notifier(&batch).into()),
-            )))
-            .await
-            .unwrap();
+        components::sink_send_all(sink, add_batch_notifier(&events, batch), &HTTP_SINK_TAGS).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
@@ -711,11 +699,7 @@ mod integration_tests {
             }
         }
 
-        let _ = sink
-            .into_sink()
-            .send_all(&mut stream::iter(events).map(Ok))
-            .await
-            .unwrap();
+        components::sink_send_all(sink, events, &HTTP_SINK_TAGS).await;
 
         let (_, outputs1) = fetch_stream(stream1.to_string(), "default").await;
         let (_, outputs2) = fetch_stream(stream2.to_string(), "default").await;
@@ -766,11 +750,7 @@ mod integration_tests {
             event.as_mut_log().insert("stream_key", "test_name");
         }
 
-        let _ = sink
-            .into_sink()
-            .send_all(&mut stream::iter(events).map(Ok))
-            .await
-            .unwrap();
+        components::sink_send_all(sink, events, &HTTP_SINK_TAGS).await;
 
         let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
 
@@ -823,11 +803,7 @@ mod integration_tests {
             }
         }
 
-        let _ = sink
-            .into_sink()
-            .send_all(&mut stream::iter(events).map(Ok))
-            .await
-            .unwrap();
+        components::sink_send_all(sink, events, &HTTP_SINK_TAGS).await;
 
         let (_, outputs1) = fetch_stream(stream.to_string(), "tenant1").await;
         let (_, outputs2) = fetch_stream(stream.to_string(), "tenant2").await;
@@ -967,10 +943,7 @@ mod integration_tests {
         config.batch.max_bytes = Some(4_000_000);
 
         let (sink, _) = config.build(cx).await.unwrap();
-        sink.into_sink()
-            .send_all(&mut stream::iter(events.clone()).map(Ok))
-            .await
-            .unwrap();
+        components::sink_send_all(sink, events.clone(), &HTTP_SINK_TAGS).await;
 
         let (timestamps, outputs) = fetch_stream(stream.to_string(), "default").await;
         assert_eq!(expected.len(), outputs.len());
