@@ -71,7 +71,7 @@ impl TaskTransform for Throttle {
     {
         let lim = RateLimiter::keyed(quota);
 
-	let mut flush_keys = tokio::time::interval(Duration::from_secs(self.window * 2);
+        let mut flush_keys = tokio::time::interval(Duration::from_secs(self.window * 2);
         let mut flush_stream = tokio::time::interval(Duration::from_millis(1000));
 
         Box::pin(
@@ -82,10 +82,10 @@ impl TaskTransform for Throttle {
                     _ = flush_stream.tick() => {
                         false
                     }
-		    _ = flush_keys.tick() => {
-			lim.retain_recent();
-		    	false
-		    }
+                    _ = flush_keys.tick() => {
+                      lim.retain_recent();
+                          false
+                    }
                     maybe_event = input_rx.next() => {
                         match maybe_event {
                             None => true,
@@ -93,7 +93,7 @@ impl TaskTransform for Throttle {
                     if let Some(condition) = self.exclude_as_ref() {
                     if condition.check(&event) {
                         output.push(event);
-                    false
+                        false
                     }
                 }
 
