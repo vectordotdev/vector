@@ -268,7 +268,8 @@ mod tests {
     use crate::{
         config::SinkConfig,
         sinks::util::test::{build_test_server_status, load_sink},
-        test_util::{components, next_addr, random_lines_with_stream},
+        test_util::components::{self, HTTP_SINK_TAGS},
+        test_util::{next_addr, random_lines_with_stream},
     };
     use bytes::Bytes;
     use futures::{
@@ -280,8 +281,6 @@ mod tests {
     use indoc::indoc;
     use pretty_assertions::assert_eq;
     use vector_core::event::{BatchNotifier, BatchStatus};
-
-    const SINK_TAGS: [&str; 1] = ["endpoint"];
 
     #[test]
     fn generate_config() {
@@ -330,7 +329,7 @@ mod tests {
         components::init();
         sink.run(events).await.unwrap();
         if batch_status == BatchStatus::Delivered {
-            components::SINK_TESTS.assert(&SINK_TAGS);
+            components::SINK_TESTS.assert(&HTTP_SINK_TAGS);
         }
 
         assert_eq!(receiver.try_recv(), Ok(batch_status));
@@ -398,7 +397,7 @@ mod tests {
             Ok(e)
         });
 
-        components::sink_send_stream(sink, events, &SINK_TAGS).await;
+        components::sink_send_stream(sink, events, &HTTP_SINK_TAGS).await;
         let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
         for (i, val) in output.iter().enumerate() {

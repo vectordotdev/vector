@@ -532,15 +532,13 @@ mod integration_tests {
         sinks::util::test::load_sink,
         sinks::VectorSink,
         template::Template,
-        test_util::{components, random_lines},
+        test_util::{components, components::HTTP_SINK_TAGS, random_lines},
     };
     use bytes::Bytes;
     use chrono::{DateTime, Duration, Utc};
     use std::convert::TryFrom;
     use std::sync::Arc;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
-
-    const SINK_TAGS: [&str; 1] = ["endpoint"];
 
     async fn build_sink(encoding: &str) -> (uuid::Uuid, VectorSink) {
         let stream = uuid::Uuid::new_v4();
@@ -589,7 +587,7 @@ mod integration_tests {
             .clone()
             .into_iter()
             .map(move |line| Event::from(LogEvent::from(line).with_batch_notifier(&batch)));
-        components::sink_send_all(sink, events, &SINK_TAGS).await;
+        components::sink_send_all(sink, events, &HTTP_SINK_TAGS).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
@@ -608,7 +606,7 @@ mod integration_tests {
             .map(Event::from)
             .collect::<Vec<_>>();
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        components::sink_send_all(sink, add_batch_notifier(&events, batch), &SINK_TAGS).await;
+        components::sink_send_all(sink, add_batch_notifier(&events, batch), &HTTP_SINK_TAGS).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
@@ -634,7 +632,7 @@ mod integration_tests {
             })
             .collect::<Vec<_>>();
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        components::sink_send_all(sink, add_batch_notifier(&events, batch), &SINK_TAGS).await;
+        components::sink_send_all(sink, add_batch_notifier(&events, batch), &HTTP_SINK_TAGS).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
@@ -654,7 +652,7 @@ mod integration_tests {
             .map(Event::from)
             .collect::<Vec<_>>();
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        components::sink_send_all(sink, add_batch_notifier(&events, batch), &SINK_TAGS).await;
+        components::sink_send_all(sink, add_batch_notifier(&events, batch), &HTTP_SINK_TAGS).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
@@ -701,7 +699,7 @@ mod integration_tests {
             }
         }
 
-        components::sink_send_all(sink, events, &SINK_TAGS).await;
+        components::sink_send_all(sink, events, &HTTP_SINK_TAGS).await;
 
         let (_, outputs1) = fetch_stream(stream1.to_string(), "default").await;
         let (_, outputs2) = fetch_stream(stream2.to_string(), "default").await;
@@ -752,7 +750,7 @@ mod integration_tests {
             event.as_mut_log().insert("stream_key", "test_name");
         }
 
-        components::sink_send_all(sink, events, &SINK_TAGS).await;
+        components::sink_send_all(sink, events, &HTTP_SINK_TAGS).await;
 
         let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
 
@@ -805,7 +803,7 @@ mod integration_tests {
             }
         }
 
-        components::sink_send_all(sink, events, &SINK_TAGS).await;
+        components::sink_send_all(sink, events, &HTTP_SINK_TAGS).await;
 
         let (_, outputs1) = fetch_stream(stream.to_string(), "tenant1").await;
         let (_, outputs2) = fetch_stream(stream.to_string(), "tenant2").await;
@@ -945,7 +943,7 @@ mod integration_tests {
         config.batch.max_bytes = Some(4_000_000);
 
         let (sink, _) = config.build(cx).await.unwrap();
-        components::sink_send_all(sink, events.clone(), &SINK_TAGS).await;
+        components::sink_send_all(sink, events.clone(), &HTTP_SINK_TAGS).await;
 
         let (timestamps, outputs) = fetch_stream(stream.to_string(), "default").await;
         assert_eq!(expected.len(), outputs.len());

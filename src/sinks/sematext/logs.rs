@@ -116,7 +116,8 @@ mod tests {
     use crate::{
         config::SinkConfig,
         sinks::util::test::{build_test_server, load_sink},
-        test_util::{components, next_addr, random_lines_with_stream},
+        test_util::components::{self, HTTP_SINK_TAGS},
+        test_util::{next_addr, random_lines_with_stream},
     };
     use futures::StreamExt;
     use indoc::indoc;
@@ -149,7 +150,7 @@ mod tests {
         tokio::spawn(server);
 
         let (expected, events) = random_lines_with_stream(100, 10, None);
-        components::run_sink(sink, events, &["endpoint"]).await;
+        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
 
         let output = rx.next().await.unwrap();
 

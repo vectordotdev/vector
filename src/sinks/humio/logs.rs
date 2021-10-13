@@ -150,7 +150,7 @@ mod integration_tests {
         config::{log_schema, SinkConfig, SinkContext},
         event::Event,
         sinks::util::Compression,
-        test_util::{components, random_string},
+        test_util::{components, components::HTTP_SINK_TAGS, random_string},
     };
     use chrono::Utc;
     use indoc::indoc;
@@ -159,8 +159,6 @@ mod integration_tests {
 
     // matches humio container address
     const HOST: &str = "http://localhost:8080";
-
-    const SINK_TAGS: [&str; 1] = ["endpoint"];
 
     #[tokio::test]
     async fn humio_insert_message() {
@@ -178,7 +176,7 @@ mod integration_tests {
         let log = event.as_mut_log();
         log.insert(log_schema().host_key(), host.clone());
 
-        components::run_sink_event(sink, event, &SINK_TAGS).await;
+        components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
 
         let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -214,7 +212,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        components::run_sink_event(sink, event, &SINK_TAGS).await;
+        components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
 
         let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -247,7 +245,7 @@ mod integration_tests {
                 .as_mut_log()
                 .insert("@timestamp", Utc::now().to_rfc3339());
 
-            components::run_sink_event(sink, event, &SINK_TAGS).await;
+            components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
 
             let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -270,7 +268,7 @@ mod integration_tests {
             let message = random_string(100);
             let event = Event::from(message.clone());
 
-            components::run_sink_event(sink, event, &SINK_TAGS).await;
+            components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
 
             let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 

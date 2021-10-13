@@ -1107,7 +1107,8 @@ mod integration_tests {
         config::{ProxyConfig, SinkConfig, SinkContext},
         http::HttpClient,
         sinks::HealthcheckError,
-        test_util::{components, random_events_with_stream, random_string, trace_init},
+        test_util::components::{self, HTTP_SINK_TAGS},
+        test_util::{random_events_with_stream, random_string, trace_init},
         tls::{self, TlsOptions},
     };
     use chrono::Utc;
@@ -1117,8 +1118,6 @@ mod integration_tests {
     use serde_json::{json, Value};
     use std::{fs::File, io::Read};
     use vector_core::event::{BatchNotifier, BatchStatus, LogEvent};
-
-    const SINK_TAGS: [&str; 1] = ["endpoint"];
 
     impl ElasticSearchCommon {
         async fn flush_request(&self) -> crate::Result<()> {
@@ -1231,7 +1230,7 @@ mod integration_tests {
 
         let timestamp = input_event[crate::config::log_schema().timestamp_key()].clone();
 
-        components::run_sink_event(sink, input_event.into(), &SINK_TAGS).await;
+        components::run_sink_event(sink, input_event.into(), &HTTP_SINK_TAGS).await;
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
@@ -1455,11 +1454,11 @@ mod integration_tests {
                     doit = true;
                     event
                 }),
-                &SINK_TAGS,
+                &HTTP_SINK_TAGS,
             )
             .await;
         } else {
-            components::run_sink(sink, events, &SINK_TAGS).await;
+            components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
         }
 
         assert_eq!(receiver.try_recv(), Ok(batch_status));
