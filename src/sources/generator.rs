@@ -18,19 +18,17 @@ use tokio_util::codec::FramedRead;
 
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
+#[serde(default)]
 pub struct GeneratorConfig {
-    #[serde(alias = "batch_interval", default = "default_interval")]
+    #[serde(alias = "batch_interval")]
     #[derivative(Default(value = "default_interval()"))]
     interval: f64,
-    #[serde(default = "default_count")]
     #[derivative(Default(value = "default_count()"))]
     count: usize,
     #[serde(flatten)]
     format: OutputFormat,
-    #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     framing: Box<dyn FramingConfig>,
-    #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     decoding: Box<dyn ParserConfig>,
 }
