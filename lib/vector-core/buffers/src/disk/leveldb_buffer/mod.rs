@@ -3,6 +3,7 @@ mod reader;
 mod writer;
 
 use super::{DataDirError, Open};
+use crate::buffer_usage_data::BufferUsageData;
 use crate::bytes::{DecodeBytes, EncodeBytes};
 use crate::Acker;
 use futures::task::AtomicWaker;
@@ -74,6 +75,7 @@ where
     pub fn build(
         path: &Path,
         max_size: usize,
+        buffer_usage_data: Arc<BufferUsageData>,
     ) -> Result<(Writer<T>, Reader<T>, Acker), DataDirError> {
         // New `max_size` of the buffer is used for storing the unacked events.
         // The rest is used as a buffer which when filled triggers compaction.
@@ -118,6 +120,7 @@ where
             max_size,
             current_size: Arc::clone(&current_size),
             slot: None,
+            buffer_usage_data: buffer_usage_data.clone(),
         };
 
         let mut reader = Reader {
@@ -137,6 +140,7 @@ where
             last_compaction: Instant::now(),
             pending_read: None,
             phantom: PhantomData,
+            buffer_usage_data,
         };
         // Compact on every start
         reader.compact();
