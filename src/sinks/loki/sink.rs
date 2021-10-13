@@ -332,7 +332,7 @@ impl LokiSink {
                 .into_batcher_settings()?,
             timeout: Duration::from_secs(config.batch.timeout_secs.unwrap_or(1)),
             out_of_order_action: config.out_of_order_action,
-            service: LokiService::new(client, config.endpoint, config.auth),
+            service: LokiService::new(client, config.endpoint, config.auth)?,
         })
     }
 

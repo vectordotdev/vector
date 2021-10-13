@@ -6,9 +6,11 @@ async fn fetch_status(
     config: &LokiConfig,
     client: &HttpClient,
 ) -> crate::Result<http::StatusCode> {
-    let uri = format!("{}{}", config.endpoint.uri, endpoint);
+    let endpoint = config.endpoint.append_path(endpoint)?;
 
-    let mut req = http::Request::get(uri).body(hyper::Body::empty()).unwrap();
+    let mut req = http::Request::get(endpoint.uri)
+        .body(hyper::Body::empty())
+        .unwrap();
 
     if let Some(auth) = &config.auth {
         auth.apply(&mut req);
@@ -18,9 +20,9 @@ async fn fetch_status(
 }
 
 pub async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()> {
-    let uri = format!("{}ready", config.endpoint.uri);
+    let endpoint = config.endpoint.append_path("ready")?;
 
-    let mut req = http::Request::get(uri)
+    let mut req = http::Request::get(endpoint.uri)
         .body(hyper::Body::empty())
         .expect("Building request never fails.");
 

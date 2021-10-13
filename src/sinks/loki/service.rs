@@ -49,16 +49,15 @@ impl Finalizable for LokiRequest {
 
 #[derive(Debug, Clone)]
 pub struct LokiService {
-    uri: String,
-    auth: Option<Auth>,
+    endpoint: UriSerde,
     client: HttpClient,
 }
 
 impl LokiService {
-    pub fn new(client: HttpClient, endpoint: UriSerde, auth: Option<Auth>) -> Self {
-        let uri = format!("{}loki/api/v1/push", endpoint.uri);
+    pub fn new(client: HttpClient, endpoint: UriSerde, auth: Option<Auth>) -> crate::Result<Self> {
+        let endpoint = endpoint.append_path("loki/api/v1/push")?.with_auth(auth);
 
-        Self { client, uri, auth }
+        Ok(Self { client, endpoint })
     }
 }
 
@@ -72,7 +71,8 @@ impl Service<LokiRequest> for LokiService {
     }
 
     fn call(&mut self, request: LokiRequest) -> Self::Future {
-        let mut req = http::Request::post(&self.uri).header("Content-Type", "application/json");
+        let mut req =
+            http::Request::post(&self.endpoint.uri).header("Content-Type", "application/json");
 
         if let Some(tenant_id) = request.tenant_id {
             req = req.header("X-Scope-OrgID", tenant_id);
@@ -81,7 +81,7 @@ impl Service<LokiRequest> for LokiService {
         let body = hyper::Body::from(request.payload);
         let mut req = req.body(body).unwrap();
 
-        if let Some(auth) = &self.auth {
+        if let Some(auth) = &self.endpoint.auth {
             auth.apply(&mut req);
         }
 
