@@ -1,9 +1,3 @@
-//! Special case Loki sink batch buffer
-//!
-//! This buffer handles stream merging -- when a record is inserted into
-//! the buffer, all records having the same stream label set are grouped
-//! together for more efficient output.
-
 use crate::sinks::util::encoding::Encoder;
 use dashmap::DashMap;
 use serde::{ser::SerializeSeq, Serialize};
