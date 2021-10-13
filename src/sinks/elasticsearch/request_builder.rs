@@ -16,11 +16,11 @@ use std::collections::HashMap;
 use rusoto_core::Region;
 
 pub struct ElasticsearchRequestBuilder {
-    bulk_uri: Uri,
-    http_request_config: RequestConfig,
-    http_auth: Option<Auth>,
-    query_params: HashMap<String, String>,
-    region: Region,
+    pub bulk_uri: Uri,
+    pub http_request_config: RequestConfig,
+    pub http_auth: Option<Auth>,
+    pub query_params: HashMap<String, String>,
+    pub region: Region,
 }
 
 

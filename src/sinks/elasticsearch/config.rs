@@ -1,4 +1,4 @@
-use crate::sinks::util::{Compression, BatchConfig};
+use crate::sinks::util::{Compression, BatchConfig, BatchSettings};
 use crate::sinks::elasticsearch::{ElasticSearchCommon, ElasticSearchMode, ElasticSearchAuth, ElasticSearchCommonMode};
 use crate::sinks::util::encoding::EncodingConfigWithDefault;
 use crate::config::{SinkConfig, SinkContext, DataType};
@@ -17,6 +17,14 @@ use crate::sinks::elasticsearch::{BatchActionTemplate, IndexTemplate};
 use snafu::ResultExt;
 use serde::{Serialize, Deserialize};
 use crate::internal_events::TemplateRenderingFailed;
+use crate::http::HttpClient;
+use crate::sinks::elasticsearch::sink::ElasticSearchSink;
+use futures::FutureExt;
+use crate::sinks::elasticsearch::request_builder::ElasticsearchRequestBuilder;
+use vector_core::stream::BatcherSettings;
+use std::time::Duration;
+use std::num::NonZeroUsize;
+use crate::sinks::elasticsearch::service::ElasticSearchService;
 
 /// The field name for the timestamp required by data stream mode
 const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
@@ -281,41 +289,50 @@ impl DataStreamConfig {
 impl SinkConfig for ElasticSearchConfig {
     async fn build(
         &self,
-        _cx: SinkContext,
+        cx: SinkContext,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let _common = ElasticSearchCommon::parse_config(self)?;
+        let common = ElasticSearchCommon::parse_config(self)?;
 
+        let http_client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
+        let batch_settings = BatchSettings::default()
+            .bytes(10_000_000)
+            .timeout(1)
+            .parse_config(self.batch)?;
 
-        todo!()
-        // let common = ElasticSearchCommon::parse_config(self)?;
-        // let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
-        //
-        // let healthcheck = common.healthcheck(client.clone()).boxed();
-        //
-        // let common = ElasticSearchCommon::parse_config(self)?;
-        // let compression = common.compression;
-        // let batch = BatchSettings::default()
-        //     .bytes(bytesize::mib(10u64))
-        //     .timeout(1)
-        //     .parse_config(self.batch)?;
-        // let request = self
-        //     .request
-        //     .tower
-        //     .unwrap_with(&TowerRequestConfig::default());
-        //
-        // let sink = BatchedHttpSink::with_logic(
-        //     common,
-        //     Buffer::new(batch.size, compression),
-        //     ElasticSearchRetryLogic,
-        //     request,
-        //     batch.timeout,
-        //     client,
-        //     cx.acker(),
-        //     ElasticSearchServiceLogic,
-        // )
-        //     .sink_map_err(|error| error!(message = "Fatal elasticsearch sink error.", %error));
-        //
-        // Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
+        let batch_settings = BatcherSettings::new(
+            batch_settings.timeout,
+            NonZeroUsize::new(batch_settings.size.bytes).expect("Batch bytes should not be 0"),
+            NonZeroUsize::new(batch_settings.size.events).expect("Batch events should not be 0")
+        );
+
+        let request_builder = ElasticsearchRequestBuilder {
+            bulk_uri: common.bulk_uri,
+            http_request_config: self.request,
+            http_auth: common.authorization,
+            query_params: common.query_params,
+            region: common.region
+        };
+
+        let service = ElasticSearchService { http_client };
+
+        let sink = ElasticSearchSink {
+            batch_settings,
+            request_builder,
+            compression: self.compression,
+            service,
+            acker: cx.acker,
+            metric_to_log: common.metric_to_log,
+            encoding: self.encoding.clone(),
+            mode: common.mode,
+            id_key_field: self.id_key.clone(),
+            aws_credentials_provider: common.credentials
+        };
+
+        let common = ElasticSearchCommon::parse_config(self)?;
+        let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
+        let healthcheck = common.healthcheck(client.clone()).boxed();
+        let stream = VectorSink::Stream(Box::new(sink));
+        Ok((stream, healthcheck))
     }
 
     fn input_type(&self) -> DataType {

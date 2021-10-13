@@ -53,14 +53,14 @@ pub struct BatchedEvents {
 
 impl ByteSizeOf for BatchedEvents {
     fn allocated_bytes(&self) -> usize {
-        todo!()
+        self.events.size_of()
     }
 }
 
 pub struct ElasticSearchSink {
     pub batch_settings: BatcherSettings,
-    pub batch_size_bytes: Option<NonZeroUsize>,
-    pub batch_size_events: NonZeroUsize,
+    // pub batch_size_bytes: Option<NonZeroUsize>,
+    // pub batch_size_events: NonZeroUsize,
     pub request_builder: ElasticsearchRequestBuilder,
     pub compression: Compression,
     pub service: ElasticSearchService,
