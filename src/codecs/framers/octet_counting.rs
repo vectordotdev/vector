@@ -15,17 +15,19 @@ pub struct OctetCountingDecoderConfig {
 #[derive(Debug, Clone, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 pub struct OctetCountingDecoderOptions {
-    #[serde(default = "crate::serde::default_max_length")]
-    #[derivative(Default(value = "crate::serde::default_max_length()"))]
-    max_length: usize,
+    max_length: Option<usize>,
 }
 
 #[typetag::serde(name = "octet_counting")]
 impl FramingConfig for OctetCountingDecoderConfig {
     fn build(&self) -> crate::Result<BoxedFramer> {
-        Ok(Box::new(OctetCountingCodec::new_with_max_length(
-            self.octet_counting.max_length,
-        )))
+        if let Some(max_length) = self.octet_counting.max_length {
+            Ok(Box::new(OctetCountingCodec::new_with_max_length(
+                max_length,
+            )))
+        } else {
+            Ok(Box::new(OctetCountingCodec::new()))
+        }
     }
 }
 

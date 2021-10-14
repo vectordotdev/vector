@@ -18,17 +18,22 @@ pub struct CharacterDelimitedDecoderOptions {
     /// The maximum length of the byte buffer.
     ///
     /// This length does *not* include the trailing delimiter.
-    #[serde(default = "crate::serde::default_max_length")]
-    max_length: usize,
+    max_length: Option<usize>,
 }
 
 #[typetag::serde(name = "character_delimited")]
 impl FramingConfig for CharacterDelimitedDecoderConfig {
     fn build(&self) -> crate::Result<BoxedFramer> {
-        Ok(Box::new(CharacterDelimitedCodec::new_with_max_length(
-            self.character_delimited.delimiter,
-            self.character_delimited.max_length,
-        )))
+        if let Some(max_length) = self.character_delimited.max_length {
+            Ok(Box::new(CharacterDelimitedCodec::new_with_max_length(
+                self.character_delimited.delimiter,
+                max_length,
+            )))
+        } else {
+            Ok(Box::new(CharacterDelimitedCodec::new(
+                self.character_delimited.delimiter,
+            )))
+        }
     }
 }
 
