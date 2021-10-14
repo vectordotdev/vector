@@ -338,9 +338,9 @@ mod test {
         let addr = next_addr();
 
         let mut config = TcpConfig::from_address(addr.into());
-        config.set_framing(Box::new(
+        config.set_framing(Some(Box::new(
             NewlineDelimitedDecoderConfig::new_with_max_length(10),
-        ));
+        )));
 
         let server = SocketConfig::from(config)
             .build(SourceContext::new_test(tx))
