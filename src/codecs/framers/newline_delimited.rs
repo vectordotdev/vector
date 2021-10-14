@@ -65,7 +65,7 @@ impl NewlineDelimitedCodec {
     /// Creates a `NewlineDelimitedCodec` with a maximum frame length limit.
     ///
     /// Any frames longer than `max_length` bytes will be discarded entirely.
-    pub fn new_with_max_length(max_length: usize) -> Self {
+    pub const fn new_with_max_length(max_length: usize) -> Self {
         Self(CharacterDelimitedCodec::new_with_max_length(
             '\n', max_length,
         ))
