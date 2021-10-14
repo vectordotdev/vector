@@ -460,7 +460,7 @@ mod tests {
         let record = encoder.encode_event(event);
         assert!(record.event.event.contains(log_schema().timestamp_key()));
         assert_eq!(record.labels.len(), 2);
-        let labels: HashMap<String, String> = record.labels.clone().into_iter().collect();
+        let labels: HashMap<String, String> = record.labels.into_iter().collect();
         assert_eq!(labels["static"], "value".to_string());
         assert_eq!(labels["foo"], "bar".to_string());
     }
