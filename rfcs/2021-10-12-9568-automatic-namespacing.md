@@ -99,13 +99,13 @@ How does this position us for success in the future?
 
 ## Drawbacks
 
-Why should we not do this?
+### Why should we not do this?
 
-- Preparing for Pipeline 2.0 implementation.
+This feature is a nice-to-have for users with large configuration files, but it is not required for any upcoming development. The new Pipelines feature can still function with a single configuration file, but it exacerbates the problem stated in the [pain](#pain).
 
-What kind on ongoing burden does this place on the team?
+### What kind on ongoing burden does this place on the team?
 
-- This only changes the configuration loading and therefore won't imply anything on Vector performance.
+Very little. This will have minimal impact to the Vector codebase. Configuration will be loaded and built in one step  before configuration is validated. I don't foresee this introduces any meaningful maintenance burden on the team.
 
 ## Prior Art
 
