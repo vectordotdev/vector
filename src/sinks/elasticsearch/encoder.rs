@@ -1,4 +1,4 @@
-use crate::sinks::util::encoding::{Encoder, as_tracked_write};
+use crate::sinks::util::encoding::{Encoder, as_tracked_write, EncodingConfiguration};
 use crate::event::{LogEvent, Finalizable, EventFinalizers};
 use std::io::Write;
 
@@ -15,7 +15,9 @@ pub struct ProcessedEvent {
     pub index: String,
     pub bulk_action: BulkAction,
     pub log: LogEvent,
-    pub id: Option<String>
+    pub id: Option<String>,
+    //TODO: This is constant for a sink, move it out of the individual event
+    pub doc_type: String,
 }
 
 impl Finalizable for ProcessedEvent {
@@ -30,10 +32,8 @@ impl ByteSizeOf for ProcessedEvent {
     }
 }
 
-pub struct ElasticSearchEncoder {
-    pub mode: ElasticSearchCommonMode,
-    pub doc_type: String,
-}
+#[derive(PartialEq, Default, Clone, Debug)]
+pub struct ElasticSearchEncoder;
 
 impl Encoder<Vec<ProcessedEvent>> for ElasticSearchEncoder {
     fn encode_input(&self, input: Vec<ProcessedEvent>, writer: &mut dyn Write) -> std::io::Result<usize> {
@@ -44,7 +44,7 @@ impl Encoder<Vec<ProcessedEvent>> for ElasticSearchEncoder {
             let mut action = json!({
                 event.bulk_action.as_str(): {
                     "_index": event.index,
-                    "_type": self.doc_type,
+                    "_type": event.doc_type,
                 }
             });
 
@@ -71,5 +71,19 @@ impl Encoder<Vec<ProcessedEvent>> for ElasticSearchEncoder {
             });
         }
         Ok(written_bytes)
+    }
+}
+
+
+impl<E> Encoder<Vec<ProcessedEvent>> for E
+    where
+        E: EncodingConfiguration,
+        E::Codec: Encoder<Vec<ProcessedEvent>>,
+{
+    fn encode_input(&self, mut input: Vec<ProcessedEvent>, writer: &mut dyn io::Write) -> io::Result<usize> {
+        for event in input.iter_mut() {
+            self.apply_rules(&mut event.log);
+        }
+        self.codec().encode_input(input, writer)
     }
 }

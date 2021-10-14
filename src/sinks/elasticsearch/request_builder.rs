@@ -14,7 +14,7 @@ use crate::http::Auth;
 use http::Request;
 use std::collections::HashMap;
 use rusoto_core::Region;
-use crate::sinks::util::encoding::Encoder;
+use crate::sinks::util::encoding::{Encoder, EncodingConfigFixed};
 use crate::event::{EventFinalizers, Finalizable};
 
 pub struct ElasticsearchRequestBuilder {
@@ -24,7 +24,7 @@ pub struct ElasticsearchRequestBuilder {
     pub query_params: HashMap<String, String>,
     pub region: Region,
     pub compression: Compression,
-    pub encoder: ElasticSearchEncoder,
+    pub encoder: EncodingConfigFixed<ElasticSearchEncoder>,
 }
 
 pub struct Input {
@@ -41,7 +41,7 @@ pub struct Metadata {
 impl RequestBuilder<Input> for ElasticsearchRequestBuilder {
     type Metadata = Metadata;
     type Events = Vec<ProcessedEvent>;
-    type Encoder = ElasticSearchEncoder;
+    type Encoder = EncodingConfigFixed<ElasticSearchEncoder>;
     type Payload = Vec<u8>;
     type Request = ElasticSearchRequest;
     type Error = std::io::Error;

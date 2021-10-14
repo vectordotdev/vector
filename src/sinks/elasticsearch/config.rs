@@ -1,6 +1,6 @@
 use crate::sinks::util::{Compression, BatchConfig, BatchSettings, Buffer};
 use crate::sinks::elasticsearch::{ElasticSearchCommon, ElasticSearchMode, ElasticSearchAuth, ElasticSearchCommonMode};
-use crate::sinks::util::encoding::EncodingConfigWithDefault;
+use crate::sinks::util::encoding::{EncodingConfigWithDefault, EncodingConfigFixed};
 use crate::config::{SinkConfig, SinkContext, DataType};
 use crate::sinks::{Healthcheck, VectorSink};
 use crate::template::Template;
@@ -50,7 +50,8 @@ pub struct ElasticSearchConfig {
     skip_serializing_if = "crate::serde::skip_serializing_if_default",
     default
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: EncodingConfigFixed<ElasticSearchEncoder>,
+    // pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
@@ -306,11 +307,6 @@ impl SinkConfig for ElasticSearchConfig {
             NonZeroUsize::new(batch_settings.size.events).expect("Batch events should not be 0")
         );
 
-        let encoder = ElasticSearchEncoder {
-            mode: common.mode.clone(),
-            doc_type: common.doc_type
-        };
-
         let request_builder = ElasticsearchRequestBuilder {
             bulk_uri: common.bulk_uri,
             http_request_config: self.request.clone(),
@@ -318,7 +314,7 @@ impl SinkConfig for ElasticSearchConfig {
             query_params: common.query_params,
             region: common.region,
             compression: self.compression,
-            encoder
+            encoder: self.encoding.clone(),
         };
 
         let service = ElasticSearchService { http_client };
@@ -330,10 +326,10 @@ impl SinkConfig for ElasticSearchConfig {
             service,
             acker: cx.acker(),
             metric_to_log: common.metric_to_log,
-            encoding: self.encoding.clone(),
             mode: common.mode,
             id_key_field: self.id_key.clone(),
-            aws_credentials_provider: common.credentials
+            aws_credentials_provider: common.credentials,
+            doc_type: common.doc_type
         };
 
         let common = ElasticSearchCommon::parse_config(self)?;

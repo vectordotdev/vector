@@ -18,6 +18,8 @@ use std::{
     fmt::{Debug, Display},
     iter::FromIterator,
 };
+use std::convert::Infallible;
+use crate::event::{Event, MaybeAsLogMut};
 
 #[derive(Clone, Debug, Getters, MutGetters, PartialEq, PartialOrd, Derivative, Deserialize)]
 pub struct LogEvent {
@@ -261,7 +263,13 @@ impl LogEvent {
                 Some(current_val) => current_val.merge(incoming_val),
             }
         }
-        self.metadata.merge(incoming.metadata);
+        self.metadata .merge(incoming.metadata);
+    }
+}
+
+impl MaybeAsLogMut for LogEvent {
+    fn maybe_as_log_mut(&mut self) -> Option<&mut LogEvent> {
+        Some(self)
     }
 }
 

@@ -15,6 +15,8 @@ use futures::{
 };
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
+use crate::sinks::util::encoding::EncodingConfigFixed;
+use crate::sinks::elasticsearch::ElasticSearchEncoder;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SematextLogsConfig {
@@ -28,7 +30,7 @@ pub struct SematextLogsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: EncodingConfigFixed<ElasticSearchEncoder>,
 
     #[serde(default)]
     request: TowerRequestConfig,

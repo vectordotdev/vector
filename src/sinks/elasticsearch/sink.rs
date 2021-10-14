@@ -12,10 +12,10 @@ use crate::sinks::elasticsearch::{BulkAction, Encoding, ElasticSearchCommonMode}
 use crate::transforms::metric_to_log::MetricToLog;
 use vector_core::stream::BatcherSettings;
 use async_trait::async_trait;
-use crate::sinks::util::encoding::EncodingConfigWithDefault;
+use crate::sinks::util::encoding::{EncodingConfigWithDefault, EncodingConfigFixed};
 use rusoto_credential::{ProvideAwsCredentials, AwsCredentials};
 use futures::future;
-use crate::sinks::elasticsearch::encoder::ProcessedEvent;
+use crate::sinks::elasticsearch::encoder::{ProcessedEvent, ElasticSearchEncoder};
 use vector_core::ByteSizeOf;
 use crate::event::Value;
 use crate::rusoto;
@@ -28,23 +28,6 @@ pub struct PartitionKey {
     pub index: String,
     pub bulk_action: BulkAction,
 }
-
-// pub struct ElasticSearchPartitioner;
-//
-// impl Partitioner for ElasticSearchPartitioner {
-//     type Item = ProcessedEvent;
-//     type Key = PartitionKey;
-//
-//     fn partition(&self, item: &ProcessedEvent) -> Self::Key {
-//
-//         // remove the allocation here?
-//         PartitionKey {
-//             index: item.index.clone(),
-//             bulk_action: BulkAction::Index
-//         }
-//
-//     }
-// }
 
 pub struct BatchedEvents {
     pub key: PartitionKey,
@@ -59,17 +42,15 @@ impl ByteSizeOf for BatchedEvents {
 
 pub struct ElasticSearchSink {
     pub batch_settings: BatcherSettings,
-    // pub batch_size_bytes: Option<NonZeroUsize>,
-    // pub batch_size_events: NonZeroUsize,
     pub request_builder: ElasticsearchRequestBuilder,
     pub compression: Compression,
     pub service: ElasticSearchService,
     pub acker: Acker,
     pub metric_to_log: MetricToLog,
-    pub encoding: EncodingConfigWithDefault<Encoding>,
     pub mode: ElasticSearchCommonMode,
     pub id_key_field: Option<String>,
     pub aws_credentials_provider: Option<rusoto::AwsCredentialsProvider>,
+    pub doc_type: String,
 }
 
 impl ElasticSearchSink {
@@ -79,6 +60,7 @@ impl ElasticSearchSink {
         let mode = self.mode;
         let id_key_field = self.id_key_field;
         let aws_credentials_provider = Arc::new(self.aws_credentials_provider);
+        let doc_type = self.doc_type;
 
         let sink = input
             .scan(self.metric_to_log, |metric_to_log, event| {
@@ -89,7 +71,7 @@ impl ElasticSearchSink {
             })
             .filter_map(|x| async move { x })
             .filter_map(move |log| {
-                future::ready(process_log(log, &mode, &id_key_field))
+                future::ready(process_log(log, &mode, &id_key_field, doc_type.clone()))
             })
             .batched(NullPartitioner::new(), self.batch_settings)
             .filter_map(move |(_, batch)| {
@@ -144,7 +126,12 @@ async fn get_aws_credentials(provider: &AwsCredentialsProvider) -> Option<AwsCre
 //     }
 // }
 
-pub fn process_log(mut log: LogEvent, mode: &ElasticSearchCommonMode, id_key_field: &Option<String>) -> Option<ProcessedEvent> {
+pub fn process_log(
+    mut log: LogEvent,
+    mode: &ElasticSearchCommonMode,
+    id_key_field: &Option<String>,
+    doc_type: String,
+) -> Option<ProcessedEvent> {
     let index = mode.index(&log)?;
     let bulk_action = mode.bulk_action(&log)?;
 
@@ -163,6 +150,7 @@ pub fn process_log(mut log: LogEvent, mode: &ElasticSearchCommonMode, id_key_fie
         bulk_action,
         log,
         id,
+        doc_type
     })
 }
 

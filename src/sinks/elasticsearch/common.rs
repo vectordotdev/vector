@@ -14,11 +14,12 @@ use std::convert::TryFrom;
 use snafu::ResultExt;
 
 use crate::rusoto;
-use crate::sinks::util::encoding::{EncodingConfigWithDefault};
+use crate::sinks::util::encoding::{EncodingConfigWithDefault, EncodingConfigFixed};
 use std::collections::HashMap;
 use rusoto_core::Region;
 use super::{Request, InvalidHost};
 use crate::sinks::HealthcheckError;
+use crate::sinks::elasticsearch::encoder::ElasticSearchEncoder;
 
 #[derive(Debug)]
 pub struct ElasticSearchCommon {
@@ -27,7 +28,7 @@ pub struct ElasticSearchCommon {
     pub bulk_uri: Uri,
     pub authorization: Option<Auth>,
     pub credentials: Option<rusoto::AwsCredentialsProvider>,
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: EncodingConfigFixed<ElasticSearchEncoder>,
     pub mode: ElasticSearchCommonMode,
     pub doc_type: String,
     pub tls_settings: TlsSettings,

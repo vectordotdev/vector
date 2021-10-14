@@ -340,6 +340,19 @@ impl From<Metric> for Event {
     }
 }
 
+pub trait MaybeAsLogMut {
+    fn maybe_as_log_mut(&mut self) -> Option<&mut LogEvent>;
+}
+
+impl MaybeAsLogMut for Event {
+    fn maybe_as_log_mut(&mut self) -> Option<&mut LogEvent> {
+        match self {
+            Event::Log(log) => Some(log),
+            Event::Metric(_) => None,
+        }
+    }
+}
+
 /// A wrapper for references to inner event types, where reconstituting
 /// a full `Event` from a `LogEvent` or `Metric` might be inconvenient.
 #[derive(Clone, Copy, Debug)]

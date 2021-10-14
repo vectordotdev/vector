@@ -15,6 +15,7 @@ mod integration_tests;
 
 pub use common::*;
 pub use config::*;
+pub use encoder::ElasticSearchEncoder;
 
 
 use crate::{
