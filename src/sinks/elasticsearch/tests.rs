@@ -1,19 +1,22 @@
-use crate::sinks::elasticsearch::{ElasticSearchConfig, ElasticSearchCommon, ElasticSearchMode, DataStreamConfig, ElasticSearchAuth};
-use crate::event::{LogEvent, Event, Value, Metric, MetricKind, MetricValue};
-use crate::sinks::elasticsearch::encoder::{ElasticSearchEncoder, ProcessedEvent};
-use crate::sinks::util::encoding::{Encoder, EncodingConfigWithDefault, EncodingConfigFixed};
-use crate::sinks::elasticsearch::sink::process_log;
-use std::collections::BTreeMap;
-use crate::template::Template;
-use std::convert::TryFrom;
-use http::{Response, StatusCode, Uri};
-use bytes::Bytes;
-use crate::sinks::elasticsearch::retry::ElasticSearchRetryLogic;
-use crate::sinks::util::retries::{RetryLogic, RetryAction};
 use super::BulkAction;
+use crate::event::{Event, LogEvent, Metric, MetricKind, MetricValue, Value};
 use crate::rusoto::AwsAuthentication;
-use crate::sinks::util::BatchConfig;
+use crate::sinks::elasticsearch::encoder::{ElasticSearchEncoder, ProcessedEvent};
+use crate::sinks::elasticsearch::retry::ElasticSearchRetryLogic;
 use crate::sinks::elasticsearch::service::ElasticSearchResponse;
+use crate::sinks::elasticsearch::sink::process_log;
+use crate::sinks::elasticsearch::{
+    DataStreamConfig, ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig,
+    ElasticSearchMode,
+};
+use crate::sinks::util::encoding::{Encoder, EncodingConfigFixed, EncodingConfigWithDefault};
+use crate::sinks::util::retries::{RetryAction, RetryLogic};
+use crate::sinks::util::BatchConfig;
+use crate::template::Template;
+use bytes::Bytes;
+use http::{Response, StatusCode, Uri};
+use std::collections::BTreeMap;
+use std::convert::TryFrom;
 
 #[test]
 fn sets_create_action_when_configured() {
@@ -36,9 +39,13 @@ fn sets_create_action_when_configured() {
     log.insert("action", "crea");
 
     let mut encoded = vec![];
-    let encoded_size = es.encoding.encode_input(vec![
-        process_log(log, &es.mode, &None, es.doc_type).unwrap()
-    ], &mut encoded).unwrap();
+    let encoded_size = es
+        .encoding
+        .encode_input(
+            vec![process_log(log, &es.mode, &None, es.doc_type).unwrap()],
+            &mut encoded,
+        )
+        .unwrap();
 
     let expected = r#"{"create":{"_index":"vector","_type":"_doc"}}
 {"action":"crea","message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
@@ -75,9 +82,13 @@ fn encode_datastream_mode() {
     log.insert("data_stream", data_stream_body());
 
     let mut encoded = vec![];
-    let encoded_size = es.encoding.encode_input(vec![
-        process_log(log, &es.mode, &None, es.doc_type).unwrap()
-    ], &mut encoded).unwrap();
+    let encoded_size = es
+        .encoding
+        .encode_input(
+            vec![process_log(log, &es.mode, &None, es.doc_type).unwrap()],
+            &mut encoded,
+        )
+        .unwrap();
 
     let expected = r#"{"create":{"_index":"synthetics-testing-default","_type":"_doc"}}
 {"@timestamp":"2020-12-01T01:02:03Z","data_stream":{"dataset":"testing","namespace":"default","type":"synthetics"},"message":"hello there"}
@@ -111,9 +122,13 @@ fn encode_datastream_mode_no_routing() {
         Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
     );
     let mut encoded = vec![];
-    let encoded_size = es.encoding.encode_input(vec![
-        process_log(log, &es.mode, &None, es.doc_type).unwrap()
-    ], &mut encoded).unwrap();
+    let encoded_size = es
+        .encoding
+        .encode_input(
+            vec![process_log(log, &es.mode, &None, es.doc_type).unwrap()],
+            &mut encoded,
+        )
+        .unwrap();
 
     let expected = r#"{"create":{"_index":"logs-generic-something","_type":"_doc"}}
 {"@timestamp":"2020-12-01T01:02:03Z","data_stream":{"dataset":"testing","namespace":"something","type":"synthetics"},"message":"hello there"}
@@ -140,9 +155,13 @@ fn handle_metrics() {
     let log = es.metric_to_log.transform_one(metric).unwrap();
 
     let mut encoded = vec![];
-    let encoded_size = es.encoding.encode_input(vec![
-        process_log(log, &es.mode, &None, es.doc_type).unwrap()
-    ], &mut encoded).unwrap();
+    let encoded_size = es
+        .encoding
+        .encode_input(
+            vec![process_log(log, &es.mode, &None, es.doc_type).unwrap()],
+            &mut encoded,
+        )
+        .unwrap();
 
     let encoded = std::str::from_utf8(&encoded).unwrap();
     let encoded_lines = encoded.split('\n').map(String::from).collect::<Vec<_>>();
@@ -216,9 +235,13 @@ fn encode_datastream_mode_no_sync() {
     );
 
     let mut encoded = vec![];
-    let encoded_size = es.encoding.encode_input(vec![
-        process_log(log, &es.mode, &None, es.doc_type).unwrap()
-    ], &mut encoded).unwrap();
+    let encoded_size = es
+        .encoding
+        .encode_input(
+            vec![process_log(log, &es.mode, &None, es.doc_type).unwrap()],
+            &mut encoded,
+        )
+        .unwrap();
 
     let expected = r#"{"create":{"_index":"synthetics-testing-something","_type":"_doc"}}
 {"@timestamp":"2020-12-01T01:02:03Z","data_stream":{"dataset":"testing","type":"synthetics"},"message":"hello there"}
@@ -245,9 +268,13 @@ fn allows_using_excepted_fields() {
     log.insert("idx", "purple");
 
     let mut encoded = vec![];
-    let encoded_size = es.encoding.encode_input(vec![
-        process_log(log, &es.mode, &None, es.doc_type).unwrap()
-    ], &mut encoded).unwrap();
+    let encoded_size = es
+        .encoding
+        .encode_input(
+            vec![process_log(log, &es.mode, &None, es.doc_type).unwrap()],
+            &mut encoded,
+        )
+        .unwrap();
 
     let expected = r#"{"index":{"_index":"purple","_type":"_doc"}}
 {"foo":"bar","message":"hello there"}
@@ -283,6 +310,3 @@ fn validate_host_header_on_aws_requests() {
         "abc-123.us-east-1.es.amazonaws.com".to_string()
     );
 }
-
-
-

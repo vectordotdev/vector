@@ -1,23 +1,23 @@
-use crate::sinks::util::{StreamSink, SinkBuilderExt, Compression};
-use futures::stream::BoxStream;
 use crate::event::{Event, LogEvent};
-use vector_core::partition::{NullPartitioner};
+use crate::sinks::util::{Compression, SinkBuilderExt, StreamSink};
+use futures::stream::BoxStream;
 use std::num::NonZeroUsize;
+use vector_core::partition::NullPartitioner;
 
-use futures::StreamExt;
-use crate::sinks::elasticsearch::request_builder::ElasticsearchRequestBuilder;
 use crate::buffers::Acker;
-use crate::sinks::elasticsearch::service::{ElasticSearchResponse, ElasticSearchRequest};
+use crate::event::Value;
+use crate::sinks::elasticsearch::encoder::ProcessedEvent;
+use crate::sinks::elasticsearch::request_builder::ElasticsearchRequestBuilder;
+use crate::sinks::elasticsearch::service::{ElasticSearchRequest, ElasticSearchResponse};
 use crate::sinks::elasticsearch::{BulkAction, ElasticSearchCommonMode};
 use crate::transforms::metric_to_log::MetricToLog;
-use vector_core::stream::BatcherSettings;
+use crate::Error;
 use async_trait::async_trait;
 use futures::future;
-use crate::sinks::elasticsearch::encoder::{ProcessedEvent};
-use vector_core::ByteSizeOf;
-use crate::event::Value;
-use crate::{Error};
+use futures::StreamExt;
 use tower::util::BoxService;
+use vector_core::stream::BatcherSettings;
+use vector_core::ByteSizeOf;
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct PartitionKey {
@@ -58,29 +58,23 @@ impl ElasticSearchSink {
             .scan(self.metric_to_log, |metric_to_log, event| {
                 future::ready(Some(match event {
                     Event::Metric(metric) => metric_to_log.transform_one(metric),
-                    Event::Log(log) => Some(log)
+                    Event::Log(log) => Some(log),
                 }))
             })
             .filter_map(|x| async move { x })
-            .filter_map(move |log| {
-                future::ready(process_log(log, &mode, &id_key_field))
-            })
+            .filter_map(move |log| future::ready(process_log(log, &mode, &id_key_field)))
             .batched(NullPartitioner::new(), self.batch_settings)
-            .map(|(_, batch)|{
-                batch
-            })
-            .request_builder(
-                request_builder_concurrency_limit,
-                self.request_builder,
-            ).filter_map(|request| async move {
-            match request {
-                Err(e) => {
-                    error!("Failed to build Elasticsearch request: {:?}.", e);
-                    None
+            .map(|(_, batch)| batch)
+            .request_builder(request_builder_concurrency_limit, self.request_builder)
+            .filter_map(|request| async move {
+                match request {
+                    Err(e) => {
+                        error!("Failed to build Elasticsearch request: {:?}.", e);
+                        None
+                    }
+                    Ok(req) => Some(req),
                 }
-                Ok(req) => Some(req),
-            }
-        })
+            })
             .into_driver(self.service, self.acker);
 
         sink.run().await
@@ -90,7 +84,7 @@ impl ElasticSearchSink {
 pub fn process_log(
     mut log: LogEvent,
     mode: &ElasticSearchCommonMode,
-    id_key_field: &Option<String>
+    id_key_field: &Option<String>,
 ) -> Option<ProcessedEvent> {
     let index = mode.index(&log)?;
     let bulk_action = mode.bulk_action(&log)?;
@@ -99,8 +93,8 @@ pub fn process_log(
         cfg.sync_fields(&mut log);
         cfg.remap_timestamp(&mut log);
     };
-    let id = if let Some(Value::Bytes(key)) =
-    id_key_field.as_ref().and_then(|key| log.remove(key)) {
+    let id = if let Some(Value::Bytes(key)) = id_key_field.as_ref().and_then(|key| log.remove(key))
+    {
         Some(String::from_utf8_lossy(&key).into_owned())
     } else {
         None
@@ -109,10 +103,9 @@ pub fn process_log(
         index,
         bulk_action,
         log,
-        id
+        id,
     })
 }
-
 
 #[async_trait]
 impl StreamSink for ElasticSearchSink {

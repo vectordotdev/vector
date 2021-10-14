@@ -1,24 +1,19 @@
 use super::Region;
+use crate::sinks::elasticsearch::ElasticSearchEncoder;
+use crate::sinks::util::encoding::EncodingConfigFixed;
+use crate::sinks::util::StreamSink;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    sinks::elasticsearch::{ElasticSearchConfig},
-    sinks::util::{
-        http::RequestConfig, BatchConfig, Compression,
-        TowerRequestConfig,
-    },
+    sinks::elasticsearch::ElasticSearchConfig,
+    sinks::util::{http::RequestConfig, BatchConfig, Compression, TowerRequestConfig},
     sinks::{Healthcheck, VectorSink},
 };
-use futures::{
-    StreamExt,
-};
-use indoc::indoc;
-use serde::{Deserialize, Serialize};
-use crate::sinks::util::encoding::EncodingConfigFixed;
-use crate::sinks::elasticsearch::ElasticSearchEncoder;
-use crate::sinks::util::StreamSink;
 use async_graphql::futures_util::stream::BoxStream;
 use async_trait::async_trait;
+use futures::StreamExt;
+use indoc::indoc;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SematextLogsConfig {
@@ -86,9 +81,7 @@ impl SinkConfig for SematextLogsConfig {
         .await?;
 
         let stream = sink.into_stream();
-        let mapped_stream = MapTimestampStream {
-            inner: stream
-        };
+        let mapped_stream = MapTimestampStream { inner: stream };
 
         Ok((VectorSink::Stream(Box::new(mapped_stream)), healthcheck))
     }
@@ -102,17 +95,14 @@ impl SinkConfig for SematextLogsConfig {
     }
 }
 
-
 struct MapTimestampStream {
-    inner: Box<dyn StreamSink + Send>
+    inner: Box<dyn StreamSink + Send>,
 }
 
 #[async_trait]
 impl StreamSink for MapTimestampStream {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let mapped_input = input.map(|event|{
-            map_timestamp(event)
-        }).boxed();
+        let mapped_input = input.map(|event| map_timestamp(event)).boxed();
         self.inner.run(mapped_input).await
     }
 }

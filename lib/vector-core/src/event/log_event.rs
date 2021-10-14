@@ -4,6 +4,7 @@ use super::{
     metadata::EventMetadata,
     util, Lookup, PathComponent, Value,
 };
+use crate::event::MaybeAsLogMut;
 use crate::{config::log_schema, ByteSizeOf};
 use bytes::Bytes;
 use chrono::Utc;
@@ -18,7 +19,6 @@ use std::{
     fmt::{Debug, Display},
     iter::FromIterator,
 };
-use crate::event::MaybeAsLogMut;
 
 #[derive(Clone, Debug, Getters, MutGetters, PartialEq, PartialOrd, Derivative, Deserialize)]
 pub struct LogEvent {
@@ -262,7 +262,7 @@ impl LogEvent {
                 Some(current_val) => current_val.merge(incoming_val),
             }
         }
-        self.metadata .merge(incoming.metadata);
+        self.metadata.merge(incoming.metadata);
     }
 }
 

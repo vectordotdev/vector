@@ -1,21 +1,11 @@
-use crate::sinks::util::{RequestBuilder, Compression};
-
-
-
-
-
+use crate::sinks::util::{Compression, RequestBuilder};
 
 use crate::sinks::elasticsearch::encoder::{ElasticSearchEncoder, ProcessedEvent};
 
 use crate::sinks::elasticsearch::service::ElasticSearchRequest;
 
-
-
-
-
-
-use crate::sinks::util::encoding::{EncodingConfigFixed};
 use crate::event::{EventFinalizers, Finalizable};
+use crate::sinks::util::encoding::EncodingConfigFixed;
 
 pub struct ElasticsearchRequestBuilder {
     pub compression: Compression,
@@ -59,4 +49,3 @@ impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
         }
     }
 }
-

@@ -1,10 +1,7 @@
 use crate::{
     http::HttpError,
-    sinks::util::{
-        retries::{RetryAction, RetryLogic},
-    },
+    sinks::util::retries::{RetryAction, RetryLogic},
 };
-
 
 use http::StatusCode;
 use serde::Deserialize;
@@ -104,8 +101,8 @@ fn get_error_reason(body: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pretty_assertions::assert_eq;
     use bytes::Bytes;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn handles_error_response() {
@@ -117,9 +114,9 @@ mod tests {
         let logic = ElasticSearchRetryLogic;
         assert!(matches!(
             logic.should_retry_response(&ElasticSearchResponse {
-            http_response: response,
-            event_status: EventStatus::Failed
-        }),
+                http_response: response,
+                event_status: EventStatus::Failed
+            }),
             RetryAction::DontRetry(_)
         ));
     }

@@ -1,10 +1,10 @@
-mod retry;
-mod config;
 mod common;
-mod request_builder;
-mod sink;
-mod service;
+mod config;
 mod encoder;
+mod request_builder;
+mod retry;
+mod service;
+mod sink;
 
 #[cfg(test)]
 mod tests;
@@ -17,11 +17,10 @@ pub use common::*;
 pub use config::*;
 pub use encoder::ElasticSearchEncoder;
 
-
 use crate::{
-    config::{SinkDescription},
+    config::SinkDescription,
     emit,
-    internal_events::{TemplateRenderingFailed},
+    internal_events::TemplateRenderingFailed,
     rusoto::{self, AwsAuthentication},
     template::{Template, TemplateParseError},
 };
@@ -31,10 +30,8 @@ use http::{
     Request,
 };
 
-
-
 use rusoto_credential::{CredentialsError, ProvideAwsCredentials};
-use rusoto_signature::{SignedRequest};
+use rusoto_signature::SignedRequest;
 use serde::{Deserialize, Serialize};
 
 use snafu::{ResultExt, Snafu};
@@ -43,8 +40,6 @@ use std::convert::TryFrom;
 
 use crate::event::{EventRef, LogEvent};
 // use crate::sinks::elasticsearch::ParseError::AwsCredentialsGenerateFailed;
-
-
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
@@ -108,7 +103,6 @@ inventory::submit! {
 
 impl_generate_config_from_default!(ElasticSearchConfig);
 
-
 #[derive(Debug, Clone)]
 pub enum ElasticSearchCommonMode {
     Normal {
@@ -164,8 +158,6 @@ impl ElasticSearchCommonMode {
     }
 }
 
-
-
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
 pub enum ParseError {
@@ -180,10 +172,6 @@ pub enum ParseError {
     #[snafu(display("Batch action template parse error: {}", source))]
     BatchActionTemplate { source: TemplateParseError },
 }
-
-
-
-
 
 async fn finish_signer(
     signer: &mut SignedRequest,
@@ -210,4 +198,3 @@ async fn finish_signer(
 
     Ok(builder)
 }
-

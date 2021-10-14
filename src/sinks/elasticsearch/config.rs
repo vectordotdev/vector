@@ -1,33 +1,37 @@
-use crate::sinks::util::{Compression, BatchConfig, BatchSettings, Buffer, ServiceBuilderExt, TowerRequestConfig};
-use crate::sinks::elasticsearch::{ElasticSearchCommon, ElasticSearchMode, ElasticSearchAuth, ElasticSearchCommonMode};
-use crate::sinks::util::encoding::{EncodingConfigFixed};
-use crate::config::{SinkConfig, SinkContext, DataType};
+use crate::config::log_schema;
+use crate::config::{DataType, SinkConfig, SinkContext};
+use crate::event::{EventRef, LogEvent, Value};
+use crate::http::HttpClient;
+use crate::internal_events::TemplateRenderingFailed;
+use crate::rusoto::RegionOrEndpoint;
+use crate::sinks::elasticsearch::request_builder::ElasticsearchRequestBuilder;
+use crate::sinks::elasticsearch::sink::ElasticSearchSink;
+use crate::sinks::elasticsearch::{BatchActionTemplate, IndexTemplate};
+use crate::sinks::elasticsearch::{
+    ElasticSearchAuth, ElasticSearchCommon, ElasticSearchCommonMode, ElasticSearchMode,
+};
+use crate::sinks::util::encoding::EncodingConfigFixed;
+use crate::sinks::util::http::RequestConfig;
+use crate::sinks::util::{
+    BatchConfig, BatchSettings, Buffer, Compression, ServiceBuilderExt, TowerRequestConfig,
+};
 use crate::sinks::{Healthcheck, VectorSink};
 use crate::template::Template;
-use crate::event::{LogEvent, Value, EventRef};
-use crate::sinks::util::http::{RequestConfig};
-use indexmap::map::IndexMap;
-use crate::rusoto::RegionOrEndpoint;
 use crate::tls::TlsOptions;
-use std::collections::{HashMap, BTreeMap};
 use crate::transforms::metric_to_log::MetricToLogConfig;
-use crate::config::log_schema;
-use std::convert::TryFrom;
-use crate::sinks::elasticsearch::{BatchActionTemplate, IndexTemplate};
-use snafu::ResultExt;
-use serde::{Serialize, Deserialize};
-use crate::internal_events::TemplateRenderingFailed;
-use crate::http::HttpClient;
-use crate::sinks::elasticsearch::sink::ElasticSearchSink;
 use futures::FutureExt;
-use crate::sinks::elasticsearch::request_builder::ElasticsearchRequestBuilder;
+use indexmap::map::IndexMap;
+use serde::{Deserialize, Serialize};
+use snafu::ResultExt;
+use std::collections::{BTreeMap, HashMap};
+use std::convert::TryFrom;
 use vector_core::stream::BatcherSettings;
 
-use std::num::NonZeroUsize;
-use crate::sinks::elasticsearch::service::{ElasticSearchService, HttpRequestBuilder};
 use crate::sinks::elasticsearch::encoder::ElasticSearchEncoder;
-use tower::ServiceBuilder;
 use crate::sinks::elasticsearch::retry::ElasticSearchRetryLogic;
+use crate::sinks::elasticsearch::service::{ElasticSearchService, HttpRequestBuilder};
+use std::num::NonZeroUsize;
+use tower::ServiceBuilder;
 
 /// The field name for the timestamp required by data stream mode
 const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
@@ -49,8 +53,8 @@ pub struct ElasticSearchConfig {
     #[serde(default)]
     pub compression: Compression,
     #[serde(
-    skip_serializing_if = "crate::serde::skip_serializing_if_default",
-    default
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
     )]
     pub encoding: EncodingConfigFixed<ElasticSearchEncoder>,
     // pub encoding: EncodingConfigWithDefault<Encoding>,
@@ -238,7 +242,6 @@ impl DataStreamConfig {
         let dataset = self.dataset(&*log);
         let namespace = self.namespace(&*log);
 
-
         let existing = log
             .as_map_mut()
             .entry("data_stream".into())
@@ -263,11 +266,7 @@ impl DataStreamConfig {
 
     pub fn index(&self, log: &LogEvent) -> Option<String> {
         let (dtype, dataset, namespace) = if !self.auto_routing {
-            (
-                self.dtype(log)?,
-                self.dataset(log)?,
-                self.namespace(log)?,
-            )
+            (self.dtype(log)?, self.dataset(log)?, self.namespace(log)?)
         } else {
             let data_stream = log.get("data_stream").and_then(|ds| ds.as_map());
             let dtype = data_stream
@@ -291,10 +290,7 @@ impl DataStreamConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticSearchConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(self)?;
 
         let http_client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
@@ -306,7 +302,7 @@ impl SinkConfig for ElasticSearchConfig {
         let batch_settings = BatcherSettings::new(
             batch_settings.timeout,
             NonZeroUsize::new(batch_settings.size.bytes).expect("Batch bytes should not be 0"),
-            NonZeroUsize::new(batch_settings.size.events).expect("Batch events should not be 0")
+            NonZeroUsize::new(batch_settings.size.events).expect("Batch events should not be 0"),
         );
 
         // This is a bit ugly, but removes a String allocation on every event
@@ -318,7 +314,10 @@ impl SinkConfig for ElasticSearchConfig {
             encoder: self.encoding.clone(),
         };
 
-        let request_limits = self.request.tower.unwrap_with(&TowerRequestConfig::default());
+        let request_limits = self
+            .request
+            .tower
+            .unwrap_with(&TowerRequestConfig::default());
 
         let http_request_builder = HttpRequestBuilder {
             bulk_uri: common.bulk_uri,
@@ -327,7 +326,7 @@ impl SinkConfig for ElasticSearchConfig {
             query_params: common.query_params,
             region: common.region,
             compression: Compression::None,
-            credentials_provider: common.credentials
+            credentials_provider: common.credentials,
         };
 
         let service = ServiceBuilder::new()
@@ -361,7 +360,6 @@ impl SinkConfig for ElasticSearchConfig {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -389,7 +387,7 @@ mod tests {
             auth.assume_role = "role"
         "#,
         )
-            .unwrap();
+        .unwrap();
 
         toml::from_str::<ElasticSearchConfig>(
             r#"
@@ -397,7 +395,7 @@ mod tests {
             auth.strategy = "aws"
         "#,
         )
-            .unwrap();
+        .unwrap();
     }
 
     #[test]
@@ -409,7 +407,7 @@ mod tests {
             data_stream.type = "synthetics"
         "#,
         )
-            .unwrap();
+        .unwrap();
         assert!(matches!(config.mode, ElasticSearchMode::DataStream));
         assert!(config.data_stream.is_some());
     }

@@ -1,25 +1,27 @@
+use crate::http::{Auth, HttpClient, MaybeAuth};
+use crate::sinks::elasticsearch::{
+    finish_signer, ElasticSearchAuth, ElasticSearchCommonMode, ElasticSearchConfig, ParseError,
+};
 use crate::transforms::metric_to_log::MetricToLog;
-use crate::http::{HttpClient, Auth, MaybeAuth};
-use crate::sinks::elasticsearch::{finish_signer, ElasticSearchAuth, ElasticSearchConfig, ParseError, ElasticSearchCommonMode};
 
-use crate::sinks::util::http::{RequestConfig};
+use crate::sinks::util::http::RequestConfig;
 
+use crate::rusoto::region_from_endpoint;
+use crate::sinks::util::{Compression, TowerRequestConfig, UriSerde};
+use crate::tls::TlsSettings;
 use http::{StatusCode, Uri};
 use hyper::Body;
 use rusoto_signature::SignedRequest;
-use crate::tls::TlsSettings;
-use crate::sinks::util::{TowerRequestConfig, UriSerde, Compression};
-use crate::rusoto::region_from_endpoint;
-use std::convert::TryFrom;
 use snafu::ResultExt;
+use std::convert::TryFrom;
 
+use super::{InvalidHost, Request};
 use crate::rusoto;
-use crate::sinks::util::encoding::{EncodingConfigFixed};
-use std::collections::HashMap;
-use rusoto_core::Region;
-use super::{Request, InvalidHost};
-use crate::sinks::HealthcheckError;
 use crate::sinks::elasticsearch::encoder::ElasticSearchEncoder;
+use crate::sinks::util::encoding::EncodingConfigFixed;
+use crate::sinks::HealthcheckError;
+use rusoto_core::Region;
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct ElasticSearchCommon {
@@ -50,7 +52,7 @@ impl ElasticSearchCommon {
             return Err(ParseError::HostMustIncludeHostname {
                 host: config.endpoint.clone(),
             }
-                .into());
+            .into());
         }
 
         let authorization = match &config.auth {

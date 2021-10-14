@@ -75,9 +75,9 @@ async fn create_template_index(common: &ElasticSearchCommon, name: &str) -> crat
     let response = client
         .put(uri)
         .json(&json!({
-                "index_patterns": ["my-*-*"],
-                "data_stream": {},
-            }))
+            "index_patterns": ["my-*-*"],
+            "data_stream": {},
+        }))
         .send()
         .await?;
     assert_eq!(response.status(), StatusCode::OK);
@@ -137,8 +137,8 @@ async fn structures_events_correctly() {
     let response = reqwest::Client::new()
         .get(&format!("{}/{}/_search", base_url, index))
         .json(&json!({
-                "query": { "query_string": { "query": "*" } }
-            }))
+            "query": { "query_string": { "query": "*" } }
+        }))
         .send()
         .await
         .unwrap()
@@ -165,10 +165,10 @@ async fn structures_events_correctly() {
     assert_eq!(None, value["my_id"].as_str());
 
     let expected = json!({
-            "message": "raw log line",
-            "foo": "bar",
-            "timestamp": timestamp,
-        });
+        "message": "raw log line",
+        "foo": "bar",
+        "timestamp": timestamp,
+    });
     assert_eq!(&expected, value);
 }
 
@@ -186,7 +186,7 @@ async fn insert_events_over_http() {
         false,
         BatchStatus::Delivered,
     )
-        .await;
+    .await;
 }
 
 #[tokio::test]
@@ -211,7 +211,7 @@ async fn insert_events_over_https() {
         false,
         BatchStatus::Delivered,
     )
-        .await;
+    .await;
 }
 
 #[tokio::test]
@@ -227,7 +227,7 @@ async fn insert_events_on_aws() {
         false,
         BatchStatus::Delivered,
     )
-        .await;
+    .await;
 }
 
 #[tokio::test]
@@ -244,7 +244,7 @@ async fn insert_events_on_aws_with_compression() {
         false,
         BatchStatus::Delivered,
     )
-        .await;
+    .await;
 }
 
 #[tokio::test]
@@ -261,7 +261,7 @@ async fn insert_events_with_failure() {
         true,
         BatchStatus::Failed,
     )
-        .await;
+    .await;
 }
 
 #[tokio::test]
@@ -349,8 +349,8 @@ async fn run_insert_tests_with_config(
             doit = true;
             event
         }))
-            .await
-            .expect("Sending events failed");
+        .await
+        .expect("Sending events failed");
     } else {
         sink.run(events).await.expect("Sending events failed");
     }
@@ -365,8 +365,8 @@ async fn run_insert_tests_with_config(
         .get(&format!("{}/{}/_search", base_url, index))
         .basic_auth("elastic", Some("vector"))
         .json(&json!({
-                "query": { "query_string": { "query": "*" } }
-            }))
+            "query": { "query_string": { "query": "*" } }
+        }))
         .send()
         .await
         .unwrap()
@@ -388,8 +388,8 @@ async fn run_insert_tests_with_config(
             .as_array_mut()
             .expect("Elasticsearch response does not include hits->hits");
         #[allow(clippy::needless_collect)]
-            // https://github.com/rust-lang/rust-clippy/issues/6909
-            let input = input
+        // https://github.com/rust-lang/rust-clippy/issues/6909
+        let input = input
             .into_iter()
             .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
             .collect::<Vec<_>>();
