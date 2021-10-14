@@ -12,7 +12,7 @@ license = "MPL-2.0"
 indexmap = "~1.6.2"
 nom = "7.0.0"
 num_enum = "0.5.4"
-prost = "0.8"
+prost = "0.9"
 prost-types = "0.8"
 shared = { path = "../shared", features = ["btreemap"] }
 snafu = { version = "0.6" }

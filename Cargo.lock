@@ -1121,7 +1121,7 @@ name = "console-api"
 version = "0.1.0"
 source = "git+https://github.com/tokio-rs/console?rev=f2c30d52c9f22de69bac38009a9183135808806c#f2c30d52c9f22de69bac38009a9183135808806c"
 dependencies = [
- "prost",
+ "prost 0.8.0",
  "prost-types",
  "tonic",
  "tonic-build",
@@ -4818,7 +4818,7 @@ dependencies = [
  "indexmap",
  "nom 7.0.0",
  "num_enum",
- "prost",
+ "prost 0.9.0",
  "prost-build",
  "prost-types",
  "shared",
@@ -4864,7 +4864,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "de5e2533f59d08fcf364fd374ebda0692a70bd6d7e66ef97f306f45c6c5d8020"
 dependencies = [
  "bytes 1.1.0",
- "prost-derive",
+ "prost-derive 0.8.0",
+]
+
+[[package]]
+name = "prost"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "444879275cb4fd84958b1a1d5420d15e6fcf7c235fe47f053c9c2a80aceb6001"
+dependencies = [
+ "bytes 1.1.0",
+ "prost-derive 0.9.0",
 ]
 
 [[package]]
@@ -4879,7 +4889,7 @@ dependencies = [
  "log",
  "multimap",
  "petgraph",
- "prost",
+ "prost 0.8.0",
  "prost-types",
  "tempfile",
  "which 4.2.2",
@@ -4899,13 +4909,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "prost-derive"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f9cc1a3263e07e0bf68e96268f37665207b49560d98739662cdfaae215c720fe"
+dependencies = [
+ "anyhow",
+ "itertools",
+ "proc-macro2 1.0.29",
+ "quote 1.0.9",
+ "syn 1.0.76",
+]
+
+[[package]]
 name = "prost-types"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "603bbd6394701d13f3f25aada59c7de9d35a6a5887cfc156181234a44002771b"
 dependencies = [
  "bytes 1.1.0",
- "prost",
+ "prost 0.8.0",
 ]
 
 [[package]]
@@ -4925,9 +4948,9 @@ dependencies = [
  "native-tls",
  "nom 7.0.0",
  "pem",
- "prost",
+ "prost 0.8.0",
  "prost-build",
- "prost-derive",
+ "prost-derive 0.8.0",
  "rand 0.8.4",
  "regex",
  "tokio",
@@ -6979,8 +7002,8 @@ dependencies = [
  "hyper-timeout",
  "percent-encoding",
  "pin-project 1.0.8",
- "prost",
- "prost-derive",
+ "prost 0.8.0",
+ "prost-derive 0.8.0",
  "tokio",
  "tokio-rustls",
  "tokio-stream",
@@ -7615,7 +7638,7 @@ dependencies = [
  "postgres-openssl",
  "pretty_assertions",
  "prometheus-parser",
- "prost",
+ "prost 0.9.0",
  "prost-build",
  "prost-types",
  "pulsar",
@@ -7756,7 +7779,7 @@ dependencies = [
  "pin-project 1.0.8",
  "pretty_assertions",
  "proptest",
- "prost",
+ "prost 0.9.0",
  "prost-build",
  "prost-types",
  "quickcheck",
