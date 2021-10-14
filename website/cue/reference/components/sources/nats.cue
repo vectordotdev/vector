@@ -11,7 +11,7 @@ components: sources: nats: {
 		multiline: enabled: false
 		codecs: {
 			enabled:         true
-			default_framing: "`bytes`"
+			default_framing: "bytes"
 		}
 	}
 

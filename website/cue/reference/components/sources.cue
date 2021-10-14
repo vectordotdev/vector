@@ -167,7 +167,7 @@ components: sources: [Name=string]: {
 							required:    false
 							common:      true
 							type: string: {
-								default: "`bytes`"
+								default: "bytes"
 								enum: {
 									bytes:  "Events containing the byte frame as-is."
 									json:   "Events being parsed from a JSON string."

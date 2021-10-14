@@ -20,7 +20,7 @@ components: sources: generator: {
 		multiline: enabled: false
 		codecs: {
 			enabled:         true
-			default_framing: "`bytes`"
+			default_framing: "bytes"
 		}
 		generate: {}
 	}

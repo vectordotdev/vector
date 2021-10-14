@@ -24,7 +24,7 @@ components: sources: heroku_logs: {
 		multiline: enabled: false
 		codecs: {
 			enabled:         true
-			default_framing: "`bytes`"
+			default_framing: "bytes"
 		}
 		receive: {
 			from: {

@@ -16,7 +16,7 @@ components: sources: exec: {
 		multiline: enabled: false
 		codecs: {
 			enabled:         true
-			default_framing: "`newline_delimited`"
+			default_framing: "newline_delimited"
 		}
 		receive: {
 			from: {
