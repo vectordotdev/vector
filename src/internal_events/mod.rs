@@ -19,8 +19,10 @@ mod aws_ecs_metrics;
 mod aws_kinesis_firehose;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 mod aws_kinesis_streams;
-#[cfg(any(feature = "sources-aws_s3", feature = "sinks-aws_s3"))]
+#[cfg(feature = "sources-aws_s3")]
 pub(crate) mod aws_s3;
+#[cfg(feature = "sinks-aws_s3")]
+pub(crate) mod aws_s3_sink;
 #[cfg(feature = "sinks-aws_sqs")]
 mod aws_sqs;
 #[cfg(feature = "sinks-azure_blob")]
@@ -159,6 +161,8 @@ pub use self::aws_ecs_metrics::*;
 pub use self::aws_kinesis_firehose::*;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 pub use self::aws_kinesis_streams::*;
+#[cfg(feature = "sinks-aws_s3")]
+pub use self::aws_s3_sink::*;
 #[cfg(feature = "sinks-aws_sqs")]
 pub use self::aws_sqs::*;
 pub use self::batch::*;

@@ -1,7 +1,10 @@
+use super::config::S3Options;
+use crate::internal_events::{AwsBytesSent, S3EventsSent};
+use crate::serde::to_string;
 use bytes::Bytes;
 use futures::{future::BoxFuture, stream};
 use md5::Digest;
-use rusoto_core::{ByteStream, RusotoError};
+use rusoto_core::{ByteStream, Region, RusotoError};
 use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3};
 use std::task::{Context, Poll};
 use tower::Service;
@@ -11,9 +14,6 @@ use vector_core::{
     event::{EventFinalizers, EventStatus, Finalizable},
 };
 
-use super::config::S3Options;
-use crate::{internal_events::aws_s3::sink::S3EventsSent, serde::to_string};
-
 #[derive(Debug, Clone)]
 pub struct S3Request {
     pub body: Bytes,
@@ -21,13 +21,14 @@ pub struct S3Request {
     pub key: String,
     pub content_encoding: Option<&'static str>,
     pub options: S3Options,
-    pub batch_size: usize,
+    pub events_count: usize,
+    pub events_size: usize,
     pub finalizers: EventFinalizers,
 }
 
 impl Ackable for S3Request {
     fn ack_size(&self) -> usize {
-        self.batch_size
+        self.events_count
     }
 }
 
@@ -35,6 +36,13 @@ impl Finalizable for S3Request {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
     }
+}
+
+pub struct S3Metadata {
+    pub partition_key: String,
+    pub count: usize,
+    pub byte_size: usize,
+    pub finalizers: EventFinalizers,
 }
 
 #[derive(Debug)]
@@ -57,11 +65,16 @@ impl AsRef<EventStatus> for S3Response {
 #[derive(Clone)]
 pub struct S3Service {
     client: S3Client,
+    region: Region,
 }
 
 impl S3Service {
-    pub const fn new(client: S3Client) -> S3Service {
-        S3Service { client }
+    pub const fn new(client: S3Client, region: Region) -> S3Service {
+        S3Service { client, region }
+    }
+
+    pub fn client(&self) -> S3Client {
+        self.client.clone()
     }
 }
 
@@ -94,8 +107,10 @@ impl Service<S3Request> for S3Service {
             }
         }
         let tagging = tagging.finish();
+        let count = request.events_count;
+        let byte_size = request.events_size;
 
-        let body_len = request.body.len();
+        let request_size = request.body.len();
         let client = self.client.clone();
         let request = PutObjectRequest {
             body: Some(bytes_to_bytestream(request.body)),
@@ -116,16 +131,20 @@ impl Service<S3Request> for S3Service {
             ..Default::default()
         };
 
+        let region = self.region.clone();
         Box::pin(async move {
-            let result = client.put_object(request).in_current_span().await;
-
-            // TODO: This is fine for testing, but we should have a better
-            // pattern for this.
-            emit!(&S3EventsSent {
-                byte_size: body_len,
-            });
-
-            result.map(|inner| S3Response { inner })
+            client
+                .put_object(request)
+                .in_current_span()
+                .await
+                .map(|inner| {
+                    emit!(&S3EventsSent { count, byte_size });
+                    emit!(&AwsBytesSent {
+                        byte_size: request_size,
+                        region,
+                    });
+                    S3Response { inner }
+                })
         })
     }
 }

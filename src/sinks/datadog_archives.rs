@@ -9,7 +9,6 @@ use std::{
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{SecondsFormat, Utc};
 use rand::{thread_rng, Rng};
-use rusoto_s3::S3Client;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tower::ServiceBuilder;
@@ -17,22 +16,23 @@ use uuid::Uuid;
 
 use vector_core::{
     config::{log_schema, LogSchema},
-    event::{Event, EventFinalizers, Finalizable},
+    event::{Event, Finalizable},
+    ByteSizeOf,
 };
 
-use crate::sinks::s3_common;
 use crate::{
     config::GenerateConfig,
     config::{DataType, SinkConfig, SinkContext},
     rusoto::{AwsAuthentication, RegionOrEndpoint},
     sinks::{
         s3_common::{
+            self,
             config::{
-                build_healthcheck, create_client, S3CannedAcl, S3RetryLogic,
+                build_healthcheck, create_service, S3CannedAcl, S3RetryLogic,
                 S3ServerSideEncryption, S3StorageClass,
             },
             partitioner::KeyPartitioner,
-            service::{S3Request, S3Service},
+            service::{S3Metadata, S3Request, S3Service},
             sink::S3Sink,
         },
         util::Concurrency,
@@ -123,9 +123,10 @@ impl DatadogArchivesSinkConfig {
         match &self.service[..] {
             "aws_s3" => {
                 let s3_config = self.aws_s3.as_ref().expect("s3 config wasn't provided");
-                let client = create_client(&s3_config.region, &s3_config.auth, None, &cx.proxy)?;
+                let service = create_service(&s3_config.region, &s3_config.auth, None, &cx.proxy)?;
+                let client = service.client();
                 let svc = self
-                    .build_s3_sink(&s3_config.options, client.clone(), cx)
+                    .build_s3_sink(&s3_config.options, service, cx)
                     .map_err(|error| format!("{}", error))?;
                 Ok((svc, build_healthcheck(self.bucket.clone(), client)?))
             }
@@ -139,7 +140,7 @@ impl DatadogArchivesSinkConfig {
     fn build_s3_sink(
         &self,
         s3_options: &S3Options,
-        client: S3Client,
+        service: S3Service,
         cx: SinkContext,
     ) -> std::result::Result<VectorSink, ConfigError> {
         // we use lower default limits, because we send 100mb batches,
@@ -147,7 +148,7 @@ impl DatadogArchivesSinkConfig {
         let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
         let service = ServiceBuilder::new()
             .settings(request_limits, S3RetryLogic)
-            .service(S3Service::new(client));
+            .service(service);
 
         match s3_options.storage_class {
             Some(class @ S3StorageClass::DeepArchive) | Some(class @ S3StorageClass::Glacier) => {
@@ -299,7 +300,7 @@ impl DatadogS3RequestBuilder {
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
-    type Metadata = (String, usize, EventFinalizers);
+    type Metadata = S3Metadata;
     type Events = Vec<Event>;
     type Encoder = DatadogArchivesEncoding;
     type Payload = Bytes;
@@ -317,19 +318,23 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
     fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
+        let metadata = S3Metadata {
+            partition_key,
+            count: events.len(),
+            byte_size: events.iter().map(ByteSizeOf::size_of).sum(),
+            finalizers,
+        };
 
-        ((partition_key, events.len(), finalizers), events)
+        (metadata, events)
     }
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        let (partition_key, batch_size, finalizers) = metadata;
-
         let filename = Uuid::new_v4().to_string();
 
         let key = format!(
             "{}/{}{}.{}",
             self.key_prefix.clone().unwrap_or_default(),
-            partition_key,
+            metadata.partition_key,
             filename,
             "json.gz"
         )
@@ -338,7 +343,7 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
         trace!(
             message = "Sending events.",
             bytes = ?payload.len(),
-            events_len = ?batch_size,
+            events_len = ?metadata.byte_size,
             bucket = ?self.bucket,
             key = ?key
         );
@@ -362,8 +367,9 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
                 content_encoding: None,
                 content_type: None,
             },
-            batch_size,
-            finalizers,
+            events_count: metadata.count,
+            events_size: metadata.byte_size,
+            finalizers: metadata.finalizers,
         }
     }
 }
