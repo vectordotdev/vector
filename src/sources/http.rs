@@ -177,7 +177,7 @@ mod tests {
         codecs::{DecodingConfig, JsonParserConfig},
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus, Value},
-        test_util::{components, next_addr, spawn_collect_n, trace_init, wait_for_tcp},
+        test_util::{components, next_addr, spawn_collect_n, wait_for_tcp},
         Pipeline,
     };
     use flate2::{
@@ -206,7 +206,7 @@ mod tests {
         acknowledgements: bool,
         decoding: DecodingConfig,
     ) -> (impl Stream<Item = Event>, SocketAddr) {
-        components::init();
+        components::init_test();
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
         let path = path.to_owned();
@@ -304,8 +304,6 @@ mod tests {
 
     #[tokio::test]
     async fn http_multiline_text() {
-        trace_init();
-
         let body = "test body\ntest body 2";
 
         let (rx, addr) = source(
@@ -342,8 +340,6 @@ mod tests {
 
     #[tokio::test]
     async fn http_multiline_text2() {
-        trace_init();
-
         //same as above test but with a newline at the end
         let body = "test body\ntest body 2\n";
 
@@ -381,8 +377,6 @@ mod tests {
 
     #[tokio::test]
     async fn http_json_parsing() {
-        trace_init();
-
         let (rx, addr) = source(
             vec![],
             vec![],
@@ -423,8 +417,6 @@ mod tests {
 
     #[tokio::test]
     async fn http_json_values() {
-        trace_init();
-
         let (rx, addr) = source(
             vec![],
             vec![],
@@ -468,8 +460,6 @@ mod tests {
 
     #[tokio::test]
     async fn http_json_dotted_keys() {
-        trace_init();
-
         let (rx, addr) = source(
             vec![],
             vec![],
@@ -512,8 +502,6 @@ mod tests {
 
     #[tokio::test]
     async fn http_ndjson() {
-        trace_init();
-
         let (rx, addr) = source(
             vec![],
             vec![],
@@ -580,8 +568,6 @@ mod tests {
 
     #[tokio::test]
     async fn http_headers() {
-        trace_init();
-
         let mut headers = HeaderMap::new();
         headers.insert("User-Agent", "test_client".parse().unwrap());
         headers.insert("Upgrade-Insecure-Requests", "false".parse().unwrap());
@@ -624,7 +610,6 @@ mod tests {
 
     #[tokio::test]
     async fn http_query() {
-        trace_init();
         let (rx, addr) = source(
             vec![],
             vec![
@@ -663,8 +648,6 @@ mod tests {
 
     #[tokio::test]
     async fn http_gzip_deflate() {
-        trace_init();
-
         let body = "test body";
 
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
@@ -704,7 +687,6 @@ mod tests {
 
     #[tokio::test]
     async fn http_path() {
-        trace_init();
         let (rx, addr) = source(
             vec![],
             vec![],
@@ -736,7 +718,6 @@ mod tests {
 
     #[tokio::test]
     async fn http_path_no_restriction() {
-        trace_init();
         let (rx, addr) = source(
             vec![],
             vec![],
@@ -806,8 +787,6 @@ mod tests {
 
     #[tokio::test]
     async fn http_delivery_failure() {
-        trace_init();
-
         let (rx, addr) = source(
             vec![],
             vec![],
@@ -833,8 +812,6 @@ mod tests {
 
     #[tokio::test]
     async fn ignores_disabled_acknowledgements() {
-        trace_init();
-
         let (rx, addr) = source(
             vec![],
             vec![],

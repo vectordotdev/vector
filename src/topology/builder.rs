@@ -208,12 +208,15 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx, _) =
-            vector_core::buffers::build(vector_core::buffers::Variant::Memory {
+        let (input_tx, input_rx, _) = vector_core::buffers::build(
+            vector_core::buffers::Variant::Memory {
                 max_events: 100,
                 when_full: vector_core::buffers::WhenFull::Block,
-            })
-            .unwrap();
+                instrument: false,
+            },
+            tracing::Span::none(),
+        )
+        .unwrap();
         let mut input_rx = crate::utilization::wrap(Pin::new(input_rx));
 
         let task = match transform {
@@ -358,7 +361,21 @@ pub async fn build_pieces(
         let (tx, rx, acker) = if let Some(buffer) = buffers.remove(key) {
             buffer
         } else {
-            let buffer = sink.buffer.build(&config.global.data_dir, key);
+            let buffer_type = match sink.buffer {
+                buffers::BufferConfig::Memory { .. } => "memory",
+                #[cfg(feature = "disk-buffer")]
+                buffers::BufferConfig::Disk { .. } => "disk",
+            };
+            let buffer_span = error_span!(
+                "sink",
+                component_kind = "sink",
+                component_id = %key.id(),
+                component_scope = %key.scope(),
+                component_type = typetag,
+                component_name = %key.id(),
+                buffer_type = buffer_type,
+            );
+            let buffer = sink.buffer.build(&config.global.data_dir, key, buffer_span);
             match buffer {
                 Err(error) => {
                     errors.push(format!("Sink \"{}\": {}", key, error));

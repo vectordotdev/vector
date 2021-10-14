@@ -11,6 +11,7 @@ use futures::task::{noop_waker, Context, Poll};
 use futures::{Sink, Stream};
 use quickcheck::{QuickCheck, TestResult};
 use std::pin::Pin;
+use tracing::Span;
 
 #[derive(Debug)]
 /// For operations that might block whether the operation would or would not
@@ -132,7 +133,8 @@ fn model_check() {
         let snd_waker = noop_waker();
         let mut snd_context = Context::from_waker(&snd_waker);
 
-        let (tx, mut rx, _) = crate::build::<Message>(guard.as_ref().clone()).unwrap();
+        let (tx, mut rx, _) =
+            crate::build::<Message>(guard.as_ref().clone(), Span::none()).unwrap();
 
         let mut tx = tx.get();
         let sink = tx.as_mut();
