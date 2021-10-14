@@ -755,6 +755,7 @@ statistic-benches = []
 metrics-benches = ["sinks-socket", "sources-socket"]
 remap-benches = ["transforms-add_fields", "transforms-coercer", "transforms-json_parser", "transforms-remap"]
 transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce"]
+loki-benches = ["sinks-loki"]
 
 [[bench]]
 name = "default"
@@ -786,6 +787,12 @@ name = "languages"
 harness = false
 test = true
 required-features = ["language-benches"]
+
+[[bench]]
+name = "loki"
+harness = false
+test = true
+required-features = ["loki-benches"]
 
 [[bench]]
 name = "distribution_statistic"

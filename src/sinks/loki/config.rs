@@ -114,7 +114,7 @@ impl SinkConfig for LokiConfig {
     }
 }
 
-pub(super) fn valid_label_name(label: &Template) -> bool {
+pub fn valid_label_name(label: &Template) -> bool {
     label.is_dynamic() || {
         // Loki follows prometheus on this https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
         // Although that isn't explicitly said anywhere besides what's in the code.

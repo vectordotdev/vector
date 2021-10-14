@@ -26,6 +26,9 @@ use config::LokiConfig;
 
 pub use config::OutOfOrderAction;
 
+#[cfg(feature = "loki-benches")]
+pub use config::valid_label_name;
+
 inventory::submit! {
     SinkDescription::new::<LokiConfig>("loki")
 }
