@@ -41,7 +41,7 @@ impl Decoder for BytesCodec {
     type Item = Bytes;
     type Error = BoxedFramingError;
 
-    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+    fn decode(&mut self, _src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         self.flushed = false;
         Ok(None)
     }
