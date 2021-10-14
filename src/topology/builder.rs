@@ -361,6 +361,11 @@ pub async fn build_pieces(
         let (tx, rx, acker) = if let Some(buffer) = buffers.remove(key) {
             buffer
         } else {
+            let buffer_type = match sink.buffer {
+                buffers::BufferConfig::Memory { .. } => "memory",
+                #[cfg(feature = "disk-buffer")]
+                buffers::BufferConfig::Disk { .. } => "disk",
+            };
             let buffer_span = error_span!(
                 "sink",
                 component_kind = "sink",
@@ -368,6 +373,7 @@ pub async fn build_pieces(
                 component_scope = %key.scope(),
                 component_type = typetag,
                 component_name = %key.id(),
+                buffer_type = buffer_type,
             );
             let buffer = sink.buffer.build(&config.global.data_dir, key, buffer_span);
             match buffer {
