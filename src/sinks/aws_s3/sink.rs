@@ -55,7 +55,7 @@ impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
         (metadata, events)
     }
 
-    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(&self, mut metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
         let filename = {
             let formatted_ts = Utc::now().format(self.filename_time_format.as_str());
 
@@ -69,7 +69,7 @@ impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
             .as_ref()
             .cloned()
             .unwrap_or_else(|| self.compression.extension().into());
-        let key = format!("{}/{}.{}", metadata.partition_key, filename, extension);
+        metadata.partition_key = format!("{}/{}.{}", metadata.partition_key, filename, extension);
 
         // TODO: move this into `.request_builder(...)` closure?
         trace!(
@@ -77,18 +77,15 @@ impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
             bytes = ?payload.len(),
             events_len = ?metadata.count,
             bucket = ?self.bucket,
-            key = ?key
+            key = ?metadata.partition_key
         );
 
         S3Request {
             body: payload,
             bucket: self.bucket.clone(),
-            key,
+            metadata,
             content_encoding: self.compression.content_encoding(),
             options: self.api_options.clone(),
-            events_count: metadata.count,
-            events_size: metadata.byte_size,
-            finalizers: metadata.finalizers,
         }
     }
 }

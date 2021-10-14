@@ -18,26 +18,24 @@ use vector_core::{
 pub struct S3Request {
     pub body: Bytes,
     pub bucket: String,
-    pub key: String,
+    pub metadata: S3Metadata,
     pub content_encoding: Option<&'static str>,
     pub options: S3Options,
-    pub events_count: usize,
-    pub events_size: usize,
-    pub finalizers: EventFinalizers,
 }
 
 impl Ackable for S3Request {
     fn ack_size(&self) -> usize {
-        self.events_count
+        self.metadata.count
     }
 }
 
 impl Finalizable for S3Request {
     fn take_finalizers(&mut self) -> EventFinalizers {
-        std::mem::take(&mut self.finalizers)
+        std::mem::take(&mut self.metadata.finalizers)
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct S3Metadata {
     pub partition_key: String,
     pub count: usize,
@@ -107,15 +105,15 @@ impl Service<S3Request> for S3Service {
             }
         }
         let tagging = tagging.finish();
-        let count = request.events_count;
-        let byte_size = request.events_size;
+        let count = request.metadata.count;
+        let byte_size = request.metadata.byte_size;
 
         let request_size = request.body.len();
         let client = self.client.clone();
         let request = PutObjectRequest {
             body: Some(bytes_to_bytestream(request.body)),
             bucket: request.bucket,
-            key: request.key,
+            key: request.metadata.partition_key,
             content_encoding,
             content_type,
             acl: options.acl.map(to_string),

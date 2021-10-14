@@ -328,10 +328,10 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
         (metadata, events)
     }
 
-    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(&self, mut metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
         let filename = Uuid::new_v4().to_string();
 
-        let key = format!(
+        metadata.partition_key = format!(
             "{}/{}{}.{}",
             self.key_prefix.clone().unwrap_or_default(),
             metadata.partition_key,
@@ -345,14 +345,14 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
             bytes = ?payload.len(),
             events_len = ?metadata.byte_size,
             bucket = ?self.bucket,
-            key = ?key
+            key = ?metadata.partition_key
         );
 
         let s3_options = self.config.options.clone();
         S3Request {
             body: payload,
             bucket: self.bucket.clone(),
-            key,
+            metadata,
             content_encoding: DEFAULT_COMPRESSION.content_encoding(),
             options: s3_common::config::S3Options {
                 acl: s3_options.acl,
@@ -367,9 +367,6 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
                 content_encoding: None,
                 content_type: None,
             },
-            events_count: metadata.count,
-            events_size: metadata.byte_size,
-            finalizers: metadata.finalizers,
         }
     }
 }
@@ -593,10 +590,11 @@ mod tests {
         let req = request_builder.build_request(metadata, fake_buf.clone());
         let expected_key_prefix = "audit/dt=20210823/hour=16/";
         let expected_key_ext = ".json.gz";
-        println!("{}", req.key);
-        assert!(req.key.starts_with(expected_key_prefix));
-        assert!(req.key.ends_with(expected_key_ext));
-        let uuid1 = &req.key[expected_key_prefix.len()..req.key.len() - expected_key_ext.len()];
+        println!("{}", req.metadata.partition_key);
+        assert!(req.metadata.partition_key.starts_with(expected_key_prefix));
+        assert!(req.metadata.partition_key.ends_with(expected_key_ext));
+        let uuid1 = &req.metadata.partition_key
+            [expected_key_prefix.len()..req.metadata.partition_key.len() - expected_key_ext.len()];
         assert_eq!(uuid1.len(), 36);
 
         // check the the second batch has a different UUID
@@ -605,7 +603,8 @@ mod tests {
         let key = partitioner.partition(&log2).expect("key wasn't provided");
         let (metadata, _events) = request_builder.split_input((key, vec![log2]));
         let req = request_builder.build_request(metadata, fake_buf);
-        let uuid2 = &req.key[expected_key_prefix.len()..req.key.len() - expected_key_ext.len()];
+        let uuid2 = &req.metadata.partition_key
+            [expected_key_prefix.len()..req.metadata.partition_key.len() - expected_key_ext.len()];
         assert_ne!(uuid1, uuid2);
     }
 
