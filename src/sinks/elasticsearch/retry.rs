@@ -101,10 +101,10 @@ fn get_error_reason(body: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bytes::Bytes;
-    use pretty_assertions::assert_eq;
     use crate::event::EventStatus;
+    use bytes::Bytes;
     use http::Response;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn handles_error_response() {
