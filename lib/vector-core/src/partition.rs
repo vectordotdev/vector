@@ -31,7 +31,5 @@ impl<T> Partitioner for NullPartitioner<T> {
     type Item = T;
     type Key = ();
 
-    fn partition(&self, _item: &T) -> Self::Key {
-        ()
-    }
+    fn partition(&self, _item: &T) -> Self::Key {}
 }
