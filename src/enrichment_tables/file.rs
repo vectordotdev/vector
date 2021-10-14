@@ -58,38 +58,49 @@ impl FileConfig {
     ) -> Result<Value, String> {
         use chrono::TimeZone;
 
-        Ok(match self.schema.get(column).map(|format| format.trim()) {
-            Some(format) if format == "date" => Value::Timestamp(
-                chrono::FixedOffset::east(0)
-                    .from_utc_datetime(
-                        &chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
-                            .map_err(|_| {
-                                format!("unable to parse date {} found in row {}", value, row)
-                            })?
-                            .and_hms(0, 0, 0),
-                    )
-                    .into(),
-            ),
-            Some(format) if format.starts_with("date|") => {
-                let format = format.trim_start_matches("date|").trim().to_string();
-                Value::Timestamp(
-                    chrono::FixedOffset::east(0)
-                        .from_utc_datetime(
-                            &chrono::NaiveDate::parse_from_str(value, &format)
-                                .map_err(|_| {
-                                    format!("unable to parse date {} found in row {}", value, row)
-                                })?
-                                .and_hms(0, 0, 0),
-                        )
-                        .into(),
-                )
-            }
+        Ok(match self.schema.get(column) {
             Some(format) => {
-                let conversion =
-                    Conversion::parse(format, timezone).map_err(|err| err.to_string())?;
-                conversion
-                    .convert(Bytes::copy_from_slice(value.as_bytes()))
-                    .map_err(|_| format!("unable to parse {} found in row {}", value, row))?
+                let mut split = format.splitn(2, "|").map(|segment| segment.trim());
+
+                match (split.next(), split.next()) {
+                    (Some("date"), None) => Value::Timestamp(
+                        chrono::FixedOffset::east(0)
+                            .from_utc_datetime(
+                                &chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
+                                    .map_err(|_| {
+                                        format!(
+                                            "unable to parse date {} found in row {}",
+                                            value, row
+                                        )
+                                    })?
+                                    .and_hms(0, 0, 0),
+                            )
+                            .into(),
+                    ),
+                    (Some("date"), Some(format)) => Value::Timestamp(
+                        chrono::FixedOffset::east(0)
+                            .from_utc_datetime(
+                                &chrono::NaiveDate::parse_from_str(value, &format)
+                                    .map_err(|_| {
+                                        format!(
+                                            "unable to parse date {} found in row {}",
+                                            value, row
+                                        )
+                                    })?
+                                    .and_hms(0, 0, 0),
+                            )
+                            .into(),
+                    ),
+                    _ => {
+                        let conversion =
+                            Conversion::parse(format, timezone).map_err(|err| err.to_string())?;
+                        conversion
+                            .convert(Bytes::copy_from_slice(value.as_bytes()))
+                            .map_err(|_| {
+                                format!("unable to parse {} found in row {}", value, row)
+                            })?
+                    }
+                }
             }
             None => value.into(),
         })
@@ -524,7 +535,9 @@ mod tests {
         schema.insert("col1".to_string(), " string ".to_string());
         schema.insert("col2".to_string(), " date ".to_string());
         schema.insert("col3".to_string(), "date|%m/%d/%Y".to_string());
+        schema.insert("col3-spaces".to_string(), "date | %m %d %Y".to_string());
         schema.insert("col4".to_string(), "timestamp|%+".to_string());
+        schema.insert("col4-spaces".to_string(), "timestamp | %+".to_string());
         schema.insert("col5".to_string(), "int".to_string());
         let config = FileConfig {
             file: Default::default(),
@@ -547,12 +560,29 @@ mod tests {
         );
 
         assert_eq!(
+            Ok(Value::from(chrono::Utc.ymd(2020, 3, 5).and_hms(0, 0, 0))),
+            config.parse_column(Default::default(), "col3-spaces", 1, "03 05 2020")
+        );
+
+        assert_eq!(
             Ok(Value::from(
                 chrono::Utc.ymd(2001, 7, 7).and_hms_micro(15, 4, 0, 26490)
             )),
             config.parse_column(
                 Default::default(),
                 "col4",
+                1,
+                "2001-07-08T00:34:00.026490+09:30"
+            )
+        );
+
+        assert_eq!(
+            Ok(Value::from(
+                chrono::Utc.ymd(2001, 7, 7).and_hms_micro(15, 4, 0, 26490)
+            )),
+            config.parse_column(
+                Default::default(),
+                "col4-spaces",
                 1,
                 "2001-07-08T00:34:00.026490+09:30"
             )
