@@ -16,8 +16,6 @@ pub struct ProcessedEvent {
     pub bulk_action: BulkAction,
     pub log: LogEvent,
     pub id: Option<String>,
-    //TODO: This is constant for a sink, move it out of the individual event
-    pub doc_type: String,
 }
 
 impl Finalizable for ProcessedEvent {
@@ -33,38 +31,22 @@ impl ByteSizeOf for ProcessedEvent {
 }
 
 #[derive(PartialEq, Default, Clone, Debug)]
-pub struct ElasticSearchEncoder;
+pub struct ElasticSearchEncoder {
+    pub doc_type: String
+}
 
 impl Encoder<Vec<ProcessedEvent>> for ElasticSearchEncoder {
     fn encode_input(&self, input: Vec<ProcessedEvent>, writer: &mut dyn Write) -> std::io::Result<usize> {
         let mut written_bytes = 0;
         for event in input {
-
-            // TODO: (perf): use a struct here instead of json Value
-            let mut action = json!({
-                event.bulk_action.as_str(): {
-                    "_index": event.index,
-                    "_type": event.doc_type,
-                }
-            });
-
-            if let Some(id) = event.id {
-                // TODO: please get rid of this
-                let doc = action.pointer_mut(event.bulk_action.as_json_pointer()).unwrap();
-                doc.as_object_mut()
-                    .unwrap()
-                    .insert("_id".into(), json!(id));
-            }
-
-            written_bytes += as_tracked_write::<_,_,io::Error>(writer, (&action, &event.log), |mut writer, (action, log)| {
-                serde_json::to_writer(&mut writer, action)?;
+            written_bytes += write_bulk_action(writer, event.bulk_action.as_str(), &event.index, &self.doc_type, &event.id)?;
+            written_bytes += as_tracked_write::<_,_,io::Error>(writer, &event.log, |mut writer, log| {
                 writer.write_all(&[b'\n'])?;
                 serde_json::to_writer(&mut writer, log)?;
                 writer.write_all(&[b'\n'])?;
                 Ok(())
             })?;
 
-            //TODO: split into trace log + batched written bytes?
             emit!(&ElasticSearchEventEncoded {
                 byte_size: written_bytes,
                 index: event.index,
@@ -72,6 +54,16 @@ impl Encoder<Vec<ProcessedEvent>> for ElasticSearchEncoder {
         }
         Ok(written_bytes)
     }
+}
+
+fn write_bulk_action(writer: &mut dyn Write, bulk_action: &str, index: &str, doc_type: &str, id: &Option<String>) -> std::io::Result<usize> {
+    as_tracked_write(writer, (bulk_action, index, doc_type, id), |mut writer, (bulk_action, index, doc_type, id)| {
+        if let Some(id) = id {
+            write!(writer, r#"{{"{}":{{"_index":"{}","_type":"{}","_id":"{}"}}}}"#, bulk_action, index, doc_type, id)
+        }else {
+            write!(writer, r#"{{"{}":{{"_index":"{}","_type":"{}"}}}}"#, bulk_action, index, doc_type)
+        }
+    })
 }
 
 

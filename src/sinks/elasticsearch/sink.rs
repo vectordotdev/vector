@@ -50,7 +50,6 @@ pub struct ElasticSearchSink {
     pub metric_to_log: MetricToLog,
     pub mode: ElasticSearchCommonMode,
     pub id_key_field: Option<String>,
-    pub doc_type: String,
 }
 
 impl ElasticSearchSink {
@@ -59,7 +58,6 @@ impl ElasticSearchSink {
 
         let mode = self.mode;
         let id_key_field = self.id_key_field;
-        let doc_type = self.doc_type;
 
         let sink = input
             .scan(self.metric_to_log, |metric_to_log, event| {
@@ -70,27 +68,12 @@ impl ElasticSearchSink {
             })
             .filter_map(|x| async move { x })
             .filter_map(move |log| {
-                future::ready(process_log(log, &mode, &id_key_field, doc_type.clone()))
+                future::ready(process_log(log, &mode, &id_key_field))
             })
             .batched(NullPartitioner::new(), self.batch_settings)
             .map(|(_, batch)|{
                 batch
             })
-            // .filter_map(move |(_, batch)| {
-            //     let aws_credentials_provider = aws_credentials_provider.clone();
-            //     async move {
-            //         let aws_credentials = match &*aws_credentials_provider {
-            //             Some(provider) => {
-            //                 Some(get_aws_credentials(provider).await?)
-            //             },
-            //             None => None
-            //         };
-            //         Some(super::request_builder::Input {
-            //             aws_credentials,
-            //             events: batch,
-            //         })
-            //     }
-            // })
             .request_builder(
                 request_builder_concurrency_limit,
                 self.request_builder,
@@ -122,8 +105,7 @@ async fn get_aws_credentials(provider: &AwsCredentialsProvider) -> Option<AwsCre
 pub fn process_log(
     mut log: LogEvent,
     mode: &ElasticSearchCommonMode,
-    id_key_field: &Option<String>,
-    doc_type: String,
+    id_key_field: &Option<String>
 ) -> Option<ProcessedEvent> {
     let index = mode.index(&log)?;
     let bulk_action = mode.bulk_action(&log)?;
@@ -142,8 +124,7 @@ pub fn process_log(
         index,
         bulk_action,
         log,
-        id,
-        doc_type
+        id
     })
 }
 

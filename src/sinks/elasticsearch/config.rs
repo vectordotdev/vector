@@ -309,6 +309,10 @@ impl SinkConfig for ElasticSearchConfig {
             NonZeroUsize::new(batch_settings.size.events).expect("Batch events should not be 0")
         );
 
+        // This is a bit ugly, but removes a String allocation on every event
+        let mut encoding = self.encoding.clone();
+        encoding.codec.doc_type = common.doc_type;
+
         let request_builder = ElasticsearchRequestBuilder {
             compression: self.compression,
             encoder: self.encoding.clone(),
@@ -339,7 +343,6 @@ impl SinkConfig for ElasticSearchConfig {
             metric_to_log: common.metric_to_log,
             mode: common.mode,
             id_key_field: self.id_key.clone(),
-            doc_type: common.doc_type
         };
 
         let common = ElasticSearchCommon::parse_config(self)?;
