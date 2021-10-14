@@ -269,7 +269,8 @@ components: {
 	}
 
 	#FeaturesCodecs: {
-		enabled: bool
+		enabled:         bool
+		default_framing: string
 	}
 
 	#FeaturesEncoding: {

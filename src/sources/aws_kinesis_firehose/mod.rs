@@ -1,6 +1,7 @@
 use crate::{
-    codecs::DecodingConfig,
+    codecs::{DecodingConfig, FramingConfig, ParserConfig},
     config::{DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
+    serde::{default_decoding, default_framing_message_based},
     tls::{MaybeTlsSettings, TlsConfig},
 };
 use futures::FutureExt;
@@ -19,8 +20,10 @@ pub struct AwsKinesisFirehoseConfig {
     access_key: Option<String>,
     tls: Option<TlsConfig>,
     record_compression: Option<Compression>,
-    #[serde(default)]
-    decoding: DecodingConfig,
+    #[serde(default = "default_framing_message_based")]
+    framing: Box<dyn FramingConfig>,
+    #[serde(default = "default_decoding")]
+    decoding: Box<dyn ParserConfig>,
 }
 
 #[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -47,10 +50,12 @@ impl fmt::Display for Compression {
 #[typetag::serde(name = "aws_kinesis_firehose")]
 impl SourceConfig for AwsKinesisFirehoseConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+
         let svc = filters::firehose(
             self.access_key.clone(),
             self.record_compression.unwrap_or_default(),
-            self.decoding.build()?,
+            decoder,
             cx.out,
         );
 
@@ -94,7 +99,8 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
             access_key: None,
             tls: None,
             record_compression: None,
-            decoding: Default::default(),
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
         })
         .unwrap()
     }
@@ -104,7 +110,6 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
 mod tests {
     use super::*;
     use crate::{
-        codecs::BytesDecoderConfig,
         event::Event,
         log_event,
         test_util::{collect_ready, next_addr, wait_for_tcp},
@@ -138,7 +143,8 @@ mod tests {
                 tls: None,
                 access_key,
                 record_compression,
-                decoding: DecodingConfig::new(Some(Box::new(BytesDecoderConfig)), None),
+                framing: default_framing_message_based(),
+                decoding: default_decoding(),
             }
             .build(SourceContext::new_test(sender))
             .await

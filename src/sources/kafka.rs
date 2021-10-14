@@ -1,10 +1,11 @@
 use super::util::finalizer::OrderedFinalizer;
 use crate::{
-    codecs::{self, DecodingConfig},
+    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::{BatchNotifier, Event, Value},
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::{KafkaAuthConfig, KafkaStatisticsContext},
+    serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util::TcpError,
     Pipeline,
@@ -33,7 +34,8 @@ enum BuildError {
     KafkaSubscribeError { source: rdkafka::error::KafkaError },
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct KafkaSourceConfig {
     bootstrap_servers: String,
@@ -62,8 +64,12 @@ pub struct KafkaSourceConfig {
     librdkafka_options: Option<HashMap<String, String>>,
     #[serde(flatten)]
     auth: KafkaAuthConfig,
-    #[serde(flatten)]
-    decoding: DecodingConfig,
+    #[serde(default = "default_framing_message_based")]
+    #[derivative(Default(value = "default_framing_message_based()"))]
+    framing: Box<dyn FramingConfig>,
+    #[serde(default = "default_decoding")]
+    #[derivative(Default(value = "default_decoding()"))]
+    decoding: Box<dyn ParserConfig>,
 }
 
 const fn default_session_timeout_ms() -> u64 {
@@ -117,6 +123,7 @@ impl_generate_config_from_default!(KafkaSourceConfig);
 impl SourceConfig for KafkaSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let consumer = create_consumer(self)?;
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
 
         Ok(Box::pin(kafka_source(
             consumer,
@@ -125,7 +132,7 @@ impl SourceConfig for KafkaSourceConfig {
             self.partition_key.clone(),
             self.offset_key.clone(),
             self.headers_key.clone(),
-            self.decoding.build()?,
+            decoder,
             cx.shutdown,
             cx.out,
             cx.acknowledgements,
