@@ -110,13 +110,10 @@ What kind on ongoing burden does this place on the team?
 
 ## Prior Art
 
-> - List prior art, the good and bad.
-> - Why can't we simply use or copy them?
-
-## Alternatives
-
-> - What other approaches have been considered and why did you not choose them?
-> - How about not doing this at all?
+- [Datadog Agent](https://docs.datadoghq.com/agent/guide/agent-configuration-files/?tab=agentv6v7)
+- [Ansible Playbook syntax](https://docs.ansible.com/ansible/latest/user_guide/playbooks_intro.html#playbook-syntax)
+- [Logstash configuration files](https://www.elastic.co/guide/en/logstash/current/config-setting-files.html)
+- [Fluentd configuration files](https://docs.fluentd.org/configuration/config-file)
 
 ## Outstanding Questions
 
