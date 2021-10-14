@@ -1,7 +1,8 @@
 use crate::{
-    codecs::{self, DecodingConfig},
+    codecs::{self, FramingConfig, ParserConfig},
     event::Event,
     internal_events::{SocketEventsReceived, SocketMode},
+    serde::{default_decoding, default_framing_stream_based},
     sources::util::{SocketListenAddr, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
@@ -26,9 +27,12 @@ pub struct TcpConfig {
     tls: Option<TlsConfig>,
     #[get_copy = "pub"]
     receive_buffer_bytes: Option<usize>,
-    #[serde(flatten, default)]
+    #[serde(default = "default_framing_stream_based")]
     #[getset(get = "pub", set = "pub")]
-    decoding: DecodingConfig,
+    framing: Box<dyn FramingConfig>,
+    #[serde(default = "default_decoding")]
+    #[getset(get = "pub", set = "pub")]
+    decoding: Box<dyn ParserConfig>,
 }
 
 const fn default_shutdown_timeout_secs() -> u64 {
@@ -36,14 +40,15 @@ const fn default_shutdown_timeout_secs() -> u64 {
 }
 
 impl TcpConfig {
-    pub const fn new(
+    pub fn new(
         address: SocketListenAddr,
         keepalive: Option<TcpKeepaliveConfig>,
         shutdown_timeout_secs: u64,
         host_key: Option<String>,
         tls: Option<TlsConfig>,
         receive_buffer_bytes: Option<usize>,
-        decoding: DecodingConfig,
+        framing: Box<dyn FramingConfig>,
+        decoding: Box<dyn ParserConfig>,
     ) -> Self {
         Self {
             address,
@@ -52,6 +57,7 @@ impl TcpConfig {
             host_key,
             tls,
             receive_buffer_bytes,
+            framing,
             decoding,
         }
     }
@@ -64,7 +70,8 @@ impl TcpConfig {
             host_key: None,
             tls: None,
             receive_buffer_bytes: None,
-            decoding: DecodingConfig::default(),
+            framing: default_framing_stream_based(),
+            decoding: default_decoding(),
         }
     }
 }

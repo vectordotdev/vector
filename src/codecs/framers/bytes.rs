@@ -7,6 +7,13 @@ use tokio_util::codec::Decoder;
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct BytesDecoderConfig;
 
+impl BytesDecoderConfig {
+    /// Creates a new `BytesDecoderConfig`.
+    pub const fn new() -> Self {
+        Self
+    }
+}
+
 #[typetag::serde(name = "bytes")]
 impl FramingConfig for BytesDecoderConfig {
     fn build(&self) -> crate::Result<BoxedFramer> {

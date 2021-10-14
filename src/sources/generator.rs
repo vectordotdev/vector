@@ -1,7 +1,8 @@
 use crate::{
-    codecs::{self, DecodingConfig},
+    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
     config::{DataType, SourceConfig, SourceContext, SourceDescription},
     internal_events::GeneratorEventProcessed,
+    serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util::TcpError,
     Pipeline,
@@ -15,20 +16,29 @@ use std::task::Poll;
 use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
+#[serde(default)]
 pub struct GeneratorConfig {
-    #[serde(alias = "batch_interval", default = "default_interval")]
+    #[serde(alias = "batch_interval")]
+    #[derivative(Default(value = "default_interval()"))]
     interval: f64,
-    #[serde(default = "usize::max_value")]
+    #[derivative(Default(value = "default_count()"))]
     count: usize,
     #[serde(flatten)]
     format: OutputFormat,
-    #[serde(flatten, default)]
-    decoding: DecodingConfig,
+    #[derivative(Default(value = "default_framing_message_based()"))]
+    framing: Box<dyn FramingConfig>,
+    #[derivative(Default(value = "default_decoding()"))]
+    decoding: Box<dyn ParserConfig>,
 }
 
 const fn default_interval() -> f64 {
     1.0
+}
+
+const fn default_count() -> usize {
+    isize::MAX as usize
 }
 
 #[derive(Debug, PartialEq, Snafu)]
@@ -109,7 +119,8 @@ impl GeneratorConfig {
                 lines,
                 sequence: false,
             },
-            decoding: Default::default(),
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
         }
     }
 }
@@ -178,11 +189,12 @@ impl_generate_config_from_default!(GeneratorConfig);
 impl SourceConfig for GeneratorConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         self.format.validate()?;
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
         Ok(Box::pin(generator_source(
             self.interval,
             self.count,
             self.format.clone(),
-            self.decoding.build()?,
+            decoder,
             cx.shutdown,
             cx.out,
         )))
@@ -212,11 +224,14 @@ mod tests {
     async fn runit(config: &str) -> mpsc::Receiver<Event> {
         let (tx, rx) = Pipeline::new_test();
         let config: GeneratorConfig = toml::from_str(config).unwrap();
+        let decoder = DecodingConfig::new(default_framing_message_based(), default_decoding())
+            .build()
+            .unwrap();
         generator_source(
             config.interval,
             config.count,
             config.format,
-            config.decoding.build().unwrap(),
+            decoder,
             ShutdownSignal::noop(),
             tx,
         )

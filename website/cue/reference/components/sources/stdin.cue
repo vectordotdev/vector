@@ -14,7 +14,10 @@ components: sources: stdin: {
 
 	features: {
 		multiline: enabled: false
-		codecs: enabled:    true
+		codecs: {
+			enabled:         true
+			default_framing: "newline_delimited"
+		}
 		receive: {
 			from: {
 				service: services.stdin

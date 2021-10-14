@@ -16,7 +16,10 @@ components: sources: socket: {
 
 	features: {
 		multiline: enabled: false
-		codecs: enabled:    true
+		codecs: {
+			enabled:         true
+			default_framing: "`newline_delimited` for TCP and Unix stream, `bytes` for UDP and Unix datagram"
+		}
 		receive: {
 			from: {
 				service: services.socket_client
