@@ -58,7 +58,7 @@ pub struct NewlineDelimitedCodec(CharacterDelimitedCodec);
 
 impl NewlineDelimitedCodec {
     /// Creates a new `NewlineDelimitedCodec`.
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self(CharacterDelimitedCodec::new('\n'))
     }
 

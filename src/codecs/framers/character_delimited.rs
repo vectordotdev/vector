@@ -60,7 +60,7 @@ impl CharacterDelimitedCodec {
     /// Creates a `CharacterDelimitedCodec` with a maximum frame length limit.
     ///
     /// Any frames longer than `max_length` bytes will be discarded entirely.
-    pub fn new_with_max_length(delimiter: char, max_length: usize) -> Self {
+    pub const fn new_with_max_length(delimiter: char, max_length: usize) -> Self {
         CharacterDelimitedCodec {
             max_length,
             ..CharacterDelimitedCodec::new(delimiter)
