@@ -83,6 +83,7 @@ impl ComponentTests {
 
 /// Initialize the necessary bits needed to run a component test specification.
 pub fn init_test() {
+    super::trace_init();
     EVENTS_RECORDED.with(|er| er.borrow_mut().clear());
     // Handle multiple initializations.
     if let Err(error) = metrics::init_test() {
