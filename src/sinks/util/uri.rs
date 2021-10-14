@@ -54,6 +54,7 @@ impl UriSerde {
         })
     }
 
+    #[allow(clippy::missing_const_for_fn)] // constant functions cannot evaluate destructors
     pub fn with_auth(mut self, auth: Option<Auth>) -> Self {
         self.auth = auth;
         self
