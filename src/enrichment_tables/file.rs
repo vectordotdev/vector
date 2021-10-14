@@ -60,7 +60,7 @@ impl FileConfig {
 
         Ok(match self.schema.get(column) {
             Some(format) => {
-                let mut split = format.splitn(2, "|").map(|segment| segment.trim());
+                let mut split = format.splitn(2, '|').map(|segment| segment.trim());
 
                 match (split.next(), split.next()) {
                     (Some("date"), None) => Value::Timestamp(
@@ -80,7 +80,7 @@ impl FileConfig {
                     (Some("date"), Some(format)) => Value::Timestamp(
                         chrono::FixedOffset::east(0)
                             .from_utc_datetime(
-                                &chrono::NaiveDate::parse_from_str(value, &format)
+                                &chrono::NaiveDate::parse_from_str(value, format)
                                     .map_err(|_| {
                                         format!(
                                             "unable to parse date {} found in row {}",

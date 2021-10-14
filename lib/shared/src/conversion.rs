@@ -89,7 +89,7 @@ impl Conversion {
     ///  * `"timestamp|FORMAT"` => Timestamp using the given format
     pub fn parse(s: impl AsRef<str>, tz: TimeZone) -> Result<Self, ConversionError> {
         let s = s.as_ref();
-        let mut split = s.splitn(2, "|").map(|segment| segment.trim());
+        let mut split = s.splitn(2, '|').map(|segment| segment.trim());
         match (split.next(), split.next()) {
             (Some("asis"), None) | (Some("bytes"), None) | (Some("string"), None) => {
                 Ok(Self::Bytes)
