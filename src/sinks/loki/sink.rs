@@ -378,9 +378,11 @@ mod tests {
     use crate::sinks::loki::config::{Encoding, OutOfOrderAction};
     use crate::sinks::loki::event::GlobalTimestamps;
     use crate::sinks::util::encoding::EncodingConfig;
+    use crate::template::Template;
     use crate::test_util::random_lines;
     use futures::stream::Stream;
     use std::collections::HashMap;
+    use std::convert::TryFrom;
     use std::pin::Pin;
     use std::task::{Context, Poll};
     use vector_core::event::Event;
@@ -409,6 +411,101 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn encoder_no_labels() {
+        let encoder = EventEncoder {
+            key_partitioner: KeyPartitioner::new(None),
+            encoding: EncodingConfig::from(Encoding::Json),
+            labels: HashMap::default(),
+            remove_label_fields: false,
+            remove_timestamp: false,
+        };
+        let mut event = Event::from("hello world");
+        let log = event.as_mut_log();
+        log.insert(log_schema().timestamp_key(), chrono::Utc::now());
+        let record = encoder.encode_event(event);
+        assert!(record.event.event.contains(log_schema().timestamp_key()));
+        assert_eq!(record.labels.len(), 1);
+        assert_eq!(
+            record.labels[0],
+            ("agent".to_string(), "vector".to_string())
+        );
+    }
+
+    #[test]
+    fn encoder_with_labels() {
+        let mut labels = HashMap::default();
+        labels.insert(
+            Template::try_from("static").unwrap(),
+            Template::try_from("value").unwrap(),
+        );
+        labels.insert(
+            Template::try_from("{{ name }}").unwrap(),
+            Template::try_from("{{ value }}").unwrap(),
+        );
+        let encoder = EventEncoder {
+            key_partitioner: KeyPartitioner::new(None),
+            encoding: EncodingConfig::from(Encoding::Json),
+            labels,
+            remove_label_fields: false,
+            remove_timestamp: false,
+        };
+        let mut event = Event::from("hello world");
+        let log = event.as_mut_log();
+        log.insert(log_schema().timestamp_key(), chrono::Utc::now());
+        log.insert("name", "foo");
+        log.insert("value", "bar");
+        let record = encoder.encode_event(event);
+        assert!(record.event.event.contains(log_schema().timestamp_key()));
+        assert_eq!(record.labels.len(), 2);
+        let labels: HashMap<String, String> = record.labels.clone().into_iter().collect();
+        assert_eq!(labels["static"], "value".to_string());
+        assert_eq!(labels["foo"], "bar".to_string());
+    }
+
+    #[test]
+    fn encoder_no_ts() {
+        let encoder = EventEncoder {
+            key_partitioner: KeyPartitioner::new(None),
+            encoding: EncodingConfig::from(Encoding::Json),
+            labels: HashMap::default(),
+            remove_label_fields: false,
+            remove_timestamp: true,
+        };
+        let mut event = Event::from("hello world");
+        let log = event.as_mut_log();
+        log.insert(log_schema().timestamp_key(), chrono::Utc::now());
+        let record = encoder.encode_event(event);
+        assert!(!record.event.event.contains(log_schema().timestamp_key()));
+    }
+
+    #[test]
+    fn encoder_no_record_labels() {
+        let mut labels = HashMap::default();
+        labels.insert(
+            Template::try_from("static").unwrap(),
+            Template::try_from("value").unwrap(),
+        );
+        labels.insert(
+            Template::try_from("{{ name }}").unwrap(),
+            Template::try_from("{{ value }}").unwrap(),
+        );
+        let encoder = EventEncoder {
+            key_partitioner: KeyPartitioner::new(None),
+            encoding: EncodingConfig::from(Encoding::Json),
+            labels,
+            remove_label_fields: true,
+            remove_timestamp: false,
+        };
+        let mut event = Event::from("hello world");
+        let log = event.as_mut_log();
+        log.insert(log_schema().timestamp_key(), chrono::Utc::now());
+        log.insert("name", "foo");
+        log.insert("value", "bar");
+        let record = encoder.encode_event(event);
+        assert!(!record.event.event.contains("value"));
     }
 
     #[tokio::test]
