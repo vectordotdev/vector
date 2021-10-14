@@ -48,7 +48,7 @@ pub struct CharacterDelimitedCodec {
 
 impl CharacterDelimitedCodec {
     /// Creates a `CharacterDelimitedCodec` with the specified delimiter.
-    pub fn new(delimiter: char) -> Self {
+    pub const fn new(delimiter: char) -> Self {
         CharacterDelimitedCodec {
             delimiter,
             max_length: usize::MAX,
