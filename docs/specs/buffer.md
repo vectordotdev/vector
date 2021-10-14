@@ -20,6 +20,10 @@ This specification addresses direct buffer development and does not cover aspect
 
 Vector buffers MUST be instrumented for optimal observability and monitoring. This is required to drive various interfaces that Vector users depend on to manage Vector installations in mission critical production environments. This section extends the [Instrumentation Specification].
 
+### Terms And Definitions
+- `byte_size` - Refers to the byte size of events from a buffer's perspective. For memory buffers, `byte_size` represents the in-memory byte size of events. For disk buffers, `byte_size` represents the serialized byte size of events.
+- `buffer_type` - One of `memory`, `disk`. Buffer metrics MUST be tagged with `buffer_type` unless otherwise specified.
+
 ### Events
 
 #### `BufferCreated`
@@ -39,10 +43,10 @@ Vector buffers MUST be instrumented for optimal observability and monitoring. Th
 
 * Properties
   * `count` - the number of received events
-  * `byte_size` - the byte size of received events
+  * `byte_size` - as defined in [Terms and Definitions](#terms-and-definitions)
 * Metric
   * MUST increment the `buffer_received_events_total` counter by the defined `count`
-  * MUST increment the `buffer_received_event_bytes_total` counter by the defined `byte_size`
+  * MUST increment the `buffer_received_bytes_total` counter by the defined `byte_size`
   * MUST increment the `buffer_events` gauge by the defined `count`
   * MUST increment the `buffer_byte_size` gauge by the defined `byte_size`
 
@@ -52,10 +56,10 @@ Vector buffers MUST be instrumented for optimal observability and monitoring. Th
 
 * Properties
   * `count` - the number of sent events
-  * `byte_size` - the byte size of sent events
+  * `byte_size` - as defined in [Terms and Definitions](#terms-and-definitions)
 * Metric
   * MUST increment the `buffer_sent_events_total` counter by the defined `count`
-  * MUST increment the `buffer_sent_event_bytes_total` counter by the defined `byte_size`
+  * MUST increment the `buffer_sent_bytes_total` counter by the defined `byte_size`
   * MUST decrement the `buffer_events` gauge by the defined `count`
   * MUST decrement the `buffer_byte_size` gauge by the defined `byte_size`
 

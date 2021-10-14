@@ -284,6 +284,7 @@ impl<B: Batch> Batch for FinalizersBatch<B> {
         match self.inner.push(item) {
             PushResult::Ok(full) => {
                 self.finalizers.merge(finalizers);
+                self.count += 1;
                 self.byte_size += byte_size;
                 PushResult::Ok(full)
             }

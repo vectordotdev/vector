@@ -176,7 +176,7 @@ mod tests {
             encoding::EncodingConfiguration, service::RATE_LIMIT_NUM_DEFAULT,
             test::build_test_server, Concurrency,
         },
-        test_util::next_addr,
+        test_util::{components, components::HTTP_SINK_TAGS, next_addr},
     };
     use bytes::Buf;
     use futures::{stream, StreamExt};
@@ -335,14 +335,12 @@ mod tests {
 
         let (sink, _healthcheck) = http_config.build(SinkContext::new_test()).await.unwrap();
         let (rx, trigger, server) = build_test_server(in_addr);
+        tokio::spawn(server);
 
         let input_lines = (0..100).map(|i| format!("msg {}", i)).collect::<Vec<_>>();
         let events = stream::iter(input_lines.clone()).map(Event::from);
-        let pump = sink.run(events);
 
-        tokio::spawn(server);
-
-        pump.await.unwrap();
+        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
         drop(trigger);
 
         let output_lines = rx
