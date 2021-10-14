@@ -18,8 +18,7 @@ use std::path::PathBuf;
 #[serde(deny_unknown_fields)]
 pub struct UnixConfig {
     pub path: PathBuf,
-    #[serde(default = "crate::serde::default_max_length")]
-    pub max_length: usize,
+    pub max_length: Option<usize>,
     pub host_key: Option<String>,
     #[serde(default)]
     pub framing: Option<Box<dyn FramingConfig>>,
@@ -31,7 +30,7 @@ impl UnixConfig {
     pub fn new(path: PathBuf) -> Self {
         Self {
             path,
-            max_length: crate::serde::default_max_length(),
+            max_length: Some(crate::serde::default_max_length()),
             host_key: None,
             framing: None,
             decoding: default_decoding(),

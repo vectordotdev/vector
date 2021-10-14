@@ -4,9 +4,9 @@ mod udp;
 mod unix;
 
 #[cfg(unix)]
-use crate::serde::{default_framing_message_based, default_framing_stream_based};
+use crate::serde::default_framing_message_based;
 use crate::{
-    codecs::DecodingConfig,
+    codecs::{DecodingConfig, NewlineDelimitedDecoderConfig},
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
@@ -83,9 +83,23 @@ impl SourceConfig for SocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self.mode.clone() {
             Mode::Tcp(config) => {
-                let decoder =
-                    DecodingConfig::new(config.framing().clone(), config.decoding().clone())
-                        .build()?;
+                if config.framing().is_some() && config.max_length().is_some() {
+                    return Err("Using `max_length` is deprecated and does not have any effect when framing is provided. Configure `max_length` on the framing config instead.".into());
+                }
+
+                let max_length = config
+                    .max_length()
+                    .unwrap_or_else(crate::serde::default_max_length);
+
+                let framing = match config.framing().as_ref() {
+                    Some(framing) => framing.clone(),
+                    None => Box::new(NewlineDelimitedDecoderConfig::new_with_max_length(
+                        max_length,
+                    )),
+                };
+
+                let decoder = DecodingConfig::new(framing, config.decoding().clone()).build()?;
+
                 let tcp = tcp::RawTcpSource::new(config.clone(), decoder);
                 let tls = MaybeTlsSettings::from_config(config.tls(), true)?;
                 tcp.run(
@@ -108,6 +122,7 @@ impl SourceConfig for SocketConfig {
                         .build()?;
                 Ok(udp::udp(
                     config.address(),
+                    config.max_length(),
                     host_key,
                     config.receive_buffer_bytes(),
                     decoder,
@@ -127,7 +142,9 @@ impl SourceConfig for SocketConfig {
                 .build()?;
                 Ok(unix::unix_datagram(
                     config.path,
-                    config.max_length,
+                    config
+                        .max_length
+                        .unwrap_or_else(crate::serde::default_max_length),
                     host_key,
                     decoder,
                     cx.shutdown,
@@ -136,14 +153,26 @@ impl SourceConfig for SocketConfig {
             }
             #[cfg(unix)]
             Mode::UnixStream(config) => {
+                if config.framing.is_some() && config.max_length.is_some() {
+                    return Err("Using `max_length` is deprecated and does not have any effect when framing is provided. Configure `max_length` on the framing config instead.".into());
+                }
+
+                let max_length = config
+                    .max_length
+                    .unwrap_or_else(crate::serde::default_max_length);
+
+                let framing = match config.framing.as_ref() {
+                    Some(framing) => framing.clone(),
+                    None => Box::new(NewlineDelimitedDecoderConfig::new_with_max_length(
+                        max_length,
+                    )),
+                };
+
+                let decoder = DecodingConfig::new(framing, config.decoding.clone()).build()?;
+
                 let host_key = config
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
-                let decoder = DecodingConfig::new(
-                    config.framing.unwrap_or_else(default_framing_stream_based),
-                    config.decoding.clone(),
-                )
-                .build()?;
                 Ok(unix::unix_stream(
                     config.path,
                     host_key,
