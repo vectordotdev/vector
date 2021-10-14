@@ -13,7 +13,7 @@ indexmap = "~1.6.2"
 nom = "7.0.0"
 num_enum = "0.5.4"
 prost = "0.8"
-prost-types = "0.8"
+prost-types = "0.9"
 shared = { path = "../shared", features = ["btreemap"] }
 snafu = { version = "0.6" }
 
