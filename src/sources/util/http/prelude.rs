@@ -101,7 +101,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                             .map(|events| {
                                 emit!(&HttpEventsReceived {
                                     count: events.len(),
-                                    byte_size: events.iter().map(|event| event.size_of()).sum(),
+                                    byte_size: events.size_of(),
                                     http_path,
                                     protocol,
                                 });
