@@ -215,7 +215,7 @@ mod test {
     //////// TCP TESTS ////////
     #[tokio::test]
     async fn tcp_it_includes_host() {
-        components::init();
+        components::init_test();
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
@@ -238,7 +238,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_it_includes_source_type() {
-        components::init();
+        components::init_test();
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
@@ -264,7 +264,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_continue_after_long_line() {
-        components::init();
+        components::init_test();
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
@@ -305,7 +305,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_with_tls() {
-        components::init();
+        components::init_test();
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
@@ -342,7 +342,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_with_tls_intermediate_ca() {
-        components::init();
+        components::init_test();
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
@@ -391,7 +391,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_shutdown_simple() {
-        components::init();
+        components::init_test();
         let source_id = ComponentKey::from("tcp_shutdown_simple");
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
@@ -427,7 +427,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_shutdown_infinite_stream() {
-        components::init();
+        components::init_test();
         // It's important that the buffer be large enough that the TCP source doesn't have
         // to block trying to forward its input into the Sender because the channel is full,
         // otherwise even sending the signal to shut down won't wake it up.
