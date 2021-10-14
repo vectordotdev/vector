@@ -19,6 +19,7 @@ use snafu::Snafu;
 use std::task::{Context, Poll};
 use tonic::{body::BoxBody, IntoRequest};
 use tower::ServiceBuilder;
+use vector_core::ByteSizeOf;
 
 type Client = proto::Client<HyperSvc>;
 
@@ -234,10 +235,15 @@ impl tower::Service<Vec<EventWrapper>> for Client {
 }
 
 fn encode_event(mut event: Event) -> EncodedEvent<EventWrapper> {
+    let byte_size = event.size_of();
     let finalizers = event.metadata_mut().take_finalizers();
     let item = event.into();
 
-    EncodedEvent { item, finalizers }
+    EncodedEvent {
+        item,
+        finalizers,
+        byte_size,
+    }
 }
 
 impl EncodedLength for EventWrapper {

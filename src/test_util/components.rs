@@ -5,8 +5,10 @@
 //! internal events and metrics, and testing that they fit the required
 //! patterns.
 
-use crate::event::{Metric, MetricValue};
+use crate::event::{Event, Metric, MetricValue};
 use crate::metrics::{self, Controller};
+use crate::sinks::VectorSink;
+use futures::{stream, SinkExt, Stream};
 use lazy_static::lazy_static;
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -16,6 +18,15 @@ thread_local!(
     /// A buffer for recording internal events emitted by a single test.
     static EVENTS_RECORDED: RefCell<HashSet<String>> = RefCell::new(Default::default());
 );
+
+/// The standard set of tags for sources that communicate over HTTP.
+pub const HTTP_SOURCE_TAGS: [&str; 2] = ["endpoint", "protocol"];
+
+/// The standard set of tags for all `TcpSource`-based sources.
+pub const TCP_SOURCE_TAGS: [&str; 2] = ["peer_addr", "protocol"];
+
+/// The standard set of tags for all `HttpSink`-based sinks.
+pub const HTTP_SINK_TAGS: [&str; 2] = ["endpoint", "protocol"];
 
 /// This struct is used to describe a set of component tests.
 pub struct ComponentTests {
@@ -33,8 +44,19 @@ lazy_static! {
         events: &["BytesReceived", "EventsReceived", "EventsSent"],
         tagged_counters: &[
             "component_received_bytes_total",
+        ],
+        untagged_counters: &[
             "component_received_events_total",
             "component_received_event_bytes_total",
+            "component_sent_events_total",
+            "component_sent_event_bytes_total",
+        ],
+    };
+    /// The component test specification for all sinks
+    pub static ref SINK_TESTS: ComponentTests = ComponentTests {
+        events: &["EventsSent", "BytesSent"], // EventsReceived is emitted in the topology
+        tagged_counters: &[
+            "component_sent_bytes_total",
         ],
         untagged_counters: &[
             "component_sent_events_total",
@@ -144,4 +166,42 @@ impl ComponentTester {
             }
         }
     }
+}
+
+/// Convenience wrapper for running sink tests
+pub async fn run_sink<S>(sink: VectorSink, events: S, tags: &[&str])
+where
+    S: Stream<Item = Event> + Send,
+{
+    init();
+    sink.run(events).await.expect("Running sink failed");
+    SINK_TESTS.assert(tags);
+}
+
+/// Convenience wrapper for running a sink with a single event
+pub async fn run_sink_event(sink: VectorSink, event: Event, tags: &[&str]) {
+    init();
+    run_sink(sink, stream::once(std::future::ready(event)), tags).await
+}
+
+/// Convenience wrapper for running sinks with `send_all`
+pub async fn sink_send_all<I>(sink: VectorSink, events: I, tags: &[&str])
+where
+    I: IntoIterator<Item = Event>,
+    I::IntoIter: Send,
+{
+    sink_send_stream(sink, stream::iter(events.into_iter().map(Ok)), tags).await
+}
+
+/// Convenience wrapper for running sinks with a stream of events
+pub async fn sink_send_stream<S>(sink: VectorSink, mut events: S, tags: &[&str])
+where
+    S: Stream<Item = Result<Event, ()>> + Send + Unpin,
+{
+    init();
+    sink.into_sink()
+        .send_all(&mut events)
+        .await
+        .expect("Sending event stream to sink failed");
+    SINK_TESTS.assert(tags);
 }

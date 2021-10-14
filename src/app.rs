@@ -5,7 +5,6 @@ use crate::{
     topology::{self, RunningTopology},
     trace, unit_test, validate,
 };
-use cfg_if::cfg_if;
 use futures::StreamExt;
 use std::{collections::HashMap, path::PathBuf};
 use tokio::{
@@ -98,20 +97,19 @@ impl Application {
 
         metrics::init_global().expect("metrics initialization failed");
 
+        let mut rt_builder = runtime::Builder::new_multi_thread();
+        rt_builder.enable_all().thread_name("vector-worker");
+
         if let Some(threads) = root_opts.threads {
             if threads < 1 {
                 error!("The `threads` argument must be greater or equal to 1.");
                 return Err(exitcode::CONFIG);
+            } else {
+                rt_builder.worker_threads(threads);
             }
         }
 
-        let rt = {
-            runtime::Builder::new_multi_thread()
-                .enable_all()
-                .thread_name("vector-worker")
-                .build()
-                .expect("Unable to create async runtime")
-        };
+        let rt = rt_builder.build().expect("Unable to create async runtime");
 
         let config = {
             let config_paths = root_opts.config_paths_with_formats();
@@ -234,22 +232,19 @@ impl Application {
             tokio::spawn(heartbeat::heartbeat());
 
             // Configure the API server, if applicable.
-            cfg_if! (
-                if #[cfg(feature = "api")] {
-                    // Assigned to prevent the API terminating when falling out of scope.
-                    let api_server = if api_config.enabled {
-                        emit!(&ApiStarted {
-                            addr: api_config.address.unwrap(),
-                            playground: api_config.playground
-                        });
+            #[cfg(feature = "api")]
+            // Assigned to prevent the API terminating when falling out of scope.
+            let api_server = if api_config.enabled {
+                emit!(&ApiStarted {
+                    addr: api_config.address.unwrap(),
+                    playground: api_config.playground
+                });
 
-                        Some(api::Server::start(topology.config(), topology.watch()))
-                    } else {
-                        info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
-                        None
-                    };
-                }
-            );
+                Some(api::Server::start(topology.config(), topology.watch()))
+            } else {
+                info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
+                None
+            };
 
             let mut sources_finished = topology.sources_finished();
 

@@ -146,8 +146,10 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of cgroup name patterns for which to gather metrics.
+
 								Defaults to including all cgroups.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: ["*"]
@@ -162,8 +164,10 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of cgroup name patterns for which to gather metrics.
+
 								Defaults to excluding no cgroups.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: []
@@ -202,8 +206,10 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of device name patterns for which to gather I/O utilization metrics.
+
 								Defaults to including all devices.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: ["*"]
@@ -218,8 +224,10 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of device name patterns for which to gather I/O utilization metrics.
+
 								Defaults to excluding no devices.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: []
@@ -248,8 +256,10 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of device name patterns for which to gather usage metrics.
+
 								Defaults to including all devices.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: ["*"]
@@ -264,8 +274,10 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of device name patterns for which to gather usage metrics.
+
 								Defaults to excluding no devices.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: []
@@ -287,8 +299,10 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of filesystem name patterns for which to gather usage metrics.
+
 								Defaults to including all filesystems.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: ["*"]
@@ -303,8 +317,10 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of filesystem name patterns for which to gather usage metrics.
+
 								Defaults to excluding no filesystems.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: []
@@ -326,8 +342,10 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of mount point path patterns for which to gather usage metrics.
+
 								Defaults to including all mount points.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: ["*"]
@@ -342,8 +360,10 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of mount point path patterns for which to gather usage metrics.
+
 								Defaults to excluding no mount points.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: []
@@ -372,8 +392,10 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of device name patterns for which to gather network utilization metrics.
+
 								Defaults to including all devices.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: ["*"]
@@ -388,8 +410,10 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of device name patterns for which to gather network utilization metrics.
+
 								Defaults to excluding no devices.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: []

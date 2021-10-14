@@ -14,7 +14,7 @@ use crate::{
     transforms::Transform,
     Pipeline,
 };
-use futures::{future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use std::pin::Pin;
 use std::{
@@ -23,7 +23,10 @@ use std::{
     sync::{Arc, Mutex},
 };
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
-use tokio::time::{timeout, Duration};
+use tokio::{
+    select,
+    time::{timeout, Duration},
+};
 use vector_core::ByteSizeOf;
 
 lazy_static! {
@@ -155,12 +158,21 @@ pub async fn build_pieces(
         // force_shutdown_tripwire. That means that if the force_shutdown_tripwire resolves while
         // the server Task is still running the Task will simply be dropped on the floor.
         let server = async {
-            match future::try_select(server, force_shutdown_tripwire.unit_error().boxed()).await {
-                Ok(_) => {
+            let result = select! {
+                biased;
+
+                _ = force_shutdown_tripwire => {
+                    Ok(())
+                },
+                result = server => result,
+            };
+
+            match result {
+                Ok(()) => {
                     debug!("Finished.");
                     Ok(TaskOutput::Source)
                 }
-                Err(_) => Err(()),
+                Err(()) => Err(()),
             }
         };
         let server = Task::new(key.clone(), typetag, server);
@@ -196,12 +208,15 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx, _) =
-            vector_core::buffers::build(vector_core::buffers::Variant::Memory {
+        let (input_tx, input_rx, _) = vector_core::buffers::build(
+            vector_core::buffers::Variant::Memory {
                 max_events: 100,
                 when_full: vector_core::buffers::WhenFull::Block,
-            })
-            .unwrap();
+                instrument: false,
+            },
+            tracing::Span::none(),
+        )
+        .unwrap();
         let mut input_rx = crate::utilization::wrap(Pin::new(input_rx));
 
         let task = match transform {
@@ -346,7 +361,21 @@ pub async fn build_pieces(
         let (tx, rx, acker) = if let Some(buffer) = buffers.remove(key) {
             buffer
         } else {
-            let buffer = sink.buffer.build(&config.global.data_dir, key);
+            let buffer_type = match sink.buffer {
+                buffers::BufferConfig::Memory { .. } => "memory",
+                #[cfg(feature = "disk-buffer")]
+                buffers::BufferConfig::Disk { .. } => "disk",
+            };
+            let buffer_span = error_span!(
+                "sink",
+                component_kind = "sink",
+                component_id = %key.id(),
+                component_scope = %key.scope(),
+                component_type = typetag,
+                component_name = %key.id(),
+                buffer_type = buffer_type,
+            );
+            let buffer = sink.buffer.build(&config.global.data_dir, key, buffer_span);
             match buffer {
                 Err(error) => {
                     errors.push(format!("Sink \"{}\": {}", key, error));
@@ -386,7 +415,7 @@ pub async fn build_pieces(
                 .take()
                 .expect("Task started but input has been taken.");
 
-            let mut rx = Box::pin(crate::utilization::wrap(rx));
+            let mut rx = crate::utilization::wrap(rx);
 
             sink.run(
                 rx.by_ref()

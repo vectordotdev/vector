@@ -49,7 +49,8 @@ _values: {
 // API and reliability are not settled.
 // * `stable` - The component is production ready.
 // * `deprecated` - The component will be removed in a future version.
-#DevelopmentStatus: "beta" | "stable" | "deprecated"
+// * `removed` - The component has been removed.
+#DevelopmentStatus: "beta" | "stable" | "deprecated" | "removed"
 
 #EncodingCodec: "json" | "logfmt" | "ndjson" | "text"
 
