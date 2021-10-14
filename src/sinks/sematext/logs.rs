@@ -2,16 +2,14 @@ use super::Region;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    sinks::elasticsearch::{ElasticSearchConfig, Encoding},
+    sinks::elasticsearch::{ElasticSearchConfig},
     sinks::util::{
-        encoding::EncodingConfigWithDefault, http::RequestConfig, BatchConfig, Compression,
+        http::RequestConfig, BatchConfig, Compression,
         TowerRequestConfig,
     },
     sinks::{Healthcheck, VectorSink},
 };
 use futures::{
-    future::{self, BoxFuture},
-    FutureExt, SinkExt,
     StreamExt,
 };
 use indoc::indoc;

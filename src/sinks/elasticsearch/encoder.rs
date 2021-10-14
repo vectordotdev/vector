@@ -2,8 +2,8 @@ use crate::sinks::util::encoding::{Encoder, as_tracked_write, EncodingConfigurat
 use crate::event::{LogEvent, Finalizable, EventFinalizers};
 use std::io::Write;
 
-use crate::sinks::elasticsearch::{ElasticSearchCommonMode, BulkAction};
-use serde_json::json;
+use crate::sinks::elasticsearch::{BulkAction};
+
 
 use crate::internal_events::ElasticSearchEventEncoded;
 
@@ -57,7 +57,7 @@ impl Encoder<Vec<ProcessedEvent>> for ElasticSearchEncoder {
 }
 
 fn write_bulk_action(writer: &mut dyn Write, bulk_action: &str, index: &str, doc_type: &str, id: &Option<String>) -> std::io::Result<usize> {
-    as_tracked_write(writer, (bulk_action, index, doc_type, id), |mut writer, (bulk_action, index, doc_type, id)| {
+    as_tracked_write(writer, (bulk_action, index, doc_type, id), |writer, (bulk_action, index, doc_type, id)| {
         if let Some(id) = id {
             write!(writer, r#"{{"{}":{{"_index":"{}","_type":"{}","_id":"{}"}}}}"#, bulk_action, index, doc_type, id)
         }else {

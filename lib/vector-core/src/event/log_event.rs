@@ -18,8 +18,7 @@ use std::{
     fmt::{Debug, Display},
     iter::FromIterator,
 };
-use std::convert::Infallible;
-use crate::event::{Event, MaybeAsLogMut};
+use crate::event::MaybeAsLogMut;
 
 #[derive(Clone, Debug, Getters, MutGetters, PartialEq, PartialOrd, Derivative, Deserialize)]
 pub struct LogEvent {

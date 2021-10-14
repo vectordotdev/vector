@@ -81,7 +81,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, io, sync::Arc};
 use crate::event::{LogEvent, MaybeAsLogMut};
-use std::convert::TryInto;
+
 
 
 pub trait Encoder<T> {
@@ -189,7 +189,7 @@ pub trait EncodingConfiguration {
     /// Apply the EncodingConfig rules to the provided event.
     ///
     /// Currently, this is idempotent.
-    fn apply_rules<T>(&self, mut event: &mut T)
+    fn apply_rules<T>(&self, event: &mut T)
     where T: MaybeAsLogMut {
         // No rules are currently applied to metrics
         if let Some(log) = event.maybe_as_log_mut() {

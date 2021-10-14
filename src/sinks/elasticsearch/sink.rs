@@ -4,24 +4,19 @@ use crate::event::{Event, LogEvent};
 use vector_core::partition::{NullPartitioner};
 use std::num::NonZeroUsize;
 
-use futures::{StreamExt, TryFutureExt};
+use futures::StreamExt;
 use crate::sinks::elasticsearch::request_builder::ElasticsearchRequestBuilder;
 use crate::buffers::Acker;
-use crate::sinks::elasticsearch::service::{ElasticSearchService, ElasticSearchResponse, ElasticSearchRequest};
-use crate::sinks::elasticsearch::{BulkAction, Encoding, ElasticSearchCommonMode};
+use crate::sinks::elasticsearch::service::{ElasticSearchResponse, ElasticSearchRequest};
+use crate::sinks::elasticsearch::{BulkAction, ElasticSearchCommonMode};
 use crate::transforms::metric_to_log::MetricToLog;
 use vector_core::stream::BatcherSettings;
 use async_trait::async_trait;
-use crate::sinks::util::encoding::{EncodingConfigWithDefault, EncodingConfigFixed};
-use rusoto_credential::{ProvideAwsCredentials, AwsCredentials};
 use futures::future;
-use crate::sinks::elasticsearch::encoder::{ProcessedEvent, ElasticSearchEncoder};
+use crate::sinks::elasticsearch::encoder::{ProcessedEvent};
 use vector_core::ByteSizeOf;
 use crate::event::Value;
-use crate::{rusoto, Error};
-
-use std::sync::Arc;
-use crate::rusoto::AwsCredentialsProvider;
+use crate::{Error};
 use tower::util::BoxService;
 
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -90,16 +85,6 @@ impl ElasticSearchSink {
 
         sink.run().await
     }
-}
-
-async fn get_aws_credentials(provider: &AwsCredentialsProvider) -> Option<AwsCredentials> {
-    Some(match provider.credentials().await {
-        Ok(creds) => creds,
-        Err(err) => {
-            error!(message = "Failed to obtain AWS credentials", error=?err);
-            return None;
-        }
-    })
 }
 
 pub fn process_log(

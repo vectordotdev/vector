@@ -3,15 +3,14 @@ use crate::buffers::Ackable;
 use crate::event::{EventFinalizers, Finalizable, EventStatus};
 use hyper::service::Service;
 use std::task::{Context, Poll};
-use crate::http::{HttpClient, HttpError, Auth};
+use crate::http::{HttpClient, Auth};
 use futures::future::BoxFuture;
 use hyper::{Body, Request};
-use futures::FutureExt;
-use http::{Response, StatusCode, Uri};
+use http::{Response, Uri};
 use bytes::Bytes;
 use crate::sinks::util::http::{HttpBatchService, RequestConfig};
 use tower::ServiceExt;
-use crate::sinks::util::retries::RetryAction;
+
 use std::collections::HashMap;
 use rusoto_core::Region;
 use rusoto_core::signature::{SignedRequestPayload, SignedRequest};

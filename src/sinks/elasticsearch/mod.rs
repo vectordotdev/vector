@@ -19,13 +19,12 @@ pub use encoder::ElasticSearchEncoder;
 
 
 use crate::{
-    config::{SinkConfig, SinkDescription},
+    config::{SinkDescription},
     emit,
     internal_events::{TemplateRenderingFailed},
     rusoto::{self, AwsAuthentication},
     template::{Template, TemplateParseError},
 };
-use futures::{FutureExt};
 use http::{
     header::{HeaderName, HeaderValue},
     uri::InvalidUri,
@@ -37,7 +36,7 @@ use http::{
 use rusoto_credential::{CredentialsError, ProvideAwsCredentials};
 use rusoto_signature::{SignedRequest};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+
 use snafu::{ResultExt, Snafu};
 
 use std::convert::TryFrom;

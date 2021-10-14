@@ -1,11 +1,11 @@
 use crate::sinks::util::{Compression, BatchConfig, BatchSettings, Buffer, ServiceBuilderExt, TowerRequestConfig};
 use crate::sinks::elasticsearch::{ElasticSearchCommon, ElasticSearchMode, ElasticSearchAuth, ElasticSearchCommonMode};
-use crate::sinks::util::encoding::{EncodingConfigWithDefault, EncodingConfigFixed};
+use crate::sinks::util::encoding::{EncodingConfigFixed};
 use crate::config::{SinkConfig, SinkContext, DataType};
 use crate::sinks::{Healthcheck, VectorSink};
 use crate::template::Template;
 use crate::event::{LogEvent, Value, EventRef};
-use crate::sinks::util::http::{RequestConfig, HttpRetryLogic};
+use crate::sinks::util::http::{RequestConfig};
 use indexmap::map::IndexMap;
 use crate::rusoto::RegionOrEndpoint;
 use crate::tls::TlsOptions;
@@ -22,7 +22,7 @@ use crate::sinks::elasticsearch::sink::ElasticSearchSink;
 use futures::FutureExt;
 use crate::sinks::elasticsearch::request_builder::ElasticsearchRequestBuilder;
 use vector_core::stream::BatcherSettings;
-use std::time::Duration;
+
 use std::num::NonZeroUsize;
 use crate::sinks::elasticsearch::service::{ElasticSearchService, HttpRequestBuilder};
 use crate::sinks::elasticsearch::encoder::ElasticSearchEncoder;

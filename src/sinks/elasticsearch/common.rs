@@ -1,9 +1,9 @@
 use crate::transforms::metric_to_log::MetricToLog;
 use crate::http::{HttpClient, Auth, MaybeAuth};
-use crate::sinks::elasticsearch::{finish_signer, ElasticSearchAuth, ElasticSearchConfig, ParseError, ElasticSearchCommonMode, Encoding};
-use rusoto_core::signature::SignedRequestPayload;
-use crate::sinks::util::http::{HttpSink, RequestConfig};
-use crate::event::Event;
+use crate::sinks::elasticsearch::{finish_signer, ElasticSearchAuth, ElasticSearchConfig, ParseError, ElasticSearchCommonMode};
+
+use crate::sinks::util::http::{RequestConfig};
+
 use http::{StatusCode, Uri};
 use hyper::Body;
 use rusoto_signature::SignedRequest;
@@ -14,7 +14,7 @@ use std::convert::TryFrom;
 use snafu::ResultExt;
 
 use crate::rusoto;
-use crate::sinks::util::encoding::{EncodingConfigWithDefault, EncodingConfigFixed};
+use crate::sinks::util::encoding::{EncodingConfigFixed};
 use std::collections::HashMap;
 use rusoto_core::Region;
 use super::{Request, InvalidHost};

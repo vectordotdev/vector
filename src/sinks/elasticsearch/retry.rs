@@ -2,14 +2,13 @@ use crate::{
     http::HttpError,
     sinks::util::{
         retries::{RetryAction, RetryLogic},
-        sink::{ServiceLogic},
     },
 };
-use http::Response;
-use bytes::Bytes;
+
+
 use http::StatusCode;
 use serde::Deserialize;
-use vector_core::event::EventStatus;
+
 use crate::sinks::elasticsearch::service::ElasticSearchResponse;
 
 #[derive(Deserialize, Debug)]
@@ -106,6 +105,7 @@ fn get_error_reason(body: &str) -> String {
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
+    use bytes::Bytes;
 
     #[test]
     fn handles_error_response() {

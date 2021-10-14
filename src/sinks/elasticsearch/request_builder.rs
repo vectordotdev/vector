@@ -1,20 +1,20 @@
 use crate::sinks::util::{RequestBuilder, Compression};
 
 
-use rusoto_core::signature::{SignedRequest, SignedRequestPayload};
-use rusoto_core::credential::AwsCredentials;
-use headers::{HeaderName, HeaderValue};
-use http::Uri;
+
+
+
+
 use crate::sinks::elasticsearch::encoder::{ElasticSearchEncoder, ProcessedEvent};
-use vector_core::ByteSizeOf;
+
 use crate::sinks::elasticsearch::service::ElasticSearchRequest;
 
-use crate::sinks::util::http::RequestConfig;
-use crate::http::Auth;
-use http::Request;
-use std::collections::HashMap;
-use rusoto_core::Region;
-use crate::sinks::util::encoding::{Encoder, EncodingConfigFixed};
+
+
+
+
+
+use crate::sinks::util::encoding::{EncodingConfigFixed};
 use crate::event::{EventFinalizers, Finalizable};
 
 pub struct ElasticsearchRequestBuilder {
