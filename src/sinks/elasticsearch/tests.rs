@@ -1,7 +1,7 @@
 use crate::sinks::elasticsearch::{ElasticSearchConfig, ElasticSearchCommon, ElasticSearchMode, DataStreamConfig, ElasticSearchAuth};
 use crate::event::{LogEvent, Event, Value, Metric, MetricKind, MetricValue};
 use crate::sinks::elasticsearch::encoder::{ElasticSearchEncoder, ProcessedEvent};
-use crate::sinks::util::encoding::{Encoder, EncodingConfigWithDefault};
+use crate::sinks::util::encoding::{Encoder, EncodingConfigWithDefault, EncodingConfigFixed};
 use crate::sinks::elasticsearch::sink::process_log;
 use std::collections::BTreeMap;
 use crate::template::Template;
@@ -34,13 +34,9 @@ fn sets_create_action_when_configured() {
     );
     log.insert("action", "crea");
 
-    let encoder = ElasticSearchEncoder {
-        mode: es.mode.clone(),
-        doc_type: es.doc_type,
-    };
     let mut encoded = vec![];
-    let encoded_size = encoder.encode_input(vec![
-        process_log(log, &es.mode, &None).unwrap()
+    let encoded_size = es.encoding.encode_input(vec![
+        process_log(log, &es.mode, &None, es.doc_type).unwrap()
     ], &mut encoded).unwrap();
 
     let expected = r#"{"create":{"_index":"vector","_type":"_doc"}}
@@ -77,13 +73,9 @@ fn encode_datastream_mode() {
     );
     log.insert("data_stream", data_stream_body());
 
-    let encoder = ElasticSearchEncoder {
-        mode: es.mode.clone(),
-        doc_type: es.doc_type,
-    };
     let mut encoded = vec![];
-    let encoded_size = encoder.encode_input(vec![
-        process_log(log, &es.mode, &None).unwrap()
+    let encoded_size = es.encoding.encode_input(vec![
+        process_log(log, &es.mode, &None, es.doc_type).unwrap()
     ], &mut encoded).unwrap();
 
     let expected = r#"{"create":{"_index":"synthetics-testing-default","_type":"_doc"}}
@@ -117,13 +109,9 @@ fn encode_datastream_mode_no_routing() {
         log_schema().timestamp_key(),
         Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
     );
-    let encoder = ElasticSearchEncoder {
-        mode: es.mode.clone(),
-        doc_type: es.doc_type,
-    };
     let mut encoded = vec![];
-    let encoded_size = encoder.encode_input(vec![
-        process_log(log, &es.mode, &None).unwrap()
+    let encoded_size = es.encoding.encode_input(vec![
+        process_log(log, &es.mode, &None, es.doc_type).unwrap()
     ], &mut encoded).unwrap();
 
     let expected = r#"{"create":{"_index":"logs-generic-something","_type":"_doc"}}
@@ -150,13 +138,9 @@ fn handle_metrics() {
     );
     let log = es.metric_to_log.transform_one(metric).unwrap();
 
-    let encoder = ElasticSearchEncoder {
-        mode: es.mode.clone(),
-        doc_type: es.doc_type,
-    };
     let mut encoded = vec![];
-    let encoded_size = encoder.encode_input(vec![
-        process_log(log, &es.mode, &None).unwrap()
+    let encoded_size = es.encoding.encode_input(vec![
+        process_log(log, &es.mode, &None, es.doc_type).unwrap()
     ], &mut encoded).unwrap();
 
     let encoded = std::str::from_utf8(&encoded).unwrap();
@@ -230,13 +214,9 @@ fn encode_datastream_mode_no_sync() {
         Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
     );
 
-    let encoder = ElasticSearchEncoder {
-        mode: es.mode.clone(),
-        doc_type: es.doc_type,
-    };
     let mut encoded = vec![];
-    let encoded_size = encoder.encode_input(vec![
-        process_log(log, &es.mode, &None).unwrap()
+    let encoded_size = es.encoding.encode_input(vec![
+        process_log(log, &es.mode, &None, es.doc_type).unwrap()
     ], &mut encoded).unwrap();
 
     let expected = r#"{"create":{"_index":"synthetics-testing-something","_type":"_doc"}}
@@ -264,7 +244,7 @@ fn handles_error_response() {
 fn allows_using_excepted_fields() {
     let config = ElasticSearchConfig {
         index: Some(String::from("{{ idx }}")),
-        encoding: EncodingConfigWithDefault {
+        encoding: EncodingConfigFixed {
             except_fields: Some(vec!["idx".to_string(), "timestamp".to_string()]),
             ..Default::default()
         },
@@ -277,13 +257,9 @@ fn allows_using_excepted_fields() {
     log.insert("foo", "bar");
     log.insert("idx", "purple");
 
-    let encoder = ElasticSearchEncoder {
-        mode: es.mode.clone(),
-        doc_type: es.doc_type,
-    };
     let mut encoded = vec![];
-    let encoded_size = encoder.encode_input(vec![
-        process_log(log, &es.mode, &None).unwrap()
+    let encoded_size = es.encoding.encode_input(vec![
+        process_log(log, &es.mode, &None, es.doc_type).unwrap()
     ], &mut encoded).unwrap();
 
     let expected = r#"{"index":{"_index":"purple","_type":"_doc"}}

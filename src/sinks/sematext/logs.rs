@@ -12,11 +12,15 @@ use crate::{
 use futures::{
     future::{self, BoxFuture},
     FutureExt, SinkExt,
+    StreamExt,
 };
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use crate::sinks::util::encoding::EncodingConfigFixed;
 use crate::sinks::elasticsearch::ElasticSearchEncoder;
+use crate::sinks::util::StreamSink;
+use async_graphql::futures_util::stream::BoxStream;
+use async_trait::async_trait;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SematextLogsConfig {
@@ -83,9 +87,12 @@ impl SinkConfig for SematextLogsConfig {
         .build(cx)
         .await?;
 
-        let sink = Box::new(sink.into_sink().with(map_timestamp));
+        let stream = sink.into_stream();
+        let mapped_stream = MapTimestampStream {
+            inner: stream
+        };
 
-        Ok((VectorSink::Sink(sink), healthcheck))
+        Ok((VectorSink::Stream(Box::new(mapped_stream)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -97,8 +104,23 @@ impl SinkConfig for SematextLogsConfig {
     }
 }
 
+
+struct MapTimestampStream {
+    inner: Box<dyn StreamSink + Send>
+}
+
+#[async_trait]
+impl StreamSink for MapTimestampStream {
+    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let mapped_input = input.map(|event|{
+            map_timestamp(event)
+        }).boxed();
+        self.inner.run(mapped_input).await
+    }
+}
+
 /// Used to map `timestamp` to `@timestamp`.
-fn map_timestamp(mut event: Event) -> BoxFuture<'static, Result<Event, ()>> {
+fn map_timestamp(mut event: Event) -> Event {
     let log = event.as_mut_log();
 
     if let Some(ts) = log.remove(crate::config::log_schema().timestamp_key()) {
@@ -109,7 +131,7 @@ fn map_timestamp(mut event: Event) -> BoxFuture<'static, Result<Event, ()>> {
         log.insert("os.host", host);
     }
 
-    future::ok(event).boxed()
+    event
 }
 
 #[cfg(test)]

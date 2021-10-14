@@ -36,6 +36,18 @@ impl VectorSink {
             _ => panic!("Failed type coercion, {:?} is not a Sink", self),
         }
     }
+
+    /// Converts `VectorSink` into a `StreamSink`
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the self instance is not `VectorSink::Stream`.
+    pub fn into_stream(self) -> Box<dyn StreamSink + Send> {
+        match self {
+            Self::Stream(stream) => stream,
+            _ => panic!("Failed type coercion, {:?} is not a Stream", self),
+        }
+    }
 }
 
 impl fmt::Debug for VectorSink {
