@@ -57,7 +57,7 @@ twox-hash = { version = "1.6.1", default-features = false }
 vrl-core = { package = "vrl", path = "../vrl/core", optional = true }
 
 [build-dependencies]
-prost-build = "0.8"
+prost-build = "0.9"
 
 [dev-dependencies]
 criterion = { version = "0.3.5", features = ["html_reports"] }
