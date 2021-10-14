@@ -26,14 +26,14 @@ None
 
 ## Pain
 
-As Vector evolves and introduces configuration heavy functionality, like the aggregator role, and the upcoming Pipelines feature, the amount of configuration necessary to program Vector grows large. The ability to organize Vector across multiple files is non-obvious and includes a heavy amount of boilerplate, making the configuration difficult for collaboration and navigation.
+As Vector evolves and introduces configuration-heavy functionality, like the aggregator role, and the upcoming Pipelines feature, the amount of configuration necessary to program Vector grows large. The ability to organize Vector across multiple files is non-obvious and includes a heavy amount of boilerplate, making the configuration difficult for collaboration and navigation.
 
 ## Proposal
 
 To solve for above, we'd like to introduce implicit configuration namespacing based on Vector's configuration directory structure. This aligns the community behind an opinionated method for organizing Vector's configuration, making it easy for users to split up their configuration files and collaborate with others on their team.
 ### User Experience
 
-- When loading Vector's configuration using `--config-dir` (let say `--config-dir /etc/vector`), every type of component (`sources`, `transforms`, `sinks` but also `enrichment_tables` and `tests`) can be declared in subfolders, in seperate files, with there filenames being their component ID.
+- When loading Vector's configuration using `--config-dir` (let say `--config-dir /etc/vector`), every type of component (`sources`, `transforms`, `sinks` but also `enrichment_tables` and `tests`) can be declared in subfolders, in separate files, with there filenames being their component ID.
 
 ```toml
 # /etc/vector/vector.toml
@@ -53,7 +53,7 @@ type = "anything"
 
 ### Implementation
 
-- [When loading the configuration from a directory](https://github.com/vectordotdev/vector/blob/v0.17.0/src/config/loading.rs#L150), instead of only considering the files in that directory, Vector will check if the folders `sources`, `transforms`, `sinks`, `enrichment_tables` and `tests` exist, load each files in those folders and merge the components with the current configuration.
+- [When loading the configuration from a directory](https://github.com/vectordotdev/vector/blob/v0.17.0/src/config/loading.rs#L150), instead of only considering the files in that directory, Vector will check if the folders `sources`, `transforms`, `sinks`, `enrichment_tables` and `tests` exist, load each file in those folders and merge the components with the current configuration.
 
 ```rust
 fn load_builder_from_dir(path: &Path) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
@@ -117,13 +117,13 @@ What kind on ongoing burden does this place on the team?
 
 ## Outstanding Questions
 
-- Should Vector load `--config-dir /etc/vector` by default instead of loading `--config /etc/vector/vector.toml` in order to handle subfolders out of the box?
+- Should Vector load `--config-dir /etc/vector` by default instead of loading `--config /etc/vector/vector.toml` to handle subfolders out of the box?
 
 ## Plan Of Attack
 
 Incremental steps to execute this change. These will be converted to issues after the RFC is approved:
 
-- [ ] Update the loading process to load components in order to implement the [strategy design pattern](https://rust-unofficial.github.io/patterns/patterns/behavioural/strategy.html).
+- [ ] Update the loading process to load components to implement the [strategy design pattern](https://rust-unofficial.github.io/patterns/patterns/behavioural/strategy.html).
 - [ ] Load `transforms` from subfolder
 - [ ] Load `sinks` from subfolder
 - [ ] Load `sources` from subfolder
