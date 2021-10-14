@@ -13,6 +13,9 @@ use hyper::Body;
 use serde_json::{json, Value};
 use std::{fs::File, future::ready, io::Read};
 use vector_core::event::{BatchNotifier, BatchStatus, LogEvent};
+use crate::sinks::util::{Compression, BatchConfig};
+use super::config::DATA_STREAM_TIMESTAMP_KEY;
+use vector_core::config::log_schema;
 
 impl ElasticSearchCommon {
     async fn flush_request(&self) -> crate::Result<()> {

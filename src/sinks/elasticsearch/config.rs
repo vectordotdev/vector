@@ -34,7 +34,7 @@ use std::num::NonZeroUsize;
 use tower::ServiceBuilder;
 
 /// The field name for the timestamp required by data stream mode
-const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
+pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -311,7 +311,7 @@ impl SinkConfig for ElasticSearchConfig {
 
         let request_builder = ElasticsearchRequestBuilder {
             compression: self.compression,
-            encoder: self.encoding.clone(),
+            encoder: encoding,
         };
 
         let request_limits = self
@@ -363,15 +363,6 @@ impl SinkConfig for ElasticSearchConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        event::{Event, Metric, MetricKind, MetricValue, Value},
-        sinks::util::retries::{RetryAction, RetryLogic},
-    };
-    use bytes::Bytes;
-    use http::{Response, StatusCode};
-    use pretty_assertions::assert_eq;
-    use serde_json::json;
-    use std::collections::BTreeMap;
 
     #[test]
     fn generate_config() {

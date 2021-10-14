@@ -103,6 +103,8 @@ mod tests {
     use super::*;
     use bytes::Bytes;
     use pretty_assertions::assert_eq;
+    use crate::event::EventStatus;
+    use http::Response;
 
     #[test]
     fn handles_error_response() {
