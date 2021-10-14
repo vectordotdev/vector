@@ -42,26 +42,17 @@ impl Decoder for BytesCodec {
     type Error = BoxedFramingError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        // We don't support emitting empty frames in stream based decoding,
-        // since this will currently result in an infinite loop when using
-        // `FramedRead`.
-        self.flushed = true;
-        if src.is_empty() {
-            Ok(None)
-        } else {
-            let frame = src.split();
-            Ok(Some(frame.freeze()))
-        }
+        self.flushed = false;
+        Ok(None)
     }
 
     fn decode_eof(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        if !self.flushed {
+        if self.flushed && src.is_empty() {
+            Ok(None)
+        } else {
             self.flushed = true;
             let frame = src.split();
             Ok(Some(frame.freeze()))
-        } else {
-            self.flushed = false;
-            Ok(None)
         }
     }
 }
@@ -77,7 +68,11 @@ mod tests {
         let mut input = BytesMut::from("some bytes");
         let mut decoder = BytesCodec::new();
 
-        assert_eq!(decoder.decode(&mut input).unwrap().unwrap(), "some bytes");
+        assert_eq!(decoder.decode(&mut input).unwrap(), None);
+        assert_eq!(
+            decoder.decode_eof(&mut input).unwrap().unwrap(),
+            "some bytes"
+        );
         assert_eq!(decoder.decode(&mut input).unwrap(), None);
     }
 
