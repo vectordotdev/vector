@@ -3,18 +3,44 @@ use crate::buffers::Ackable;
 use crate::event::{EventFinalizers, Finalizable, EventStatus};
 use hyper::service::Service;
 use std::task::{Context, Poll};
-use crate::http::HttpClient;
+use crate::http::{HttpClient, HttpError, Auth};
 use futures::future::BoxFuture;
 use hyper::{Body, Request};
 use futures::FutureExt;
+use http::{Response, StatusCode, Uri};
+use bytes::Bytes;
+use crate::sinks::util::http::{HttpBatchService, RequestConfig};
+use tower::ServiceExt;
+use crate::sinks::util::retries::RetryAction;
+use std::collections::HashMap;
+use rusoto_core::Region;
+use rusoto_core::signature::{SignedRequestPayload, SignedRequest};
+use crate::sinks::util::{Compression, ElementCount};
+use rusoto_core::credential::{AwsCredentials, ProvideAwsCredentials};
+use http::header::HeaderName;
+use hyper::header::HeaderValue;
+use crate::rusoto::AwsCredentialsProvider;
+use std::sync::Arc;
+use vector_core::ByteSizeOf;
 
-
+#[derive(Clone)]
 pub struct ElasticSearchRequest {
-    pub http_request: Request<Vec<u8>>,
+    pub payload: Vec<u8>,
     pub finalizers: EventFinalizers,
     pub batch_size: usize,
 }
 
+impl ByteSizeOf for ElasticSearchRequest {
+    fn allocated_bytes(&self) -> usize {
+        self.payload.allocated_bytes() + self.finalizers.allocated_bytes()
+    }
+}
+
+impl ElementCount for ElasticSearchRequest {
+    fn element_count(&self) -> usize {
+        self.batch_size
+    }
+}
 
 impl Ackable for ElasticSearchRequest {
     fn ack_size(&self) -> usize {
@@ -28,24 +54,136 @@ impl Finalizable for ElasticSearchRequest {
     }
 }
 
+#[derive(Clone)]
 pub struct ElasticSearchService {
-    pub http_client: HttpClient
+    batch_service: HttpBatchService<BoxFuture<'static, Result<http::Request<Vec<u8>>, crate::Error>>, ElasticSearchRequest>
+}
+
+impl ElasticSearchService {
+    pub fn new(http_client: HttpClient<Body>, http_request_builder: HttpRequestBuilder) -> ElasticSearchService {
+
+        let http_request_builder = Arc::new(http_request_builder);
+        let batch_service = HttpBatchService::new(
+            http_client,
+            move |req|{
+                let request_builder = http_request_builder.clone();
+                let future:BoxFuture<'static, Result<http::Request<Vec<u8>>, crate::Error>> = Box::pin(async move {
+                    request_builder.build_request(req).await
+                });
+                future
+            }
+        );
+        ElasticSearchService { batch_service }
+    }
+}
+
+
+pub struct HttpRequestBuilder {
+    pub bulk_uri: Uri,
+    pub query_params: HashMap<String, String>,
+    pub region: Region,
+    pub compression: Compression,
+    pub http_request_config: RequestConfig,
+    pub http_auth: Option<Auth>,
+    pub credentials_provider: Option<AwsCredentialsProvider>
+}
+
+impl HttpRequestBuilder {
+    pub async fn build_request(&self, es_req: ElasticSearchRequest) -> Result<Request<Vec<u8>>, crate::Error> {
+        let mut builder = Request::post(&self.bulk_uri);
+
+        let request = if let Some(credentials_provider) = &self.credentials_provider {
+            let mut request = self.create_signed_request("POST", &self.bulk_uri, true);
+            let aws_credentials = credentials_provider.credentials().await?;
+
+            request.add_header("Content-Type", "application/x-ndjson");
+
+            if let Some(ce) = self.compression.content_encoding() {
+                request.add_header("Content-Encoding", ce);
+            }
+
+            for (header, value) in &self.http_request_config.headers {
+                request.add_header(header, value);
+            }
+
+            request.set_payload(Some(es_req.payload));
+            builder = sign_request(&mut request, &aws_credentials, builder);
+
+            // The SignedRequest ends up owning the body, so we have
+            // to play games here
+            let body = request.payload.take().unwrap();
+            match body {
+                SignedRequestPayload::Buffer(body) => {
+                    builder.body(body.to_vec()).expect("Invalid http request value used")
+                }
+                _ => unreachable!(),
+            }
+        } else {
+            builder = builder.header("Content-Type", "application/x-ndjson");
+
+            if let Some(ce) = self.compression.content_encoding() {
+                builder = builder.header("Content-Encoding", ce);
+            }
+
+            for (header, value) in &self.http_request_config.headers {
+                builder = builder.header(&header[..], &value[..]);
+            }
+
+            if let Some(auth) = &self.http_auth {
+                builder = auth.apply_builder(builder);
+            }
+
+            builder.body(es_req.payload).expect("Invalid http request value used")
+        };
+        Ok(request)
+    }
+
+    fn create_signed_request(&self, method: &str, uri: &Uri, use_params: bool) -> SignedRequest {
+        let mut request = SignedRequest::new(method, "es", &self.region, uri.path());
+        request.set_hostname(uri.host().map(|host| host.into()));
+        if use_params {
+            for (key, value) in &self.query_params {
+                request.add_param(key, value);
+            }
+        }
+        request
+    }
+}
+
+fn sign_request(
+    request: &mut SignedRequest,
+    credentials: &AwsCredentials,
+    mut builder: http::request::Builder,
+) -> http::request::Builder {
+    request.sign(&credentials);
+
+    for (name, values) in request.headers() {
+        let header_name = name
+            .parse::<HeaderName>()
+            .expect("Could not parse header name.");
+        for value in values {
+            let header_value =
+                HeaderValue::from_bytes(value).expect("Could not parse header value.");
+            builder = builder.header(&header_name, header_value);
+        }
+    }
+    builder
 }
 
 pub struct ElasticSearchResponse {
-
+    pub http_response: Response<Bytes>,
+    pub event_status: EventStatus
 }
 
 impl AsRef<EventStatus> for ElasticSearchResponse {
     fn as_ref(&self) -> &EventStatus {
-        //TODO: use the correct status
-        &EventStatus::Delivered
+        &self.event_status
     }
 }
 
 impl Service<ElasticSearchRequest> for ElasticSearchService {
     type Response = ElasticSearchResponse;
-    type Error = ();
+    type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -53,11 +191,34 @@ impl Service<ElasticSearchRequest> for ElasticSearchService {
     }
 
     fn call(&mut self, req: ElasticSearchRequest) -> Self::Future {
-        let http_req = req.http_request.map(Body::from);
-        let mut http_client = self.http_client.clone();
+        let mut http_service = self.batch_service.clone();
         Box::pin(async move {
-            http_client.call(http_req).await;
-            Ok(ElasticSearchResponse{})
+            http_service.ready().await?;
+            let http_response = http_service.call(req).await?;
+            let event_status = get_event_status(&http_response);
+            Ok(ElasticSearchResponse{
+                http_response,
+                event_status
+            })
         })
+    }
+}
+
+fn get_event_status(response: &Response<Bytes>) -> EventStatus {
+    if response.status().is_success() {
+        let body = String::from_utf8_lossy(response.body());
+        if body.contains("\"errors\":true") {
+            error!(message = "Response contained errors.", ?response);
+            EventStatus::Failed
+        } else {
+            trace!(message = "Response successful.", ?response);
+            EventStatus::Delivered
+        }
+    } else if response.status().is_server_error() {
+        error!(message = "Response wasn't successful.", ?response);
+        EventStatus::Errored
+    } else {
+        error!(message = "Response failed.", ?response);
+        EventStatus::Failed
     }
 }

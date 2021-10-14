@@ -7,7 +7,7 @@ use std::num::NonZeroUsize;
 use futures::{StreamExt, TryFutureExt};
 use crate::sinks::elasticsearch::request_builder::ElasticsearchRequestBuilder;
 use crate::buffers::Acker;
-use crate::sinks::elasticsearch::service::ElasticSearchService;
+use crate::sinks::elasticsearch::service::{ElasticSearchService, ElasticSearchResponse, ElasticSearchRequest};
 use crate::sinks::elasticsearch::{BulkAction, Encoding, ElasticSearchCommonMode};
 use crate::transforms::metric_to_log::MetricToLog;
 use vector_core::stream::BatcherSettings;
@@ -18,10 +18,11 @@ use futures::future;
 use crate::sinks::elasticsearch::encoder::{ProcessedEvent, ElasticSearchEncoder};
 use vector_core::ByteSizeOf;
 use crate::event::Value;
-use crate::rusoto;
+use crate::{rusoto, Error};
 
 use std::sync::Arc;
 use crate::rusoto::AwsCredentialsProvider;
+use tower::util::BoxService;
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct PartitionKey {
@@ -44,12 +45,11 @@ pub struct ElasticSearchSink {
     pub batch_settings: BatcherSettings,
     pub request_builder: ElasticsearchRequestBuilder,
     pub compression: Compression,
-    pub service: ElasticSearchService,
+    pub service: BoxService<ElasticSearchRequest, ElasticSearchResponse, Error>,
     pub acker: Acker,
     pub metric_to_log: MetricToLog,
     pub mode: ElasticSearchCommonMode,
     pub id_key_field: Option<String>,
-    pub aws_credentials_provider: Option<rusoto::AwsCredentialsProvider>,
     pub doc_type: String,
 }
 
@@ -59,7 +59,6 @@ impl ElasticSearchSink {
 
         let mode = self.mode;
         let id_key_field = self.id_key_field;
-        let aws_credentials_provider = Arc::new(self.aws_credentials_provider);
         let doc_type = self.doc_type;
 
         let sink = input
@@ -74,21 +73,24 @@ impl ElasticSearchSink {
                 future::ready(process_log(log, &mode, &id_key_field, doc_type.clone()))
             })
             .batched(NullPartitioner::new(), self.batch_settings)
-            .filter_map(move |(_, batch)| {
-                let aws_credentials_provider = aws_credentials_provider.clone();
-                async move {
-                    let aws_credentials = match &*aws_credentials_provider {
-                        Some(provider) => {
-                            Some(get_aws_credentials(provider).await?)
-                        },
-                        None => None
-                    };
-                    Some(super::request_builder::Input {
-                        aws_credentials,
-                        events: batch,
-                    })
-                }
+            .map(|(_, batch)|{
+                batch
             })
+            // .filter_map(move |(_, batch)| {
+            //     let aws_credentials_provider = aws_credentials_provider.clone();
+            //     async move {
+            //         let aws_credentials = match &*aws_credentials_provider {
+            //             Some(provider) => {
+            //                 Some(get_aws_credentials(provider).await?)
+            //             },
+            //             None => None
+            //         };
+            //         Some(super::request_builder::Input {
+            //             aws_credentials,
+            //             events: batch,
+            //         })
+            //     }
+            // })
             .request_builder(
                 request_builder_concurrency_limit,
                 self.request_builder,
@@ -116,15 +118,6 @@ async fn get_aws_credentials(provider: &AwsCredentialsProvider) -> Option<AwsCre
         }
     })
 }
-// struct GetCredentials {
-//     pub aws_credentials_provider: Option<rusoto::AwsCredentialsProvider>
-// }
-//
-// impl GetCredentials {
-//     pub async fn get_credentials(&mut self) -> Option<Option<AwsCredentials>> {
-//         self.aws_credentials_provider.credentials().await
-//     }
-// }
 
 pub fn process_log(
     mut log: LogEvent,

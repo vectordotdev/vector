@@ -13,6 +13,7 @@ use crate::sinks::util::retries::{RetryLogic, RetryAction};
 use super::BulkAction;
 use crate::rusoto::AwsAuthentication;
 use crate::sinks::util::BatchConfig;
+use crate::sinks::elasticsearch::service::ElasticSearchResponse;
 
 #[test]
 fn sets_create_action_when_configured() {
@@ -224,20 +225,6 @@ fn encode_datastream_mode_no_sync() {
 "#;
     assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
     assert_eq!(encoded.len(), encoded_size);
-}
-
-#[test]
-fn handles_error_response() {
-    let json = "{\"took\":185,\"errors\":true,\"items\":[{\"index\":{\"_index\":\"test-hgw28jv10u\",\"_type\":\"log_lines\",\"_id\":\"3GhQLXEBE62DvOOUKdFH\",\"status\":400,\"error\":{\"type\":\"illegal_argument_exception\",\"reason\":\"mapper [message] of different type, current_type [long], merged_type [text]\"}}}]}";
-    let response = Response::builder()
-        .status(StatusCode::OK)
-        .body(Bytes::from(json))
-        .unwrap();
-    let logic = ElasticSearchRetryLogic;
-    assert!(matches!(
-            logic.should_retry_response(&response),
-            RetryAction::DontRetry(_)
-        ));
 }
 
 #[test]

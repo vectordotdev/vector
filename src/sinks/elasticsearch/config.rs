@@ -1,11 +1,11 @@
-use crate::sinks::util::{Compression, BatchConfig, BatchSettings, Buffer};
+use crate::sinks::util::{Compression, BatchConfig, BatchSettings, Buffer, ServiceBuilderExt, TowerRequestConfig};
 use crate::sinks::elasticsearch::{ElasticSearchCommon, ElasticSearchMode, ElasticSearchAuth, ElasticSearchCommonMode};
 use crate::sinks::util::encoding::{EncodingConfigWithDefault, EncodingConfigFixed};
 use crate::config::{SinkConfig, SinkContext, DataType};
 use crate::sinks::{Healthcheck, VectorSink};
 use crate::template::Template;
 use crate::event::{LogEvent, Value, EventRef};
-use crate::sinks::util::http::RequestConfig;
+use crate::sinks::util::http::{RequestConfig, HttpRetryLogic};
 use indexmap::map::IndexMap;
 use crate::rusoto::RegionOrEndpoint;
 use crate::tls::TlsOptions;
@@ -24,8 +24,10 @@ use crate::sinks::elasticsearch::request_builder::ElasticsearchRequestBuilder;
 use vector_core::stream::BatcherSettings;
 use std::time::Duration;
 use std::num::NonZeroUsize;
-use crate::sinks::elasticsearch::service::ElasticSearchService;
+use crate::sinks::elasticsearch::service::{ElasticSearchService, HttpRequestBuilder};
 use crate::sinks::elasticsearch::encoder::ElasticSearchEncoder;
+use tower::ServiceBuilder;
+use crate::sinks::elasticsearch::retry::ElasticSearchRetryLogic;
 
 /// The field name for the timestamp required by data stream mode
 const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
@@ -308,16 +310,25 @@ impl SinkConfig for ElasticSearchConfig {
         );
 
         let request_builder = ElasticsearchRequestBuilder {
+            compression: self.compression,
+            encoder: self.encoding.clone(),
+        };
+
+        let request_limits = self.request.tower.unwrap_with(&TowerRequestConfig::default());
+
+        let http_request_builder = HttpRequestBuilder {
             bulk_uri: common.bulk_uri,
             http_request_config: self.request.clone(),
             http_auth: common.authorization,
             query_params: common.query_params,
             region: common.region,
-            compression: self.compression,
-            encoder: self.encoding.clone(),
+            compression: Compression::None,
+            credentials_provider: common.credentials
         };
 
-        let service = ElasticSearchService { http_client };
+        let service = ServiceBuilder::new()
+            .settings(request_limits, ElasticSearchRetryLogic)
+            .service(ElasticSearchService::new(http_client, http_request_builder));
 
         let sink = ElasticSearchSink {
             batch_settings,
@@ -328,7 +339,6 @@ impl SinkConfig for ElasticSearchConfig {
             metric_to_log: common.metric_to_log,
             mode: common.mode,
             id_key_field: self.id_key.clone(),
-            aws_credentials_provider: common.credentials,
             doc_type: common.doc_type
         };
 
