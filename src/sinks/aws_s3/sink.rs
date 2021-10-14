@@ -48,7 +48,7 @@ impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
         let metadata = S3Metadata {
             partition_key,
             count: events.len(),
-            byte_size: events.iter().map(ByteSizeOf::size_of).sum(),
+            byte_size: events.size_of(),
             finalizers,
         };
 
