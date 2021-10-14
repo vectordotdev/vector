@@ -1,6 +1,8 @@
 use crate::conditions::{AnyCondition, Condition};
 use crate::config::{DataType, TransformConfig, TransformContext, TransformDescription};
 use crate::event::Event;
+use crate::internal_events::TemplateRenderingFailed;
+use crate::template::Template;
 use crate::transforms::{TaskTransform, Transform};
 
 use async_stream::stream;
@@ -17,7 +19,7 @@ use std::time::Duration;
 pub struct ThrottleConfig {
     threshold: u32,
     window: f64,
-    key_field: Option<String>,
+    key_field: Option<Template>,
     exclude: Option<AnyCondition>,
 }
 
@@ -50,12 +52,15 @@ impl TransformConfig for ThrottleConfig {
 #[derive(Clone)]
 pub struct Throttle {
     quota: Quota,
-    key_field: Option<String>,
+    flush_keys_interval: Duration,
+    key_field: Option<Template>,
     exclude: Option<Box<dyn Condition>>,
 }
 
 impl Throttle {
     pub fn new(config: &ThrottleConfig, context: &TransformContext) -> crate::Result<Self> {
+        let flush_keys_interval = Duration::from_secs_f64(config.window.clone());
+
         let threshold = match NonZeroU32::new(config.threshold) {
             Some(threshold) => threshold,
             None => return Err(Box::new(ConfigError::NonZero)),
@@ -75,7 +80,8 @@ impl Throttle {
 
         Ok(Self {
             quota,
-            key_field: None,
+            flush_keys_interval,
+            key_field: config.key_field.clone(),
             exclude,
         })
     }
@@ -91,6 +97,8 @@ impl TaskTransform for Throttle {
     {
         let limiter = RateLimiter::keyed(self.quota);
 
+        let mut flush_keys = tokio::time::interval(self.flush_keys_interval * 2);
+
         let mut flush_stream = tokio::time::interval(Duration::from_millis(1000));
 
         Box::pin(
@@ -101,6 +109,10 @@ impl TaskTransform for Throttle {
                     _ = flush_stream.tick() => {
                         false
                     }
+                    _ = flush_keys.tick() => {
+                        limiter.retain_recent();
+                        false
+                    }
                     maybe_event = input_rx.next() => {
                         match maybe_event {
                             None => true,
@@ -109,7 +121,19 @@ impl TaskTransform for Throttle {
                                     if condition.check(&event) {
                                         output.push(event);
                                     } else {
-                                        match limiter.check_key(&"default") {
+                                        let key = self.key_field.as_ref().and_then(|t| {
+                                            t.render_string(&event)
+                                                .map_err(|error| {
+                                                    emit!(&TemplateRenderingFailed {
+                                                        error,
+                                                        field: Some("key_field"),
+                                                        drop_event: false,
+                                                    })
+                                                })
+                                                .ok()
+                                        });
+
+                                        match limiter.check_key(&key) {
                                             Ok(()) => {
                                                 output.push(event);
                                             }
@@ -119,7 +143,19 @@ impl TaskTransform for Throttle {
                                         }
                                     }
                                 } else {
-                                    match limiter.check_key(&"default") {
+                                    let key = self.key_field.as_ref().and_then(|t| {
+                                        t.render_string(&event)
+                                            .map_err(|error| {
+                                                emit!(&TemplateRenderingFailed {
+                                                    error,
+                                                    field: Some("key_field"),
+                                                    drop_event: false,
+                                                })
+                                            })
+                                            .ok()
+                                    });
+
+                                    match limiter.check_key(&key) {
                                         Ok(()) => {
                                             output.push(event);
                                         }
