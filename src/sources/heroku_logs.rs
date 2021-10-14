@@ -264,9 +264,7 @@ mod tests {
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
         serde::{default_decoding, default_framing_message_based},
-        test_util::{
-            components, next_addr, random_string, spawn_collect_n, trace_init, wait_for_tcp,
-        },
+        test_util::{components, next_addr, random_string, spawn_collect_n, wait_for_tcp},
         Pipeline,
     };
     use chrono::{DateTime, Utc};
@@ -286,7 +284,7 @@ mod tests {
         status: EventStatus,
         acknowledgements: bool,
     ) -> (impl Stream<Item = Event>, SocketAddr) {
-        components::init();
+        components::init_test();
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
         let mut context = SourceContext::new_test(sender);
@@ -343,8 +341,6 @@ mod tests {
 
     #[tokio::test]
     async fn logplex_handles_router_log() {
-        trace_init();
-
         let auth = make_auth();
 
         let (rx, addr) = source(
@@ -390,8 +386,6 @@ mod tests {
 
     #[tokio::test]
     async fn logplex_handles_failures() {
-        trace_init();
-
         let auth = make_auth();
 
         let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Failed, true).await;
@@ -414,8 +408,6 @@ mod tests {
 
     #[tokio::test]
     async fn logplex_ignores_disabled_acknowledgements() {
-        trace_init();
-
         let auth = make_auth();
 
         let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Failed, false).await;

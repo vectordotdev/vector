@@ -233,11 +233,24 @@ pub trait Batch: Sized {
     fn num_items(&self) -> usize;
 }
 
+#[derive(Debug)]
+pub struct EncodedBatch<I> {
+    pub items: I,
+    pub finalizers: EventFinalizers,
+    pub count: usize,
+    pub byte_size: usize,
+}
+
 /// This is a batch construct that stores an set of event finalizers alongside the batch itself.
 #[derive(Clone, Debug)]
 pub struct FinalizersBatch<B> {
     inner: B,
     finalizers: EventFinalizers,
+    // The count of items inserted into this batch is distinct from the
+    // number of items recorded by the inner batch, as that inner count
+    // could be smaller due to aggregated items (ie metrics).
+    count: usize,
+    byte_size: usize,
 }
 
 impl<B: Batch> From<B> for FinalizersBatch<B> {
@@ -245,13 +258,15 @@ impl<B: Batch> From<B> for FinalizersBatch<B> {
         Self {
             inner,
             finalizers: Default::default(),
+            count: 0,
+            byte_size: 0,
         }
     }
 }
 
 impl<B: Batch> Batch for FinalizersBatch<B> {
     type Input = EncodedEvent<B::Input>;
-    type Output = (B::Output, EventFinalizers);
+    type Output = EncodedBatch<B::Output>;
 
     fn get_settings_defaults(
         config: BatchConfig,
@@ -261,13 +276,23 @@ impl<B: Batch> Batch for FinalizersBatch<B> {
     }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
-        let EncodedEvent { item, finalizers } = item;
+        let EncodedEvent {
+            item,
+            finalizers,
+            byte_size,
+        } = item;
         match self.inner.push(item) {
             PushResult::Ok(full) => {
                 self.finalizers.merge(finalizers);
+                self.count += 1;
+                self.byte_size += byte_size;
                 PushResult::Ok(full)
             }
-            PushResult::Overflow(item) => PushResult::Overflow(EncodedEvent { item, finalizers }),
+            PushResult::Overflow(item) => PushResult::Overflow(EncodedEvent {
+                item,
+                finalizers,
+                byte_size,
+            }),
         }
     }
 
@@ -279,11 +304,18 @@ impl<B: Batch> Batch for FinalizersBatch<B> {
         Self {
             inner: self.inner.fresh(),
             finalizers: Default::default(),
+            count: 0,
+            byte_size: 0,
         }
     }
 
     fn finish(self) -> Self::Output {
-        (self.inner.finish(), self.finalizers)
+        EncodedBatch {
+            items: self.inner.finish(),
+            finalizers: self.finalizers,
+            count: self.count,
+            byte_size: self.byte_size,
+        }
     }
 
     fn num_items(&self) -> usize {

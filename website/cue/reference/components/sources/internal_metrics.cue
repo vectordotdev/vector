@@ -483,6 +483,48 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		buffer_byte_size: {
+			description:       "The number of bytes current in the buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_events: {
+			description:       "The number of events currently in the buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_discarded_events_total: {
+			description:       "The number of events dropped by this non-blocking buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_received_event_bytes_total: {
+			description:       "The number of bytes received by this buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_received_events_total: {
+			description:       "The number of events received by this buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_sent_event_bytes_total: {
+			description:       "The number of bytes sent by this buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_sent_events_total: {
+			description:       "The number of events sent by this buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		component_received_bytes_total: {
 			description:       "The number of raw bytes accepted by this component from source origins."
 			type:              "counter"
@@ -498,27 +540,27 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags & {
 				file: {
-					description: "The file from which the event originates."
+					description: "The file from which the data originated."
 					required:    false
 				}
 				uri: {
-					description: "The sanitized URI from which the event originates."
+					description: "The sanitized URI from which the data originated."
 					required:    false
 				}
 				container_name: {
-					description: "The name of the container from which the event originates."
+					description: "The name of the container from which the data originated."
 					required:    false
 				}
 				pod_name: {
-					description: "The name of the pod from which the event originates."
+					description: "The name of the pod from which the data originated."
 					required:    false
 				}
 				peer_addr: {
-					description: "The IP from which the event originates."
+					description: "The IP from which the data originated."
 					required:    false
 				}
 				peer_path: {
-					description: "The pathname from which the event originates."
+					description: "The pathname from which the data originated."
 					required:    false
 				}
 				mode: _mode

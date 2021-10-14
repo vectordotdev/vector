@@ -187,7 +187,9 @@ mod test {
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSinkConfig,
         test_util::{
-            collect_n, next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
+            collect_n,
+            components::{self, SOURCE_TESTS, TCP_SOURCE_TAGS},
+            next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
         },
         tls::{self, TlsConfig, TlsOptions},
         Pipeline,
@@ -230,6 +232,7 @@ mod test {
     //////// TCP TESTS ////////
     #[tokio::test]
     async fn tcp_it_includes_host() {
+        components::init_test();
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
@@ -246,6 +249,8 @@ mod test {
 
         let event = rx.next().await.unwrap();
         assert_eq!(event.as_log()[log_schema().host_key()], "127.0.0.1".into());
+
+        SOURCE_TESTS.assert(&TCP_SOURCE_TAGS);
     }
 
     #[tokio::test]
@@ -273,6 +278,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_it_includes_source_type() {
+        components::init_test();
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
@@ -292,10 +298,13 @@ mod test {
             event.as_log()[log_schema().source_type_key()],
             "socket".into()
         );
+
+        SOURCE_TESTS.assert(&TCP_SOURCE_TAGS);
     }
 
     #[tokio::test]
     async fn tcp_continue_after_long_line() {
+        components::init_test();
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
@@ -327,10 +336,13 @@ mod test {
             event.as_log()[log_schema().message_key()],
             "more short".into()
         );
+
+        SOURCE_TESTS.assert(&TCP_SOURCE_TAGS);
     }
 
     #[tokio::test]
     async fn tcp_with_tls() {
+        components::init_test();
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
@@ -361,10 +373,13 @@ mod test {
             event.as_log()[log_schema().message_key()],
             "another line".into()
         );
+
+        SOURCE_TESTS.assert(&TCP_SOURCE_TAGS);
     }
 
     #[tokio::test]
     async fn tcp_with_tls_intermediate_ca() {
+        components::init_test();
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
@@ -407,10 +422,13 @@ mod test {
             event.as_log()[crate::config::log_schema().message_key()],
             "another line".into()
         );
+
+        SOURCE_TESTS.assert(&TCP_SOURCE_TAGS);
     }
 
     #[tokio::test]
     async fn tcp_shutdown_simple() {
+        components::init_test();
         let source_id = ComponentKey::from("tcp_shutdown_simple");
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
@@ -432,6 +450,8 @@ mod test {
         let event = rx.next().await.unwrap();
         assert_eq!(event.as_log()[log_schema().message_key()], "test".into());
 
+        SOURCE_TESTS.assert(&TCP_SOURCE_TAGS);
+
         // Now signal to the Source to shut down.
         let deadline = Instant::now() + Duration::from_secs(10);
         let shutdown_complete = shutdown.shutdown_source(&source_id, deadline);
@@ -444,6 +464,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_shutdown_infinite_stream() {
+        components::init_test();
         // It's important that the buffer be large enough that the TCP source doesn't have
         // to block trying to forward its input into the Sender because the channel is full,
         // otherwise even sending the signal to shut down won't wake it up.
@@ -491,6 +512,8 @@ mod test {
                 message.clone().into()
             );
         }
+
+        SOURCE_TESTS.assert(&TCP_SOURCE_TAGS);
 
         let deadline = Instant::now() + Duration::from_secs(10);
         let shutdown_complete = shutdown.shutdown_source(&source_id, deadline);

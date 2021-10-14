@@ -312,7 +312,7 @@ mod tests {
                 test::{build_test_server, build_test_server_generic, build_test_server_status},
             },
         },
-        test_util::{next_addr, random_lines_with_stream},
+        test_util::{components, components::HTTP_SINK_TAGS, next_addr, random_lines_with_stream},
     };
     use bytes::{Buf, Bytes};
     use flate2::read::MultiGzDecoder;
@@ -664,13 +664,11 @@ mod tests {
         let (in_addr, sink) = build_sink(extra_config).await;
 
         let (rx, trigger, server) = build_test_server(in_addr);
+        tokio::spawn(server);
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
-        let pump = sink.run(events);
-
-        tokio::spawn(server);
-        pump.await.unwrap();
+        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
         drop(trigger);
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
