@@ -793,11 +793,21 @@ fn event_error(text: &str, code: u16, event: usize) -> Response {
 #[cfg(test)]
 mod tests {
     use super::{parse_timestamp, SplunkConfig};
-    use crate::{Pipeline, config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext}, event::Event, sinks::{
+    use crate::{
+        config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
+        event::Event,
+        sinks::{
             splunk_hec::logs::{Encoding, HecSinkLogsConfig},
             util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
             Healthcheck, VectorSink,
-        }, test_util::{collect_n, components::{self, SOURCE_TESTS, HTTP_PUSH_SOURCE_TAGS}, next_addr, trace_init, wait_for_tcp}};
+        },
+        test_util::{
+            collect_n,
+            components::{self, HTTP_PUSH_SOURCE_TAGS, SOURCE_TESTS},
+            next_addr, trace_init, wait_for_tcp,
+        },
+        Pipeline,
+    };
     use chrono::{TimeZone, Utc};
     use futures::{channel::mpsc, stream, StreamExt};
     use std::{future::ready, net::SocketAddr};
