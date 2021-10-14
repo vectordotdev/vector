@@ -85,9 +85,17 @@ N/A
 
 ### Implementation
 
-- Add new event type that will represent traces, this would materialise as a new member of the `Event` enum
-  - It shall efficiently allow operation on traces as a graph of spans
-  - It shall allow to keep APM events (specific spans extracted by the trace-agent) correlated with their original traces
+The first item to be address would be to add a new event type that will represent traces, this would materialise as a
+new member of the `Event` enum. It shall allow to keep APM events (specific spans extracted by the trace-agent) correlated with their original traces. To allow lossless operation, given some discrepancy between the Datadog trace format and, for example, opentelemetry traces:
+```
+enum Trace {
+    Datadog(DatadogTrace),
+    OpenTelemetry(OTTrace),
+    [...]
+}
+```
+  This would allow subsequent extension to other kind of trace with specific data structure (perf, ctf, etc.) and
+  express clear conversion capabilities.
 - Implement a `datadog_trace` source that decodes incoming protobuf to the internal represention implemented in the step
   before, .proto are located in the [datadog-agent
   repository](https://github.com/DataDog/datadog-agent/blob/0a19a75/pkg/trace/pb/trace_payload.proto)
@@ -125,7 +133,10 @@ N/A
 ## Outstanding Questions
 
 - Confirm that this RFC only addresses traces
-- Internal traces representation: Datadog protobuf derived struct, [OpenTelemetry](https://github.com/open-telemetry/opentelemetry-proto/tree/main/opentelemetry/proto/trace/v1) derived representation (with/without reuse of exsiting rust implementation) or a brand new implementation
+- Clearly identify contraints over extracted spans (a.k.a APM events):
+  - Are they mandatory, i.e. can we just dropped those for the initial implementation
+  - Do they need to be sent with their parent trace in the same request
+  - What the usual relative amount of extracted spans vs. full traces
 
 ## Plan Of Attack
 
