@@ -225,23 +225,6 @@ where
     }
 }
 
-// impl<E> Encoder<Vec<LogEvent>> for E
-//     where
-//         E: EncodingConfiguration,
-//         E::Codec: Encoder<Vec<LogEvent>>,
-// {
-//     fn encode_input(&self, mut input: Vec<LogEvent>, writer: &mut dyn io::Write) -> io::Result<usize> {
-//         for input in input.iter_mut() {
-//             let log = std::mem::replace(input, LogEvent::default());
-//             let mut event = Event::from(log);
-//             self.apply_rules(&mut event);
-//             std::mem::replace(input, event.into_log());
-//         }
-//
-//         self.codec().encode_input(input, writer)
-//     }
-// }
-
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum TimestampFormat {
