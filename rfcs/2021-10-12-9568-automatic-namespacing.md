@@ -4,7 +4,7 @@ The RFC covers the ability to implicitly namespace Vector configuration based on
 
 ## Context
 
-- [Multiple pipelines RFC](rfcs/2021-07-19-8216-multiple-pipelines.md)
+- [Vector Pipelines 2.0](https://docs.google.com/document/d/19L5p-kqvROkygDy9t21nV9EOmxgb_DDbsvoV65ixrk0/edit?usp=sharing)
 
 ## Cross cutting concerns
 
@@ -21,10 +21,12 @@ None
 
 - How components configuration should work
 - How components should work
+- Advanced configuration templating tactics (explicitly including files, etc)
+- Multiple configuration directories
 
 ## Pain
 
-- The actual configuration files can become big and it can become hard to follow when looking for components.
+As Vector evolves and introduces configuration heavy functionality, like the aggregator role, and the upcoming Pipelines feature, the amount of configuration necessary to program Vector grows large. The ability to organize Vector across multiple files is non-obvious and includes a heavy amount of boilerplate, making the configuration difficult for collaboration and navigation.
 
 ## Proposal
 
