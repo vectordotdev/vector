@@ -1,7 +1,8 @@
 use crate::{
-    codecs::{Decoder, DecodingConfig},
+    codecs::{Decoder, FramingConfig, ParserConfig},
     event::Event,
     internal_events::{SocketEventsReceived, SocketMode},
+    serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::{util::TcpError, Source},
     udp, Pipeline,
@@ -28,9 +29,12 @@ pub struct UdpConfig {
     host_key: Option<String>,
     #[get_copy = "pub"]
     receive_buffer_bytes: Option<usize>,
-    #[serde(flatten, default)]
+    #[serde(default = "default_framing_message_based")]
     #[get = "pub"]
-    decoding: DecodingConfig,
+    framing: Box<dyn FramingConfig>,
+    #[serde(default = "default_decoding")]
+    #[get = "pub"]
+    decoding: Box<dyn ParserConfig>,
 }
 
 impl UdpConfig {
@@ -40,7 +44,8 @@ impl UdpConfig {
             max_length: crate::serde::default_max_length(),
             host_key: None,
             receive_buffer_bytes: None,
-            decoding: Default::default(),
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
         }
     }
 }

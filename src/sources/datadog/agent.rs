@@ -1,11 +1,12 @@
 use crate::{
-    codecs::{self, DecodingConfig},
+    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::Event,
     internal_events::HttpDecompressError,
+    serde::{default_decoding, default_framing_message_based},
     sources::{
         self,
         util::{ErrorMessage, TcpError},
@@ -43,8 +44,10 @@ pub struct DatadogAgentConfig {
     tls: Option<TlsConfig>,
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
-    #[serde(flatten, default)]
-    decoding: DecodingConfig,
+    #[serde(default = "default_framing_message_based")]
+    framing: Box<dyn FramingConfig>,
+    #[serde(default = "default_decoding")]
+    decoding: Box<dyn ParserConfig>,
 }
 
 inventory::submit! {
@@ -63,7 +66,8 @@ impl GenerateConfig for DatadogAgentConfig {
             address: "0.0.0.0:8080".parse().unwrap(),
             tls: None,
             store_api_key: true,
-            decoding: Default::default(),
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
         })
         .unwrap()
     }
@@ -73,7 +77,8 @@ impl GenerateConfig for DatadogAgentConfig {
 #[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let source = DatadogAgentSource::new(self.store_api_key, self.decoding.build()?);
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+        let source = DatadogAgentSource::new(self.store_api_key, decoder);
 
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let listener = tls.bind(&self.address).await?;
@@ -358,6 +363,7 @@ mod tests {
         codecs::{self, BytesCodec, BytesParser},
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus},
+        serde::{default_decoding, default_framing_message_based},
         sources::datadog::agent::DatadogAgentSource,
         test_util::{next_addr, spawn_collect_n, trace_init, wait_for_tcp},
         Pipeline,
@@ -434,7 +440,8 @@ mod tests {
                 address,
                 tls: None,
                 store_api_key,
-                decoding: Default::default(),
+                framing: default_framing_message_based(),
+                decoding: default_decoding(),
             }
             .build(context)
             .await
