@@ -1,5 +1,4 @@
 use metrics::counter;
-use rusoto_core::Region;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
@@ -112,11 +111,13 @@ impl<'a> InternalEvent for EndpointBytesSent<'a> {
     }
 }
 
+#[cfg(feature = "rusoto")]
 pub struct AwsBytesSent {
     pub byte_size: usize,
-    pub region: Region,
+    pub region: rusoto_core::Region,
 }
 
+#[cfg(feature = "rusoto")]
 impl InternalEvent for AwsBytesSent {
     fn emit_logs(&self) {
         trace!(message = "Bytes sent.", byte_size = %self.byte_size, region = ?self.region);
