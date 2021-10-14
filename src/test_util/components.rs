@@ -22,6 +22,9 @@ thread_local!(
 /// The standard set of tags for sources that poll connections over HTTP.
 pub const HTTP_POLL_SOURCE_TAGS: [&str; 2] = ["endpoint", "protocol"];
 
+/// The standard set of tags for sources that accept connections over HTTP.
+pub const HTTP_PUSH_SOURCE_TAGS: [&str; 2] = ["http_path", "protocol"];
+
 /// The standard set of tags for all `TcpSource`-based sources.
 pub const TCP_SOURCE_TAGS: [&str; 2] = ["peer_addr", "protocol"];
 

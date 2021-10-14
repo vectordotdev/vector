@@ -793,17 +793,11 @@ fn event_error(text: &str, code: u16, event: usize) -> Response {
 #[cfg(test)]
 mod tests {
     use super::{parse_timestamp, SplunkConfig};
-    use crate::{
-        config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
-        event::Event,
-        sinks::{
+    use crate::{Pipeline, config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext}, event::Event, sinks::{
             splunk_hec::logs::{Encoding, HecSinkLogsConfig},
             util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
             Healthcheck, VectorSink,
-        },
-        test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
-        Pipeline,
-    };
+        }, test_util::{collect_n, components::{self, SOURCE_TESTS, HTTP_PUSH_SOURCE_TAGS}, next_addr, trace_init, wait_for_tcp}};
     use chrono::{TimeZone, Utc};
     use futures::{channel::mpsc, stream, StreamExt};
     use std::{future::ready, net::SocketAddr};
@@ -825,6 +819,7 @@ mod tests {
         token: Option<String>,
         valid_tokens: Option<&[&str]>,
     ) -> (mpsc::Receiver<Event>, SocketAddr) {
+        components::init();
         let (sender, recv) = Pipeline::new_test();
         let address = next_addr();
         let valid_tokens =
@@ -894,6 +889,7 @@ mod tests {
         });
 
         let events = collect_n(source, n).await;
+        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
         assert_eq!(n, events.len());
 
         events
@@ -1092,6 +1088,7 @@ mod tests {
         assert_eq!(200, post(address, "services/collector/raw", message).await);
 
         let event = collect_n(source, 1).await.remove(0);
+        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
         assert_eq!(event.as_log()[log_schema().message_key()], message.into());
         assert_eq!(event.as_log()[&super::CHANNEL], "channel".into());
         assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
@@ -1119,6 +1116,7 @@ mod tests {
         );
 
         let event = collect_n(source, 1).await.remove(0);
+        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
         assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
     }
 
@@ -1140,6 +1138,7 @@ mod tests {
         );
 
         let event = collect_n(source, 1).await.remove(0);
+        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
         assert_eq!(event.as_log()[log_schema().host_key()], "10.0.0.1".into());
     }
 
@@ -1162,6 +1161,7 @@ mod tests {
         );
 
         let event = collect_n(source, 1).await.remove(0);
+        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
         assert_eq!(event.as_log()[log_schema().host_key()], "10.1.0.2".into());
     }
 
@@ -1184,6 +1184,7 @@ mod tests {
         );
 
         let event = collect_n(source, 1).await.remove(0);
+        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
         assert_eq!(event.as_log()[log_schema().host_key()], "10.0.0.1".into());
     }
 
@@ -1205,6 +1206,7 @@ mod tests {
         );
 
         let event = collect_n(source, 1).await.remove(0);
+        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
         assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
     }
 
@@ -1255,6 +1257,7 @@ mod tests {
             )
             .await
         );
+        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
     }
 
     #[tokio::test]
@@ -1268,6 +1271,7 @@ mod tests {
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
+        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
         assert_eq!(event.as_log()[log_schema().message_key()], message.into());
     }
 
@@ -1284,6 +1288,7 @@ mod tests {
         );
 
         let event = collect_n(source, 1).await.remove(0);
+        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
         assert_eq!(event.as_log()[log_schema().message_key()], "first".into());
         assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
@@ -1307,6 +1312,7 @@ mod tests {
         );
 
         let event = collect_n(source, 1).await.remove(0);
+        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
         assert_eq!(event.as_log()[log_schema().message_key()], "first".into());
         assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
@@ -1328,6 +1334,7 @@ mod tests {
         );
 
         let event = collect_n(source, 1).await.remove(0);
+        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
         assert_eq!(event.as_log()[log_schema().message_key()], "first".into());
         assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
@@ -1350,6 +1357,7 @@ mod tests {
 
         let events = collect_n(source, 3).await;
 
+        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
         assert_eq!(
             events[0].as_log()[log_schema().message_key()],
             "first".into()
@@ -1415,6 +1423,7 @@ mod tests {
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
+        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
         assert_eq!(event.as_log()[log_schema().message_key()], message.into());
         assert!(event.as_log().get(log_schema().host_key()).is_none());
     }
