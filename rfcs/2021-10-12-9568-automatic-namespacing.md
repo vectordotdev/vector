@@ -31,6 +31,7 @@ As Vector evolves and introduces configuration-heavy functionality, like the agg
 ## Proposal
 
 To solve for above, we'd like to introduce implicit configuration namespacing based on Vector's configuration directory structure. This aligns the community behind an opinionated method for organizing Vector's configuration, making it easy for users to split up their configuration files and collaborate with others on their team.
+
 ### User Experience
 
 - When loading Vector's configuration using `--config-dir` (let say `--config-dir /etc/vector`), every type of component (`sources`, `transforms`, `sinks` but also `enrichment_tables` and `tests`) can be declared in subfolders, in separate files, with there filenames being their component ID.
@@ -95,8 +96,6 @@ Why is this change worth it?
 How does this position us for success in the future?
 
 - Pipeline 2.0 will rely on splitting the configuration file into compound transforms. Splitting the configuration that way will allow to have a dedicated folder or file for the definition of those transforms.
-
-> What is the impact of not doing this?
 
 ## Drawbacks
 
