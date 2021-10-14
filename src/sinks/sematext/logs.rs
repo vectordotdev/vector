@@ -9,9 +9,8 @@ use crate::{
     sinks::util::{http::RequestConfig, BatchConfig, Compression, TowerRequestConfig},
     sinks::{Healthcheck, VectorSink},
 };
-use async_graphql::futures_util::stream::BoxStream;
 use async_trait::async_trait;
-use futures::StreamExt;
+use futures::stream::BoxStream;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 
