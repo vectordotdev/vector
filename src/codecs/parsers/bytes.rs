@@ -64,7 +64,6 @@ mod tests {
             let event = events.next().unwrap();
             let log = event.as_log();
             assert_eq!(log[log_schema().message_key()], "foo".into());
-            assert!(log.get(log_schema().timestamp_key()).is_some());
         }
 
         assert_eq!(events.next(), None);
