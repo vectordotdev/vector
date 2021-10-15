@@ -227,7 +227,7 @@ hyper-openssl = { version = "0.9.1", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 infer = { version = "0.5.0", default-features = false, optional = true}
 # pinned due to https://github.com/tkaitchuck/aHash/issues/95
-indexmap = { version = "~1.6.2", default-features = false, features = ["serde"] }
+indexmap = { version = "~1.7.0", default-features = false, features = ["serde"] }
 indoc = { version = "1.0.3", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
 k8s-openapi = { version = "0.13.1", default-features = true, features = ["api", "v1_16"], optional = true }
