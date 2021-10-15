@@ -1,5 +1,5 @@
 use core_common::internal_event::InternalEvent;
-use metrics::{counter, decrement_gauge, increment_gauge};
+use metrics::{counter, decrement_gauge, gauge, increment_gauge};
 
 pub struct BufferEventsReceived {
     pub count: u64,
@@ -38,5 +38,22 @@ pub struct EventsDropped {
 impl InternalEvent for EventsDropped {
     fn emit_metrics(&self) {
         counter!("buffer_discarded_events_total", self.count);
+    }
+}
+
+pub struct BufferCreated {
+    pub max_size_events: Option<usize>,
+    pub max_size_bytes: Option<usize>,
+}
+
+impl InternalEvent for BufferCreated {
+    #[allow(clippy::cast_precision_loss)]
+    fn emit_metrics(&self) {
+        if let Some(max_size) = self.max_size_events {
+            gauge!("buffer_max_event_size", max_size as f64);
+        }
+        if let Some(max_size) = self.max_size_bytes {
+            gauge!("buffer_max_byte_size", max_size as f64);
+        }
     }
 }
