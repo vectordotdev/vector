@@ -122,6 +122,7 @@ async fn main() {
     let variant = Variant::Memory {
         max_events: 99999,
         when_full: WhenFull::DropNewest,
+        instrument: true,
     };
 
     let (writer, reader, acker) =

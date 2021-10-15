@@ -21,8 +21,9 @@ This specification addresses direct buffer development and does not cover aspect
 Vector buffers MUST be instrumented for optimal observability and monitoring. This is required to drive various interfaces that Vector users depend on to manage Vector installations in mission critical production environments. This section extends the [Instrumentation Specification].
 
 ### Terms And Definitions
-- `byte_size` - Refers to the byte size of events from a buffer's perspective. For memory buffers, `byte_size` represents the in-memory byte size of events. For disk buffers, `byte_size` represents the serialized byte size of events.
-- `buffer_type` - One of `memory`, `disk`. Buffer metrics MUST be tagged with `buffer_type` unless otherwise specified.
+
+* `byte_size` - Refers to the byte size of events from a buffer's perspective. For memory buffers, `byte_size` represents the in-memory byte size of events. For disk buffers, `byte_size` represents the serialized byte size of events.
+* `buffer_type` - One of `memory`, `disk`. Buffer metrics MUST be tagged with `buffer_type` unless otherwise specified.
 
 ### Events
 

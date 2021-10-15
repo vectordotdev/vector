@@ -1,7 +1,8 @@
 use crate::{
-    codecs::{Decoder, DecodingConfig},
+    codecs::{Decoder, FramingConfig, ParserConfig},
     event::Event,
     internal_events::{SocketEventsReceived, SocketMode},
+    serde::default_decoding,
     shutdown::ShutdownSignal,
     sources::{
         util::{build_unix_datagram_source, build_unix_stream_source},
@@ -17,20 +18,22 @@ use std::path::PathBuf;
 #[serde(deny_unknown_fields)]
 pub struct UnixConfig {
     pub path: PathBuf,
-    #[serde(default = "crate::serde::default_max_length")]
-    pub max_length: usize,
+    pub max_length: Option<usize>,
     pub host_key: Option<String>,
-    #[serde(flatten, default)]
-    pub decoding: DecodingConfig,
+    #[serde(default)]
+    pub framing: Option<Box<dyn FramingConfig>>,
+    #[serde(default = "default_decoding")]
+    pub decoding: Box<dyn ParserConfig>,
 }
 
 impl UnixConfig {
     pub fn new(path: PathBuf) -> Self {
         Self {
             path,
-            max_length: crate::serde::default_max_length(),
+            max_length: Some(crate::serde::default_max_length()),
             host_key: None,
-            decoding: Default::default(),
+            framing: None,
+            decoding: default_decoding(),
         }
     }
 }

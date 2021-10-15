@@ -1,11 +1,12 @@
 use crate::{
-    codecs::{self, DecodingConfig},
+    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
+    serde::{default_decoding, default_framing_message_based},
     sources::util::{
         add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig, TcpError,
     },
@@ -32,8 +33,10 @@ pub struct LogplexConfig {
     query_parameters: Vec<String>,
     tls: Option<TlsConfig>,
     auth: Option<HttpSourceAuthConfig>,
-    #[serde(flatten, default)]
-    decoding: DecodingConfig,
+    #[serde(default = "default_framing_message_based")]
+    framing: Box<dyn FramingConfig>,
+    #[serde(default = "default_decoding")]
+    decoding: Box<dyn ParserConfig>,
 }
 
 inventory::submit! {
@@ -51,7 +54,8 @@ impl GenerateConfig for LogplexConfig {
             query_parameters: Vec::new(),
             tls: None,
             auth: None,
-            decoding: Default::default(),
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
         })
         .unwrap()
     }
@@ -81,9 +85,10 @@ impl HttpSource for LogplexSource {
 #[typetag::serde(name = "heroku_logs")]
 impl SourceConfig for LogplexConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
         let source = LogplexSource {
             query_parameters: self.query_parameters.clone(),
-            decoder: self.decoding.build()?,
+            decoder,
         };
         source.run(self.address, "events", true, &self.tls, &self.auth, cx)
     }
@@ -258,9 +263,8 @@ mod tests {
     use super::{HttpSourceAuthConfig, LogplexConfig};
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
-        test_util::{
-            components, next_addr, random_string, spawn_collect_n, trace_init, wait_for_tcp,
-        },
+        serde::{default_decoding, default_framing_message_based},
+        test_util::{components, next_addr, random_string, spawn_collect_n, wait_for_tcp},
         Pipeline,
     };
     use chrono::{DateTime, Utc};
@@ -280,7 +284,7 @@ mod tests {
         status: EventStatus,
         acknowledgements: bool,
     ) -> (impl Stream<Item = Event>, SocketAddr) {
-        components::init();
+        components::init_test();
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
         let mut context = SourceContext::new_test(sender);
@@ -291,7 +295,8 @@ mod tests {
                 query_parameters,
                 tls: None,
                 auth,
-                decoding: Default::default(),
+                framing: default_framing_message_based(),
+                decoding: default_decoding(),
             }
             .build(context)
             .await
@@ -336,8 +341,6 @@ mod tests {
 
     #[tokio::test]
     async fn logplex_handles_router_log() {
-        trace_init();
-
         let auth = make_auth();
 
         let (rx, addr) = source(
@@ -383,8 +386,6 @@ mod tests {
 
     #[tokio::test]
     async fn logplex_handles_failures() {
-        trace_init();
-
         let auth = make_auth();
 
         let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Failed, true).await;
@@ -407,8 +408,6 @@ mod tests {
 
     #[tokio::test]
     async fn logplex_ignores_disabled_acknowledgements() {
-        trace_init();
-
         let auth = make_auth();
 
         let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Failed, false).await;

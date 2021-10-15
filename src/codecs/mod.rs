@@ -126,45 +126,28 @@ impl tokio_util::codec::Decoder for Decoder {
 }
 
 /// Config used to build a `Decoder`.
-///
-/// Usually used in source configs via `#[serde(flatten)]`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-#[serde(default)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DecodingConfig {
     /// The framing config.
-    framing: Option<Box<dyn FramingConfig>>,
+    framing: Box<dyn FramingConfig>,
     /// The decoding config.
-    decoding: Option<Box<dyn ParserConfig>>,
+    decoding: Box<dyn ParserConfig>,
 }
 
 impl DecodingConfig {
     /// Creates a new `DecodingConfig` with the provided `FramingConfig` and
     /// `ParserConfig`.
-    pub fn new(
-        framing: Option<Box<dyn FramingConfig>>,
-        decoding: Option<Box<dyn ParserConfig>>,
-    ) -> Self {
+    pub fn new(framing: Box<dyn FramingConfig>, decoding: Box<dyn ParserConfig>) -> Self {
         Self { framing, decoding }
     }
 
     /// Builds a `Decoder` from the provided configuration.
-    ///
-    /// Fails if any of the provided `framing` or `decoding` configs fail to
-    /// build.
     pub fn build(&self) -> crate::Result<Decoder> {
-        // Build the framer or use a newline delimited decoder if not provided.
-        let framer: BoxedFramer = self
-            .framing
-            .as_ref()
-            .map(|config| config.build())
-            .unwrap_or_else(|| NewlineDelimitedDecoderConfig::new().build())?;
+        // Build the framer.
+        let framer: BoxedFramer = self.framing.build()?;
 
-        // Build the parser or use a plain bytes parser if not provided.
-        let parser: BoxedParser = self
-            .decoding
-            .as_ref()
-            .map(|config| config.build())
-            .unwrap_or_else(|| BytesParserConfig::new().build())?;
+        // Build the parser.
+        let parser: BoxedParser = self.decoding.build()?;
 
         Ok(Decoder::new(framer, parser))
     }

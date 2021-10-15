@@ -40,7 +40,7 @@ jobs:
         internal_events: ${{ steps.filter.outputs.internal_events }}
         helm: ${{ steps.filter.outputs.helm }}
         cue: ${{ steps.filter.outputs.cue }}
-        markdown: ${{ steps.filter.outputs.cue }}
+        markdown: ${{ steps.filter.outputs.markdown }}
       steps:
       - uses: actions/checkout@v2.3.4
       - uses: dorny/paths-filter@v2
@@ -74,7 +74,7 @@ jobs:
             cue:
               - 'website/cue/**'
             markdown:
-              - '**/**.md'
+              - '*/**.md'
             internal_events:
               - 'src/internal_events/**'
             helm:

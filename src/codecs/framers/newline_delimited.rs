@@ -58,14 +58,14 @@ pub struct NewlineDelimitedCodec(CharacterDelimitedCodec);
 
 impl NewlineDelimitedCodec {
     /// Creates a new `NewlineDelimitedCodec`.
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self(CharacterDelimitedCodec::new('\n'))
     }
 
     /// Creates a `NewlineDelimitedCodec` with a maximum frame length limit.
     ///
     /// Any frames longer than `max_length` bytes will be discarded entirely.
-    pub fn new_with_max_length(max_length: usize) -> Self {
+    pub const fn new_with_max_length(max_length: usize) -> Self {
         Self(CharacterDelimitedCodec::new_with_max_length(
             '\n', max_length,
         ))
