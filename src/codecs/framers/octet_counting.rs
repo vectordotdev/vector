@@ -7,7 +7,10 @@ use tokio_util::codec::{LinesCodec, LinesCodecError};
 /// Config used to build a `OctetCountingCodec`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct OctetCountingDecoderConfig {
-    #[serde(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     octet_counting: OctetCountingDecoderOptions,
 }
 
@@ -15,6 +18,7 @@ pub struct OctetCountingDecoderConfig {
 #[derive(Debug, Clone, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 pub struct OctetCountingDecoderOptions {
+    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
     max_length: Option<usize>,
 }
 

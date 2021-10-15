@@ -7,6 +7,10 @@ use tokio_util::codec::{Decoder, Encoder};
 /// Config used to build a `CharacterDelimitedCodec`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CharacterDelimitedDecoderConfig {
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     character_delimited: CharacterDelimitedDecoderOptions,
 }
 
@@ -18,6 +22,7 @@ pub struct CharacterDelimitedDecoderOptions {
     /// The maximum length of the byte buffer.
     ///
     /// This length does *not* include the trailing delimiter.
+    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
     max_length: Option<usize>,
 }
 

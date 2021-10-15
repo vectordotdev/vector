@@ -6,7 +6,10 @@ use tokio_util::codec::Decoder;
 /// Config used to build a `NewlineDelimitedCodec`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct NewlineDelimitedDecoderConfig {
-    #[serde(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     newline_delimited: NewlineDelimitedDecoderOptions,
 }
 
@@ -17,6 +20,7 @@ pub struct NewlineDelimitedDecoderOptions {
     /// The maximum length of the byte buffer.
     ///
     /// This length does *not* include the trailing delimiter.
+    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
     max_length: Option<usize>,
 }
 
