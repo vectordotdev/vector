@@ -17,6 +17,8 @@ pub trait Partitioner {
     fn partition(&self, item: &Self::Item) -> Self::Key;
 }
 
+/// This always returns `()` as the partition key, effectively disabling partitioning.
+/// This is useful if you want to use the `Batcher` but don't actually need partitioning.
 #[derive(Default)]
 pub struct NullPartitioner<T> {
     item: PhantomData<T>,

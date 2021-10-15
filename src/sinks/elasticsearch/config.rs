@@ -57,7 +57,7 @@ pub struct ElasticSearchConfig {
         default
     )]
     pub encoding: EncodingConfigFixed<ElasticSearchEncoder>,
-    // pub encoding: EncodingConfigWithDefault<Encoding>,
+
     #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
