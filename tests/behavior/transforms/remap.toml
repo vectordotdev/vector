@@ -2251,7 +2251,7 @@ schema.id = "integer"
       "type" = "vrl"
       source = '''
         .trees == [{"id": 3, "tree": "yew"},
-	           {"id": 5, "tree": "yew"},
-		   {"id": 7, "tree": "yew"}]
+                   {"id": 5, "tree": "yew"},
+                   {"id": 7, "tree": "yew"}]
       '''
 
