@@ -216,9 +216,8 @@ fn apache_metrics(
                                     })
                                     .collect::<Vec<_>>();
 
-                                let byte_size = metrics.iter().map(ByteSizeOf::size_of).sum();
                                 emit!(&ApacheMetricsEventsReceived {
-                                    byte_size,
+                                    byte_size: metrics.size_of(),
                                     count: metrics.len(),
                                     endpoint: &sanitized_url,
                                 });
