@@ -1,11 +1,14 @@
+use vector_core::ByteSizeOf;
+
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value, Metric, MetricValue, LogEvent},
     http::{HttpClient},
     sinks::util::{
+        batch::BatchError,
         encoding::{EncodingConfigWithDefault, EncodingConfiguration, TimestampFormat},
         http::{BatchedHttpSink, HttpSink},
-        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
+        Batch, PushResult, BatchConfig, BatchSettings, Compression, TowerRequestConfig,
     },
     tls::{TlsOptions, TlsSettings},
 };
@@ -55,10 +58,10 @@ pub struct NewRelicConfig {
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsOptions>
 }
 
-pub trait ToJSON<T>: Serialize + TryFrom<T>
+pub trait ToJSON<T> : Serialize + TryFrom<T>
 where
     <Self as TryFrom<T>>::Error: std::fmt::Display
 {
@@ -217,6 +220,90 @@ impl TryFrom<LogEvent> for NewRelicLog {
     }
 }
 
+//TODO: rename NewRelicSample, contain models of New Relic Event, Log and Metric ionstead of Vector models.
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub enum BufEvent {
+    Log(LogEvent),
+    Metric(Metric),
+}
+
+impl BufEvent {
+    pub fn remap(event: Event) -> Self {
+        match event {
+            Event::Log(log) => Self::Log(log),
+            Event::Metric(metric) => Self::Metric(metric)
+        }
+    }
+}
+
+impl ByteSizeOf for BufEvent {
+    fn allocated_bytes(&self) -> usize {
+        match self {
+            Self::Log(_) => std::mem::size_of::<LogEvent>(),
+            Self::Metric(_) => std::mem::size_of::<Metric>()
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+pub struct NewRelicBuffer {
+    buffer: Vec<BufEvent>,
+    max_size: usize
+}
+
+impl NewRelicBuffer {
+    pub const fn new(max_size: usize) -> Self {
+        Self {
+            buffer: Vec::new(),
+            max_size
+        }
+    }
+}
+
+impl Batch for NewRelicBuffer {
+    type Input = BufEvent;
+    type Output = Vec<BufEvent>;
+
+    fn get_settings_defaults(
+        config: BatchConfig,
+        defaults: BatchSettings<Self>,
+    ) -> Result<BatchSettings<Self>, BatchError> {
+        Ok(defaults)
+    }
+
+    fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
+        if self.buffer.len() <= self.max_size {
+            self.buffer.push(item);
+            info!("-------> NewRelicBuffer::push OK");
+            PushResult::Ok(true)
+        }
+        else {
+            info!("-------> NewRelicBuffer::push Overflow");
+            PushResult::Overflow(item)
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        info!("-------> NewRelicBuffer::is_empty() = {}", self.buffer.is_empty());
+        self.buffer.is_empty()
+    }
+
+    fn fresh(&self) -> Self {
+        info!("-------> NewRelicBuffer::fresh()");
+        Self::new(self.max_size)
+    }
+
+    fn finish(self) -> Self::Output {
+        info!("-------> NewRelicBuffer::finish()");
+        self.buffer
+    }
+
+    fn num_items(&self) -> usize {
+        info!("-------> NewRelicBuffer::num_items() = {}", self.buffer.len());
+        self.buffer.len()
+    }
+}
+
 inventory::submit! {
     SinkDescription::new::<NewRelicConfig>("new_relic")
 }
@@ -238,17 +325,10 @@ impl SinkConfig for NewRelicConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        
-        /* TODO
-        PROBLEM:
-            BatchedHttpSink sends the events/metrics/logs one by one in a batch, but it doesn't work for New Relic, because it has its own format for grouping data points.
-        SOLUTION:
-            Create a custom buffer that generates all the evenets/metrics/logs together in a batch and send to New Relic.
-        */
 
-        let batch = BatchSettings::default()
-            .bytes(bytesize::mb(1u64))
-            .timeout(0)
+        let batch = BatchSettings::<NewRelicBuffer>::default()
+            .bytes(bytesize::mb(10u64))
+            .timeout(5)
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
@@ -256,7 +336,8 @@ impl SinkConfig for NewRelicConfig {
 
         let sink = BatchedHttpSink::new(
             self.clone(),
-            Buffer::new(batch.size, self.compression),
+            //Buffer::new(batch.size, self.compression),
+            NewRelicBuffer::new(5),
             request,
             batch.timeout,
             client.clone(),
@@ -281,8 +362,8 @@ impl SinkConfig for NewRelicConfig {
 
 #[async_trait::async_trait]
 impl HttpSink for NewRelicConfig {
-    type Input = Vec<u8>;
-    type Output = Vec<u8>;
+    type Input = BufEvent;
+    type Output = Vec<BufEvent>;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         let encoding = EncodingConfigWithDefault {
@@ -292,8 +373,17 @@ impl HttpSink for NewRelicConfig {
         encoding.apply_rules(&mut event);
 
         //TODO: remove this before production
-        info!("Encode event = {:#?}", event);
+        println!("------------------------------------------------------------------------");
+        println!("Encode event =\n{:#?}", event);
+        println!("------------------------------------------------------------------------");
 
+        Some(BufEvent::remap(event))
+
+        //TODO: buffer event
+
+        //TODO: if buffer is full, generate JSON and return it, otherwise return None
+
+        /*
         match self.api {
             NewRelicApi::Events => {
                 if let Event::Log(log) = event {
@@ -323,9 +413,15 @@ impl HttpSink for NewRelicConfig {
                 }
             }
         }
+        */
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
+
+        println!("------------------------------------------------------------------------");
+        println!("Build request events =\n{:#?}", events);
+        println!("------------------------------------------------------------------------");
+
         let uri = match self.api {
             NewRelicApi::Events => {
                 match self.region.as_ref().unwrap_or(&NewRelicRegion::Us) {
@@ -366,7 +462,9 @@ impl HttpSink for NewRelicConfig {
             builder = builder.header("Content-Encoding", ce);
         }
 
-        let request = builder.body(events).unwrap();
+        //let request = builder.body(events).unwrap();
+        let json = "{\"name\":\"Andreu\"}".to_owned();
+        let request = builder.body(json.as_bytes().to_vec()).unwrap();
 
         Ok(request)
     }
