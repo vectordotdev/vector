@@ -362,7 +362,7 @@ pub async fn build_pieces(
 
     // We should have all the data for the enrichment tables loaded now, so switch them over to
     // readonly.
-    ENRICHMENT_TABLES.finish_load();
+    enrichment_tables.finish_load();
 
     if errors.is_empty() {
         let pieces = Pieces {
@@ -373,7 +373,7 @@ pub async fn build_pieces(
             healthchecks,
             shutdown_coordinator,
             detach_triggers,
-            enrichment_tables: ENRICHMENT_TABLES.clone(),
+            enrichment_tables: enrichment_tables.clone(),
         };
 
         Ok(pieces)
