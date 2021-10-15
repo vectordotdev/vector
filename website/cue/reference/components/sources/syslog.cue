@@ -73,7 +73,7 @@ components: sources: syslog: {
 		}
 		max_length: {
 			common:      true
-			description: "The maximum bytes size of incoming messages before they are discarded."
+			description: "The maximum buffer size of incoming messages. Messages larger than this are truncated."
 			required:    false
 			warnings: []
 			type: uint: {

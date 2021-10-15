@@ -1,20 +1,19 @@
 use crate::{
-    codecs::{Decoder, FramingConfig, ParserConfig},
+    codecs::{self, Decoder, FramingConfig, ParserConfig},
     event::Event,
-    internal_events::{SocketEventsReceived, SocketMode},
+    internal_events::{SocketEventsReceived, SocketMode, SocketReceiveError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::{util::TcpError, Source},
     udp, Pipeline,
 };
-use async_stream::stream;
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use futures::{SinkExt, StreamExt};
 use getset::{CopyGetters, Getters};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use tokio::net::UdpSocket;
-use tokio_util::udp::UdpFramed;
+use tokio_util::codec::FramedRead;
 
 /// UDP processes messages per packet, where messages are separated by newline.
 #[derive(Deserialize, Serialize, Debug, Clone, Getters, CopyGetters)]
@@ -52,10 +51,11 @@ impl UdpConfig {
 
 pub fn udp(
     address: SocketAddr,
+    max_length: usize,
     host_key: String,
     receive_buffer_bytes: Option<usize>,
     decoder: Decoder,
-    shutdown: ShutdownSignal,
+    mut shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> Source {
     let mut out = out.sink_map_err(|error| error!(message = "Error sending event.", %error));
@@ -71,45 +71,72 @@ pub fn udp(
             }
         }
 
+        let max_length = if let Some(receive_buffer_bytes) = receive_buffer_bytes {
+            std::cmp::min(max_length, receive_buffer_bytes)
+        } else {
+            max_length
+        };
+
         info!(message = "Listening.", address = %address);
 
-        let mut stream = UdpFramed::new(socket, decoder).take_until(shutdown);
-        (stream! {
-            loop {
-                match stream.next().await {
-                    Some(Ok(((events, byte_size), received_from))) => {
-                        emit!(&SocketEventsReceived {
+        let mut buf = BytesMut::with_capacity(max_length);
+        loop {
+            buf.resize(max_length, 0);
+            tokio::select! {
+                recv = socket.recv_from(&mut buf) => {
+                    let (byte_size, address) = recv.map_err(|error| {
+                        let error = codecs::Error::FramingError(error.into());
+                        emit!(&SocketReceiveError {
                             mode: SocketMode::Udp,
-                            byte_size,
-                            count: events.len()
-                        });
+                            error: &error
+                        })
+                    })?;
 
-                        for mut event in events {
-                            if let Event::Log(ref mut log) = event {
-                                log.insert(
-                                    crate::config::log_schema().source_type_key(),
-                                    Bytes::from("socket"),
-                                );
+                    let payload = buf.split_to(byte_size);
 
-                                log.insert(host_key.clone(), received_from.to_string());
+                    let mut stream = FramedRead::new(payload.as_ref(), decoder.clone());
+
+                    loop {
+                        match stream.next().await {
+                            Some(Ok((events, byte_size))) => {
+                                emit!(&SocketEventsReceived {
+                                    mode: SocketMode::Udp,
+                                    byte_size,
+                                    count: events.len()
+                                });
+
+                                for mut event in events {
+                                    if let Event::Log(ref mut log) = event {
+                                        log.insert(
+                                            crate::config::log_schema().source_type_key(),
+                                            Bytes::from("socket"),
+                                        );
+
+                                        log.insert(host_key.clone(), address.to_string());
+                                    }
+
+                                    tokio::select!{
+                                        result = out.send(event) => {match result {
+                                            Ok(()) => { },
+                                            Err(()) => return Ok(()),
+                                        }}
+                                        _ = &mut shutdown => return Ok(()),
+                                    }
+                                }
                             }
-
-                            yield event;
+                            Some(Err(error)) => {
+                                // Error is logged by `crate::codecs::Decoder`, no
+                                // further handling is needed here.
+                                if !error.can_continue() {
+                                    break;
+                                }
+                            }
+                            None => break,
                         }
                     }
-                    Some(Err(error)) => {
-                        // Error is logged by `crate::codecs::Decoder`, no
-                        // further handling is needed here.
-                        if !error.can_continue() {
-                            break;
-                        }
-                    }
-                    None => break,
                 }
+                _ = &mut shutdown => return Ok(()),
             }
-        })
-        .map(Ok)
-        .forward(&mut out)
-        .await
+        }
     })
 }
