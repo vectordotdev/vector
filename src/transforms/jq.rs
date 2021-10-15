@@ -1,4 +1,7 @@
-use std::{convert::{TryFrom, TryInto}, str::FromStr};
+use std::{
+    convert::{TryFrom, TryInto},
+    str::FromStr,
+};
 
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
@@ -6,7 +9,7 @@ use crate::{
     transforms::{FunctionTransform, Transform},
 };
 use serde::{Deserialize, Serialize};
-use tracing::{warn, error, debug};
+use tracing::{debug, error, warn};
 use vector_core::event::LogEvent;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -22,7 +25,7 @@ inventory::submit! {
 impl GenerateConfig for JqConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            query : ".".to_owned(),
+            query: ".".to_owned(),
         })
         .unwrap()
     }
@@ -32,9 +35,7 @@ impl GenerateConfig for JqConfig {
 #[typetag::serde(name = "jq")]
 impl TransformConfig for JqConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(Jq::new(
-            self.clone(),
-        )))
+        Ok(Transform::function(Jq::new(self.clone())))
     }
 
     fn input_type(&self) -> DataType {
@@ -70,7 +71,7 @@ impl FunctionTransform for Jq {
         if let Ok(l) = v {
             let lstr = l.to_string();
             let o = jq_rs::run(self.query.as_str(), lstr.as_str());
-            if let Ok(out_str) =  o {
+            if let Ok(out_str) = o {
                 let json = serde_json::Value::from_str(out_str.as_str());
                 if let Ok(json_value) = json {
                     match json_value {
@@ -82,7 +83,7 @@ impl FunctionTransform for Jq {
                                 } else {
                                     let error = log_evt.unwrap_err();
                                     error!(message = "Unhandled log \t", %json_value, %error);
-                                }            
+                                }
                             });
                         }
                         serde_json::Value::Object(_) => {
@@ -92,7 +93,7 @@ impl FunctionTransform for Jq {
                             } else {
                                 let error = log_evt.unwrap_err();
                                 error!(message = "Unhandled log \t", %error);
-                            }        
+                            }
                         }
                         serde_json::Value::Null => (),
                         _ => {
@@ -101,12 +102,12 @@ impl FunctionTransform for Jq {
                     }
                 } else {
                     debug!(message = "Unhandled json \t", %out_str);
-                }            
+                }
             } else {
                 let error = o.unwrap_err();
                 warn!(message = "error running query: \t", %error);
-                // output.push(event) 
-            }           
+                // output.push(event)
+            }
         } else {
             let error = v.unwrap_err();
             warn!(message = "error decoding event: \t", %error);
