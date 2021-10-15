@@ -218,13 +218,13 @@ fn line_to_events(mut decoder: codecs::Decoder, line: String) -> SmallVec<[Event
                     for mut event in decoded {
                         if let Event::Log(ref mut log) = event {
                             if let Ok(ts) = timestamp.parse::<DateTime<Utc>>() {
-                                log.insert(log_schema().timestamp_key(), ts);
+                                log.try_insert(log_schema().timestamp_key(), ts);
                             }
 
-                            log.insert(log_schema().host_key(), hostname.to_owned());
+                            log.try_insert(log_schema().host_key(), hostname.to_owned());
 
-                            log.insert("app_name", app_name.to_owned());
-                            log.insert("proc_id", proc_id.to_owned());
+                            log.try_insert_flat("app_name", app_name.to_owned());
+                            log.try_insert_flat("proc_id", proc_id.to_owned());
                         }
 
                         events.push(event);
@@ -251,7 +251,7 @@ fn line_to_events(mut decoder: codecs::Decoder, line: String) -> SmallVec<[Event
     for event in &mut events {
         if let Event::Log(log) = event {
             // Add source type
-            log.insert_flat(log_schema().source_type_key(), Bytes::from("heroku_logs"));
+            log.try_insert(log_schema().source_type_key(), Bytes::from("heroku_logs"));
         }
     }
 

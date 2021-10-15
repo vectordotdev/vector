@@ -265,17 +265,17 @@ impl DatadogAgentSource {
                     Ok(Some((events, _byte_size))) => {
                         for mut event in events {
                             if let Event::Log(ref mut log) = event {
-                                log.insert_flat(self.log_schema_timestamp_key, now);
-                                log.insert_flat(
+                                log.try_insert_flat(self.log_schema_timestamp_key, now);
+                                log.try_insert_flat(
                                     self.log_schema_source_type_key,
                                     Bytes::from("datadog_agent"),
                                 );
-                                log.insert_flat("status", message.status.clone());
-                                log.insert_flat("timestamp", message.timestamp);
-                                log.insert_flat("hostname", message.hostname.clone());
-                                log.insert_flat("service", message.service.clone());
-                                log.insert_flat("ddsource", message.ddsource.clone());
-                                log.insert_flat("ddtags", message.ddtags.clone());
+                                log.try_insert_flat("status", message.status.clone());
+                                log.try_insert_flat("timestamp", message.timestamp);
+                                log.try_insert_flat("hostname", message.hostname.clone());
+                                log.try_insert_flat("service", message.service.clone());
+                                log.try_insert_flat("ddsource", message.ddsource.clone());
+                                log.try_insert_flat("ddtags", message.ddtags.clone());
                                 if let Some(k) = &api_key {
                                     log.metadata_mut().set_datadog_api_key(Some(Arc::clone(k)));
                                 }

@@ -158,7 +158,7 @@ fn add_path(events: &mut [Event], key: &str, path: &str) {
     for event in events.iter_mut() {
         event
             .as_mut_log()
-            .insert(key, Value::from(path.to_string()));
+            .try_insert(key, Value::from(path.to_string()));
     }
 }
 
@@ -167,7 +167,7 @@ fn add_headers(events: &mut [Event], headers_config: &[String], headers: HeaderM
         let value = headers.get(header_name).map(HeaderValue::as_bytes);
 
         for event in events.iter_mut() {
-            event.as_mut_log().insert(
+            event.as_mut_log().try_insert_flat(
                 header_name as &str,
                 Value::from(value.map(Bytes::copy_from_slice)),
             );

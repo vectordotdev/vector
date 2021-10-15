@@ -55,13 +55,13 @@ fn handle_events(
     for event in events {
         let log = event.as_mut_log();
 
-        log.insert(
+        log.try_insert(
             crate::config::log_schema().source_type_key(),
             Bytes::from("socket"),
         );
 
         if let Some(ref host) = received_from {
-            log.insert(host_key, host.clone());
+            log.try_insert(host_key, host.clone());
         }
     }
 }

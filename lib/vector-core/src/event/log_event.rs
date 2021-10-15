@@ -166,6 +166,14 @@ impl LogEvent {
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
+    pub fn try_insert_flat(&mut self, key: impl AsRef<str>, value: impl Into<Value> + Debug) {
+        let key = key.as_ref();
+        if !self.contains(key) {
+            self.insert_flat(key, value);
+        }
+    }
+
+    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn remove(&mut self, key: impl AsRef<str>) -> Option<Value> {
         util::log::remove(self.as_map_mut(), key.as_ref(), false)
     }

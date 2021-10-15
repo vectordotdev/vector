@@ -47,9 +47,9 @@ pub async fn firehose(
 
                     for mut event in events {
                         if let Event::Log(ref mut log) = event {
-                            log.insert(log_schema().timestamp_key(), request.timestamp);
-                            log.insert("request_id", request_id.to_string());
-                            log.insert("source_arn", source_arn.to_string());
+                            log.try_insert(log_schema().timestamp_key(), request.timestamp);
+                            log.try_insert_flat("request_id", request_id.to_string());
+                            log.try_insert_flat("source_arn", source_arn.to_string());
                         }
 
                         out.send(event)

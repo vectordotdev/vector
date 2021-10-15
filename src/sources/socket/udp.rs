@@ -107,12 +107,12 @@ pub fn udp(
 
                                 for mut event in events {
                                     if let Event::Log(ref mut log) = event {
-                                        log.insert(
+                                        log.try_insert(
                                             crate::config::log_schema().source_type_key(),
                                             Bytes::from("socket"),
                                         );
 
-                                        log.insert(host_key.clone(), address.to_string());
+                                        log.try_insert(host_key.clone(), address.to_string());
                                     }
 
                                     tokio::select!{

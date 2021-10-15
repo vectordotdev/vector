@@ -465,32 +465,29 @@ fn handle_event(
     event: &mut Event,
 ) {
     if let Event::Log(log) = event {
-        let timestamp_key = log_schema().timestamp_key();
-        if !log.contains(timestamp_key) {
-            // Add timestamp
-            log.insert(timestamp_key, Utc::now());
-        }
+        // Add timestamp
+        log.try_insert(log_schema().timestamp_key(), Utc::now());
 
         // Add source type
-        log.insert(log_schema().source_type_key(), Bytes::from(EXEC));
+        log.try_insert(log_schema().source_type_key(), Bytes::from(EXEC));
 
         // Add data stream of stdin or stderr (if needed)
         if let Some(data_stream) = data_stream {
-            log.insert(STREAM_KEY, data_stream.clone());
+            log.try_insert_flat(STREAM_KEY, data_stream.clone());
         }
 
         // Add pid (if needed)
         if let Some(pid) = pid {
-            log.insert(PID_KEY, pid as i64);
+            log.try_insert_flat(PID_KEY, pid as i64);
         }
 
         // Add hostname (if needed)
         if let Some(hostname) = hostname {
-            log.insert(log_schema().host_key(), hostname.clone());
+            log.try_insert(log_schema().host_key(), hostname.clone());
         }
 
         // Add command
-        log.insert(COMMAND_KEY, config.command.clone());
+        log.try_insert_flat(COMMAND_KEY, config.command.clone());
     }
 }
 

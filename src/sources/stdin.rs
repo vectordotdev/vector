@@ -128,10 +128,10 @@ where
                         for mut event in events {
                             let log = event.as_mut_log();
 
-                            log.insert(log_schema().source_type_key(), Bytes::from("stdin"));
+                            log.try_insert(log_schema().source_type_key(), Bytes::from("stdin"));
 
                             if let Some(hostname) = &hostname {
-                                log.insert(&host_key, hostname.clone());
+                                log.try_insert(&host_key, hostname.clone());
                             }
 
                             yield event;

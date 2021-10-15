@@ -110,7 +110,7 @@ impl TcpSource for RawTcpSource {
 
         for event in events {
             if let Event::Log(ref mut log) = event {
-                log.insert(
+                log.try_insert(
                     crate::config::log_schema().source_type_key(),
                     Bytes::from("socket"),
                 );
@@ -118,7 +118,7 @@ impl TcpSource for RawTcpSource {
                 let host_key = (self.config.host_key.clone())
                     .unwrap_or_else(|| crate::config::log_schema().host_key().to_string());
 
-                log.insert(host_key, host.clone());
+                log.try_insert(host_key, host.clone());
             }
         }
     }
