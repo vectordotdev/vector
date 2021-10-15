@@ -8,7 +8,7 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::TimeZone;
-use futures::{future, stream::BoxStream, SinkExt, StreamExt};
+use futures::{future, stream, stream::BoxStream, SinkExt, StreamExt};
 use lazy_static::lazy_static;
 use nix::{
     sys::signal::{kill, Signal},
@@ -292,13 +292,17 @@ impl JournaldSource {
         cursor: &'a mut Option<String>,
     ) -> bool {
         loop {
-            let mut saw_record = false;
+            let mut count = 0;
+            let mut byte_size = 0;
+            let mut events = Vec::new();
+            let mut exiting = false;
 
             for _ in 0..self.batch_size {
                 let bytes = match stream.next().await {
                     None => {
                         warn!("Journalctl process stopped.");
-                        return true;
+                        exiting = true;
+                        break;
                     }
                     Some(Ok(text)) => text,
                     Some(Err(error)) => {
@@ -328,28 +332,32 @@ impl JournaldSource {
                     *cursor = Some(tmp);
                 }
 
-                saw_record = true;
                 let exclude = filter_matches(&record, &self.include_matches, &self.exclude_matches);
                 let event = create_event(record);
-                emit!(&JournaldEventsReceived {
-                    count: 1,
-                    byte_size: event.size_of(),
-                });
+                count += 1;
+                byte_size += event.size_of();
 
                 if !exclude {
-                    match self.out.send(event).await {
+                    events.push(event);
+                }
+            }
+
+            if count > 0 {
+                emit!(&JournaldEventsReceived { count, byte_size });
+                if !events.is_empty() {
+                    match self.out.send_all(&mut stream::iter(events).map(Ok)).await {
                         Ok(_) => {}
                         Err(error) => {
                             error!(message = "Could not send journald log.", %error);
                             // `out` channel is closed, don't restart journalctl.
-                            return false;
+                            break false;
                         }
                     }
                 }
-            }
-
-            if saw_record {
                 Self::save_checkpoint(checkpointer, &*cursor).await;
+            }
+            if exiting {
+                break true;
             }
         }
     }
