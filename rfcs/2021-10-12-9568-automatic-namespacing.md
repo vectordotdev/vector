@@ -92,12 +92,12 @@ fn load_sinks_from_dir(path: &Path, builder: &mut ConfigBuilder, errors: &mut Ve
 
 Why is this change worth it?
 
-- The new pipeline 2.0 will require such a feature in order to to load the transforms and the inner pipelines.
+- Having this kind of feature for the new pipeline 2.0 will make it easier to load the transforms and the inner pipelines. It will also make it much nicer to use across multiple teams.
 - This would allow to an admin to allow users to write the files in the `transforms` folder and not read the files in `sinks` folder.
 
 How does this position us for success in the future?
 
-- Having this feature for Pipeline 2.0 will help to split the configuration file into compound transforms. Splitting the configuration that way will allow having a dedicated folder or file for the definition of those transforms. It will make it much nicer to use across multiple teams.
+- Pipeline 2.0 will rely on splitting the configuration file into compound transforms. Splitting the configuration that way will allow to have a dedicated folder or file for the definition of those transforms.
 
 ## Drawbacks
 
