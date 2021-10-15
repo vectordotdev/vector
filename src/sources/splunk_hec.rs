@@ -826,7 +826,7 @@ mod tests {
         token: Option<String>,
         valid_tokens: Option<&[&str]>,
     ) -> (mpsc::Receiver<Event>, SocketAddr) {
-        components::init();
+        components::init_test();
         let (sender, recv) = Pipeline::new_test();
         let address = next_addr();
         let valid_tokens =
@@ -957,8 +957,6 @@ mod tests {
 
     #[tokio::test]
     async fn no_compression_text_event() {
-        trace_init();
-
         let message = "gzip_text_event";
         let (sink, source) = start(Encoding::Text, Compression::None).await;
 
@@ -974,8 +972,6 @@ mod tests {
 
     #[tokio::test]
     async fn one_simple_text_event() {
-        trace_init();
-
         let message = "one_simple_text_event";
         let (sink, source) = start(Encoding::Text, Compression::gzip_default()).await;
 
@@ -991,8 +987,6 @@ mod tests {
 
     #[tokio::test]
     async fn multiple_simple_text_event() {
-        trace_init();
-
         let n = 200;
         let (sink, source) = start(Encoding::Text, Compression::None).await;
 
@@ -1013,8 +1007,6 @@ mod tests {
 
     #[tokio::test]
     async fn one_simple_json_event() {
-        trace_init();
-
         let message = "one_simple_json_event";
         let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
 
@@ -1030,8 +1022,6 @@ mod tests {
 
     #[tokio::test]
     async fn multiple_simple_json_event() {
-        trace_init();
-
         let n = 200;
         let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
 
@@ -1052,8 +1042,6 @@ mod tests {
 
     #[tokio::test]
     async fn json_event() {
-        trace_init();
-
         let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
 
         let mut event = Event::new_empty_log();
@@ -1073,8 +1061,6 @@ mod tests {
 
     #[tokio::test]
     async fn line_to_message() {
-        trace_init();
-
         let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
 
         let mut event = Event::new_empty_log();
@@ -1087,8 +1073,6 @@ mod tests {
 
     #[tokio::test]
     async fn raw() {
-        trace_init();
-
         let message = "raw";
         let (source, address) = source().await;
 
@@ -1107,8 +1091,6 @@ mod tests {
 
     #[tokio::test]
     async fn channel_header() {
-        trace_init();
-
         let message = "raw";
         let (source, address) = source().await;
 
@@ -1129,8 +1111,6 @@ mod tests {
 
     #[tokio::test]
     async fn xff_header_raw() {
-        trace_init();
-
         let message = "raw";
         let (source, address) = source().await;
 
@@ -1152,8 +1132,6 @@ mod tests {
     // Test helps to illustrate that a payload's `host` value should override an x-forwarded-for header
     #[tokio::test]
     async fn xff_header_event_with_host_field() {
-        trace_init();
-
         let message = r#"{"event":"first", "host": "10.1.0.2"}"#;
         let (source, address) = source().await;
 
@@ -1175,8 +1153,6 @@ mod tests {
     // Test helps to illustrate that a payload's `host` value should override an x-forwarded-for header
     #[tokio::test]
     async fn xff_header_event_without_host_field() {
-        trace_init();
-
         let message = r#"{"event":"first", "color": "blue"}"#;
         let (source, address) = source().await;
 
@@ -1197,8 +1173,6 @@ mod tests {
 
     #[tokio::test]
     async fn channel_query_param() {
-        trace_init();
-
         let message = "raw";
         let (source, address) = source().await;
 
@@ -1219,8 +1193,6 @@ mod tests {
 
     #[tokio::test]
     async fn no_data() {
-        trace_init();
-
         let (_source, address) = source().await;
 
         assert_eq!(400, post(address, "services/collector/event", "").await);
@@ -1228,8 +1200,6 @@ mod tests {
 
     #[tokio::test]
     async fn invalid_token() {
-        trace_init();
-
         let (_source, address) = source().await;
         let opts = SendWithOpts {
             channel: Some(Channel::Header("channel")),
@@ -1244,8 +1214,6 @@ mod tests {
 
     #[tokio::test]
     async fn secondary_token() {
-        trace_init();
-
         let message = r#"{"event":"first", "color": "blue"}"#;
         let (_source, address) = source_with(None, Some(VALID_TOKENS)).await;
         let options = SendWithOpts {
@@ -1269,8 +1237,6 @@ mod tests {
 
     #[tokio::test]
     async fn no_authorization() {
-        trace_init();
-
         let message = "no_authorization";
         let (source, address) = source_with(None, None).await;
         let (sink, health) = sink(address, Encoding::Text, Compression::gzip_default()).await;
@@ -1284,8 +1250,6 @@ mod tests {
 
     #[tokio::test]
     async fn partial() {
-        trace_init();
-
         let message = r#"{"event":"first"}{"event":"second""#;
         let (source, address) = source().await;
 
@@ -1306,8 +1270,6 @@ mod tests {
 
     #[tokio::test]
     async fn handles_newlines() {
-        trace_init();
-
         let message = r#"
 {"event":"first"}
         "#;
@@ -1330,8 +1292,6 @@ mod tests {
 
     #[tokio::test]
     async fn handles_spaces() {
-        trace_init();
-
         let message = r#" {"event":"first"} "#;
         let (source, address) = source().await;
 
@@ -1352,8 +1312,6 @@ mod tests {
 
     #[tokio::test]
     async fn default() {
-        trace_init();
-
         let message = r#"{"event":"first","source":"main"}{"event":"second"}{"event":"third","source":"secondary"}"#;
         let (source, address) = source().await;
 
@@ -1423,8 +1381,6 @@ mod tests {
     /// https://github.com/seanmonstar/warp/pull/713
     #[tokio::test]
     async fn host_test() {
-        trace_init();
-
         let message = "for the host";
         let (sink, source) = start(Encoding::Text, Compression::gzip_default()).await;
 

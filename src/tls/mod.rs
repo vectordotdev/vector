@@ -17,7 +17,7 @@ mod settings;
 #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
 pub(crate) use incoming::{MaybeTlsIncomingStream, MaybeTlsListener};
 pub(crate) use maybe_tls::MaybeTls;
-pub use settings::{MaybeTlsSettings, TlsConfig, TlsOptions, TlsSettings, get_protocol};
+pub use settings::{get_protocol, MaybeTlsSettings, TlsConfig, TlsOptions, TlsSettings};
 #[cfg(test)]
 pub use settings::{TEST_PEM_CA_PATH, TEST_PEM_CRT_PATH, TEST_PEM_KEY_PATH};
 
@@ -182,4 +182,3 @@ fn tls_connector(settings: &MaybeTlsSettings) -> Result<ConnectConfiguration> {
         .verify_hostname(verify_hostname);
     Ok(configure)
 }
-
