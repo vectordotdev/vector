@@ -51,6 +51,8 @@ type = "anything"
 
 - Any duplicate component ID (like `sinks/foo.toml` and `sinks/foo.json`) will error.
 - If Vector's configuration is loaded using a specific file (`--config /etc/vector/vector.toml` for example), Vector will keep its default behavior and only load this file.
+- To keep backward compatibility, if Vector encounters a folder with a name that doesn't refer to a component type (like `/etc/vector/foo`, a warning will be thrown and will ignore the folder.
+- If a component file (like `/etc/vector/sinks/foo.toml`) doesn't have a proper sink configuration structure, Vector will error.
 
 ### Implementation
 
