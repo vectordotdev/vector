@@ -292,6 +292,7 @@ impl JournaldSource {
         cursor: &'a mut Option<String>,
     ) -> bool {
         loop {
+            let mut record_size = 0;
             let mut count = 0;
             let mut byte_size = 0;
             let mut events = Vec::new();
@@ -313,10 +314,7 @@ impl JournaldSource {
                         break;
                     }
                 };
-                emit!(&BytesReceived {
-                    byte_size: bytes.len(),
-                    protocol: "journald",
-                });
+                record_size += bytes.len();
 
                 let mut record = match decode_record(&bytes, self.remap_priority) {
                     Ok(record) => record,
@@ -342,6 +340,12 @@ impl JournaldSource {
                 }
             }
 
+            if record_size > 0 {
+                emit!(&BytesReceived {
+                    byte_size: record_size,
+                    protocol: "journald",
+                });
+            }
             if count > 0 {
                 emit!(&JournaldEventsReceived { count, byte_size });
                 if !events.is_empty() {
