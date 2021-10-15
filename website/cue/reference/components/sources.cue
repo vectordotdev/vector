@@ -112,7 +112,7 @@ components: sources: [Name=string]: {
 									required:    false
 									common:      false
 									type: uint: {
-										default: 102400
+										default: null
 										examples: [65535, 102400]
 										unit: "bytes"
 									}
@@ -130,7 +130,7 @@ components: sources: [Name=string]: {
 									required:    false
 									common:      false
 									type: uint: {
-										default: 102400
+										default: null
 										examples: [65535, 102400]
 										unit: "bytes"
 									}
@@ -148,7 +148,7 @@ components: sources: [Name=string]: {
 									required:    false
 									common:      false
 									type: uint: {
-										default: 102400
+										default: null
 										examples: [65535, 102400]
 										unit: "bytes"
 									}
