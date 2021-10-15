@@ -1,6 +1,7 @@
 use crate::{
     codecs::{BoxedParser, Parser, ParserConfig},
-    event::Event,
+    config::log_schema,
+    event::{Event, LogEvent},
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
@@ -40,11 +41,9 @@ impl BytesParser {
 
 impl Parser for BytesParser {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
-        // Currently, the `From` implementation from `Bytes` to `Event` adds a
-        // timestamp to the event. This is not strictly related to parsing and
-        // should probably better be done explicitly in another place. However,
-        // many parts in Vector rely on this behavior, so we just leave it here.
-        Ok(smallvec![bytes.into()])
+        let mut log = LogEvent::default();
+        log.insert(log_schema().message_key(), bytes);
+        Ok(smallvec![log.into()])
     }
 }
 
