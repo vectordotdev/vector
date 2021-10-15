@@ -445,6 +445,13 @@ fn open_read(filename: &Path, note: &'static str) -> Result<(Vec<u8>, PathBuf)> 
     Ok((text, filename.into()))
 }
 
+pub const fn get_protocol(tls_config: &Option<TlsConfig>) -> &'static str {
+    match tls_config {
+        Some(_) => "https",
+        None => "http",
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

@@ -17,7 +17,7 @@ mod settings;
 #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
 pub(crate) use incoming::{MaybeTlsIncomingStream, MaybeTlsListener};
 pub(crate) use maybe_tls::MaybeTls;
-pub use settings::{MaybeTlsSettings, TlsConfig, TlsOptions, TlsSettings};
+pub use settings::{MaybeTlsSettings, TlsConfig, TlsOptions, TlsSettings, get_protocol};
 #[cfg(test)]
 pub use settings::{TEST_PEM_CA_PATH, TEST_PEM_CRT_PATH, TEST_PEM_KEY_PATH};
 
@@ -183,9 +183,3 @@ fn tls_connector(settings: &MaybeTlsSettings) -> Result<ConnectConfiguration> {
     Ok(configure)
 }
 
-pub(crate) const fn get_protocol(tls_config: &Option<TlsConfig>) -> &'static str {
-    match tls_config {
-        Some(_) => "https",
-        None => "http",
-    }
-}
