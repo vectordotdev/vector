@@ -801,7 +801,7 @@ mod tests {
         test_util::{
             collect_n,
             components::{self, HTTP_PUSH_SOURCE_TAGS, SOURCE_TESTS},
-            next_addr, trace_init, wait_for_tcp,
+            next_addr, wait_for_tcp,
         },
         Pipeline,
     };
