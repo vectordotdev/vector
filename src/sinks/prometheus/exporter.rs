@@ -437,7 +437,7 @@ mod tests {
         event::metric::{Metric, MetricValue},
         http::HttpClient,
         test_util::{next_addr, random_string, trace_init},
-        tls::MaybeTlsSettings,
+        tls::{get_protocol, MaybeTlsSettings},
     };
     use chrono::Duration;
     use indoc::indoc;
@@ -492,10 +492,7 @@ mod tests {
         trace_init();
 
         let client_settings = MaybeTlsSettings::from_config(&tls_config, false).unwrap();
-        let proto = match &tls_config {
-            Some(_) => "https",
-            None => "http",
-        };
+        let proto = get_protocol(&tls_config);
 
         let address = next_addr();
         let config = PrometheusExporterConfig {

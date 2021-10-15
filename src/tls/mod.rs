@@ -182,3 +182,10 @@ fn tls_connector(settings: &MaybeTlsSettings) -> Result<ConnectConfiguration> {
         .verify_hostname(verify_hostname);
     Ok(configure)
 }
+
+pub(crate) const fn get_protocol(tls_config: &Option<TlsConfig>) -> &'static str {
+    match tls_config {
+        Some(_) => "https",
+        None => "http",
+    }
+}

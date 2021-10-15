@@ -111,6 +111,7 @@ mod test {
         config::{SinkConfig, SinkContext},
         sinks::prometheus::remote_write::RemoteWriteConfig,
         test_util::{self, components},
+        tls::get_protocol,
         Pipeline,
     };
     use chrono::{SubsecRound as _, Utc};
@@ -137,7 +138,7 @@ mod test {
         let address = test_util::next_addr();
         let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
 
-        let proto = if tls.is_none() { "http" } else { "https" };
+        let proto = get_protocol(&tls);
         let source = PrometheusRemoteWriteConfig {
             address,
             auth: None,

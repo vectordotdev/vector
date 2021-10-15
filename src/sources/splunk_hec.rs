@@ -5,7 +5,7 @@ use crate::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
         SplunkHecRequestReceived,
     },
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{get_protocol, MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
 use bytes::{Buf, Bytes};
@@ -152,10 +152,7 @@ impl SplunkSource {
             .iter()
             .flatten()
             .chain(config.token.iter());
-        let protocol = match config.tls {
-            Some(_) => "https",
-            None => "http",
-        };
+        let protocol = get_protocol(&config.tls);
         SplunkSource {
             valid_credentials: valid_tokens
                 .map(|token| format!("Splunk {}", token))
