@@ -70,3 +70,15 @@ impl<T: AsyncWrite, F> AsyncWrite for StreamWrapper<T, F> {
         self.project().inner.poll_shutdown(cx)
     }
 }
+
+#[cfg(feature = "tonic")]
+mod tonic {
+    use tonic::transport::server::Connected;
+
+    impl<T: Connected, F> Connected for super::StreamWrapper<T, F> {
+        type ConnectInfo = T::ConnectInfo;
+        fn connect_info(&self) -> Self::ConnectInfo {
+            self.inner.connect_info()
+        }
+    }
+}
