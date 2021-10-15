@@ -447,9 +447,6 @@ mod tests {
                 [sources.source0.framing]
                 method = "newline_delimited"
 
-                [sources.source0.framing.newline_delimited]
-                max_length = 102400
-
                 [transforms.transform0]
                 inputs = ["source0"]
                 drop_field = true
@@ -489,9 +486,6 @@ mod tests {
                 [sources.source0.framing]
                 method = "newline_delimited"
 
-                [sources.source0.framing.newline_delimited]
-                max_length = 102400
-
                 [transforms.transform0]
                 inputs = ["source0"]
                 drop_field = true
@@ -530,9 +524,6 @@ mod tests {
 
                 [sources.source0.framing]
                 method = "newline_delimited"
-
-                [sources.source0.framing.newline_delimited]
-                max_length = 102400
 
                 [sinks.sink0]
                 inputs = ["source0"]
