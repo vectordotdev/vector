@@ -2,7 +2,7 @@ use crate::{
     codecs::{BoxedFramingError, CharacterDelimitedCodec},
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::{Event, LogEvent, Value},
-    internal_events::{JournaldEventReceived, JournaldInvalidRecord},
+    internal_events::{BytesReceived, JournaldEventsReceived, JournaldInvalidRecord},
     shutdown::ShutdownSignal,
     Pipeline,
 };
@@ -26,14 +26,14 @@ use std::{
     str::FromStr,
     time::Duration,
 };
-use tokio_util::codec::FramedRead;
-
 use tokio::{
     fs::{File, OpenOptions},
     io::{self, AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
     process::Command,
     time::sleep,
 };
+use tokio_util::codec::FramedRead;
+use vector_core::ByteSizeOf;
 
 const DEFAULT_BATCH_SIZE: usize = 16;
 
@@ -309,6 +309,10 @@ impl JournaldSource {
                         break;
                     }
                 };
+                emit!(&BytesReceived {
+                    byte_size: bytes.len(),
+                    protocol: "journald",
+                });
 
                 let mut record = match decode_record(&bytes, self.remap_priority) {
                     Ok(record) => record,
@@ -325,21 +329,21 @@ impl JournaldSource {
                 }
 
                 saw_record = true;
-
-                if filter_matches(&record, &self.include_matches, &self.exclude_matches) {
-                    continue;
-                }
-
-                emit!(&JournaldEventReceived {
-                    byte_size: bytes.len()
+                let exclude = filter_matches(&record, &self.include_matches, &self.exclude_matches);
+                let event = create_event(record);
+                emit!(&JournaldEventsReceived {
+                    count: 1,
+                    byte_size: event.size_of(),
                 });
 
-                match self.out.send(create_event(record)).await {
-                    Ok(_) => {}
-                    Err(error) => {
-                        error!(message = "Could not send journald log.", %error);
-                        // `out` channel is closed, don't restart journalctl.
-                        return false;
+                if !exclude {
+                    match self.out.send(event).await {
+                        Ok(_) => {}
+                        Err(error) => {
+                            error!(message = "Could not send journald log.", %error);
+                            // `out` channel is closed, don't restart journalctl.
+                            return false;
+                        }
                     }
                 }
             }
@@ -649,6 +653,7 @@ mod checkpointer_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_util::components;
     use futures::Stream;
     use std::pin::Pin;
     use std::{
@@ -728,6 +733,7 @@ mod tests {
         exclude_matches: Matches,
         cursor: Option<&str>,
     ) -> Vec<Event> {
+        components::init_test();
         let (tx, rx) = Pipeline::new_test();
         let (trigger, shutdown, _) = ShutdownSignal::new_wired();
 
@@ -763,7 +769,9 @@ mod tests {
         sleep(Duration::from_millis(100)).await;
         drop(trigger);
 
-        timeout(Duration::from_secs(1), rx.collect()).await.unwrap()
+        let result = timeout(Duration::from_secs(1), rx.collect()).await.unwrap();
+        components::SOURCE_TESTS.assert(&["protocol"]);
+        result
     }
 
     fn create_unit_matches<S: Into<String>>(units: Vec<S>) -> Matches {

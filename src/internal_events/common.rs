@@ -4,6 +4,22 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
+pub struct BytesReceived {
+    pub byte_size: usize,
+    pub protocol: &'static str,
+}
+
+impl InternalEvent for BytesReceived {
+    fn emit_logs(&self) {
+        trace!(message = "Bytes received.", byte_size = %self.byte_size, protocol = %self.protocol);
+    }
+
+    fn emit_metrics(&self) {
+        counter!("component_received_bytes_total", self.byte_size as u64, "protocol" => self.protocol);
+    }
+}
+
+#[derive(Debug)]
 pub struct EventsReceived {
     pub count: usize,
     pub byte_size: usize,
