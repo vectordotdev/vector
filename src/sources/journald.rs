@@ -314,7 +314,6 @@ impl JournaldSource {
                         break;
                     }
                 };
-                record_size += bytes.len();
 
                 let mut record = match decode_record(&bytes, self.remap_priority) {
                     Ok(record) => record,
@@ -330,12 +329,11 @@ impl JournaldSource {
                     *cursor = Some(tmp);
                 }
 
-                let exclude = filter_matches(&record, &self.include_matches, &self.exclude_matches);
-                let event = create_event(record);
-                count += 1;
-                byte_size += event.size_of();
-
-                if !exclude {
+                if !filter_matches(&record, &self.include_matches, &self.exclude_matches) {
+                    record_size += bytes.len();
+                    let event = create_event(record);
+                    count += 1;
+                    byte_size += event.size_of();
                     events.push(event);
                 }
             }
