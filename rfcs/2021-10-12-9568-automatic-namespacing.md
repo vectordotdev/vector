@@ -95,7 +95,7 @@ Why is this change worth it?
 
 How does this position us for success in the future?
 
-- Pipeline 2.0 will rely on splitting the configuration file into compound transforms. Splitting the configuration that way will allow to have a dedicated folder or file for the definition of those transforms.
+- Having this feature for Pipeline 2.0 will help to split the configuration file into compound transforms. Splitting the configuration that way will allow having a dedicated folder or file for the definition of those transforms. It will make it much nicer to use across multiple teams.
 
 ## Drawbacks
 
@@ -109,10 +109,7 @@ Very little. This will have minimal impact to the Vector codebase. Configuration
 
 ## Prior Art
 
-- [Datadog Agent](https://docs.datadoghq.com/agent/guide/agent-configuration-files/?tab=agentv6v7)
 - [Ansible Playbook syntax](https://docs.ansible.com/ansible/latest/user_guide/playbooks_intro.html#playbook-syntax)
-- [Logstash configuration files](https://www.elastic.co/guide/en/logstash/current/config-setting-files.html)
-- [Fluentd configuration files](https://docs.fluentd.org/configuration/config-file)
 
 ## Outstanding Questions
 
