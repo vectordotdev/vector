@@ -10,6 +10,7 @@ use crate::{
     tls::TlsConfig,
 };
 use bytes::{Bytes, BytesMut};
+use chrono::Utc;
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr};
@@ -108,12 +109,12 @@ impl HttpSource for SimpleHttpSource {
         add_query_parameters(&mut events, &self.query_parameters, query_parameters);
         add_path(&mut events, self.path_key.as_str(), request_path);
 
-        // Add source type
-        let key_source_type = log_schema().source_type_key();
+        let now = Utc::now();
         for event in &mut events {
-            event
-                .as_mut_log()
-                .try_insert(key_source_type, Bytes::from("http"));
+            let log = event.as_mut_log();
+
+            log.try_insert(log_schema().source_type_key(), Bytes::from("http"));
+            log.try_insert(log_schema().timestamp_key(), now);
         }
 
         Ok(events)
