@@ -266,14 +266,15 @@ mod tests {
             SimpleHttpConfig {
                 address,
                 headers,
+                encoding: None,
                 query_parameters,
                 tls: None,
                 auth: None,
                 strict_path,
                 path_key,
                 path,
-                framing: framing.unwrap_or_else(default_framing_stream_based),
-                decoding: decoding.unwrap_or_else(default_decoding),
+                framing,
+                decoding,
             }
             .build(context)
             .await
