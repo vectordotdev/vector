@@ -7,15 +7,11 @@ use tokio_util::codec::{Decoder, Encoder};
 /// Config used to build a `CharacterDelimitedCodec`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CharacterDelimitedDecoderConfig {
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
     character_delimited: CharacterDelimitedDecoderOptions,
 }
 
 /// Options for building a `CharacterDelimitedCodec`.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct CharacterDelimitedDecoderOptions {
     /// The character that delimits byte sequences.
     delimiter: char,

@@ -15,7 +15,7 @@ pub struct OctetCountingDecoderConfig {
 }
 
 /// Options for building a `OctetCountingCodec`.
-#[derive(Debug, Clone, Derivative, Deserialize, Serialize)]
+#[derive(Debug, Clone, Derivative, Deserialize, Serialize, PartialEq)]
 #[derivative(Default)]
 pub struct OctetCountingDecoderOptions {
     #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]

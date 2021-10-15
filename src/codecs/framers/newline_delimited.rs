@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder;
 
 /// Config used to build a `NewlineDelimitedCodec`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
 pub struct NewlineDelimitedDecoderConfig {
     #[serde(
         default,
@@ -14,7 +14,7 @@ pub struct NewlineDelimitedDecoderConfig {
 }
 
 /// Options for building a `NewlineDelimitedCodec`.
-#[derive(Debug, Clone, Derivative, Deserialize, Serialize)]
+#[derive(Debug, Clone, Derivative, Deserialize, Serialize, PartialEq)]
 #[derivative(Default)]
 pub struct NewlineDelimitedDecoderOptions {
     /// The maximum length of the byte buffer.
