@@ -101,7 +101,7 @@ struct MapTimestampStream {
 #[async_trait]
 impl StreamSink for MapTimestampStream {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let mapped_input = input.map(|event| map_timestamp(event)).boxed();
+        let mapped_input = input.map(map_timestamp).boxed();
         self.inner.run(mapped_input).await
     }
 }

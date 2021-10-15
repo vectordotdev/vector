@@ -70,7 +70,7 @@ impl ElasticSearchService {
     ) -> ElasticSearchService {
         let http_request_builder = Arc::new(http_request_builder);
         let batch_service = HttpBatchService::new(http_client, move |req| {
-            let request_builder = http_request_builder.clone();
+            let request_builder = Arc::clone(&http_request_builder);
             let future: BoxFuture<'static, Result<http::Request<Vec<u8>>, crate::Error>> =
                 Box::pin(async move { request_builder.build_request(req).await });
             future
@@ -161,7 +161,7 @@ fn sign_request(
     credentials: &AwsCredentials,
     mut builder: http::request::Builder,
 ) -> http::request::Builder {
-    request.sign(&credentials);
+    request.sign(credentials);
 
     for (name, values) in request.headers() {
         let header_name = name
@@ -207,7 +207,7 @@ impl Service<ElasticSearchRequest> for ElasticSearchService {
             if event_status == EventStatus::Delivered {
                 emit!(&EventsSent {
                     count: batch_size,
-                    byte_size: byte_size
+                    byte_size
                 });
             }
             Ok(ElasticSearchResponse {
