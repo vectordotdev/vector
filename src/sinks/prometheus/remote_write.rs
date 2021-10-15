@@ -105,18 +105,18 @@ impl SinkConfig for RemoteWriteConfig {
                 .with_flat_map(move |event: Event| {
                     let byte_size = event.size_of();
                     stream::iter(normalizer.apply(event).map(|event| {
-                        let tenant_id = tenant_id.as_ref().and_then(|template| {
-                            template
-                                .render_string(&event)
-                                .map_err(|error| {
-                                    emit!(&TemplateRenderingFailed {
-                                        error,
-                                        field: Some("tenant_id"),
-                                        drop_event: false,
+                        let tenant_id = tenant_id.as_ref()
+                            .and_then(|template| {
+                                template.render_string(&event)
+                                    .map_err(|error| {
+                                        emit!(&TemplateRenderingFailed {
+                                            error,
+                                            field: Some("tenant_id"),
+                                            drop_event: false,
+                                        })
                                     })
-                                })
-                                .ok()
-                        });
+                                    .ok()
+                            });
                         let key = PartitionKey { tenant_id };
                         Ok(EncodedEvent::new(
                             PartitionInnerBuffer::new(event, key),

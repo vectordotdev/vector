@@ -1,7 +1,10 @@
 use std::{cmp, mem};
 
 use core_common::byte_size_of::ByteSizeOf;
+use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
+
+use crate::event::metric::Bucket;
 
 const AGENT_DEFAULT_BIN_LIMIT: u16 = 4096;
 const AGENT_DEFAULT_EPS: f64 = 1.0 / 128.0;
@@ -294,6 +297,7 @@ impl AgentDDSketch {
         self.is_empty().then(|| self.avg)
     }
 
+    /// Clears the sketch, removing all bins and resetting all statistics.
     pub fn clear(&mut self) {
         self.count = 0;
         self.min = f64::MAX;
@@ -459,7 +463,7 @@ impl AgentDDSketch {
         self.insert_key_counts(vec![(key, n)]);
     }
 
-    pub fn insert_interpolate(&mut self, lower: f64, upper: f64, count: u32) {
+    fn insert_interpolate_bucket(&mut self, lower: f64, upper: f64, count: u32) {
         // Find the keys for the bins where the lower bound and upper bound would end up, and
         // collect all of the keys in between, inclusive.
         let lower_key = self.config.key(lower);
@@ -514,6 +518,29 @@ impl AgentDDSketch {
         }
 
         self.insert_key_counts(key_counts);
+    }
+
+    pub fn insert_interpolate_buckets(&mut self, mut buckets: Vec<Bucket>) {
+        // Buckets need to be sorted from lowest to highest so that we can properly calculate the
+        // rolling lower/upper bounds.
+        buckets.sort_by(|a, b| {
+            let oa = OrderedFloat(a.upper_limit);
+            let ob = OrderedFloat(b.upper_limit);
+
+            oa.cmp(&ob)
+        });
+
+        let mut lower = 0.0;
+
+        for bucket in buckets {
+            let mut upper = bucket.upper_limit;
+            if upper.is_sign_positive() && upper.is_infinite() {
+                upper = lower;
+            }
+
+            self.insert_interpolate_bucket(lower, upper, bucket.count);
+            lower = bucket.upper_limit;
+        }
     }
 
     pub fn quantile(&self, q: f64) -> Option<f64> {
@@ -860,9 +887,23 @@ fn round_to_even(v: f64) -> f64 {
 
 #[cfg(test)]
 mod tests {
+    use crate::{event::metric::Bucket, metrics::handle::Histogram};
+
     use super::{round_to_even, AgentDDSketch, Config, AGENT_DEFAULT_EPS};
 
     const FLOATING_POINT_ACCEPTABLE_ERROR: f64 = 1.0e-10;
+
+    static HISTO_VALUES: &[u64] = &[
+        104221, 10206, 32436, 121686, 92848, 83685, 23739, 15122, 50491, 88507, 48318, 28004,
+        29576, 8735, 77693, 33965, 88047, 7592, 64138, 59966, 117956, 112525, 41743, 82790, 27084,
+        26967, 75008, 10752, 96636, 97150, 60768, 33411, 24746, 91872, 59057, 48329, 16756, 100459,
+        117640, 59244, 107584, 124303, 32368, 109940, 106353, 90452, 84471, 39086, 91119, 89680,
+        41339, 23329, 25629, 98156, 97002, 9538, 73671, 112586, 101616, 70719, 117291, 90043,
+        10713, 49195, 60656, 60887, 47332, 113675, 8371, 42619, 33489, 108629, 70501, 84355, 24576,
+        34468, 76756, 110706, 42854, 83841, 120751, 66494, 65210, 70244, 118529, 28021, 51603,
+        96315, 92364, 59120, 118968, 5484, 91790, 45171, 102756, 29673, 85303, 108322, 122793,
+        88373,
+    ];
 
     #[cfg(ddsketch_extended)]
     fn generate_pareto_distribution() -> Vec<OrderedFloat<f64>> {
@@ -1091,6 +1132,28 @@ mod tests {
         let max_value = i64::MAX as f32;
 
         test_relative_accuracy(config, AGENT_DEFAULT_EPS, min_value, max_value)
+    }
+
+    #[test]
+    fn test_histogram_interpolation() {
+        let mut histo_sketch = AgentDDSketch::with_agent_defaults();
+        assert!(histo_sketch.is_empty());
+
+        let histo = Histogram::new();
+        for num in HISTO_VALUES {
+            histo.record((*num as f64) / 10_000.0);
+        }
+
+        let buckets = histo
+            .buckets()
+            .map(|(ub, n)| Bucket {
+                upper_limit: ub,
+                count: n,
+            })
+            .collect::<Vec<_>>();
+        histo_sketch.insert_interpolate_buckets(buckets);
+
+        assert!(!histo_sketch.is_empty());
     }
 
     fn test_relative_accuracy(config: Config, rel_acc: f64, min_value: f32, max_value: f32) {

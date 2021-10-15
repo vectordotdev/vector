@@ -2,7 +2,7 @@ use std::io;
 
 use super::{encoding::Encoder, Compression, Compressor};
 
-/// Generalized interface for defining how a batch of events will be turned into an request.
+/// Generalized interface for defining how a batch of events will be turned into a request.
 pub trait RequestBuilder<Input> {
     type Metadata;
     type Events;
@@ -35,7 +35,7 @@ pub trait RequestBuilder<Input> {
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request;
 }
 
-/// Generalized interface for defining how a batch of events will incrementally be turned into an request.
+/// Generalized interface for defining how a batch of events will incrementally be turned into requests.
 /// 
 /// As opposed to `RequestBuilder`, this trait provides the means to incrementally build requests
 /// from a single batch of events, where all events in the batch may not fit into a single request.
@@ -45,15 +45,15 @@ pub trait RequestBuilder<Input> {
 /// While batches can be limited in size before being handed off to a request builder, we can't
 /// always know in advance how large the encoded payload will be, which requires us to be able to
 /// potentially split a batch into multiple requests.
-pub trait StatefulRequestBuilder<Input> {
+pub trait IncrementalRequestBuilder<Input> {
     type Metadata;
     type Payload;
     type Request;
     type Error: From<io::Error>;
 
     /// Incrementally encodes the given input, potentially generating multiple payloads.
-    fn encode_events_incremental(&mut self, input: Input) -> Result<Vec<(Self::Metadata, Self::Payload)>, Self::Error>;
+    fn encode_events_incremental(&self, input: Input) -> Result<Vec<(Self::Metadata, Self::Payload)>, Self::Error>;
 
     /// Builds a request for the given metadata and payload.
-    fn build_request(&mut self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request;
+    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request;
 }

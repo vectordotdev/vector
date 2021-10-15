@@ -1,6 +1,5 @@
 mod ddsketch;
 mod handle;
-mod histogram;
 mod label_filter;
 mod recorder;
 
@@ -9,7 +8,6 @@ use std::sync::Arc;
 use crate::event::Metric;
 pub use crate::metrics::ddsketch::{AgentDDSketch, BinMap};
 pub use crate::metrics::handle::{Counter, Handle};
-pub use crate::metrics::histogram::AgentDDSketchHistogram;
 use crate::metrics::label_filter::VectorLabelFilter;
 use crate::metrics::recorder::VectorRecorder;
 use metrics::Key;

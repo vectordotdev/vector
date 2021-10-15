@@ -84,7 +84,7 @@ impl ByteSizeOf for MetricName {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Getters, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Getters, MutGetters, PartialEq, Serialize)]
 pub struct MetricData {
     #[getset(get = "pub")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -93,7 +93,7 @@ pub struct MetricData {
     #[getset(get = "pub")]
     pub kind: MetricKind,
 
-    #[getset(get = "pub")]
+    #[getset(get = "pub", get_mut = "pub")]
     #[serde(flatten)]
     pub value: MetricValue,
 }

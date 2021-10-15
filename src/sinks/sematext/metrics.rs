@@ -189,7 +189,7 @@ impl Service<Vec<Metric>> for SematextMetricsService {
 
 struct SematextMetricNormalize;
 
-impl MetricNormalize for SematextMetricNormalize {
+impl MetricNormalize for SematextMetricNormalize { 
     fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match &metric.value() {
             MetricValue::Gauge { .. } => state.make_absolute(metric),

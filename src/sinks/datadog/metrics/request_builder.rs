@@ -4,12 +4,12 @@ use bytes::Bytes;
 use http::Uri;
 use vector_core::event::{EventFinalizers, Finalizable, Metric};
 
-use crate::sinks::util::{Compression, StatefulRequestBuilder, encoding::StatefulEncoder};
+use crate::sinks::util::{Compression, IncrementalRequestBuilder, encoding::StatefulEncoder};
 use super::{
     config::DatadogMetricsEndpoint, encoder::DatadogMetricsEncoder, service::DatadogMetricsRequest,
 };
 
-struct DatadogMetricsRequestBuilder {
+pub struct DatadogMetricsRequestBuilder {
     compression: Compression,
     endpoint_uri_mappings: Vec<(DatadogMetricsEndpoint, Uri)>,
 }
@@ -29,13 +29,13 @@ impl DatadogMetricsRequestBuilder {
     }
 }
 
-impl StatefulRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)> for DatadogMetricsRequestBuilder {
+impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)> for DatadogMetricsRequestBuilder {
     type Metadata = (DatadogMetricsEndpoint, usize, EventFinalizers);
     type Payload = Bytes;
     type Request = DatadogMetricsRequest;
     type Error = io::Error;
 
-    fn encode_events_incremental(&mut self, input: (DatadogMetricsEndpoint, Vec<Metric>))
+    fn encode_events_incremental(&self, input: (DatadogMetricsEndpoint, Vec<Metric>))
         -> Result<Vec<(Self::Metadata, Self::Payload)>, Self::Error>
     {
         let (endpoint, mut metrics) = input;
@@ -90,7 +90,7 @@ impl StatefulRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)> for DatadogMe
         Ok(results)
     }
 
-    fn build_request(&mut self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
         let (endpoint, batch_size, finalizers) = metadata;
         let uri = self.get_endpoint_uri(endpoint)
             .expect("unable to find URI for metric endpoint");

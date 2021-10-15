@@ -1,15 +1,17 @@
+use std::{fmt, num::NonZeroUsize};
+
 use async_trait::async_trait;
-use futures_util::{StreamExt, future::ready, stream::BoxStream};
+use futures_util::{StreamExt, future::ready, stream::{self, BoxStream}};
 use http::Uri;
 use tower::Service;
-use vector_core::{buffers::Acker, event::{Event, Metric, MetricValue}, partition::Partitioner, sink::StreamSink, stream::BatcherSettings};
+use vector_core::{buffers::Acker, event::{Event, EventStatus, Metric, MetricValue}, partition::Partitioner, sink::StreamSink, stream::BatcherSettings};
 
 use crate::{
     config::SinkContext,
     sinks::util::{Compression, SinkBuilderExt},
 };
 
-use super::{config::DatadogMetricsEndpoint, service::DatadogMetricsRequest};
+use super::{config::DatadogMetricsEndpoint, normalizer::DatadogMetricsNormalizer, request_builder::DatadogMetricsRequestBuilder, service::DatadogMetricsRequest};
 
 struct DatadogMetricsTypePartitioner;
 
@@ -41,6 +43,9 @@ pub struct DatadogMetricsSink<S> {
 impl<S> DatadogMetricsSink<S>
 where
     S: Service<DatadogMetricsRequest> + Send,
+    S::Error: fmt::Debug + 'static,
+    S::Future: Send + 'static,
+    S::Response: AsRef<EventStatus>
 {
     pub fn new(
         cx: SinkContext,
@@ -59,11 +64,16 @@ where
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let builder_limit = NonZeroUsize::new(64);
+        let request_builder = DatadogMetricsRequestBuilder::new(self.compression, self.metric_endpoints);
+
         let sink = input
             .filter_map(|event| ready(event.try_into_metric()))
-            .normalize(DatadogMetricNormalizer)
-            .batched(DatadogMetricsTypePartitioner, self.batch_settings);
-        //.into_driver(self.service, self.acker);
+            .normalized::<DatadogMetricsNormalizer>()
+            .batched(DatadogMetricsTypePartitioner, self.batch_settings)
+            .incremental_request_builder(builder_limit, request_builder)
+            .flat_map(stream::iter)
+            .into_driver(self.service, self.acker);
 
         //sink.run().await
         Ok(())
@@ -74,6 +84,9 @@ where
 impl<S> StreamSink for DatadogMetricsSink<S>
 where
     S: Service<DatadogMetricsRequest> + Send,
+    S::Error: fmt::Debug + 'static,
+    S::Future: Send + 'static,
+    S::Response: AsRef<EventStatus>
 {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
