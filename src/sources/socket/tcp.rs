@@ -1,7 +1,8 @@
 use crate::{
-    codecs::{self, DecodingConfig},
+    codecs::{self, FramingConfig, ParserConfig},
     event::Event,
     internal_events::{SocketEventsReceived, SocketMode},
+    serde::default_decoding,
     sources::util::{SocketListenAddr, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
@@ -17,6 +18,8 @@ pub struct TcpConfig {
     address: SocketListenAddr,
     #[get_copy = "pub"]
     keepalive: Option<TcpKeepaliveConfig>,
+    #[getset(get_copy = "pub", set = "pub")]
+    max_length: Option<usize>,
     #[serde(default = "default_shutdown_timeout_secs")]
     #[getset(get_copy = "pub", set = "pub")]
     shutdown_timeout_secs: u64,
@@ -26,9 +29,11 @@ pub struct TcpConfig {
     tls: Option<TlsConfig>,
     #[get_copy = "pub"]
     receive_buffer_bytes: Option<usize>,
-    #[serde(flatten, default)]
     #[getset(get = "pub", set = "pub")]
-    decoding: DecodingConfig,
+    framing: Option<Box<dyn FramingConfig>>,
+    #[serde(default = "default_decoding")]
+    #[getset(get = "pub", set = "pub")]
+    decoding: Box<dyn ParserConfig>,
 }
 
 const fn default_shutdown_timeout_secs() -> u64 {
@@ -36,22 +41,26 @@ const fn default_shutdown_timeout_secs() -> u64 {
 }
 
 impl TcpConfig {
-    pub const fn new(
+    pub fn new(
         address: SocketListenAddr,
         keepalive: Option<TcpKeepaliveConfig>,
+        max_length: Option<usize>,
         shutdown_timeout_secs: u64,
         host_key: Option<String>,
         tls: Option<TlsConfig>,
         receive_buffer_bytes: Option<usize>,
-        decoding: DecodingConfig,
+        framing: Option<Box<dyn FramingConfig>>,
+        decoding: Box<dyn ParserConfig>,
     ) -> Self {
         Self {
             address,
             keepalive,
+            max_length,
             shutdown_timeout_secs,
             host_key,
             tls,
             receive_buffer_bytes,
+            framing,
             decoding,
         }
     }
@@ -60,11 +69,13 @@ impl TcpConfig {
         Self {
             address,
             keepalive: None,
+            max_length: Some(crate::serde::default_max_length()),
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             host_key: None,
             tls: None,
             receive_buffer_bytes: None,
-            decoding: DecodingConfig::default(),
+            framing: None,
+            decoding: default_decoding(),
         }
     }
 }

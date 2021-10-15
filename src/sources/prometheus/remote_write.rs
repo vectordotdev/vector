@@ -134,7 +134,7 @@ mod test {
     }
 
     async fn receives_metrics(tls: Option<TlsConfig>) {
-        components::init();
+        components::init_test();
         let address = test_util::next_addr();
         let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
 
@@ -229,7 +229,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn receive_something() {
-        components::init();
+        components::init_test();
         let config = PrometheusRemoteWriteConfig {
             address: PROMETHEUS_RECEIVE_ADDRESS.parse().unwrap(),
             auth: None,

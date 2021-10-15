@@ -85,7 +85,8 @@ impl ComponentTests {
 }
 
 /// Initialize the necessary bits needed to run a component test specification.
-pub fn init() {
+pub fn init_test() {
+    super::trace_init();
     EVENTS_RECORDED.with(|er| er.borrow_mut().clear());
     // Handle multiple initializations.
     if let Err(error) = metrics::init_test() {
@@ -176,14 +177,14 @@ pub async fn run_sink<S>(sink: VectorSink, events: S, tags: &[&str])
 where
     S: Stream<Item = Event> + Send,
 {
-    init();
+    init_test();
     sink.run(events).await.expect("Running sink failed");
     SINK_TESTS.assert(tags);
 }
 
 /// Convenience wrapper for running a sink with a single event
 pub async fn run_sink_event(sink: VectorSink, event: Event, tags: &[&str]) {
-    init();
+    init_test();
     run_sink(sink, stream::once(std::future::ready(event)), tags).await
 }
 
@@ -201,7 +202,7 @@ pub async fn sink_send_stream<S>(sink: VectorSink, mut events: S, tags: &[&str])
 where
     S: Stream<Item = Result<Event, ()>> + Send + Unpin,
 {
-    init();
+    init_test();
     sink.into_sink()
         .send_all(&mut events)
         .await

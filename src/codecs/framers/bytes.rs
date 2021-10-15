@@ -7,6 +7,13 @@ use tokio_util::codec::Decoder;
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct BytesDecoderConfig;
 
+impl BytesDecoderConfig {
+    /// Creates a new `BytesDecoderConfig`.
+    pub const fn new() -> Self {
+        Self
+    }
+}
+
 #[typetag::serde(name = "bytes")]
 impl FramingConfig for BytesDecoderConfig {
     fn build(&self) -> crate::Result<BoxedFramer> {
@@ -41,27 +48,18 @@ impl Decoder for BytesCodec {
     type Item = Bytes;
     type Error = BoxedFramingError;
 
-    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        // We don't support emitting empty frames in stream based decoding,
-        // since this will currently result in an infinite loop when using
-        // `FramedRead`.
-        self.flushed = true;
-        if src.is_empty() {
-            Ok(None)
-        } else {
-            let frame = src.split();
-            Ok(Some(frame.freeze()))
-        }
+    fn decode(&mut self, _src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        self.flushed = false;
+        Ok(None)
     }
 
     fn decode_eof(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        if !self.flushed {
+        if self.flushed && src.is_empty() {
+            Ok(None)
+        } else {
             self.flushed = true;
             let frame = src.split();
             Ok(Some(frame.freeze()))
-        } else {
-            self.flushed = false;
-            Ok(None)
         }
     }
 }
@@ -77,7 +75,11 @@ mod tests {
         let mut input = BytesMut::from("some bytes");
         let mut decoder = BytesCodec::new();
 
-        assert_eq!(decoder.decode(&mut input).unwrap().unwrap(), "some bytes");
+        assert_eq!(decoder.decode(&mut input).unwrap(), None);
+        assert_eq!(
+            decoder.decode_eof(&mut input).unwrap().unwrap(),
+            "some bytes"
+        );
         assert_eq!(decoder.decode(&mut input).unwrap(), None);
     }
 

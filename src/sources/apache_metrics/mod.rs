@@ -350,7 +350,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
         let (tx, rx) = Pipeline::new_test();
 
-        components::init();
+        components::init_test();
         let source = ApacheMetricsConfig {
             endpoints: vec![format!("http://foo:bar@{}/metrics", in_addr)],
             scrape_interval_secs: 1,
