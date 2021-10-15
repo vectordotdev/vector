@@ -338,6 +338,7 @@ mod test {
         let addr = next_addr();
 
         let mut config = TcpConfig::from_address(addr.into());
+        config.set_max_length(None);
         config.set_framing(Some(Box::new(
             NewlineDelimitedDecoderConfig::new_with_max_length(10),
         )));

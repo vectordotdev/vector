@@ -84,7 +84,7 @@ pub fn udp(
             buf.resize(max_length, 0);
             tokio::select! {
                 recv = socket.recv_from(&mut buf) => {
-                    let (byte_size, _address) = recv.map_err(|error| {
+                    let (byte_size, address) = recv.map_err(|error| {
                         let error = codecs::Error::FramingError(error.into());
                         emit!(&SocketReceiveError {
                             mode: SocketMode::Udp,
@@ -98,7 +98,7 @@ pub fn udp(
 
                     loop {
                         match stream.next().await {
-                            Some(Ok((events, received_from))) => {
+                            Some(Ok((events, byte_size))) => {
                                 emit!(&SocketEventsReceived {
                                     mode: SocketMode::Udp,
                                     byte_size,
@@ -112,7 +112,7 @@ pub fn udp(
                                             Bytes::from("socket"),
                                         );
 
-                                        log.insert(host_key.clone(), received_from.to_string());
+                                        log.insert(host_key.clone(), address.to_string());
                                     }
 
                                     tokio::select!{
