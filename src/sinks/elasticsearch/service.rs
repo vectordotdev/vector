@@ -11,6 +11,7 @@ use hyper::{Body, Request};
 use std::task::{Context, Poll};
 use tower::ServiceExt;
 
+use crate::internal_events::EventsSent;
 use crate::rusoto::AwsCredentialsProvider;
 use crate::sinks::util::{Compression, ElementCount};
 use http::header::HeaderName;
@@ -21,7 +22,6 @@ use rusoto_core::Region;
 use std::collections::HashMap;
 use std::sync::Arc;
 use vector_core::ByteSizeOf;
-use crate::internal_events::EventsSent;
 
 #[derive(Clone)]
 pub struct ElasticSearchRequest {
