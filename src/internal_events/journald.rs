@@ -1,5 +1,3 @@
-// ## skip check-events ##
-
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -26,18 +24,29 @@ impl InternalEvent for JournaldEventsReceived {
 }
 
 #[derive(Debug)]
-pub struct JournaldInvalidRecord {
+pub struct JournaldInvalidRecordError {
     pub error: serde_json::Error,
     pub text: String,
 }
 
-impl InternalEvent for JournaldInvalidRecord {
+impl InternalEvent for JournaldInvalidRecordError {
     fn emit_logs(&self) {
-        error!(message = "Invalid record from journald, discarding.", error = ?self.error, text = %self.text);
+        error!(
+            message = "Invalid record from journald, discarding.",
+            error = ?self.error,
+            text = %self.text,
+            stage = "processing",
+            error_type = "parse_failed",
+        );
     }
 
     fn emit_metrics(&self) {
-        counter!("invalid_record_total", 1);
-        counter!("invalid_record_bytes_total", self.text.len() as u64);
+        counter!(
+            "component_errors_total", 1,
+            "stage" => "processing",
+            "error_type" => "parse_failed",
+        );
+        counter!("invalid_record_total", 1); // deprecated
+        counter!("invalid_record_bytes_total", self.text.len() as u64); // deprecated
     }
 }

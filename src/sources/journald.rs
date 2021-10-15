@@ -2,7 +2,7 @@ use crate::{
     codecs::{BoxedFramingError, CharacterDelimitedCodec},
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::{Event, LogEvent, Value},
-    internal_events::{BytesReceived, JournaldEventsReceived, JournaldInvalidRecord},
+    internal_events::{BytesReceived, JournaldEventsReceived, JournaldInvalidRecordError},
     shutdown::ShutdownSignal,
     Pipeline,
 };
@@ -321,7 +321,7 @@ impl JournaldSource {
                 let mut record = match decode_record(&bytes, self.remap_priority) {
                     Ok(record) => record,
                     Err(error) => {
-                        emit!(&JournaldInvalidRecord {
+                        emit!(&JournaldInvalidRecordError {
                             error,
                             text: String::from_utf8_lossy(&bytes).into_owned()
                         });
