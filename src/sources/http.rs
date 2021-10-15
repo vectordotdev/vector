@@ -150,7 +150,7 @@ impl SourceConfig for SimpleHttpConfig {
                 ),
                 Encoding::Binary => (
                     Box::new(BytesDecoderConfig::new()) as Box<dyn FramingConfig>,
-                    Box::new(JsonParserConfig::new()) as Box<dyn ParserConfig>,
+                    Box::new(BytesParserConfig::new()) as Box<dyn ParserConfig>,
                 ),
             }
         } else {
