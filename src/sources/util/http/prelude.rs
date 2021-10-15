@@ -42,10 +42,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         cx: SourceContext,
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
-        let protocol = match &tls {
-            MaybeTlsSettings::Raw { .. } => "http",
-            MaybeTlsSettings::Tls { .. } => "https",
-        };
+        let protocol = tls.http_protocol_name();
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
         let path = path.to_owned();
         let out = cx.out;
