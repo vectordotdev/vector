@@ -5,7 +5,7 @@ use crate::{
     event::{Event, Value, Metric, MetricValue, LogEvent},
     http::{HttpClient},
     sinks::util::{
-        batch::BatchError,
+        batch::{BatchError, BatchSize},
         encoding::{EncodingConfigWithDefault, EncodingConfiguration, TimestampFormat},
         http::{BatchedHttpSink, HttpSink},
         Batch, PushResult, BatchConfig, BatchSettings, Compression, TowerRequestConfig,
@@ -87,67 +87,89 @@ where
     } 
 }
 
-type NRKeyValData = HashMap<String, Value>;
-type NRMetricStore = HashMap<String, Vec<NRKeyValData>>;
+type KeyValData = HashMap<String, Value>;
+type DataStore = HashMap<String, Vec<KeyValData>>;
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct NewRelicMetric(Vec<NRMetricStore>);
+pub struct MetricsApiModel(Vec<DataStore>);
 
-impl NewRelicMetric {
-    pub fn new(m_name: Value, m_type: Value, m_value: Value, m_timestamp: Value) -> Self {
-        let mut metric_data = NRKeyValData::new();
-        metric_data.insert("name".to_owned(), m_name);
-        metric_data.insert("type".to_owned(), m_type);
-        metric_data.insert("value".to_owned(), m_value);
-        match m_timestamp {
-            Value::Timestamp(ts) => { metric_data.insert("timestamp".to_owned(), Value::from(ts.timestamp())); },
-            Value::Integer(i) => { metric_data.insert("timestamp".to_owned(), Value::from(i)); },
-            _ => {}
+impl MetricsApiModel {
+    pub fn new(metric_array: Vec<(Value, Value, Value, Value)>) -> Self {
+        let mut metric_data_array = vec!();
+        for (m_name, m_type, m_value, m_timestamp) in metric_array {
+            let mut metric_data = KeyValData::new();
+            metric_data.insert("name".to_owned(), m_name);
+            metric_data.insert("type".to_owned(), m_type);
+            metric_data.insert("value".to_owned(), m_value);
+            match m_timestamp {
+                Value::Timestamp(ts) => { metric_data.insert("timestamp".to_owned(), Value::from(ts.timestamp())); },
+                Value::Integer(i) => { metric_data.insert("timestamp".to_owned(), Value::from(i)); },
+                _ => {}
+            }
+            metric_data_array.push(metric_data);
         }
-        let mut metric_store = NRMetricStore::new();
-        metric_store.insert("metrics".to_owned(), vec!(metric_data));
+        let mut metric_store = DataStore::new();
+        metric_store.insert("metrics".to_owned(), metric_data_array);
         Self(vec!(metric_store))
     }
 }
 
-impl ToJSON<Metric> for NewRelicMetric {}
+impl ToJSON<Vec<BufEvent>> for MetricsApiModel {}
 
-impl TryFrom<Metric> for NewRelicMetric {
+impl TryFrom<Vec<BufEvent>> for MetricsApiModel {
     type Error = &'static str;
 
-    fn try_from(metric: Metric) -> Result<Self, Self::Error> {
-        match metric.value() {
-            MetricValue::Gauge { value } => {
-                Ok(Self::new(
-                    Value::from(metric.name().to_owned()),
-                    Value::from("gauge".to_owned()),
-                    Value::from(*value),
-                    //TODO: check Some instead of unwraping
-                    Value::from(metric.timestamp().unwrap())
-                ))
-            },
-            MetricValue::Counter { value } => {
-                Ok(Self::new(
-                    Value::from(metric.name().to_owned()),
-                    Value::from("count".to_owned()),
-                    Value::from(*value),
-                    //TODO: check Some instead of unwraping
-                    Value::from(metric.timestamp().unwrap())
-                ))
-            },
-            _ => {
-                Err("Unrecognized metric type")
+    fn try_from(buf_events: Vec<BufEvent>) -> Result<Self, Self::Error> {
+        let mut metric_array = vec!();
+
+        for buf_event in buf_events {
+            match buf_event {
+                BufEvent::Metric(metric) => {
+                    match metric.value() {
+                        MetricValue::Gauge { value } => {
+                            metric_array.push((
+                                Value::from(metric.name().to_owned()),
+                                Value::from("gauge".to_owned()),
+                                Value::from(*value),
+                                //TODO: check Some instead of unwraping
+                                Value::from(metric.timestamp().unwrap())
+                            ));
+                        },
+                        MetricValue::Counter { value } => {
+                            metric_array.push((
+                                Value::from(metric.name().to_owned()),
+                                Value::from("count".to_owned()),
+                                Value::from(*value),
+                                //TODO: check Some instead of unwraping
+                                Value::from(metric.timestamp().unwrap())
+                            ));
+                        },
+                        _ => {
+                            // Unrecognized metric type
+                        }
+                    }
+                },
+                _ => {
+                    // Unrecognized event type
+                }
             }
+        }
+
+        if metric_array.len() > 0 {
+            Ok(MetricsApiModel::new(metric_array))
+        }
+        else {
+            Err("No valid metrics to generate")
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct NewRelicEvent(NRKeyValData);
+pub struct NewRelicEvent(KeyValData);
 
 impl NewRelicEvent {
     pub fn new() -> Self {
-        Self(NRKeyValData::new())
+        Self(KeyValData::new())
     }
 }
 
@@ -195,11 +217,11 @@ impl TryFrom<LogEvent> for NewRelicEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct NewRelicLog(NRKeyValData);
+pub struct NewRelicLog(KeyValData);
 
 impl NewRelicLog {
     pub fn new() -> Self {
-        Self(NRKeyValData::new())
+        Self(KeyValData::new())
     }
 }
 
@@ -245,14 +267,47 @@ impl ByteSizeOf for BufEvent {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[derive(Debug)]
+pub struct NewRelicSinkError {
+    message: String
+}
+
+impl NewRelicSinkError {
+    pub fn new(msg: &str) -> Self {
+        NewRelicSinkError {
+            message: String::from(msg)
+        }
+    }
+
+    pub fn boxed(msg: &str) -> Box<Self> {
+        Box::new(
+            NewRelicSinkError {
+                message: String::from(msg)
+            }
+        )
+    }
+}
+
+impl std::fmt::Display for NewRelicSinkError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl std::error::Error for NewRelicSinkError {
+    fn description(&self) -> &str {
+        &self.message
+    }
+}
+
+#[derive(Debug)]
 pub struct NewRelicBuffer {
     buffer: Vec<BufEvent>,
-    max_size: usize
+    max_size: BatchSize<Self>
 }
 
 impl NewRelicBuffer {
-    pub const fn new(max_size: usize) -> Self {
+    pub const fn new(max_size: BatchSize<Self>) -> Self {
         Self {
             buffer: Vec::new(),
             max_size
@@ -265,41 +320,30 @@ impl Batch for NewRelicBuffer {
     type Output = Vec<BufEvent>;
 
     fn get_settings_defaults(
-        config: BatchConfig,
+        _config: BatchConfig,
         defaults: BatchSettings<Self>,
     ) -> Result<BatchSettings<Self>, BatchError> {
         Ok(defaults)
     }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
-        if self.buffer.len() <= self.max_size {
-            self.buffer.push(item);
-            info!("-------> NewRelicBuffer::push OK");
-            PushResult::Ok(true)
-        }
-        else {
-            info!("-------> NewRelicBuffer::push Overflow");
-            PushResult::Overflow(item)
-        }
+        self.buffer.push(item);
+        PushResult::Ok(self.buffer.len() > self.max_size.events)
     }
 
     fn is_empty(&self) -> bool {
-        info!("-------> NewRelicBuffer::is_empty() = {}", self.buffer.is_empty());
         self.buffer.is_empty()
     }
 
     fn fresh(&self) -> Self {
-        info!("-------> NewRelicBuffer::fresh()");
-        Self::new(self.max_size)
+        Self::new(self.max_size.clone())
     }
 
     fn finish(self) -> Self::Output {
-        info!("-------> NewRelicBuffer::finish()");
         self.buffer
     }
 
     fn num_items(&self) -> usize {
-        info!("-------> NewRelicBuffer::num_items() = {}", self.buffer.len());
         self.buffer.len()
     }
 }
@@ -327,7 +371,7 @@ impl SinkConfig for NewRelicConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
 
         let batch = BatchSettings::<NewRelicBuffer>::default()
-            .bytes(bytesize::mb(10u64))
+            .events(5)
             .timeout(5)
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
@@ -337,7 +381,7 @@ impl SinkConfig for NewRelicConfig {
         let sink = BatchedHttpSink::new(
             self.clone(),
             //Buffer::new(batch.size, self.compression),
-            NewRelicBuffer::new(5),
+            NewRelicBuffer::new(batch.size),
             request,
             batch.timeout,
             client.clone(),
@@ -455,18 +499,30 @@ impl HttpSink for NewRelicConfig {
             }
         };
 
-        let mut builder = Request::post(&uri).header("Content-Type", "application/json");
-        builder = builder.header("Api-Key", self.license_key.clone());
+        let json = match self.api {
+            NewRelicApi::Metrics => {
+                MetricsApiModel::to_json(events)
+            },
+            _ => {
+                None
+            }
+        };
 
-        if let Some(ce) = self.compression.content_encoding() {
-            builder = builder.header("Content-Encoding", ce);
+        if let Some(json) = json {
+            let mut builder = Request::post(&uri).header("Content-Type", "application/json");
+            builder = builder.header("Api-Key", self.license_key.clone());
+
+            if let Some(ce) = self.compression.content_encoding() {
+                builder = builder.header("Content-Encoding", ce);
+            }
+
+            let request = builder.body(json).unwrap();
+
+            Ok(request)
         }
-
-        //let request = builder.body(events).unwrap();
-        let json = "{\"name\":\"Andreu\"}".to_owned();
-        let request = builder.body(json.as_bytes().to_vec()).unwrap();
-
-        Ok(request)
+        else {
+            Err(NewRelicSinkError::boxed("Error generating API model"))
+        }
     }
 }
 
