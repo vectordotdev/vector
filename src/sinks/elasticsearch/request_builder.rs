@@ -6,6 +6,7 @@ use crate::sinks::elasticsearch::service::ElasticSearchRequest;
 
 use crate::event::{EventFinalizers, Finalizable};
 use crate::sinks::util::encoding::EncodingConfigFixed;
+use vector_core::ByteSizeOf;
 
 pub struct ElasticsearchRequestBuilder {
     pub compression: Compression,
@@ -15,6 +16,7 @@ pub struct ElasticsearchRequestBuilder {
 pub struct Metadata {
     finalizers: EventFinalizers,
     batch_size: usize,
+    events_byte_size: usize,
 }
 
 impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
@@ -34,9 +36,15 @@ impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
     }
 
     fn split_input(&self, mut events: Vec<ProcessedEvent>) -> (Self::Metadata, Self::Events) {
+        let events_byte_size = events.iter()
+            .map(|x| x.log.size_of())
+            .reduce(|a, b| a + b)
+            .unwrap_or(0);
+
         let metadata = Metadata {
             finalizers: events.take_finalizers(),
             batch_size: events.len(),
+            events_byte_size
         };
         (metadata, events)
     }
@@ -46,6 +54,7 @@ impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
             payload,
             finalizers: metadata.finalizers,
             batch_size: metadata.batch_size,
+            events_byte_size: metadata.events_byte_size
         }
     }
 }

@@ -17,6 +17,7 @@ pub trait Partitioner {
     fn partition(&self, item: &Self::Item) -> Self::Key;
 }
 
+#[derive(Default)]
 pub struct NullPartitioner<T> {
     item: PhantomData<T>,
 }

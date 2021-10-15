@@ -325,7 +325,7 @@ impl SinkConfig for ElasticSearchConfig {
             http_auth: common.authorization,
             query_params: common.query_params,
             region: common.region,
-            compression: Compression::None,
+            compression: self.compression,
             credentials_provider: common.credentials,
         };
 

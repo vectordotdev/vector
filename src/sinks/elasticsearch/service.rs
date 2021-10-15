@@ -21,12 +21,14 @@ use rusoto_core::Region;
 use std::collections::HashMap;
 use std::sync::Arc;
 use vector_core::ByteSizeOf;
+use crate::internal_events::EventsSent;
 
 #[derive(Clone)]
 pub struct ElasticSearchRequest {
     pub payload: Vec<u8>,
     pub finalizers: EventFinalizers,
     pub batch_size: usize,
+    pub events_byte_size: usize,
 }
 
 impl ByteSizeOf for ElasticSearchRequest {
@@ -198,8 +200,16 @@ impl Service<ElasticSearchRequest> for ElasticSearchService {
         let mut http_service = self.batch_service.clone();
         Box::pin(async move {
             http_service.ready().await?;
+            let batch_size = req.batch_size;
+            let byte_size = req.events_byte_size;
             let http_response = http_service.call(req).await?;
             let event_status = get_event_status(&http_response);
+            if event_status == EventStatus::Delivered {
+                emit!(&EventsSent {
+                    count: batch_size,
+                    byte_size: byte_size
+                });
+            }
             Ok(ElasticSearchResponse {
                 http_response,
                 event_status,

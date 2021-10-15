@@ -10,7 +10,7 @@ use crate::{
     sinks::{Healthcheck, VectorSink},
 };
 use async_trait::async_trait;
-use futures::stream::BoxStream;
+use futures::stream::{BoxStream, StreamExt};
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 
