@@ -113,6 +113,14 @@ impl LogEvent {
         util::log::insert(self.as_map_mut(), key.as_ref(), value.into())
     }
 
+    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
+    pub fn try_insert(&mut self, key: impl AsRef<str>, value: impl Into<Value> + Debug) {
+        let key = key.as_ref();
+        if !self.contains(key) {
+            self.insert(key, value);
+        }
+    }
+
     #[instrument(level = "trace", skip(self, key), fields(key = ?key))]
     pub fn insert_path<V>(&mut self, key: Vec<PathComponent>, value: V) -> Option<Value>
     where
@@ -149,26 +157,18 @@ impl LogEvent {
     /// pathing information in the key. It will insert over the top of any value
     /// that exists in the map already.
     #[instrument(level = "trace", skip(self, key), fields(key = %key))]
-    pub fn insert_flat<K, V>(&mut self, key: K, value: V)
+    pub fn insert_flat<K, V>(&mut self, key: K, value: V) -> Option<Value>
     where
         K: Into<String> + Display,
         V: Into<Value> + Debug,
     {
-        self.as_map_mut().insert(key.into(), value.into());
-    }
-
-    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
-    pub fn try_insert(&mut self, key: impl AsRef<str>, value: impl Into<Value> + Debug) {
-        let key = key.as_ref();
-        if !self.contains(key) {
-            self.insert(key, value);
-        }
+        self.as_map_mut().insert(key.into(), value.into())
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn try_insert_flat(&mut self, key: impl AsRef<str>, value: impl Into<Value> + Debug) {
         let key = key.as_ref();
-        if !self.contains(key) {
+        if !self.as_map().contains_key(key) {
             self.insert_flat(key, value);
         }
     }
@@ -555,6 +555,107 @@ mod test {
         let (actual_fields, _) = base.into_parts();
 
         assert_eq!(expected_fields, actual_fields);
+    }
+
+    #[test]
+    fn insert() {
+        let mut log = LogEvent::default();
+
+        let old = log.insert("foo", "foo");
+
+        assert_eq!(log.get("foo"), Some(&"foo".into()));
+        assert_eq!(old, None);
+    }
+
+    #[test]
+    fn insert_existing() {
+        let mut log = LogEvent::default();
+        log.insert("foo", "foo");
+
+        let old = log.insert("foo", "bar");
+
+        assert_eq!(log.get("foo"), Some(&"bar".into()));
+        assert_eq!(old, Some("foo".into()));
+    }
+
+    #[test]
+    fn try_insert() {
+        let mut log = LogEvent::default();
+
+        log.try_insert("foo", "foo");
+
+        assert_eq!(log.get("foo"), Some(&"foo".into()));
+    }
+
+    #[test]
+    fn try_insert_existing() {
+        let mut log = LogEvent::default();
+        log.insert("foo", "foo");
+
+        log.try_insert("foo", "bar");
+
+        assert_eq!(log.get("foo"), Some(&"foo".into()));
+    }
+
+    #[test]
+    fn try_insert_dotted() {
+        let mut log = LogEvent::default();
+
+        log.try_insert("foo.bar", "foo");
+
+        assert_eq!(log.get("foo.bar"), Some(&"foo".into()));
+        assert_eq!(log.get_flat("foo.bar"), None);
+    }
+
+    #[test]
+    fn try_insert_existing_dotted() {
+        let mut log = LogEvent::default();
+        log.insert("foo.bar", "foo");
+
+        log.try_insert("foo.bar", "bar");
+
+        assert_eq!(log.get("foo.bar"), Some(&"foo".into()));
+        assert_eq!(log.get_flat("foo.bar"), None);
+    }
+
+    #[test]
+    fn try_insert_flat() {
+        let mut log = LogEvent::default();
+
+        log.try_insert_flat("foo", "foo");
+
+        assert_eq!(log.get_flat("foo"), Some(&"foo".into()));
+    }
+
+    #[test]
+    fn try_insert_flat_existing() {
+        let mut log = LogEvent::default();
+        log.insert_flat("foo", "foo");
+
+        log.try_insert_flat("foo", "bar");
+
+        assert_eq!(log.get_flat("foo"), Some(&"foo".into()));
+    }
+
+    #[test]
+    fn try_insert_flat_dotted() {
+        let mut log = LogEvent::default();
+
+        log.try_insert_flat("foo.bar", "foo");
+
+        assert_eq!(log.get_flat("foo.bar"), Some(&"foo".into()));
+        assert_eq!(log.get("foo.bar"), None);
+    }
+
+    #[test]
+    fn try_insert_flat_existing_dotted() {
+        let mut log = LogEvent::default();
+        log.insert_flat("foo.bar", "foo");
+
+        log.try_insert_flat("foo.bar", "bar");
+
+        assert_eq!(log.get_flat("foo.bar"), Some(&"foo".into()));
+        assert_eq!(log.get("foo.bar"), None);
     }
 
     // This test iterates over the `tests/data/fixtures/log_event` folder and:
