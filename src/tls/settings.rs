@@ -383,6 +383,13 @@ impl MaybeTlsSettings {
             }
         }
     }
+
+    pub const fn http_protocol_name(&self) -> &'static str {
+        match self {
+            MaybeTls::Raw(_) => "http",
+            MaybeTls::Tls(_) => "https",
+        }
+    }
 }
 
 impl From<TlsSettings> for MaybeTlsSettings {
@@ -443,13 +450,6 @@ fn open_read(filename: &Path, note: &'static str) -> Result<(Vec<u8>, PathBuf)> 
         .with_context(|| FileReadFailed { note, filename })?;
 
     Ok((text, filename.into()))
-}
-
-pub const fn get_protocol(tls_config: &Option<TlsConfig>) -> &'static str {
-    match tls_config {
-        Some(_) => "https",
-        None => "http",
-    }
 }
 
 #[cfg(test)]

@@ -6,7 +6,7 @@ use super::{
 use crate::{
     config::SourceContext,
     internal_events::{HttpBadRequest, HttpBytesReceived, HttpEventsReceived},
-    tls::{get_protocol, MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
 use async_trait::async_trait;
@@ -41,8 +41,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         auth: &Option<HttpSourceAuthConfig>,
         cx: SourceContext,
     ) -> crate::Result<crate::sources::Source> {
-        let protocol = get_protocol(tls);
         let tls = MaybeTlsSettings::from_config(tls, true)?;
+        let protocol = tls.http_protocol_name();
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
         let path = path.to_owned();
         let out = cx.out;

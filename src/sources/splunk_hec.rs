@@ -5,7 +5,7 @@ use crate::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
         SplunkHecRequestReceived,
     },
-    tls::{get_protocol, MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
 use bytes::{Buf, Bytes};
@@ -81,7 +81,8 @@ fn default_socket_address() -> SocketAddr {
 #[typetag::serde(name = "splunk_hec")]
 impl SourceConfig for SplunkConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let source = SplunkSource::new(self);
+        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let source = SplunkSource::new(self, tls.http_protocol_name());
 
         let event_service = source.event_service(cx.out.clone());
         let raw_service = source.raw_service(cx.out);
@@ -109,7 +110,6 @@ impl SourceConfig for SplunkConfig {
             )
             .or_else(finish_err);
 
-        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let listener = tls.bind(&self.address).await?;
 
         let shutdown = cx.shutdown;
@@ -146,13 +146,12 @@ struct SplunkSource {
 }
 
 impl SplunkSource {
-    fn new(config: &SplunkConfig) -> Self {
+    fn new(config: &SplunkConfig, protocol: &'static str) -> Self {
         let valid_tokens = config
             .valid_tokens
             .iter()
             .flatten()
             .chain(config.token.iter());
-        let protocol = get_protocol(&config.tls);
         SplunkSource {
             valid_credentials: valid_tokens
                 .map(|token| format!("Splunk {}", token))
