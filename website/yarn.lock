@@ -1388,10 +1388,10 @@
   dependencies:
     mini-svg-data-uri "^1.2.3"
 
-"@tailwindcss/typography@^0.4.1":
-  version "0.4.1"
-  resolved "https://registry.yarnpkg.com/@tailwindcss/typography/-/typography-0.4.1.tgz#51ddbceea6a0ee9902c649dbe58871c81a831212"
-  integrity sha512-ovPPLUhs7zAIJfr0y1dbGlyCuPhpuv/jpBoFgqAc658DWGGrOBWBMpAWLw2KlzbNeVk4YBJMzue1ekvIbdw6XA==
+"@tailwindcss/typography@^0.5.0-alpha.2":
+  version "0.5.0-alpha.2"
+  resolved "https://registry.yarnpkg.com/@tailwindcss/typography/-/typography-0.5.0-alpha.2.tgz#70ce7ed3a501f5a814cc5a8e4a9b13e47d38f421"
+  integrity sha512-xeTOHK2ki2ZfmmL0ThdPShM6iPtVtsw9Lt/9X6ZpZ0eaueluQESGIaE7r/3ZqqrN5ljpWkg6/5n04jyIOwiChA==
   dependencies:
     lodash.castarray "^4.4.0"
     lodash.isplainobject "^4.0.6"
