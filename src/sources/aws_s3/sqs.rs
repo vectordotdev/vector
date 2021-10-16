@@ -445,6 +445,7 @@ impl IngestorProcess {
                     log.insert_flat("bucket", bucket_name.clone());
                     log.insert_flat("object", object_key.clone());
                     log.insert_flat("region", aws_region.clone());
+                    log.insert_flat(log_schema().source_type_key(), Bytes::from("aws_s3"));
                     log.insert_flat(log_schema().timestamp_key(), timestamp);
 
                     if let Some(metadata) = &metadata {

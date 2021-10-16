@@ -192,13 +192,13 @@ fn line_to_event(line: String) -> Event {
         let log = event.as_mut_log();
 
         if let Ok(ts) = timestamp.parse::<DateTime<Utc>>() {
-            log.insert(log_schema().timestamp_key(), ts);
+            log.try_insert(log_schema().timestamp_key(), ts);
         }
 
-        log.insert(log_schema().host_key(), hostname.to_owned());
+        log.try_insert(log_schema().host_key(), hostname.to_owned());
 
-        log.insert("app_name", app_name.to_owned());
-        log.insert("proc_id", proc_id.to_owned());
+        log.try_insert_flat("app_name", app_name.to_owned());
+        log.try_insert_flat("proc_id", proc_id.to_owned());
 
         event
     } else {
@@ -210,10 +210,10 @@ fn line_to_event(line: String) -> Event {
         Event::from(line)
     };
 
-    // Add source type
-    event
-        .as_mut_log()
-        .try_insert(log_schema().source_type_key(), Bytes::from("heroku_logs"));
+    let log = event.as_mut_log();
+
+    log.try_insert(log_schema().source_type_key(), Bytes::from("heroku_logs"));
+    log.try_insert(log_schema().timestamp_key(), Utc::now());
 
     event
 }
