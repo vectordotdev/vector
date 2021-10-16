@@ -87,16 +87,6 @@ const manageState = () => {
     toggleDarkMode() {
       this.dark = !this.dark;
     },
-    // Toggle between stable and nightly
-    toggleRelease() {
-      if (this.release === 'stable') {
-        this.release = 'nightly';
-        this.setVersion('nightly');
-      } else if (this.release === 'nightly') {
-        this.release = 'stable';
-        this.setVersion(this.versionBackup);
-      }
-    },
     // Switch the banner on and off
     toggleBanner() {
       this.banner = !this.banner;
@@ -104,12 +94,6 @@ const manageState = () => {
     // Boolean helpers
     isNightly() {
       return this.release === 'nightly';
-    },
-    isStable() {
-      return this.release === 'stable';
-    },
-    isCurrent(version) {
-      return this.version === version;
     },
   }, useLocalStorage);
 }
