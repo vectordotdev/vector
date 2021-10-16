@@ -1,5 +1,6 @@
 use crate::{
     codecs::{self, FramingConfig, ParserConfig},
+    config::log_schema,
     event::Event,
     internal_events::{SocketEventsReceived, SocketMode},
     serde::default_decoding,
@@ -8,6 +9,7 @@ use crate::{
     tls::TlsConfig,
 };
 use bytes::Bytes;
+use chrono::Utc;
 use getset::{CopyGetters, Getters, Setters};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
@@ -108,15 +110,15 @@ impl TcpSource for RawTcpSource {
             count: events.len()
         });
 
+        let now = Utc::now();
+
         for event in events {
             if let Event::Log(ref mut log) = event {
-                log.try_insert(
-                    crate::config::log_schema().source_type_key(),
-                    Bytes::from("socket"),
-                );
+                log.try_insert(log_schema().source_type_key(), Bytes::from("socket"));
+                log.try_insert(log_schema().timestamp_key(), now);
 
                 let host_key = (self.config.host_key.clone())
-                    .unwrap_or_else(|| crate::config::log_schema().host_key().to_string());
+                    .unwrap_or_else(|| log_schema().host_key().to_string());
 
                 log.try_insert(host_key, host.clone());
             }

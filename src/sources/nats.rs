@@ -136,12 +136,12 @@ async fn nats_source(
                         count: events.len()
                     });
 
+                    let now = Utc::now();
+
                     for mut event in events {
                         if let Event::Log(ref mut log) = event {
-                            log.try_insert(log_schema().timestamp_key(), Utc::now());
-
-                            // Add source type
                             log.try_insert(log_schema().source_type_key(), Bytes::from("nats"));
+                            log.try_insert(log_schema().timestamp_key(), now);
                         }
 
                         out.send(event)

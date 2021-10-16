@@ -248,10 +248,12 @@ fn line_to_events(mut decoder: codecs::Decoder, line: String) -> SmallVec<[Event
         events.push(Event::from(line))
     };
 
+    let now = Utc::now();
+
     for event in &mut events {
         if let Event::Log(log) = event {
-            // Add source type
             log.try_insert(log_schema().source_type_key(), Bytes::from("heroku_logs"));
+            log.try_insert(log_schema().timestamp_key(), now);
         }
     }
 
