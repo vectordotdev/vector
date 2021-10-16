@@ -15,6 +15,7 @@ use crate::{
     tls::TlsConfig,
 };
 use bytes::{Bytes, BytesMut};
+use chrono::Utc;
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr};
@@ -114,12 +115,12 @@ impl HttpSource for SimpleHttpSource {
         add_query_parameters(&mut events, &self.query_parameters, query_parameters);
         add_path(&mut events, self.path_key.as_str(), request_path);
 
-        // Add source type
-        let key_source_type = log_schema().source_type_key();
+        let now = Utc::now();
         for event in &mut events {
-            event
-                .as_mut_log()
-                .try_insert(key_source_type, Bytes::from("http"));
+            let log = event.as_mut_log();
+
+            log.try_insert(log_schema().source_type_key(), Bytes::from("http"));
+            log.try_insert(log_schema().timestamp_key(), now);
         }
 
         Ok(events)
@@ -200,7 +201,7 @@ fn add_path(events: &mut [Event], key: &str, path: &str) {
     for event in events.iter_mut() {
         event
             .as_mut_log()
-            .insert(key, Value::from(path.to_string()));
+            .try_insert(key, Value::from(path.to_string()));
     }
 }
 
@@ -209,7 +210,7 @@ fn add_headers(events: &mut [Event], headers_config: &[String], headers: HeaderM
         let value = headers.get(header_name).map(HeaderValue::as_bytes);
 
         for event in events.iter_mut() {
-            event.as_mut_log().insert(
+            event.as_mut_log().try_insert_flat(
                 header_name as &str,
                 Value::from(value.map(Bytes::copy_from_slice)),
             );

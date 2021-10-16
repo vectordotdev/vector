@@ -1,12 +1,14 @@
 use crate::{
     codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
-    config::{DataType, SourceConfig, SourceContext, SourceDescription},
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     internal_events::GeneratorEventProcessed,
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util::TcpError,
     Pipeline,
 };
+use bytes::Bytes;
+use chrono::Utc;
 use fakedata::logs::*;
 use futures::{SinkExt, StreamExt};
 use rand::seq::SliceRandom;
@@ -156,7 +158,14 @@ async fn generator_source(
         while let Some(next) = stream.next().await {
             match next {
                 Ok((events, _byte_size)) => {
-                    for event in events {
+                    let now = Utc::now();
+
+                    for mut event in events {
+                        let log = event.as_mut_log();
+
+                        log.try_insert(log_schema().source_type_key(), Bytes::from("generator"));
+                        log.try_insert(log_schema().timestamp_key(), now);
+
                         out.send(event)
                             .await
                             .map_err(|_: crate::pipeline::ClosedError| {
