@@ -78,16 +78,19 @@ would be usable even between different versions of Vector.
 ### Implementation
 
 - Rewrite disk buffers, switching to an append-only log format.
+    - Primarily, no more LevelDB.  No more C/C++ libraries.  All Rust code.  Code that we control.
     - Conceptually, this would look a lot like the writer side simply writing lines to a file, and
       the reader side tailing that file.
     - We would end up having some small metadata on disk that the writer used to keep track of log
       files, and the reader would similarly have some small metadata on disk to track its read
       progress.
-    - Crucially, no more LevelDB.  No more C/C++ libraries.  All Rust code.  Code that we control.
-    - We would make sure to tackle including checksumming of each on-disk record as well as being
-      able to configure fsync behavior.
-      ([#8671](https://github.com/vectordotdev/vector/issues/8671),
-      [#8540](https://github.com/vectordotdev/vector/issues/8540))
+    - Records would be checksummed on disk in order to detect corruption.  We would use a CRC32
+      checksum at the end of each record for speed and reasonable resiliency.
+      ([#8671](https://github.com/vectordotdev/vector/issues/8671))
+    - For disk buffers, fsync behavior would be configurable:
+      ([#8540](https://github.com/vectordotdev/vector/issues/8540))
+        - Time-based: flush to disk on a configurable interval
+        - Count-based: flush to disk every N events
 - In-memory buffering would simply stay as it exists now, as a raw channel.
 - Disk buffering and external buffers would become independent reader and writer Tokio tasks that
   are communicated with via channels.
@@ -212,3 +215,5 @@ cost.
   for disk space. [#5102](https://github.com/vectordotdev/vector/issues/5102)
 - Make sure we gracefully handle disk out of space errors.
   [#8763](https://github.com/vectordotdev/vector/issues/8763)
+- Using `io_uring` (likely via `tokio-uring`) to drive the disk buffer I/O for lower overhead,
+  higher efficiency, higher performance, etc.
