@@ -1701,7 +1701,7 @@
   <td class="leading-snug">
     {{ .description | markdownify }}
   </td>
-  <td class="overflow-auto">
+  <td>
     {{ with .default }}
     <code>{{ . }}</code>
     {{ end }}
@@ -1719,7 +1719,7 @@
 {{ define "vrl-function-args" }}
 {{ $required := where . "required" true }}
 {{ $optional := where . "required" false }}
-<table class="table-fixed">
+<table class="table">
   <thead>
     <tr>
       <th class="w-1/6">
