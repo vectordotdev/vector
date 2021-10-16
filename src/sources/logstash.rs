@@ -105,13 +105,11 @@ impl TcpSource for LogstashSource {
         let now = Value::from(chrono::Utc::now());
         for event in events {
             let log = event.as_mut_log();
-            if log.get(log_schema().host_key()).is_none() {
-                log.insert(log_schema().host_key(), host.clone());
-            }
+            log.try_insert(log_schema().source_type_key(), "logstash");
             if log.get(log_schema().timestamp_key()).is_none() {
                 // Attempt to parse @timestamp if it exists; otherwise set to receipt time.
                 let timestamp = log
-                    .get("@timestamp")
+                    .get_flat("@timestamp")
                     .and_then(|timestamp| {
                         self.timestamp_converter
                             .convert::<Value>(timestamp.as_bytes())
@@ -120,6 +118,7 @@ impl TcpSource for LogstashSource {
                     .unwrap_or_else(|| now.clone());
                 log.insert(log_schema().timestamp_key(), timestamp);
             }
+            log.try_insert(log_schema().host_key(), host.clone());
         }
     }
 }

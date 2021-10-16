@@ -3,7 +3,7 @@ use crate::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
-    event::Event,
+    event::{Event, LogEvent},
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
@@ -181,41 +181,43 @@ fn body_to_events(body: Bytes) -> Vec<Event> {
 fn line_to_event(line: String) -> Event {
     let parts = line.splitn(8, ' ').collect::<Vec<&str>>();
 
-    let mut event = if parts.len() == 8 {
+    let mut log = if parts.len() == 8 {
         let timestamp = parts[2];
         let hostname = parts[3];
         let app_name = parts[4];
         let proc_id = parts[5];
         let message = parts[7];
 
-        let mut event = Event::from(message);
-        let log = event.as_mut_log();
+        let mut log = LogEvent::default();
+        log.insert(log_schema().message_key(), message);
 
         if let Ok(ts) = timestamp.parse::<DateTime<Utc>>() {
-            log.insert(log_schema().timestamp_key(), ts);
+            log.try_insert(log_schema().timestamp_key(), ts);
         }
 
-        log.insert(log_schema().host_key(), hostname.to_owned());
+        log.try_insert(log_schema().host_key(), hostname.to_owned());
 
-        log.insert("app_name", app_name.to_owned());
-        log.insert("proc_id", proc_id.to_owned());
+        log.try_insert_flat("app_name", app_name.to_owned());
+        log.try_insert_flat("proc_id", proc_id.to_owned());
 
-        event
+        log
     } else {
         warn!(
             message = "Line didn't match expected logplex format, so raw message is forwarded.",
             fields = parts.len(),
             internal_log_rate_secs = 10
         );
-        Event::from(line)
+
+        let mut log = LogEvent::default();
+        log.insert(log_schema().message_key(), line);
+
+        log
     };
 
-    // Add source type
-    event
-        .as_mut_log()
-        .try_insert(log_schema().source_type_key(), Bytes::from("heroku_logs"));
+    log.try_insert(log_schema().source_type_key(), Bytes::from("heroku_logs"));
+    log.try_insert(log_schema().timestamp_key(), Utc::now());
 
-    event
+    log.into()
 }
 
 #[cfg(test)]
