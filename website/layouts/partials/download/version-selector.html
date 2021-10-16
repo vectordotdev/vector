@@ -4,7 +4,7 @@
 <div x-data="{ open: false }" @click.away="open = false" class="relative inline-block text-left">
   <div>
     <button @click="open = !open" type="button" class="flex items-center space-x-3 justify-center w-full rounded-md border dark:text-gray-200 text:gray-700 border-gray-300 dark:border-gray-700 shadow-sm px-3.5 py-2 bg-white dark:bg-dark text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 focus:ring-primary dark:hover:bg-black" id="menu-button" aria-expanded="true" aria-haspopup="true">
-      <span class="flex space-x-2.5">
+      <span class="flex items-center space-x-2.5">
         <span>
           Version&nbsp;<strong x-text="$store.global.version"></strong>
         </span>
@@ -50,7 +50,7 @@
 
       {{ range $versions }}
       {{ $isLatest := eq . $latest }}
-      <div class="flex justify-between px-5 items-center text-md hover:bg-gray-50 py-1.5 dark:hover:bg-black py-1.5">
+      <div class="flex justify-between py-1.5 px-5 items-center text-md hover:bg-gray-50 dark:hover:bg-black">
         <button @click="$store.global.setVersion('{{ . }}'); open = false" class="text-gray-600 dark:text-gray-200" role="menuitem" tabindex="-1" id="version-{{ . }}">
           <span>
             {{ . }}

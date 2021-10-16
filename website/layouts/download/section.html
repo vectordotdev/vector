@@ -51,15 +51,7 @@ Download | {{ site.Title }}
             </div>
           </div>
 
-          <div class="col-span-1 mt-6 lg:mt-0">
-            <div class="prose">
-              {{ partial "heading.html" (dict "text" "Other methods" "level" 2) }}
-            </div>
-
-            <div class="mt-2 flex flex-col divide-y divide-gray-200 border rounded-md dark:border-gray-700">
-              {{ partial "download/links.html" . }}
-            </div>
-          </div>
+          {{ template "methods" }}
         </div>
       </div>
     </div>
@@ -80,36 +72,48 @@ Download | {{ site.Title }}
       <div class="mt-8">
         <div class="lg:grid lg:grid-cols-3 gap-8">
           <div class="col-span-2">
-            {{ template "download-heading" (dict "text" "Download") }}
+            <div class="prose">
+              {{ partial "heading.html" (dict "text" "Downloads" "level" 2) }}
+            </div>
 
-            <div class="border px-4 py-3 lg:px-6 lg:py-4 rounded-md dark:border-gray-700">
+            <div class="mt-2 border px-4 py-3 lg:px-6 lg:py-4 rounded-md dark:border-gray-700">
               {{ partial "download/download-matrix.html" (dict "version" "nightly") }}
             </div>
 
-            <div class="mt-8 rounded-md border-yellow-400 border-2 px-4 py-3 flex items-start bg-yellow-100 dark:bg-dark">
-              {{/* Heroicon: outline/exclamation */}}
-              <span>
-                <svg xmlns="http://www.w3.org/2000/svg" class="text-yellow-500 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </span>
-
-              <span class="tracking-tight text-gray-600 dark:text-gray-300 ml-3">
-                Nightly versions contain bleeding-edge changes that may contain bugs. Proceed with caution.
-              </span>
-            </div>
+            {{ template "nightly-warning" }}
           </div>
 
-          <div class="col-span-1 mt-6 lg:mt-0">
-            {{ template "download-heading" (dict "text" "Other methods") }}
-
-            <div class="flex flex-col divide-y divide-gray-200 border rounded-md dark:border-gray-700">
-              {{ partial "download/links.html" . }}
-            </div>
-          </div>
+          {{ template "methods" }}
         </div>
       </div>
     </div>
+  </div>
+</div>
+{{ end }}
+
+{{ define "nightly-warning" }}
+<div class="mt-8 rounded-md border-yellow-400 border-2 px-4 py-3 flex items-start bg-yellow-100 dark:bg-dark">
+  {{/* Heroicon: outline/exclamation */}}
+  <span>
+    <svg xmlns="http://www.w3.org/2000/svg" class="text-yellow-500 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+    </svg>
+  </span>
+
+  <span class="tracking-tight text-gray-600 dark:text-gray-300 ml-3">
+    Nightly versions contain bleeding-edge changes that may contain bugs. Proceed with caution.
+  </span>
+</div>
+{{ end }}
+
+{{ define "methods" }}
+<div class="col-span-1 mt-6 lg:mt-0">
+  <div class="prose">
+    {{ partial "heading.html" (dict "text" "Other methods" "level" 2) }}
+  </div>
+
+  <div class="mt-2 flex flex-col divide-y divide-gray-200 border rounded-md dark:border-gray-700">
+    {{ partial "download/links.html" . }}
   </div>
 </div>
 {{ end }}
