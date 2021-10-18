@@ -18,7 +18,6 @@ use rdkafka::{
     config::ClientConfig,
     consumer::{Consumer, StreamConsumer},
     message::{BorrowedMessage, Headers, Message},
-    Offset, TopicPartitionList,
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -269,7 +268,9 @@ async fn kafka_source(
                     None => match out.send_all(&mut stream).await {
                         Err(err) => error!(message = "Error sending to sink.", error = %err),
                         Ok(_) => {
-                            if let Err(err) = consumer.store_offset(&msg) {
+                            if let Err(err) =
+                                consumer.store_offset(msg.topic(), msg.partition(), msg.offset())
+                            {
                                 emit!(&KafkaOffsetUpdateFailed { error: err });
                             }
                         }
@@ -301,12 +302,7 @@ impl<'a> From<BorrowedMessage<'a>> for FinalizerEntry {
 
 fn mark_done(consumer: Arc<StreamConsumer<KafkaStatisticsContext>>) -> impl Fn(FinalizerEntry) {
     move |entry| {
-        // Would like to use `consumer.store_offset` here, but types don't allow it.
-        let mut tpl = TopicPartitionList::new();
-        tpl.add_partition(&entry.topic, entry.partition)
-            .set_offset(Offset::from_raw(entry.offset + 1)) // Not sure why this needs a +1
-            .expect("Setting offset failed");
-        if let Err(error) = consumer.store_offsets(&tpl) {
+        if let Err(error) = consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
             emit!(&KafkaOffsetUpdateFailed { error });
         }
     }
@@ -413,6 +409,7 @@ mod integration_test {
         message::OwnedHeaders,
         producer::{FutureProducer, FutureRecord},
         util::Timeout,
+        Offset, TopicPartitionList,
     };
     use std::time::Duration;
     use vector_core::event::EventStatus;
