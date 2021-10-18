@@ -217,28 +217,48 @@ impl TryFrom<LogEvent> for NewRelicEvent {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct NewRelicLog(KeyValData);
+pub struct LogsApiModel(Vec<DataStore>);
 
-impl NewRelicLog {
-    pub fn new() -> Self {
-        Self(KeyValData::new())
+impl LogsApiModel {
+    pub fn new(logs_array: Vec<KeyValData>) -> Self {
+        let mut logs_store = DataStore::new();
+        logs_store.insert("logs".to_owned(), logs_array);
+        Self(vec!(logs_store))
     }
 }
 
-impl ToJSON<LogEvent> for NewRelicLog {}
+impl ToJSON<Vec<BufEvent>> for LogsApiModel {}
 
-impl TryFrom<LogEvent> for NewRelicLog {
+impl TryFrom<Vec<BufEvent>> for LogsApiModel {
     type Error = &'static str;
 
-    fn try_from(log: LogEvent) -> Result<Self, Self::Error> {
-        let mut nrlog = Self::new();
-        for (k, v) in log.all_fields() {
-            nrlog.0.insert(k, v.clone());
+    fn try_from(buf_events: Vec<BufEvent>) -> Result<Self, Self::Error> {
+        let mut logs_array = vec!();
+        for buf_event in buf_events {
+            let mut attr = HashMap::<String, Value>::new();
+            match buf_event {
+                BufEvent::Log(log) => {
+                    let mut log_model = KeyValData::new();
+                    for (k, v) in log.all_fields() {
+                        log_model.insert(k, v.clone());
+                    }
+                    if let None = log.get("message") {
+                        log_model.insert("message".to_owned(), Value::from("log from vector".to_owned()));
+                    }
+                    logs_array.push(log_model);
+                },
+                _ => {
+                    // Unrecognized event type
+                }
+            }
         }
-        if let None = log.get("message") {
-            nrlog.0.insert("message".to_owned(), Value::from("log from vector".to_owned()));
+
+        if logs_array.len() > 0 {
+            Ok(Self::new(logs_array))
         }
-        Ok(nrlog)
+        else {
+            Err("No valid logs to generate")
+        }
     }
 }
 
@@ -502,6 +522,9 @@ impl HttpSink for NewRelicConfig {
         let json = match self.api {
             NewRelicApi::Metrics => {
                 MetricsApiModel::to_json(events)
+            },
+            NewRelicApi::Logs => {
+                LogsApiModel::to_json(events)
             },
             _ => {
                 None
