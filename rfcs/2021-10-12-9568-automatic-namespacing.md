@@ -49,7 +49,7 @@ can become
 type = "anything"
 ```
 
-- Vector will only consider the files with the `yml`, `json`, or `toml` extensions of throw an error.
+- Vector will only consider the files with the `yml`, `yaml`, `json`, or `toml` extensions of throw an error.
 - Any duplicate component ID (like `sinks/foo.toml` and `sinks/foo.json`) will error.
 - If Vector's configuration is **not** loaded using a specific configuration folder (`--config-dir /etc/vector` for example), Vector will keep its default behavior and only load the specified configuration file.
 - If Vector encounters a hidden file or a hidden folder (name starting with a `.`, like `/etc/vector/.data` or `/etc/vector/.foo.toml`), the file/folder will be ignored.
