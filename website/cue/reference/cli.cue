@@ -65,6 +65,7 @@ _config_options: {
 cli: {
 	#Args: [Arg=string]: {
 		description: !=""
+		required:    bool | *false
 		name:        Arg
 		type:        #ArgType
 		default?:    string | [...string]

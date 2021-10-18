@@ -57,12 +57,6 @@
       </div>
       {{ end }}
 
-      {{ with $v.args }}
-      <div>
-        {{ template "args-table" (dict "title" "Arguments" "items" . "cmd" $k) }}
-      </div>
-      {{ end }}
-
       {{ with $v.flags }}
       <div>
         {{ template "options-table" (dict "title" "Flags" "items" . "cmd" $k) }}
@@ -72,6 +66,12 @@
       {{ with $v.options }}
       <div>
         {{ template "options-table" (dict "title" "Options" "items" . "cmd" $k) }}
+      </div>
+      {{ end }}
+
+      {{ with $v.args }}
+      <div>
+        {{ template "args-table" (dict "title" "Arguments" "items" . "cmd" $k) }}
       </div>
       {{ end }}
     </div>
@@ -102,6 +102,9 @@
         {{ .title }}
       </th>
       <th>
+        Required
+      </th>
+      <th>
         Description
       </th>
       <th>
@@ -117,6 +120,9 @@
     <tr>
       <td>
         <code>{{ $k }}</code>
+      </td>
+      <td>
+        {{ $v.required }}
       </td>
       <td>
         {{ $v.description | markdownify }}
