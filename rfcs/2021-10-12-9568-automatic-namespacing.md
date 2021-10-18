@@ -114,10 +114,6 @@ Very little. This will have minimal impact to the Vector codebase. Configuration
 
 - [Ansible Playbook syntax](https://docs.ansible.com/ansible/latest/user_guide/playbooks_intro.html#playbook-syntax)
 
-## Outstanding Questions
-
-- Should Vector load `--config-dir /etc/vector` by default instead of loading `--config /etc/vector/vector.toml` to handle subfolders out of the box?
-
 ## Plan Of Attack
 
 Incremental steps to execute this change. These will be converted to issues after the RFC is approved:
