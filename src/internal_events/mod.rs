@@ -91,6 +91,8 @@ mod lua;
 mod metric_to_log;
 #[cfg(feature = "sources-mongodb_metrics")]
 mod mongodb_metrics;
+#[cfg(feature = "sources-mqtt")]
+mod mqtt;
 #[cfg(any(feature = "sources-nats", feature = "sinks-nats"))]
 mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
@@ -237,6 +239,8 @@ pub(crate) use self::loki::*;
 pub use self::lua::*;
 #[cfg(feature = "transforms-metric_to_log")]
 pub(crate) use self::metric_to_log::*;
+#[cfg(any(feature = "sources-mqtt"))]
+pub use self::mqtt::*;
 #[cfg(any(feature = "sources-nats", feature = "sinks-nats"))]
 pub use self::nats::*;
 #[cfg(feature = "sources-nginx_metrics")]

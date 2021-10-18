@@ -277,6 +277,7 @@ zstd = { version = "0.6", default-features = false, optional = true }
 tonic = { version = "0.5", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls"] }
 data-encoding = { version = "2.2", default-features = false, features = ["std"], optional = true }
 trust-dns-proto = { version = "0.20", features = ["dnssec"], optional = true }
+rumqttc = { version = "0.9", optional = true, default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1.19"
@@ -422,6 +423,7 @@ sources-logs = [
   "sources-syslog",
   "sources-vector",
   "sources-nats",
+  "sources-mqtt",
 ]
 sources-metrics = [
   "sources-apache_metrics",
@@ -457,6 +459,7 @@ sources-internal_metrics = []
 sources-journald = ["codecs"]
 sources-kafka = ["rdkafka", "codecs"]
 sources-nats = ["async-nats", "codecs"]
+sources-mqtt = ["rumqttc"]
 sources-logstash = ["listenfd", "tokio-util/net", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "codecs"]
 sources-kubernetes_logs = ["file-source", "kubernetes", "transforms-merge", "transforms-regex_parser"]
 sources-mongodb_metrics = ["mongodb"]
@@ -668,6 +671,7 @@ all-integration-tests = [
   "logstash-integration-tests",
   "loki-integration-tests",
   "mongodb_metrics-integration-tests",
+  "mqtt-integration-tests",
   "nats-integration-tests",
   "nginx-integration-tests",
   "postgresql_metrics-integration-tests",
@@ -716,6 +720,7 @@ kafka-integration-tests = ["sinks-kafka", "sources-kafka"]
 logstash-integration-tests = ["docker", "sources-logstash", "uuid"]
 loki-integration-tests = ["sinks-loki"]
 mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
+mqtt-integration-tests = ["sources-mqtt"]
 nats-integration-tests = ["sinks-nats", "sources-nats"]
 nginx-integration-tests = ["sources-nginx_metrics"]
 postgresql_metrics-integration-tests = ["sources-postgresql_metrics"]

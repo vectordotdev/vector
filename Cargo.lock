@@ -3809,6 +3809,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "mqttbytes"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12793a86f38eb258c5dbddf801dfd521c1d7a9def6e3a3de1ee248441c9dcc28"
+dependencies = [
+ "bytes 1.1.0",
+]
+
+[[package]]
 name = "multer"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4578,6 +4587,12 @@ dependencies = [
  "wepoll-ffi",
  "winapi 0.3.9",
 ]
+
+[[package]]
+name = "pollster"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb20dcc30536a1508e75d47dd0e399bb2fe7354dcf35cda9127f2bf1ed92e30e"
 
 [[package]]
 name = "portpicker"
@@ -5375,6 +5390,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "921904a62e410e37e215c40381b7117f830d9d89ba60ab5236170541dd25646b"
 dependencies = [
  "xmlparser",
+]
+
+[[package]]
+name = "rumqttc"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "613456fdab2f811204edb36f25e397cc62956c85326c274d153bc0b17c44a777"
+dependencies = [
+ "async-channel",
+ "bytes 1.1.0",
+ "http",
+ "log",
+ "mqttbytes",
+ "pollster",
+ "thiserror",
+ "tokio",
+ "tokio-rustls",
+ "webpki",
 ]
 
 [[package]]
@@ -7581,6 +7614,7 @@ dependencies = [
  "reqwest",
  "rmp-serde",
  "rmpv",
+ "rumqttc",
  "rusoto_cloudwatch",
  "rusoto_core",
  "rusoto_credential",
