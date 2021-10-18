@@ -45,6 +45,6 @@ ignore = [
 
     # Potential segfault in localtime_r invocations
     # We resolved this by patching chrono to use a version that doesn't depend on `time` v0.1
-    # https://github.com/vectordotdev/vector/issues/9673
+    # https://github.com/vectordotdev/vector/issues/9679
     "RUSTSEC-2020-0159",
 ]
