@@ -66,6 +66,8 @@ const manageState = () => {
     },
     // Set a new version
     setVersion(v) {
+      location.hash = v;
+
       this.version = v;
 
       if (v === 'nightly') {
@@ -76,6 +78,9 @@ const manageState = () => {
         this.setRelease('stable');
         this.versionBackup = v;
       }
+    },
+    isVersion(v) {
+      return (location.hash === v) || (this.version === v);
     },
     notLatest() {
       return this.version != '{{ $latest }}';

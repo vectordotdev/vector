@@ -40,7 +40,7 @@ Download | {{ site.Title }}
 {{ define "release-header" }}
 {{ $v := .version }}
 {{ $isNightly := eq $v "nightly" }}
-<div x-show="location.hash === '/download/{{ $v }}' || $store.global.version === '{{ $v }}'"{{ if $isNightly}} x-data="{ date: new Date().toISOString().slice(0, 10) }"{{ end }}>
+<div x-show="$store.global.isVersion('{{ $v }}')"{{ if $isNightly}} x-data="{ date: new Date().toISOString().slice(0, 10) }"{{ end }}>
   <div class="flex items-center space-x-10">
     <span class="text-md lg:text-lg font-light text-dark dark:text-gray-300">
       Date {{ if $isNightly }}
@@ -65,7 +65,7 @@ Download | {{ site.Title }}
 
 {{ define "release-body" }}
 {{ $v := .version }}
-<div x-show="$store.global.version === '{{ $v }}'">
+<div x-show="$store.global.isVersion('{{ $v }}')">
   <div class="mt-8">
     <div class="lg:grid lg:grid-cols-3 gap-8">
       <div class="col-span-2">
