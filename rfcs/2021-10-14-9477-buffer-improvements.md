@@ -215,5 +215,6 @@ cost.
   for disk space. [#5102](https://github.com/vectordotdev/vector/issues/5102)
 - Make sure we gracefully handle disk out of space errors.
   [#8763](https://github.com/vectordotdev/vector/issues/8763)
-- Using `io_uring` (likely via `tokio-uring`) to drive the disk buffer I/O for lower overhead,
-  higher efficiency, higher performance, etc.
+- Using `io_uring`  on Linux (likely via `tokio-uring`) to drive the disk buffer I/O for lower overhead,
+  higher efficiency, higher performance, etc.  Potentially usable for Windows as well if
+  `tokio-uring` gained support for Windows' new I/O Rings feature.
