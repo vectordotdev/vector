@@ -88,3 +88,69 @@ impl SinkConfig for HecSinkLogsConfig {
         "splunk_hec_logs"
     }
 }
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct HecSinkMetricsConfig {
+    pub default_namespace: Option<String>,
+    pub token: String,
+    pub endpoint: String,
+    #[serde(default = "host_key")]
+    pub host_key: String,
+    pub index: Option<Template>,
+    pub sourcetype: Option<Template>,
+    pub source: Option<Template>,
+    #[serde(default)]
+    pub compression: Compression,
+    #[serde(default)]
+    pub batch: BatchConfig,
+    #[serde(default)]
+    pub request: TowerRequestConfig,
+    pub tls: Option<TlsOptions>,
+}
+
+impl GenerateConfig for HecSinkMetricsConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            default_namespace: None,
+            token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned(),
+            endpoint: "http://localhost:8088".to_owned(),
+            host_key: host_key(),
+            index: None,
+            sourcetype: None,
+            source: None,
+            compression: Compression::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
+            tls: None,
+        })
+        .unwrap()
+    }
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "splunk_hec_metrics")]
+impl SinkConfig for HecSinkMetricsConfig {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        conn::build_sink(
+            self.clone(),
+            &self.request,
+            &self.tls,
+            cx.proxy(),
+            self.batch,
+            self.compression,
+            cx.acker(),
+            &self.endpoint,
+            &self.token,
+        )
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::Metric
+    }
+
+    fn sink_type(&self) -> &'static str {
+        "splunk_hec_metrics"
+    }
+}
+
