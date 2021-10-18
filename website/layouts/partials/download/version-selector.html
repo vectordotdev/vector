@@ -42,7 +42,7 @@
 
     <div class="flex flex-col py-3" role="none">
       <div class="flex justify-between py-1.5 px-5 items-center text-xl hover:bg-gray-50 dark:hover:bg-black">
-        <button @click="$store.global.setVersion('nightly'); open = false" class="text-gray-600 dark:text-gray-200" role="menuitem" tabindex="-1" id="version-nightly">
+        <button @click="location.hash = 'nightly'; $store.global.setVersion('nightly'); open = false" class="text-gray-600 dark:text-gray-200" role="menuitem" tabindex="-1" id="version-nightly">
           <span>
             nightly
           </span>
@@ -54,12 +54,9 @@
       {{ range $versions }}
       {{ $isLatest := eq . $latest }}
       <div class="flex justify-between py-1.5 px-5 items-center text-xl hover:bg-gray-50 dark:hover:bg-black">
-        <button @click="$store.global.setVersion('{{ . }}'); open = false" class="text-gray-600 dark:text-gray-200" role="menuitem" tabindex="-1" id="version-{{ . }}">
-          {{ if $isLatest }}
-          <strong>{{ . }}</strong>
-          {{ else }}
-          {{ . }}
-          {{ end }}
+        <button @click="location.hash = '{{ . }}'; $store.global.setVersion('{{ . }}'); open = false" class="text-gray-600 dark:text-gray-200" role="menuitem" tabindex="-1" id="version-{{ . }}">
+          <span x-show="$store.global.version === '{{ . }}'"><strong>{{ . }}</strong></span>
+          <span x-show="$store.global.version != '{{ . }}'">{{ . }}</span>
         </button>
 
         {{ if $isLatest }}
