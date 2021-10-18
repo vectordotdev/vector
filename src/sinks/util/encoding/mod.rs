@@ -96,10 +96,6 @@ where
     }
 }
 
-pub trait LogEncoder {
-    fn encode_log(&self, log: LogEvent, writer: &mut dyn io::Write) -> io::Result<()>;
-}
-
 /// The behavior of a encoding configuration.
 pub trait EncodingConfiguration {
     type Codec;
