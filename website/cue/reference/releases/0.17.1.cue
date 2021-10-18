@@ -7,8 +7,8 @@ releases: "0.17.1": {
 	description: """
 		The Vector team is pleased to announce version `v0.17.1`!
 
-		This release contains a few ug fixes from the `v0.17.0` release to restore compatibility with existing source
-		event decoding.
+		This release contains a few bug fixes from the `v0.17.0` release to restore compatibility with existing source
+		event decoding as well as a fix for the `events_out_total` metric where it was double the value it should have been.
 
 		**Note:** Please see the release notes for [`v0.17.0`](/releases/0.17.0/) for additional changes if upgrading from
 		`v0.16.X`. In particular, the upgrade guide for breaking changes.
