@@ -3,8 +3,7 @@ use crate::{
     buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    internal_events::FileOpen,
-    internal_events::TemplateRenderingFailed,
+    internal_events::{EventsSent, FileBytesSent, FileOpen, TemplateRenderingFailed},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
@@ -21,6 +20,7 @@ use futures::{
 };
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
+use vector_core::ByteSizeOf;
 
 use tokio::{
     fs::{self, File},
@@ -290,8 +290,19 @@ impl FileSink {
         };
 
         trace!(message = "Writing an event to file.", path = ?path);
-        if let Err(error) = write_event_to_file(file, event, &self.encoding).await {
-            error!(message = "Failed to write file.", path = ?path, %error);
+        let event_size = event.size_of();
+        match write_event_to_file(file, event, &self.encoding).await {
+            Ok(byte_size) => {
+                emit!(&EventsSent {
+                    count: 1,
+                    byte_size: event_size,
+                });
+                emit!(&FileBytesSent {
+                    byte_size,
+                    file: String::from_utf8_lossy(&path),
+                });
+            }
+            Err(error) => error!(message = "Failed to write file.", path = ?path, %error),
         }
     }
 }
@@ -328,10 +339,10 @@ async fn write_event_to_file(
     file: &mut OutFile,
     event: Event,
     encoding: &EncodingConfig<Encoding>,
-) -> Result<(), std::io::Error> {
+) -> Result<usize, std::io::Error> {
     let mut buf = encode_event(encoding, event);
     buf.push(b'\n');
-    file.write_all(&buf[..]).await
+    file.write_all(&buf[..]).await.map(|()| buf.len())
 }
 
 #[async_trait]
@@ -348,10 +359,12 @@ impl StreamSink for FileSink {
 mod tests {
     use super::*;
     use crate::test_util::{
+        components::{self, FILE_SINK_TAGS, SINK_TESTS},
         lines_from_file, lines_from_gzip_file, random_events_with_stream, random_lines_with_stream,
         temp_dir, temp_file, trace_init,
     };
     use futures::{stream, SinkExt};
+    use pretty_assertions::assert_eq;
     use std::convert::TryInto;
 
     #[test]
@@ -361,6 +374,7 @@ mod tests {
 
     #[tokio::test]
     async fn single_partition() {
+        components::init();
         trace_init();
 
         let template = temp_file();
@@ -377,6 +391,7 @@ mod tests {
 
         let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
         sink.run(events).await.unwrap();
+        SINK_TESTS.assert(&FILE_SINK_TAGS);
 
         let output = lines_from_file(template);
         for (input, output) in input.into_iter().zip(output) {
@@ -386,6 +401,7 @@ mod tests {
 
     #[tokio::test]
     async fn single_partition_gzip() {
+        components::init();
         trace_init();
 
         let template = temp_file();
@@ -402,6 +418,7 @@ mod tests {
 
         let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
         sink.run(events).await.unwrap();
+        SINK_TESTS.assert(&FILE_SINK_TAGS);
 
         let output = lines_from_gzip_file(template);
         for (input, output) in input.into_iter().zip(output) {
@@ -411,6 +428,7 @@ mod tests {
 
     #[tokio::test]
     async fn many_partitions() {
+        components::init();
         trace_init();
 
         let directory = temp_dir();
@@ -449,6 +467,7 @@ mod tests {
 
         let events = Box::pin(stream::iter(input.clone().into_iter()));
         sink.run(events).await.unwrap();
+        SINK_TESTS.assert(&FILE_SINK_TAGS);
 
         let output = vec![
             lines_from_file(&directory.join("warnings-2019-26-07.log")),
@@ -495,8 +514,7 @@ mod tests {
 
     #[tokio::test]
     async fn reopening() {
-        use pretty_assertions::assert_eq;
-
+        components::init();
         trace_init();
 
         let template = temp_file();
@@ -534,5 +552,7 @@ mod tests {
         // make sure we appended instead of overwriting
         let output = lines_from_file(template);
         assert_eq!(input, output);
+
+        SINK_TESTS.assert(&FILE_SINK_TAGS);
     }
 }
