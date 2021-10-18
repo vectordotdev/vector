@@ -14,8 +14,8 @@ internal tracing has its own
 
 ### Some details about traces handling by the Agent
 
-Traces are collected by a dedicated agent (the `trace-agent`). It has its own runtime, comes with a log of configuration
-settings but it shares global option like `site` to select the Datadog region where to send data.
+Traces are collected by a dedicated agent (the `trace-agent`). It has its own runtime, comes with a lot of configuration
+settings, but it shares global option like `site` to select the Datadog region where to send data.
 
 It exposes a [local API](https://github.com/DataDog/datadog-agent/blob/main/pkg/trace/api/endpoints.go), that is used by
 [tracing
@@ -68,13 +68,13 @@ N/A
 
 ### Out of scope
 
-* Pofiling data, but as the trace-agent only proxifies profiling data, the same behaviour can be impletement rather
+* Profiling data, but as the trace-agent only proxifies profiling data, the same behaviour can be implemented rather
   quickly in Vector.
-* Debugger logs can be already diverted to Vector (untested but it should work as vector support datadog logs and there
+* Debugger logs can be already diverted to Vector (untested but it should work as Vector supports datadog logs and there
   is an config option to explicitly configure the debugger log destination)
 * Metrics emitted by the trace-agent (they could theoretically be received by Vector by a statsd source, but the host
-  use by the trace-agent is derived from the local config to programmatically discover the main agent, thus there is no
-  existing knob to force the trace agent to send metric to a custom dogstatsd host)
+  used by the trace-agent is derived from the local config to programmatically discover the main agent, thus there is no
+  existing knob to force the trace agent to send metrics to a custom dogstatsd host)
 * Span extraction, filtering
 * Other sources & sinks for traces than `datadog_trace`
 
@@ -87,33 +87,33 @@ N/A
 
 ### User Experience
 
-* User will be able to ingest trace from the trace agent
-  * Vector config would then consist in: `datadog_trace` source -> some filtering/enrichment transform ->
+* User will be able to ingest traces from the trace agent
+  * Vector config would then consist of: `datadog_trace` source -> some filtering/enrichment transform ->
     `datadog_trace` sink
-  * Datadog trace agent can be configured to send traces to any arbitrary endpoint using the `apm_config.apm_dd_url`
+  * Datadog trace agent can be configured to send traces to any arbitrary endpoint using `apm_config.apm_dd_url`
     [config key](https://github.com/DataDog/datadog-agent/blob/34a5589/pkg/config/apm.go#L61-L87)
 * This change is a pure addition to Vector, there will be no impact on existing feature
 
 ### Implementation
 
-The first item to be address would be to add a new event type that will represent traces, this would materialise as a
+The first item to be addressed would be to add a new event type that will represent traces. This would materialise as a
 new member of the `Event` enum. As it would be implemented in vector-core, it's probably better to stay relatively
 vendor agnostic, so basing it on the [OpenTelemetry trace
 format](https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/trace/v1/trace.proto) with
-additional field upon necessity is probably a safe option. Overal there is no huge discrepancy between Datdog traces and
+additional fields as required is probably a safe option. Overall, there is no huge discrepancy between Datadog traces and
 OpenTelemetry traces (The trace-agent already offer
-[OLTP->Datadog](https://github.com/DataDog/datadog-agent/blob/637b43e/pkg/trace/api/otlp.go#L305-L377) conversion). The main difference is that Datadog spans come with a string/double map containing metrics and string/string map for some metadata whereas OTLP traces comes with a list of key/value (value mimic json values). The easiest way do deal with that would be for the Vector trace struct to keep the OLTP generic key/value list as generic structured metadata holder along with a tags maps for Datadog format string/string map and a the string/double metric map.
+[OLTP->Datadog](https://github.com/DataDog/datadog-agent/blob/637b43e/pkg/trace/api/otlp.go#L305-L377) conversion). The main difference is that Datadog spans come with a string/double map containing metrics and a string/string map for some metadata whereas OTLP traces come with a list of key/value (value mimics json values). The easiest way do deal with that would be for the Vector trace struct to keep the OLTP generic key/value list as a generic structured metadata holder along with a tags map for Datadog string/string formatted maps and a string/double metrics map.
 
-This `Trace` struct shall allow to represent APM events (specific spans extracted by the trace-agent), so this `Trace`
+This `Trace` struct shall represent APM events (specific spans extracted by the trace-agent), so this `Trace`
 struct has to support standalone spans/or single span traces.
 
 Based on the aforementioned work a source & sink would then be added to Vector:
 
 * A `datadog_trace` source that decodes incoming [gzip'ed protobuf over
   http](https://github.com/DataDog/datadog-agent/blob/8b63d85/pkg/trace/writer/trace.go#L230-L269) to the internal
-  represention implemented in the step before. .proto are located in the [datadog-agent
+  represention implemented in the prior step. .proto files are located in the [datadog-agent
   repository](https://github.com/DataDog/datadog-agent/blob/0a19a75/pkg/trace/pb/trace_payload.proto)
-* A `datadog_trace` sink that does the opposite conversion and sends the trace to datadog to the relevant region
+* A `datadog_trace` sink that does the opposite conversion and sends the trace to Datadog to the relevant region
   according to the sink config
 
 Datadog API key management would be the same as it is for Datadog logs & metrics.
@@ -121,25 +121,25 @@ Datadog API key management would be the same as it is for Datadog logs & metrics
 ## Rationale
 
 * traces support is expected by users
-* local sampling is an interesting feature to lessen the amount of data sent to Datadog
+* Local sampling is an interesting feature to lessen the amount of data sent to Datadog
 
 ## Drawbacks
 
-* Adding a brand new datatype has a large impact, although it will be mostly code addition, it will impact vector-core
+* Adding a brand new datatype has a large impact and although it will be mostly a code addition, it will impact vector-core
 
 ## Prior Art
 
-* Internal rust traces can be converted into [log
+* Internal Rust traces can be converted into [log
   event](https://github.com/vectordotdev/vector/blob/bd3d58c/lib/vector-core/src/event/log_event.rs#L402-L432), but this
-  is not reversible, but this is a good way of getting text based representation
+  is not reversible. This is still a good way of getting a text-based representation
 
 ## Alternatives
 
-* Regarding implementation traces could also be represented as a log event, conversion to/from json should
-  theroretically not be a problem for traces/spans, but it would generate deeper than usual structure (should not be a
+* Regarding implementation, traces could also be represented as a log event. Conversion to/from json should
+  theoretically not be a problem for traces/spans, but it would generate a deeper than usual structure (should not be a
   problem though)
 * Traces could be represented themselves as a enum with specific implementation per vendor, allowing almost direct
-  mapping from protocol definition into rust struct.
+  mapping from protocol definition into Rust struct(s).
 
 ## Outstanding Questions
 
@@ -157,7 +157,7 @@ Datadog API key management would be the same as it is for Datadog logs & metrics
 * Profile support
 * Ingest traces from app directly
 * Opentelemetry exporter support (the Datadog export would probably be easily supported once this RFC has been
-  implemented as it's using the same [Datadog endpoint thant the trace
+  implemented as it's using the same [Datadog endpoint as the trace
   agent](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/04f97ec/exporter/datadogexporter/config/config.go#L288-L290)
 * Traces helpers in VRL
 * Trace-agent configuration with a `vector.traces.url` & `vector.traces.enabled`
