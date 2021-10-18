@@ -67,11 +67,30 @@ impl FunctionTransform for Lane {
 //------------------------------------------------------------------------------
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
 pub struct RouteConfig {
-    // Deprecated name
+    #[serde(flatten)]
+    route_or_routes: RouteOrRoutes,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct RouteOrRoutes {
     #[serde(alias = "lanes")]
-    route: IndexMap<String, AnyCondition>,
+    route: Option<IndexMap<String, AnyCondition>>,
+    #[serde(flatten)]
+    routes: Option<Routes>,
+}
+
+/// Dynamically route to one of the pre-defined routes, based on a field value.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Routes {
+    /// The field to match against the possible values.
+    field: String,
+
+    /// The possible route values of the field.
+    ///
+    /// When the field matches one of these values, it is sent to the route with a similar name.
+    routes: Vec<String>,
 }
 
 inventory::submit! {
@@ -85,7 +104,7 @@ inventory::submit! {
 impl GenerateConfig for RouteConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            route: IndexMap::new(),
+            route_or_routes: RouteOrRoutes::default(),
         })
         .unwrap()
     }
@@ -103,13 +122,30 @@ impl TransformConfig for RouteConfig {
     ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
         let mut map: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
 
-        while let Some((k, v)) = self.route.pop() {
-            if map
-                .insert(k.clone(), Box::new(LaneConfig { condition: v }))
-                .is_some()
-            {
-                return Err("duplicate route id".into());
+        if let Some(ref mut route) = self.route_or_routes.route {
+            while let Some((k, v)) = route.pop() {
+                if map
+                    .insert(k.clone(), Box::new(LaneConfig { condition: v }))
+                    .is_some()
+                {
+                    return Err("duplicate route id".into());
+                }
             }
+        } else if let Some(ref mut routes) = self.route_or_routes.routes {
+            let Routes { field, routes } = routes;
+
+            while let Some(k) = routes.pop() {
+                let v = AnyCondition::String(format!("{} == s'{}'", field, k));
+
+                if map
+                    .insert(k.clone(), Box::new(LaneConfig { condition: v }))
+                    .is_some()
+                {
+                    return Err("duplicate route id".into());
+                }
+            }
+        } else {
+            return Err("Must specify at least one route or dynamic routes".into());
         }
 
         if !map.is_empty() {
