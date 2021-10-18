@@ -318,7 +318,15 @@ azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev =
 
 [patch.crates-io]
 # A patch for lib/vector-core/buffers, addresses Issue 7514
-leveldb-sys = { git = "https://github.com/timberio/leveldb-sys.git", branch = "leveldb_mmap_limit" }
+leveldb-sys = { git = "https://github.com/vectordotdev/leveldb-sys.git", branch = "leveldb_mmap_limit" }
+# Removes dependency on `time` v0.1
+# https://github.com/chronotope/chrono/pull/578
+chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time" }
+# Removes dependency on `time` v0.1
+headers = { git = "https://github.com/hyperium/headers.git", rev = "4bf199f38d1403bb2cfa10c1644fd7e218faf281" }
+# Removes dependency on `time` v0.1
+# https://github.com/Geal/rust-syslog/pull/57
+syslog = { git = "https://github.com/vectordotdev/rust-syslog.git", branch = "upgrade-time-0.3" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
