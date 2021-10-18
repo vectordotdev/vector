@@ -34,7 +34,7 @@ To solve for above, we'd like to introduce implicit configuration namespacing ba
 
 ### User Experience
 
-- When loading Vector's configuration using `--config-dir` (let say `--config-dir /etc/vector`), every type of component (`sources`, `transforms`, `sinks` but also `enrichment_tables` and `tests`) can be declared in subfolders, in separate files, with there filenames being their component ID and only with the `yml`, `json`, or `toml` extensions.
+- When loading Vector's configuration using `--config-dir` (let say `--config-dir /etc/vector`), it will look in every subfolder for any component configuration file, with their filenames being their component ID.
 
 ```toml
 # /etc/vector/vector.toml
@@ -49,15 +49,16 @@ can become
 type = "anything"
 ```
 
+- Vector will only consider the files with the `yml`, `json`, or `toml` extensions of throw an error.
 - Any duplicate component ID (like `sinks/foo.toml` and `sinks/foo.json`) will error.
 - If Vector's configuration is **not** loaded using a specific configuration folder (`--config-dir /etc/vector` for example), Vector will keep its default behavior and only load the specified configuration file.
 - If Vector encounters a hidden file or a hidden folder (name starting with a `.`, like `/etc/vector/.data` or `/etc/vector/.foo.toml`), a warning will be displayed and the file/folder will be ignored.
-- If Vector encounters a folder with a name that doesn't refer to a component type (like `/etc/vector/foo`), an error will be thrown.
+- If Vector encounters a folder (like `/etc/vector/foo`) with a name that doesn't refer to a component type (like `sources`, `transforms`, `sinks`, `enrichment_tables`, `tests`), an error will be thrown.
 - If a component file (like `/etc/vector/sinks/foo.toml`) doesn't have a proper sink configuration structure, Vector will error.
 
 ### Implementation
 
-- [When loading the configuration from a directory](https://github.com/vectordotdev/vector/blob/v0.17.0/src/config/loading.rs#L150), instead of only considering the files in that directory, Vector will check if the folders `sources`, `transforms`, `sinks`, `enrichment_tables` and `tests` exist, load each file in those folders and merge the components with the current configuration.
+- [When loading the configuration from a directory](https://github.com/vectordotdev/vector/blob/v0.17.0/src/config/loading.rs#L150), instead of only considering the files in that directory, Vector will consider the subfolders, load each file in those folders and merge the components with the current configuration.
 
 ```rust
 fn load_builder_from_dir(path: &Path) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
@@ -66,7 +67,7 @@ fn load_builder_from_dir(path: &Path) -> Result<(ConfigBuilder, Vec<String>), Ve
   for child in path.children() {
     if child.is_dir() {
       match child.name() {
-        // same with transforms, sources, tests, enrichment_tables
+        // same with other component types like transforms, sources, tests, enrichment_tables
         "sinks" => load_sinks_from_dir(child, &mut builder, &mut errors),
         other => tracing::debug!("ignoring folder {}", other),
       }
