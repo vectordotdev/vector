@@ -34,7 +34,7 @@ components: transforms: ansi_stripper: {
 			"""
 			\(ansi_stripper._remap_deprecation_notice)
 
-			```vrl
+			```coffee
 			.message = strip_ansi_escape_codes(.message)
 			```
 			""",

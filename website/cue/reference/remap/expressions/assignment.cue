@@ -36,20 +36,20 @@ remap: expressions: assignment: {
 					"=": """
 						Simple assignment operator. Assigns the result from the right-hand side to the left-hand side:
 
-						```vrl
+						```coffee
 						.field = "value"
 						```
 						"""
 					"|=": """
 						Object merge assignment operator. Assigns the result of the right-hand side, merged with the left-hand side, to the left-hand side:
 
-						```vrl
+						```coffee
 						.field |= {"foo": "bar"}
 						```
 
 						This is equivalent to using the `merge` function:
 
-						```vrl
+						```coffee
 						.field = merge(.field, {"foo": "bar"})
 						```
 
@@ -59,7 +59,7 @@ remap: expressions: assignment: {
 						Assigns _only_ if the right-hand side doesn't error. This is useful when invoking fallible
 						functions on the right-hand side:
 
-						```vrl
+						```coffee
 						.structured ??= parse_json(.message)
 						```
 						"""

@@ -31,7 +31,7 @@ components: transforms: add_fields: {
 			"""
 			\(add_fields._remap_deprecation_notice)
 
-			```vrl
+			```coffee
 			.severity = "crit"
 			.status = 200
 			.success_codes = [200, 201, 202, 204]
