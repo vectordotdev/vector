@@ -40,7 +40,7 @@ components: transforms: key_value_parser: {
 			"""
 			\(key_value_parser._remap_deprecation_notice)
 
-			```vrl
+			```coffee
 			.message = parse_key_value(.message)
 			```
 			""",
