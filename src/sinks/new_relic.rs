@@ -131,8 +131,7 @@ impl TryFrom<Vec<BufEvent>> for MetricsApiModel {
                                 Value::from(metric.name().to_owned()),
                                 Value::from("gauge".to_owned()),
                                 Value::from(*value),
-                                //TODO: check Some instead of unwraping
-                                Value::from(metric.timestamp().unwrap())
+                                Value::from(metric.timestamp())
                             ));
                         },
                         MetricValue::Counter { value } => {
@@ -140,8 +139,7 @@ impl TryFrom<Vec<BufEvent>> for MetricsApiModel {
                                 Value::from(metric.name().to_owned()),
                                 Value::from("count".to_owned()),
                                 Value::from(*value),
-                                //TODO: check Some instead of unwraping
-                                Value::from(metric.timestamp().unwrap())
+                                Value::from(metric.timestamp())
                             ));
                         },
                         _ => {
