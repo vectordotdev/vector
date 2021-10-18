@@ -52,7 +52,7 @@ type = "anything"
 - Vector will only consider the files with the `yml`, `json`, or `toml` extensions of throw an error.
 - Any duplicate component ID (like `sinks/foo.toml` and `sinks/foo.json`) will error.
 - If Vector's configuration is **not** loaded using a specific configuration folder (`--config-dir /etc/vector` for example), Vector will keep its default behavior and only load the specified configuration file.
-- If Vector encounters a hidden file or a hidden folder (name starting with a `.`, like `/etc/vector/.data` or `/etc/vector/.foo.toml`), a warning will be displayed and the file/folder will be ignored.
+- If Vector encounters a hidden file or a hidden folder (name starting with a `.`, like `/etc/vector/.data` or `/etc/vector/.foo.toml`), the file/folder will be ignored.
 - If Vector encounters a folder (like `/etc/vector/foo`) with a name that doesn't refer to a component type (like `sources`, `transforms`, `sinks`, `enrichment_tables`, `tests`), an error will be thrown.
 - If a component file (like `/etc/vector/sinks/foo.toml`) doesn't have a proper sink configuration structure, Vector will error.
 
