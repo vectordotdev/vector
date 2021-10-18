@@ -148,7 +148,7 @@ cli: {
 		}
 		"verbose": {
 			_short:      "v"
-			description: "Enable more detailed logging. Repeat to reduce further. Overrides `--verbose`".
+			description: "Enable more detailed logging. Repeat to reduce further. Overrides `--verbose`."
 		}
 		"watch-config": {
 			_short:      "w"
