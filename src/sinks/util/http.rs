@@ -365,6 +365,8 @@ where
 
 pub struct HttpBatchService<F, B = Vec<u8>> {
     inner: HttpClient<Body>,
+
+    //TODO: use a custom trait here instead
     request_builder: Arc<dyn Fn(B) -> F + Send + Sync>,
 }
 

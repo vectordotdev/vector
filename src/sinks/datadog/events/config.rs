@@ -11,6 +11,11 @@ use futures::{FutureExt, SinkExt};
 use serde::{Serialize, Deserialize};
 use crate::sinks::datadog::events::service::DatadogEventsService;
 use indoc::indoc;
+use crate::sinks::datadog::events::sink::DatadogEventsSink;
+use tower::ServiceBuilder;
+use crate::sinks::util::ServiceBuilderExt;
+use crate::sinks::util::encoding::{EncodingConfigWithDefault, TimestampFormat, EncodingConfigFixed, StandardJsonEncoding};
+
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -50,54 +55,6 @@ impl DatadogEventsConfig {
             .clone()
             .unwrap_or_else(|| format!("https://api.{}", &self.site))
     }
-
-    pub fn build_sink<T, B, O>(
-        &self,
-        cx: SinkContext,
-        service: T,
-        batch: B,
-        timeout: Duration,
-    ) -> crate::Result<(VectorSink, Healthcheck)>
-        where
-            O: ByteSizeOf + 'static,
-            B: Batch<Output = Vec<O>> + std::marker::Send + 'static,
-            B::Output: std::marker::Send + Clone,
-            B::Input: std::marker::Send,
-            T: HttpSink<
-                Input = PartitionInnerBuffer<B::Input, ApiKey>,
-                Output = PartitionInnerBuffer<B::Output, ApiKey>,
-            > + Clone,
-    {
-        let mut request_opts = self.request;
-        // Since we are sending only one event per request we should try to send as much
-        // requests in parallel as possible.
-        request_opts.concurrency = request_opts.concurrency.if_none(Concurrency::Adaptive);
-        let request_settings = request_opts.unwrap_with(&TowerRequestConfig::default());
-
-        let tls_settings = MaybeTlsSettings::from_config(
-            &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
-            false,
-        )?;
-
-        let client = HttpClient::new(tls_settings, cx.proxy())?;
-        let healthcheck = healthcheck(
-            self.get_api_endpoint(),
-            self.default_api_key.clone(),
-            client.clone(),
-        )
-            .boxed();
-        let sink = PartitionHttpSink::new(
-            service,
-            PartitionBuffer::new(batch),
-            request_settings,
-            timeout,
-            client,
-            cx.acker(),
-        )
-            .sink_map_err(|error| error!(message = "Fatal datadog_events sink error.", %error));
-
-        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
-    }
 }
 
 
@@ -106,18 +63,54 @@ impl DatadogEventsConfig {
 impl SinkConfig for DatadogEventsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         // Datadog Event API doesn't support batching.
-        let batch_settings = BatchSettings::default()
-            .bytes(100_000)
-            .events(1)
-            .timeout(0)
-            .parse_config(BatchConfig::default())?;
+        // let batch_settings = BatchSettings::default()
+        //     .bytes(100_000)
+        //     .events(1)
+        //     .timeout(0)
+        //     .parse_config(BatchConfig::default())?;
 
-        self.build_sink(
-            cx,
-            DatadogEventsService::new(self),
-            JsonArrayBuffer::new(batch_settings.size),
-            batch_settings.timeout,
+        let tls_settings = MaybeTlsSettings::from_config(
+            &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
+            false,
+        )?;
+
+        let client = HttpClient::new(tls_settings, cx.proxy())?;
+
+        let service = DatadogEventsService::new(
+            &self.get_uri(),
+            &self.default_api_key,
+            client.clone()
+        );
+
+        let mut request_opts = self.request;
+        let request_settings = request_opts.unwrap_with(&TowerRequestConfig::default());
+
+
+        let healthcheck = healthcheck(
+            self.get_api_endpoint(),
+            self.default_api_key.clone(),
+            client.clone(),
         )
+            .boxed();
+        // let sink = PartitionHttpSink::new(
+        //     service,
+        //     PartitionBuffer::new(batch),
+        //     request_settings,
+        //     timeout,
+        //     client,
+        //     cx.acker(),
+        // )
+        //     .sink_map_err(|error| error!(message = "Fatal datadog_events sink error.", %error));
+
+        let sink = DatadogEventsSink {
+            service
+        };
+
+        let service = ServiceBuilder::new()
+            .settings(request_settings, DatadogEventsRetryLogic)
+            .service(ElasticSearchService::new(http_client, http_request_builder));
+
+        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -137,5 +130,4 @@ mod tests {
     fn generate_config() {
         crate::test_util::test_generate_config::<DatadogEventsConfig>();
     }
-
 }

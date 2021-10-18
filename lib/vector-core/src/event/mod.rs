@@ -60,9 +60,21 @@ impl ByteSizeOf for Event {
 impl Finalizable for Event {
     fn take_finalizers(&mut self) -> EventFinalizers {
         match self {
-            Event::Log(log) => log.metadata_mut().take_finalizers(),
-            Event::Metric(metric) => metric.metadata_mut().take_finalizers(),
+            Event::Log(log) => log.take_finalizers(),
+            Event::Metric(metric) => metric.take_finalizers(),
         }
+    }
+}
+
+impl Finalizable for LogEvent {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.metadata_mut().take_finalizers()
+    }
+}
+
+impl Finalizable for Metric {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.metadata_mut().take_finalizers()
     }
 }
 
