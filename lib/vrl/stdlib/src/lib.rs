@@ -78,6 +78,8 @@ mod ipv6_to_ipv4;
 mod is_array;
 #[cfg(feature = "is_boolean")]
 mod is_boolean;
+#[cfg(feature = "is_empty")]
+mod is_empty;
 #[cfg(feature = "is_float")]
 mod is_float;
 #[cfg(feature = "is_integer")]
@@ -329,6 +331,8 @@ pub use ipv6_to_ipv4::Ipv6ToIpV4;
 pub use is_array::IsArray;
 #[cfg(feature = "is_boolean")]
 pub use is_boolean::IsBoolean;
+#[cfg(feature = "is_empty")]
+pub use is_empty::IsEmpty;
 #[cfg(feature = "is_float")]
 pub use is_float::IsFloat;
 #[cfg(feature = "is_integer")]
@@ -566,6 +570,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(IsArray),
         #[cfg(feature = "is_boolean")]
         Box::new(IsBoolean),
+        #[cfg(feature = "is_empty")]
+        Box::new(IsEmpty),
         #[cfg(feature = "is_float")]
         Box::new(IsFloat),
         #[cfg(feature = "is_integer")]
