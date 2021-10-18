@@ -34,7 +34,7 @@ To solve for above, we'd like to introduce implicit configuration namespacing ba
 
 ### User Experience
 
-- When loading Vector's configuration using `--config-dir` (let say `--config-dir /etc/vector`), every type of component (`sources`, `transforms`, `sinks` but also `enrichment_tables` and `tests`) can be declared in subfolders, in separate files, with there filenames being their component ID.
+- When loading Vector's configuration using `--config-dir` (let say `--config-dir /etc/vector`), every type of component (`sources`, `transforms`, `sinks` but also `enrichment_tables` and `tests`) can be declared in subfolders, in separate files, with there filenames being their component ID and only with the `yml`, `json`, or `toml` extensions.
 
 ```toml
 # /etc/vector/vector.toml
@@ -50,8 +50,9 @@ type = "anything"
 ```
 
 - Any duplicate component ID (like `sinks/foo.toml` and `sinks/foo.json`) will error.
-- If Vector's configuration is loaded using a specific file (`--config /etc/vector/vector.toml` for example), Vector will keep its default behavior and only load this file.
-- To keep backward compatibility, if Vector encounters a folder with a name that doesn't refer to a component type (like `/etc/vector/foo`, a warning will be thrown and will ignore the folder.
+- If Vector's configuration is **not** loaded using a specific configuration folder (`--config-dir /etc/vector` for example), Vector will keep its default behavior and only load the specified configuration file.
+- If Vector encounters a hidden file or a hidden folder (name starting with a `.`, like `/etc/vector/.data` or `/etc/vector/.foo.toml`), a warning will be displayed and the file/folder will be ignored.
+- If Vector encounters a folder with a name that doesn't refer to a component type (like `/etc/vector/foo`), an error will be thrown.
 - If a component file (like `/etc/vector/sinks/foo.toml`) doesn't have a proper sink configuration structure, Vector will error.
 
 ### Implementation
