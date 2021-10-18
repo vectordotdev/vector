@@ -73,14 +73,14 @@ where
                         json.push(b'\n');
                         Some(json)
                     },
-                    Err(e) => {
-                        info!("Failed generating JSON: {}", e);
+                    Err(error) => {
+                        error!(message = "Failed generating JSON.", %error);
                         None
                     }
                 }
             },
-            Err(e) => {
-                info!("Failed converting: {}", e);
+            Err(error) => {
+                error!(message = "Failed converting model.", %error);
                 None
             }
         }
@@ -165,54 +165,74 @@ impl TryFrom<Vec<BufEvent>> for MetricsApiModel {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct NewRelicEvent(KeyValData);
+pub struct EventsApiModel(Vec<KeyValData>);
 
-impl NewRelicEvent {
-    pub fn new() -> Self {
-        Self(KeyValData::new())
+impl EventsApiModel {
+    pub fn new(events_array: Vec<KeyValData>) -> Self {
+        Self(events_array)
     }
 }
 
-impl ToJSON<LogEvent> for NewRelicEvent {}
+impl ToJSON<Vec<BufEvent>> for EventsApiModel {}
 
-impl TryFrom<LogEvent> for NewRelicEvent {
+impl TryFrom<Vec<BufEvent>> for EventsApiModel {
     type Error = &'static str;
 
-    fn try_from(log: LogEvent) -> Result<Self, Self::Error> {
-        let mut nrevent = Self::new();
-        for (k, v) in log.all_fields() {
-            nrevent.0.insert(k, v.clone());
-        }
-        if let Some(message) = log.get("message") {
-            let message = message.to_string_lossy().replace("\\\"", "\"");
-            // If message contains a JSON string, parse it and insert all fields into self
-            if let serde_json::Result::Ok(json_map) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&message) {
-                for (k, v) in json_map {
-                    match v {
-                        serde_json::Value::String(s) => {
-                            nrevent.0.insert(k, Value::from(s));
-                        },
-                        serde_json::Value::Number(n) => {
-                            if n.is_f64() {
-                                nrevent.0.insert(k, Value::from(n.as_f64()));
-                            }
-                            else {
-                                nrevent.0.insert(k, Value::from(n.as_i64()));
-                            }
-                        },
-                        serde_json::Value::Bool(b) => {
-                            nrevent.0.insert(k, Value::from(b));
-                        },
-                        _ => {}
+    fn try_from(buf_events: Vec<BufEvent>) -> Result<Self, Self::Error> {
+        let mut events_array = vec!();
+        for buf_event in buf_events {
+            match buf_event {
+                BufEvent::Log(log) => {
+                    let mut event_model = KeyValData::new();
+                    for (k, v) in log.all_fields() {
+                        event_model.insert(k, v.clone());
                     }
+
+                    if let Some(message) = log.get("message") {
+                        let message = message.to_string_lossy().replace("\\\"", "\"");
+                        // If message contains a JSON string, parse it and insert all fields into self
+                        if let serde_json::Result::Ok(json_map) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&message) {
+                            for (k, v) in json_map {
+                                match v {
+                                    serde_json::Value::String(s) => {
+                                        event_model.insert(k, Value::from(s));
+                                    },
+                                    serde_json::Value::Number(n) => {
+                                        if n.is_f64() {
+                                            event_model.insert(k, Value::from(n.as_f64()));
+                                        }
+                                        else {
+                                            event_model.insert(k, Value::from(n.as_i64()));
+                                        }
+                                    },
+                                    serde_json::Value::Bool(b) => {
+                                        event_model.insert(k, Value::from(b));
+                                    },
+                                    _ => {}
+                                }
+                            }
+                            event_model.remove("message");
+                        }
+                    }
+                    
+                    if let None = event_model.get("eventType") {
+                        event_model.insert("eventType".to_owned(), Value::from("VectorSink".to_owned()));
+                    }
+                    
+                    events_array.push(event_model);
+                },
+                _ => {
+                    // Unrecognized event type
                 }
-                nrevent.0.remove("message");
             }
         }
-        if let None = nrevent.0.get("eventType") {
-            nrevent.0.insert("eventType".to_owned(), Value::from("VectorSink".to_owned()));
+
+        if events_array.len() > 0 {
+            Ok(Self::new(events_array))
         }
-        Ok(nrevent)
+        else {
+            Err("No valid events to generate")
+        }
     }
 }
 
@@ -235,7 +255,6 @@ impl TryFrom<Vec<BufEvent>> for LogsApiModel {
     fn try_from(buf_events: Vec<BufEvent>) -> Result<Self, Self::Error> {
         let mut logs_array = vec!();
         for buf_event in buf_events {
-            let mut attr = HashMap::<String, Value>::new();
             match buf_event {
                 BufEvent::Log(log) => {
                     let mut log_model = KeyValData::new();
@@ -263,6 +282,7 @@ impl TryFrom<Vec<BufEvent>> for LogsApiModel {
 }
 
 //TODO: rename NewRelicSample, contain models of New Relic Event, Log and Metric ionstead of Vector models.
+//TODO: or even better, remove this model and use Vector's OOTB Event instead.
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub enum BufEvent {
     Log(LogEvent),
@@ -520,15 +540,9 @@ impl HttpSink for NewRelicConfig {
         };
 
         let json = match self.api {
-            NewRelicApi::Metrics => {
-                MetricsApiModel::to_json(events)
-            },
-            NewRelicApi::Logs => {
-                LogsApiModel::to_json(events)
-            },
-            _ => {
-                None
-            }
+            NewRelicApi::Metrics => MetricsApiModel::to_json(events),
+            NewRelicApi::Logs => LogsApiModel::to_json(events),
+            NewRelicApi::Events => EventsApiModel::to_json(events)
         };
 
         if let Some(json) = json {
