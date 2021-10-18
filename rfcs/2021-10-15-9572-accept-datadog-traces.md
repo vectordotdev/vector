@@ -90,8 +90,8 @@ N/A
 * User will be able to ingest traces from the trace agent
   * Vector config would then consist of: `datadog_trace` source -> some filtering/enrichment transform ->
     `datadog_trace` sink
-  * Datadog trace agent can be configured to send traces to any arbitrary endpoint using `apm_config.apm_dd_url`
-    [config key](https://github.com/DataDog/datadog-agent/blob/34a5589/pkg/config/apm.go#L61-L87)
+  * Datadog trace agent can be configured to send traces to any arbitrary endpoint using `apm_config.apm_dd_url` [config
+    key](https://github.com/DataDog/datadog-agent/blob/34a5589/pkg/config/apm.go#L61-L87)
 * This change is a pure addition to Vector, there will be no impact on existing feature
 
 ### Implementation
@@ -100,12 +100,16 @@ The first item to be addressed would be to add a new event type that will repres
 new member of the `Event` enum. As it would be implemented in vector-core, it's probably better to stay relatively
 vendor agnostic, so basing it on the [OpenTelemetry trace
 format](https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/trace/v1/trace.proto) with
-additional fields as required is probably a safe option. Overall, there is no huge discrepancy between Datadog traces and
-OpenTelemetry traces (The trace-agent already offer
-[OLTP->Datadog](https://github.com/DataDog/datadog-agent/blob/637b43e/pkg/trace/api/otlp.go#L305-L377) conversion). The main difference is that Datadog spans come with a string/double map containing metrics and a string/string map for some metadata whereas OTLP traces come with a list of key/value (value mimics json values). The easiest way do deal with that would be for the Vector trace struct to keep the OLTP generic key/value list as a generic structured metadata holder along with a tags map for Datadog string/string formatted maps and a string/double metrics map.
+additional fields as required is probably a safe option. Overall, there is no huge discrepancy between Datadog traces
+and OpenTelemetry traces (The trace-agent already offer
+[OLTP->Datadog](https://github.com/DataDog/datadog-agent/blob/637b43e/pkg/trace/api/otlp.go#L305-L377) conversion). The
+main difference is that Datadog spans come with a string/double map containing metrics and a string/string map for some
+metadata whereas OTLP traces come with a list of key/value (value mimics json values). The easiest way do deal with that
+would be for the Vector trace struct to keep the OLTP generic key/value list as a generic structured metadata holder
+along with a tags map for Datadog string/string formatted maps and a string/double metrics map.
 
-This `Trace` struct shall represent APM events (specific spans extracted by the trace-agent), so this `Trace`
-struct has to support standalone spans/or single span traces.
+This `Trace` struct shall represent APM events (specific spans extracted by the trace-agent), so this `Trace` struct has
+to support standalone spans/or single span traces.
 
 Based on the aforementioned work a source & sink would then be added to Vector:
 
@@ -120,12 +124,13 @@ Datadog API key management would be the same as it is for Datadog logs & metrics
 
 ## Rationale
 
-* traces support is expected by users
+* Traces support is expected by users
 * Local sampling is an interesting feature to lessen the amount of data sent to Datadog
 
 ## Drawbacks
 
-* Adding a brand new datatype has a large impact and although it will be mostly a code addition, it will impact vector-core
+* Adding a brand new datatype has a large impact and although it will be mostly a code addition, it will impact
+  vector-core
 
 ## Prior Art
 
@@ -155,7 +160,7 @@ Datadog API key management would be the same as it is for Datadog logs & metrics
 
 * Support for additional trace formats, probably OpenTelemetry first
 * Profile support
-* Ingest traces from app directly
+* Ingest traces from Datadog tracing libraries directly
 * Opentelemetry exporter support (the Datadog export would probably be easily supported once this RFC has been
   implemented as it's using the same [Datadog endpoint as the trace
   agent](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/04f97ec/exporter/datadogexporter/config/config.go#L288-L290)
