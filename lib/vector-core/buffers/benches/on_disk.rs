@@ -1,4 +1,4 @@
-use crate::common::{war_measurement, wtr_measurement};
+use crate::common::{init_instrumentation, war_measurement, wtr_measurement};
 use buffers::{self, Variant, WhenFull};
 use criterion::{
     criterion_group, criterion_main, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId,
@@ -7,6 +7,7 @@ use criterion::{
 use std::mem;
 use std::path::PathBuf;
 use std::time::Duration;
+use tokio::runtime::Runtime;
 
 mod common;
 
@@ -68,45 +69,49 @@ impl Drop for PathGuard {
 
 macro_rules! experiment {
     ($criterion:expr, [$( $width:expr ),*], $group_name:expr, $id_slug:expr, $measure_fn:ident) => {
-        let mut group: BenchmarkGroup<WallTime> = $criterion.benchmark_group($group_name);
-        group.sampling_mode(SamplingMode::Auto);
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async move {
+            let mut group: BenchmarkGroup<WallTime> = $criterion.benchmark_group($group_name);
+            group.sampling_mode(SamplingMode::Auto);
+            init_instrumentation();
 
-        let max_events = 1_000;
-        let mut data_dir = DataDir::new($id_slug);
+            let max_events = 1_000;
+            let mut data_dir = DataDir::new($id_slug);
 
-        $(
-            // Additional constant factor here is to avoid potential message
-            // drops due to reuse of disk buffer's internals between
-            // runs. Tempdir has low entropy compared to the number of
-            // iterations we make in these benchmarks.
-            let max_size = 1_000_000 * max_events * mem::size_of::<crate::common::Message<$width>>();
-            let bytes = mem::size_of::<crate::common::Message<$width>>();
-            group.throughput(Throughput::Elements(max_events as u64));
-            group.bench_with_input(
-                BenchmarkId::new($id_slug, bytes),
-                &max_events,
-                |b, max_events| {
-                    b.iter_batched(
-                        || {
-                            let guard = data_dir.next();
-                            let variant = Variant::Disk {
-                                max_size,
-                                when_full: WhenFull::DropNewest,
-                                data_dir: guard.inner.clone(),
-                                id: format!("{}", $width),
-                            };
-                            let buf = crate::common::setup::<$width>(*max_events, variant);
-                            (buf, guard)
-                        },
-                        |(buf, guard)| {
-                            $measure_fn(buf);
-                            drop(guard)
-                        },
-                        BatchSize::SmallInput,
-                    )
-                },
-            );
-        )*
+            $(
+                // Additional constant factor here is to avoid potential message
+                // drops due to reuse of disk buffer's internals between
+                // runs. Tempdir has low entropy compared to the number of
+                // iterations we make in these benchmarks.
+                let max_size = 1_000_000 * max_events * mem::size_of::<crate::common::Message<$width>>();
+                let bytes = mem::size_of::<crate::common::Message<$width>>();
+                group.throughput(Throughput::Elements(max_events as u64));
+                group.bench_with_input(
+                    BenchmarkId::new($id_slug, bytes),
+                    &max_events,
+                    |b, max_events| {
+                        b.iter_batched(
+                            || {
+                                let guard = data_dir.next();
+                                let variant = Variant::Disk {
+                                    max_size,
+                                    when_full: WhenFull::DropNewest,
+                                    data_dir: guard.inner.clone(),
+                                    id: format!("{}", $width),
+                                };
+                                let buf = crate::common::setup::<$width>(*max_events, variant);
+                                (buf, guard)
+                            },
+                            |(buf, guard)| {
+                                $measure_fn(buf);
+                                drop(guard)
+                            },
+                            BatchSize::SmallInput,
+                        )
+                    },
+                );
+            )*
+        });
     };
 }
 

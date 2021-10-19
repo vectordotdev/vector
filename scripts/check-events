@@ -69,7 +69,7 @@ class Event
     # Make sure Error events output an error
     if has_errors or @name.end_with? 'Error'
       append('Error events MUST be named "___Error".') unless @name.end_with? 'Error'
-      counters_must_include('component_errors_total', ['error_type', 'stage'] + @members - ['error'])
+      counters_must_include('component_errors_total', ['error_type', 'stage'] + @members - ['body', 'error'])
     end
 
     # Make sure error events contain the right parameters

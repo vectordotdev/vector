@@ -2,7 +2,7 @@ use super::parser;
 use crate::{
     config::{self, GenerateConfig, SourceConfig, SourceContext, SourceDescription},
     event::Event,
-    internal_events::{PrometheusRemoteWriteParseError, PrometheusRemoteWriteReceived},
+    internal_events::PrometheusRemoteWriteParseError,
     sources::{
         self,
         util::{decode, ErrorMessage, HttpSource, HttpSourceAuthConfig},
@@ -100,8 +100,6 @@ impl HttpSource for RemoteWriteSource {
             body = decode(&Some("snappy".to_string()), body)?;
         }
         let events = self.decode_body(body)?;
-        let count = events.len();
-        emit!(&PrometheusRemoteWriteReceived { count });
         Ok(events)
     }
 }
@@ -112,7 +110,9 @@ mod test {
     use crate::{
         config::{SinkConfig, SinkContext},
         sinks::prometheus::remote_write::RemoteWriteConfig,
-        test_util, Pipeline,
+        test_util::{self, components},
+        tls::MaybeTlsSettings,
+        Pipeline,
     };
     use chrono::{SubsecRound as _, Utc};
     use futures::stream;
@@ -134,10 +134,13 @@ mod test {
     }
 
     async fn receives_metrics(tls: Option<TlsConfig>) {
+        components::init_test();
         let address = test_util::next_addr();
         let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
 
-        let proto = if tls.is_none() { "http" } else { "https" };
+        let proto = MaybeTlsSettings::from_config(&tls, true)
+            .unwrap()
+            .http_protocol_name();
         let source = PrometheusRemoteWriteConfig {
             address,
             auth: None,
@@ -166,6 +169,7 @@ mod test {
             1,
         )
         .await;
+        components::SOURCE_TESTS.assert(&["http_path"]);
 
         // The MetricBuffer used by the sink may reorder the metrics, so
         // put them back into order before comparing.
@@ -220,13 +224,14 @@ mod test {
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
     use super::*;
-    use crate::{test_util, Pipeline};
+    use crate::{test_util, test_util::components, Pipeline};
     use tokio::time::Duration;
 
     const PROMETHEUS_RECEIVE_ADDRESS: &str = "127.0.0.1:9093";
 
     #[tokio::test]
     async fn receive_something() {
+        components::init_test();
         let config = PrometheusRemoteWriteConfig {
             address: PROMETHEUS_RECEIVE_ADDRESS.parse().unwrap(),
             auth: None,
@@ -241,6 +246,7 @@ mod integration_tests {
         tokio::time::sleep(Duration::from_secs(2)).await;
 
         let events = test_util::collect_ready(rx).await;
+        components::SOURCE_TESTS.assert(&["http_path"]);
         assert!(!events.is_empty());
     }
 }

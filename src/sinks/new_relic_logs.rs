@@ -133,15 +133,14 @@ impl NewRelicLogsConfig {
             NewRelicLogsRegion::Eu => Uri::from_static("https://log-api.eu.newrelic.com/log/v1"),
         };
 
-        let batch = self.batch.use_size_as_bytes()?;
-        let max_payload_size = batch.max_bytes.unwrap_or(MAX_PAYLOAD_SIZE);
+        let max_payload_size = self.batch.max_bytes.unwrap_or(MAX_PAYLOAD_SIZE);
         if max_payload_size > MAX_PAYLOAD_SIZE {
             return Err(Box::new(BuildError::BatchMaxSize));
         }
         let batch = BatchConfig {
-            max_bytes: Some(batch.max_bytes.unwrap_or(MAX_PAYLOAD_SIZE)),
+            max_bytes: Some(max_payload_size),
             max_events: None,
-            ..batch
+            ..self.batch
         };
 
         let tower = TowerRequestConfig {
@@ -177,7 +176,7 @@ mod tests {
             encoding::EncodingConfiguration, service::RATE_LIMIT_NUM_DEFAULT,
             test::build_test_server, Concurrency,
         },
-        test_util::next_addr,
+        test_util::{components, components::HTTP_SINK_TAGS, next_addr},
     };
     use bytes::Buf;
     use futures::{stream, StreamExt};
@@ -238,7 +237,7 @@ mod tests {
         let mut nr_config = NewRelicLogsConfig::with_encoding(Encoding::Json);
         nr_config.insert_key = Some("foo".to_owned());
         nr_config.region = Some(NewRelicLogsRegion::Eu);
-        nr_config.batch.max_size = Some(MAX_PAYLOAD_SIZE);
+        nr_config.batch.max_bytes = Some(MAX_PAYLOAD_SIZE);
         nr_config.request.concurrency = Concurrency::Fixed(12);
         nr_config.request.rate_limit_num = Some(24);
 
@@ -272,7 +271,7 @@ mod tests {
         encoding = "json"
 
         [batch]
-        max_size = 838860
+        max_bytes = 838860
 
         [request]
         concurrency = 12
@@ -311,7 +310,7 @@ mod tests {
         encoding = "json"
 
         [batch]
-        max_size = 8388600
+        max_bytes = 8388600
 
         [request]
         concurrency = 12
@@ -336,14 +335,12 @@ mod tests {
 
         let (sink, _healthcheck) = http_config.build(SinkContext::new_test()).await.unwrap();
         let (rx, trigger, server) = build_test_server(in_addr);
+        tokio::spawn(server);
 
         let input_lines = (0..100).map(|i| format!("msg {}", i)).collect::<Vec<_>>();
         let events = stream::iter(input_lines.clone()).map(Event::from);
-        let pump = sink.run(events);
 
-        tokio::spawn(server);
-
-        pump.await.unwrap();
+        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
         drop(trigger);
 
         let output_lines = rx

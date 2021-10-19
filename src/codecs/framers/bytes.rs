@@ -7,6 +7,13 @@ use tokio_util::codec::Decoder;
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct BytesDecoderConfig;
 
+impl BytesDecoderConfig {
+    /// Creates a new `BytesDecoderConfig`.
+    pub const fn new() -> Self {
+        Self
+    }
+}
+
 #[typetag::serde(name = "bytes")]
 impl FramingConfig for BytesDecoderConfig {
     fn build(&self) -> crate::Result<BoxedFramer> {
@@ -18,12 +25,16 @@ impl FramingConfig for BytesDecoderConfig {
 ///
 /// This is basically a no-op and is used to convert from `BytesMut` to `Bytes`.
 #[derive(Debug, Clone)]
-pub struct BytesCodec;
+pub struct BytesCodec {
+    /// Whether the empty buffer has been flushed. This is important to
+    /// propagate empty frames in message based transports.
+    flushed: bool,
+}
 
 impl BytesCodec {
     /// Creates a new `BytesCodec`.
     pub const fn new() -> Self {
-        Self
+        Self { flushed: false }
     }
 }
 
@@ -37,13 +48,19 @@ impl Decoder for BytesCodec {
     type Item = Bytes;
     type Error = BoxedFramingError;
 
-    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        Ok(if src.is_empty() {
-            None
+    fn decode(&mut self, _src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        self.flushed = false;
+        Ok(None)
+    }
+
+    fn decode_eof(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        if self.flushed && src.is_empty() {
+            Ok(None)
         } else {
+            self.flushed = true;
             let frame = src.split();
-            Some(frame.freeze())
-        })
+            Ok(Some(frame.freeze()))
+        }
     }
 }
 
@@ -58,7 +75,11 @@ mod tests {
         let mut input = BytesMut::from("some bytes");
         let mut decoder = BytesCodec::new();
 
-        assert_eq!(decoder.decode(&mut input).unwrap().unwrap(), "some bytes");
+        assert_eq!(decoder.decode(&mut input).unwrap(), None);
+        assert_eq!(
+            decoder.decode_eof(&mut input).unwrap().unwrap(),
+            "some bytes"
+        );
         assert_eq!(decoder.decode(&mut input).unwrap(), None);
     }
 
@@ -70,6 +91,17 @@ mod tests {
         let mut reader = FramedRead::new(input, decoder);
 
         assert_eq!(reader.next().await.unwrap().unwrap(), "foo");
+        assert!(reader.next().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn decode_frame_reader_empty() {
+        let input: &[u8] = b"";
+        let decoder = BytesCodec::new();
+
+        let mut reader = FramedRead::new(input, decoder);
+
+        assert_eq!(reader.next().await.unwrap().unwrap(), "");
         assert!(reader.next().await.is_none());
     }
 }

@@ -20,10 +20,10 @@ fn benchmark_batch(c: &mut Criterion) {
     group.sampling_mode(SamplingMode::Flat);
 
     let cases = [
-        (Compression::None, bytesize::mib(2u64)),
-        (Compression::None, bytesize::kib(500u64)),
-        (Compression::gzip_default(), bytesize::mib(2u64)),
-        (Compression::gzip_default(), bytesize::kib(500u64)),
+        (Compression::None, 2_000_000),
+        (Compression::None, 500_000),
+        (Compression::gzip_default(), 2_000_000),
+        (Compression::gzip_default(), 500_000),
     ];
 
     let input: Vec<_> = random_lines(event_len)
@@ -38,7 +38,7 @@ fn benchmark_batch(c: &mut Criterion) {
                     let rt = runtime();
                     let (acker, _) = Acker::new_for_testing();
                     let batch = BatchSettings::default()
-                        .bytes(*batch_size as u64)
+                        .bytes(*batch_size)
                         .events(num_events)
                         .size;
                     let batch_sink = PartitionBatchSink::new(
@@ -55,7 +55,7 @@ fn benchmark_batch(c: &mut Criterion) {
                             inner: b,
                             key: Bytes::from("key"),
                         }))
-                        .map(|item| Ok(EncodedEvent::new(item))),
+                        .map(|item| Ok(EncodedEvent::new(item, 0))),
                         batch_sink,
                     )
                 },
@@ -72,7 +72,7 @@ fn benchmark_batch(c: &mut Criterion) {
                         let rt = runtime();
                         let (acker, _) = Acker::new_for_testing();
                         let batch = BatchSettings::default()
-                            .bytes(*batch_size as u64)
+                            .bytes(*batch_size)
                             .events(num_events)
                             .size;
                         let batch_sink = BatchSink::new(
@@ -85,7 +85,7 @@ fn benchmark_batch(c: &mut Criterion) {
 
                         (
                             rt,
-                            stream::iter(input.clone()).map(|item| Ok(EncodedEvent::new(item))),
+                            stream::iter(input.clone()).map(|item| Ok(EncodedEvent::new(item, 0))),
                             batch_sink,
                         )
                     },

@@ -1,37 +1,70 @@
 //! Encoding related code.
 //!
-//! You'll find two stuctures for configuration:
-//!   * `EncodingConfig<E>`: For sinks without a default `Encoding`.
-//!   * `EncodingConfigWithDefault<E: Default>`: For sinks that have a default `Encoding`.
+//! You'll find three encoding configuration types that can be used:
+//!   * [`EncodingConfig<E>`]
+//!   * [`EncodingConfigWithDefault<E>`]
+//!   * [`EncodingConfigFixed<E>`]
 //!
-//! Your sink should define some `Encoding` enum that is used as the `E` parameter.
+//! These configurations wrap up common fields that can be used via [`EncodingConfiguration`] to
+//! provide filtering of fields as events are encoded.  As well, from the name, and from the type
+//! `E`, they define an actual codec to use for encoding the event once any configured field rules
+//! have been applied.  The codec type parameter is generic and not constrained directly, but to use
+//! it with the common encoding infrastructure, you'll likely want to look at [`StandardEncodings`]
+//! and [`Encoder`] to understand how it all comes together.
 //!
-//! You can use either of these for a sink! They both implement `EncodingConfiguration`, which you
-//! will need to import as well.
+//! ## Configuration types
 //!
-//! # Using a configuration
+//! ###  [`EncodingConfig<E>`]
 //!
-//! To use an `EncodingConfig` involves three steps:
+//! This configuration type is the most common: it requires a codec to be specified in all cases,
+//! and so is useful when we want the user to choose a specific codec i.e. JSON vs text.
 //!
-//!  1. Choose between `EncodingConfig` and `EncodingConfigWithDefault`.
-//!  2. Call `apply_rules(&mut event)` on this config **on each event** just before it gets sent.
+//! ### [`EncodingConfigWithDefault<E>`]
 //!
-//! # Implementation notes
+//! This configuration type is practically identical to [`EncodingConfigWithDefault<E>`], except it
+//! will use the `Default` implementation of `E` to create the codec if a value isn't specified in
+//! the configuration when deserialized.  Similarly, it won't write the codec during serialization
+//! if it's already the default value.  This is good when there's an obvious default codec to use,
+//! but you still want to provide the ability to change it.
 //!
-//! You may wonder why we have both of these types! **Great question.** `serde` works with the
+//! ### [`EncodingConfigFixed<E>`]
+//!
+//! This configuration type is specialized.  It is typically only required when the codec for a
+//! given sink is fixed.  An example of this is the Datadog Archives sink, where all output files
+//! must be encoded via JSON.  There's no reason for us to make a user specify that in a
+//! configuration every time, and on the flip side, there's no way or reason for them to pass in
+//! anything other than JSON, so we simply skip serializing and deserializing the codec altogether.
+//!
+//! This requires that `E` implement `Default`, as we always use the `Default` value when deserializing.
+//!
+//! ## Using a configuration
+//!
+//! Using one of the encoding configuration types involves utilizing their implementation of the
+//! [`EncodingConfiguration`] trait which defines default methods for interpreting the configuration
+//! of the encoding -- "only fields", "timestamp format", etc -- and applying it to a given [`Event`].
+//!
+//! This can be done simply by calling [`EncodingConfiguration::apply_rules`] on an [`Event`], which
+//! applies all configured rules.  This should be done before actual encoding the event via the
+//! specific codec.  If you're taking advantage of the implementations of [`Encoder<T>`]  for
+//! [`EncodingConfiguration`], this is handled automatically for you.
+//!
+//! ## Implementation notes
+//!
+//! You may wonder why we have three different types! **Great question.** `serde` works with the
 //! static `*SinkConfig` types when it deserializes our configuration. This means `serde` needs to
 //! statically be aware if there is a default for some given `E` of the config. Since
 //! We don't require `E: Default` we can't always assume that, so we need to create statically
-//! distinct types! Having `EncodingConfigWithDefault` is a relatively straightforward way to
-//! accomplish this without a bunch of magic.
-//!
-// TODO: To avoid users forgetting to apply the rules, the `E` param should require a trait
-//       `Encoder` that defines some `encode` function which this config then calls internally as
-//       part of it's own (yet to be written) `encode() -> Vec<u8>` function.
-
+//! distinct types! Having [`EncodingConfigWithDefault`] is a relatively straightforward way to
+//! accomplish this without a bunch of magic.  [`EncodingConfigFixed`] goes a step further and
+//! provides a way to force a codec, disallowing an override from being specified.
+mod codec;
+pub use codec::{StandardEncodings, StandardJsonEncoding, StandardTextEncoding};
 mod config;
 pub use config::EncodingConfig;
+mod fixed;
+pub use fixed::EncodingConfigFixed;
 mod with_default;
+
 pub use with_default::EncodingConfigWithDefault;
 
 use crate::{
@@ -39,13 +72,28 @@ use crate::{
     Result,
 };
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{fmt::Debug, io, sync::Arc};
+
+pub trait Encoder<T> {
+    /// Encodes the input into the provided writer.
+    fn encode_input(&self, input: T, writer: &mut dyn io::Write) -> io::Result<usize>;
+}
+
+impl<E, T> Encoder<T> for Arc<E>
+where
+    E: Encoder<T>,
+{
+    fn encode_input(&self, input: T, writer: &mut dyn io::Write) -> io::Result<usize> {
+        (**self).encode_input(input, writer)
+    }
+}
 
 /// The behavior of a encoding configuration.
-pub trait EncodingConfiguration<E> {
+pub trait EncodingConfiguration {
+    type Codec;
     // Required Accessors
 
-    fn codec(&self) -> &E;
+    fn codec(&self) -> &Self::Codec;
     fn schema(&self) -> &Option<String>;
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
     fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>>;
@@ -149,6 +197,31 @@ pub trait EncodingConfiguration<E> {
         self.apply_except_fields(event);
         self.apply_only_fields(event);
         self.apply_timestamp_format(event);
+    }
+}
+
+impl<E> Encoder<Event> for E
+where
+    E: EncodingConfiguration,
+    E::Codec: Encoder<Event>,
+{
+    fn encode_input(&self, mut input: Event, writer: &mut dyn io::Write) -> io::Result<usize> {
+        self.apply_rules(&mut input);
+        self.codec().encode_input(input, writer)
+    }
+}
+
+impl<E> Encoder<Vec<Event>> for E
+where
+    E: EncodingConfiguration,
+    E::Codec: Encoder<Vec<Event>>,
+{
+    fn encode_input(&self, mut input: Vec<Event>, writer: &mut dyn io::Write) -> io::Result<usize> {
+        for event in input.iter_mut() {
+            self.apply_rules(event);
+        }
+
+        self.codec().encode_input(input, writer)
     }
 }
 

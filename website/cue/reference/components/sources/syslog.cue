@@ -46,8 +46,64 @@ components: sources: syslog: {
 		platform_name: null
 	}
 
-	configuration: sources.socket.configuration & {
-		"type": "type": string: enum: syslog: "The type of this component."
+	configuration: {
+		address: {
+			description:   "The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port."
+			relevant_when: "mode = `tcp` or `udp`"
+			required:      true
+			warnings: []
+			type: string: {
+				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
+				syntax: "literal"
+			}
+		}
+		host_key: {
+			category:    "Context"
+			common:      false
+			description: """
+				The key name added to each event representing the current host. This can also be globally set via the
+				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
+				"""
+			required:    false
+			warnings: []
+			type: string: {
+				default: "host"
+				syntax:  "literal"
+			}
+		}
+		max_length: {
+			common:      true
+			description: "The maximum buffer size of incoming messages. Messages larger than this are truncated."
+			required:    false
+			warnings: []
+			type: uint: {
+				default: 102400
+				unit:    "bytes"
+			}
+		}
+		mode: {
+			description: "The type of socket to use."
+			required:    true
+			warnings: []
+			type: string: {
+				enum: {
+					tcp:  "TCP socket."
+					udp:  "UDP socket."
+					unix: "Unix domain stream socket."
+				}
+				syntax: "literal"
+			}
+		}
+		path: {
+			description:   "The unix socket path. *This should be an absolute path*."
+			relevant_when: "mode = `unix`"
+			required:      true
+			warnings: []
+			type: string: {
+				examples: ["/path/to/socket"]
+				syntax: "literal"
+			}
+		}
 	}
 
 	output: logs: line: {
@@ -208,6 +264,7 @@ components: sources: syslog: {
 		connection_read_errors_total:    components.sources.internal_metrics.output.metrics.connection_read_errors_total
 		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:          components.sources.internal_metrics.output.metrics.processed_events_total
+		component_received_bytes_total:  components.sources.internal_metrics.output.metrics.component_received_bytes_total
 		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
 		utf8_convert_errors_total:       components.sources.internal_metrics.output.metrics.utf8_convert_errors_total
 	}

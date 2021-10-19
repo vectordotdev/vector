@@ -1,5 +1,6 @@
 use super::{
     EventsInTotal, EventsOutTotal, ProcessedBytesTotal, ProcessedEventsTotal, ReceivedEventsTotal,
+    SentEventsTotal,
 };
 use crate::{
     config::ComponentKey,
@@ -48,6 +49,7 @@ pub trait MetricsFilter<'a> {
     fn received_events_total(&self) -> Option<ReceivedEventsTotal>;
     fn events_in_total(&self) -> Option<EventsInTotal>;
     fn events_out_total(&self) -> Option<EventsOutTotal>;
+    fn sent_events_total(&self) -> Option<SentEventsTotal>;
 }
 
 impl<'a> MetricsFilter<'a> for Vec<Metric> {
@@ -82,6 +84,15 @@ impl<'a> MetricsFilter<'a> for Vec<Metric> {
         let sum = sum_metrics(self.iter().filter(|m| m.name() == "events_out_total"))?;
 
         Some(EventsOutTotal::new(sum))
+    }
+
+    fn sent_events_total(&self) -> Option<SentEventsTotal> {
+        let sum = sum_metrics(
+            self.iter()
+                .filter(|m| m.name() == "component_sent_events_total"),
+        )?;
+
+        Some(SentEventsTotal::new(sum))
     }
 }
 
@@ -135,6 +146,16 @@ impl<'a> MetricsFilter<'a> for Vec<&'a Metric> {
 
         Some(EventsOutTotal::new(sum))
     }
+
+    fn sent_events_total(&self) -> Option<SentEventsTotal> {
+        let sum = sum_metrics(
+            self.iter()
+                .filter(|m| m.name() == "component_sent_events_total")
+                .copied(),
+        )?;
+
+        Some(SentEventsTotal::new(sum))
+    }
 }
 
 /// Returns a stream of `Metric`s, collected at the provided millisecond interval.
@@ -168,15 +189,7 @@ pub fn get_all_metrics(interval: i32) -> impl Stream<Item = Vec<Metric>> {
 pub fn by_component_key(component_key: &ComponentKey) -> Vec<Metric> {
     get_controller()
         .capture_metrics()
-        .filter_map(|m| {
-            if let Some(pipeline) = component_key.pipeline_str() {
-                m.tag_matches("component_id", component_key.id())
-                    && m.tag_matches("pipeline_id", pipeline)
-            } else {
-                m.tag_matches("component_id", component_key.id())
-            }
-            .then(|| m)
-        })
+        .filter_map(|m| m.tag_matches("component_id", component_key.id()).then(|| m))
         .collect()
 }
 

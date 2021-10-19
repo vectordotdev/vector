@@ -155,9 +155,8 @@ or receiving one or more Vector events.
 
 #### EventsSent
 
-*All components* MUST emit an `EventsSent` event immediately before sending the
-event down stream. This should happen before any transmission preparation, such
-as encoding.
+*All components* MUST emit an `EventsSent` event immediately after
+sending the events down stream, if the transmission was successful.
 
 * Properties
   * `count` - The count of Vector events.
@@ -174,7 +173,7 @@ as encoding.
 #### BytesSent
 
 *Sinks* MUST emit a `BytesSent` event immediately after sending bytes to the
-downstream target regardless if the transmission was successful or not.
+downstream target, if the transmission was successful.
 
 * Properties
   * `byte_size`

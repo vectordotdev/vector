@@ -1,0 +1,16 @@
+subscription OutputEventsByComponentIdPatternsSubscription(
+    $patterns: [String!]!, $limit: Int!, $interval: Int!, $encoding: EventEncodingType!){
+    outputEventsByComponentIdPatterns(patterns: $patterns, limit: $limit, interval: $interval) {
+        __typename
+        ... on Log {
+            componentId
+            message
+            timestamp
+            string(encoding: $encoding)
+        }
+        ... on EventNotification {
+            pattern
+            notification
+        }
+    }
+}

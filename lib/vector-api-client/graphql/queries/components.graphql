@@ -4,7 +4,6 @@ query ComponentsQuery($first: Int!) {
             node {
                 __typename
                 componentId
-                pipelineId
                 componentType
                 ... on Source {
                     metrics {
@@ -18,8 +17,8 @@ query ComponentsQuery($first: Int!) {
                         receivedEventsTotal {
                             receivedEventsTotal
                         }
-                        eventsOutTotal {
-                            eventsOutTotal
+                        sentEventsTotal {
+                            sentEventsTotal
                         }
                     }
                 }
@@ -35,8 +34,8 @@ query ComponentsQuery($first: Int!) {
                         receivedEventsTotal {
                             receivedEventsTotal
                         }
-                        eventsOutTotal {
-                            eventsOutTotal
+                        sentEventsTotal {
+                            sentEventsTotal
                         }
                     }
                 }
@@ -52,8 +51,8 @@ query ComponentsQuery($first: Int!) {
                         receivedEventsTotal {
                             receivedEventsTotal
                         }
-                        eventsOutTotal {
-                            eventsOutTotal
+                        sentEventsTotal {
+                            sentEventsTotal
                         }
                     }
                 }

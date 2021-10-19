@@ -24,7 +24,7 @@
           {{ if $v.required }}
           {{ partial "badge.html" (dict "word" "required" "color" "red") }}
           {{ else }}
-          {{ partial "badge.html" (dict "word" "optional" "color" "gray") }}
+          {{ partial "badge.html" (dict "word" "optional" "color" "blue") }}
           {{ end }}
 
           {{ range $k, $v := $v.type }}
@@ -60,75 +60,9 @@
       </div>
 
       {{ range $k, $v := $v.type }}
-
-
-
       {{ if eq $k "object" }} {{/* Object (with sub-configs) */}}
-      <div class="mt-4 border dark:border-gray-700 rounded flex flex-col divide-y dark:divide-gray-700">
-        {{ range $k, $v := $v.options }}
-        <div class="py-3 px-4">
-          <span class="flex justify-between items-center">
-            <span class="font-mono font-semibold">
-              {{ $text := printf "%s.%s" $name $k }}
-              {{ partial "heading.html" (dict "text" $text "level" 4 "anchor" true "icon" false "id" $text) }}
-            </span>
-
-            <span class="flex space-x-1">
-              {{ if $v.required }}
-              {{ partial "badge.html" (dict "word" "required" "color" "red") }}
-              {{ else }}
-              {{ partial "badge.html" (dict "word" "optional" "color" "blue") }}
-              {{ end }}
-
-              {{ range $k, $v := $v.type }}
-              {{ partial "badge.html" (dict "word" $k "color" "gray") }}
-
-              {{ with $v.enum }}
-              {{ partial "badge.html" (dict "word" "enum" "color" "yellow") }}
-              {{ end }}
-
-              {{ with $v.syntax }}
-              {{ partial "badge.html" (dict "word" $v.syntax "color" "gray") }}
-              {{ end }}
-              {{ end }}
-            </span>
-          </span>
-
-          <div class="mt-4 prose dark:prose-dark max-w-none leading-snug">
-            {{ $v.description | markdownify }}
-          </div>
-
-          {{/* "Relevant when" conditions */}}
-          {{ with .relevant_when }}
-          <div class="mt-2">
-            <span>
-              Relevant when: <code>{{ . }}</code>
-            </span>
-          </div>
-          {{ end }}
-
-          {{/* Default value */}}
-          {{ range $k, $v := $v.type }}
-          {{ with $v.enum }}
-          <div class="mt-4">
-            <span class="font-semibold">
-              Enum options
-            </span>
-
-            <div class="mt-2 prose dark:prose-dark max-w-none">
-              {{ template "enum-options-table" . }}
-            </div>
-          </div>
-          {{ end }}
-
-          {{ if or $v.default (eq $v.default false) }}
-          <div class="mt-4">
-            {{ template "default" . }}
-          </div>
-          {{ end }}
-          {{ end }}
-        </div>
-        {{ end }}
+      <div class="mt-4">
+        {{ template "config-object" (dict "name" $name "config" $v "level" 4) }}
       </div>
       {{ else if eq $k "array" }} {{/* Array */}}
       {{ with $v.items }}
@@ -769,9 +703,9 @@
   {{ with .vrl_real_world_examples }}
   <div class="flex flex-col divide-y dark:divide-gray-700">
     {{ range . }}
-    {{ $input := dict "message" .input.log.message | jsonify (dict "indent" " ") }}
+    {{ $input := dict "message" .input.log.message | jsonify (dict "indent" "  ") }}
     {{ $vrlSourceCode := highlight .source "toml" "" }}
-    {{ $output := .output | jsonify (dict "indent" " ") }}
+    {{ $output := .output | jsonify (dict "indent" "  ") }}
     {{ $outputCode := highlight $output "json" "" }}
     <div class="py-3 px-5">
       <span class="font-semibold tracking-tight">
@@ -781,7 +715,7 @@
 
       <div class="mt-3 flex flex-col space-y-2">
         {{ with .input.log }}
-        {{ $json := . | jsonify (dict "indent" " ") }}
+        {{ $json := . | jsonify (dict "indent" "  ") }}
         {{ $code := highlight $json "json" "" }}
         <span>
           Given this <a href="/docs/about/under-the-hood/architecture/data-model/log">Vector log event</a>...
@@ -790,7 +724,7 @@
         {{ end }}
 
         {{ with .input.metric }}
-        {{ $json := . | jsonify (dict "indent" " ") }}
+        {{ $json := . | jsonify (dict "indent" "  ") }}
         {{ $code := highlight $json "json" "" }}
         <span>
           Given this <a href="/docs/about/under-the-hood/architecture/data-model/metric">Vector metric event</a>...
@@ -805,7 +739,7 @@
         {{ $vrlSourceCode }}
 
         {{ if .raises }}
-        {{ $errorCode := highlight .raises.compiletime "ruby" "" }}
+        {{ $errorCode := highlight .raises.compiletime "rust" "" }}
         <span>
           ...you should see this error:
         </span>
@@ -924,7 +858,7 @@
               {{/* Example event (log or metric) */}}
               {{ with .input }}
               {{ with .log }} {{/* Log event */}}
-              {{ $json := . | jsonify (dict "indent" " ") }}
+              {{ $json := . | jsonify (dict "indent" "  ") }}
               <div>
                 <span class="tracking-tighter font-semibold text-sm">
                   Log event
@@ -935,7 +869,7 @@
               {{ end }}
 
               {{ with .metric }} {{/* Metric event */}}
-              {{ $json := . | jsonify (dict "indent" " ") }}
+              {{ $json := . | jsonify (dict "indent" "  ") }}
               <div>
                 <span class="tracking-tighter font-semibold text-sm">
                   Metric event
@@ -952,7 +886,7 @@
                   VRL program
                 </span>
 
-                {{ highlight . "ruby" "" }}
+                {{ highlight . "coffee" "" }}
               </div>
               {{ end }}
 
@@ -1000,7 +934,7 @@
 
       <div class="mt-2 border rounded p-4 dark:border-gray-700">
         <div>
-          {{ highlight .source "ruby" "" }}
+          {{ highlight .source "coffee" "" }}
         </div>
 
         {{ with .definitions }}
@@ -1083,7 +1017,7 @@
             </span>
 
             <div class="mt-1">
-              {{ highlight .source "ruby" "" }}
+              {{ highlight .source "coffee" "" }}
             </div>
           </div>
 
@@ -1180,7 +1114,7 @@
 
         <div class="mt-2 flex flex-col space-y-2 text-sm">
           {{ range . }}
-          {{ highlight . "ruby" "" }}
+          {{ highlight . "coffee" "" }}
           {{ end }}
         </div>
       </div>
@@ -1507,7 +1441,7 @@
 
   <div x-show="open" class="mt-3 text-sm flex flex-col space-y-2">
     {{ range .examples }}
-    {{ $json := . | jsonify (dict "indent" " ") }}
+    {{ $json := . | jsonify (dict "indent" "  ") }}
     {{ highlight $json "json" "" }}
     {{ end }}
   </div>
@@ -1515,7 +1449,7 @@
 {{ end }}
 
 {{ define "config-array-examples" }}
-{{ $json := .examples | jsonify (dict "indent" " ") }}
+{{ $json := .examples | jsonify (dict "indent" "  ") }}
 <div x-data="{ open: false }" class="mt-2.5 border rounded py-2 px-3 dark:border-gray-700">
   <span class="flex justify-between items-center">
     <span class="text-sm">
@@ -1882,9 +1816,107 @@
 </div>
 {{ end }}
 
+{{ define "config-object" }}
+{{ $prefix := .name }}
+{{ $level := .level }}
+{{ $innerLevel := add $level 1 }}
+<div class="border dark:border-gray-700 rounded flex flex-col divide-y dark:divide-gray-700">
+  {{ range $k, $v := .config.options }}
+  {{ $name := printf "%s.%s" $prefix $k }}
+  <div class="py-3 px-4">
+    <div class="flex justify-between items-center">
+      <span>
+        {{ partial "heading.html" (dict "text" $name "level" $level "anchor" true "icon" false "mono" true) }}
+      </span>
+
+      <span class="flex space-x-1">
+        {{ if .config.common }}
+        {{ partial "badge.html" (dict "word" "common" "color" "blue") }}
+        {{ end }}
+
+        {{ if .config.required }}
+        {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+        {{ else }}
+        {{ partial "badge.html" (dict "word" "optional" "color" "blue") }}
+        {{ end }}
+
+        {{ range $k, $v := $v.type }}
+        {{ $isArray := eq $k "array" }}
+        {{ if $isArray }}
+        {{ range $k, $v := $v.items.type }}
+        {{ $name := printf "[%s]" $k }}
+        {{ partial "badge.html" (dict "word" $name "color" "gray") }}
+        {{ end }}
+        {{ else }}
+        {{ partial "badge.html" (dict "word" $k "color" "gray") }}
+        {{ end }}
+
+        {{ with $v.syntax }}
+        {{ if eq . "remap_boolean_expression" }}
+        {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#boolean-expressions") }}
+        {{ else if eq . "remap_program" }}
+        {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#program") }}
+        {{ else }}
+        {{ partial "badge.html" (dict "word" . "color" "gray") }}
+        {{ end }}
+        {{ end }}
+
+        {{ if $v.enum }}
+        {{ partial "badge.html" (dict "word" "enum" "color" "yellow") }}
+        {{ end }}
+        {{ end }}
+      </span>
+    </div>
+
+    <div class="mt-4 prose dark:prose-dark max-w-none leading-snug">
+      {{ $v.description | markdownify }}
+    </div>
+
+    {{ with $v.relevant_when }}
+    <div class="mt-2">
+      <span>
+        Relevant when: <code>{{ . }}</code>
+      </span>
+    </div>
+    {{ end }}
+
+    {{ range $k, $v := $v.type }}
+    {{ if eq $k "object" }}
+    <div class="mt-4">
+      {{ template "config-object" (dict "name" $name "config" $v "level" $innerLevel) }}
+    </div>
+    {{ end }}
+
+    {{ with $v.enum }}
+    <div class="mt-4">
+      <span class="font-semibold">
+        Enum options
+      </span>
+
+      <div class="mt-2 prose dark:prose-dark max-w-none">
+        {{ template "enum-options-table" . }}
+      </div>
+    </div>
+    {{ end }}
+
+    {{ with $v.examples }}
+    {{ template "config-examples" (dict "examples" .) }}
+    {{ end }}
+
+    {{ if or $v.default (eq $v.default false) }}
+    <div class="mt-4">
+      {{ template "default" . }}
+    </div>
+    {{ end }}
+    {{ end }}
+  </div>
+  {{ end }}
+</div>
+{{ end }}
+
 {{ define "code" }}
 {{ if reflect.IsMap . }} {{/* If a map or array, highlight as JSON */}}
-{{ $json := . | jsonify (dict "indent" " ") }}
+{{ $json := . | jsonify (dict "indent" "  ") }}
 {{ highlight $json "json" "" }}
 {{ else if reflect.IsSlice . }}
 {{ $json := . | jsonify }}

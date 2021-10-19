@@ -212,7 +212,8 @@ pub(crate) use self::host_metrics::*;
     feature = "sources-utils-http",
     feature = "sources-utils-http-encoding",
     feature = "sinks-http",
-    feature = "sources-datadog"
+    feature = "sources-datadog",
+    feature = "sources-splunk_hec",
 ))]
 pub(crate) use self::http::*;
 #[cfg(all(unix, feature = "sources-journald"))]

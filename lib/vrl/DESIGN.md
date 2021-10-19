@@ -91,27 +91,27 @@ There are a number of features that we've so far rejected to implement in the
 language. This might change in the future, but there should be a good reason to
 do so.
 
-- modules (see: [#5507][])
+* modules (see: [#5507][])
 
   So far, we've had no need to split up functions over multiple modules. The
   function naming rules make it so that most functions are already grouped by
   their logical usage patterns.
 
-- classes
+* classes
 
   Given that VRL is a simple DSL, and that any indirection in a program's source
   can lead to confusion, we've decided against introducing the concept of
   classes, and instead focused on the usage of function calls to solve operator
   needs.
 
-- user-defined functions
+* user-defined functions
 
   User-defined functions again produce indirection. While it _might_ be useful
   to some extremely large use-cases, in most cases, allowing people to read
   a program from top to bottom without having to jump around is more clear in
   the context within which VRL is used.
 
-- network calls (see [#4517][] and [#8717][])
+* network calls (see [#4517][] and [#8717][])
 
   In order to avoid performance foot guns, we want to ensure each function is as
   performant as it can be, and there's no way to use functions in such a way
@@ -119,7 +119,7 @@ do so.
   some point, if we find a good caching solution to solve most of our concerns,
   but so far we've avoided any network calls inside our stdlib.
 
-- assignable closures (see [#9001])
+* assignable closures (see [#9001])
 
   While we _do_ support closures, they are tied to function calls, and cannot be
   used elsewhere. This also means closures cannot be assigned to variables, and
@@ -269,75 +269,75 @@ This decision [was made][#6507] for ergonomics purposes.
 
 ### Errors
 
-- All errors are caught at compile-time by the compiler (see "fallibility"
+* All errors are caught at compile-time by the compiler (see "fallibility"
   chapter).
 
-- The only exception to this rule is if the operator explicitly allows
+* The only exception to this rule is if the operator explicitly allows
   a function to fail the program at runtime (e.g. `safe_call()` vs
   `unsafe_call!()`).
 
-- A function should be marked as "fallible" if its internal implementation can
+* A function should be marked as "fallible" if its internal implementation can
   fail.
 
-- A function _should not_ be marked as fallible if it receives the wrong
+* A function _should not_ be marked as fallible if it receives the wrong
   argument type. This is handled by the compiler.
 
-- Errors should contain explicit messages detailing what went wrong, and how the
+* Errors should contain explicit messages detailing what went wrong, and how the
   operator can solve the problem.
 
 ### Functions
 
 #### Composition
 
-- Favor function composition over single-purpose functions.
+* Favor function composition over single-purpose functions.
 
-- If a problem needs to be solved in multiple steps, consider adding
+* If a problem needs to be solved in multiple steps, consider adding
   single-purpose functions for each individual step.
 
-- If usability or readability is hurt by composition, favor single-purpose
+* If usability or readability is hurt by composition, favor single-purpose
   functions.
 
 #### Naming
 
-- Function names are lower-cased (e.g. `round`).
+* Function names are lower-cased (e.g. `round`).
 
-- Multi-name functions use underscore (`_`) as a separator (e.g.
+* Multi-name functions use underscore (`_`) as a separator (e.g.
   `encode_key_value`).
 
-- Favor explicit verbose names over terse ones (e.g.
+* Favor explicit verbose names over terse ones (e.g.
   `parse_aws_cloudwatch_log_subscription_message` over `parse_aws_cwl_msg`).
 
-- Functions should be preceded with their function category for organization and
+* Functions should be preceded with their function category for organization and
   discovery.
 
-  - Use `parse_*` for functions that decode a string to another type of data
+  * Use `parse_*` for functions that decode a string to another type of data
     (e.g. `parse_json` and `parse_grok`).
 
-  - Use `decode_*` for string to string decoding functions (e.g.
+  * Use `decode_*` for string to string decoding functions (e.g.
     `decode_base64`).
 
-  - Use `encode_*` for string encoding functions (e.g. `encode_base64`).
+  * Use `encode_*` for string encoding functions (e.g. `encode_base64`).
 
-  - Use `to_*` to convert from one type to another (e.g. `to_bool`).
+  * Use `to_*` to convert from one type to another (e.g. `to_bool`).
 
-  - Use `is_*` to determine if the provided value is of a given type (e.g.
+  * Use `is_*` to determine if the provided value is of a given type (e.g.
     `is_string` or `is_json`).
 
-  - Use `format_*` for string formatting functions (e.g. `format_timestamp` and
+  * Use `format_*` for string formatting functions (e.g. `format_timestamp` and
     `format_number`).
 
-  - Use `get_*` for functions that return a single result, or error if zero or
+  * Use `get_*` for functions that return a single result, or error if zero or
     more results are found.
 
-  - Use `find_*` when multiple possible results are returned in an array.
+  * Use `find_*` when multiple possible results are returned in an array.
 
 #### Return Types
 
-- Return boolean from `is_*` functions (e.g. `is_string`).
+* Return boolean from `is_*` functions (e.g. `is_string`).
 
-- Return a string from `encode_*` functions (e.g. `encode_base64`).
+* Return a string from `encode_*` functions (e.g. `encode_base64`).
 
-- Return an error whenever the function can fail at runtime.
+* Return an error whenever the function can fail at runtime.
 
 #### Mutability
 
@@ -362,34 +362,34 @@ limited, and additional exceptions should be well reasoned.
 
 #### Fallibility
 
-- A function must be marked as fallible if it can fail in any way.
+* A function must be marked as fallible if it can fail in any way.
 
-- A function should be designed with the goal of making it infallible.
+* A function should be designed with the goal of making it infallible.
 
-- A function must not hide fallibility for the sake of pursuing the previous
+* A function must not hide fallibility for the sake of pursuing the previous
   rule.
 
-- A function implementation may assume it receives the argument type it has
+* A function implementation may assume it receives the argument type it has
   defined.
 
-- `parse_*` functions should almost always error when used incorrectly.
+* `parse_*` functions should almost always error when used incorrectly.
 
-- `get_*` functions should fail when it can't find a single result to return.
+* `get_*` functions should fail when it can't find a single result to return.
 
-- `to_*` functions must never fail.
+* `to_*` functions must never fail.
 
 #### Signatures
 
-- Functions can have zero or more parameters (e.g. `now()` and `assert(true)`).
+* Functions can have zero or more parameters (e.g. `now()` and `assert(true)`).
 
-- Argument naming follows the same conventions as function naming.
+* Argument naming follows the same conventions as function naming.
 
-- For one or more parameters, the first parameter must be the "value" the
+* For one or more parameters, the first parameter must be the "value" the
   function is acting on (e.g. `parse_regex(value: <string>, pattern: <regex>)`).
 
-- The first parameter must therefore almost always be named `value`.
+* The first parameter must therefore almost always be named `value`.
 
-- The exception to this is when you're dealing with an actual VRL path (e.g.
+* The exception to this is when you're dealing with an actual VRL path (e.g.
   `del(path)`) or in special cases such as `assert`.
 
 ## Patterns

@@ -21,6 +21,7 @@ use std::{
     task::{Context, Poll},
 };
 use tower::{Service, ServiceBuilder};
+use vector_core::ByteSizeOf;
 
 inventory::submit! {
     SinkDescription::new::<RedisSinkConfig>("redis")
@@ -201,6 +202,12 @@ impl EncodedLength for RedisKvEntry {
     }
 }
 
+impl ByteSizeOf for RedisKvEntry {
+    fn allocated_bytes(&self) -> usize {
+        self.key.len() + self.value.len()
+    }
+}
+
 fn encode_event(
     mut event: Event,
     key: &Template,
@@ -217,6 +224,7 @@ fn encode_event(
         })
         .ok()?;
 
+    let byte_size = event.size_of();
     encoding.apply_rules(&mut event);
 
     let value = match encoding.codec() {
@@ -230,7 +238,7 @@ fn encode_event(
             .unwrap_or_default(),
     };
 
-    let event = EncodedEvent::new(RedisKvEntry { key, value });
+    let event = EncodedEvent::new(RedisKvEntry { key, value }, byte_size);
     Some(event)
 }
 

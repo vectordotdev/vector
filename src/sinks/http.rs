@@ -4,7 +4,6 @@ use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     internal_events::{HttpEventEncoded, HttpEventMissingMessage},
     sinks::util::{
-        buffer::compression::GZIP_DEFAULT,
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink, RequestConfig},
         BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
@@ -140,7 +139,7 @@ impl SinkConfig for HttpSinkConfig {
         validate_headers(&config.request.headers, &config.auth)?;
 
         let batch = BatchSettings::default()
-            .bytes(bytesize::mib(10u64))
+            .bytes(10_000_000)
             .timeout(1)
             .parse_config(config.batch)?;
         let request = config
@@ -249,8 +248,7 @@ impl HttpSink for HttpSinkConfig {
             Compression::Gzip(level) => {
                 builder = builder.header("Content-Encoding", "gzip");
 
-                let level = level.unwrap_or(GZIP_DEFAULT) as u32;
-                let mut w = GzEncoder::new(Vec::new(), flate2::Compression::new(level));
+                let mut w = GzEncoder::new(Vec::new(), level);
                 w.write_all(&body).expect("Writing to Vec can't fail");
                 body = w.finish().expect("Writing to Vec can't fail");
             }
@@ -314,7 +312,7 @@ mod tests {
                 test::{build_test_server, build_test_server_generic, build_test_server_status},
             },
         },
-        test_util::{next_addr, random_lines_with_stream},
+        test_util::{components, components::HTTP_SINK_TAGS, next_addr, random_lines_with_stream},
     };
     use bytes::{Buf, Bytes};
     use flate2::read::MultiGzDecoder;
@@ -666,13 +664,11 @@ mod tests {
         let (in_addr, sink) = build_sink(extra_config).await;
 
         let (rx, trigger, server) = build_test_server(in_addr);
+        tokio::spawn(server);
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
-        let pump = sink.run(events);
-
-        tokio::spawn(server);
-        pump.await.unwrap();
+        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
         drop(trigger);
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));

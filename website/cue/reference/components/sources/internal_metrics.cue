@@ -483,6 +483,48 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		buffer_byte_size: {
+			description:       "The number of bytes current in the buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_events: {
+			description:       "The number of events currently in the buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_discarded_events_total: {
+			description:       "The number of events dropped by this non-blocking buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_received_event_bytes_total: {
+			description:       "The number of bytes received by this buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_received_events_total: {
+			description:       "The number of events received by this buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_sent_event_bytes_total: {
+			description:       "The number of bytes sent by this buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_sent_events_total: {
+			description:       "The number of events sent by this buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		component_received_bytes_total: {
 			description:       "The number of raw bytes accepted by this component from source origins."
 			type:              "counter"
@@ -498,27 +540,27 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags & {
 				file: {
-					description: "The file from which the event originates."
+					description: "The file from which the data originated."
 					required:    false
 				}
 				uri: {
-					description: "The sanitized URI from which the event originates."
+					description: "The sanitized URI from which the data originated."
 					required:    false
 				}
 				container_name: {
-					description: "The name of the container from which the event originates."
+					description: "The name of the container from which the data originated."
 					required:    false
 				}
 				pod_name: {
-					description: "The name of the pod from which the event originates."
+					description: "The name of the pod from which the data originated."
 					required:    false
 				}
 				peer_addr: {
-					description: "The IP from which the event originates."
+					description: "The IP from which the data originated."
 					required:    false
 				}
 				peer_path: {
-					description: "The pathname from which the event originates."
+					description: "The pathname from which the data originated."
 					required:    false
 				}
 				mode: _mode
@@ -1061,11 +1103,10 @@ components: sources: internal_metrics: {
 
 		// Helpful tag groupings
 		_component_tags: _internal_metrics_tags & {
-			component_kind:  _component_kind
-			component_id:    _component_id
-			component_scope: _component_scope
-			component_name:  _component_name
-			component_type:  _component_type
+			component_kind: _component_kind
+			component_id:   _component_id
+			component_name: _component_name
+			component_type: _component_type
 		}
 
 		// All available tags
@@ -1087,11 +1128,6 @@ components: sources: internal_metrics: {
 			required:    true
 			examples: ["my_source", "my_sink"]
 		}
-		_component_scope: {
-			description: "The Vector component scope."
-			required:    true
-			examples: ["global", "pipeline:appname"]
-		}
 		_component_name: {
 			description: "Deprecated, use `component_id` instead. The value is the same as `component_id`."
 			required:    true
@@ -1112,8 +1148,10 @@ components: sources: internal_metrics: {
 			required:    true
 			enum: {
 				"delete_failed":               "The file deletion failed."
+				"encode_failed":               "The encode operation failed."
 				"field_missing":               "The event field was missing."
 				"glob_failed":                 "The glob pattern match operation failed."
+				"http_error":                  "The HTTP request resulted in an error code."
 				"invalid_metric":              "The metric was invalid."
 				"mapping_failed":              "The mapping failed."
 				"match_failed":                "The match operation failed."

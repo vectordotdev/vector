@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{
     config::SourceContext,
-    internal_events::{HttpBadRequest, HttpEventsReceived},
+    internal_events::{HttpBadRequest, HttpBytesReceived, HttpEventsReceived},
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
@@ -14,6 +14,7 @@ use bytes::Bytes;
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use std::{collections::HashMap, convert::TryFrom, fmt, net::SocketAddr, sync::Arc};
 use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event};
+use vector_core::ByteSizeOf;
 use warp::{
     filters::{path::FullPath, path::Tail, BoxedFilter},
     http::{HeaderMap, StatusCode},
@@ -41,6 +42,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         cx: SourceContext,
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
+        let protocol = tls.http_protocol_name();
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
         let path = path.to_owned();
         let out = cx.out;
@@ -80,14 +82,27 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                           body: Bytes,
                           query_parameters: HashMap<String, String>| {
                         debug!(message = "Handling HTTP request.", headers = ?headers);
+                        let http_path = path.as_str();
+                        emit!(&HttpBytesReceived {
+                            byte_size: body.len(),
+                            http_path,
+                            protocol,
+                        });
 
                         let events = auth
                             .is_valid(&auth_header)
                             .and_then(|()| decode(&encoding_header, body))
                             .and_then(|body| {
-                                let body_len = body.len();
                                 self.build_events(body, headers, query_parameters, path.as_str())
-                                    .map(|events| (events, body_len))
+                            })
+                            .map(|events| {
+                                emit!(&HttpEventsReceived {
+                                    count: events.len(),
+                                    byte_size: events.size_of(),
+                                    http_path,
+                                    protocol,
+                                });
+                                events
                             });
 
                         handle_request(events, acknowledgements, out.clone())
@@ -131,17 +146,12 @@ impl fmt::Debug for RejectShuttingDown {
 impl warp::reject::Reject for RejectShuttingDown {}
 
 async fn handle_request(
-    events: Result<(Vec<Event>, usize), ErrorMessage>,
+    events: Result<Vec<Event>, ErrorMessage>,
     acknowledgements: bool,
     mut out: Pipeline,
 ) -> Result<impl warp::Reply, Rejection> {
     match events {
-        Ok((mut events, body_size)) => {
-            emit!(&HttpEventsReceived {
-                events_count: events.len(),
-                byte_size: body_size,
-            });
-
+        Ok(mut events) => {
             let receiver = acknowledgements.then(|| {
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
                 for event in &mut events {

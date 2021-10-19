@@ -1,24 +1,21 @@
-use super::{Config, ConfigBuilder, TestDefinition, TestInput, TestInputValue};
-use crate::config::{
-    self, ComponentKey, ConfigDiff, ConfigPath, GlobalOptions, TransformConfig, TransformContext,
+use super::{
+    graph::Graph, ComponentKey, Config, ConfigBuilder, ConfigDiff, ConfigPath, GlobalOptions,
+    TestDefinition, TestInput, TestInputValue, TransformConfig, TransformContext,
 };
 use crate::{
     conditions::Condition,
+    config,
     event::{Event, Value},
     topology::builder::load_enrichment_tables,
     transforms::Transform,
 };
 use indexmap::IndexMap;
 use std::collections::HashMap;
-use std::path::PathBuf;
 
-pub async fn build_unit_tests_main(
-    paths: &[ConfigPath],
-    pipeline_paths: &[PathBuf],
-) -> Result<Vec<UnitTest>, Vec<String>> {
-    config::init_log_schema(paths, pipeline_paths, false)?;
+pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>, Vec<String>> {
+    config::init_log_schema(paths, false)?;
 
-    let (config, _) = super::loading::load_builder_and_pipelines_from_paths(paths, pipeline_paths)?;
+    let (config, _) = super::loading::load_builder_from_paths(paths)?;
 
     build_unit_tests(config).await
 }
@@ -28,6 +25,23 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
     let mut errors = vec![];
 
     let expansions = super::compiler::expand_macros(&mut builder)?;
+
+    // Resolve inputs via the graph, even though we haven't fully validated everything here
+    let graph = Graph::new_unchecked(&IndexMap::new(), &builder.transforms, &builder.sinks);
+    let transforms = std::mem::take(&mut builder.transforms)
+        .into_iter()
+        .map(|(key, transform)| {
+            let inputs = graph.inputs_for(&key);
+            (key, transform.with_inputs(inputs))
+        })
+        .collect();
+    let sinks = std::mem::take(&mut builder.sinks)
+        .into_iter()
+        .map(|(key, sink)| {
+            let inputs = graph.inputs_for(&key);
+            (key, sink.with_inputs(inputs))
+        })
+        .collect();
 
     // Don't let this escape since it's not validated
     let config = Config {
@@ -39,8 +53,8 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
         healthchecks: builder.healthchecks,
         enrichment_tables: builder.enrichment_tables,
         sources: builder.sources,
-        sinks: builder.sinks,
-        transforms: builder.transforms,
+        sinks,
+        transforms,
         tests: builder.tests,
         expansions,
     };
@@ -128,6 +142,17 @@ fn walk(
                 for input in inputs.clone() {
                     t.transform(&mut results, input)
                 }
+                targets = target.next.clone();
+                transforms.insert(key, target);
+            }
+            Transform::FallibleFunction(ref mut t) => {
+                let mut err_buf = Vec::new();
+                for input in inputs.clone() {
+                    t.transform(&mut results, &mut err_buf, input)
+                }
+                // unit tests don't currently support multiple outputs, so just throw these away
+                err_buf.clear();
+
                 targets = target.next.clone();
                 transforms.insert(key, target);
             }
@@ -420,7 +445,8 @@ async fn build_unit_test(
 
     config.transforms.iter().for_each(|(k, t)| {
         t.inputs.iter().for_each(|i| {
-            if let Some(outputs) = transform_outputs.get_mut(i) {
+            // TODO: this is intentionally ignoring named outputs for now
+            if let Some(outputs) = transform_outputs.get_mut(&i.component) {
                 outputs.insert(k.clone(), ());
             }
         })
@@ -487,11 +513,7 @@ async fn build_unit_test(
                     );
                 }
                 Err(err) => {
-                    errors.push(format!(
-                        "failed to build transform '{}': {:#}",
-                        id,
-                        anyhow::anyhow!(err)
-                    ));
+                    errors.push(format!("failed to build transform '{}': {:#}", id, err));
                 }
             }
         }
@@ -552,6 +574,8 @@ async fn build_unit_test(
             "unit test must contain at least one of `outputs` or `no_outputs_from`.".to_owned(),
         );
     }
+
+    enrichment_tables.finish_load();
 
     if !errors.is_empty() {
         Err(errors)

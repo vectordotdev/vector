@@ -34,7 +34,7 @@ components: transforms: coercer: {
 			"""
 			\(coercer._remap_deprecation_notice)
 
-			```vrl
+			```coffee
 			.bool = to_bool("false")
 			.float = to_float("1.0")
 			.int = to_int("1")
