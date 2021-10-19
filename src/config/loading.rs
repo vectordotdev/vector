@@ -1,7 +1,6 @@
 use super::{
-    builder::ConfigBuilder, format, validation, vars, ComponentKey, Config, ConfigPath,
-    EnrichmentTableOuter, Format, FormatHint, SinkOuter, SourceOuter, TestDefinition,
-    TransformOuter,
+    builder::ConfigBuilder, format, validation, vars, ComponentKey, Config, ConfigPath, Format,
+    FormatHint,
 };
 use crate::signal;
 use glob::glob;
@@ -156,95 +155,35 @@ fn component_name(path: &Path) -> Result<String, Vec<String>> {
         .ok_or_else(|| vec![format!("Couldn't get component name for file: {:?}", path)])
 }
 
-fn load_sink_from_file(
+fn load_component_from_file<T, U>(
     path: &Path,
     builder: &mut ConfigBuilder,
-) -> Result<Vec<String>, Vec<String>> {
-    let name = component_name(path)?;
+    updater: U,
+) -> Result<Vec<String>, Vec<String>>
+where
+    T: serde::de::DeserializeOwned,
+    U: Fn(&mut ConfigBuilder, ComponentKey, T),
+{
+    let name = component_name(path).map(ComponentKey::from)?;
     if let Some(file) = open_config(path) {
         let format = Format::from_path(path).ok();
-        let (sink, warnings): (SinkOuter<String>, Vec<String>) = load(file, format)?;
-        builder.sinks.insert(ComponentKey::from(name), sink);
+        let (component, warnings): (T, Vec<String>) = load(file, format)?;
+        updater(builder, name, component);
         Ok(warnings)
     } else {
         Ok(Vec::new())
     }
 }
 
-fn load_enrichment_table_from_file(
-    path: &Path,
-    builder: &mut ConfigBuilder,
-) -> Result<Vec<String>, Vec<String>> {
-    let name = component_name(path)?;
-    if let Some(file) = open_config(path) {
-        let format = Format::from_path(path).ok();
-        let (component, warnings): (EnrichmentTableOuter, Vec<String>) = load(file, format)?;
-        builder
-            .enrichment_tables
-            .insert(ComponentKey::from(name), component);
-        Ok(warnings)
-    } else {
-        Ok(Vec::new())
-    }
-}
-
-fn load_source_from_file(
-    path: &Path,
-    builder: &mut ConfigBuilder,
-) -> Result<Vec<String>, Vec<String>> {
-    let name = component_name(path)?;
-    if let Some(file) = open_config(path) {
-        let format = Format::from_path(path).ok();
-        let (source, warnings): (SourceOuter, Vec<String>) = load(file, format)?;
-        builder.sources.insert(ComponentKey::from(name), source);
-        Ok(warnings)
-    } else {
-        Ok(Vec::new())
-    }
-}
-
-fn load_transform_from_file(
-    path: &Path,
-    builder: &mut ConfigBuilder,
-) -> Result<Vec<String>, Vec<String>> {
-    let name = component_name(path)?;
-    if let Some(file) = open_config(path) {
-        let format = Format::from_path(path).ok();
-        let (transform, warnings): (TransformOuter<String>, Vec<String>) = load(file, format)?;
-        builder
-            .transforms
-            .insert(ComponentKey::from(name), transform);
-        Ok(warnings)
-    } else {
-        Ok(Vec::new())
-    }
-}
-
-fn load_test_from_file(
-    path: &Path,
-    builder: &mut ConfigBuilder,
-) -> Result<Vec<String>, Vec<String>> {
-    let name = component_name(path)?;
-    if let Some(file) = open_config(path) {
-        let format = Format::from_path(path).ok();
-        let (mut component, warnings): (TestDefinition, Vec<String>) = load(file, format)?;
-        if component.name.is_empty() {
-            component.name = name;
-        }
-        builder.tests.push(component);
-        Ok(warnings)
-    } else {
-        Ok(Vec::new())
-    }
-}
-
-fn load_components_from_dir<F>(
+fn load_components_from_dir<F, T>(
     path: &Path,
     builder: &mut ConfigBuilder,
     loader: F,
 ) -> Result<Vec<String>, Vec<String>>
 where
-    F: Fn(&Path, &mut ConfigBuilder) -> Result<Vec<String>, Vec<String>>,
+    T: serde::de::DeserializeOwned,
+    F: Fn(&mut ConfigBuilder, ComponentKey, T),
+    F: Copy,
 {
     let readdir = path
         .read_dir()
@@ -256,7 +195,7 @@ where
             Ok(direntry) => {
                 let entry_path = direntry.path();
                 if entry_path.is_file() {
-                    match loader(&direntry.path(), builder) {
+                    match load_component_from_file(&direntry.path(), builder, loader) {
                         Ok(warns) => warnings.extend(warns),
                         Err(errs) => errors.extend(errs),
                     }
@@ -297,22 +236,30 @@ fn load_builder_from_dir(
                     }
                 } else if entry_path.is_dir() {
                     let result = match direntry.file_name().to_str() {
-                        Some("enrichment_tables") => load_components_from_dir(
-                            &entry_path,
-                            builder,
-                            load_enrichment_table_from_file,
-                        ),
+                        Some("enrichment_tables") => {
+                            load_components_from_dir(&entry_path, builder, |b, name, table| {
+                                b.enrichment_tables.insert(name, table);
+                            })
+                        }
                         Some("sinks") => {
-                            load_components_from_dir(&entry_path, builder, load_sink_from_file)
+                            load_components_from_dir(&entry_path, builder, |b, name, sink| {
+                                b.sinks.insert(name, sink);
+                            })
                         }
                         Some("sources") => {
-                            load_components_from_dir(&entry_path, builder, load_source_from_file)
+                            load_components_from_dir(&entry_path, builder, |b, name, source| {
+                                b.sources.insert(name, source);
+                            })
                         }
                         Some("tests") => {
-                            load_components_from_dir(&entry_path, builder, load_test_from_file)
+                            load_components_from_dir(&entry_path, builder, |b, _, test| {
+                                b.tests.push(test);
+                            })
                         }
                         Some("transforms") => {
-                            load_components_from_dir(&entry_path, builder, load_transform_from_file)
+                            load_components_from_dir(&entry_path, builder, |b, name, transform| {
+                                b.transforms.insert(name, transform);
+                            })
                         }
                         Some(name) => {
                             // ignore hidden folders
