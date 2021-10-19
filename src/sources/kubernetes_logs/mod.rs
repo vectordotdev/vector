@@ -14,14 +14,15 @@ use crate::kubernetes as k8s;
 use crate::kubernetes::hash_value::HashKey;
 use crate::{
     config::{
-        ComponentKey, DataType, GenerateConfig, GlobalOptions, ProxyConfig, SourceConfig,
-        SourceContext, SourceDescription,
+        log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, ProxyConfig,
+        SourceConfig, SourceContext, SourceDescription,
     },
     shutdown::ShutdownSignal,
     sources,
     transforms::{FunctionTransform, TaskTransform},
 };
 use bytes::Bytes;
+use chrono::Utc;
 use file_source::{
     Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, Line,
     ReadFrom,
@@ -494,18 +495,17 @@ fn create_event(line: Bytes, file: &str, ingestion_timestamp_field: Option<&str>
     let mut event = LogEvent::from(line);
 
     // Add source type.
-    event.insert(
-        crate::config::log_schema().source_type_key(),
-        COMPONENT_ID.to_owned(),
-    );
+    event.insert(log_schema().source_type_key(), COMPONENT_ID.to_owned());
 
     // Add file.
     event.insert(FILE_KEY, file.to_owned());
 
     // Add ingestion timestamp if requested.
     if let Some(ingestion_timestamp_field) = ingestion_timestamp_field {
-        event.insert(ingestion_timestamp_field, chrono::Utc::now());
+        event.insert(ingestion_timestamp_field, Utc::now());
     }
+
+    event.try_insert(log_schema().timestamp_key(), Utc::now());
 
     event.into()
 }

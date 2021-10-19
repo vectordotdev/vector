@@ -1,3 +1,5 @@
+#[cfg(any(feature = "sources-http"))]
+mod body_decoding;
 mod encoding_config;
 #[cfg(any(feature = "sources-file", feature = "sources-kafka"))]
 pub mod finalizer;
@@ -24,6 +26,8 @@ mod unix_datagram;
 #[cfg(all(unix, feature = "sources-utils-unix"))]
 mod unix_stream;
 
+#[cfg(any(feature = "sources-http"))]
+pub use self::body_decoding::Encoding;
 #[cfg(feature = "sources-utils-http-query")]
 pub use self::http::add_query_parameters;
 #[cfg(any(

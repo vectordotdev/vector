@@ -326,7 +326,7 @@ mod tests {
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (expected, events) = random_events_with_stream(100, 10, Some(batch));
 
-        components::init();
+        components::init_test();
         sink.run(events).await.unwrap();
         if batch_status == BatchStatus::Delivered {
             components::SINK_TESTS.assert(&HTTP_SINK_TAGS);

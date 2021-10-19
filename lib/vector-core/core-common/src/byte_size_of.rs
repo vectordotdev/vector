@@ -104,7 +104,7 @@ impl ByteSizeOf for Value {
         match self {
             Value::Null | Value::Bool(_) | Value::Number(_) => 0,
             Value::String(s) => s.len(),
-            Value::Array(a) => a.iter().map(ByteSizeOf::size_of).sum(),
+            Value::Array(a) => a.size_of(),
             Value::Object(o) => o.iter().map(|(k, v)| k.size_of() + v.size_of()).sum(),
         }
     }

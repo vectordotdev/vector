@@ -1,10 +1,11 @@
 use super::util::finalizer::OrderedFinalizer;
 use crate::{
-    codecs::{self, DecodingConfig},
+    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::{BatchNotifier, Event, Value},
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::{KafkaAuthConfig, KafkaStatisticsContext},
+    serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util::TcpError,
     Pipeline,
@@ -36,7 +37,8 @@ enum BuildError {
     KafkaSubscribeError { source: rdkafka::error::KafkaError },
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct KafkaSourceConfig {
     bootstrap_servers: String,
@@ -65,8 +67,12 @@ pub struct KafkaSourceConfig {
     librdkafka_options: Option<HashMap<String, String>>,
     #[serde(flatten)]
     auth: KafkaAuthConfig,
-    #[serde(flatten)]
-    decoding: DecodingConfig,
+    #[serde(default = "default_framing_message_based")]
+    #[derivative(Default(value = "default_framing_message_based()"))]
+    framing: Box<dyn FramingConfig>,
+    #[serde(default = "default_decoding")]
+    #[derivative(Default(value = "default_decoding()"))]
+    decoding: Box<dyn ParserConfig>,
 }
 
 const fn default_session_timeout_ms() -> u64 {
@@ -120,6 +126,7 @@ impl_generate_config_from_default!(KafkaSourceConfig);
 impl SourceConfig for KafkaSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let consumer = create_consumer(self)?;
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
 
         Ok(Box::pin(kafka_source(
             consumer,
@@ -128,7 +135,7 @@ impl SourceConfig for KafkaSourceConfig {
             self.partition_key.clone(),
             self.offset_key.clone(),
             self.headers_key.clone(),
-            self.decoding.build()?,
+            decoder,
             cx.shutdown,
             cx.out,
             cx.acknowledgements,
@@ -221,13 +228,13 @@ async fn kafka_source(
                         Ok((mut events, _)) => {
                             let mut event = events.pop().expect("event must exist");
                             if let Event::Log(ref mut log) = event {
-                                log.insert(schema.source_type_key(), Bytes::from("kafka"));
-                                log.insert(schema.timestamp_key(), timestamp);
-                                log.insert(key_field, msg_key.clone());
-                                log.insert(topic_key, Value::from(msg_topic.clone()));
-                                log.insert(partition_key, Value::from(msg_partition));
-                                log.insert(offset_key, Value::from(msg_offset));
-                                log.insert(headers_key, Value::from(headers_map.clone()));
+                                log.try_insert(schema.source_type_key(), Bytes::from("kafka"));
+                                log.try_insert(schema.timestamp_key(), timestamp);
+                                log.try_insert(key_field, msg_key.clone());
+                                log.try_insert(topic_key, Value::from(msg_topic.clone()));
+                                log.try_insert(partition_key, Value::from(msg_partition));
+                                log.try_insert(offset_key, Value::from(msg_offset));
+                                log.try_insert(headers_key, Value::from(headers_map.clone()));
                             }
 
                             Some(Some(Ok(event)))
