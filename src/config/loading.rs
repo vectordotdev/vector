@@ -1,5 +1,6 @@
 use super::{
-    builder::ConfigBuilder, format, validation, vars, Config, ConfigPath, Format, FormatHint,
+    builder::ConfigBuilder, format, validation, vars, ComponentKey, Config, ConfigPath, Format,
+    FormatHint, TransformOuter,
 };
 use crate::signal;
 use glob::glob;
@@ -147,6 +148,65 @@ fn load_builder_from_file(
     }
 }
 
+fn load_transforms_from_file(
+    path: &Path,
+    builder: &mut ConfigBuilder,
+) -> Result<Vec<String>, Vec<String>> {
+    let name = path
+        .file_stem()
+        .and_then(|name| name.to_str())
+        .map(|name| name.to_string())
+        .ok_or_else(|| vec![format!("Couldn't get component name for file: {:?}", path)])?;
+    if let Some(file) = open_config(path) {
+        let format = Format::from_path(path).ok();
+        let (transform, warnings): (TransformOuter<String>, Vec<String>) = load(file, format)?;
+        builder
+            .transforms
+            .insert(ComponentKey::from(name), transform);
+        Ok(warnings)
+    } else {
+        Ok(Vec::new())
+    }
+}
+
+fn load_transforms_from_dir(
+    path: &Path,
+    builder: &mut ConfigBuilder,
+) -> Result<Vec<String>, Vec<String>> {
+    let readdir = path.read_dir().map_err(|err| {
+        vec![format!(
+            "Could not read transforms dir: {:?}, {}.",
+            path, err
+        )]
+    })?;
+    let mut warnings = Vec::new();
+    let mut errors = Vec::new();
+    for res in readdir {
+        match res {
+            Ok(direntry) => {
+                let entry_path = direntry.path();
+                if entry_path.is_file() {
+                    match load_transforms_from_file(&direntry.path(), builder) {
+                        Ok(warns) => warnings.extend(warns),
+                        Err(errs) => errors.extend(errs),
+                    }
+                }
+            }
+            Err(err) => {
+                errors.push(format!(
+                    "Could not read file in config dir: {:?}, {}.",
+                    path, err
+                ));
+            }
+        }
+    }
+    if errors.is_empty() {
+        Ok(warnings)
+    } else {
+        Err(errors)
+    }
+}
+
 fn load_builder_from_dir(
     path: &Path,
     builder: &mut ConfigBuilder,
@@ -166,23 +226,29 @@ fn load_builder_from_dir(
                         Err(errs) => errors.extend(errs),
                     }
                 } else if entry_path.is_dir() {
-                    match direntry.file_name().to_str() {
+                    let result = match direntry.file_name().to_str() {
                         Some("enrichment_tables") => unimplemented!(),
                         Some("sinks") => unimplemented!(),
                         Some("sources") => unimplemented!(),
                         Some("tests") => unimplemented!(),
-                        Some("transforms") => unimplemented!(),
+                        Some("transforms") => load_transforms_from_dir(&entry_path, builder),
                         Some(name) => {
                             // ignore hidden folders
                             if !name.starts_with('.') {
-                                errors.push(format!(
+                                Err(vec![format!(
                                     "Couldn't identify component type for folder {:?}",
                                     entry_path
-                                ));
+                                )])
+                            } else {
+                                Ok(Vec::new())
                             }
                         }
-                        None => {}
+                        None => Ok(Vec::new()),
                     };
+                    match result {
+                        Ok(warns) => warnings.extend(warns),
+                        Err(errs) => errors.extend(errs),
+                    }
                 }
             }
             Err(err) => {
@@ -302,4 +368,22 @@ where
     let (with_vars, warnings) = vars::interpolate(&source_string, &vars);
 
     format::deserialize(&with_vars, format).map(|builder| (builder, warnings))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::load_builder_from_paths;
+    use crate::config::{ComponentKey, ConfigPath};
+    use std::path::PathBuf;
+
+    #[test]
+    fn load_namespacing_folder() {
+        let path = PathBuf::from("./tests/namespacing");
+        let configs = vec![ConfigPath::Dir(path)];
+        let (builder, warnings) = load_builder_from_paths(&configs).unwrap();
+        assert!(warnings.is_empty());
+        assert!(builder
+            .transforms
+            .contains_key(&ComponentKey::from("apache_parser")));
+    }
 }
