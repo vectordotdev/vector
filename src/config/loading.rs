@@ -1,6 +1,6 @@
 use super::{
-    builder::ConfigBuilder, format, validation, vars, ComponentKey, Config, ConfigPath, Format,
-    FormatHint, SinkOuter, SourceOuter, TransformOuter,
+    builder::ConfigBuilder, format, validation, vars, ComponentKey, Config, ConfigPath,
+    EnrichmentTableOuter, Format, FormatHint, SinkOuter, SourceOuter, TransformOuter,
 };
 use crate::signal;
 use glob::glob;
@@ -170,6 +170,23 @@ fn load_sink_from_file(
     }
 }
 
+fn load_enrichment_table_from_file(
+    path: &Path,
+    builder: &mut ConfigBuilder,
+) -> Result<Vec<String>, Vec<String>> {
+    let name = component_name(path)?;
+    if let Some(file) = open_config(path) {
+        let format = Format::from_path(path).ok();
+        let (component, warnings): (EnrichmentTableOuter, Vec<String>) = load(file, format)?;
+        builder
+            .enrichment_tables
+            .insert(ComponentKey::from(name), component);
+        Ok(warnings)
+    } else {
+        Ok(Vec::new())
+    }
+}
+
 fn load_source_from_file(
     path: &Path,
     builder: &mut ConfigBuilder,
@@ -261,7 +278,11 @@ fn load_builder_from_dir(
                     }
                 } else if entry_path.is_dir() {
                     let result = match direntry.file_name().to_str() {
-                        Some("enrichment_tables") => unimplemented!(),
+                        Some("enrichment_tables") => load_components_from_dir(
+                            &entry_path,
+                            builder,
+                            load_enrichment_table_from_file,
+                        ),
                         Some("sinks") => {
                             load_components_from_dir(&entry_path, builder, load_sink_from_file)
                         }
