@@ -302,7 +302,7 @@ libc = "0.2.104"
 libz-sys = "1.1.3"
 matches = "0.1.9"
 pretty_assertions = "1.0.0"
-reqwest = { version = "0.11.5", features = ["json"] }
+reqwest = { version = "0.11.6", features = ["json"] }
 tempfile = "3.2.0"
 tokio = { version = "1.12.0", features = ["test-util"] }
 tokio-test = "0.4.2"
