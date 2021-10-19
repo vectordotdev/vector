@@ -306,7 +306,7 @@ components: sinks: [Name=string]: {
 											common: false
 											description: """
                                                 When calculating the past RTT average, we also compute a secondary "deviation" value that indicates how variable those values are. We use that deviation when comparing the past RTT average to the current measurements, so we can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to an appropriate range. Valid values are greater than or equal to 0, and we expect reasonable values to range from 1.0 to 3.0. Larger values cause the algorithm to ignore larger increases in the RTT.
-                                            """
+                                            	"""
 											required: false
 											type: float: default: 2.0
 										}
