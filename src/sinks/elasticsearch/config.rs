@@ -39,8 +39,7 @@ pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ElasticSearchConfig {
-
-    #[serde(alias="host")]
+    #[serde(alias = "host")]
     pub endpoint: String,
 
     // Deprecated, use `normal.bulk_action` instead
@@ -88,8 +87,6 @@ pub enum Encoding {
 }
 
 impl ElasticSearchConfig {
-
-
     pub fn bulk_action(&self) -> crate::Result<Option<Template>> {
         if self.bulk_action.is_some() {
             warn!("ES sink config option `bulk_action` is deprecated. Use `normal.bulk_action` instead");
