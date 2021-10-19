@@ -1,6 +1,5 @@
 // ## skip check-events ##
 
-#[cfg(feature = "sources-aws_s3")]
 pub mod source {
     use crate::sources::aws_s3::sqs::ProcessingError;
     use metrics::counter;
@@ -165,25 +164,6 @@ pub mod source {
 
         fn emit_metrics(&self) {
             counter!("sqs_s3_event_record_ignored_total", 1, "ignore_type" => "invalid_event_kind");
-        }
-    }
-}
-
-#[cfg(feature = "sinks-aws_s3")]
-pub mod sink {
-    use metrics::counter;
-
-    use vector_core::internal_event::InternalEvent;
-
-    pub struct S3EventsSent {
-        pub byte_size: usize,
-    }
-
-    impl InternalEvent for S3EventsSent {
-        fn emit_logs(&self) {}
-
-        fn emit_metrics(&self) {
-            counter!("processed_bytes_total", self.byte_size as u64);
         }
     }
 }
