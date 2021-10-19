@@ -3,10 +3,13 @@ use crate::{
     event::{Event, LogEvent, Value},
     internal_events::{SplunkEventEncodeError, SplunkEventSent},
     sinks::splunk_hec::conn,
-    sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration},
-        http::HttpSink,
-        BatchConfig, Compression, TowerRequestConfig,
+    sinks::{
+        splunk_hec::common::render_template_string,
+        util::{
+            encoding::{EncodingConfig, EncodingConfiguration},
+            http::HttpSink,
+            BatchConfig, Compression, TowerRequestConfig,
+        },
     },
     sinks::{Healthcheck, VectorSink},
     template::Template,
@@ -138,17 +141,17 @@ impl HttpSink for HecSinkLogsConfig {
         let sourcetype = self
             .sourcetype
             .as_ref()
-            .and_then(|sourcetype| super::render_template_string(sourcetype, &event, "sourcetype"));
+            .and_then(|sourcetype| render_template_string(sourcetype, &event, "sourcetype"));
 
         let source = self
             .source
             .as_ref()
-            .and_then(|source| super::render_template_string(source, &event, "source"));
+            .and_then(|source| render_template_string(source, &event, "source"));
 
         let index = self
             .index
             .as_ref()
-            .and_then(|index| super::render_template_string(index, &event, "index"));
+            .and_then(|index| render_template_string(index, &event, "index"));
 
         let mut event = event.into_log();
 

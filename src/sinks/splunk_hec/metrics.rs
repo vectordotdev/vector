@@ -16,6 +16,8 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::iter;
 
+use super::common::render_template_string;
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct HecSinkMetricsConfig {
@@ -190,15 +192,15 @@ impl HecSinkMetricsConfig {
     }
 
     fn extract_source(&self, metric: &Metric) -> Option<String> {
-        super::render_template_string(self.source.as_ref()?, metric, "source")
+        render_template_string(self.source.as_ref()?, metric, "source")
     }
 
     fn extract_sourcetype(&self, metric: &Metric) -> Option<String> {
-        super::render_template_string(self.sourcetype.as_ref()?, metric, "sourcetype")
+        render_template_string(self.sourcetype.as_ref()?, metric, "sourcetype")
     }
 
     fn extract_index(&self, metric: &Metric) -> Option<String> {
-        super::render_template_string(self.index.as_ref()?, metric, "index")
+        render_template_string(self.index.as_ref()?, metric, "index")
     }
 
     fn extract_fields<'a>(&'a self, metric: &'a Metric) -> Option<FieldMap> {
