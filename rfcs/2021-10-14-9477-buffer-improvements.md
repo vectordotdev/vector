@@ -87,10 +87,9 @@ would be usable even between different versions of Vector.
     - Records would be checksummed on disk in order to detect corruption.  We would use a CRC32
       checksum at the end of each record for speed and reasonable resiliency.
       ([#8671](https://github.com/vectordotdev/vector/issues/8671))
-    - For disk buffers, fsync behavior would be configurable:
+    - For disk buffers, fsync behavior would be configurable, allowing users to choose how often
+      (time) the buffer should be synchronized to disk.
       ([#8540](https://github.com/vectordotdev/vector/issues/8540))
-        - Time-based: flush to disk on a configurable interval
-        - Count-based: flush to disk every N events
 - In-memory buffering would simply stay as it exists now, as a raw channel.
 - Disk buffering and external buffers would become independent reader and writer Tokio tasks that
   are communicated with via channels.
@@ -241,19 +240,29 @@ cost.
 
 ## Outstanding Questions
 
-- Should we prioritize a particular external buffer implementation first?  For example, Kafka vs
+- [x] Should we prioritize a particular external buffer implementation first?  For example, Kafka vs
   SQS, or S3 vs GCP.
-- Should we reconsider using the existing sinks/sources to power external buffers?
+  - **Answer:** We'll start with implementing Kafka as the first external buffer type.
+- [x] Should we reconsider using the existing sinks/sources to power external buffers?
     - Supporting batching of values to make it more efficient, handling service-specific
       authentication, etc, would be trivial if we used the existing code.
     - It may also inextricably tie us to code that is hard to test and hard to document in terms of
       invariants and behavior.
-- Is it actually possible for us to (de)serialize the buffer configuration in a way that we can
+    - **Answer:** No, we will stick with the isolated code design/approach.
+- [x] Is it actually possible for us to (de)serialize the buffer configuration in a way that we can
   detect both modes without overlap?
-- Can we reasonably support “drop oldest” behavior? This would mean having to hijack the reader side
+  - **Answer:** We should be able to wrap the existing buffer configuration type with an enum, and
+    add another variant to support an "extended" configuration.  We already have examples of 
+    `serde::Serializer` implementations that can generate varying outputs based on the value of a
+    given field, so we will add a new field, tentatively called `advanced`, that can be set to
+    `true` to unlock support for defining a series of buffer types that get nested within one another.
+- [x] Can we reasonably support “drop oldest” behavior? This would mean having to hijack the reader side
   to forcefully advance it, adding an extra constraint around the design and behavior of each
   buffer.  For in-memory only, it could even imply a lock around the receiver itself.
   [#8209](https://github.com/vectordotdev/vector/issues/8209)
+  - **Answer:** I do not believe we can reasonably support this without hamstringing our performance
+    for all buffer types.  While some users may have asked for it, it does not seem to have enough
+    traction to warrant focusing energy on coming up with a performant design that supports it.
 
 ## Plan Of Attack
 
@@ -266,7 +275,7 @@ cost.
 - [ ] Rewrite the existing in-memory implementations so it can be wrapped by the aforementioned
   sender/receiver types.
 - [ ] Update the topology builder code to understand and use the new-style buffer configuration.
-- [ ] Write the first external buffer implementation.
+- [ ] Write an external buffer implementation for Kafka.
 
 ## Future Improvements
 
