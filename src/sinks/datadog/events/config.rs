@@ -3,18 +3,22 @@ use crate::sinks::{VectorSink, Healthcheck};
 use std::time::Duration;
 use vector_core::ByteSizeOf;
 use crate::sinks::util::{Batch, PartitionInnerBuffer, Concurrency, TowerRequestConfig, PartitionBuffer, BatchSettings, BatchConfig, JsonArrayBuffer};
-use crate::sinks::util::http::{HttpSink, PartitionHttpSink};
+use crate::sinks::util::http::{HttpSink, PartitionHttpSink, HttpRetryLogic, HttpStatusRetryLogic};
 use crate::sinks::datadog::{ApiKey, healthcheck};
 use crate::tls::{MaybeTlsSettings, TlsConfig};
-use crate::http::HttpClient;
+use crate::http::{HttpClient, HttpError};
 use futures::{FutureExt, SinkExt};
 use serde::{Serialize, Deserialize};
-use crate::sinks::datadog::events::service::DatadogEventsService;
+use crate::sinks::datadog::events::service::{DatadogEventsService, DatadogEventsResponse};
 use indoc::indoc;
 use crate::sinks::datadog::events::sink::DatadogEventsSink;
 use tower::ServiceBuilder;
 use crate::sinks::util::ServiceBuilderExt;
 use crate::sinks::util::encoding::{EncodingConfigWithDefault, TimestampFormat, EncodingConfigFixed, StandardJsonEncoding};
+use tower::util::BoxService;
+use crate::sinks::util::retries::{RetryLogic, RetryAction};
+use crate::event::{Event, EventStatus, Finalizable};
+use crate::sinks::datadog::events::request_builder::DatadogEventsRequest;
 
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -62,24 +66,17 @@ impl DatadogEventsConfig {
 #[typetag::serde(name = "datadog_events")]
 impl SinkConfig for DatadogEventsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        // Datadog Event API doesn't support batching.
-        // let batch_settings = BatchSettings::default()
-        //     .bytes(100_000)
-        //     .events(1)
-        //     .timeout(0)
-        //     .parse_config(BatchConfig::default())?;
-
         let tls_settings = MaybeTlsSettings::from_config(
             &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
             false,
         )?;
 
-        let client = HttpClient::new(tls_settings, cx.proxy())?;
+        let http_client = HttpClient::new(tls_settings, cx.proxy())?;
 
         let service = DatadogEventsService::new(
             &self.get_uri(),
             &self.default_api_key,
-            client.clone()
+            http_client.clone()
         );
 
         let mut request_opts = self.request;
@@ -89,26 +86,20 @@ impl SinkConfig for DatadogEventsConfig {
         let healthcheck = healthcheck(
             self.get_api_endpoint(),
             self.default_api_key.clone(),
-            client.clone(),
+            http_client.clone(),
         )
             .boxed();
-        // let sink = PartitionHttpSink::new(
-        //     service,
-        //     PartitionBuffer::new(batch),
-        //     request_settings,
-        //     timeout,
-        //     client,
-        //     cx.acker(),
-        // )
-        //     .sink_map_err(|error| error!(message = "Fatal datadog_events sink error.", %error));
 
-        let sink = DatadogEventsSink {
-            service
-        };
+        let retry_logic = HttpStatusRetryLogic::new(|req: &DatadogEventsResponse |req.http_status);
 
         let service = ServiceBuilder::new()
-            .settings(request_settings, DatadogEventsRetryLogic)
-            .service(ElasticSearchService::new(http_client, http_request_builder));
+            .settings(request_settings, retry_logic)
+            .service(service);
+
+        let sink = DatadogEventsSink {
+            service,
+            acker: cx.acker()
+        };
 
         Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
     }
@@ -121,6 +112,25 @@ impl SinkConfig for DatadogEventsConfig {
         "datadog_events"
     }
 }
+
+// #[derive(Clone)]
+// pub struct DatadogEventsRetryLogic;
+//
+// impl RetryLogic for DatadogEventsRetryLogic {
+//     type Error = HttpError;
+//     type Response = DatadogEventsResponse;
+//
+//     fn is_retriable_error(&self, error: &Self::Error) -> bool {
+//         true
+//     }
+//
+//     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
+//         match response.event_status {
+//             EventStatus::Delivered => RetryAction::Successful,
+//             EventStatus::Failed => RetryAction::DontRetry()
+//         }
+//     }
+// }
 
 #[cfg(test)]
 mod tests {

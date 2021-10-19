@@ -73,6 +73,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, io, sync::Arc};
+use crate::event::LogEvent;
 
 pub trait Encoder<T> {
     /// Encodes the input into the provided writer.
@@ -208,6 +209,19 @@ where
     fn encode_input(&self, mut input: Event, writer: &mut dyn io::Write) -> io::Result<usize> {
         self.apply_rules(&mut input);
         self.codec().encode_input(input, writer)
+    }
+}
+
+//TODO: Make this more generic so an impl isn't needed for every input type
+impl<E> Encoder<LogEvent> for E
+    where
+        E: EncodingConfiguration,
+        E::Codec: Encoder<LogEvent>,
+{
+    fn encode_input(&self, mut log: LogEvent, writer: &mut dyn io::Write) -> io::Result<usize> {
+        // TODO: merge in ES PR changes
+        //self.apply_rules(&mut input);
+        self.codec().encode_input(log, writer)
     }
 }
 

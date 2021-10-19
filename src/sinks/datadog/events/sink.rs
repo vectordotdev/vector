@@ -1,29 +1,48 @@
-use crate::sinks::util::StreamSink;
+use crate::sinks::util::{StreamSink, SinkBuilderExt};
 use async_graphql::futures_util::stream::BoxStream;
 use crate::event::{Event, LogEvent};
-use crate::sinks::datadog::events::service::DatadogEventsService;
-use futures::StreamExt;
+use crate::sinks::datadog::events::service::{DatadogEventsService, DatadogEventsResponse};
+use futures::{future, StreamExt};
 use crate::config::log_schema;
 use crate::internal_events::{DatadogEventsProcessed, DatadogEventsFieldInvalid};
+use crate::sinks::datadog::events::request_builder::{DatadogEventsRequest, DatadogEventsRequestBuilder};
+use tower::util::BoxService;
+use async_trait::async_trait;
+use std::num::NonZeroUsize;
+use crate::buffers::Acker;
 
 pub struct DatadogEventsSink {
-    pub service: DatadogEventsService,
+    pub service: BoxService<DatadogEventsRequest, DatadogEventsResponse, crate::Error>,
+    pub acker: Acker,
 }
 
 impl DatadogEventsSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let x = input
-            .filter_map(|event| {
+
+        let concurrency_limit = NonZeroUsize::new(50);
+
+        let driver = input
+            .map(|event| {
                 // Panic: This sink only accepts Logs, so this should never panic
                 event.into_log()
             })
-            .filter_map(ensure_required_fields);
-
-        todo!()
+            .filter_map(ensure_required_fields)
+            .request_builder(concurrency_limit, DatadogEventsRequestBuilder::new())
+            .filter_map(|request| async move {
+                match request {
+                    Err(e) => {
+                        error!("Failed to build DatadogEvents request: {:?}.", e);
+                        None
+                    }
+                    Ok(req) => Some(req),
+                }
+            })
+            .into_driver(self.service, self.acker);
+        driver.run().await
     }
 }
 
-fn ensure_required_fields(mut log: LogEvent) -> Option<LogEvent> {
+async fn ensure_required_fields(mut log: LogEvent) -> Option<LogEvent> {
     if !log.contains("title") {
         emit!(&DatadogEventsFieldInvalid { field: "title" });
         return None;
@@ -62,9 +81,9 @@ fn ensure_required_fields(mut log: LogEvent) -> Option<LogEvent> {
     Some(log)
 }
 
-
+#[async_trait]
 impl StreamSink for DatadogEventsSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        self.run(input)
+        self.run(input).await
     }
 }

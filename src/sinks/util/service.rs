@@ -266,6 +266,8 @@ where
     S::Error: Into<crate::Error> + Send + Sync + 'static,
     S::Future: Send + 'static,
     RL: RetryLogic<Response = S::Response> + Send + 'static,
+
+    //TODO: can this Clone requirement be removed?
     Request: Clone + Send + 'static,
 {
     type Service = BoxService<Request, S::Response, crate::Error>;

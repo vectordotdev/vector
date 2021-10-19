@@ -1,21 +1,55 @@
-use crate::sinks::util::{RequestBuilder, Compression};
+use crate::sinks::util::{RequestBuilder, Compression, ElementCount};
 use crate::event::{LogEvent, EventFinalizers, Finalizable};
 use crate::sinks::util::encoding::{EncodingConfigFixed, StandardJsonEncoding, TimestampFormat};
 use std::io;
 use crate::internal_events::{DatadogEventsProcessed, DatadogEventsFieldInvalid};
 use crate::event::PathComponent;
+use std::sync::Arc;
+use crate::sinks::datadog::events::service::DatadogEventsResponse;
+use crate::buffers::Ackable;
+use vector_core::ByteSizeOf;
 
+#[derive(Clone)]
 pub struct DatadogEventsRequest {
-    body: Vec<u8>,
-    finalizers: EventFinalizers
+    pub body: Vec<u8>,
+    pub metadata: Metadata,
 }
 
+impl Finalizable for DatadogEventsRequest {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.metadata.finalizers)
+    }
+}
+
+impl Ackable for DatadogEventsRequest {
+    fn ack_size(&self) -> usize {
+        self.element_count()
+    }
+}
+
+impl ByteSizeOf for DatadogEventsRequest {
+    fn allocated_bytes(&self) -> usize {
+        self.body.allocated_bytes()
+            + self.metadata.finalizers.allocated_bytes()
+    }
+}
+
+impl ElementCount for DatadogEventsRequest {
+    fn element_count(&self) -> usize {
+        // Datadog Events api only accepts a single event per request
+        1
+    }
+}
+
+
+#[derive(Clone)]
 pub struct Metadata {
-    finalizers: EventFinalizers
+    pub finalizers: EventFinalizers,
+    pub api_key: Option<Arc<str>>,
 }
 
 pub struct DatadogEventsRequestBuilder {
-    encoder: EncodingConfigFixed<StandardJsonEncoding>
+    encoder: EncodingConfigFixed<StandardJsonEncoding>,
 }
 
 impl DatadogEventsRequestBuilder {
@@ -43,10 +77,9 @@ impl RequestBuilder<LogEvent> for DatadogEventsRequestBuilder {
     }
 
     fn split_input(&self, mut log: LogEvent) -> (Self::Metadata, Self::Events) {
-        // let (fields, mut log_metadata) = log.into_parts();
-        let x = log.metadata();
         let metadata = Metadata {
-            finalizers: log_metadata.take_finalizers(),
+            finalizers: log.take_finalizers(),
+            api_key: log.metadata_mut().datadog_api_key().clone(),
         };
         (metadata, log)
     }
@@ -59,7 +92,7 @@ impl RequestBuilder<LogEvent> for DatadogEventsRequestBuilder {
 
         DatadogEventsRequest {
             body,
-            finalizers: metadata.finalizers
+            metadata,
         }
     }
 }
