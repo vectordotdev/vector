@@ -46,4 +46,5 @@ ignore = [
     # Potential segfault in the time crate
     # https://github.com/vectordotdev/vector/issues/9673
     "RUSTSEC-2020-0071",
+    "RUSTSEC-2020-0159"
 ]
