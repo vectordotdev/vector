@@ -98,13 +98,16 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 
     #[cfg(any(
+        feature = "sources-datadog",
         feature = "sources-vector",
         feature = "sources-dnstap",
+        feature = "sinks-datadog_metrics",
         feature = "sinks-vector"
     ))]
     {
         println!("cargo:rerun-if-changed=proto/vector.proto");
         println!("cargo:rerun-if-changed=proto/dnstap.proto");
+        println!("cargo:rerun-if-changed=proto/ddsketch.proto");
 
         let mut prost_build = prost_build::Config::new();
         prost_build.btree_map(&["."]);
@@ -116,6 +119,7 @@ fn main() {
                     "lib/vector-core/proto/event.proto",
                     "proto/vector.proto",
                     "proto/dnstap.proto",
+                    "proto/ddsketch.proto",
                 ],
                 &["proto/", "lib/vector-core/proto/"],
             )

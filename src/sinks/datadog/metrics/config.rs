@@ -1,14 +1,25 @@
-use crate::{config::{DataType, SinkConfig, SinkContext}, http::HttpClient, sinks::{Healthcheck, UriParseError, VectorSink, datadog::{healthcheck, Region}, util::{Compression, Concurrency, ServiceBuilderExt, TowerRequestConfig, batch::{BatchConfig, BatchSettings}, http::HttpRetryLogic}}};
+use crate::{
+    config::{DataType, SinkConfig, SinkContext},
+    http::HttpClient,
+    sinks::{
+        datadog::{healthcheck, Region},
+        util::{
+            batch::{BatchConfig, BatchSettings},
+            Concurrency, ServiceBuilderExt, TowerRequestConfig,
+        },
+        Healthcheck, UriParseError, VectorSink,
+    },
+};
 use futures::FutureExt;
 use http::{uri::InvalidUri, Uri};
-use hyper::Body;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tower::ServiceBuilder;
 use vector_core::config::proxy::ProxyConfig;
 
 use super::{
-    service::DatadogMetricsService,
+    request_builder::DatadogMetricsRequestBuilder,
+    service::{DatadogMetricsRetryLogic, DatadogMetricsService},
     sink::DatadogMetricsSink,
 };
 
@@ -70,8 +81,6 @@ pub struct DatadogMetricsConfig {
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    #[serde(default = "Compression::gzip_default")]
-    pub compression: Compression,
 }
 
 impl_generate_config_from_default!(DatadogMetricsConfig);
@@ -80,8 +89,6 @@ impl_generate_config_from_default!(DatadogMetricsConfig);
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = HttpClient::<Body>::new(None, cx.proxy())?;
-
         let client = self.build_client(&cx.proxy)?;
         let healthcheck = self.build_healthcheck(client.clone());
         let sink = self.build_sink(client, cx)?;
@@ -173,16 +180,15 @@ impl DatadogMetricsConfig {
         let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
         let metric_endpoints = self.generate_metric_endpoints()?;
         let service = ServiceBuilder::new()
-            .settings(request_limits, HttpRetryLogic)
+            .settings(request_limits, DatadogMetricsRetryLogic)
             .service(DatadogMetricsService::new(client, self.api_key.as_str()));
 
-        let sink = DatadogMetricsSink::new(
-            cx,
-            service,
+        let request_builder = DatadogMetricsRequestBuilder::new(
             metric_endpoints,
-            self.compression,
-            batcher_settings,
+            self.default_namespace.clone(),
         );
+
+        let sink = DatadogMetricsSink::new(cx, service, request_builder, batcher_settings);
 
         Ok(VectorSink::Stream(Box::new(sink)))
     }

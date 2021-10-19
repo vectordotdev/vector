@@ -1,10 +1,18 @@
 use std::{fmt, future::Future, hash::Hash, num::NonZeroUsize, pin::Pin, sync::Arc};
 
-use futures_util::{Stream, StreamExt};
+use futures_util::Stream;
 use tower::Service;
-use vector_core::{ByteSizeOf, buffers::{Ackable, Acker}, event::{EventStatus, Finalizable, Metric}, partition::Partitioner, stream::{Batcher, BatcherSettings, ConcurrentMap, Driver, ExpirationQueue}};
+use vector_core::{
+    buffers::{Ackable, Acker},
+    event::{EventStatus, Finalizable, Metric},
+    partition::Partitioner,
+    stream::{Batcher, BatcherSettings, ConcurrentMap, Driver, ExpirationQueue},
+    ByteSizeOf,
+};
 
-use super::{Normalizer, RequestBuilder, IncrementalRequestBuilder, buffer::metrics::MetricNormalize};
+use super::{
+    buffer::metrics::MetricNormalize, IncrementalRequestBuilder, Normalizer, RequestBuilder,
+};
 
 impl<T: ?Sized> SinkBuilderExt for T where T: Stream {}
 
@@ -130,7 +138,7 @@ pub trait SinkBuilderExt: Stream {
 
             Box::pin(async move {
                 let mut results = Vec::new();
-        
+
                 // Encode the events, generating potentially many metadata/payload pairs.
                 match builder.encode_events_incremental(input) {
                     Ok(pairs) => {
@@ -138,7 +146,7 @@ pub trait SinkBuilderExt: Stream {
                         for (metadata, payload) in pairs {
                             results.push(Ok(builder.build_request(metadata, payload)));
                         }
-                    },
+                    }
                     Err(e) => results.push(Err(e)),
                 }
 
@@ -148,7 +156,7 @@ pub trait SinkBuilderExt: Stream {
     }
 
     /// Normalizes a stream of [`Metric`] events with the provided normalizer.
-    /// 
+    ///
     /// An implementation of [`MetricNormalize`] is used to either drop metrics which cannot be
     /// supported by the sink, or to modify them.  Such modifications typically include converting
     /// absolute metrics to incremental metrics by tracking the change over time for a particular
@@ -156,7 +164,7 @@ pub trait SinkBuilderExt: Stream {
     fn normalized<N>(self) -> Normalizer<Self, N>
     where
         Self: Stream<Item = Metric> + Unpin + Sized,
-        N: MetricNormalize
+        N: MetricNormalize,
     {
         Normalizer::new(self)
     }

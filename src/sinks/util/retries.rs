@@ -1,6 +1,13 @@
 use crate::Error;
 use futures::FutureExt;
-use std::{borrow::Cow, cmp, future::Future, pin::Pin, task::{Context, Poll}, time::Duration};
+use std::{
+    borrow::Cow,
+    cmp,
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
 use tokio::time::{sleep, Sleep};
 use tower::{retry::Policy, timeout::error::Elapsed};
 

@@ -1,7 +1,6 @@
-use crate::{
-    http::HttpClient,
-    sinks::{HealthcheckError, UriParseError},
-};
+use crate::sinks::UriParseError;
+use crate::{http::HttpClient, sinks::HealthcheckError};
+
 use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;

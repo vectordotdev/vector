@@ -1,40 +1,70 @@
 use crate::{
-    http::{HttpClient, HttpError, BuildRequest, CallRequest},
-    sinks::util::Compression,
+    http::{BuildRequest, CallRequest, HttpClient, HttpError},
+    sinks::util::{
+        retries::{RetryAction, RetryLogic},
+    },
 };
 use bytes::{Buf, Bytes};
 use futures::future::BoxFuture;
-use http::{Request, Response, StatusCode, Uri, header::{CONTENT_ENCODING, CONTENT_TYPE, HeaderValue}};
+use http::{
+    header::{HeaderValue, CONTENT_ENCODING, CONTENT_TYPE},
+    Request, Response, StatusCode, Uri,
+};
 use hyper::Body;
 use snafu::ResultExt;
 use std::task::{Context, Poll};
 use tower::Service;
-use vector_core::{buffers::Ackable, event::{EventFinalizers, EventStatus, Finalizable}};
+use vector_core::{
+    buffers::Ackable,
+    event::{EventFinalizers, EventStatus, Finalizable},
+};
+
+#[derive(Debug, Default, Clone)]
+pub struct DatadogMetricsRetryLogic;
+
+impl RetryLogic for DatadogMetricsRetryLogic {
+    type Error = HttpError;
+    type Response = DatadogMetricsResponse;
+
+    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
+        true
+    }
+
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
+        let status = response.status_code;
+
+        match status {
+            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
+            StatusCode::NOT_IMPLEMENTED => {
+                RetryAction::DontRetry("endpoint not implemented".into())
+            }
+            _ if status.is_server_error() => RetryAction::Retry(
+                format!("{}: {}", status, String::from_utf8_lossy(&response.body)).into(),
+            ),
+            _ if status.is_success() => RetryAction::Successful,
+            _ => RetryAction::DontRetry(format!("response status: {}", status).into()),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct DatadogMetricsRequest {
     pub payload: Bytes,
     pub uri: Uri,
     pub content_type: &'static str,
-    pub compression: Compression,
     pub finalizers: EventFinalizers,
     pub batch_size: usize,
 }
 
 impl DatadogMetricsRequest {
     pub fn into_http_request(self, api_key: HeaderValue) -> http::Result<Request<Body>> {
-        let content_encoding = self.compression.content_encoding();
-
         let request = Request::post(self.uri)
             .header(CONTENT_TYPE, self.content_type)
-            .header("DD-API-KEY", api_key);
+            .header("DD-API-KEY", api_key)
+            .header(CONTENT_ENCODING, "deflate");
 
-        let request = if let Some(value) = content_encoding {
-            request.header(CONTENT_ENCODING, value)
-        } else {
-            request
-        };
-
+        // TODO: do we need the agent proto payload repo version as a header for sketches? or is
+        // that just a nice-to-have? not clear yet.
         request.body(Body::from(self.payload))
     }
 }
@@ -54,19 +84,28 @@ impl Finalizable for DatadogMetricsRequest {
 #[derive(Debug)]
 pub struct DatadogMetricsResponse {
     status_code: StatusCode,
+    body: Bytes,
 }
 
-impl From<Response<Body>> for DatadogMetricsResponse {
-    fn from(response: Response<Body>) -> DatadogMetricsResponse {
+impl From<Response<Bytes>> for DatadogMetricsResponse {
+    fn from(response: Response<Bytes>) -> DatadogMetricsResponse {
+        let (parts, body) = response.into_parts();
         DatadogMetricsResponse {
-            status_code: response.status(),
+            status_code: parts.status,
+            body,
         }
     }
 }
 
 impl AsRef<EventStatus> for DatadogMetricsResponse {
     fn as_ref(&self) -> &EventStatus {
-        &EventStatus::Delivered
+        if self.status_code.is_success() {
+            &EventStatus::Delivered
+        } else if self.status_code.is_client_error() {
+            &EventStatus::Failed
+        } else {
+            &EventStatus::Errored
+        }
     }
 }
 
@@ -87,7 +126,7 @@ impl DatadogMetricsService {
 }
 
 impl Service<DatadogMetricsRequest> for DatadogMetricsService {
-    type Response = http::Response<Bytes>;
+    type Response = DatadogMetricsResponse;
     type Error = HttpError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -100,17 +139,13 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
         let api_key = self.api_key.clone();
 
         Box::pin(async move {
-            let request = request.into_http_request(api_key)
-                .context(BuildRequest)?;
+            let request = request.into_http_request(api_key).context(BuildRequest)?;
             let response = client.send(request).await?;
             let (parts, body) = response.into_parts();
-            let mut body = hyper::body::aggregate(body).await
-                .context(CallRequest)?;
+            let mut body = hyper::body::aggregate(body).await.context(CallRequest)?;
 
-            Ok(hyper::Response::from_parts(
-                parts,
-                body.copy_to_bytes(body.remaining()),
-            ))
+            let response = hyper::Response::from_parts(parts, body.copy_to_bytes(body.remaining()));
+            Ok(response.into())
         })
     }
 }

@@ -1,43 +1,50 @@
-use std::io;
-
 use bytes::Bytes;
 use http::Uri;
 use vector_core::event::{EventFinalizers, Finalizable, Metric};
 
-use crate::sinks::util::{Compression, IncrementalRequestBuilder, encoding::StatefulEncoder};
 use super::{
-    config::DatadogMetricsEndpoint, encoder::DatadogMetricsEncoder, service::DatadogMetricsRequest,
+    config::DatadogMetricsEndpoint,
+    encoder::{DatadogMetricsEncoder, EncoderError},
+    service::DatadogMetricsRequest,
 };
+use crate::sinks::util::IncrementalRequestBuilder;
 
 pub struct DatadogMetricsRequestBuilder {
-    compression: Compression,
     endpoint_uri_mappings: Vec<(DatadogMetricsEndpoint, Uri)>,
+    default_namespace: Option<String>,
 }
 
 impl DatadogMetricsRequestBuilder {
-    pub fn new(compression: Compression, endpoint_uri_mappings: Vec<(DatadogMetricsEndpoint, Uri)>) -> Self {
+    pub fn new(
+        endpoint_uri_mappings: Vec<(DatadogMetricsEndpoint, Uri)>,
+        default_namespace: Option<String>,
+    ) -> Self {
         Self {
-            compression,
             endpoint_uri_mappings,
+            default_namespace,
         }
     }
 
     fn get_endpoint_uri(&self, endpoint: DatadogMetricsEndpoint) -> Option<Uri> {
-        self.endpoint_uri_mappings.iter()
+        self.endpoint_uri_mappings
+            .iter()
             .find(|e| e.0 == endpoint)
             .map(|e| e.1.clone())
     }
 }
 
-impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)> for DatadogMetricsRequestBuilder {
+impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
+    for DatadogMetricsRequestBuilder
+{
     type Metadata = (DatadogMetricsEndpoint, usize, EventFinalizers);
     type Payload = Bytes;
     type Request = DatadogMetricsRequest;
-    type Error = io::Error;
+    type Error = EncoderError;
 
-    fn encode_events_incremental(&self, input: (DatadogMetricsEndpoint, Vec<Metric>))
-        -> Result<Vec<(Self::Metadata, Self::Payload)>, Self::Error>
-    {
+    fn encode_events_incremental(
+        &self,
+        input: (DatadogMetricsEndpoint, Vec<Metric>),
+    ) -> Result<Vec<(Self::Metadata, Self::Payload)>, Self::Error> {
         let (endpoint, mut metrics) = input;
         let mut metric_drain = metrics.drain(..);
 
@@ -45,12 +52,12 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)> for Datado
         let mut pending = None;
         while metric_drain.len() != 0 {
             let mut n = 0;
-            let mut finalizers = EventFinalizers::default();
-            let mut encoder = DatadogMetricsEncoder::new(endpoint, self.compression)?;
+            let mut encoder =
+                DatadogMetricsEncoder::new(endpoint, self.default_namespace.clone())?;
 
             loop {
                 // Grab the previously pending metric, or the next metric from the drain.
-                let mut metric = if let Some(metric) = pending.take() {
+                let metric = if let Some(metric) = pending.take() {
                     metric
                 } else {
                     match metric_drain.next() {
@@ -60,29 +67,56 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)> for Datado
                 };
 
                 // Try encoding the metric.
-                let subfinalizers = metric.take_finalizers();
                 match encoder.try_encode(metric)? {
-                    None => {
-                        // We encoded the metric successfully, so update our metadata and continue.
-                        finalizers.merge(subfinalizers);
-                        n += 1;
-                    },
-                    Some(mut metric) => {
+                    // We encoded the metric successfully, so update our metadata and continue.
+                    None => n += 1,
+                    Some(metric) => {
                         // The encoded metric would not fit within the configured limits, so we need
                         // to finish the current encoder and generate our payload, and keep going.
-                        metric.metadata_mut().merge_finalizers(subfinalizers);
                         pending = Some(metric);
-                        break
+                        break;
                     }
                 }
             }
 
             // If we encoded one or more metrics this pass, finalize the payload.
             if n > 0 {
-                if let Some(payload) = encoder.finish()? {
-                    results.push(((endpoint, n, finalizers), payload.into()));
-                } else {
-                    error!("Finalized payload was over the configured limits; {} event dropped as a result", n);
+                match encoder.finish() {
+                    Ok((payload, mut metrics)) => {
+                        let finalizers = metrics.take_finalizers();
+                        results.push(((endpoint, n, finalizers), payload.into()));
+                    }
+                    Err(err) => match err {
+                        // The encoder informed us that the resulting payload was too big, so we're
+                        // being given a chance here to split it into smaller input batches in the
+                        // hopes of generating a smaller payload that _isn't_ too big.  We only
+                        // attempt this once.
+                        //
+                        // TODO: In the future, when we have a way to incrementally write out
+                        // Protocol Buffers data, similiar to how the Datadog Agent does it with
+                        // `molecule`, we can wrap all of the sketch encoding into the same
+                        // incremental encoding paradigm and avoid this.
+                        EncoderError::TooLarge { metrics } => {
+                            let mut first = metrics;
+                            let second = first.split_off(first.len() / 2);
+
+                            let result = encode_now_or_never(
+                                first,
+                                endpoint,
+                                self.default_namespace.clone(),
+                            )?;
+                            results.push(result);
+
+                            let result = encode_now_or_never(
+                                second,
+                                endpoint,
+                                self.default_namespace.clone(),
+                            )?;
+                            results.push(result);
+                        }
+                        // Not an error we can do anything about, so just forward it on.
+                        suberr => return Err(suberr),
+                    },
                 }
             }
         }
@@ -92,16 +126,40 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)> for Datado
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
         let (endpoint, batch_size, finalizers) = metadata;
-        let uri = self.get_endpoint_uri(endpoint)
+        let uri = self
+            .get_endpoint_uri(endpoint)
             .expect("unable to find URI for metric endpoint");
 
         DatadogMetricsRequest {
             payload,
             uri,
             content_type: endpoint.content_type(),
-            compression: self.compression,
             finalizers,
             batch_size,
         }
     }
+}
+
+fn encode_now_or_never(
+    metrics: Vec<Metric>,
+    endpoint: DatadogMetricsEndpoint,
+    default_namespace: Option<String>,
+) -> Result<((DatadogMetricsEndpoint, usize, EventFinalizers), Bytes), EncoderError> {
+    let mut n = 0;
+    let mut encoder = DatadogMetricsEncoder::new(endpoint, default_namespace)?;
+    for metric in metrics {
+        if let Some(_) = encoder.try_encode(metric)? {
+            // We're co-opting the TooLarge error here, but any error that a caller receives from
+            // this method implies we failed, and that they need to tpack up and go home.
+            return Err(EncoderError::TooLarge {
+                metrics: Vec::new(),
+            });
+        }
+        n += 1;
+    }
+
+    encoder.finish().map(|(payload, mut processed)| {
+        let finalizers = processed.take_finalizers();
+        ((endpoint, n, finalizers), payload.into())
+    })
 }

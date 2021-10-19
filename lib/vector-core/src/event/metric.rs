@@ -43,6 +43,16 @@ impl Finalizable for Metric {
     }
 }
 
+impl Finalizable for Vec<Metric> {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.iter_mut()
+            .fold(EventFinalizers::default(), |mut acc, x| {
+                acc.merge(x.take_finalizers());
+                acc
+            })
+    }
+}
+
 impl AsRef<MetricData> for Metric {
     fn as_ref(&self) -> &MetricData {
         &self.data
@@ -190,6 +200,23 @@ pub enum MetricValue {
     Sketch { sketch: MetricSketch },
 }
 
+impl MetricValue {
+    /// Gets the name of this `MetricValue` as a string.
+    ///
+    /// This maps to the name of the enum variant itself.
+    pub fn as_name(&self) -> &'static str {
+        match self {
+            Self::Counter { .. } => "counter",
+            Self::Gauge { .. } => "gauge",
+            Self::Set { .. } => "set",
+            Self::Distribution { .. } => "distribution",
+            Self::AggregatedHistogram { .. } => "aggregated histogram",
+            Self::AggregatedSummary { .. } => "aggregated summary",
+            Self::Sketch { sketch } => sketch.as_name(),
+        }
+    }
+}
+
 impl ByteSizeOf for MetricValue {
     fn allocated_bytes(&self) -> usize {
         match self {
@@ -327,15 +354,7 @@ pub fn zip_quantiles(
 #[cfg(feature = "vrl")]
 impl From<MetricValue> for vrl_core::Value {
     fn from(value: MetricValue) -> Self {
-        match value {
-            MetricValue::Counter { .. } => "counter".into(),
-            MetricValue::Gauge { .. } => "gauge".into(),
-            MetricValue::Set { .. } => "set".into(),
-            MetricValue::Distribution { .. } => "distribution".into(),
-            MetricValue::AggregatedHistogram { .. } => "aggregated histogram".into(),
-            MetricValue::AggregatedSummary { .. } => "aggregated summary".into(),
-            MetricValue::Sketch { sketch } => sketch.into(),
-        }
+        value.as_name().into()
     }
 }
 
@@ -358,6 +377,17 @@ pub enum MetricSketch {
     AgentDDSketch(AgentDDSketch),
 }
 
+impl MetricSketch {
+    /// Gets the name of this `MetricSketch` as a string.
+    ///
+    /// This maps to the name of the enum variant itself.
+    pub fn as_name(&self) -> &'static str {
+        match self {
+            Self::AgentDDSketch(_) => "agent dd sketch",
+        }
+    }
+}
+
 impl ByteSizeOf for MetricSketch {
     fn allocated_bytes(&self) -> usize {
         match self {
@@ -372,9 +402,7 @@ impl ByteSizeOf for MetricSketch {
 #[cfg(feature = "vrl")]
 impl From<MetricSketch> for vrl_core::Value {
     fn from(value: MetricSketch) -> Self {
-        match value {
-            MetricSketch::AgentDDSketch(_) => "agent dd sketch".into(),
-        }
+        value.as_name().into()
     }
 }
 

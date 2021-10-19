@@ -273,28 +273,44 @@ impl AgentDDSketch {
     ///
     /// Returns `None` if the sketch is empty.
     pub fn min(&self) -> Option<f64> {
-        self.is_empty().then(|| self.min)
+        if self.is_empty() {
+            None
+        } else {
+            Some(self.min)
+        }
     }
 
     /// Maximum value seen by this sketch.
     ///
     /// Returns `None` if the sketch is empty.
     pub fn max(&self) -> Option<f64> {
-        self.is_empty().then(|| self.max)
+        if self.is_empty() {
+            None
+        } else {
+            Some(self.max)
+        }
     }
 
     /// Sum of all values seen by this sketch.
     ///
     /// Returns `None` if the sketch is empty.
     pub fn sum(&self) -> Option<f64> {
-        self.is_empty().then(|| self.sum)
+        if self.is_empty() {
+            None
+        } else {
+            Some(self.sum)
+        }
     }
 
     /// Average value seen by this sketch.
     ///
     /// Returns `None` if the sketch is empty.
     pub fn avg(&self) -> Option<f64> {
-        self.is_empty().then(|| self.avg)
+        if self.is_empty() {
+            None
+        } else {
+            Some(self.avg)
+        }
     }
 
     /// Clears the sketch, removing all bins and resetting all statistics.
@@ -930,6 +946,33 @@ mod tests {
         samples.sort();
 
         samples
+    }
+
+    #[test]
+    fn test_ddsketch_basic() {
+        let mut sketch = AgentDDSketch::with_agent_defaults();
+        assert!(sketch.is_empty());
+        assert_eq!(sketch.count(), 0);
+        assert_eq!(sketch.min(), None);
+        assert_eq!(sketch.max(), None);
+        assert_eq!(sketch.sum(), None);
+        assert_eq!(sketch.avg(), None);
+
+        sketch.insert(3.14);
+        assert!(!sketch.is_empty());
+        assert_eq!(sketch.count(), 1);
+        assert_eq!(sketch.min(), Some(3.14));
+        assert_eq!(sketch.max(), Some(3.14));
+        assert_eq!(sketch.sum(), Some(3.14));
+        assert_eq!(sketch.avg(), Some(3.14));
+
+        sketch.insert(2.28);
+        assert!(!sketch.is_empty());
+        assert_eq!(sketch.count(), 2);
+        assert_eq!(sketch.min(), Some(2.28));
+        assert_eq!(sketch.max(), Some(3.14));
+        assert_eq!(sketch.sum(), Some(5.42));
+        assert_eq!(sketch.avg(), Some(2.71));
     }
 
     #[test]
