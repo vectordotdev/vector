@@ -1,6 +1,6 @@
 use super::{
     builder::ConfigBuilder, format, validation, vars, ComponentKey, Config, ConfigPath, Format,
-    FormatHint, SinkOuter, TransformOuter,
+    FormatHint, SinkOuter, SourceOuter, TransformOuter,
 };
 use crate::signal;
 use glob::glob;
@@ -155,7 +155,7 @@ fn component_name(path: &Path) -> Result<String, Vec<String>> {
         .ok_or_else(|| vec![format!("Couldn't get component name for file: {:?}", path)])
 }
 
-fn load_sinks_from_file(
+fn load_sink_from_file(
     path: &Path,
     builder: &mut ConfigBuilder,
 ) -> Result<Vec<String>, Vec<String>> {
@@ -170,7 +170,22 @@ fn load_sinks_from_file(
     }
 }
 
-fn load_transforms_from_file(
+fn load_source_from_file(
+    path: &Path,
+    builder: &mut ConfigBuilder,
+) -> Result<Vec<String>, Vec<String>> {
+    let name = component_name(path)?;
+    if let Some(file) = open_config(path) {
+        let format = Format::from_path(path).ok();
+        let (source, warnings): (SourceOuter, Vec<String>) = load(file, format)?;
+        builder.sources.insert(ComponentKey::from(name), source);
+        Ok(warnings)
+    } else {
+        Ok(Vec::new())
+    }
+}
+
+fn load_transform_from_file(
     path: &Path,
     builder: &mut ConfigBuilder,
 ) -> Result<Vec<String>, Vec<String>> {
@@ -248,15 +263,15 @@ fn load_builder_from_dir(
                     let result = match direntry.file_name().to_str() {
                         Some("enrichment_tables") => unimplemented!(),
                         Some("sinks") => {
-                            load_components_from_dir(&entry_path, builder, load_sinks_from_file)
+                            load_components_from_dir(&entry_path, builder, load_sink_from_file)
                         }
-                        Some("sources") => unimplemented!(),
+                        Some("sources") => {
+                            load_components_from_dir(&entry_path, builder, load_source_from_file)
+                        }
                         Some("tests") => unimplemented!(),
-                        Some("transforms") => load_components_from_dir(
-                            &entry_path,
-                            builder,
-                            load_transforms_from_file,
-                        ),
+                        Some("transforms") => {
+                            load_components_from_dir(&entry_path, builder, load_transform_from_file)
+                        }
                         Some(name) => {
                             // ignore hidden folders
                             if !name.starts_with('.') {
@@ -410,6 +425,9 @@ mod tests {
         assert!(builder
             .transforms
             .contains_key(&ComponentKey::from("apache_parser")));
+        assert!(builder
+            .sources
+            .contains_key(&ComponentKey::from("apache_logs")));
         assert!(builder
             .sinks
             .contains_key(&ComponentKey::from("es_cluster")));

@@ -1,12 +1,6 @@
 # Set global options
 data_dir = "/var/lib/vector"
 
-# Ingest data by tailing one or more files
-[sources.apache_logs]
-  type         = "file"
-  include      = ["/var/log/apache2/*.log"]    # supports globbing
-  ignore_older = 86400                         # 1 day
-
 # Sample the data to save on cost
 [transforms.apache_sample]
   inputs       = ["apache_parser"]
