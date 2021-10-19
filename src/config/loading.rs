@@ -132,51 +132,100 @@ pub async fn load_from_paths_with_provider(
     Ok(new_config)
 }
 
+fn load_builder_from_file(
+    path: &Path,
+    format: Option<Format>,
+    builder: &mut ConfigBuilder,
+) -> Result<Vec<String>, Vec<String>> {
+    if let Some(file) = open_config(path) {
+        let format = format.or_else(|| Format::from_path(path).ok());
+        let (loaded, warnings) = load(file, format)?;
+        builder.append(loaded)?;
+        Ok(warnings)
+    } else {
+        Ok(Vec::new())
+    }
+}
+
+fn load_builder_from_dir(
+    path: &Path,
+    builder: &mut ConfigBuilder,
+) -> Result<Vec<String>, Vec<String>> {
+    let readdir = path
+        .read_dir()
+        .map_err(|err| vec![format!("Could not read config dir: {:?}, {}.", path, err)])?;
+    let mut warnings = Vec::new();
+    let mut errors = Vec::new();
+    for res in readdir {
+        match res {
+            Ok(direntry) => {
+                let entry_path = direntry.path();
+                if entry_path.is_file() {
+                    match load_builder_from_file(&direntry.path(), None, builder) {
+                        Ok(warns) => warnings.extend(warns),
+                        Err(errs) => errors.extend(errs),
+                    }
+                } else if entry_path.is_dir() {
+                    match direntry.file_name().to_str() {
+                        Some("enrichment_tables") => unimplemented!(),
+                        Some("sinks") => unimplemented!(),
+                        Some("sources") => unimplemented!(),
+                        Some("tests") => unimplemented!(),
+                        Some("transforms") => unimplemented!(),
+                        Some(name) => {
+                            // ignore hidden folders
+                            if !name.starts_with('.') {
+                                errors.push(format!(
+                                    "Couldn't identify component type for folder {:?}",
+                                    entry_path
+                                ));
+                            }
+                        }
+                        None => {}
+                    };
+                }
+            }
+            Err(err) => {
+                errors.push(format!(
+                    "Could not read file in config dir: {:?}, {}.",
+                    path, err
+                ));
+            }
+        }
+    }
+    if errors.is_empty() {
+        Ok(warnings)
+    } else {
+        Err(errors)
+    }
+}
+
 pub fn load_builder_from_paths(
     config_paths: &[ConfigPath],
 ) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
-    let mut inputs = Vec::new();
+    let mut result = ConfigBuilder::default();
+    let mut warnings = Vec::new();
     let mut errors = Vec::new();
 
     for config_path in config_paths {
         match config_path {
             ConfigPath::File(path, format) => {
-                if let Some(file) = open_config(path) {
-                    inputs.push((file, format.or_else(move || Format::from_path(&path).ok())));
-                } else {
-                    errors.push(format!("Config file not found in path: {:?}.", path));
+                match load_builder_from_file(path, *format, &mut result) {
+                    Ok(warns) => warnings.extend(warns),
+                    Err(errs) => errors.extend(errs),
                 };
             }
-            ConfigPath::Dir(path) => match path.read_dir() {
-                Ok(readdir) => {
-                    for res in readdir {
-                        match res {
-                            Ok(direntry) => {
-                                // skip any unknown file formats
-                                if let Ok(format) = Format::from_path(direntry.path()) {
-                                    if let Some(file) = open_config(&direntry.path()) {
-                                        inputs.push((file, Some(format)));
-                                    }
-                                }
-                            }
-                            Err(err) => {
-                                errors.push(format!(
-                                    "Could not read file in config dir: {:?}, {}.",
-                                    path, err
-                                ));
-                            }
-                        }
-                    }
-                }
-                Err(err) => {
-                    errors.push(format!("Could not read config dir: {:?}, {}.", path, err));
-                }
-            },
+            ConfigPath::Dir(path) => {
+                match load_builder_from_dir(path, &mut result) {
+                    Ok(warns) => warnings.extend(warns),
+                    Err(errs) => errors.extend(errs),
+                };
+            }
         }
     }
 
     if errors.is_empty() {
-        load_from_inputs(inputs)
+        Ok((result, warnings))
     } else {
         Err(errors)
     }
@@ -201,8 +250,8 @@ fn load_from_inputs(
     let mut warnings = Vec::new();
 
     for (input, format) in inputs {
-        if let Err(errs) = load(input, format).and_then(|(n, mut warn)| {
-            warnings.append(&mut warn);
+        if let Err(errs) = load(input, format).and_then(|(n, warn)| {
+            warnings.extend(warn);
             config.append(n)
         }) {
             // TODO: add back paths
@@ -232,10 +281,13 @@ fn open_config(path: &Path) -> Option<File> {
     }
 }
 
-pub fn load(
+pub fn load<T>(
     mut input: impl std::io::Read,
     format: FormatHint,
-) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
+) -> Result<(T, Vec<String>), Vec<String>>
+where
+    T: serde::de::DeserializeOwned,
+{
     let mut source_string = String::new();
     input
         .read_to_string(&mut source_string)
