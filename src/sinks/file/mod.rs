@@ -374,7 +374,7 @@ mod tests {
 
     #[tokio::test]
     async fn single_partition() {
-        components::init();
+        components::init_test();
         trace_init();
 
         let template = temp_file();
@@ -401,7 +401,7 @@ mod tests {
 
     #[tokio::test]
     async fn single_partition_gzip() {
-        components::init();
+        components::init_test();
         trace_init();
 
         let template = temp_file();
@@ -428,7 +428,7 @@ mod tests {
 
     #[tokio::test]
     async fn many_partitions() {
-        components::init();
+        components::init_test();
         trace_init();
 
         let directory = temp_dir();
@@ -514,7 +514,7 @@ mod tests {
 
     #[tokio::test]
     async fn reopening() {
-        components::init();
+        components::init_test();
         trace_init();
 
         let template = temp_file();
