@@ -39,11 +39,19 @@ pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ElasticSearchConfig {
-    // Deprecated name
-    #[serde(alias = "host")]
+
+    #[serde(alias="host")]
     pub endpoint: String,
-    // Deprecated, use normal.index instead
+
+    // Deprecated, use `normal.bulk_action` instead
+    pub bulk_action: Option<String>,
+
+    // Deprecated, use `normal.index` instead
     pub index: Option<String>,
+
+    // Deprecated, use `request.headers` instead.
+    pub headers: Option<IndexMap<String, String>>,
+
     pub doc_type: Option<String>,
     pub id_key: Option<String>,
     pub pipeline: Option<String>,
@@ -63,15 +71,9 @@ pub struct ElasticSearchConfig {
     #[serde(default)]
     pub request: RequestConfig,
     pub auth: Option<ElasticSearchAuth>,
-
-    // Deprecated, moved to request.
-    pub headers: Option<IndexMap<String, String>>,
     pub query: Option<HashMap<String, String>>,
-
     pub aws: Option<RegionOrEndpoint>,
     pub tls: Option<TlsOptions>,
-    // Deprecated, use normal.bulk_action instead
-    pub bulk_action: Option<String>,
     pub normal: Option<NormalConfig>,
     pub data_stream: Option<DataStreamConfig>,
     pub metrics: Option<MetricToLogConfig>,
@@ -86,7 +88,12 @@ pub enum Encoding {
 }
 
 impl ElasticSearchConfig {
+
+
     pub fn bulk_action(&self) -> crate::Result<Option<Template>> {
+        if self.bulk_action.is_some() {
+            warn!("ES sink config option `bulk_action` is deprecated. Use `normal.bulk_action` instead");
+        }
         Ok(self
             .normal
             .as_ref()
@@ -97,6 +104,9 @@ impl ElasticSearchConfig {
     }
 
     pub fn index(&self) -> crate::Result<Template> {
+        if self.bulk_action.is_some() {
+            warn!("ES sink config option `index` is deprecated. Use `normal.index` instead");
+        }
         let index = self
             .normal
             .as_ref()
