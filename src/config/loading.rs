@@ -1,6 +1,7 @@
 use super::{
     builder::ConfigBuilder, format, validation, vars, ComponentKey, Config, ConfigPath,
-    EnrichmentTableOuter, Format, FormatHint, SinkOuter, SourceOuter, TransformOuter,
+    EnrichmentTableOuter, Format, FormatHint, SinkOuter, SourceOuter, TestDefinition,
+    TransformOuter,
 };
 use crate::signal;
 use glob::glob;
@@ -219,6 +220,24 @@ fn load_transform_from_file(
     }
 }
 
+fn load_test_from_file(
+    path: &Path,
+    builder: &mut ConfigBuilder,
+) -> Result<Vec<String>, Vec<String>> {
+    let name = component_name(path)?;
+    if let Some(file) = open_config(path) {
+        let format = Format::from_path(path).ok();
+        let (mut component, warnings): (TestDefinition, Vec<String>) = load(file, format)?;
+        if component.name.is_empty() {
+            component.name = name;
+        }
+        builder.tests.push(component);
+        Ok(warnings)
+    } else {
+        Ok(Vec::new())
+    }
+}
+
 fn load_components_from_dir<F>(
     path: &Path,
     builder: &mut ConfigBuilder,
@@ -289,7 +308,9 @@ fn load_builder_from_dir(
                         Some("sources") => {
                             load_components_from_dir(&entry_path, builder, load_source_from_file)
                         }
-                        Some("tests") => unimplemented!(),
+                        Some("tests") => {
+                            load_components_from_dir(&entry_path, builder, load_test_from_file)
+                        }
                         Some("transforms") => {
                             load_components_from_dir(&entry_path, builder, load_transform_from_file)
                         }
@@ -452,5 +473,6 @@ mod tests {
         assert!(builder
             .sinks
             .contains_key(&ComponentKey::from("es_cluster")));
+        assert_eq!(builder.tests.len(), 2);
     }
 }

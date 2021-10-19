@@ -18,3 +18,13 @@ data_dir = "/var/lib/vector"
   encoding     = "ndjson"                      # new line delimited JSON
   [sinks.s3_archives.batch]
     max_bytes   = 10000000                      # 10mb uncompressed
+
+[[tests]]
+  name = "first"
+  [tests.input]
+    insert_at = "demo"
+    type = "log"
+    [tests.input.log_fields]
+      "message" = "foo"
+  [[tests.outputs]]
+    extract_from = "demo"
