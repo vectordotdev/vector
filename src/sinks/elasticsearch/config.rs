@@ -101,7 +101,7 @@ impl ElasticSearchConfig {
     }
 
     pub fn index(&self) -> crate::Result<Template> {
-        if self.bulk_action.is_some() {
+        if self.index.is_some() {
             warn!("ES sink config option `index` is deprecated. Use `normal.index` instead");
         }
         let index = self
