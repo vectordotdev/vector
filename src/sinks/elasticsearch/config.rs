@@ -91,7 +91,7 @@ pub enum Encoding {
 impl ElasticSearchConfig {
     pub fn bulk_action(&self) -> crate::Result<Option<Template>> {
         if self.bulk_action.is_some() {
-            warn!("ES sink config option `bulk_action` is deprecated. Use `normal.bulk_action` instead");
+            warn!("ES sink config option `bulk_action` is deprecated. Use `bulk.action` instead");
         }
         Ok(self
             .bulk
@@ -104,7 +104,7 @@ impl ElasticSearchConfig {
 
     pub fn index(&self) -> crate::Result<Template> {
         if self.index.is_some() {
-            warn!("ES sink config option `index` is deprecated. Use `normal.index` instead");
+            warn!("ES sink config option `index` is deprecated. Use `bulk.index` instead");
         }
         let index = self
             .bulk
