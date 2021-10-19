@@ -4,46 +4,29 @@ use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::marker::PhantomData;
+use std::num::NonZeroUsize;
 use std::time::Duration;
+use vector_core::stream::BatcherSettings;
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Snafu, PartialEq)]
 pub enum BatchError {
-    #[snafu(display("Cannot configure both `max_bytes` and `max_size`"))]
-    BytesAndSize,
-    #[snafu(display("Cannot configure both `max_events` and `max_size`"))]
-    EventsAndSize,
     #[snafu(display("This sink does not allow setting `max_bytes`"))]
     BytesNotAllowed,
+    #[snafu(display("`max_bytes` was unexpectedly zero"))]
+    InvalidMaxBytes,
+    #[snafu(display("`max_events` was unexpectedly zero"))]
+    InvalidMaxEvents,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
 pub struct BatchConfig {
     pub max_bytes: Option<usize>,
     pub max_events: Option<usize>,
-    /// Deprecated. Left in for backwards compatibility, use `max_bytes`
-    /// or `max_events` instead.
-    pub max_size: Option<usize>,
     pub timeout_secs: Option<u64>,
 }
 
 impl BatchConfig {
-    // This is used internally by new_relic_logs sink, else it could be
-    // pub(super) too
-    pub const fn use_size_as_bytes(&self) -> Result<Self, BatchError> {
-        let max_bytes = match (self.max_bytes, self.max_size) {
-            (Some(_), Some(_)) => return Err(BatchError::BytesAndSize),
-            (Some(bytes), None) => Some(bytes),
-            (None, Some(size)) => Some(size),
-            (None, None) => None,
-        };
-        Ok(Self {
-            max_bytes,
-            max_size: None,
-            ..*self
-        })
-    }
-
-    pub(super) const fn disallow_max_bytes(&self) -> Result<Self, BatchError> {
+    pub const fn disallow_max_bytes(&self) -> Result<Self, BatchError> {
         // Sinks that used `max_size` for an event count cannot count
         // bytes, so err if `max_bytes` is set.
         match self.max_bytes {
@@ -52,18 +35,30 @@ impl BatchConfig {
         }
     }
 
-    pub(super) const fn use_size_as_events(&self) -> Result<Self, BatchError> {
-        let max_events = match (self.max_events, self.max_size) {
-            (Some(_), Some(_)) => return Err(BatchError::EventsAndSize),
-            (Some(events), None) => Some(events),
-            (None, Some(size)) => Some(size),
-            (None, None) => None,
-        };
-        Ok(Self {
-            max_events,
-            max_size: None,
-            ..*self
-        })
+    pub const fn limit_max_bytes(self, limit: usize) -> Self {
+        if let Some(n) = self.max_bytes {
+            if n > limit {
+                return Self {
+                    max_bytes: Some(limit),
+                    ..self
+                };
+            }
+        }
+
+        self
+    }
+
+    pub const fn limit_max_events(self, limit: usize) -> Self {
+        if let Some(n) = self.max_events {
+            if n > limit {
+                return Self {
+                    max_events: Some(limit),
+                    ..self
+                };
+            }
+        }
+
+        self
     }
 
     pub(super) fn get_settings_or_default<T>(
@@ -135,7 +130,7 @@ impl<B> BatchSettings<B> {
     }
 
     // Fake the builder pattern
-    pub const fn bytes(self, bytes: u64) -> Self {
+    pub const fn bytes(self, bytes: usize) -> Self {
         Self {
             size: BatchSize {
                 bytes: bytes as usize,
@@ -171,6 +166,26 @@ impl<B> BatchSettings<B> {
             },
             timeout: self.timeout,
         }
+    }
+
+    /// Converts these settings into [`BatcherSettings`].
+    ///
+    /// `BatcherSettings` is effectively the `vector_core` spiritual successor of
+    /// [`BatchSettings<B>`].  Once all sinks are rewritten in the new stream-based style and we can
+    /// eschew customized batch buffer types, we can de-genericify `BatchSettings` and move it into
+    /// `vector_core`, and use that instead of `BatcherSettings`.
+    pub fn into_batcher_settings(self) -> Result<BatcherSettings, BatchError> {
+        let max_bytes = Some(self.size.bytes)
+            .map(|n| if n == 0 { usize::MAX } else { n })
+            .and_then(NonZeroUsize::new)
+            .ok_or(BatchError::InvalidMaxBytes)?;
+
+        let max_events = Some(self.size.events)
+            .map(|n| if n == 0 { usize::MAX } else { n })
+            .and_then(NonZeroUsize::new)
+            .ok_or(BatchError::InvalidMaxBytes)?;
+
+        Ok(BatcherSettings::new(self.timeout, max_bytes, max_events))
     }
 }
 
@@ -218,11 +233,24 @@ pub trait Batch: Sized {
     fn num_items(&self) -> usize;
 }
 
+#[derive(Debug)]
+pub struct EncodedBatch<I> {
+    pub items: I,
+    pub finalizers: EventFinalizers,
+    pub count: usize,
+    pub byte_size: usize,
+}
+
 /// This is a batch construct that stores an set of event finalizers alongside the batch itself.
 #[derive(Clone, Debug)]
 pub struct FinalizersBatch<B> {
     inner: B,
     finalizers: EventFinalizers,
+    // The count of items inserted into this batch is distinct from the
+    // number of items recorded by the inner batch, as that inner count
+    // could be smaller due to aggregated items (ie metrics).
+    count: usize,
+    byte_size: usize,
 }
 
 impl<B: Batch> From<B> for FinalizersBatch<B> {
@@ -230,13 +258,15 @@ impl<B: Batch> From<B> for FinalizersBatch<B> {
         Self {
             inner,
             finalizers: Default::default(),
+            count: 0,
+            byte_size: 0,
         }
     }
 }
 
 impl<B: Batch> Batch for FinalizersBatch<B> {
     type Input = EncodedEvent<B::Input>;
-    type Output = (B::Output, EventFinalizers);
+    type Output = EncodedBatch<B::Output>;
 
     fn get_settings_defaults(
         config: BatchConfig,
@@ -246,13 +276,23 @@ impl<B: Batch> Batch for FinalizersBatch<B> {
     }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
-        let EncodedEvent { item, finalizers } = item;
+        let EncodedEvent {
+            item,
+            finalizers,
+            byte_size,
+        } = item;
         match self.inner.push(item) {
             PushResult::Ok(full) => {
                 self.finalizers.merge(finalizers);
+                self.count += 1;
+                self.byte_size += byte_size;
                 PushResult::Ok(full)
             }
-            PushResult::Overflow(item) => PushResult::Overflow(EncodedEvent { item, finalizers }),
+            PushResult::Overflow(item) => PushResult::Overflow(EncodedEvent {
+                item,
+                finalizers,
+                byte_size,
+            }),
         }
     }
 
@@ -264,11 +304,18 @@ impl<B: Batch> Batch for FinalizersBatch<B> {
         Self {
             inner: self.inner.fresh(),
             finalizers: Default::default(),
+            count: 0,
+            byte_size: 0,
         }
     }
 
     fn finish(self) -> Self::Output {
-        (self.inner.finish(), self.finalizers)
+        EncodedBatch {
+            items: self.inner.finish(),
+            finalizers: self.finalizers,
+            count: self.count,
+            byte_size: self.byte_size,
+        }
     }
 
     fn num_items(&self) -> usize {

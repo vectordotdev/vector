@@ -31,6 +31,8 @@ pub struct CounterConfig {
     namespace: Option<String>,
     #[serde(default = "default_increment_by_value")]
     increment_by_value: bool,
+    #[serde(default = "default_kind")]
+    kind: MetricKind,
     tags: Option<IndexMap<String, String>>,
 }
 
@@ -92,6 +94,10 @@ const fn default_increment_by_value() -> bool {
     false
 }
 
+const fn default_kind() -> MetricKind {
+    MetricKind::Incremental
+}
+
 #[derive(Debug, Clone)]
 pub struct LogToMetric {
     config: LogToMetricConfig,
@@ -109,6 +115,7 @@ impl GenerateConfig for LogToMetricConfig {
                 name: None,
                 namespace: None,
                 increment_by_value: false,
+                kind: MetricKind::Incremental,
                 tags: None,
             })],
         })
@@ -242,7 +249,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             Ok(Metric::new_with_metadata(
                 name,
-                MetricKind::Incremental,
+                counter.kind,
                 MetricValue::Counter { value },
                 metadata,
             )
@@ -570,6 +577,36 @@ mod tests {
             Metric::new_with_metadata(
                 "amount_total",
                 MetricKind::Incremental,
+                MetricValue::Counter { value: 33.99 },
+                metadata,
+            )
+            .with_timestamp(Some(ts()))
+        );
+    }
+
+    #[test]
+    fn count_absolute() {
+        let config = parse_config(
+            r#"
+            [[metrics]]
+            type = "counter"
+            field = "amount"
+            name = "amount_total"
+            increment_by_value = true
+            kind = "absolute"
+            "#,
+        );
+
+        let event = create_event("amount", "33.99");
+        let metadata = event.metadata().clone();
+        let mut transform = LogToMetric::new(config);
+        let metric = transform_one(&mut transform, event).unwrap();
+
+        assert_eq!(
+            metric.into_metric(),
+            Metric::new_with_metadata(
+                "amount_total",
+                MetricKind::Absolute,
                 MetricValue::Counter { value: 33.99 },
                 metadata,
             )

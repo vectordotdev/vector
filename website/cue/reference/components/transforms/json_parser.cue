@@ -40,7 +40,7 @@ components: transforms: json_parser: {
 			"""
 			\(json_parser._remap_deprecation_notice)
 
-			```vrl
+			```coffee
 			.message = parse_json(.message)
 			```
 			""",

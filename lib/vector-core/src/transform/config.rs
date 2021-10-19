@@ -50,6 +50,10 @@ pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone 
 
     fn output_type(&self) -> DataType;
 
+    fn named_outputs(&self) -> Vec<String> {
+        Vec::new()
+    }
+
     fn transform_type(&self) -> &'static str;
 
     /// Allows a transform configuration to expand itself into multiple "child"

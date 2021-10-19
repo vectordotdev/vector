@@ -33,7 +33,7 @@ components: sinks: kafka: {
 				enabled: true
 				codec: {
 					enabled: true
-					enum: ["json", "text"]
+					enum: ["json", "text", "ndjson"]
 				}
 			}
 			request: enabled: false

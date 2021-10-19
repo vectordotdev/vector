@@ -1,10 +1,13 @@
-use std::{env, fmt, path::PathBuf, process, time::Duration};
+#[cfg(feature = "disk-buffer")]
+use std::path::PathBuf;
+use std::{env, fmt, process, time::Duration};
 
 use buffers::{
     bytes::{DecodeBytes, EncodeBytes},
     Variant, WhenFull,
 };
 use bytes::{Buf, BufMut};
+use core_common::byte_size_of::ByteSizeOf;
 use futures::{SinkExt, StreamExt};
 use metrics::{counter, increment_counter};
 use metrics_exporter_prometheus::PrometheusBuilder;
@@ -12,11 +15,18 @@ use tokio::{
     pin, select,
     time::{interval, sleep},
 };
+use tracing::Span;
 
 #[derive(Clone, Copy)]
 pub struct Message<const N: usize> {
     id: u64,
     _padding: [u64; N],
+}
+
+impl<const N: usize> ByteSizeOf for Message<N> {
+    fn allocated_bytes(&self) -> usize {
+        0
+    }
 }
 
 impl<const N: usize> Message<N> {
@@ -91,22 +101,32 @@ async fn main() {
         .expect("exporter install should not fail");
 
     let _ = cli_args.remove(0);
-    let data_dir: PathBuf = cli_args
-        .remove(0)
-        .parse()
-        .expect("database path must be a valid path");
-    let db_size: usize = cli_args
-        .remove(0)
-        .parse()
-        .expect("database size must be a non-negative amount");
-    let variant = Variant::Disk {
-        id: "debug".to_owned(),
-        data_dir,
-        max_size: db_size,
+    #[cfg(feature = "disk-buffer")]
+    let variant = {
+        let data_dir: PathBuf = cli_args
+            .remove(0)
+            .parse()
+            .expect("database path must be a valid path");
+        let db_size: usize = cli_args
+            .remove(0)
+            .parse()
+            .expect("database size must be a non-negative amount");
+        Variant::Disk {
+            id: "debug".to_owned(),
+            data_dir,
+            max_size: db_size,
+            when_full: WhenFull::DropNewest,
+        }
+    };
+    #[cfg(not(feature = "disk-buffer"))]
+    let variant = Variant::Memory {
+        max_events: 99999,
         when_full: WhenFull::DropNewest,
+        instrument: true,
     };
 
-    let (writer, reader, acker) = buffers::build(variant).expect("failed to create buffer");
+    let (writer, reader, acker) =
+        buffers::build(variant, Span::none()).expect("failed to create buffer");
     let _ = tokio::spawn(async move {
         let mut id = 0;
         let mut writer = writer.get();

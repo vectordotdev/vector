@@ -30,8 +30,11 @@ use http::header::{HeaderName, HeaderValue};
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use std::num::NonZeroUsize;
-use std::{collections::HashMap, convert::TryFrom};
+use std::{
+    collections::HashMap,
+    convert::TryFrom,
+    io::{self},
+};
 use tower::ServiceBuilder;
 use uuid::Uuid;
 use vector_core::event::{EventFinalizers, Finalizable};
@@ -147,12 +150,10 @@ impl GcsSinkConfig {
             ..Default::default()
         });
 
-        let batch_settings = DEFAULT_BATCH_SETTINGS.parse_config(self.batch)?;
+        let batch_settings = DEFAULT_BATCH_SETTINGS
+            .parse_config(self.batch)?
+            .into_batcher_settings()?;
 
-        let batch_size_bytes = NonZeroUsize::new(batch_settings.size.bytes);
-        let batch_size_events = NonZeroUsize::new(batch_settings.size.events)
-            .ok_or("batch events must be greater than 0")?;
-        let batch_timeout = batch_settings.timeout;
         let partitioner = self.key_partitioner()?;
 
         let svc = ServiceBuilder::new()
@@ -161,17 +162,7 @@ impl GcsSinkConfig {
 
         let request_settings = RequestSettings::new(self)?;
 
-        let sink = GcsSink::new(
-            cx,
-            svc,
-            request_settings,
-            partitioner,
-            self.encoding.clone(),
-            self.compression,
-            batch_size_bytes,
-            batch_size_events,
-            batch_timeout,
-        );
+        let sink = GcsSink::new(cx, svc, request_settings, partitioner, batch_settings);
 
         Ok(VectorSink::Stream(Box::new(sink)))
     }
@@ -197,13 +188,25 @@ struct RequestSettings {
     extension: String,
     time_format: String,
     append_uuid: bool,
+    encoding: EncodingConfig<StandardEncodings>,
+    compression: Compression,
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
     type Metadata = (String, usize, EventFinalizers);
     type Events = Vec<Event>;
+    type Encoder = EncodingConfig<StandardEncodings>;
     type Payload = Bytes;
     type Request = GcsRequest;
+    type Error = io::Error; // TODO: this is ugly.
+
+    fn compression(&self) -> Compression {
+        self.compression
+    }
+
+    fn encoder(&self) -> &Self::Encoder {
+        &self.encoding
+    }
 
     fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
         let (partition_key, mut events) = input;
@@ -286,6 +289,8 @@ impl RequestSettings {
             extension,
             time_format,
             append_uuid,
+            compression: config.compression,
+            encoding: config.encoding.clone(),
         })
     }
 }

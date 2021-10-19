@@ -22,6 +22,7 @@ use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{sync::Arc, time::Duration};
+use vector_core::ByteSizeOf;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -74,7 +75,7 @@ impl DatadogEventsConfig {
         timeout: Duration,
     ) -> crate::Result<(VectorSink, Healthcheck)>
     where
-        O: 'static,
+        O: ByteSizeOf + 'static,
         B: Batch<Output = Vec<O>> + std::marker::Send + 'static,
         B::Output: std::marker::Send + Clone,
         B::Input: std::marker::Send,
@@ -121,7 +122,7 @@ impl SinkConfig for DatadogEventsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         // Datadog Event API doesn't support batching.
         let batch_settings = BatchSettings::default()
-            .bytes(bytesize::kib(100u64))
+            .bytes(100_000)
             .events(1)
             .timeout(0)
             .parse_config(BatchConfig::default())?;
@@ -267,6 +268,7 @@ mod tests {
     use crate::{
         config::SinkConfig,
         sinks::util::test::{build_test_server_status, load_sink},
+        test_util::components::{self, HTTP_SINK_TAGS},
         test_util::{next_addr, random_lines_with_stream},
     };
     use bytes::Bytes;
@@ -324,7 +326,11 @@ mod tests {
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (expected, events) = random_events_with_stream(100, 10, Some(batch));
 
-        let _ = sink.run(events).await.unwrap();
+        components::init_test();
+        sink.run(events).await.unwrap();
+        if batch_status == BatchStatus::Delivered {
+            components::SINK_TESTS.assert(&HTTP_SINK_TAGS);
+        }
 
         assert_eq!(receiver.try_recv(), Ok(batch_status));
 
@@ -384,14 +390,14 @@ mod tests {
 
         let (expected, events) = random_events_with_stream(100, 10, None);
 
-        let mut events = events.map(|mut e| {
+        let events = events.map(|mut e| {
             e.as_mut_log()
                 .metadata_mut()
                 .set_datadog_api_key(Some(Arc::from("from_metadata")));
             Ok(e)
         });
 
-        let _ = sink.into_sink().send_all(&mut events).await.unwrap();
+        components::sink_send_stream(sink, events, &HTTP_SINK_TAGS).await;
         let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
         for (i, val) in output.iter().enumerate() {

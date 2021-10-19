@@ -1,14 +1,14 @@
 use super::{
     retries::{RetryAction, RetryLogic},
     sink::{self, ServiceLogic},
-    Batch, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
-    TowerRequestSettings,
+    Batch, ElementCount, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink,
+    TowerRequestConfig, TowerRequestSettings,
 };
 use crate::{
     buffers::Acker,
     event::Event,
     http::{HttpClient, HttpError},
-    internal_events::{EndpointBytesSent, EventsSent},
+    internal_events::EndpointBytesSent,
 };
 use bytes::{Buf, Bytes};
 use futures::{future::BoxFuture, ready, Sink};
@@ -59,7 +59,7 @@ pub struct BatchedHttpSink<
     SL = sink::StdServiceLogic<http::Response<Bytes>>,
 > where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
     SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
 {
@@ -80,7 +80,7 @@ pub struct BatchedHttpSink<
 impl<T, B> BatchedHttpSink<T, B>
 where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     pub fn new(
@@ -107,7 +107,7 @@ where
 impl<T, B, RL, SL> BatchedHttpSink<T, B, RL, SL>
 where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     RL: RetryLogic<Response = http::Response<Bytes>, Error = HttpError> + Send + 'static,
     SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
@@ -152,7 +152,7 @@ where
 impl<T, B, RL, SL> Sink<Event> for BatchedHttpSink<T, B, RL, SL>
 where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
     RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
     SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
@@ -176,14 +176,14 @@ where
     }
 
     fn start_send(self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
-        let finalizers = event.metadata_mut().take_finalizers();
         let byte_size = event.size_of();
+        let finalizers = event.metadata_mut().take_finalizers();
         if let Some(item) = self.sink.encode_event(event) {
-            emit!(&EventsSent {
-                count: 1,
-                byte_size
+            *self.project().slot = Some(EncodedEvent {
+                item,
+                finalizers,
+                byte_size,
             });
-            *self.project().slot = Some(EncodedEvent { item, finalizers });
         }
 
         Ok(())
@@ -209,7 +209,7 @@ where
 pub struct PartitionHttpSink<T, B, K, RL = HttpRetryLogic>
 where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
@@ -230,7 +230,7 @@ where
 impl<T, B, K> PartitionHttpSink<T, B, K, HttpRetryLogic>
 where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
@@ -258,7 +258,7 @@ where
 impl<T, B, K, RL> PartitionHttpSink<T, B, K, RL>
 where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     RL: RetryLogic<Response = http::Response<Bytes>, Error = HttpError> + Send + 'static,
@@ -309,7 +309,7 @@ where
 impl<T, B, K, RL> Sink<Event> for PartitionHttpSink<T, B, K, RL>
 where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
@@ -337,11 +337,11 @@ where
         let finalizers = event.metadata_mut().take_finalizers();
         let byte_size = event.size_of();
         if let Some(item) = self.sink.encode_event(event) {
-            emit!(&EventsSent {
-                count: 1,
-                byte_size
+            *self.project().slot = Some(EncodedEvent {
+                item,
+                finalizers,
+                byte_size,
             });
-            *self.project().slot = Some(EncodedEvent { item, finalizers });
         }
 
         Ok(())
@@ -383,7 +383,7 @@ impl<F, B> HttpBatchService<F, B> {
 impl<F, B> Service<B> for HttpBatchService<F, B>
 where
     F: Future<Output = crate::Result<hyper::Request<Vec<u8>>>> + Send + 'static,
-    B: Send + 'static,
+    B: ByteSizeOf + ElementCount + Send + 'static,
 {
     type Response = http::Response<Bytes>;
     type Error = crate::Error;
@@ -414,13 +414,16 @@ where
                 .unwrap_or_else(|_| unreachable!())
                 .to_string();
 
-            emit!(&EndpointBytesSent {
-                byte_size,
-                protocol: scheme.unwrap_or(Scheme::HTTP).as_str(),
-                endpoint: &endpoint
-            });
-
             let response = http_client.call(request).await?;
+
+            if response.status().is_success() {
+                emit!(&EndpointBytesSent {
+                    byte_size,
+                    protocol: scheme.unwrap_or(Scheme::HTTP).as_str(),
+                    endpoint: &endpoint
+                });
+            }
+
             let (parts, body) = response.into_parts();
             let mut body = body::aggregate(body).await?;
             Ok(hyper::Response::from_parts(
@@ -502,7 +505,7 @@ impl RequestConfig {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{config::ProxyConfig, sinks::util::service::Concurrency, test_util::next_addr};
+    use crate::{config::ProxyConfig, test_util::next_addr};
     use futures::{future::ready, StreamExt};
     use hyper::{
         service::{make_service_fn, service_fn},
@@ -579,12 +582,5 @@ mod test {
 
         let (body, _rest) = rx.into_future().await;
         assert_eq!(body.unwrap(), "hello");
-    }
-
-    #[test]
-    fn alias_in_flight_limit_works() {
-        let cfg = toml::from_str::<RequestConfig>("in_flight_limit = 10")
-            .expect("Fixed concurrency failed for in_flight_limit param");
-        assert_eq!(cfg.tower.concurrency(), &Concurrency::Fixed(10));
     }
 }

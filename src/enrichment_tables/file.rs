@@ -4,8 +4,10 @@ use enrichment::{Case, Condition, IndexHandle, Table};
 use serde::{Deserialize, Serialize};
 use shared::{conversion::Conversion, datetime::TimeZone};
 use std::collections::{BTreeMap, HashMap};
+use std::fs;
 use std::hash::Hasher;
 use std::path::PathBuf;
+use std::time::SystemTime;
 use tracing::trace;
 use vrl::Value;
 
@@ -35,22 +37,11 @@ struct FileC {
     encoding: Encoding,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-#[serde(rename_all = "snake_case")]
-enum SchemaType {
-    String,
-    Date,
-    DateTime,
-    Integer,
-    Float,
-    Boolean,
-}
-
 #[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq)]
-struct FileConfig {
+pub struct FileConfig {
     file: FileC,
     #[serde(default)]
-    schema: HashMap<String, SchemaType>,
+    schema: HashMap<String, String>,
 }
 
 const fn default_delimiter() -> char {
@@ -68,41 +59,57 @@ impl FileConfig {
         use chrono::TimeZone;
 
         Ok(match self.schema.get(column) {
-            Some(SchemaType::Date) => Value::Timestamp(
-                chrono::FixedOffset::east(0)
-                    .from_utc_datetime(
-                        &chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
+            Some(format) => {
+                let mut split = format.splitn(2, '|').map(|segment| segment.trim());
+
+                match (split.next(), split.next()) {
+                    (Some("date"), None) => Value::Timestamp(
+                        chrono::FixedOffset::east(0)
+                            .from_utc_datetime(
+                                &chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
+                                    .map_err(|_| {
+                                        format!(
+                                            "unable to parse date {} found in row {}",
+                                            value, row
+                                        )
+                                    })?
+                                    .and_hms(0, 0, 0),
+                            )
+                            .into(),
+                    ),
+                    (Some("date"), Some(format)) => Value::Timestamp(
+                        chrono::FixedOffset::east(0)
+                            .from_utc_datetime(
+                                &chrono::NaiveDate::parse_from_str(value, format)
+                                    .map_err(|_| {
+                                        format!(
+                                            "unable to parse date {} found in row {}",
+                                            value, row
+                                        )
+                                    })?
+                                    .and_hms(0, 0, 0),
+                            )
+                            .into(),
+                    ),
+                    _ => {
+                        let conversion =
+                            Conversion::parse(format, timezone).map_err(|err| err.to_string())?;
+                        conversion
+                            .convert(Bytes::copy_from_slice(value.as_bytes()))
                             .map_err(|_| {
-                                format!("unable to parse date {} found in row {}", value, row)
+                                format!("unable to parse {} found in row {}", value, row)
                             })?
-                            .and_hms(0, 0, 0),
-                    )
-                    .into(),
-            ),
-            Some(SchemaType::DateTime) => Conversion::Timestamp(timezone)
-                .convert(Bytes::copy_from_slice(value.as_bytes()))
-                .map_err(|_| format!("unable to parse datetime {} found in row {}", value, row))?,
-            Some(SchemaType::Integer) => Conversion::Integer
-                .convert(Bytes::copy_from_slice(value.as_bytes()))
-                .map_err(|_| format!("unable to parse integer {} found in row {}", value, row))?,
-            Some(SchemaType::Float) => Conversion::Boolean
-                .convert(Bytes::copy_from_slice(value.as_bytes()))
-                .map_err(|_| format!("unable to parse integer {} found in row {}", value, row))?,
-            Some(SchemaType::Boolean) => Conversion::Boolean
-                .convert(Bytes::copy_from_slice(value.as_bytes()))
-                .map_err(|_| format!("unable to parse integer {} found in row {}", value, row))?,
-            Some(SchemaType::String) | None => value.into(),
+                    }
+                }
+            }
+            None => value.into(),
         })
     }
-}
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "file")]
-impl EnrichmentTableConfig for FileConfig {
-    async fn build(
+    fn load_file(
         &self,
-        globals: &crate::config::GlobalOptions,
-    ) -> crate::Result<Box<dyn Table + Send + Sync>> {
+        timezone: TimeZone,
+    ) -> crate::Result<(Vec<String>, Vec<Vec<Value>>, SystemTime)> {
         let Encoding::Csv {
             include_headers,
             delimiter,
@@ -134,7 +141,7 @@ impl EnrichmentTableConfig for FileConfig {
                 Ok(row?
                     .iter()
                     .enumerate()
-                    .map(|(idx, col)| self.parse_column(globals.timezone, &headers[idx], idx, col))
+                    .map(|(idx, col)| self.parse_column(timezone, &headers[idx], idx, col))
                     .collect::<Result<Vec<_>, String>>()?)
             })
             .collect::<crate::Result<Vec<_>>>()?;
@@ -145,7 +152,28 @@ impl EnrichmentTableConfig for FileConfig {
             headers
         );
 
-        Ok(Box::new(File::new(data, headers)))
+        let modified = fs::metadata(&self.file.path)?.modified()?;
+
+        Ok((headers, data, modified))
+    }
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "file")]
+impl EnrichmentTableConfig for FileConfig {
+    async fn build(
+        &self,
+        globals: &crate::config::GlobalOptions,
+    ) -> crate::Result<Box<dyn Table + Send + Sync>> {
+        let (headers, data, modified) = self.load_file(globals.timezone)?;
+
+        Ok(Box::new(File::new(
+            self.clone(),
+            globals.timezone,
+            modified,
+            data,
+            headers,
+        )))
     }
 }
 
@@ -157,6 +185,9 @@ impl_generate_config_from_default!(FileConfig);
 
 #[derive(Clone)]
 pub struct File {
+    config: FileConfig,
+    timezone: TimeZone,
+    last_modified: SystemTime,
     data: Vec<Vec<Value>>,
     headers: Vec<String>,
     indexes: Vec<(
@@ -167,8 +198,17 @@ pub struct File {
 }
 
 impl File {
-    pub fn new(data: Vec<Vec<Value>>, headers: Vec<String>) -> Self {
+    pub fn new(
+        config: FileConfig,
+        timezone: TimeZone,
+        last_modified: SystemTime,
+        data: Vec<Vec<Value>>,
+        headers: Vec<String>,
+    ) -> Self {
         Self {
+            config,
+            timezone,
+            last_modified,
             data,
             headers,
             indexes: Vec::new(),
@@ -446,6 +486,30 @@ impl Table for File {
             }
         }
     }
+
+    /// Returns a list of the field names that are in each index
+    fn index_fields(&self) -> Vec<(Case, Vec<String>)> {
+        self.indexes
+            .iter()
+            .map(|index| {
+                let (case, fields, _) = index;
+                (
+                    *case,
+                    fields
+                        .iter()
+                        .map(|idx| self.headers[*idx].clone())
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect::<Vec<_>>()
+    }
+
+    /// Checks the modified timestamp of the data file to see if data has changed.
+    fn needs_reload(&self) -> bool {
+        matches!(fs::metadata(&self.config.file.path)
+            .and_then(|metadata| metadata.modified()),
+            Ok(modified) if modified > self.last_modified)
+    }
 }
 
 impl std::fmt::Debug for File {
@@ -466,6 +530,71 @@ mod tests {
     use shared::btreemap;
 
     #[test]
+    fn parse_column() {
+        let mut schema = HashMap::new();
+        schema.insert("col1".to_string(), " string ".to_string());
+        schema.insert("col2".to_string(), " date ".to_string());
+        schema.insert("col3".to_string(), "date|%m/%d/%Y".to_string());
+        schema.insert("col3-spaces".to_string(), "date | %m %d %Y".to_string());
+        schema.insert("col4".to_string(), "timestamp|%+".to_string());
+        schema.insert("col4-spaces".to_string(), "timestamp | %+".to_string());
+        schema.insert("col5".to_string(), "int".to_string());
+        let config = FileConfig {
+            file: Default::default(),
+            schema,
+        };
+
+        assert_eq!(
+            Ok(Value::from("zork")),
+            config.parse_column(Default::default(), "col1", 1, "zork")
+        );
+
+        assert_eq!(
+            Ok(Value::from(chrono::Utc.ymd(2020, 3, 5).and_hms(0, 0, 0))),
+            config.parse_column(Default::default(), "col2", 1, "2020-03-05")
+        );
+
+        assert_eq!(
+            Ok(Value::from(chrono::Utc.ymd(2020, 3, 5).and_hms(0, 0, 0))),
+            config.parse_column(Default::default(), "col3", 1, "03/05/2020")
+        );
+
+        assert_eq!(
+            Ok(Value::from(chrono::Utc.ymd(2020, 3, 5).and_hms(0, 0, 0))),
+            config.parse_column(Default::default(), "col3-spaces", 1, "03 05 2020")
+        );
+
+        assert_eq!(
+            Ok(Value::from(
+                chrono::Utc.ymd(2001, 7, 7).and_hms_micro(15, 4, 0, 26490)
+            )),
+            config.parse_column(
+                Default::default(),
+                "col4",
+                1,
+                "2001-07-08T00:34:00.026490+09:30"
+            )
+        );
+
+        assert_eq!(
+            Ok(Value::from(
+                chrono::Utc.ymd(2001, 7, 7).and_hms_micro(15, 4, 0, 26490)
+            )),
+            config.parse_column(
+                Default::default(),
+                "col4-spaces",
+                1,
+                "2001-07-08T00:34:00.026490+09:30"
+            )
+        );
+
+        assert_eq!(
+            Ok(Value::from(42)),
+            config.parse_column(Default::default(), "col5", 1, "42")
+        );
+    }
+
+    #[test]
     fn seahash() {
         // Ensure we can separate fields to create a distinct hash.
         let mut one = seahash::SeaHasher::default();
@@ -484,6 +613,9 @@ mod tests {
     #[test]
     fn finds_row() {
         let file = File::new(
+            Default::default(),
+            shared::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],
@@ -508,6 +640,9 @@ mod tests {
     #[test]
     fn duplicate_indexes() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             Vec::new(),
             vec![
                 "field1".to_string(),
@@ -526,6 +661,9 @@ mod tests {
     #[test]
     fn errors_on_missing_columns() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             Vec::new(),
             vec![
                 "field1".to_string(),
@@ -544,6 +682,9 @@ mod tests {
     #[test]
     fn finds_row_with_index() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],
@@ -570,6 +711,9 @@ mod tests {
     #[test]
     fn finds_rows_with_index_case_sensitive() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],
@@ -619,6 +763,9 @@ mod tests {
     #[test]
     fn selects_columns() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into(), "zoop".into()],
                 vec!["zirp".into(), "zurp".into(), "zork".into()],
@@ -661,6 +808,9 @@ mod tests {
     #[test]
     fn finds_rows_with_index_case_insensitive() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],
@@ -719,6 +869,9 @@ mod tests {
     #[test]
     fn finds_row_with_dates() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec![
                     "zip".into(),
@@ -758,6 +911,9 @@ mod tests {
     #[test]
     fn doesnt_find_row() {
         let file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],
@@ -779,6 +935,9 @@ mod tests {
     #[test]
     fn doesnt_find_row_with_index() {
         let mut file = File::new(
+            Default::default(),
+            shared::datetime::TimeZone::Local,
+            SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
                 vec!["zirp".into(), "zurp".into()],

@@ -40,7 +40,7 @@ components: transforms: logfmt_parser: {
 			"""
 			\(logfmt_parser._remap_deprecation_notice)
 
-			```vrl
+			```coffee
 			.message = parse_key_value(.message)
 			```
 			""",

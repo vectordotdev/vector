@@ -34,7 +34,7 @@ components: transforms: rename_fields: {
 			"""
 			\(rename_fields._remap_deprecation_notice)
 
-			```vrl
+			```coffee
 			.new_name = del(.old_name)
 			```
 			""",

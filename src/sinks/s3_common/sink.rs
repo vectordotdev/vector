@@ -2,89 +2,65 @@ use crate::sinks::util::partitioner::KeyPartitioner;
 use crate::{
     config::SinkContext,
     event::Event,
-    sinks::util::{encoding::Encoder, Compression, RequestBuilder, SinkBuilderExt},
+    sinks::util::{RequestBuilder, SinkBuilderExt},
 };
 use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures_util::StreamExt;
-use std::{fmt, num::NonZeroUsize, time::Duration};
+use std::{fmt, num::NonZeroUsize};
 use tower::Service;
-use vector_core::{buffers::Ackable, event::Finalizable, sink::StreamSink};
+use vector_core::{
+    buffers::Ackable, event::Finalizable, sink::StreamSink, stream::BatcherSettings,
+};
 use vector_core::{buffers::Acker, event::EventStatus};
 
-pub struct S3Sink<Svc, RB, E> {
+pub struct S3Sink<Svc, RB> {
     acker: Acker,
     service: Svc,
     request_builder: RB,
     partitioner: KeyPartitioner,
-    encoding: E,
-    compression: Compression,
-    batch_size_bytes: Option<NonZeroUsize>,
-    batch_size_events: NonZeroUsize,
-    batch_timeout: Duration,
+    batcher_settings: BatcherSettings,
 }
 
-impl<Svc, RB, E> S3Sink<Svc, RB, E> {
+impl<Svc, RB> S3Sink<Svc, RB> {
     pub fn new(
         cx: SinkContext,
         service: Svc,
         request_builder: RB,
         partitioner: KeyPartitioner,
-        encoding: E,
-        compression: Compression,
-        batch_size_bytes: Option<NonZeroUsize>,
-        batch_size_events: NonZeroUsize,
-        batch_timeout: Duration,
+        batcher_settings: BatcherSettings,
     ) -> Self {
         Self {
+            partitioner,
             acker: cx.acker(),
             service,
             request_builder,
-            partitioner,
-            encoding,
-            compression,
-            batch_size_bytes,
-            batch_size_events,
-            batch_timeout,
+            batcher_settings,
         }
     }
 }
 
-impl<Svc, RB, E> S3Sink<Svc, RB, E>
+impl<Svc, RB> S3Sink<Svc, RB>
 where
     Svc: Service<RB::Request> + Send + 'static,
     Svc::Future: Send + 'static,
     Svc::Response: AsRef<EventStatus> + Send + 'static,
     Svc::Error: fmt::Debug + Into<crate::Error> + Send,
     RB: RequestBuilder<(String, Vec<Event>)> + Send + Sync + 'static,
-    RB::Events: IntoIterator<Item = Event>,
-    RB::Payload: From<Vec<u8>>,
+    RB::Error: fmt::Debug + Send,
     RB::Request: Ackable + Finalizable + Send,
-    E: Encoder + Send + Sync + 'static,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        // All sinks do the same fundamental job: take in events, and ship them
-        // out. Empirical testing shows that our number one priority for high
-        // throughput needs to be servicing I/O as soon as we possibly can.  In
-        // order to do that, we'll spin up a separate task that deals
-        // exclusively with I/O, while we deal with everything else here:
-        // batching, ordering, and so on.
-        let request_builder_concurrency_limit = NonZeroUsize::new(50);
+        let partitioner = self.partitioner;
+        let settings = self.batcher_settings;
+
+        let builder_limit = NonZeroUsize::new(64);
+        let request_builder = self.request_builder;
 
         let sink = input
-            .batched(
-                self.partitioner,
-                self.batch_timeout,
-                self.batch_size_events,
-                self.batch_size_bytes,
-            )
+            .batched(partitioner, settings)
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
-            .request_builder(
-                request_builder_concurrency_limit,
-                self.request_builder,
-                self.encoding,
-                self.compression,
-            )
+            .request_builder(builder_limit, request_builder)
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
@@ -101,17 +77,15 @@ where
 }
 
 #[async_trait]
-impl<Svc, RB, E> StreamSink for S3Sink<Svc, RB, E>
+impl<Svc, RB> StreamSink for S3Sink<Svc, RB>
 where
     Svc: Service<RB::Request> + Send + 'static,
     Svc::Future: Send + 'static,
     Svc::Response: AsRef<EventStatus> + Send + 'static,
     Svc::Error: fmt::Debug + Into<crate::Error> + Send,
     RB: RequestBuilder<(String, Vec<Event>)> + Send + Sync + 'static,
-    RB::Events: IntoIterator<Item = Event>,
-    RB::Payload: From<Vec<u8>>,
+    RB::Error: fmt::Debug + Send,
     RB::Request: Ackable + Finalizable + Send,
-    E: Encoder + Send + Sync + 'static,
 {
     async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await

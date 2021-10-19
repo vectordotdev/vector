@@ -34,7 +34,7 @@ components: transforms: remove_fields: {
 			"""
 			\(remove_fields._remap_deprecation_notice)
 
-			```vrl
+			```coffee
 			del(.level)
 			```
 			""",

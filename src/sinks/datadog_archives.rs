@@ -2,9 +2,7 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     convert::TryFrom,
     io::{self, Write},
-    num::NonZeroUsize,
     sync::atomic::{AtomicU32, Ordering},
-    time::Duration,
 };
 
 use bytes::{BufMut, Bytes, BytesMut};
@@ -17,15 +15,22 @@ use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
 
-use vector_core::event::{Event, EventFinalizers, Finalizable};
+use vector_core::{
+    config::{log_schema, LogSchema},
+    event::{Event, EventFinalizers, Finalizable},
+};
 
-use crate::sinks::{gcs_common, s3_common};
 use crate::{
     config::GenerateConfig,
     config::{DataType, SinkConfig, SinkContext},
     http::HttpClient,
     rusoto::{AwsAuthentication, RegionOrEndpoint},
     serde::to_string,
+    sinks::gcp::{GcpAuthConfig, GcpCredentials},
+    sinks::gcs_common::config::{GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass, BASE_URL},
+    sinks::gcs_common::service::{GcsRequest, GcsRequestSettings, GcsService},
+    sinks::gcs_common::sink::GcsSink,
+    sinks::{gcs_common, s3_common},
     sinks::{
         s3_common::{
             config::{
@@ -43,22 +48,16 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 
-use super::util::{encoding::Encoder, Compression, RequestBuilder};
-use crate::sinks::gcp::{GcpAuthConfig, GcpCredentials};
-use crate::sinks::gcs_common::config::{
-    GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass, BASE_URL,
-};
-use crate::sinks::gcs_common::service::{GcsRequest, GcsRequestSettings, GcsService};
-use crate::sinks::gcs_common::sink::GcsSink;
-use crate::sinks::util::encoding::StandardEncodings;
-use crate::sinks::util::BatchSettings;
 use goauth::scopes::Scope;
 
-const DEFAULT_REQUEST_LIMITS: TowerRequestConfig = {
-    TowerRequestConfig::const_new(Concurrency::Fixed(50), Concurrency::Fixed(50))
-        .rate_limit_num(250)
+use super::util::{
+    batch::BatchError,
+    encoding::{Encoder, StandardEncodings},
+    BatchSettings, Compression, RequestBuilder,
 };
 
+const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
+    TowerRequestConfig::new(Concurrency::Fixed(50)).rate_limit_num(250);
 const DEFAULT_COMPRESSION: Compression = Compression::gzip_default();
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -132,6 +131,8 @@ enum ConfigError {
     UnsupportedService { service: String },
     #[snafu(display("Unsupported storage class: {}", storage_class))]
     UnsupportedStorageClass { storage_class: String },
+    #[snafu(display("Invalid batch configuration: {}", source))]
+    InvalidBatchConfiguration { source: BatchError },
 }
 
 const KEY_TEMPLATE: &str = "/dt=%Y%m%d/hour=%H/";
@@ -215,38 +216,28 @@ impl DatadogArchivesSinkConfig {
             _ => (),
         }
 
-        let batch_size_bytes = NonZeroUsize::new(100_000_000);
-        let batch_size_events =
-            NonZeroUsize::new(200_000).expect("batch size, in events, must be greater than 0"); // provided the average log size is around 500 bytes
-        let batch_timeout = Duration::from_secs(900);
+        // We use the default batch settings directly as we don't support allowing users to change
+        // the batching behavior, as it could negatively impact performance.
+        let batcher_settings = DEFAULT_BATCH_SETTINGS
+            .into_batcher_settings()
+            .map_err(|source| ConfigError::InvalidBatchConfiguration { source })?;
 
-        let partitioner = DatadogArchivesSinkConfig::key_partitioner();
+        let partitioner = DatadogArchivesSinkConfig::build_partitioner();
 
         let s3_config = self
             .aws_s3
             .as_ref()
             .expect("s3 config wasn't provided")
             .clone();
-        let encoding = DatadogArchiveEncoding::default();
         let request_builder =
             DatadogS3RequestBuilder::new(self.bucket.clone(), self.key_prefix.clone(), s3_config);
 
-        let sink = S3Sink::new(
-            cx,
-            service,
-            request_builder,
-            partitioner,
-            encoding,
-            DEFAULT_COMPRESSION,
-            batch_size_bytes,
-            batch_size_events,
-            batch_timeout,
-        );
+        let sink = S3Sink::new(cx, service, request_builder, partitioner, batcher_settings);
 
         Ok(VectorSink::Stream(Box::new(sink)))
     }
 
-    fn build_gcs_sink(
+    pub fn build_gcs_sink(
         &self,
         client: HttpClient,
         base_url: String,
@@ -259,10 +250,7 @@ impl DatadogArchivesSinkConfig {
             ..Default::default()
         });
 
-        let batch_size_bytes = NonZeroUsize::new(DEFAULT_BATCH_SETTINGS.size.bytes);
-        let batch_size_events = NonZeroUsize::new(DEFAULT_BATCH_SETTINGS.size.events)
-            .ok_or("batch events must be greater than 0")?;
-        let batch_timeout = DEFAULT_BATCH_SETTINGS.timeout;
+        let batcher_settings = DEFAULT_BATCH_SETTINGS.into_batcher_settings()?;
 
         let svc = ServiceBuilder::new()
             .settings(request, GcsRetryLogic)
@@ -295,27 +283,18 @@ impl DatadogArchivesSinkConfig {
             acl,
             storage_class,
             metadata,
+            encoding: DatadogArchivesEncoding::default(),
+            compression: DEFAULT_COMPRESSION,
         };
 
-        let partitioner = DatadogArchivesSinkConfig::key_partitioner();
-        let encoding = DatadogArchiveEncoding::default();
+        let partitioner = DatadogArchivesSinkConfig::build_partitioner();
 
-        let sink = GcsSink::new(
-            cx,
-            svc,
-            request_builder,
-            partitioner,
-            encoding,
-            DEFAULT_COMPRESSION,
-            batch_size_bytes,
-            batch_size_events,
-            batch_timeout,
-        );
+        let sink = GcsSink::new(cx, svc, request_builder, partitioner, batcher_settings);
 
         Ok(VectorSink::Stream(Box::new(sink)))
     }
 
-    fn key_partitioner() -> KeyPartitioner {
+    pub fn build_partitioner() -> KeyPartitioner {
         KeyPartitioner::new(Template::try_from(KEY_TEMPLATE).expect("invalid object key format"))
     }
 }
@@ -324,13 +303,16 @@ const RESERVED_ATTRIBUTES: [&str; 10] = [
     "_id", "date", "message", "host", "source", "service", "status", "tags", "trace_id", "span_id",
 ];
 
-struct DatadogArchiveEncoding {
+#[derive(Debug)]
+struct DatadogArchivesEncoding {
+    inner: StandardEncodings,
     reserved_attributes: HashSet<&'static str>,
     id_rnd_bytes: [u8; 8],
     id_seq_number: AtomicU32,
+    log_schema: &'static LogSchema,
 }
 
-impl DatadogArchiveEncoding {
+impl DatadogArchivesEncoding {
     /// Generates a unique event ID compatible with DD:
     /// - 18 bytes;
     /// - first 6 bytes represent a "now" timestamp in millis;
@@ -355,58 +337,61 @@ impl DatadogArchiveEncoding {
     }
 }
 
-impl Default for DatadogArchiveEncoding {
+impl Default for DatadogArchivesEncoding {
     fn default() -> Self {
         Self {
+            inner: StandardEncodings::Ndjson,
             reserved_attributes: RESERVED_ATTRIBUTES.to_vec().into_iter().collect(),
             id_rnd_bytes: thread_rng().gen::<[u8; 8]>(),
             id_seq_number: AtomicU32::new(0),
+            log_schema: log_schema(),
         }
     }
 }
 
-impl Encoder for DatadogArchiveEncoding {
+impl Encoder<Vec<Event>> for DatadogArchivesEncoding {
     /// Applies the following transformations to align event's schema with DD:
     /// - `_id` is generated in the sink(format described below);
     /// - `date` is set from the Global Log Schema's `timestamp` mapping, or to the current time if missing;
     /// - `message`,`host` are set from the corresponding Global Log Schema mappings;
     /// - `source`, `service`, `status`, `tags` and other reserved attributes are left as is;
     /// - the rest of the fields is moved to `attributes`.
-    fn encode_event(&self, event: Event, mut writer: &mut dyn Write) -> io::Result<()> {
-        let mut log_event = event.into_log();
+    fn encode_input(&self, mut input: Vec<Event>, writer: &mut dyn Write) -> io::Result<usize> {
+        for event in input.iter_mut() {
+            let log_event = event.as_mut_log();
 
-        log_event.insert("_id", self.generate_log_id());
+            log_event.insert("_id", self.generate_log_id());
 
-        let timestamp = log_event
-            .remove(crate::config::log_schema().timestamp_key())
-            .unwrap_or_else(|| chrono::Utc::now().timestamp_millis().into());
-        log_event.insert(
-            "date",
-            timestamp
-                .as_timestamp()
-                .cloned()
-                .unwrap_or_else(chrono::Utc::now)
-                .to_rfc3339_opts(SecondsFormat::Millis, true),
-        );
-        log_event.rename_key_flat(crate::config::log_schema().message_key(), "message");
-        log_event.rename_key_flat(crate::config::log_schema().host_key(), "host");
+            let timestamp = log_event
+                .remove(self.log_schema.timestamp_key())
+                .unwrap_or_else(|| chrono::Utc::now().timestamp_millis().into());
+            log_event.insert(
+                "date",
+                timestamp
+                    .as_timestamp()
+                    .cloned()
+                    .unwrap_or_else(chrono::Utc::now)
+                    .to_rfc3339_opts(SecondsFormat::Millis, true),
+            );
+            log_event.rename_key_flat(self.log_schema.message_key(), "message");
+            log_event.rename_key_flat(self.log_schema.host_key(), "host");
 
-        let mut attributes = BTreeMap::new();
-        let custom_attributes: Vec<String> = log_event
-            .as_map()
-            .keys()
-            .filter(|&path| !self.reserved_attributes.contains(path.as_str()))
-            .map(|v| v.to_owned())
-            .collect();
-        for path in custom_attributes {
-            if let Some(value) = log_event.remove(&path) {
-                attributes.insert(path, value);
+            let mut attributes = BTreeMap::new();
+            let custom_attributes: Vec<String> = log_event
+                .as_map()
+                .keys()
+                .filter(|&path| !self.reserved_attributes.contains(path.as_str()))
+                .map(|v| v.to_owned())
+                .collect();
+            for path in custom_attributes {
+                if let Some(value) = log_event.remove(&path) {
+                    attributes.insert(path, value);
+                }
             }
+            log_event.insert("attributes", attributes);
         }
-        log_event.insert("attributes", attributes);
 
-        let _ = serde_json::to_writer(&mut writer, &log_event)?;
-        writer.write_all(b"\n")
+        self.inner.encode_input(input, writer)
     }
 }
 #[derive(Debug)]
@@ -414,14 +399,16 @@ struct DatadogS3RequestBuilder {
     bucket: String,
     key_prefix: Option<String>,
     config: S3Config,
+    encoding: DatadogArchivesEncoding,
 }
 
 impl DatadogS3RequestBuilder {
-    pub const fn new(bucket: String, key_prefix: Option<String>, config: S3Config) -> Self {
+    pub fn new(bucket: String, key_prefix: Option<String>, config: S3Config) -> Self {
         Self {
             bucket,
             key_prefix,
             config,
+            encoding: DatadogArchivesEncoding::default(),
         }
     }
 }
@@ -429,8 +416,18 @@ impl DatadogS3RequestBuilder {
 impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
     type Metadata = (String, usize, EventFinalizers);
     type Events = Vec<Event>;
+    type Encoder = DatadogArchivesEncoding;
     type Payload = Bytes;
     type Request = S3Request;
+    type Error = io::Error;
+
+    fn compression(&self) -> Compression {
+        DEFAULT_COMPRESSION
+    }
+
+    fn encoder(&self) -> &Self::Encoder {
+        &self.encoding
+    }
 
     fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
         let (partition_key, mut events) = input;
@@ -484,6 +481,8 @@ struct DatadogGcsRequestBuilder {
     acl: Option<HeaderValue>,
     storage_class: HeaderValue,
     metadata: Vec<(HeaderName, HeaderValue)>,
+    encoding: DatadogArchivesEncoding,
+    compression: Compression,
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
@@ -491,6 +490,8 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
     type Events = Vec<Event>;
     type Payload = Bytes;
     type Request = GcsRequest;
+    type Encoder = DatadogArchivesEncoding;
+    type Error = io::Error;
 
     fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
         let (partition_key, mut events) = input;
@@ -529,6 +530,14 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
             },
             finalizers,
         }
+    }
+
+    fn compression(&self) -> Compression {
+        self.compression
+    }
+
+    fn encoder(&self) -> &Self::Encoder {
+        &self.encoding
     }
 }
 
@@ -600,8 +609,8 @@ mod tests {
         log_mut.insert("timestamp", timestamp);
 
         let mut writer = Cursor::new(Vec::new());
-        let encoding = DatadogArchiveEncoding::default();
-        let _ = encoding.encode_event(event, &mut writer);
+        let encoding = DatadogArchivesEncoding::default();
+        let _ = encoding.encode_input(vec![event], &mut writer);
 
         let encoded = writer.into_inner();
         let json: BTreeMap<String, serde_json::Value> =
@@ -674,8 +683,8 @@ mod tests {
             .with_timezone(&Utc);
         log.insert("timestamp", timestamp);
 
-        let key_partitioner = DatadogArchivesSinkConfig::key_partitioner();
-        let key = key_partitioner
+        let partitioner = DatadogArchivesSinkConfig::build_partitioner();
+        let key = partitioner
             .partition(&log.into())
             .expect("key wasn't provided");
 
@@ -686,8 +695,8 @@ mod tests {
     fn generates_valid_id() {
         let log1 = Event::from("test event 1");
         let mut writer = Cursor::new(Vec::new());
-        let encoding = DatadogArchiveEncoding::default();
-        let _ = encoding.encode_event(log1, &mut writer);
+        let encoding = DatadogArchivesEncoding::default();
+        let _ = encoding.encode_input(vec![log1], &mut writer);
         let encoded = writer.into_inner();
         let json: BTreeMap<String, serde_json::Value> =
             serde_json::from_slice(encoded.as_slice()).unwrap();
@@ -701,7 +710,7 @@ mod tests {
         // check that id is different for the next event
         let log2 = Event::from("test event 2");
         let mut writer = Cursor::new(Vec::new());
-        let _ = encoding.encode_event(log2, &mut writer);
+        let _ = encoding.encode_input(vec![log2], &mut writer);
         let encoded = writer.into_inner();
         let json: BTreeMap<String, serde_json::Value> =
             serde_json::from_slice(encoded.as_slice()).unwrap();
@@ -718,8 +727,8 @@ mod tests {
     fn generates_date_if_missing() {
         let log = Event::from("test message");
         let mut writer = Cursor::new(Vec::new());
-        let encoding = DatadogArchiveEncoding::default();
-        let _ = encoding.encode_event(log, &mut writer);
+        let encoding = DatadogArchivesEncoding::default();
+        let _ = encoding.encode_input(vec![log], &mut writer);
         let encoded = writer.into_inner();
         let json: BTreeMap<String, serde_json::Value> =
             serde_json::from_slice(encoded.as_slice()).unwrap();
@@ -760,10 +769,8 @@ mod tests {
             .expect("invalid test case")
             .with_timezone(&Utc);
         log.as_mut_log().insert("timestamp", timestamp);
-        let key_partitioner = DatadogArchivesSinkConfig::key_partitioner();
-        let key = key_partitioner
-            .partition(&log)
-            .expect("key wasn't provided");
+        let partitioner = DatadogArchivesSinkConfig::build_partitioner();
+        let key = partitioner.partition(&log).expect("key wasn't provided");
 
         let request_builder = DatadogS3RequestBuilder::new(
             "dd-logs".into(),
@@ -784,9 +791,7 @@ mod tests {
         // check the the second batch has a different UUID
         let log2 = Event::new_empty_log();
 
-        let key = key_partitioner
-            .partition(&log2)
-            .expect("key wasn't provided");
+        let key = partitioner.partition(&log2).expect("key wasn't provided");
         let (metadata, _events) = request_builder.split_input((key, vec![log2]));
         let req = request_builder.build_request(metadata, fake_buf);
         let uuid2 = &req.key[expected_key_prefix.len()..req.key.len() - expected_key_ext.len()];
