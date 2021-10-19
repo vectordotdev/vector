@@ -97,17 +97,76 @@ would be usable even between different versions of Vector.
 - External buffers would be implemented with as little of a shim layer as possible.  While
   functioning like normal topology components, we don’t want to share code between them and existing
   sources/sinks.
-- Buffers as a whole would be tweaked to become the equivalent of a tower::Service:
-    - A normal in-memory buffer would simply be a straight-forward MPSC channel.
-    - A disk buffer, or external buffer, would also be represented by MPSC channels.
-    - Setting any buffer configuration to “overflow” mode would simply swap these channels around,
-      such that the sender side of the in-memory channel would stay unchanged, but the receiver side
-      that would normally be given would be replaced with the receiver side of the buffer
-      implementation used for overflow.
+- Buffers as a whole would be tweaked to become composable in the same style as `tower::Service`:
+    - All buffers would represent themselves via simple MPSC channels.
+    - Two new types, for sending and receiving, would be created as the public-facing side of a
+      buffer.  These types would provide a `Sink` and `Stream` implementation, respectively:
+
+      ```rust
+      struct BufferSender {
+        base: PollSender,
+        base_ready: bool,
+        overflow: Option<BufferSender>,
+        overflow_ready: bool,
+      }
+
+      struct BufferReceiver {
+        base: PollReceiver,
+        overflow: Option<BufferReceiver>,
+      }
+      ```
+    - The buffer wrapper types would coordinate how the internal buffer channels are used, such that
+      they were used in a cascading fashion:
+        ```rust
+        impl Sink<Event> for BufferSender {
+          fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            // Figure out if our base sender is ready, and if not, and we have an overflow sender configured, see if _they're_ ready.
+            match self.base.poll_ready(cx) {
+              Poll::Ready(Ok(())) => self.base_ready = true,
+              _ => if let Some(overflow) = self.overflow {
+                if let Poll::Ready(Ok(())) = overflow.poll_ready(cx) {
+                  self.overflow_ready = true;
+                }
+              }
+            }
+
+            // Some logic here to handle dropping the event or blocking.
+
+            // Either our base sender or overflow is ready, so can we proceed.
+            if self.base_ready || self.overflow_ready {
+              Poll::Ready(Ok(()))
+            } else {
+              Poll::Pending
+            }
+          }
+
+          fn start_send(self: Pin<&mut Self>, item: Item) -> Result<(), Self::Error> {
+            let result = if self.base_ready {
+              self.base.start_send(item)
+            } else if self.overflow_ready {
+              match self.overflow {
+                Some(overflow) => overflow.start_send(item),
+                None => Err("overflow ready but no overflow configured")
+              }
+            } else {
+              Err("called start_send without ready")
+            };
+
+            self.base_ready = false;
+            self.overflow_ready = false;
+            result
+          }
+        }
+        ```
+    - Thus, `BufferSender` and `BufferReceiver` would contain a "base" sender/receiver that
+      represents the "primary" buffer channel for that instance, with the ability to "overflow" to
+      another instance of `BufferSender`/`BufferReceiver`.  While `BufferSender` would try the base
+      sender first, and then the overflow sender, `BufferReceiver` would operate in reverse, trying
+      the overflow receiver first, then the base receiver
     - This design isn’t necessarily novel, but if designed right, allows us to arbitrarily augment
       the in-memory channel with an overflow strategy, potentially nested even further: in-memory
       overflowing to external overflowing to disk, etc.
-    - To tie back it back to tower::Service, in this sense, all implementations would share a common
+    - To tie back it back to `tower::Service`, in this sense, all implementations would share a common
       interface that allows them to be layered/wrapped in a generic way.
 - Augment the buffer configuration logic/types such that multiple buffers can be defined for a
   single sink, with enough logic so that we can parse both the old-style single buffer and the
@@ -203,8 +262,9 @@ cost.
   would live.
 - [ ] Create a new buffer builder that would allow us to do the aforementioned chained buffering.
 - [ ] Refactor the buffer configuration code so that it can be parsed both in the old and new style.
-- [ ] Rewrite the existing in-memory and disk buffer implementations so they can be wrapped by the
-  aforementioned sender/receiver types.
+- [ ] Rewrite the existing disk buffer implementation to the new append-only design.
+- [ ] Rewrite the existing in-memory implementations so it can be wrapped by the aforementioned
+  sender/receiver types.
 - [ ] Update the topology builder code to understand and use the new-style buffer configuration.
 - [ ] Write the first external buffer implementation.
 
