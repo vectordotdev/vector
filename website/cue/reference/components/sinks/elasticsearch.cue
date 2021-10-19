@@ -183,7 +183,8 @@ components: sinks: elasticsearch: {
 							syntax: "template"
 						}
 					}
-					common:      true
+					index: {
+						common:      true
 						description: "Index name to write events to."
 						required:    false
 						warnings: []
