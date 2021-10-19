@@ -17,8 +17,9 @@ https://vector.dev/docs/reference/configuration/sinks/elasticsearch/
 
 | Deprecated Field   | New Field             |
 | -----------        | -----------           |
+| `mode = normal`    | `mode = bulk`         |
 | `host`             | `endpoint`            |
-| `bulk_action`      | `normal.bulk_action`  |
-| `index`            | `normal.index`        |
+| `bulk_action`      | `bulk.action`         |
+| `index`            | `bulk.index`          |
 | `headers`          | `request.headers`     |
 

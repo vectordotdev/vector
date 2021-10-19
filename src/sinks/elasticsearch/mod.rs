@@ -51,13 +51,14 @@ pub enum ElasticSearchAuth {
 #[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum ElasticSearchMode {
-    Normal,
+    #[serde(alias = "normal")]
+    Bulk,
     DataStream,
 }
 
 impl Default for ElasticSearchMode {
     fn default() -> Self {
-        Self::Normal
+        Self::Bulk
     }
 }
 

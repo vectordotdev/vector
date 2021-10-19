@@ -161,15 +161,15 @@ components: sinks: elasticsearch: {
 				syntax: "template"
 			}
 		}
-		normal: {
+		bulk: {
 			common: true
-			description: "Options for the normal mode."
+			description: "Options for the bulk mode."
 			required: false
 			warnings: []
 			type: object: {
 				examples: []
 				options: {
-					bulk_action: {
+					action: {
 						common:      false
 						description: """
 							Action to use when making requests to the [Elasticsearch Bulk API](\(urls.elasticsearch_bulk)).
@@ -325,12 +325,12 @@ components: sinks: elasticsearch: {
 		}
 		mode: {
 			common:      true
-			description: "The type of index mechanism. If `data_stream` mode is enabled, the `bulk_action` is set to `create`."
+			description: "The type of index mechanism. If `data_stream` mode is enabled, the `bulk.action` is set to `create`."
 			required:    false
 			warnings: []
 			type: string: {
-				default: "normal"
-				examples: ["normal", "data_stream"]
+				default: "bulk"
+				examples: ["bulk", "data_stream"]
 				syntax: "literal"
 			}
 		}

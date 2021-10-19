@@ -42,10 +42,10 @@ pub struct ElasticSearchConfig {
     #[serde(alias = "host")]
     pub endpoint: String,
 
-    // Deprecated, use `normal.bulk_action` instead
+    // Deprecated, use `bulk.action` instead
     pub bulk_action: Option<String>,
 
-    // Deprecated, use `normal.index` instead
+    // Deprecated, use `bulk.index` instead
     pub index: Option<String>,
 
     // Deprecated, use `request.headers` instead.
@@ -73,7 +73,9 @@ pub struct ElasticSearchConfig {
     pub query: Option<HashMap<String, String>>,
     pub aws: Option<RegionOrEndpoint>,
     pub tls: Option<TlsOptions>,
-    pub normal: Option<NormalConfig>,
+
+    #[serde(alias = "normal")]
+    pub bulk: Option<BulkConfig>,
     pub data_stream: Option<DataStreamConfig>,
     pub metrics: Option<MetricToLogConfig>,
 }
@@ -92,9 +94,9 @@ impl ElasticSearchConfig {
             warn!("ES sink config option `bulk_action` is deprecated. Use `normal.bulk_action` instead");
         }
         Ok(self
-            .normal
+            .bulk
             .as_ref()
-            .and_then(|n| n.bulk_action.as_deref())
+            .and_then(|n| n.action.as_deref())
             .or_else(|| self.bulk_action.as_deref())
             .map(|value| Template::try_from(value).context(BatchActionTemplate))
             .transpose()?)
@@ -105,18 +107,18 @@ impl ElasticSearchConfig {
             warn!("ES sink config option `index` is deprecated. Use `normal.index` instead");
         }
         let index = self
-            .normal
+            .bulk
             .as_ref()
             .and_then(|n| n.index.as_deref())
             .or_else(|| self.index.as_deref())
             .map(String::from)
-            .unwrap_or_else(NormalConfig::default_index);
+            .unwrap_or_else(BulkConfig::default_index);
         Ok(Template::try_from(index.as_str()).context(IndexTemplate)?)
     }
 
     pub fn common_mode(&self) -> crate::Result<ElasticSearchCommonMode> {
         match self.mode {
-            ElasticSearchMode::Normal => {
+            ElasticSearchMode::Bulk => {
                 let index = self.index()?;
                 let bulk_action = self.bulk_action()?;
                 Ok(ElasticSearchCommonMode::Normal { index, bulk_action })
@@ -130,12 +132,13 @@ impl ElasticSearchConfig {
 
 #[derive(Deserialize, Serialize, Clone, Default, Debug)]
 #[serde(rename_all = "snake_case")]
-pub struct NormalConfig {
-    bulk_action: Option<String>,
+pub struct BulkConfig {
+    #[serde(alias = "bulk_action")]
+    action: Option<String>,
     index: Option<String>,
 }
 
-impl NormalConfig {
+impl BulkConfig {
     fn default_index() -> String {
         "vector-%Y.%m.%d".into()
     }
