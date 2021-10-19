@@ -20,7 +20,6 @@ dns-lookup = { version = "1.0.8", optional = true }
 grok = { version = "1", optional = true }
 hex = { version = "0.4", optional = true }
 hostname = { version = "0.3", optional = true }
-# pinned due to https://github.com/tkaitchuck/aHash/issues/95
 indexmap = { version = "~1.7.0", default-features = false, optional = true}
 lazy_static = { version = "1", optional = true }
 md-5 = { version = "0.9", optional = true }
