@@ -40,7 +40,7 @@ components: transforms: regex_parser: {
 			"""
 			\(regex_parser._remap_deprecation_notice)
 
-			```vrl
+			```coffee
 			.message = parse_regex(.message, r'(?P<number>.*?) group')
 			```
 			""",

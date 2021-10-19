@@ -1,5 +1,3 @@
-// ## skip check-events ##
-
 use crate::event::metric::{MetricKind, MetricValue};
 use metrics::counter;
 use serde_json::Error;
@@ -29,11 +27,14 @@ impl InternalEvent for SplunkEventEncodeError {
         error!(
             message = "Error encoding Splunk HEC event to JSON.",
             error = ?self.error,
+            error_type = "encode_failed",
+            stage = "processing",
             internal_log_rate_secs = 30,
         );
     }
 
     fn emit_metrics(&self) {
+        counter!("component_errors_total", 1, "error_type" => "encode_failed", "stage" => "processing");
         counter!("encode_errors_total", 1);
     }
 }
@@ -66,20 +67,6 @@ mod source {
     use vector_core::internal_event::InternalEvent;
 
     #[derive(Debug)]
-    pub struct SplunkHecEventReceived;
-
-    impl InternalEvent for SplunkHecEventReceived {
-        fn emit_logs(&self) {
-            trace!(message = "Received one event.");
-        }
-
-        fn emit_metrics(&self) {
-            counter!("component_received_events_total", 1);
-            counter!("events_in_total", 1);
-        }
-    }
-
-    #[derive(Debug)]
     pub struct SplunkHecRequestReceived<'a> {
         pub path: &'a str,
     }
@@ -99,20 +86,24 @@ mod source {
     }
 
     #[derive(Debug)]
-    pub struct SplunkHecRequestBodyInvalid {
+    pub struct SplunkHecRequestBodyInvalidError {
         pub error: std::io::Error,
     }
 
-    impl InternalEvent for SplunkHecRequestBodyInvalid {
+    impl InternalEvent for SplunkHecRequestBodyInvalidError {
         fn emit_logs(&self) {
             error!(
                 message = "Invalid request body.",
                 error = ?self.error,
+                error_type = "parse_failed",
+                stage = "processing",
                 internal_log_rate_secs = 10
             );
         }
 
-        fn emit_metrics(&self) {}
+        fn emit_metrics(&self) {
+            counter!("component_errors_total", 1, "error_type" => "parse_failed", "stage" => "processing")
+        }
     }
 
     #[derive(Debug)]
@@ -125,12 +116,15 @@ mod source {
             error!(
                 message = "Error processing request.",
                 error = ?self.error,
+                error_type = "http_error",
+                stage = "receiving",
                 internal_log_rate_secs = 10
             );
         }
 
         fn emit_metrics(&self) {
             counter!("http_request_errors_total", 1);
+            counter!("component_errors_total", 1, "error_type" => "http_error", "stage" => "receiving")
         }
     }
 }

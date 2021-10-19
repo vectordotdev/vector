@@ -19,11 +19,17 @@ thread_local!(
     static EVENTS_RECORDED: RefCell<HashSet<String>> = RefCell::new(Default::default());
 );
 
-/// The standard set of tags for sources that communicate over HTTP.
-pub const HTTP_SOURCE_TAGS: [&str; 2] = ["endpoint", "protocol"];
+/// The standard set of tags for sources that poll connections over HTTP.
+pub const HTTP_PULL_SOURCE_TAGS: [&str; 2] = ["endpoint", "protocol"];
+
+/// The standard set of tags for sources that accept connections over HTTP.
+pub const HTTP_PUSH_SOURCE_TAGS: [&str; 2] = ["http_path", "protocol"];
 
 /// The standard set of tags for all `TcpSource`-based sources.
 pub const TCP_SOURCE_TAGS: [&str; 2] = ["peer_addr", "protocol"];
+
+/// The standard set of tags for all sinks that write a file.
+pub const FILE_SINK_TAGS: [&str; 2] = ["file", "protocol"];
 
 /// The standard set of tags for all `HttpSink`-based sinks.
 pub const HTTP_SINK_TAGS: [&str; 2] = ["endpoint", "protocol"];

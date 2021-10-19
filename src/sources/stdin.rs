@@ -9,6 +9,7 @@ use crate::{
 };
 use async_stream::stream;
 use bytes::Bytes;
+use chrono::Utc;
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::{io, thread};
@@ -125,13 +126,16 @@ where
                             count: events.len()
                         });
 
+                        let now = Utc::now();
+
                         for mut event in events {
                             let log = event.as_mut_log();
 
-                            log.insert(log_schema().source_type_key(), Bytes::from("stdin"));
+                            log.try_insert(log_schema().source_type_key(), Bytes::from("stdin"));
+                            log.try_insert(log_schema().timestamp_key(), now);
 
                             if let Some(hostname) = &hostname {
-                                log.insert(&host_key, hostname.clone());
+                                log.try_insert(&host_key, hostname.clone());
                             }
 
                             yield event;

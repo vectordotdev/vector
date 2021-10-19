@@ -40,7 +40,7 @@ components: transforms: grok_parser: {
 			"""
 			\(grok_parser._remap_deprecation_notice)
 
-			```vrl
+			```coffee
 			.message = parse_grok(.message, "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}")
 			```
 			""",

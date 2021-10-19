@@ -221,7 +221,7 @@ fn encode_events(
     metrics: Vec<Metric>,
 ) -> EncodedEvent<String> {
     let mut output = String::new();
-    let byte_size = metrics.iter().map(|metric| metric.size_of()).sum();
+    let byte_size = metrics.size_of();
     for metric in metrics.into_iter() {
         let (series, data, _metadata) = metric.into_parts();
         let namespace = series

@@ -216,9 +216,8 @@ fn apache_metrics(
                                     })
                                     .collect::<Vec<_>>();
 
-                                let byte_size = metrics.iter().map(ByteSizeOf::size_of).sum();
                                 emit!(&ApacheMetricsEventsReceived {
-                                    byte_size,
+                                    byte_size: metrics.size_of(),
                                     count: metrics.len(),
                                     endpoint: &sanitized_url,
                                 });
@@ -275,7 +274,7 @@ mod test {
     use super::*;
     use crate::{
         config::SourceConfig,
-        test_util::components::{self, HTTP_SOURCE_TAGS, SOURCE_TESTS},
+        test_util::components::{self, HTTP_PULL_SOURCE_TAGS, SOURCE_TESTS},
         test_util::{collect_ready, next_addr, wait_for_tcp},
         Error,
     };
@@ -369,7 +368,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             .map(|e| e.into_metric())
             .collect::<Vec<_>>();
 
-        SOURCE_TESTS.assert(&HTTP_SOURCE_TAGS);
+        SOURCE_TESTS.assert(&HTTP_PULL_SOURCE_TAGS);
 
         match metrics.iter().find(|m| m.name() == "up") {
             Some(m) => {
