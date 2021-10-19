@@ -1,6 +1,6 @@
 use super::{
     builder::ConfigBuilder, format, validation, vars, ComponentKey, Config, ConfigPath, Format,
-    FormatHint, TransformOuter,
+    FormatHint, SinkOuter, TransformOuter,
 };
 use crate::signal;
 use glob::glob;
@@ -148,15 +148,33 @@ fn load_builder_from_file(
     }
 }
 
+fn component_name(path: &Path) -> Result<String, Vec<String>> {
+    path.file_stem()
+        .and_then(|name| name.to_str())
+        .map(|name| name.to_string())
+        .ok_or_else(|| vec![format!("Couldn't get component name for file: {:?}", path)])
+}
+
+fn load_sinks_from_file(
+    path: &Path,
+    builder: &mut ConfigBuilder,
+) -> Result<Vec<String>, Vec<String>> {
+    let name = component_name(path)?;
+    if let Some(file) = open_config(path) {
+        let format = Format::from_path(path).ok();
+        let (sink, warnings): (SinkOuter<String>, Vec<String>) = load(file, format)?;
+        builder.sinks.insert(ComponentKey::from(name), sink);
+        Ok(warnings)
+    } else {
+        Ok(Vec::new())
+    }
+}
+
 fn load_transforms_from_file(
     path: &Path,
     builder: &mut ConfigBuilder,
 ) -> Result<Vec<String>, Vec<String>> {
-    let name = path
-        .file_stem()
-        .and_then(|name| name.to_str())
-        .map(|name| name.to_string())
-        .ok_or_else(|| vec![format!("Couldn't get component name for file: {:?}", path)])?;
+    let name = component_name(path)?;
     if let Some(file) = open_config(path) {
         let format = Format::from_path(path).ok();
         let (transform, warnings): (TransformOuter<String>, Vec<String>) = load(file, format)?;
@@ -169,16 +187,17 @@ fn load_transforms_from_file(
     }
 }
 
-fn load_transforms_from_dir(
+fn load_components_from_dir<F>(
     path: &Path,
     builder: &mut ConfigBuilder,
-) -> Result<Vec<String>, Vec<String>> {
-    let readdir = path.read_dir().map_err(|err| {
-        vec![format!(
-            "Could not read transforms dir: {:?}, {}.",
-            path, err
-        )]
-    })?;
+    loader: F,
+) -> Result<Vec<String>, Vec<String>>
+where
+    F: Fn(&Path, &mut ConfigBuilder) -> Result<Vec<String>, Vec<String>>,
+{
+    let readdir = path
+        .read_dir()
+        .map_err(|err| vec![format!("Could not read config dir: {:?}, {}.", path, err)])?;
     let mut warnings = Vec::new();
     let mut errors = Vec::new();
     for res in readdir {
@@ -186,7 +205,7 @@ fn load_transforms_from_dir(
             Ok(direntry) => {
                 let entry_path = direntry.path();
                 if entry_path.is_file() {
-                    match load_transforms_from_file(&direntry.path(), builder) {
+                    match loader(&direntry.path(), builder) {
                         Ok(warns) => warnings.extend(warns),
                         Err(errs) => errors.extend(errs),
                     }
@@ -228,10 +247,16 @@ fn load_builder_from_dir(
                 } else if entry_path.is_dir() {
                     let result = match direntry.file_name().to_str() {
                         Some("enrichment_tables") => unimplemented!(),
-                        Some("sinks") => unimplemented!(),
+                        Some("sinks") => {
+                            load_components_from_dir(&entry_path, builder, load_sinks_from_file)
+                        }
                         Some("sources") => unimplemented!(),
                         Some("tests") => unimplemented!(),
-                        Some("transforms") => load_transforms_from_dir(&entry_path, builder),
+                        Some("transforms") => load_components_from_dir(
+                            &entry_path,
+                            builder,
+                            load_transforms_from_file,
+                        ),
                         Some(name) => {
                             // ignore hidden folders
                             if !name.starts_with('.') {
@@ -385,5 +410,8 @@ mod tests {
         assert!(builder
             .transforms
             .contains_key(&ComponentKey::from("apache_parser")));
+        assert!(builder
+            .sinks
+            .contains_key(&ComponentKey::from("es_cluster")));
     }
 }
