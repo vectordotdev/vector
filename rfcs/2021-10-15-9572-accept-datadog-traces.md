@@ -61,8 +61,8 @@ N/A
 
 ### In scope
 
-* Ingest traces from the trace-agent (`datadog_trace` source)
-* Send traces to the Datadog trace endpoint (`datadog_trace` sink)
+* Ingest traces from the trace-agent in the `datadog_agent` source
+* Send traces to the Datadog trace endpoint through a new `datadog_trace` sink
 * Basic operation on traces: filtering, routing
 * Pave the way for OpenTelemetry traces
 
@@ -76,7 +76,7 @@ N/A
   used by the trace-agent is derived from the local config to programmatically discover the main agent, thus there is no
   existing knob to force the trace agent to send metrics to a custom dogstatsd host)
 * Span extraction, filtering
-* Other sources & sinks for traces than `datadog_trace`
+* Other sources & sinks for traces than `datadog_agent` source & `datadog_trace` sink
 
 ## Pain
 
@@ -88,7 +88,7 @@ N/A
 ### User Experience
 
 * User will be able to ingest traces from the trace agent
-  * Vector config would then consist of: `datadog_trace` source -> some filtering/enrichment transform ->
+  * Vector config would then consist of: `datadog_agent` source -> some filtering/enrichment transform ->
     `datadog_trace` sink
   * Datadog trace agent can be configured to send traces to any arbitrary endpoint using `apm_config.apm_dd_url` [config
     key](https://github.com/DataDog/datadog-agent/blob/34a5589/pkg/config/apm.go#L61-L87)
@@ -101,7 +101,7 @@ new member of the `Event` enum. As it would be implemented in vector-core, it's 
 vendor agnostic, so basing it on the [OpenTelemetry trace
 format](https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/trace/v1/trace.proto) with
 additional fields as required is probably a safe option. Overall, there is no huge discrepancy between Datadog traces
-and OpenTelemetry traces (The trace-agent already offer
+and OpenTelemetry traces (The trace-agent already offers
 [OLTP->Datadog](https://github.com/DataDog/datadog-agent/blob/637b43e/pkg/trace/api/otlp.go#L305-L377) conversion). The
 main difference is that Datadog spans come with a string/double map containing metrics and a string/string map for some
 metadata whereas OTLP traces come with a list of key/value (value mimics json values). The easiest way do deal with that
@@ -113,7 +113,7 @@ to support standalone spans/or single span traces.
 
 Based on the aforementioned work a source & sink would then be added to Vector:
 
-* A `datadog_trace` source that decodes incoming [gzip'ed protobuf over
+* A `datadog_agent` addition that decodes incoming [gzip'ed protobuf over
   http](https://github.com/DataDog/datadog-agent/blob/8b63d85/pkg/trace/writer/trace.go#L230-L269) to the internal
   represention implemented in the prior step. .proto files are located in the [datadog-agent
   repository](https://github.com/DataDog/datadog-agent/blob/0a19a75/pkg/trace/pb/trace_payload.proto)
@@ -154,7 +154,8 @@ Datadog API key management would be the same as it is for Datadog logs & metrics
 ## Plan Of Attack
 
 * [ ] Submit a PR introducing the trace event type
-* [ ] Submit a PR introducing the `datadog_trace` source & sink
+* [ ] Submit a PR introducing traces support in the `datadog_agent` source
+* [ ] Submit a PR introducing the `datadog_trace` sink
 
 ## Future Improvements
 
@@ -166,3 +167,5 @@ Datadog API key management would be the same as it is for Datadog logs & metrics
   agent](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/04f97ec/exporter/datadogexporter/config/config.go#L288-L290)
 * Traces helpers in VRL
 * Trace-agent configuration with a `vector.traces.url` & `vector.traces.enabled`
+* In some situation disabling certain datatypes/only enabling one datatype for the `datadog_agent` might be useful, so
+  introducing a config list like: `accept: [metrics, traces]` might be desirable for some users
