@@ -51,16 +51,39 @@ enum BuildError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DatadogMetricsEndpoint {
     Series,
-    Distribution,
-    Sketch,
+    Sketches,
 }
 
 impl DatadogMetricsEndpoint {
+    /// Gets the content type associated with the specific encoder for a given metric endpoint.
     pub fn content_type(&self) -> &'static str {
         match self {
             DatadogMetricsEndpoint::Series => "application/json",
-            DatadogMetricsEndpoint::Distribution => "application/json",
-            DatadogMetricsEndpoint::Sketch => "application/x-protobuf",
+            DatadogMetricsEndpoint::Sketches => "application/x-protobuf",
+        }
+    }
+}
+
+/// Maps Datadog metric endpoints to their actual URI.
+pub struct DatadogMetricsEndpointConfiguration {
+    series_endpoint: Uri,
+    sketches_endpoint: Uri,
+}
+
+impl DatadogMetricsEndpointConfiguration {
+    /// Creates a new `DatadogMEtricsEndpointConfiguration`.
+    pub fn new(series_endpoint: Uri, sketches_endpoint: Uri) -> Self {
+        Self {
+            series_endpoint,
+            sketches_endpoint,
+        }
+    }
+
+    /// Gets the URI for the given Datadog metrics endpoint.
+    pub fn get_uri_for_endpoint(&self, endpoint: DatadogMetricsEndpoint) -> Uri {
+        match endpoint {
+            DatadogMetricsEndpoint::Series => self.series_endpoint.clone(),
+            DatadogMetricsEndpoint::Sketches => self.sketches_endpoint.clone(),
         }
     }
 }
@@ -129,18 +152,18 @@ impl DatadogMetricsConfig {
         })
     }
 
-    /// Generates the full URIs to use for the various type-specific metrics endpoints.
-    fn generate_metric_endpoints(&self) -> crate::Result<Vec<(DatadogMetricsEndpoint, Uri)>> {
+    /// Generates the `DatadogMetricsEndpointConfiguration`, used for mapping endpoints to their URI.
+    fn generate_metrics_endpoint_configuration(
+        &self,
+    ) -> crate::Result<DatadogMetricsEndpointConfiguration> {
         let base_uri = self.get_base_agent_endpoint();
         let series_endpoint = build_uri(&base_uri, "/api/v1/series")?;
-        let distribution_endpoint = build_uri(&base_uri, "/api/v1/distribution_points")?;
-        let sketch_endpoint = build_uri(&base_uri, "/api/beta/sketches")?;
+        let sketches_endpoint = build_uri(&base_uri, "/api/beta/sketches")?;
 
-        Ok(vec![
-            (DatadogMetricsEndpoint::Series, series_endpoint),
-            (DatadogMetricsEndpoint::Distribution, distribution_endpoint),
-            (DatadogMetricsEndpoint::Sketch, sketch_endpoint),
-        ])
+        Ok(DatadogMetricsEndpointConfiguration::new(
+            series_endpoint,
+            sketches_endpoint,
+        ))
     }
 
     /// Gets the base URI of the Datadog API.
@@ -178,13 +201,13 @@ impl DatadogMetricsConfig {
             .into_batcher_settings()?;
 
         let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
-        let metric_endpoints = self.generate_metric_endpoints()?;
+        let endpoint_configuration = self.generate_metrics_endpoint_configuration()?;
         let service = ServiceBuilder::new()
             .settings(request_limits, DatadogMetricsRetryLogic)
             .service(DatadogMetricsService::new(client, self.api_key.as_str()));
 
         let request_builder = DatadogMetricsRequestBuilder::new(
-            metric_endpoints,
+            endpoint_configuration,
             self.default_namespace.clone(),
         );
 

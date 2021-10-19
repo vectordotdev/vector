@@ -4,7 +4,7 @@ use core_common::byte_size_of::ByteSizeOf;
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 
-use crate::event::metric::Bucket;
+use crate::event::{metric::Bucket, Metric, MetricValue};
 
 const AGENT_DEFAULT_BIN_LIMIT: u16 = 4096;
 const AGENT_DEFAULT_EPS: f64 = 1.0 / 128.0;
@@ -631,6 +631,44 @@ impl AgentDDSketch {
         trim_left(&mut temp, self.config.bin_limit);
 
         self.bins = temp;
+    }
+
+    /// Converts a `Metric` to a sketch representation, if possible, using `AgentDDSketch`.
+    ///
+    /// For certain types of metric values, such as distributions or aggregated histograms, we can
+    /// easily convert them to a sketch-based representation.  Rather than push the logic of how to
+    /// do that up to callers that wish to use a sketch-based representation, we bundle it here as a
+    /// free function on `AgentDDSketch` itself.
+    ///
+    /// If the metric value cannot be represented as a sketch -- essentially, everything that isn't
+    /// a distribution or aggregated histogram -- then the metric is passed back unmodified.  All
+    /// existing metadata -- series name, tags, timestamp, etc -- is left unmodified, even if the
+    /// metric is converted to a sketch internally.
+    pub fn transform_to_sketch(mut metric: Metric) -> Metric {
+        let sketch = match metric.data_mut().value_mut() {
+            MetricValue::Distribution { samples, .. } if !samples.is_empty() => {
+                let mut sketch = AgentDDSketch::with_agent_defaults();
+                for sample in samples {
+                    sketch.insert_n(sample.value, sample.rate);
+                }
+                Some(sketch)
+            }
+            MetricValue::AggregatedHistogram { buckets, count, .. } if *count != 0 => {
+                let delta_buckets = mem::replace(buckets, Vec::new());
+                let mut sketch = AgentDDSketch::with_agent_defaults();
+                sketch.insert_interpolate_buckets(delta_buckets);
+                Some(sketch)
+            }
+            // We can't convert from any other metric value.
+            _ => None,
+        };
+
+        match sketch {
+            // Metric was not able to be converted to a sketch, so pass it back.
+            None => metric,
+            // Metric was able to be converted to a sketch, so adjust the value.
+            Some(sketch) => metric.with_value(sketch.into()),
+        }
     }
 }
 

@@ -20,7 +20,7 @@ pub struct Metric {
     #[serde(flatten)]
     pub(super) series: MetricSeries,
 
-    #[getset(get = "pub")]
+    #[getset(get = "pub", get_mut = "pub")]
     #[serde(flatten)]
     pub(super) data: MetricData,
 
@@ -226,6 +226,14 @@ impl ByteSizeOf for MetricValue {
             Self::AggregatedHistogram { buckets, .. } => buckets.allocated_bytes(),
             Self::AggregatedSummary { quantiles, .. } => quantiles.allocated_bytes(),
             Self::Sketch { sketch } => sketch.allocated_bytes(),
+        }
+    }
+}
+
+impl From<AgentDDSketch> for MetricValue {
+    fn from(ddsketch: AgentDDSketch) -> Self {
+        MetricValue::Sketch {
+            sketch: MetricSketch::AgentDDSketch(ddsketch),
         }
     }
 }

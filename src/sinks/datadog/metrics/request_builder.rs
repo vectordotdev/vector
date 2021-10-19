@@ -1,35 +1,28 @@
 use bytes::Bytes;
-use http::Uri;
 use vector_core::event::{EventFinalizers, Finalizable, Metric};
 
 use super::{
-    config::DatadogMetricsEndpoint,
+    config::{DatadogMetricsEndpoint, DatadogMetricsEndpointConfiguration},
     encoder::{DatadogMetricsEncoder, EncoderError},
     service::DatadogMetricsRequest,
 };
 use crate::sinks::util::IncrementalRequestBuilder;
 
+/// Incremental request builder specific to Datadog metrics.
 pub struct DatadogMetricsRequestBuilder {
-    endpoint_uri_mappings: Vec<(DatadogMetricsEndpoint, Uri)>,
+    endpoint_configuration: DatadogMetricsEndpointConfiguration,
     default_namespace: Option<String>,
 }
 
 impl DatadogMetricsRequestBuilder {
     pub fn new(
-        endpoint_uri_mappings: Vec<(DatadogMetricsEndpoint, Uri)>,
+        endpoint_configuration: DatadogMetricsEndpointConfiguration,
         default_namespace: Option<String>,
     ) -> Self {
         Self {
-            endpoint_uri_mappings,
+            endpoint_configuration,
             default_namespace,
         }
-    }
-
-    fn get_endpoint_uri(&self, endpoint: DatadogMetricsEndpoint) -> Option<Uri> {
-        self.endpoint_uri_mappings
-            .iter()
-            .find(|e| e.0 == endpoint)
-            .map(|e| e.1.clone())
     }
 }
 
@@ -52,8 +45,7 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
         let mut pending = None;
         while metric_drain.len() != 0 {
             let mut n = 0;
-            let mut encoder =
-                DatadogMetricsEncoder::new(endpoint, self.default_namespace.clone())?;
+            let mut encoder = DatadogMetricsEncoder::new(endpoint, self.default_namespace.clone())?;
 
             loop {
                 // Grab the previously pending metric, or the next metric from the drain.
@@ -126,9 +118,7 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
         let (endpoint, batch_size, finalizers) = metadata;
-        let uri = self
-            .get_endpoint_uri(endpoint)
-            .expect("unable to find URI for metric endpoint");
+        let uri = self.endpoint_configuration.get_uri_for_endpoint(endpoint);
 
         DatadogMetricsRequest {
             payload,
@@ -140,6 +130,11 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
     }
 }
 
+/// Simple encoder implementation that doesn't try to split.
+///
+/// This is required because the issues mentioned in `DatadogMetricsRequestBuilder` with not being
+/// able to _actually_ encode Protocol Buffers data incrementally.  We split batches that end up
+/// being too large, and simply try to encode them here: in isolation, without further splitting.
 fn encode_now_or_never(
     metrics: Vec<Metric>,
     endpoint: DatadogMetricsEndpoint,

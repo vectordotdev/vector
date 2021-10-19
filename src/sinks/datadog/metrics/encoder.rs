@@ -123,21 +123,14 @@ impl DatadogMetricsEncoder {
         )
     }
 
-    fn encode_metric_for_endpoint(
-        &mut self,
-        metric: &Metric,
-    ) -> Result<usize, EncoderError> {
+    fn encode_metric_for_endpoint(&mut self, metric: &Metric) -> Result<usize, EncoderError> {
         match self.endpoint {
             DatadogMetricsEndpoint::Series => self.encode_series_metric(metric),
-            DatadogMetricsEndpoint::Distribution => self.encode_distribution_metric(metric),
-            DatadogMetricsEndpoint::Sketch => self.encode_sketch_metric(metric),
+            DatadogMetricsEndpoint::Sketches => self.encode_sketch_metric(metric),
         }
     }
 
-    fn encode_series_metric(
-        &mut self,
-        metric: &Metric,
-    ) -> Result<usize, EncoderError> {
+    fn encode_series_metric(&mut self, metric: &Metric) -> Result<usize, EncoderError> {
         let namespaced_name = self.get_namespaced_name(metric);
         let ts = encode_timestamp(metric.timestamp());
         let tags = metric.tags().map(encode_tags);
@@ -180,17 +173,7 @@ impl DatadogMetricsEncoder {
         result.map_err(Into::into).context(Io)
     }
 
-    fn encode_distribution_metric(
-        &self,
-        _metric: &Metric,
-    ) -> Result<usize, EncoderError> {
-        todo!()
-    }
-
-    fn encode_sketch_metric(
-        &self,
-        _metric: &Metric,
-    ) -> Result<usize, EncoderError> {
+    fn encode_sketch_metric(&self, _metric: &Metric) -> Result<usize, EncoderError> {
         // We don't write anything here because sketches are encoded in `DatadogMetricsEncoder::pre_finish`.
         Ok(0)
     }
@@ -280,10 +263,10 @@ impl DatadogMetricsEncoder {
         // sketches would overflow our limits, and if so, we pass back all of the metrics.  This
         // allows the caller to try and split the batch the split and try to run through the
         // encoding process again.
-        
+
         // Only go through this if we're targeting the sketch endpoint.
-        if !(matches!(self.endpoint, DatadogMetricsEndpoint::Sketch)) {
-            return Ok(())
+        if !(matches!(self.endpoint, DatadogMetricsEndpoint::Sketches)) {
+            return Ok(());
         }
 
         let mut sketches = Vec::new();
