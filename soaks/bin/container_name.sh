@@ -21,10 +21,9 @@ fi
 SOAK_NAME="${1:-}"
 COMMIT_SHA="${2:-}"
 
-SOAK_DIR="${SOAK_ROOT}/${SOAK_NAME}"
-# Shellcheck cannot follow dynamic paths properly.
 # shellcheck disable=SC1091
-. "${SOAK_DIR}/FEATURES"
+. "${SOAK_ROOT}/${SOAK_NAME}/FEATURES"
+
 FEATURE_SHA=$(echo -n "${FEATURES}" | sha256sum - | head -c40)
 IMAGE="vector:${COMMIT_SHA}-${FEATURE_SHA}"
 
