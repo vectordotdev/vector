@@ -33,7 +33,7 @@ impl_generate_config_from_default!(ThrottleConfig);
 #[typetag::serde(name = "throttle")]
 impl TransformConfig for ThrottleConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Throttle::new(self, context, clock::MonotonicClock).map(Transform::task)
+        Throttle::new(self, context, &clock::MonotonicClock).map(Transform::task)
     }
 
     fn input_type(&self) -> DataType {
@@ -50,15 +50,15 @@ impl TransformConfig for ThrottleConfig {
 }
 
 #[derive(Clone)]
-pub struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
+pub struct Throttle<'a, C: clock::Clock<Instant = I>, I: clock::Reference> {
     quota: Quota,
     flush_keys_interval: Duration,
     key_field: Option<Template>,
     exclude: Option<Box<dyn Condition>>,
-    clock: C,
+    clock: &'a C,
 }
 
-impl<C, I> Throttle<C, I>
+impl<'a, C, I> Throttle<'a, C, I>
 where
     C: clock::Clock<Instant = I>,
     I: clock::Reference,
@@ -66,7 +66,7 @@ where
     pub fn new(
         config: &ThrottleConfig,
         context: &TransformContext,
-        clock: C,
+        clock: &'a C,
     ) -> crate::Result<Self> {
         let flush_keys_interval = Duration::from_secs_f64(config.window.clone());
 
@@ -97,9 +97,9 @@ where
     }
 }
 
-impl<C, I> TaskTransform for Throttle<C, I>
+impl<'a, C, I> TaskTransform for Throttle<'a, C, I>
 where
-    C: clock::Clock<Instant = I> + Send,
+    C: clock::Clock<Instant = I> + Send + Sync,
     I: clock::Reference + Send,
 {
     fn transform(
@@ -113,7 +113,7 @@ where
 
         let mut flush_stream = tokio::time::interval(Duration::from_millis(1000));
 
-        let limiter = RateLimiter::dashmap_with_clock(self.quota, &self.clock);
+        let limiter = RateLimiter::dashmap_with_clock(self.quota, self.clock);
 
         Box::pin(
             stream! {
@@ -199,7 +199,7 @@ window = 5
         )
         .unwrap();
 
-        let throttle = Throttle::new(&config, &TransformContext::default(), clock)
+        let throttle = Throttle::new(&config, &TransformContext::default(), &clock)
             .map(Transform::task)
             .unwrap();
 
