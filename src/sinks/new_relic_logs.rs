@@ -211,7 +211,7 @@ mod tests {
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
-        assert_eq!(http_config.request.tower.concurrency, Concurrency::Adaptive,);
+        assert_eq!(http_config.request.tower.concurrency, Concurrency::None);
         assert_eq!(
             http_config.request.tower.rate_limit_num,
             Some(RATE_LIMIT_NUM_DEFAULT)
