@@ -26,7 +26,7 @@ pub trait SinkBuilderExt: Stream {
         settings: BatcherSettings,
     ) -> Batcher<Self, P, ExpirationQueue<P::Key>>
     where
-        Self: Stream<Item = P::Item> + Sized + Unpin,
+        Self: Stream<Item = P::Item> + Sized,
         P: Partitioner + Unpin,
         P::Key: Eq + Hash + Clone,
         P::Item: ByteSizeOf,

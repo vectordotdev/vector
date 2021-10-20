@@ -1,4 +1,5 @@
 use std::hash::Hash;
+use std::marker::PhantomData;
 
 /// Calculate partitions for an item
 ///
@@ -14,4 +15,24 @@ pub trait Partitioner {
     /// in such a way that if two distinct `Item` instances partition to the
     /// same key they are mergable if put into the same collection by this key.
     fn partition(&self, item: &Self::Item) -> Self::Key;
+}
+
+/// This always returns `()` as the partition key, effectively disabling partitioning.
+/// This is useful if you want to use the `Batcher` but don't actually need partitioning.
+#[derive(Default)]
+pub struct NullPartitioner<T> {
+    item: PhantomData<T>,
+}
+
+impl<T> NullPartitioner<T> {
+    pub fn new() -> NullPartitioner<T> {
+        NullPartitioner { item: PhantomData }
+    }
+}
+
+impl<T> Partitioner for NullPartitioner<T> {
+    type Item = T;
+    type Key = ();
+
+    fn partition(&self, _item: &T) -> Self::Key {}
 }

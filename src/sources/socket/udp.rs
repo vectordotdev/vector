@@ -1,5 +1,6 @@
 use crate::{
     codecs::{self, Decoder, FramingConfig, ParserConfig},
+    config::log_schema,
     event::Event,
     internal_events::{SocketEventsReceived, SocketMode, SocketReceiveError},
     serde::{default_decoding, default_framing_message_based},
@@ -8,6 +9,7 @@ use crate::{
     udp, Pipeline,
 };
 use bytes::{Bytes, BytesMut};
+use chrono::Utc;
 use futures::{SinkExt, StreamExt};
 use getset::{CopyGetters, Getters};
 use serde::{Deserialize, Serialize};
@@ -105,14 +107,13 @@ pub fn udp(
                                     count: events.len()
                                 });
 
+                                let now = Utc::now();
+
                                 for mut event in events {
                                     if let Event::Log(ref mut log) = event {
-                                        log.insert(
-                                            crate::config::log_schema().source_type_key(),
-                                            Bytes::from("socket"),
-                                        );
-
-                                        log.insert(host_key.clone(), address.to_string());
+                                        log.try_insert(log_schema().source_type_key(), Bytes::from("socket"));
+                                        log.try_insert(log_schema().timestamp_key(), now);
+                                        log.try_insert(host_key.clone(), address.to_string());
                                     }
 
                                     tokio::select!{

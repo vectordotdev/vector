@@ -24,7 +24,7 @@ remap: errors: "630": {
 				"""#
 			diff: #"""
 				- 	format_timestamp!(to_timestamp("2021-01-17T23:27:31.891948Z"), format: "%v %R")
-				+# 	format_timestamp!(to_timestamp!("2021-01-17T23:27:31.891948Z"), format: "%v %R")
+				+ 	format_timestamp!(to_timestamp!("2021-01-17T23:27:31.891948Z"), format: "%v %R")
 				"""#
 		},
 	]

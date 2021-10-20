@@ -492,10 +492,7 @@ mod tests {
         trace_init();
 
         let client_settings = MaybeTlsSettings::from_config(&tls_config, false).unwrap();
-        let proto = match &tls_config {
-            Some(_) => "https",
-            None => "http",
-        };
+        let proto = client_settings.http_protocol_name();
 
         let address = next_addr();
         let config = PrometheusExporterConfig {

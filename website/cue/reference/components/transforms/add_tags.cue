@@ -31,7 +31,7 @@ components: transforms: add_tags: {
 			"""
 			\(add_tags._remap_deprecation_notice)
 
-			```vrl
+			```coffee
 			#".tag = "value""#
 			```
 			""",

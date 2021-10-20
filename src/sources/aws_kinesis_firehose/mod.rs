@@ -347,6 +347,7 @@ mod tests {
                 assert_event_data_eq!(
                     events,
                     vec![log_event! {
+                        "source_type" => Bytes::from("aws_kinesis_firehose"),
                         "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
                         "message"=> Bytes::from(expected),
                         "request_id" => request_id,
@@ -410,6 +411,7 @@ mod tests {
         assert_event_data_eq!(
             events,
             vec![log_event! {
+                "source_type" => Bytes::from("aws_kinesis_firehose"),
                 "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
                 "message"=> record,
                 "request_id" => request_id,

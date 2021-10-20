@@ -78,7 +78,7 @@ impl Finalizable for Metric {
     }
 }
 
-impl Finalizable for Vec<Event> {
+impl<T: Finalizable> Finalizable for Vec<T> {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.iter_mut()
             .fold(EventFinalizers::default(), |mut acc, x| {
@@ -349,6 +349,19 @@ impl From<LogEvent> for Event {
 impl From<Metric> for Event {
     fn from(metric: Metric) -> Self {
         Event::Metric(metric)
+    }
+}
+
+pub trait MaybeAsLogMut {
+    fn maybe_as_log_mut(&mut self) -> Option<&mut LogEvent>;
+}
+
+impl MaybeAsLogMut for Event {
+    fn maybe_as_log_mut(&mut self) -> Option<&mut LogEvent> {
+        match self {
+            Event::Log(log) => Some(log),
+            Event::Metric(_) => None,
+        }
     }
 }
 
