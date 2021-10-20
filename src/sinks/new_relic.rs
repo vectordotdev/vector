@@ -571,6 +571,7 @@ mod tests {
         
         assert_eq!(logs.len(), 1);
         assert_eq!(logs[0].get("tag_key").is_some(), true);
+        assert_eq!(logs[0].get("tag_key").unwrap().to_string_lossy(), "tag_value".to_owned());
         assert_eq!(logs[0].get("message").is_some(), true);
 
         // With message field
@@ -583,7 +584,9 @@ mod tests {
         
         assert_eq!(logs.len(), 1);
         assert_eq!(logs[0].get("tag_key").is_some(), true);
+        assert_eq!(logs[0].get("tag_key").unwrap().to_string_lossy(), "tag_value".to_owned());
         assert_eq!(logs[0].get("message").is_some(), true);
+        assert_eq!(logs[0].get("message").unwrap().to_string_lossy(), "This is a message".to_owned());
     }
 
     #[test]
@@ -595,7 +598,9 @@ mod tests {
 
         assert_eq!(metrics.len(), 1);
         assert_eq!(metrics[0].get("name").is_some(), true);
+        assert_eq!(metrics[0].get("name").unwrap().to_string_lossy(), "my_metric".to_owned());
         assert_eq!(metrics[0].get("value").is_some(), true);
+        assert_eq!(metrics[0].get("value").unwrap(), &Value::Float(100.0));
         assert_eq!(metrics[0].get("timestamp").is_some(), true);
 
         // With timestamp
@@ -612,9 +617,9 @@ mod tests {
 
         assert_eq!(metrics.len(), 1);
         assert_eq!(metrics[0].get("name").is_some(), true);
+        assert_eq!(metrics[0].get("name").unwrap().to_string_lossy(), "my_metric".to_owned());
         assert_eq!(metrics[0].get("value").is_some(), true);
+        assert_eq!(metrics[0].get("value").unwrap(), &Value::Float(100.0));
         assert_eq!(metrics[0].get("timestamp").is_some(), true);
     }
 }
-
-//TODO: integration tests
