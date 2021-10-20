@@ -1,6 +1,6 @@
 use crate::event::Event;
-use crate::sinks::splunk_hec::logs_new::encoder::HecLogsEncoder;
-use crate::sinks::splunk_hec::logs_new::sink::process_log;
+use crate::sinks::splunk_hec::logs::encoder::HecLogsEncoder;
+use crate::sinks::splunk_hec::logs::sink::process_log;
 use crate::template::Template;
 use chrono::Utc;
 use serde::Deserialize;

@@ -1,5 +1,5 @@
 pub mod config;
-mod encoder;
+pub mod encoder;
 #[cfg(all(test, feature = "splunk-integration-tests"))]
 mod integration_tests;
 mod retry;

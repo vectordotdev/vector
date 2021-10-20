@@ -1,12 +1,11 @@
 use crate::config::SinkDescription;
 
-pub mod common;
+mod common;
 mod conn;
 pub mod logs;
-pub mod logs_new;
 pub mod metrics;
 
-use logs_new::config::HecSinkLogsConfig;
+use logs::config::HecSinkLogsConfig;
 
 // legacy
 inventory::submit! {
