@@ -47,6 +47,8 @@ SOAK_NAME="${1:-}"
 COMMIT_SHA="${2:-}"
 
 SOAK_DIR="${SOAK_ROOT}/${SOAK_NAME}"
+# Shellcheck cannot follow dynamic paths properly.
+# shellcheck disable=SC1091
 . "${SOAK_DIR}/FEATURES"
 IMAGE=$(./bin/container_name.sh "${SOAK_NAME}" "${COMMIT_SHA}")
 docker image inspect "${IMAGE}" > /dev/null || build_vector "${IMAGE}" "${COMMIT_SHA}"

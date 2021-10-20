@@ -32,10 +32,10 @@ collect_samples() {
     local sample_idx=0
     while [ $sample_idx -ne $TOTAL_SAMPLES ]
     do
-        SAMPLE=$(curl --silent ${PROM_URL}/api/v1/query\?query\="sum(rate((bytes_written\[1m\])))" | jq '.data.result[0].value[1]' | sed 's/"//g')
+        SAMPLE=$(curl --silent "${PROM_URL}/api/v1/query?query=\"sum(rate((bytes_written\[1m\])))\"" | jq '.data.result[0].value[1]' | sed 's/"//g')
         echo -e "${EXPERIMENT_TYPE}\t${sample_idx}\t${SAMPLE}" >> "${CAPTURE_FILE}"
         sleep 1
-        sample_idx=$(($sample_idx+1))
+        sample_idx=$sample_idx+1
     done
 }
 
