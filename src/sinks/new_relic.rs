@@ -539,7 +539,7 @@ mod tests {
         map.insert("message".to_owned(), Value::from("{\"my_key\" : \"my_value\"}".to_owned()));
         let event = Event::Log(LogEvent::from(map));
         let model = EventsApiModel::try_from(vec!(event)).expect("Failed mapping event into API model");
-        
+
         assert_eq!(model.0.len(), 1);
         assert_eq!(model.0[0].get("eventType").is_some(), true);
         assert_eq!(model.0[0].get("user").is_some(), true);
@@ -547,9 +547,31 @@ mod tests {
         assert_eq!(model.0[0].get("my_key").is_some(), true);
     }
 
-    //TODO: test NewRelicBuffer
-    //TODO: test try_from for all api models
+    #[test]
+    fn generate_log_api_model() {
+        // Without message field
+        let mut map = HashMap::<String, Value>::new();
+        map.insert("tag_key".to_owned(), Value::from("tag_value".to_owned()));
+        let event = Event::Log(LogEvent::from(map));
+        let model = LogsApiModel::try_from(vec!(event)).expect("Failed mapping event into API model");
+        let logs = model.0[0].get("logs").expect("Logs data store not present");
+        
+        assert_eq!(logs.len(), 1);
+        assert_eq!(logs[0].get("tag_key").is_some(), true);
+        assert_eq!(logs[0].get("message").is_some(), true);
 
+        // With message field
+        let mut map = HashMap::<String, Value>::new();
+        map.insert("tag_key".to_owned(), Value::from("tag_value".to_owned()));
+        map.insert("message".to_owned(), Value::from("This is a message".to_owned()));
+        let event = Event::Log(LogEvent::from(map));
+        let model = LogsApiModel::try_from(vec!(event)).expect("Failed mapping event into API model");
+        let logs = model.0[0].get("logs").expect("Logs data store not present");
+        
+        assert_eq!(logs.len(), 1);
+        assert_eq!(logs[0].get("tag_key").is_some(), true);
+        assert_eq!(logs[0].get("message").is_some(), true);
+    }
 }
 
 //TODO: integration tests
