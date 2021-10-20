@@ -5,7 +5,7 @@ use crate::{
         util::{
             encoding::{EncodingConfig, EncodingConfigWithDefault},
             http::RequestConfig,
-            BatchConfig, Compression, Concurrency, TowerRequestConfig,
+            BatchConfig, Compression, TowerRequestConfig,
         },
     },
 };
