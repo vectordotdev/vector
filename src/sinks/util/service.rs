@@ -64,12 +64,12 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
 pub struct TowerRequestConfig {
     #[serde(default)]
     #[serde(skip_serializing_if = "concurrency_is_none")]
-    pub concurrency: Concurrency, // 1024
+    pub concurrency: Concurrency, // adaptive
     /// The same as concurrency but with old deprecated name.
     /// Alias couldn't be used because of <https://github.com/serde-rs/serde/issues/1504>
     #[serde(default)]
     #[serde(skip_serializing_if = "concurrency_is_none")]
-    pub in_flight_limit: Concurrency, // 1024
+    pub in_flight_limit: Concurrency, // adaptive
     pub timeout_secs: Option<u64>,             // 1 minute
     pub rate_limit_duration_secs: Option<u64>, // 1 second
     pub rate_limit_num: Option<u64>,           // i64::MAX
@@ -364,6 +364,13 @@ mod tests {
         let cfg = toml::from_str::<TowerRequestConfig>("in_flight_limit = 10")
             .expect("Fixed concurrency failed for in_flight_limit param");
         assert_eq!(cfg.concurrency(), &Concurrency::Fixed(10));
+    }
+
+    #[test]
+    fn config_merging_defaults_concurrency_to_none_if_unset() {
+        let cfg = TowerRequestConfig::default().unwrap_with(&TowerRequestConfig::default());
+
+        assert_eq!(cfg.concurrency, None);
     }
 
     #[tokio::test]
