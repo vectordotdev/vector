@@ -116,7 +116,6 @@ mod integration_tests {
             },
             request: TowerRequestConfig::default(),
             tls: None,
-            // encoding_standard: StandardEncodings::Json.into(),
         }
     }
 
@@ -178,43 +177,43 @@ mod integration_tests {
         assert_eq!(entry["source"].as_str(), Some("/var/log/syslog"));
     }
 
-    // #[tokio::test]
-    // async fn splunk_insert_index() {
-    //     let cx = SinkContext::new_test();
+    #[tokio::test]
+    async fn splunk_insert_index() {
+        let cx = SinkContext::new_test();
 
-    //     let mut config = config(Encoding::Text, vec![]).await;
-    //     config.index = Template::try_from("custom_index".to_string()).ok();
-    //     let (sink, _) = config.build(cx).await.unwrap();
+        let mut config = config(Encoding::Text, vec![]).await;
+        config.index = Template::try_from("custom_index".to_string()).ok();
+        let (sink, _) = config.build(cx).await.unwrap();
 
-    //     let message = random_string(100);
-    //     let event = Event::from(message.clone());
-    //     components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+        let message = random_string(100);
+        let event = Event::from(message.clone());
+        components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
 
-    //     let entry = find_entry(message.as_str()).await;
+        let entry = find_entry(message.as_str()).await;
 
-    //     assert_eq!(entry["index"].as_str().unwrap(), "custom_index");
-    // }
+        assert_eq!(entry["index"].as_str().unwrap(), "custom_index");
+    }
 
-    // #[tokio::test]
-    // async fn splunk_index_is_interpolated() {
-    //     let cx = SinkContext::new_test();
+    #[tokio::test]
+    async fn splunk_index_is_interpolated() {
+        let cx = SinkContext::new_test();
 
-    //     let indexed_fields = vec!["asdf".to_string()];
-    //     let mut config = config(Encoding::Json, indexed_fields).await;
-    //     config.index = Template::try_from("{{ index_name }}".to_string()).ok();
+        let indexed_fields = vec!["asdf".to_string()];
+        let mut config = config(Encoding::Json, indexed_fields).await;
+        config.index = Template::try_from("{{ index_name }}".to_string()).ok();
 
-    //     let (sink, _) = config.build(cx).await.unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
-    //     let message = random_string(100);
-    //     let mut event = Event::from(message.clone());
-    //     event.as_mut_log().insert("index_name", "custom_index");
-    //     components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+        let message = random_string(100);
+        let mut event = Event::from(message.clone());
+        event.as_mut_log().insert("index_name", "custom_index");
+        components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
 
-    //     let entry = find_entry(message.as_str()).await;
+        let entry = find_entry(message.as_str()).await;
 
-    //     let index = entry["index"].as_str().unwrap();
-    //     assert_eq!("custom_index", index);
-    // }
+        let index = entry["index"].as_str().unwrap();
+        assert_eq!("custom_index", index);
+    }
 
     // #[tokio::test]
     // async fn splunk_insert_many() {

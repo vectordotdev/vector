@@ -31,6 +31,7 @@ pub struct HecLogsSink<S> {
     pub request_builder: HecLogsRequestBuilder,
     pub batch_settings: BatcherSettings,
     pub source: Option<Template>,
+    pub index: Option<Template>,
 }
 
 impl<S> HecLogsSink<S>
@@ -43,6 +44,7 @@ where
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         // is clone needed here?
         let source = self.source.clone();
+        let index = self.index;
 
         let builder_limit = NonZeroUsize::new(64);
         let sink = input
@@ -52,7 +54,7 @@ where
                     log,
                     None,
                     source.as_ref(),
-                    None,
+                    index.as_ref(),
                     "".to_string(),
                     Vec::new(),
                 ))

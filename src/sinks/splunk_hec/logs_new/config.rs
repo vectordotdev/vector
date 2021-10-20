@@ -117,7 +117,6 @@ impl HecSinkLogsConfig {
             host_key: self.host_key.clone(),
             // encoding_standard: self.encoding_standard.clone(),
         };
-        
 
         let batch_settings = BatchSettings::<Buffer>::default()
             .bytes(1_000_000)
@@ -132,6 +131,7 @@ impl HecSinkLogsConfig {
             context: cx,
             batch_settings: batch_settings,
             source: self.source.clone(),
+            index: self.index.clone(),
         };
 
         Ok(VectorSink::Stream(Box::new(sink)))
