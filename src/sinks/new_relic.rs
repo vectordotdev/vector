@@ -12,13 +12,14 @@ use crate::{
     },
     tls::{TlsOptions, TlsSettings},
 };
-
 use futures::{future, FutureExt, SinkExt};
 use http::{Request, Uri};
 use serde::{Deserialize, Serialize};
+use flate2::write::GzEncoder;
 use std::{
     collections::HashMap,
-    convert::TryFrom
+    convert::TryFrom,
+    io::Write
 };
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -47,7 +48,9 @@ pub struct NewRelicConfig {
     pub account_id: String,
     pub region: Option<NewRelicRegion>,
     pub api: NewRelicApi,
-    //#[serde(default)]
+    pub buffer_size: Option<usize>,
+    pub timeout: Option<u64>,
+    #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
@@ -94,16 +97,16 @@ type DataStore = HashMap<String, Vec<KeyValData>>;
 pub struct MetricsApiModel(Vec<DataStore>);
 
 impl MetricsApiModel {
-    pub fn new(metric_array: Vec<(Value, Value, Value, Value)>) -> Self {
+    pub fn new(metric_array: Vec<(Value, Value, Value)>) -> Self {
         let mut metric_data_array = vec!();
-        for (m_name, m_type, m_value, m_timestamp) in metric_array {
+        for (m_name, m_value, m_timestamp) in metric_array {
             let mut metric_data = KeyValData::new();
             metric_data.insert("name".to_owned(), m_name);
-            metric_data.insert("type".to_owned(), m_type);
             metric_data.insert("value".to_owned(), m_value);
             match m_timestamp {
                 Value::Timestamp(ts) => { metric_data.insert("timestamp".to_owned(), Value::from(ts.timestamp())); },
                 Value::Integer(i) => { metric_data.insert("timestamp".to_owned(), Value::from(i)); },
+                //TODO: if no timestamp present, put current time
                 _ => {}
             }
             metric_data_array.push(metric_data);
@@ -125,11 +128,11 @@ impl TryFrom<Vec<BufEvent>> for MetricsApiModel {
         for buf_event in buf_events {
             match buf_event {
                 BufEvent::Metric(metric) => {
+                    // Future improvement: put metric type. If type = count, NR metric model requieres an interval.ms field, that is not provided by the Vector Metric model.
                     match metric.value() {
                         MetricValue::Gauge { value } => {
                             metric_array.push((
                                 Value::from(metric.name().to_owned()),
-                                Value::from("gauge".to_owned()),
                                 Value::from(*value),
                                 Value::from(metric.timestamp())
                             ));
@@ -137,7 +140,6 @@ impl TryFrom<Vec<BufEvent>> for MetricsApiModel {
                         MetricValue::Counter { value } => {
                             metric_array.push((
                                 Value::from(metric.name().to_owned()),
-                                Value::from("count".to_owned()),
                                 Value::from(*value),
                                 Value::from(metric.timestamp())
                             ));
@@ -409,8 +411,8 @@ impl SinkConfig for NewRelicConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
 
         let batch = BatchSettings::<NewRelicBuffer>::default()
-            .events(5)
-            .timeout(5)
+            .events(self.buffer_size.unwrap_or(50))
+            .timeout(self.timeout.unwrap_or(30))
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
@@ -418,7 +420,6 @@ impl SinkConfig for NewRelicConfig {
 
         let sink = BatchedHttpSink::new(
             self.clone(),
-            //Buffer::new(batch.size, self.compression),
             NewRelicBuffer::new(batch.size),
             request,
             batch.timeout,
@@ -442,6 +443,8 @@ impl SinkConfig for NewRelicConfig {
     }
 }
 
+//TODO: use Event instead of BufEvent
+
 #[async_trait::async_trait]
 impl HttpSink for NewRelicConfig {
     type Input = BufEvent;
@@ -460,46 +463,11 @@ impl HttpSink for NewRelicConfig {
         println!("------------------------------------------------------------------------");
 
         Some(BufEvent::remap(event))
-
-        //TODO: buffer event
-
-        //TODO: if buffer is full, generate JSON and return it, otherwise return None
-
-        /*
-        match self.api {
-            NewRelicApi::Events => {
-                if let Event::Log(log) = event {
-                    NewRelicEvent::to_json(log)
-                }
-                else {
-                    info!("Received Metric while expecting events, ignoring");
-                    None
-                }
-            },
-            NewRelicApi::Metrics => {
-                if let Event::Metric(metric) = event {
-                    NewRelicMetric::to_json(metric)
-                }
-                else {
-                    info!("Received LogEvent while expecting metrics, ignoring");
-                    None
-                }
-            },
-            NewRelicApi::Logs => {
-                if let Event::Log(log) = event {
-                    NewRelicLog::to_json(log)
-                }
-                else {
-                    info!("Received Metric while expecting logs, ignoring");
-                    None
-                }
-            }
-        }
-        */
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
 
+        //TODO: remove this before production
         println!("------------------------------------------------------------------------");
         println!("Build request events =\n{:#?}", events);
         println!("------------------------------------------------------------------------");
@@ -507,32 +475,32 @@ impl HttpSink for NewRelicConfig {
         let uri = match self.api {
             NewRelicApi::Events => {
                 match self.region.as_ref().unwrap_or(&NewRelicRegion::Us) {
+                    /*
                     NewRelicRegion::Us => Uri::from_static("http://localhost:8888/events/us"),
                     NewRelicRegion::Eu => Uri::from_static("http://localhost:8888/events/eu"),
-                    /*
+                    */
                     NewRelicRegion::Us => format!("https://insights-collector.newrelic.com/v1/accounts/{}/events", self.account_id).parse::<Uri>().unwrap(),
                     NewRelicRegion::Eu => format!("https://insights-collector.eu01.nr-data.net/v1/accounts/{}/events", self.account_id).parse::<Uri>().unwrap(),
-                    */
                 }
             },
             NewRelicApi::Metrics => {
                 match self.region.as_ref().unwrap_or(&NewRelicRegion::Us) {
+                    /*
                     NewRelicRegion::Us => Uri::from_static("http://localhost:8888/metrics/us"),
                     NewRelicRegion::Eu => Uri::from_static("http://localhost:8888/metrics/eu"),
-                    /*
+                    */
                     NewRelicRegion::Us => Uri::from_static("https://metric-api.newrelic.com/metric/v1"),
                     NewRelicRegion::Eu => Uri::from_static("https://metric-api.eu.newrelic.com/metric/v1"),
-                    */
                 }
             },
             NewRelicApi::Logs => {
                 match self.region.as_ref().unwrap_or(&NewRelicRegion::Us) {
+                    /*
                     NewRelicRegion::Us => Uri::from_static("http://localhost:8888/logs/us"),
                     NewRelicRegion::Eu => Uri::from_static("http://localhost:8888/logs/eu"),
-                    /*
+                    */
                     NewRelicRegion::Us => Uri::from_static("https://log-api.newrelic.com/log/v1"),
                     NewRelicRegion::Eu => Uri::from_static("https://log-api.eu.newrelic.com/log/v1"),
-                    */
                 }
             }
         };
@@ -551,7 +519,16 @@ impl HttpSink for NewRelicConfig {
                 builder = builder.header("Content-Encoding", ce);
             }
 
-            let request = builder.body(json).unwrap();
+            let body = match self.compression {
+                Compression::None => json,
+                Compression::Gzip(level) => {
+                    let mut gz = GzEncoder::new(Vec::new(), level);
+                    gz.write_all(&json).unwrap_or_default();
+                    gz.finish().unwrap()
+                }
+            };
+
+            let request = builder.body(body).unwrap();
 
             Ok(request)
         }
