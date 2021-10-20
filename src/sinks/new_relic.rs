@@ -427,49 +427,25 @@ impl HttpSink for NewRelicConfig {
             ..self.encoding.clone()
         };
         encoding.apply_rules(&mut event);
-
-        //TODO: remove this before production
-        println!("------------------------------------------------------------------------");
-        println!("Encode event =\n{:#?}", event);
-        println!("------------------------------------------------------------------------");
-
         Some(event)
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
-
-        //TODO: remove this before production
-        println!("------------------------------------------------------------------------");
-        println!("Build request events =\n{:#?}", events);
-        println!("------------------------------------------------------------------------");
-
         let uri = match self.api {
             NewRelicApi::Events => {
                 match self.region.as_ref().unwrap_or(&NewRelicRegion::Us) {
-                    /*
-                    NewRelicRegion::Us => Uri::from_static("http://localhost:8888/events/us"),
-                    NewRelicRegion::Eu => Uri::from_static("http://localhost:8888/events/eu"),
-                    */
                     NewRelicRegion::Us => format!("https://insights-collector.newrelic.com/v1/accounts/{}/events", self.account_id).parse::<Uri>().unwrap(),
                     NewRelicRegion::Eu => format!("https://insights-collector.eu01.nr-data.net/v1/accounts/{}/events", self.account_id).parse::<Uri>().unwrap(),
                 }
             },
             NewRelicApi::Metrics => {
                 match self.region.as_ref().unwrap_or(&NewRelicRegion::Us) {
-                    /*
-                    NewRelicRegion::Us => Uri::from_static("http://localhost:8888/metrics/us"),
-                    NewRelicRegion::Eu => Uri::from_static("http://localhost:8888/metrics/eu"),
-                    */
                     NewRelicRegion::Us => Uri::from_static("https://metric-api.newrelic.com/metric/v1"),
                     NewRelicRegion::Eu => Uri::from_static("https://metric-api.eu.newrelic.com/metric/v1"),
                 }
             },
             NewRelicApi::Logs => {
                 match self.region.as_ref().unwrap_or(&NewRelicRegion::Us) {
-                    /*
-                    NewRelicRegion::Us => Uri::from_static("http://localhost:8888/logs/us"),
-                    NewRelicRegion::Eu => Uri::from_static("http://localhost:8888/logs/eu"),
-                    */
                     NewRelicRegion::Us => Uri::from_static("https://log-api.newrelic.com/log/v1"),
                     NewRelicRegion::Eu => Uri::from_static("https://log-api.eu.newrelic.com/log/v1"),
                 }
@@ -509,4 +485,71 @@ impl HttpSink for NewRelicConfig {
     }
 }
 
-//TODO: tests
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        event::{Event, Value, LogEvent, Metric, MetricValue}
+    };
+    use std::{
+        collections::HashMap,
+        convert::TryFrom
+    };
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<NewRelicConfig>();
+    }
+
+    #[test]
+    fn generate_event_api_model() {
+        // Without message field
+        let mut map = HashMap::<String, Value>::new();
+        map.insert("eventType".to_owned(), Value::from("TestEvent".to_owned()));
+        map.insert("user".to_owned(), Value::from("Joe".to_owned()));
+        map.insert("user_id".to_owned(), Value::from(123456));
+        let event = Event::Log(LogEvent::from(map));
+        let model = EventsApiModel::try_from(vec!(event)).expect("Failed mapping event into API model");
+        
+        assert_eq!(model.0.len(), 1);
+        assert_eq!(model.0[0].get("eventType").is_some(), true);
+        assert_eq!(model.0[0].get("user").is_some(), true);
+        assert_eq!(model.0[0].get("user_id").is_some(), true);
+
+        // With message field
+        let mut map = HashMap::<String, Value>::new();
+        map.insert("eventType".to_owned(), Value::from("TestEvent".to_owned()));
+        map.insert("user".to_owned(), Value::from("Joe".to_owned()));
+        map.insert("user_id".to_owned(), Value::from(123456));
+        map.insert("message".to_owned(), Value::from("This is a message".to_owned()));
+        let event = Event::Log(LogEvent::from(map));
+        let model = EventsApiModel::try_from(vec!(event)).expect("Failed mapping event into API model");
+
+        assert_eq!(model.0.len(), 1);
+        assert_eq!(model.0[0].get("eventType").is_some(), true);
+        assert_eq!(model.0[0].get("user").is_some(), true);
+        assert_eq!(model.0[0].get("user_id").is_some(), true);
+        assert_eq!(model.0[0].get("message").is_some(), true);
+
+        // With a JSON encoded inside the message field
+        let mut map = HashMap::<String, Value>::new();
+        map.insert("eventType".to_owned(), Value::from("TestEvent".to_owned()));
+        map.insert("user".to_owned(), Value::from("Joe".to_owned()));
+        map.insert("user_id".to_owned(), Value::from(123456));
+        map.insert("message".to_owned(), Value::from("{\"my_key\" : \"my_value\"}".to_owned()));
+        let event = Event::Log(LogEvent::from(map));
+        let model = EventsApiModel::try_from(vec!(event)).expect("Failed mapping event into API model");
+        
+        assert_eq!(model.0.len(), 1);
+        assert_eq!(model.0[0].get("eventType").is_some(), true);
+        assert_eq!(model.0[0].get("user").is_some(), true);
+        assert_eq!(model.0[0].get("user_id").is_some(), true);
+        assert_eq!(model.0[0].get("my_key").is_some(), true);
+    }
+
+    //TODO: test NewRelicBuffer
+    //TODO: test try_from for all api models
+
+}
+
+//TODO: integration tests
