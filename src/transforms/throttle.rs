@@ -33,7 +33,7 @@ impl_generate_config_from_default!(ThrottleConfig);
 #[typetag::serde(name = "throttle")]
 impl TransformConfig for ThrottleConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Throttle::new(self, context).map(Transform::task)
+        Throttle::new(self, context, clock::MonotonicClock).map(Transform::task)
     }
 
     fn input_type(&self) -> DataType {
@@ -50,15 +50,24 @@ impl TransformConfig for ThrottleConfig {
 }
 
 #[derive(Clone)]
-pub struct Throttle {
+pub struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
     quota: Quota,
     flush_keys_interval: Duration,
     key_field: Option<Template>,
     exclude: Option<Box<dyn Condition>>,
+    clock: C,
 }
 
-impl Throttle {
-    pub fn new(config: &ThrottleConfig, context: &TransformContext) -> crate::Result<Self> {
+impl<C, I> Throttle<C, I>
+where
+    C: clock::Clock<Instant = I>,
+    I: clock::Reference,
+{
+    pub fn new(
+        config: &ThrottleConfig,
+        context: &TransformContext,
+        clock: C,
+    ) -> crate::Result<Self> {
         let flush_keys_interval = Duration::from_secs_f64(config.window.clone());
 
         let threshold = match NonZeroU32::new(config.threshold) {
@@ -80,6 +89,7 @@ impl Throttle {
 
         Ok(Self {
             quota,
+            clock,
             flush_keys_interval,
             key_field: config.key_field.clone(),
             exclude,
@@ -87,7 +97,11 @@ impl Throttle {
     }
 }
 
-impl TaskTransform for Throttle {
+impl<C, I> TaskTransform for Throttle<C, I>
+where
+    C: clock::Clock<Instant = I> + Send,
+    I: clock::Reference + Send,
+{
     fn transform(
         self: Box<Self>,
         mut input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
@@ -95,11 +109,11 @@ impl TaskTransform for Throttle {
     where
         Self: 'static,
     {
-        let limiter = RateLimiter::keyed(self.quota);
-
         let mut flush_keys = tokio::time::interval(self.flush_keys_interval * 2);
 
         let mut flush_stream = tokio::time::interval(Duration::from_millis(1000));
+
+        let limiter = RateLimiter::dashmap_with_clock(self.quota, &self.clock);
 
         Box::pin(
             stream! {
@@ -117,10 +131,9 @@ impl TaskTransform for Throttle {
                         match maybe_event {
                             None => true,
                             Some(event) => {
-                                if let Some(condition) = self.exclude.as_ref() {
-                                    if condition.check(&event) {
-                                        output.push(event);
-                                    } else {
+                                match self.exclude.as_ref() {
+                                  Some(condition) if condition.check(&event) => output.push(event),
+                                  _ => {
                                         let key = self.key_field.as_ref().and_then(|t| {
                                             t.render_string(&event)
                                                 .map_err(|error| {
@@ -142,27 +155,6 @@ impl TaskTransform for Throttle {
                                             }
                                         }
                                     }
-                                } else {
-                                    let key = self.key_field.as_ref().and_then(|t| {
-                                        t.render_string(&event)
-                                            .map_err(|error| {
-                                                emit!(&TemplateRenderingFailed {
-                                                    error,
-                                                    field: Some("key_field"),
-                                                    drop_event: false,
-                                                })
-                                            })
-                                            .ok()
-                                    });
-
-                                    match limiter.check_key(&key) {
-                                        Ok(()) => {
-                                            output.push(event);
-                                        }
-                                        _ => {
-                                            // Dropping event
-                                        }
-                                    }
                                 }
                                 false
                             }
@@ -182,4 +174,106 @@ impl TaskTransform for Throttle {
 pub enum ConfigError {
     #[snafu(display("`threshold`, and `window` must be non-zero"))]
     NonZero,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::event::Event;
+    use futures::SinkExt;
+    use std::task::Poll;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<ThrottleConfig>();
+    }
+
+    #[tokio::test]
+    async fn throttle_events() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r#"
+threshold = 1
+window = 5
+"#,
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock)
+            .map(Transform::task)
+            .unwrap();
+
+        let throttle = throttle.into_task();
+
+        let (mut tx, rx) = futures::channel::mpsc::channel(10);
+        let mut out_stream = throttle.transform(Box::pin(rx));
+
+        // tokio interval is always immediately ready, so we poll once to make sure
+        // we trip it/set the interval in the future
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        tx.send(Event::new_empty_log()).await.unwrap();
+
+        if let Some(_event) = out_stream.next().await {
+        } else {
+            panic!("Unexpectedly recieved None in output stream");
+        }
+
+        clock.advance(Duration::from_secs(2));
+
+        tx.send(Event::new_empty_log()).await.unwrap();
+
+        // We should be back to pending, having the second event dropped
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        tx.send(Event::new_empty_log()).await.unwrap();
+
+        // We should be back to pending, having nothing waiting for us
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+        // Close the input stream which should trigger the shutting down flush
+        tx.disconnect();
+
+        // And still nothing there
+        assert_eq!(Poll::Ready(None), futures::poll!(out_stream.next()));
+    }
+
+    #[tokio::test]
+    async fn dont_throttle_events() {
+        let throttle = toml::from_str::<ThrottleConfig>(
+            r#"
+threshold = 60
+window = 60
+"#,
+        )
+        .unwrap()
+        .build(&TransformContext::default())
+        .await
+        .unwrap();
+
+        let throttle = throttle.into_task();
+
+        let (mut tx, rx) = futures::channel::mpsc::channel(10);
+        let mut out_stream = throttle.transform(Box::pin(rx));
+
+        tokio::time::pause();
+
+        // tokio interval is always immediately ready, so we poll once to make sure
+        // we trip it/set the interval in the future
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        // Now send our events
+
+        // We won't have flushed yet b/c the interval hasn't elapsed, so no outputs
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+        // Now fast foward time enough that our flush should trigger.
+        tokio::time::advance(Duration::from_secs(10)).await;
+
+        // We should be back to pending, having nothing waiting for us
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+        // Close the input stream which should trigger the shutting down flush
+        tx.disconnect();
+
+        // And still nothing there
+        assert_eq!(Poll::Ready(None), futures::poll!(out_stream.next()));
+    }
 }
