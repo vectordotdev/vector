@@ -193,63 +193,6 @@ mod tests {
         let clock = clock::FakeRelativeClock::default();
         let config = toml::from_str::<ThrottleConfig>(
             r#"
-threshold = 1
-window = 5
-"#,
-        )
-        .unwrap();
-
-        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
-            .map(Transform::task)
-            .unwrap();
-
-        let throttle = throttle.into_task();
-
-        let (mut tx, rx) = futures::channel::mpsc::channel(10);
-        let mut out_stream = throttle.transform(Box::pin(rx));
-
-        // tokio interval is always immediately ready, so we poll once to make sure
-        // we trip it/set the interval in the future
-        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
-
-        tx.send(Event::new_empty_log()).await.unwrap();
-
-        if let Some(_event) = out_stream.next().await {
-        } else {
-            panic!("Unexpectedly recieved None in output stream");
-        }
-
-        clock.advance(Duration::from_secs(2));
-
-        tx.send(Event::new_empty_log()).await.unwrap();
-
-        // We should be back to pending, having the second event dropped
-        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
-
-        clock.advance(Duration::from_secs(3));
-
-        tx.send(Event::new_empty_log()).await.unwrap();
-
-        // The rate limiter should now be refreshed and allow an additional event through
-        if let Some(_event) = out_stream.next().await {
-        } else {
-            panic!("Unexpectedly recieved None in output stream");
-        }
-
-        // We should be back to pending, having nothing waiting for us
-        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
-
-        tx.disconnect();
-
-        // And still nothing there
-        assert_eq!(Poll::Ready(None), futures::poll!(out_stream.next()));
-    }
-
-    #[tokio::test]
-    async fn dont_throttle_events() {
-        let clock = clock::FakeRelativeClock::default();
-        let config = toml::from_str::<ThrottleConfig>(
-            r#"
 threshold = 2
 window = 5
 "#,
@@ -282,9 +225,152 @@ window = 5
         }
         assert_eq!(2, count);
 
-        // We should be back to pending, having received two events
+        clock.advance(Duration::from_secs(2));
+
+        tx.send(Event::new_empty_log()).await.unwrap();
+
+        // We should be back to pending, having the second event dropped
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
-        //
+
+        clock.advance(Duration::from_secs(3));
+
+        tx.send(Event::new_empty_log()).await.unwrap();
+
+        // The rate limiter should now be refreshed and allow an additional event through
+        if let Some(_event) = out_stream.next().await {
+        } else {
+            panic!("Unexpectedly recieved None in output stream");
+        }
+
+        // We should be back to pending, having nothing waiting for us
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        tx.disconnect();
+
+        // And still nothing there
+        assert_eq!(Poll::Ready(None), futures::poll!(out_stream.next()));
+    }
+
+    #[tokio::test]
+    async fn throttle_exclude() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r#"
+threshold = 2
+window = 5
+exclude = """
+exists(.special)
+"""
+"#,
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
+            .map(Transform::task)
+            .unwrap();
+
+        let throttle = throttle.into_task();
+
+        let (mut tx, rx) = futures::channel::mpsc::channel(10);
+        let mut out_stream = throttle.transform(Box::pin(rx));
+
+        // tokio interval is always immediately ready, so we poll once to make sure
+        // we trip it/set the interval in the future
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        tx.send(Event::new_empty_log()).await.unwrap();
+        tx.send(Event::new_empty_log()).await.unwrap();
+
+        let mut count = 0_u8;
+        while count < 2 {
+            if let Some(_event) = out_stream.next().await {
+                count += 1;
+            } else {
+                panic!("Unexpectedly recieved None in output stream");
+            }
+        }
+        assert_eq!(2, count);
+
+        clock.advance(Duration::from_secs(2));
+
+        tx.send(Event::new_empty_log()).await.unwrap();
+
+        // We should be back to pending, having the second event dropped
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        let mut special_log = Event::new_empty_log();
+        special_log.as_mut_log().insert("special", "true");
+        tx.send(special_log).await.unwrap();
+        // The rate limiter should allow this log through regardless of current limit
+        if let Some(_event) = out_stream.next().await {
+        } else {
+            panic!("Unexpectedly recieved None in output stream");
+        }
+
+        clock.advance(Duration::from_secs(3));
+
+        tx.send(Event::new_empty_log()).await.unwrap();
+
+        // The rate limiter should now be refreshed and allow an additional event through
+        if let Some(_event) = out_stream.next().await {
+        } else {
+            panic!("Unexpectedly recieved None in output stream");
+        }
+
+        // We should be back to pending, having nothing waiting for us
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        tx.disconnect();
+
+        // And still nothing there
+        assert_eq!(Poll::Ready(None), futures::poll!(out_stream.next()));
+    }
+
+    #[tokio::test]
+    async fn throttle_buckets() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r#"
+threshold = 1
+window = 5
+key_field = "{{ bucket }}"
+"#,
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
+            .map(Transform::task)
+            .unwrap();
+
+        let throttle = throttle.into_task();
+
+        let (mut tx, rx) = futures::channel::mpsc::channel(10);
+        let mut out_stream = throttle.transform(Box::pin(rx));
+
+        // tokio interval is always immediately ready, so we poll once to make sure
+        // we trip it/set the interval in the future
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        let mut log_a = Event::new_empty_log();
+        log_a.as_mut_log().insert("bucket", "a");
+        let mut log_b = Event::new_empty_log();
+        log_b.as_mut_log().insert("bucket", "b");
+        tx.send(log_a).await.unwrap();
+        tx.send(log_b).await.unwrap();
+
+        let mut count = 0_u8;
+        while count < 2 {
+            if let Some(_event) = out_stream.next().await {
+                count += 1;
+            } else {
+                panic!("Unexpectedly recieved None in output stream");
+            }
+        }
+        assert_eq!(2, count);
+
+        // We should be back to pending, having nothing waiting for us
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
         tx.disconnect();
 
         // And still nothing there
