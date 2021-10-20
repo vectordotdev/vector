@@ -208,12 +208,15 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx, _) =
-            vector_core::buffers::build(vector_core::buffers::Variant::Memory {
+        let (input_tx, input_rx, _) = vector_core::buffers::build(
+            vector_core::buffers::Variant::Memory {
                 max_events: 100,
                 when_full: vector_core::buffers::WhenFull::Block,
-            })
-            .unwrap();
+                instrument: false,
+            },
+            tracing::Span::none(),
+        )
+        .unwrap();
         let mut input_rx = crate::utilization::wrap(Pin::new(input_rx));
 
         let task = match transform {
@@ -226,7 +229,7 @@ pub async fn build_pieces(
                     .inspect(|events| {
                         emit!(&EventsReceived {
                             count: events.len(),
-                            byte_size: events.iter().map(|e| e.size_of()).sum(),
+                            byte_size: events.size_of(),
                         });
                     })
                     .flat_map(move |events| {
@@ -239,7 +242,7 @@ pub async fn build_pieces(
                         }
                         emit!(&EventsSent {
                             count: output.len(),
-                            byte_size: output.iter().map(|event| event.size_of()).sum(),
+                            byte_size: output.size_of(),
                         });
                         stream::iter(output.into_iter()).map(Ok)
                     })
@@ -275,8 +278,7 @@ pub async fn build_pieces(
                         // TODO: account for error outputs separately?
                         emit!(&EventsSent {
                             count: buf.len() + err_buf.len(),
-                            byte_size: buf.iter().map(|event| event.size_of()).sum::<usize>()
-                                + err_buf.iter().map(|event| event.size_of()).sum::<usize>(),
+                            byte_size: buf.size_of() + err_buf.size_of(),
                         });
 
                         for event in buf {
@@ -358,7 +360,21 @@ pub async fn build_pieces(
         let (tx, rx, acker) = if let Some(buffer) = buffers.remove(key) {
             buffer
         } else {
-            let buffer = sink.buffer.build(&config.global.data_dir, key);
+            let buffer_type = match sink.buffer {
+                buffers::BufferConfig::Memory { .. } => "memory",
+                #[cfg(feature = "disk-buffer")]
+                buffers::BufferConfig::Disk { .. } => "disk",
+            };
+            let buffer_span = error_span!(
+                "sink",
+                component_kind = "sink",
+                component_id = %key.id(),
+                component_scope = %key.scope(),
+                component_type = typetag,
+                component_name = %key.id(),
+                buffer_type = buffer_type,
+            );
+            let buffer = sink.buffer.build(&config.global.data_dir, key, buffer_span);
             match buffer {
                 Err(error) => {
                     errors.push(format!("Sink \"{}\": {}", key, error));
@@ -471,7 +487,7 @@ pub async fn build_pieces(
 
     // We should have all the data for the enrichment tables loaded now, so switch them over to
     // readonly.
-    ENRICHMENT_TABLES.finish_load();
+    enrichment_tables.finish_load();
 
     let mut finalized_outputs = HashMap::new();
     for (id, output) in outputs {
@@ -490,7 +506,7 @@ pub async fn build_pieces(
             healthchecks,
             shutdown_coordinator,
             detach_triggers,
-            enrichment_tables: ENRICHMENT_TABLES.clone(),
+            enrichment_tables: enrichment_tables.clone(),
         };
 
         Ok(pieces)

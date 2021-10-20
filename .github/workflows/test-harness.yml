@@ -55,7 +55,7 @@ jobs:
 
     # Clone vector source and build .deb
     - name: Clone the PR branch
-      uses: actions/checkout@v2.3.4
+      uses: actions/checkout@v2.3.5
       with:
         lfs: true
         ref: '${{ steps.pr-info.outputs.head_sha }}'

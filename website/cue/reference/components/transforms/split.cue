@@ -34,7 +34,7 @@ components: transforms: split: {
 			"""
 			\(split._remap_deprecation_notice)
 
-			```vrl
+			```coffee
 			.message = split(.message)
 			```
 			""",

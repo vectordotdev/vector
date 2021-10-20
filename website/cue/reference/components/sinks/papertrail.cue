@@ -77,6 +77,17 @@ components: sinks: papertrail: {
 				syntax: "literal"
 			}
 		}
+		process: {
+			description: "The value to use as the `process` in Papertrail."
+			common:      true
+			required:    false
+			warnings: []
+			type: string: {
+				default: "vector"
+				examples: ["{{ process }}", "my-process"]
+				syntax: "template"
+			}
+		}
 	}
 
 	input: {

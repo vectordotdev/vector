@@ -1,12 +1,14 @@
 mod common;
 mod model;
 
-use crate::{Acker, DropWhenFull};
+use crate::buffer_usage_data::BufferUsageData;
+use crate::{Acker, DropWhenFull, WhenFull};
 use futures::task::Poll;
 use futures::{channel::mpsc, future, task::AtomicWaker};
 use futures::{Sink, Stream};
 use std::sync::{atomic::AtomicUsize, Arc};
 use tokio_test::task::spawn;
+use tracing::Span;
 
 #[tokio::test]
 #[allow(clippy::semicolon_if_nothing_returned)] // appears to be a false positive as there is a ;
@@ -14,7 +16,10 @@ async fn drop_when_full() {
     future::lazy(|cx| {
         let (tx, rx) = mpsc::channel(2);
 
-        let mut tx = Box::pin(DropWhenFull::new(tx));
+        let mut tx = Box::pin(DropWhenFull::new(
+            tx,
+            BufferUsageData::new(WhenFull::DropNewest, Span::none(), None, Some(2)),
+        ));
 
         assert_eq!(tx.as_mut().poll_ready(cx), Poll::Ready(Ok(())));
         assert_eq!(tx.as_mut().start_send(1), Ok(()));

@@ -305,8 +305,8 @@ components: sinks: [Name=string]: {
 										rtt_deviation_scale: {
 											common: false
 											description: """
-                                                When calculating the past RTT average, we also compute a secondary "deviation" value that indicates how variable those values are. We use that deviation when comparing the past RTT average to the current measurements, so we can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to an appropriate range. Valid values are greater than or equal to 0, and we expect reasonable values to range from 1.0 to 3.0. Larger values cause the algorithm to ignore larger increases in the RTT.
-                                            """
+											When calculating the past RTT average, we also compute a secondary "deviation" value that indicates how variable those values are. We use that deviation when comparing the past RTT average to the current measurements, so we can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to an appropriate range. Valid values are greater than or equal to 0, and we expect reasonable values to range from 1.0 to 3.0. Larger values cause the algorithm to ignore larger increases in the RTT.
+											"""
 											required: false
 											type: float: default: 2.0
 										}
@@ -631,5 +631,12 @@ components: sinks: [Name=string]: {
 		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
 		utilization:                          components.sources.internal_metrics.output.metrics.utilization
+		buffer_byte_size:                     components.sources.internal_metrics.output.metrics.buffer_byte_size
+		buffer_events:                        components.sources.internal_metrics.output.metrics.buffer_events
+		buffer_received_events_total:         components.sources.internal_metrics.output.metrics.buffer_received_events_total
+		buffer_received_event_bytes_total:    components.sources.internal_metrics.output.metrics.buffer_received_event_bytes_total
+		buffer_sent_events_total:             components.sources.internal_metrics.output.metrics.buffer_sent_events_total
+		buffer_sent_event_bytes_total:        components.sources.internal_metrics.output.metrics.buffer_sent_event_bytes_total
+		buffer_discarded_events_total:        components.sources.internal_metrics.output.metrics.buffer_discarded_events_total
 	}
 }

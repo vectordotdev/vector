@@ -39,6 +39,7 @@ use tower::{
     timeout::Timeout,
     Service, ServiceBuilder, ServiceExt,
 };
+use vector_core::ByteSizeOf;
 
 // Estimated maximum size of InputLogEvent with an empty message
 const EVENT_SIZE_OVERHEAD: usize = 50;
@@ -461,6 +462,7 @@ fn partition_encode(
 
     let key = CloudwatchKey { group, stream };
 
+    let byte_size = event.size_of();
     encoding.apply_rules(&mut event);
     let event = encode_log(event.into_log(), encoding)
         .map_err(
@@ -468,7 +470,10 @@ fn partition_encode(
         )
         .ok()?;
 
-    Some(EncodedEvent::new(PartitionInnerBuffer::new(event, key)))
+    Some(EncodedEvent::new(
+        PartitionInnerBuffer::new(event, key),
+        byte_size,
+    ))
 }
 
 #[derive(Debug, Snafu)]
