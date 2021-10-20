@@ -29,6 +29,7 @@ impl<T, F> StreamWrapper<T, F> {
         Self { inner, after_read }
     }
 
+    #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
     pub const fn get_ref(&self) -> &T {
         &self.inner
     }
