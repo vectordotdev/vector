@@ -1,6 +1,4 @@
-use crate::{
-    config::SinkDescription
-};
+use crate::config::SinkDescription;
 
 pub mod common;
 mod conn;
