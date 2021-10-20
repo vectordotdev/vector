@@ -1,8 +1,6 @@
-use vector_core::ByteSizeOf;
-
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{Event, Value, Metric, MetricValue, LogEvent},
+    event::{Event, Value, MetricValue},
     http::{HttpClient},
     sinks::util::{
         batch::{BatchError, BatchSize},
@@ -16,10 +14,12 @@ use futures::{future, FutureExt, SinkExt};
 use http::{Request, Uri};
 use serde::{Deserialize, Serialize};
 use flate2::write::GzEncoder;
+use chrono::{DateTime, Utc};
 use std::{
     collections::HashMap,
     convert::TryFrom,
-    io::Write
+    io::Write,
+    time::SystemTime
 };
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -106,8 +106,7 @@ impl MetricsApiModel {
             match m_timestamp {
                 Value::Timestamp(ts) => { metric_data.insert("timestamp".to_owned(), Value::from(ts.timestamp())); },
                 Value::Integer(i) => { metric_data.insert("timestamp".to_owned(), Value::from(i)); },
-                //TODO: if no timestamp present, put current time
-                _ => {}
+                _ => { metric_data.insert("timestamp".to_owned(), Value::from(DateTime::<Utc>::from(SystemTime::now()).timestamp())); }
             }
             metric_data_array.push(metric_data);
         }
@@ -117,17 +116,17 @@ impl MetricsApiModel {
     }
 }
 
-impl ToJSON<Vec<BufEvent>> for MetricsApiModel {}
+impl ToJSON<Vec<Event>> for MetricsApiModel {}
 
-impl TryFrom<Vec<BufEvent>> for MetricsApiModel {
+impl TryFrom<Vec<Event>> for MetricsApiModel {
     type Error = &'static str;
 
-    fn try_from(buf_events: Vec<BufEvent>) -> Result<Self, Self::Error> {
+    fn try_from(buf_events: Vec<Event>) -> Result<Self, Self::Error> {
         let mut metric_array = vec!();
 
         for buf_event in buf_events {
             match buf_event {
-                BufEvent::Metric(metric) => {
+                Event::Metric(metric) => {
                     // Future improvement: put metric type. If type = count, NR metric model requieres an interval.ms field, that is not provided by the Vector Metric model.
                     match metric.value() {
                         MetricValue::Gauge { value } => {
@@ -173,16 +172,16 @@ impl EventsApiModel {
     }
 }
 
-impl ToJSON<Vec<BufEvent>> for EventsApiModel {}
+impl ToJSON<Vec<Event>> for EventsApiModel {}
 
-impl TryFrom<Vec<BufEvent>> for EventsApiModel {
+impl TryFrom<Vec<Event>> for EventsApiModel {
     type Error = &'static str;
 
-    fn try_from(buf_events: Vec<BufEvent>) -> Result<Self, Self::Error> {
+    fn try_from(buf_events: Vec<Event>) -> Result<Self, Self::Error> {
         let mut events_array = vec!();
         for buf_event in buf_events {
             match buf_event {
-                BufEvent::Log(log) => {
+                Event::Log(log) => {
                     let mut event_model = KeyValData::new();
                     for (k, v) in log.all_fields() {
                         event_model.insert(k, v.clone());
@@ -247,16 +246,16 @@ impl LogsApiModel {
     }
 }
 
-impl ToJSON<Vec<BufEvent>> for LogsApiModel {}
+impl ToJSON<Vec<Event>> for LogsApiModel {}
 
-impl TryFrom<Vec<BufEvent>> for LogsApiModel {
+impl TryFrom<Vec<Event>> for LogsApiModel {
     type Error = &'static str;
 
-    fn try_from(buf_events: Vec<BufEvent>) -> Result<Self, Self::Error> {
+    fn try_from(buf_events: Vec<Event>) -> Result<Self, Self::Error> {
         let mut logs_array = vec!();
         for buf_event in buf_events {
             match buf_event {
-                BufEvent::Log(log) => {
+                Event::Log(log) => {
                     let mut log_model = KeyValData::new();
                     for (k, v) in log.all_fields() {
                         log_model.insert(k, v.clone());
@@ -277,32 +276,6 @@ impl TryFrom<Vec<BufEvent>> for LogsApiModel {
         }
         else {
             Err("No valid logs to generate")
-        }
-    }
-}
-
-//TODO: rename NewRelicSample, contain models of New Relic Event, Log and Metric ionstead of Vector models.
-//TODO: or even better, remove this model and use Vector's OOTB Event instead.
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub enum BufEvent {
-    Log(LogEvent),
-    Metric(Metric),
-}
-
-impl BufEvent {
-    pub fn remap(event: Event) -> Self {
-        match event {
-            Event::Log(log) => Self::Log(log),
-            Event::Metric(metric) => Self::Metric(metric)
-        }
-    }
-}
-
-impl ByteSizeOf for BufEvent {
-    fn allocated_bytes(&self) -> usize {
-        match self {
-            Self::Log(_) => std::mem::size_of::<LogEvent>(),
-            Self::Metric(_) => std::mem::size_of::<Metric>()
         }
     }
 }
@@ -342,7 +315,7 @@ impl std::error::Error for NewRelicSinkError {
 
 #[derive(Debug)]
 pub struct NewRelicBuffer {
-    buffer: Vec<BufEvent>,
+    buffer: Vec<Event>,
     max_size: BatchSize<Self>
 }
 
@@ -356,8 +329,8 @@ impl NewRelicBuffer {
 }
 
 impl Batch for NewRelicBuffer {
-    type Input = BufEvent;
-    type Output = Vec<BufEvent>;
+    type Input = Event;
+    type Output = Vec<Event>;
 
     fn get_settings_defaults(
         _config: BatchConfig,
@@ -443,12 +416,10 @@ impl SinkConfig for NewRelicConfig {
     }
 }
 
-//TODO: use Event instead of BufEvent
-
 #[async_trait::async_trait]
 impl HttpSink for NewRelicConfig {
-    type Input = BufEvent;
-    type Output = Vec<BufEvent>;
+    type Input = Event;
+    type Output = Vec<Event>;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         let encoding = EncodingConfigWithDefault {
@@ -462,7 +433,7 @@ impl HttpSink for NewRelicConfig {
         println!("Encode event =\n{:#?}", event);
         println!("------------------------------------------------------------------------");
 
-        Some(BufEvent::remap(event))
+        Some(event)
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
