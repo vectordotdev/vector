@@ -25,6 +25,14 @@ use std::{
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
+pub enum Encoding {
+    #[derivative(Default)]
+    Default,
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
 pub enum NewRelicRegion {
     #[derivative(Default)]
     Us,
@@ -39,29 +47,6 @@ pub enum NewRelicApi {
     Events,
     Metrics,
     Logs
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
-#[serde(deny_unknown_fields)]
-pub struct NewRelicConfig {
-    pub license_key: String,
-    pub account_id: String,
-    pub region: Option<NewRelicRegion>,
-    pub api: NewRelicApi,
-    pub buffer_size: Option<usize>,
-    pub timeout: Option<u64>,
-    #[serde(default = "Compression::gzip_default")]
-    pub compression: Compression,
-    #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
-    )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
-    #[serde(default)]
-    pub batch: BatchConfig,
-    #[serde(default)]
-    pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>
 }
 
 pub trait ToJSON<T> : Serialize + TryFrom<T>
@@ -365,15 +350,30 @@ inventory::submit! {
     SinkDescription::new::<NewRelicConfig>("new_relic")
 }
 
-impl_generate_config_from_default!(NewRelicConfig);
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Default,
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[serde(deny_unknown_fields)]
+pub struct NewRelicConfig {
+    pub license_key: String,
+    pub account_id: String,
+    pub region: Option<NewRelicRegion>,
+    pub api: NewRelicApi,
+    pub buffer_size: Option<usize>,
+    pub timeout: Option<u64>,
+    #[serde(default = "Compression::gzip_default")]
+    pub compression: Compression,
+    #[serde(
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
+    )]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
+    #[serde(default)]
+    pub batch: BatchConfig,
+    #[serde(default)]
+    pub request: TowerRequestConfig,
+    pub tls: Option<TlsOptions>
 }
+
+impl_generate_config_from_default!(NewRelicConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "new_relic")]
