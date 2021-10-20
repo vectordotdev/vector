@@ -34,7 +34,8 @@ impl Service<AzureBlobRequest> for AzureBlobService {
     }
 
     fn call(&mut self, request: AzureBlobRequest) -> Self::Future {
-        let client = Arc::clone(&self.client).as_blob_client(request.blob_name.as_str());
+        let client =
+            Arc::clone(&self.client).as_blob_client(request.metadata.partition_key.as_str());
 
         Box::pin(async move {
             let byte_size = request.blob_data.len();

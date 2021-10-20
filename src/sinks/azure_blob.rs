@@ -1,4 +1,4 @@
-use std::{convert::TryInto, num::NonZeroUsize, sync::Arc};
+use std::{convert::TryInto, io, sync::Arc};
 
 use azure_storage::blob::prelude::*;
 use bytes::Bytes;
@@ -6,11 +6,13 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 use uuid::Uuid;
+use vector_core::ByteSizeOf;
 
 use crate::sinks::azure_common;
+use crate::sinks::azure_common::config::AzureBlobMetadata;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext},
-    event::{Event, EventFinalizers, Finalizable},
+    event::{Event, Finalizable},
     sinks::{
         azure_common::{
             config::{AzureBlobRequest, AzureBlobRetryLogic},
@@ -88,10 +90,8 @@ impl SinkConfig for AzureBlobSinkConfig {
     }
 }
 
-const DEFAULT_REQUEST_LIMITS: TowerRequestConfig = {
-    TowerRequestConfig::const_new(Concurrency::Fixed(50), Concurrency::Fixed(50))
-        .rate_limit_num(250)
-};
+const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
+    TowerRequestConfig::new(Concurrency::Fixed(50)).rate_limit_num(250);
 
 const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = {
     BatchSettings::const_default()
@@ -115,11 +115,9 @@ impl AzureBlobSinkConfig {
             .service(AzureBlobService::new(client));
 
         // Configure our partitioning/batching.
-        let batch_settings = DEFAULT_BATCH_SETTINGS.parse_config(self.batch)?;
-        let batch_size_bytes = NonZeroUsize::new(batch_settings.size.bytes);
-        let batch_size_events = NonZeroUsize::new(batch_settings.size.events)
-            .ok_or("batch events must be greater than 0")?;
-        let batch_timeout = batch_settings.timeout;
+        let batcher_settings = DEFAULT_BATCH_SETTINGS
+            .parse_config(self.batch)?
+            .into_batcher_settings()?;
 
         let blob_time_format = self
             .blob_time_format
@@ -143,11 +141,7 @@ impl AzureBlobSinkConfig {
             service,
             request_options,
             self.key_partitioner()?,
-            self.encoding.clone(),
-            self.compression,
-            batch_size_bytes,
-            batch_size_events,
-            batch_timeout,
+            batcher_settings,
         );
 
         Ok(VectorSink::Stream(Box::new(sink)))
@@ -174,21 +168,35 @@ pub struct AzureBlobRequestOptions {
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
-    type Metadata = (String, usize, EventFinalizers);
+    type Metadata = AzureBlobMetadata;
     type Events = Vec<Event>;
+    type Encoder = EncodingConfig<StandardEncodings>;
     type Payload = Bytes;
     type Request = AzureBlobRequest;
+    type Error = io::Error;
+
+    fn compression(&self) -> Compression {
+        self.compression
+    }
+
+    fn encoder(&self) -> &Self::Encoder {
+        &self.encoding
+    }
 
     fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
+        let metadata = AzureBlobMetadata {
+            partition_key,
+            count: events.len(),
+            byte_size: events.size_of(),
+            finalizers,
+        };
 
-        ((partition_key, events.len(), finalizers), events)
+        (metadata, events)
     }
 
-    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        let (key, batch_size, finalizers) = metadata;
-
+    fn build_request(&self, mut metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
         let blob_name = {
             let formatted_ts = Utc::now().format(self.blob_time_format.as_str());
 
@@ -198,22 +206,21 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
         };
 
         let extension = self.compression.extension();
-        let blob_name = format!("{}{}.{}", key, blob_name, extension);
+        metadata.partition_key = format!("{}{}.{}", metadata.partition_key, blob_name, extension);
 
         debug!(
             message = "Sending events.",
             bytes = ?payload.len(),
-            events_len = ?batch_size,
+            events_len = ?metadata.count,
+            blob = ?metadata.partition_key,
             container = ?self.container_name,
-            blob = ?key
         );
 
         AzureBlobRequest {
             blob_data: payload,
-            blob_name,
             content_encoding: self.compression.content_encoding(),
             content_type: self.compression.content_type(),
-            finalizers,
+            metadata,
         }
     }
 }
@@ -283,7 +290,7 @@ mod tests {
         let (metadata, _events) = request_options.split_input((key, vec![log]));
         let request = request_options.build_request(metadata, Bytes::new());
 
-        assert_eq!(request.blob_name, "blob.log".to_string());
+        assert_eq!(request.metadata.partition_key, "blob.log".to_string());
         assert_eq!(request.content_encoding, None);
         assert_eq!(request.content_type, "text/plain");
     }
@@ -318,7 +325,7 @@ mod tests {
         let (metadata, _events) = request_options.split_input((key, vec![log]));
         let request = request_options.build_request(metadata, Bytes::new());
 
-        assert_eq!(request.blob_name, "blob.log.gz".to_string());
+        assert_eq!(request.metadata.partition_key, "blob.log.gz".to_string());
         assert_eq!(request.content_encoding, Some("gzip"));
         assert_eq!(request.content_type, "application/gzip");
     }
@@ -354,7 +361,7 @@ mod tests {
         let request = request_options.build_request(metadata, Bytes::new());
 
         assert_eq!(
-            request.blob_name,
+            request.metadata.partition_key,
             format!("blob{}.log", Utc::now().format("%F"))
         );
         assert_eq!(request.content_encoding, None);
@@ -391,7 +398,7 @@ mod tests {
         let (metadata, _events) = request_options.split_input((key, vec![log]));
         let request = request_options.build_request(metadata, Bytes::new());
 
-        assert_ne!(request.blob_name, "blob.log".to_string());
+        assert_ne!(request.metadata.partition_key, "blob.log".to_string());
         assert_eq!(request.content_encoding, None);
         assert_eq!(request.content_type, "text/plain");
     }

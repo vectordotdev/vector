@@ -25,6 +25,13 @@ impl DummyEnrichmentTable {
             indexes,
         }
     }
+
+    pub(crate) fn new_with_data(data: BTreeMap<String, Value>) -> Self {
+        Self {
+            data,
+            indexes: Default::default(),
+        }
+    }
 }
 
 impl Table for DummyEnrichmentTable {
@@ -52,6 +59,14 @@ impl Table for DummyEnrichmentTable {
         let mut indexes = self.indexes.lock().unwrap();
         indexes.push(fields.iter().map(|s| (*s).to_string()).collect());
         Ok(IndexHandle(indexes.len() - 1))
+    }
+
+    fn index_fields(&self) -> Vec<(Case, Vec<String>)> {
+        Vec::new()
+    }
+
+    fn needs_reload(&self) -> bool {
+        false
     }
 }
 

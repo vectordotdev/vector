@@ -5,24 +5,36 @@ use std::{cmp, io, usize};
 use tokio_util::codec::{Decoder, Encoder};
 
 /// Config used to build a `CharacterDelimitedCodec`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CharacterDelimitedDecoderConfig {
+    character_delimited: CharacterDelimitedDecoderOptions,
+}
+
+/// Options for building a `CharacterDelimitedCodec`.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+pub struct CharacterDelimitedDecoderOptions {
     /// The character that delimits byte sequences.
     delimiter: char,
     /// The maximum length of the byte buffer.
     ///
     /// This length does *not* include the trailing delimiter.
-    #[serde(default = "crate::serde::default_max_length")]
-    max_length: usize,
+    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
+    max_length: Option<usize>,
 }
 
 #[typetag::serde(name = "character_delimited")]
 impl FramingConfig for CharacterDelimitedDecoderConfig {
     fn build(&self) -> crate::Result<BoxedFramer> {
-        Ok(Box::new(CharacterDelimitedCodec::new_with_max_length(
-            self.delimiter,
-            self.max_length,
-        )))
+        if let Some(max_length) = self.character_delimited.max_length {
+            Ok(Box::new(CharacterDelimitedCodec::new_with_max_length(
+                self.character_delimited.delimiter,
+                max_length,
+            )))
+        } else {
+            Ok(Box::new(CharacterDelimitedCodec::new(
+                self.character_delimited.delimiter,
+            )))
+        }
     }
 }
 

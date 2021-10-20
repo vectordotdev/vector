@@ -28,8 +28,6 @@ pub struct Pipeline {
     #[derivative(Debug = "ignore")]
     inlines: Vec<Box<dyn FunctionTransform>>,
     enqueued: VecDeque<Event>,
-    events_outstanding: usize,
-    bytes_outstanding: usize,
 }
 
 impl Pipeline {
@@ -37,32 +35,43 @@ impl Pipeline {
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), <Self as Sink<Event>>::Error>> {
-        // We batch the updates to "events out" for efficiency, and do it here because
+        // We batch the updates to EventsSent for efficiency, and do it here because
         // it gives us a chance to allow the natural batching of `Pipeline` to kick in.
-        if self.events_outstanding > 0 {
-            emit!(&EventsSent {
-                count: self.events_outstanding,
-                byte_size: self.bytes_outstanding,
-            });
-            self.events_outstanding = 0;
-            self.bytes_outstanding = 0;
-        }
+        let mut sent_count = 0;
+        let mut sent_bytes = 0;
 
         while let Some(event) = self.enqueued.pop_front() {
             match self.inner.poll_ready(cx) {
                 Poll::Pending => {
                     self.enqueued.push_front(event);
+                    if sent_count > 0 {
+                        emit!(&EventsSent {
+                            count: sent_count,
+                            byte_size: sent_bytes,
+                        });
+                    }
                     return Poll::Pending;
                 }
                 Poll::Ready(Ok(())) => {
                     // continue to send below
                 }
-                Poll::Ready(Err(_error)) => return Poll::Ready(Err(ClosedError)),
+                Poll::Ready(Err(_error)) => {
+                    if sent_count > 0 {
+                        emit!(&EventsSent {
+                            count: sent_count,
+                            byte_size: sent_bytes,
+                        });
+                    }
+                    return Poll::Ready(Err(ClosedError));
+                }
             }
 
+            let event_bytes = event.size_of();
             match self.inner.start_send(event) {
                 Ok(()) => {
                     // we good, keep looping
+                    sent_count += 1;
+                    sent_bytes += event_bytes;
                 }
                 Err(error) if error.is_full() => {
                     // We only try to send after a successful call to poll_ready, which reserves
@@ -71,10 +80,22 @@ impl Pipeline {
                     panic!("Channel was both ready and full; this is a bug.")
                 }
                 Err(error) if error.is_disconnected() => {
+                    if sent_count > 0 {
+                        emit!(&EventsSent {
+                            count: sent_count,
+                            byte_size: sent_bytes,
+                        });
+                    }
                     return Poll::Ready(Err(ClosedError));
                 }
                 Err(_) => unreachable!(),
             }
+        }
+        if sent_count > 0 {
+            emit!(&EventsSent {
+                count: sent_count,
+                byte_size: sent_bytes,
+            });
         }
         Poll::Ready(Ok(()))
     }
@@ -92,9 +113,6 @@ impl Sink<Event> for Pipeline {
     }
 
     fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
-        self.events_outstanding += 1;
-        self.bytes_outstanding += item.size_of();
-
         // Note how this gets **swapped** with `new_working_set` in the loop.
         // At the end of the loop, it will only contain finalized events.
         let mut working_set = vec![item];
@@ -157,8 +175,6 @@ impl Pipeline {
             // We ensure the buffer is sufficient that it is unlikely to require reallocations.
             // There is a possibility a component might blow this queue size.
             enqueued: VecDeque::with_capacity(10),
-            events_outstanding: 0,
-            bytes_outstanding: 0,
         }
     }
 }

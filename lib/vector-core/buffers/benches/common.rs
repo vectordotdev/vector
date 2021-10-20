@@ -1,11 +1,16 @@
 use buffers::bytes::{DecodeBytes, EncodeBytes};
 use buffers::{self, Variant};
 use bytes::{Buf, BufMut};
+use core_common::byte_size_of::ByteSizeOf;
 use futures::task::{noop_waker, Context, Poll};
 use futures::{Sink, Stream};
+use metrics_tracing_context::{MetricsLayer, TracingContextLayer};
+use metrics_util::layers::Layer;
+use metrics_util::DebuggingRecorder;
 use std::fmt;
 use std::pin::Pin;
-use tokio::runtime::Runtime;
+use tracing::Span;
+use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 
 #[derive(Clone, Copy)]
 pub struct Message<const N: usize> {
@@ -19,6 +24,12 @@ impl<const N: usize> Message<N> {
             id,
             _padding: [0; N],
         }
+    }
+}
+
+impl<const N: usize> ByteSizeOf for Message<N> {
+    fn allocated_bytes(&self) -> usize {
+        0
     }
 }
 
@@ -82,7 +93,7 @@ pub fn setup<const N: usize>(
         messages.push(Message::new(i as u64));
     }
 
-    let (tx, rx, _) = buffers::build::<Message<N>>(variant).unwrap();
+    let (tx, rx, _) = buffers::build::<Message<N>>(variant, Span::none()).unwrap();
     (Pin::new(tx.get()), Box::pin(rx), messages)
 }
 
@@ -108,6 +119,16 @@ fn consume<T>(mut stream: Pin<&mut (dyn Stream<Item = T> + Unpin + Send)>, conte
     while let Poll::Ready(Some(_)) = stream.as_mut().poll_next(context) {}
 }
 
+pub fn init_instrumentation() {
+    if metrics::try_recorder().is_none() {
+        let subscriber = tracing_subscriber::Registry::default().with(MetricsLayer::new());
+        tracing::subscriber::set_global_default(subscriber).unwrap();
+
+        let recorder = TracingContextLayer::all().layer(DebuggingRecorder::new());
+        metrics::set_boxed_recorder(Box::new(recorder)).unwrap();
+    }
+}
+
 //
 // Measurements
 //
@@ -126,26 +147,23 @@ pub fn wtr_measurement<const N: usize>(
         Vec<Message<N>>,
     ),
 ) {
-    let rt = Runtime::new().unwrap();
-    rt.block_on(async move {
-        {
-            let waker = noop_waker();
-            let mut context = Context::from_waker(&waker);
+    {
+        let waker = noop_waker();
+        let mut context = Context::from_waker(&waker);
 
-            let mut sink = input.0;
-            for msg in input.2.into_iter() {
-                send_msg(msg, sink.as_mut(), &mut context)
-            }
+        let mut sink = input.0;
+        for msg in input.2.into_iter() {
+            send_msg(msg, sink.as_mut(), &mut context)
         }
+    }
 
-        {
-            let waker = noop_waker();
-            let mut context = Context::from_waker(&waker);
+    {
+        let waker = noop_waker();
+        let mut context = Context::from_waker(&waker);
 
-            let mut stream = input.1;
-            consume(stream.as_mut(), &mut context)
-        }
-    })
+        let mut stream = input.1;
+        consume(stream.as_mut(), &mut context)
+    }
 }
 
 #[allow(clippy::type_complexity)]
@@ -156,19 +174,16 @@ pub fn war_measurement<const N: usize>(
         Vec<Message<N>>,
     ),
 ) {
-    let rt = Runtime::new().unwrap();
-    rt.block_on(async move {
-        let snd_waker = noop_waker();
-        let mut snd_context = Context::from_waker(&snd_waker);
+    let snd_waker = noop_waker();
+    let mut snd_context = Context::from_waker(&snd_waker);
 
-        let rcv_waker = noop_waker();
-        let mut rcv_context = Context::from_waker(&rcv_waker);
+    let rcv_waker = noop_waker();
+    let mut rcv_context = Context::from_waker(&rcv_waker);
 
-        let mut stream = input.1;
-        let mut sink = input.0;
-        for msg in input.2.into_iter() {
-            send_msg(msg, sink.as_mut(), &mut snd_context);
-            consume(stream.as_mut(), &mut rcv_context)
-        }
-    })
+    let mut stream = input.1;
+    let mut sink = input.0;
+    for msg in input.2.into_iter() {
+        send_msg(msg, sink.as_mut(), &mut snd_context);
+        consume(stream.as_mut(), &mut rcv_context)
+    }
 }

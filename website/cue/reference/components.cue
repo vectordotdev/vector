@@ -169,6 +169,7 @@ components: {
 			collect?:  #FeaturesCollect
 			generate?: #FeaturesGenerate
 			multiline: #FeaturesMultiline
+			codecs?:   #FeaturesCodecs
 			encoding?: #FeaturesEncoding
 			receive?:  #FeaturesReceive
 		}
@@ -265,6 +266,11 @@ components: {
 
 	#FeaturesMultiline: {
 		enabled: bool
+	}
+
+	#FeaturesCodecs: {
+		enabled:         bool
+		default_framing: string
 	}
 
 	#FeaturesEncoding: {

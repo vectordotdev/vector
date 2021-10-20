@@ -65,11 +65,6 @@ pub struct TowerRequestConfig {
     #[serde(default)]
     #[serde(skip_serializing_if = "concurrency_is_none")]
     pub concurrency: Concurrency, // 1024
-    /// The same as concurrency but with old deprecated name.
-    /// Alias couldn't be used because of <https://github.com/serde-rs/serde/issues/1504>
-    #[serde(default)]
-    #[serde(skip_serializing_if = "concurrency_is_none")]
-    pub in_flight_limit: Concurrency, // 1024
     pub timeout_secs: Option<u64>,             // 1 minute
     pub rate_limit_duration_secs: Option<u64>, // 1 second
     pub rate_limit_num: Option<u64>,           // i64::MAX
@@ -90,25 +85,14 @@ pub const TIMEOUT_SECONDS_DEFAULT: u64 = 60; // one minute
 
 impl Default for TowerRequestConfig {
     fn default() -> Self {
-        Self {
-            concurrency: CONCURRENCY_DEFAULT,
-            in_flight_limit: CONCURRENCY_DEFAULT,
-            timeout_secs: Some(TIMEOUT_SECONDS_DEFAULT),
-            rate_limit_duration_secs: Some(RATE_LIMIT_DURATION_SECONDS_DEFAULT),
-            rate_limit_num: Some(RATE_LIMIT_NUM_DEFAULT),
-            retry_attempts: Some(RETRY_ATTEMPTS_DEFAULT),
-            retry_max_duration_secs: Some(RETRY_MAX_DURATION_SECONDS_DEFAULT),
-            retry_initial_backoff_secs: Some(RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT),
-            adaptive_concurrency: AdaptiveConcurrencySettings::default(),
-        }
+        Self::new(CONCURRENCY_DEFAULT)
     }
 }
 
 impl TowerRequestConfig {
-    pub const fn const_new(concurrency: Concurrency, in_flight_limit: Concurrency) -> Self {
+    pub const fn new(concurrency: Concurrency) -> Self {
         Self {
             concurrency,
-            in_flight_limit,
             timeout_secs: Some(TIMEOUT_SECONDS_DEFAULT),
             rate_limit_duration_secs: Some(RATE_LIMIT_DURATION_SECONDS_DEFAULT),
             rate_limit_num: Some(RATE_LIMIT_NUM_DEFAULT),
@@ -124,9 +108,14 @@ impl TowerRequestConfig {
         self
     }
 
+    pub const fn rate_limit_duration_secs(mut self, rate_limit_duration_secs: u64) -> Self {
+        self.rate_limit_duration_secs = Some(rate_limit_duration_secs);
+        self
+    }
+
     pub fn unwrap_with(&self, defaults: &Self) -> TowerRequestSettings {
         TowerRequestSettings {
-            concurrency: self.concurrency().parse_concurrency(defaults.concurrency()),
+            concurrency: self.concurrency.parse_concurrency(defaults.concurrency),
             timeout: Duration::from_secs(
                 self.timeout_secs
                     .or(defaults.timeout_secs)
@@ -156,20 +145,6 @@ impl TowerRequestConfig {
                     .unwrap_or(RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT),
             ),
             adaptive_concurrency: self.adaptive_concurrency,
-        }
-    }
-
-    pub fn concurrency(&self) -> &Concurrency {
-        match (
-            concurrency_is_none(&self.concurrency),
-            concurrency_is_none(&self.in_flight_limit),
-        ) {
-            (_, true) => &self.concurrency,
-            (true, false) => &self.in_flight_limit,
-            (false, false) => {
-                warn!("Option `in_flight_limit` has been renamed to `concurrency`. Ignoring `in_flight_limit` and using `concurrency` option.");
-                &self.concurrency
-            }
         }
     }
 }
@@ -359,13 +334,6 @@ mod tests {
             .expect_err("Invalid concurrency setting didn't fail on negative number");
     }
 
-    #[test]
-    fn backward_compatibility_with_in_flight_limit_param_works() {
-        let cfg = toml::from_str::<TowerRequestConfig>("in_flight_limit = 10")
-            .expect("Fixed concurrency failed for in_flight_limit param");
-        assert_eq!(cfg.concurrency(), &Concurrency::Fixed(10));
-    }
-
     #[tokio::test]
     async fn partition_sink_retry_concurrency() {
         let cfg = TowerRequestConfig {
@@ -405,7 +373,7 @@ mod tests {
 
         let input = (0..20).into_iter().map(|i| PartitionInnerBuffer::new(i, 0));
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item))))
+            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
             .await
             .unwrap();
 

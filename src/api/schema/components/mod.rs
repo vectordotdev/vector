@@ -24,7 +24,6 @@ use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 #[derive(Debug, Clone, Interface)]
 #[graphql(
     field(name = "component_id", type = "String"),
-    field(name = "pipeline_id", type = "Option<&str>"),
     field(name = "component_type", type = "String")
 )]
 pub enum Component {
@@ -208,16 +207,8 @@ impl ComponentsQuery {
     }
 
     /// Gets a configured component by component_key
-    async fn component_by_component_key(
-        &self,
-        pipeline_id: Option<String>,
-        component_id: String,
-    ) -> Option<Component> {
-        let key = if let Some(pipeline_id) = pipeline_id {
-            ComponentKey::pipeline(&pipeline_id, &component_id)
-        } else {
-            ComponentKey::global(&component_id)
-        };
+    async fn component_by_component_key(&self, component_id: String) -> Option<Component> {
+        let key = ComponentKey::global(&component_id);
         component_by_component_key(&key)
     }
 }
@@ -332,7 +323,7 @@ mod tests {
     use super::*;
     use crate::{
         api::schema::sort,
-        config::{ComponentKey, DataType},
+        config::{ComponentKey, DataType, OutputId},
     };
 
     /// Generate component fixes for use with tests
@@ -356,12 +347,12 @@ mod tests {
             Component::Transform(transform::Transform(transform::Data {
                 component_key: ComponentKey::from("parse_json"),
                 component_type: "json".to_string(),
-                inputs: vec![ComponentKey::from("gen1"), ComponentKey::from("gen2")],
+                inputs: vec![OutputId::from("gen1"), OutputId::from("gen2")],
             })),
             Component::Sink(sink::Sink(sink::Data {
                 component_key: ComponentKey::from("devnull"),
                 component_type: "blackhole".to_string(),
-                inputs: vec![ComponentKey::from("gen3"), ComponentKey::from("parse_json")],
+                inputs: vec![OutputId::from("gen3"), OutputId::from("parse_json")],
             })),
         ]
     }
@@ -485,17 +476,17 @@ mod tests {
             Component::Sink(sink::Sink(sink::Data {
                 component_key: ComponentKey::from("a"),
                 component_type: "blackhole".to_string(),
-                inputs: vec![ComponentKey::from("gen3"), ComponentKey::from("parse_json")],
+                inputs: vec![OutputId::from("gen3"), OutputId::from("parse_json")],
             })),
             Component::Sink(sink::Sink(sink::Data {
                 component_key: ComponentKey::from("b"),
                 component_type: "blackhole".to_string(),
-                inputs: vec![ComponentKey::from("gen3"), ComponentKey::from("parse_json")],
+                inputs: vec![OutputId::from("gen3"), OutputId::from("parse_json")],
             })),
             Component::Transform(transform::Transform(transform::Data {
                 component_key: ComponentKey::from("c"),
                 component_type: "json".to_string(),
-                inputs: vec![ComponentKey::from("gen1"), ComponentKey::from("gen2")],
+                inputs: vec![OutputId::from("gen1"), OutputId::from("gen2")],
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("e"),

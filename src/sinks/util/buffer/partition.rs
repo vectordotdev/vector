@@ -1,4 +1,6 @@
-use crate::sinks::util::batch::{Batch, BatchConfig, BatchError, BatchSettings, PushResult};
+use super::super::batch::{Batch, BatchConfig, BatchError, BatchSettings, PushResult};
+use super::super::ElementCount;
+use vector_core::ByteSizeOf;
 
 pub trait Partition<K> {
     fn partition(&self) -> K;
@@ -83,5 +85,22 @@ where
 {
     fn partition(&self) -> K {
         self.key.clone()
+    }
+}
+
+impl<T: ByteSizeOf, K> ByteSizeOf for PartitionInnerBuffer<T, K> {
+    // This ignores the size of the key, as it does not represent actual data size.
+    fn size_of(&self) -> usize {
+        self.inner.size_of()
+    }
+
+    fn allocated_bytes(&self) -> usize {
+        self.inner.allocated_bytes()
+    }
+}
+
+impl<T: ElementCount, K> ElementCount for PartitionInnerBuffer<T, K> {
+    fn element_count(&self) -> usize {
+        self.inner.element_count()
     }
 }

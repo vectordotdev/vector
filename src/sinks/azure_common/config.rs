@@ -15,22 +15,29 @@ use std::sync::Arc;
 #[derive(Debug, Clone)]
 pub struct AzureBlobRequest {
     pub blob_data: Bytes,
-    pub blob_name: String,
     pub content_encoding: Option<&'static str>,
     pub content_type: &'static str,
-    pub finalizers: EventFinalizers,
+    pub metadata: AzureBlobMetadata,
 }
 
 impl Ackable for AzureBlobRequest {
     fn ack_size(&self) -> usize {
-        self.blob_data.len()
+        self.metadata.count
     }
 }
 
 impl Finalizable for AzureBlobRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
-        std::mem::take(&mut self.finalizers)
+        std::mem::take(&mut self.metadata.finalizers)
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct AzureBlobMetadata {
+    pub partition_key: String,
+    pub count: usize,
+    pub byte_size: usize,
+    pub finalizers: EventFinalizers,
 }
 
 #[derive(Debug, Clone)]

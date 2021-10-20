@@ -16,6 +16,10 @@ components: sources: kafka: {
 			from: components._kafka.features.collect.from
 		}
 		multiline: enabled: false
+		codecs: {
+			enabled:         true
+			default_framing: "bytes"
+		}
 	}
 
 	classes: {
