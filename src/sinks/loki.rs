@@ -20,8 +20,8 @@ use crate::{
         buffer::loki::{GlobalTimestamps, LokiBuffer, LokiEvent, LokiRecord, PartitionKey},
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{HttpSink, PartitionHttpSink},
-        BatchConfig, BatchSettings, Concurrency, PartitionBuffer, PartitionInnerBuffer,
-        TowerRequestConfig, UriSerde,
+        BatchConfig, BatchSettings, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
+        UriSerde,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
@@ -108,7 +108,6 @@ impl SinkConfig for LokiConfig {
         }
 
         let request_settings = self.request.unwrap_with(&TowerRequestConfig {
-            concurrency: Concurrency::Fixed(5),
             ..Default::default()
         });
 

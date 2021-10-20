@@ -26,7 +26,6 @@ components: sinks: datadog_archives: {
 			proxy: enabled:       false
 			request: {
 				enabled:        true
-				concurrency:    50
 				rate_limit_num: 250
 				headers:        false
 			}
