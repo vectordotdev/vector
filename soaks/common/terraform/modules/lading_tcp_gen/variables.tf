@@ -8,7 +8,7 @@ variable "namespace" {
   type        = string
 }
 
-variable "http-blackhole-toml" {
-  description = "The rendered http_blackhole.toml for this test"
+variable "tcp-gen-toml" {
+  description = "The rendered tcp_gen.toml for this test"
   type        = string
 }

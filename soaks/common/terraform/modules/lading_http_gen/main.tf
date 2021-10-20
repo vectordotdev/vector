@@ -16,8 +16,8 @@ resource "kubernetes_service" "http-gen" {
   }
   spec {
     selector = {
-      app = "http-gen"
-        type = var.type
+      app  = "http-gen"
+      type = var.type
     }
     session_affinity = "ClientIP"
     port {
@@ -34,7 +34,7 @@ resource "kubernetes_deployment" "http-gen" {
     name      = "http-gen"
     namespace = var.namespace
     labels = {
-      app = "http-gen"
+      app  = "http-gen"
       type = var.type
     }
   }
@@ -44,7 +44,7 @@ resource "kubernetes_deployment" "http-gen" {
 
     selector {
       match_labels = {
-        app = "http-gen"
+        app  = "http-gen"
         type = var.type
       }
     }
@@ -52,13 +52,13 @@ resource "kubernetes_deployment" "http-gen" {
     template {
       metadata {
         labels = {
-          app = "http-gen"
+          app  = "http-gen"
           type = var.type
         }
         annotations = {
           "prometheus.io/scrape" = true
-          "prometheus.io/port" = 9090
-          "prometheus.io/path" = "/metrics"
+          "prometheus.io/port"   = 9090
+          "prometheus.io/path"   = "/metrics"
         }
       }
 
@@ -68,7 +68,7 @@ resource "kubernetes_deployment" "http-gen" {
           image_pull_policy = "IfNotPresent"
           image             = "ghcr.io/blt/lading:0.5.0"
           name              = "http-gen"
-          command = ["/http_gen"]
+          command           = ["/http_gen"]
 
           volume_mount {
             mount_path = "/etc/lading"

@@ -23,7 +23,7 @@ module "vector" {
   type         = var.type
   vector_image = var.vector_image
   sha          = var.sha
-  test_name    = "datadog_agent_remap_datadog_logs"
+  test_name    = "syslog_regex_logs2metric_ddmetrics"
   vector-toml  = file("${path.module}/vector.toml")
   namespace    = kubernetes_namespace.soak.metadata[0].name
   depends_on   = [module.http-blackhole]
@@ -34,9 +34,10 @@ module "http-blackhole" {
   http-blackhole-toml = file("${path.module}/http_blackhole.toml")
   namespace           = kubernetes_namespace.soak.metadata[0].name
 }
-module "http-gen" {
-  source        = "../../common/terraform/modules/lading_http_gen"
-  type          = var.type
-  http-gen-toml = file("${path.module}/http_gen.toml")
-  namespace     = kubernetes_namespace.soak.metadata[0].name
+module "tcp-gen" {
+  source       = "../../common/terraform/modules/lading_tcp_gen"
+  type         = var.type
+  tcp-gen-toml = file("${path.module}/tcp_gen.toml")
+  namespace    = kubernetes_namespace.soak.metadata[0].name
+  depends_on   = [module.vector]
 }

@@ -1,30 +1,25 @@
 resource "kubernetes_config_map" "lading" {
   metadata {
-    name      = "lading-http-blackhole"
+    name      = "lading-tcp-gen"
     namespace = var.namespace
   }
 
   data = {
-    "http_blackhole.toml" = var.http-blackhole-toml
+    "tcp_gen.toml" = var.tcp-gen-toml
   }
 }
 
-resource "kubernetes_service" "http-blackhole" {
+resource "kubernetes_service" "tcp-gen" {
   metadata {
-    name      = "http-blackhole"
+    name      = "tcp-gen"
     namespace = var.namespace
   }
   spec {
     selector = {
-      app  = "http-blackhole"
+      app  = "tcp-gen"
       type = var.type
     }
     session_affinity = "ClientIP"
-    port {
-      name        = "datadog-agent"
-      port        = 8080
-      target_port = 8080
-    }
     port {
       name        = "prom-export"
       port        = 9090
@@ -34,12 +29,12 @@ resource "kubernetes_service" "http-blackhole" {
   }
 }
 
-resource "kubernetes_deployment" "http-blackhole" {
+resource "kubernetes_deployment" "tcp-gen" {
   metadata {
-    name      = "http-blackhole"
+    name      = "tcp-gen"
     namespace = var.namespace
     labels = {
-      app  = "http-blackhole"
+      app  = "tcp-gen"
       type = var.type
     }
   }
@@ -49,7 +44,7 @@ resource "kubernetes_deployment" "http-blackhole" {
 
     selector {
       match_labels = {
-        app  = "http-blackhole"
+        app  = "tcp-gen"
         type = var.type
       }
     }
@@ -57,7 +52,7 @@ resource "kubernetes_deployment" "http-blackhole" {
     template {
       metadata {
         labels = {
-          app  = "http-blackhole"
+          app  = "tcp-gen"
           type = var.type
         }
         annotations = {
@@ -71,9 +66,9 @@ resource "kubernetes_deployment" "http-blackhole" {
         automount_service_account_token = false
         container {
           image_pull_policy = "IfNotPresent"
-          image             = "ghcr.io/blt/lading:0.5.0"
-          name              = "http-blackhole"
-          command           = ["/http_blackhole"]
+          image             = "ghcr.io/blt/lading:0.5.1"
+          name              = "tcp-gen"
+          command           = ["/tcp_gen"]
 
           volume_mount {
             mount_path = "/etc/lading"
@@ -83,19 +78,15 @@ resource "kubernetes_deployment" "http-blackhole" {
 
           resources {
             limits = {
-              cpu    = "100m"
-              memory = "32Mi"
+              cpu    = "1"
+              memory = "512Mi"
             }
             requests = {
-              cpu    = "100m"
-              memory = "32Mi"
+              cpu    = "1"
+              memory = "512Mi"
             }
           }
 
-          port {
-            container_port = 8080
-            name           = "listen"
-          }
           port {
             container_port = 9090
             name           = "prom-export"

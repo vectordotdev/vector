@@ -22,7 +22,7 @@ resource "kubernetes_service" "vector" {
     }
     session_affinity = "ClientIP"
     port {
-      name        = "datadog-agent"
+      name        = "source"
       port        = 8282
       target_port = 8282
     }
@@ -103,7 +103,7 @@ resource "kubernetes_deployment" "vector" {
 
           port {
             container_port = 8282
-            name           = "datadog-agent"
+            name           = "source"
           }
           port {
             container_port = 9090
