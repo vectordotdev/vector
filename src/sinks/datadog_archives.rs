@@ -9,7 +9,6 @@ use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{SecondsFormat, Utc};
 use http::header::{HeaderName, HeaderValue};
 use rand::{thread_rng, Rng};
-use rusoto_s3::S3Client;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tower::ServiceBuilder;
@@ -17,26 +16,31 @@ use uuid::Uuid;
 
 use vector_core::{
     config::{log_schema, LogSchema},
-    event::{Event, EventFinalizers, Finalizable},
+    event::{Event, Finalizable},
+    ByteSizeOf,
 };
 
 use crate::{
     config::GenerateConfig,
     config::{DataType, SinkConfig, SinkContext},
+    event::EventFinalizers,
     http::HttpClient,
     rusoto::{AwsAuthentication, RegionOrEndpoint},
     serde::to_string,
-    sinks::gcp::{GcpAuthConfig, GcpCredentials},
-    sinks::gcs_common::config::{GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass, BASE_URL},
-    sinks::gcs_common::service::{GcsRequest, GcsRequestSettings, GcsService},
-    sinks::gcs_common::sink::GcsSink,
-    sinks::{gcs_common, s3_common},
     sinks::{
+        gcp::{GcpAuthConfig, GcpCredentials},
+        gcs_common::{
+            self,
+            config::{GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass, BASE_URL},
+            service::{GcsRequest, GcsRequestSettings, GcsService},
+            sink::GcsSink,
+        },
         s3_common::{
+            self,
             config::{
-                create_client, S3CannedAcl, S3RetryLogic, S3ServerSideEncryption, S3StorageClass,
+                create_service, S3CannedAcl, S3RetryLogic, S3ServerSideEncryption, S3StorageClass,
             },
-            service::{S3Request, S3Service},
+            service::{S3Metadata, S3Request, S3Service},
             sink::S3Sink,
         },
         util::partitioner::KeyPartitioner,
@@ -155,9 +159,10 @@ impl DatadogArchivesSinkConfig {
         match &self.service[..] {
             "aws_s3" => {
                 let s3_config = self.aws_s3.as_ref().expect("s3 config wasn't provided");
-                let client = create_client(&s3_config.region, &s3_config.auth, None, &cx.proxy)?;
+                let service = create_service(&s3_config.region, &s3_config.auth, None, &cx.proxy)?;
+                let client = service.client();
                 let svc = self
-                    .build_s3_sink(&s3_config.options, client.clone(), cx)
+                    .build_s3_sink(&s3_config.options, service, cx)
                     .map_err(|error| format!("{}", error))?;
                 Ok((
                     svc,
@@ -197,7 +202,7 @@ impl DatadogArchivesSinkConfig {
     fn build_s3_sink(
         &self,
         s3_options: &S3Options,
-        client: S3Client,
+        service: S3Service,
         cx: SinkContext,
     ) -> std::result::Result<VectorSink, ConfigError> {
         // we use lower default limits, because we send 100mb batches,
@@ -205,7 +210,7 @@ impl DatadogArchivesSinkConfig {
         let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
         let service = ServiceBuilder::new()
             .settings(request_limits, S3RetryLogic)
-            .service(S3Service::new(client));
+            .service(service);
 
         match s3_options.storage_class {
             Some(class @ S3StorageClass::DeepArchive) | Some(class @ S3StorageClass::Glacier) => {
@@ -414,7 +419,7 @@ impl DatadogS3RequestBuilder {
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
-    type Metadata = (String, usize, EventFinalizers);
+    type Metadata = S3Metadata;
     type Events = Vec<Event>;
     type Encoder = DatadogArchivesEncoding;
     type Payload = Bytes;
@@ -432,28 +437,33 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
     fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
+        let metadata = S3Metadata {
+            partition_key,
+            count: events.len(),
+            byte_size: events.size_of(),
+            finalizers,
+        };
 
-        ((partition_key, events.len(), finalizers), events)
+        (metadata, events)
     }
 
-    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        let (partition_key, batch_size, finalizers) = metadata;
-
-        let key = generate_object_key(self.key_prefix.clone(), partition_key);
+    fn build_request(&self, mut metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+        metadata.partition_key =
+            generate_object_key(self.key_prefix.clone(), metadata.partition_key);
 
         trace!(
             message = "Sending events.",
             bytes = ?payload.len(),
-            events_len = ?batch_size,
+            events_len = ?metadata.byte_size,
             bucket = ?self.bucket,
-            key = ?key
+            key = ?metadata.partition_key
         );
 
         let s3_options = self.config.options.clone();
         S3Request {
             body: payload,
             bucket: self.bucket.clone(),
-            key,
+            metadata,
             content_encoding: DEFAULT_COMPRESSION.content_encoding(),
             options: s3_common::config::S3Options {
                 acl: s3_options.acl,
@@ -468,8 +478,6 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
                 content_encoding: None,
                 content_type: None,
             },
-            batch_size,
-            finalizers,
         }
     }
 }
@@ -782,10 +790,11 @@ mod tests {
         let req = request_builder.build_request(metadata, fake_buf.clone());
         let expected_key_prefix = "audit/dt=20210823/hour=16/";
         let expected_key_ext = ".json.gz";
-        println!("{}", req.key);
-        assert!(req.key.starts_with(expected_key_prefix));
-        assert!(req.key.ends_with(expected_key_ext));
-        let uuid1 = &req.key[expected_key_prefix.len()..req.key.len() - expected_key_ext.len()];
+        println!("{}", req.metadata.partition_key);
+        assert!(req.metadata.partition_key.starts_with(expected_key_prefix));
+        assert!(req.metadata.partition_key.ends_with(expected_key_ext));
+        let uuid1 = &req.metadata.partition_key
+            [expected_key_prefix.len()..req.metadata.partition_key.len() - expected_key_ext.len()];
         assert_eq!(uuid1.len(), 36);
 
         // check the the second batch has a different UUID
@@ -794,7 +803,8 @@ mod tests {
         let key = partitioner.partition(&log2).expect("key wasn't provided");
         let (metadata, _events) = request_builder.split_input((key, vec![log2]));
         let req = request_builder.build_request(metadata, fake_buf);
-        let uuid2 = &req.key[expected_key_prefix.len()..req.key.len() - expected_key_ext.len()];
+        let uuid2 = &req.metadata.partition_key
+            [expected_key_prefix.len()..req.metadata.partition_key.len() - expected_key_ext.len()];
         assert_ne!(uuid1, uuid2);
     }
 
