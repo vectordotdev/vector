@@ -201,6 +201,20 @@ pub enum MetricValue {
 }
 
 impl MetricValue {
+    /// Gets whether or not this value is "empty".
+    ///
+    /// Scalar values (counter, gauge) are never considered empty.
+    pub fn is_empty(&self) -> bool {
+        match self {
+            MetricValue::Counter { .. } | MetricValue::Gauge { .. } => false,
+            MetricValue::Set { values } => values.is_empty(),
+            MetricValue::Distribution { samples, .. } => samples.is_empty(),
+            MetricValue::AggregatedSummary { count, .. } => *count == 0,
+            MetricValue::AggregatedHistogram { count, .. } => *count == 0,
+            MetricValue::Sketch { sketch } => sketch.is_empty(),
+        }
+    }
+
     /// Gets the name of this `MetricValue` as a string.
     ///
     /// This maps to the name of the enum variant itself.
@@ -386,6 +400,13 @@ pub enum MetricSketch {
 }
 
 impl MetricSketch {
+    /// Gets whether or not this sketch is "empty".
+    pub fn is_empty(&self) -> bool {
+        match self {
+            MetricSketch::AgentDDSketch(ddsketch) => ddsketch.is_empty(),
+        }
+    }
+
     /// Gets the name of this `MetricSketch` as a string.
     ///
     /// This maps to the name of the enum variant itself.
@@ -846,7 +867,12 @@ impl MetricValue {
     pub fn subtract(&mut self, other: &Self) -> bool {
         match (self, other) {
             (Self::Counter { ref mut value }, Self::Counter { value: value2 })
-            | (Self::Gauge { ref mut value }, Self::Gauge { value: value2 }) => {
+                if *value >= *value2 =>
+            {
+                *value -= value2;
+                true
+            }
+            (Self::Gauge { ref mut value }, Self::Gauge { value: value2 }) => {
                 *value -= value2;
                 true
             }
@@ -887,7 +913,8 @@ impl MetricValue {
                     count: count2,
                     sum: sum2,
                 },
-            ) if buckets.len() == buckets2.len()
+            ) if *count >= *count2
+                && buckets.len() == buckets2.len()
                 && buckets
                     .iter()
                     .zip(buckets2.iter())
@@ -1192,6 +1219,98 @@ mod test {
     }
 
     #[test]
+    fn subtract_counters() {
+        // Make sure a newer/higher value counter can subtract an older/lesser value counter:
+        let old_counter = Metric::new(
+            "counter",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 4.0 },
+        );
+
+        let mut new_counter = Metric::new(
+            "counter",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 6.0 },
+        );
+
+        assert!(new_counter.subtract(&old_counter));
+        assert_eq!(new_counter.value(), &MetricValue::Counter { value: 2.0 });
+
+        // But not the other way around:
+        let old_counter = Metric::new(
+            "counter",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 6.0 },
+        );
+
+        let mut new_reset_counter = Metric::new(
+            "counter",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        );
+
+        assert!(!new_reset_counter.subtract(&old_counter));
+    }
+
+    #[test]
+    fn subtract_aggregated_histograms() {
+        // Make sure a newer/higher count aggregated histogram can subtract an older/lower count
+        // aggregated histogram:
+        let old_histogram = Metric::new(
+            "histogram",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                count: 1,
+                sum: 1.0,
+                buckets: buckets!(2.0 => 1),
+            },
+        );
+
+        let mut new_histogram = Metric::new(
+            "histogram",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                count: 3,
+                sum: 3.0,
+                buckets: buckets!(2.0 => 3),
+            },
+        );
+
+        assert!(new_histogram.subtract(&old_histogram));
+        assert_eq!(
+            new_histogram.value(),
+            &MetricValue::AggregatedHistogram {
+                count: 2,
+                sum: 2.0,
+                buckets: buckets!(2.0 => 2),
+            }
+        );
+
+        // But not the other way around:
+        let old_histogram = Metric::new(
+            "histogram",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                count: 3,
+                sum: 3.0,
+                buckets: buckets!(2.0 => 3),
+            },
+        );
+
+        let mut new_reset_histogram = Metric::new(
+            "histogram",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                count: 1,
+                sum: 1.0,
+                buckets: buckets!(2.0 => 1),
+            },
+        );
+
+        assert!(!new_reset_histogram.subtract(&old_histogram));
+    }
+
+    #[test]
     // `too_many_lines` is mostly just useful for production code but we're not
     // able to flag the lint on only for non-test.
     #[allow(clippy::too_many_lines)]
@@ -1310,7 +1429,7 @@ mod test {
     }
 
     #[test]
-    fn test_quantile_as_percentile() {
+    fn quantile_as_percentile() {
         let quantiles = [
             (-1.0, "0"),
             (0.0, "0"),

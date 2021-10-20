@@ -12,12 +12,19 @@ impl MetricNormalize for DatadogMetricsNormalizer {
         // We primarily care about making sure that counters are incremental, and that gauges are
         // always absolute.  For other metric kinds, we want them to be incremental.
         match &metric.value() {
+            // We always send counters as incremental and gauges as absolute.  Realistically, any
+            // system sending an incremental gauge update is kind of doing it wrong, but alas.
             MetricValue::Counter { .. } => state.make_incremental(metric),
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             // We convert distributions and aggregated histograms to sketches internally. We can't
             // send absolute sketches to Datadog, though, so we incrementalize them first.
-            MetricValue::Distribution { .. } | MetricValue::AggregatedHistogram { .. } => state
+            MetricValue::Distribution { .. } => state
                 .make_incremental(metric)
+                .filter(|metric| !metric.value().is_empty())
+                .map(AgentDDSketch::transform_to_sketch),
+            MetricValue::AggregatedHistogram { .. } => state
+                .make_incremental(metric)
+                .filter(|metric| !metric.value().is_empty())
                 .map(AgentDDSketch::transform_to_sketch),
             _ => match metric.kind() {
                 MetricKind::Absolute => state.make_incremental(metric),

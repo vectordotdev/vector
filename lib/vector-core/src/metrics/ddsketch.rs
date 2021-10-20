@@ -646,14 +646,14 @@ impl AgentDDSketch {
     /// metric is converted to a sketch internally.
     pub fn transform_to_sketch(mut metric: Metric) -> Metric {
         let sketch = match metric.data_mut().value_mut() {
-            MetricValue::Distribution { samples, .. } if !samples.is_empty() => {
+            MetricValue::Distribution { samples, .. } => {
                 let mut sketch = AgentDDSketch::with_agent_defaults();
                 for sample in samples {
                     sketch.insert_n(sample.value, sample.rate);
                 }
                 Some(sketch)
             }
-            MetricValue::AggregatedHistogram { buckets, count, .. } if *count != 0 => {
+            MetricValue::AggregatedHistogram { buckets, .. } => {
                 let delta_buckets = mem::replace(buckets, Vec::new());
                 let mut sketch = AgentDDSketch::with_agent_defaults();
                 sketch.insert_interpolate_buckets(delta_buckets);
