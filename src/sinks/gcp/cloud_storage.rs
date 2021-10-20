@@ -10,7 +10,7 @@ use crate::{
             batch::{BatchConfig, BatchSettings},
             encoding::{EncodingConfig, EncodingConfiguration},
             retries::{RetryAction, RetryLogic},
-            Buffer, Compression, Concurrency, EncodedEvent, PartitionBatchSink, PartitionBuffer,
+            Buffer, Compression, EncodedEvent, PartitionBatchSink, PartitionBuffer,
             PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
