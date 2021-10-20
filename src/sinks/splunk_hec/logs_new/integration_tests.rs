@@ -21,6 +21,7 @@ use std::net::SocketAddr;
 use tokio::time::{sleep, Duration};
 use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 use warp::Filter;
+use crate::sinks::splunk_hec::logs_new::encoder::HecLogsEncoder;
 
 const USERNAME: &str = "admin";
 const PASSWORD: &str = "password";
@@ -97,7 +98,7 @@ async fn find_entry(message: &str) -> serde_json::value::Value {
 }
 
 async fn config(
-    encoding: impl Into<EncodingConfig<Encoding>>,
+    encoding: impl Into<EncodingConfig<HecLogsEncoder>>,
     indexed_fields: Vec<String>,
 ) -> HecSinkLogsConfig {
     HecSinkLogsConfig {
@@ -123,7 +124,7 @@ async fn config(
 async fn splunk_insert_message() {
     let cx = SinkContext::new_test();
 
-    let config = config(Encoding::Text, vec![]).await;
+    let config = config(HecLogsEncoder::Text, vec![]).await;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
@@ -145,7 +146,7 @@ async fn splunk_insert_message() {
 async fn splunk_insert_broken_token() {
     let cx = SinkContext::new_test();
 
-    let mut config = config(Encoding::Text, vec![]).await;
+    let mut config = config(HecLogsEncoder::Text, vec![]).await;
     config.token = "BROKEN_TOKEN".into();
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -163,7 +164,7 @@ async fn splunk_insert_broken_token() {
 async fn splunk_insert_source() {
     let cx = SinkContext::new_test();
 
-    let mut config = config(Encoding::Text, vec![]).await;
+    let mut config = config(HecLogsEncoder::Text, vec![]).await;
     config.source = Template::try_from("/var/log/syslog".to_string()).ok();
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -181,7 +182,7 @@ async fn splunk_insert_source() {
 async fn splunk_insert_index() {
     let cx = SinkContext::new_test();
 
-    let mut config = config(Encoding::Text, vec![]).await;
+    let mut config = config(HecLogsEncoder::Text, vec![]).await;
     config.index = Template::try_from("custom_index".to_string()).ok();
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -199,7 +200,7 @@ async fn splunk_index_is_interpolated() {
     let cx = SinkContext::new_test();
 
     let indexed_fields = vec!["asdf".to_string()];
-    let mut config = config(Encoding::Json, indexed_fields).await;
+    let mut config = config(HecLogsEncoder::Json, indexed_fields).await;
     config.index = Template::try_from("{{ index_name }}".to_string()).ok();
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -219,7 +220,7 @@ async fn splunk_index_is_interpolated() {
 async fn splunk_insert_many() {
     let cx = SinkContext::new_test();
 
-    let config = config(Encoding::Text, vec![]).await;
+    let config = config(HecLogsEncoder::Text, vec![]).await;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (messages, events) = random_lines_with_stream(100, 10, None);
@@ -250,7 +251,7 @@ async fn splunk_custom_fields() {
     let cx = SinkContext::new_test();
 
     let indexed_fields = vec!["asdf".into()];
-    let config = config(Encoding::Json, indexed_fields).await;
+    let config = config(HecLogsEncoder::Json, indexed_fields).await;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
@@ -270,7 +271,7 @@ async fn splunk_hostname() {
     let cx = SinkContext::new_test();
 
     let indexed_fields = vec!["asdf".into()];
-    let config = config(Encoding::Json, indexed_fields).await;
+    let config = config(HecLogsEncoder::Json, indexed_fields).await;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
@@ -293,7 +294,7 @@ async fn splunk_sourcetype() {
     let cx = SinkContext::new_test();
 
     let indexed_fields = vec!["asdf".to_string()];
-    let mut config = config(Encoding::Json, indexed_fields).await;
+    let mut config = config(HecLogsEncoder::Json, indexed_fields).await;
     config.sourcetype = Template::try_from("_json".to_string()).ok();
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -318,7 +319,7 @@ async fn splunk_configure_hostname() {
 
     let config = HecSinkLogsConfig {
         host_key: "roast".into(),
-        ..config(Encoding::Json, vec!["asdf".to_string()]).await
+        ..config(HecLogsEncoder::Json, vec!["asdf".to_string()]).await
     };
 
     let (sink, _) = config.build(cx).await.unwrap();

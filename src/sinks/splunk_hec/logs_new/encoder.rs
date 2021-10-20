@@ -2,28 +2,36 @@ use std::io;
 
 use vector_core::{
     config::log_schema,
-    event::{Event, LogEvent, Value},
+    event::{Event},
 };
 
-use super::{service::Encoding, sink::ProcessedEvent};
+use super::{sink::ProcessedEvent};
 use crate::{
     internal_events::{SplunkEventEncodeError, SplunkEventSent},
     sinks::util::encoding::{Encoder, EncodingConfiguration},
 };
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-#[derive(PartialEq, Default, Clone, Debug)]
-pub struct HecLogsEncoder {
-    pub encoding: Encoding,
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Eq)]
+pub enum HecLogsEncoder {
+    Json,
+    Text,
+}
+
+impl Default for HecLogsEncoder {
+    fn default() -> Self {
+        HecLogsEncoder::Text
+    }
 }
 
 impl HecLogsEncoder {
-    fn encode_event(&self, processed_event: ProcessedEvent) -> Option<Vec<u8>> {
+    pub fn encode_event(&self, processed_event: ProcessedEvent) -> Option<Vec<u8>> {
         let log = processed_event.log;
 
-        let event = match self.encoding {
-            Encoding::Json => json!(&log),
-            Encoding::Text => json!(log
+        let event = match self {
+            HecLogsEncoder::Json => json!(&log),
+            HecLogsEncoder::Text => json!(log
                 .get(log_schema().message_key())
                 .map(|v| v.to_string_lossy())
                 .unwrap_or_else(|| "".into())),

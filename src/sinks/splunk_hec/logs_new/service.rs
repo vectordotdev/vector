@@ -7,41 +7,34 @@ use std::{
 use crate::{
     internal_events::EventsSent,
     sinks::{
-        util::{encoding::EncodingConfigFixed, http::HttpBatchService, ElementCount},
+        util::{http::HttpBatchService, ElementCount},
         UriParseError,
     },
 };
-use futures_util::{future::BoxFuture, FutureExt};
+use futures_util::{future::BoxFuture};
 use http::{
-    uri::{PathAndQuery, Scheme},
-    Request, Uri,
+    Request, 
 };
-use hyper::Body;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use tower::{Service, ServiceExt};
 use vector_core::{
     buffers::Ackable,
-    config::log_schema,
-    event::{Event, EventFinalizers, EventStatus, Finalizable, LogEvent, Value},
+    event::{EventFinalizers, EventStatus, Finalizable},
     ByteSizeOf,
 };
 
 use crate::{
     http::HttpClient,
-    internal_events::{EndpointBytesSent, SplunkEventEncodeError, SplunkEventSent},
     sinks::{
         splunk_hec::{
-            common::{build_uri, render_template_string},
-            logs_new,
+            common::{build_uri},
         },
         util::{
-            encoding::{Encoder, EncodingConfig, EncodingConfiguration, StandardEncodings},
+            encoding::{Encoder, EncodingConfig},
             retries::RetryLogic,
             Compression, RequestBuilder,
         },
     },
-    template::Template,
 };
 use snafu::{ResultExt, Snafu};
 
@@ -81,14 +74,13 @@ impl Service<HecLogsRequest> for HecLogsService {
         let mut http_service = self.batch_service.clone();
         Box::pin(async move {
             http_service.ready().await?;
-            // let batch_size = req.batch_size;
-            // let byte_size = req.events_byte_size;
+            let events_count = req.events_count;
+            let byte_size = req.events_byte_size;
             let response = http_service.call(req).await?;
             let event_status = if response.status().is_success() {
-                // TODO, use real metrics
                 emit!(&EventsSent {
-                    count: 1,
-                    byte_size: 1,
+                    count: events_count,
+                    byte_size: byte_size,
                 });
                 EventStatus::Delivered
             } else if response.status().is_server_error() {
@@ -105,7 +97,9 @@ impl Service<HecLogsRequest> for HecLogsService {
 #[derive(Clone)]
 pub struct HecLogsRequest {
     pub body: Vec<u8>,
-    finalizers: EventFinalizers,
+    pub events_count: usize,
+    pub events_byte_size: usize,
+    pub finalizers: EventFinalizers,
 }
 
 impl ByteSizeOf for HecLogsRequest {
@@ -116,13 +110,13 @@ impl ByteSizeOf for HecLogsRequest {
 
 impl ElementCount for HecLogsRequest {
     fn element_count(&self) -> usize {
-        1
+        self.events_count
     }
 }
 
 impl Ackable for HecLogsRequest {
     fn ack_size(&self) -> usize {
-        1
+        self.events_count
     }
 }
 
@@ -211,10 +205,8 @@ pub struct HecLogsRequestBuilder {
 }
 
 impl RequestBuilder<((), Vec<ProcessedEvent>)> for HecLogsRequestBuilder {
-    type Metadata = (usize, EventFinalizers);
+    type Metadata = (usize, usize, EventFinalizers);
     type Events = Vec<ProcessedEvent>;
-    // type Events = Vec<Event>;
-    // type Events = Event;
     type Encoder = EncodingConfig<HecLogsEncoder>;
     type Payload = Vec<u8>;
     type Request = HecLogsRequest;
@@ -225,18 +217,18 @@ impl RequestBuilder<((), Vec<ProcessedEvent>)> for HecLogsRequestBuilder {
     }
 
     fn encoder(&self) -> &Self::Encoder {
-        // &self.encoding.into()
-        // &EncodingConfig::from(StandardEncodings::Json)
         &self.encoding
     }
 
     fn split_input(&self, input: ((), Vec<ProcessedEvent>)) -> (Self::Metadata, Self::Events) {
         let (_, mut events) = input;
         let finalizers = events.take_finalizers();
-        // let finalizers = events.iter().map(|e| e.take_finalizers()).collect();
+        let events_byte_size: usize = events
+            .iter()
+            .map(|x| x.log.size_of())
+            .sum();
 
-        ((events.len(), finalizers), events)
-        // ((1, finalizers), events)
+        ((events.len(), events_byte_size, finalizers), events)
     }
 
     fn encode_events(&self, events: Self::Events) -> Result<Self::Payload, Self::Error> {
@@ -244,20 +236,16 @@ impl RequestBuilder<((), Vec<ProcessedEvent>)> for HecLogsRequestBuilder {
         let mut payload = Vec::new();
         self.encoding.encode_input(events, &mut payload)?;
         Ok(payload)
-        // Ok(self.encode_event(events).unwrap_or(vec![]))
-        // Ok(events
-        //     .into_iter()
-        //     .filter_map(|e| self.encode_event(e))
-        //     .flatten()
-        //     .collect())
     }
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
         println!("[HecLogsRequestBuilder::build_request] {:?}", metadata);
-        let (_, finalizers) = metadata;
+        let (events_count, events_byte_size, finalizers) = metadata;
         HecLogsRequest {
             body: payload,
             finalizers,
+            events_count,
+            events_byte_size,
         }
     }
 }

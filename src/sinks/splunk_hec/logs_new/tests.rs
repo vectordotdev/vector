@@ -1,5 +1,7 @@
 use crate::event::Event;
 use crate::sinks::splunk_hec::logs_new::config::HecSinkLogsConfig;
+use crate::sinks::splunk_hec::logs_new::encoder::HecLogsEncoder;
+use crate::sinks::splunk_hec::logs_new::service::Encoding;
 use crate::sinks::splunk_hec::logs_new::sink::process_log;
 use crate::sinks::util::http::HttpSink;
 use crate::sinks::util::test::load_sink;
@@ -49,26 +51,41 @@ fn splunk_process_log_event() {
 
 // #[test]
 // fn splunk_encode_log_event_json() {
+//     // let mut event = Event::from("hello world");
+//     // event.as_mut_log().insert("key", "value");
+//     // event.as_mut_log().insert("magic", "vector");
+
 //     let mut event = Event::from("hello world");
+//     event.as_mut_log().insert("event_sourcetype", "test_sourcetype");
+//     event.as_mut_log().insert("event_source", "test_source");
+//     event.as_mut_log().insert("event_index", "test_index");
+//     event.as_mut_log().insert("event_field1", "test_value1");
+//     event.as_mut_log().insert("event_field2", "test_value2");
 //     event.as_mut_log().insert("key", "value");
-//     event.as_mut_log().insert("magic", "vector");
+//     // let (config, _cx) = load_sink::<HecSinkLogsConfig>(
+//     //     r#"
+//     //     host = "test.com"
+//     //     token = "alksjdfo"
+//     //     host_key = "host"
+//     //     indexed_fields = ["key"]
+//     //     source = "{{ magic }}"
 
-//     let (config, _cx) = load_sink::<HecSinkLogsConfig>(
-//         r#"
-//         host = "test.com"
-//         token = "alksjdfo"
-//         host_key = "host"
-//         indexed_fields = ["key"]
-//         source = "{{ magic }}"
+//     //     [encoding]
+//     //     codec = "json"
+//     //     except_fields = ["magic"]
+//     // "#,
+//     // )
+//     // .unwrap();
 
-//         [encoding]
-//         codec = "json"
-//         except_fields = ["magic"]
-//     "#,
-//     )
-//     .unwrap();
+//     let sourcetype = Template::try_from("{{ event_sourcetype }}".to_string()).ok();
+//     let source = Template::try_from("{{ event_source }}".to_string()).ok();
+//     let index= Template::try_from("{{ event_index }}".to_string()).ok();
+//     let indexed_fields = vec!["event_field1".to_string(), "event_field2".to_string()];
 
-//     let bytes = config.encode_event(event).unwrap();
+//     let processed_event = process_log(event.into_log(), sourcetype.as_ref(), source.as_ref(), index.as_ref(), "host_key", indexed_fields.as_slice()).unwrap();
+
+//     let encoder = HecLogsEncoder::Json;
+//     let bytes = encoder.encode_event(processed_event).unwrap();
 
 //     let hec_event = serde_json::from_slice::<HecEventJson>(&bytes[..]).unwrap();
 
@@ -84,12 +101,14 @@ fn splunk_process_log_event() {
 //         .get(&log_schema().timestamp_key().to_string())
 //         .is_none());
 
-//     assert!(!event.contains_key("magic"));
-//     assert_eq!(hec_event.source, Some("vector".to_string()));
+//     assert!(!event.contains_key("event_source")); // should fail
+//     assert!(!event.contains_key("event_sourcetype"));
+//     assert!(!event.contains_key("event_index"));
+//     assert_eq!(hec_event.source, Some("test_source".to_string()));
 
 //     assert_eq!(
-//         hec_event.fields.get("key").map(|s| s.as_str()),
-//         Some("value")
+//         hec_event.fields.get("event_field1").map(|s| s.as_str()),
+//         Some("test_value1")
 //     );
 
 //     let now = Utc::now().timestamp_millis() as f64 / 1000f64;
