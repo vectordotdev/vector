@@ -328,7 +328,7 @@ async fn run_insert_tests_with_config(
             "{}",
             Utc::now().format(".ds-logs-generic-default-%Y.%m.%d-000001")
         ),
-        ElasticSearchMode::Normal => config.index.clone().unwrap(),
+        ElasticSearchMode::Bulk => config.index.clone().unwrap(),
     };
     let base_url = common.base_url.clone();
 

@@ -121,7 +121,10 @@ impl ElasticSearchConfig {
             ElasticSearchMode::Bulk => {
                 let index = self.index()?;
                 let bulk_action = self.bulk_action()?;
-                Ok(ElasticSearchCommonMode::Normal { index, bulk_action })
+                Ok(ElasticSearchCommonMode::Bulk {
+                    index,
+                    action: bulk_action,
+                })
             }
             ElasticSearchMode::DataStream => Ok(ElasticSearchCommonMode::DataStream(
                 self.data_stream.clone().unwrap_or_default(),

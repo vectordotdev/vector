@@ -106,9 +106,9 @@ impl_generate_config_from_default!(ElasticSearchConfig);
 
 #[derive(Debug, Clone)]
 pub enum ElasticSearchCommonMode {
-    Normal {
+    Bulk {
         index: Template,
-        bulk_action: Option<Template>,
+        action: Option<Template>,
     },
     DataStream(DataStreamConfig),
 }
@@ -116,7 +116,7 @@ pub enum ElasticSearchCommonMode {
 impl ElasticSearchCommonMode {
     fn index(&self, log: &LogEvent) -> Option<String> {
         match self {
-            Self::Normal { index, .. } => index
+            Self::Bulk { index, .. } => index
                 .render_string(log)
                 .map_err(|error| {
                     emit!(&TemplateRenderingFailed {
@@ -132,7 +132,10 @@ impl ElasticSearchCommonMode {
 
     fn bulk_action<'a>(&self, event: impl Into<EventRef<'a>>) -> Option<BulkAction> {
         match self {
-            ElasticSearchCommonMode::Normal { bulk_action, .. } => match bulk_action {
+            ElasticSearchCommonMode::Bulk {
+                action: bulk_action,
+                ..
+            } => match bulk_action {
                 Some(template) => template
                     .render_string(event)
                     .map_err(|error| {
