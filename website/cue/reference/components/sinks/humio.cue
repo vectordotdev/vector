@@ -52,7 +52,6 @@ components: sinks: _humio: {
 			proxy: enabled: true
 			request: {
 				enabled:                    true
-				concurrency:                10
 				rate_limit_duration_secs:   1
 				rate_limit_num:             10
 				retry_initial_backoff_secs: 1
