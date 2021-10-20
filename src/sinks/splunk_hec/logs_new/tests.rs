@@ -1,10 +1,13 @@
 use crate::event::Event;
 use crate::sinks::splunk_hec::logs_new::config::HecSinkLogsConfig;
+use crate::sinks::splunk_hec::logs_new::sink::process_log;
 use crate::sinks::util::http::HttpSink;
-// use crate::sinks::util::test::load_sink;
+use crate::sinks::util::test::load_sink;
+use crate::template::Template;
 use chrono::Utc;
 use serde::Deserialize;
 use std::collections::BTreeMap;
+use std::convert::TryFrom;
 use vector_core::config::log_schema;
 
 #[derive(Deserialize, Debug)]
@@ -20,6 +23,28 @@ struct HecEventText {
     time: f64,
     event: String,
     fields: BTreeMap<String, String>,
+}
+
+#[test]
+fn splunk_process_log_event() {
+    let mut event = Event::from("hello world");
+    event.as_mut_log().insert("event_sourcetype", "test_sourcetype");
+    event.as_mut_log().insert("event_source", "test_source");
+    event.as_mut_log().insert("event_index", "test_index");
+    event.as_mut_log().insert("event_field1", "test_field1");
+    event.as_mut_log().insert("event_field2", "test_field2");
+
+    let sourcetype = Template::try_from("{{ event_sourcetype }}".to_string()).ok();
+    let source = Template::try_from("{{ event_source }}".to_string()).ok();
+    let index= Template::try_from("{{ event_index }}".to_string()).ok();
+    let indexed_fields = vec!["event_field1".to_string(), "event_field2".to_string()];
+
+    let processed_event = process_log(event.into_log(), sourcetype.as_ref(), source.as_ref(), index.as_ref(), "host_key", indexed_fields.as_slice()).unwrap();
+    assert_eq!(processed_event.sourcetype, Some("test_sourcetype".to_string()));
+    assert_eq!(processed_event.source, Some("test_source".to_string()));
+    assert_eq!(processed_event.index, Some("test_index".to_string()));
+    assert!(processed_event.fields.contains("event_field1"));
+    assert!(processed_event.fields.contains("event_field2"));
 }
 
 // #[test]

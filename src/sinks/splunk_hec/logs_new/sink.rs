@@ -121,7 +121,7 @@ impl ByteSizeOf for ProcessedEvent {
     }
 }
 
-fn process_log(
+pub fn process_log(
     mut log: LogEvent,
     sourcetype: Option<&Template>,
     source: Option<&Template>,
