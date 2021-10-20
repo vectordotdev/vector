@@ -113,7 +113,7 @@ async-stream = "0.3.2"
 async-trait = "0.1.51"
 futures = { version = "0.3.17", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.12.0", default-features = false, features = ["full"] }
-tokio-openssl = { version = "0.6.2", default-features = false }
+tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.7", default-features = false, features = ["net", "sync"] }
 tokio-util = { version = "0.6.8", default-features = false, features = ["codec", "time", "io"] }
 console-subscriber = { git = "https://github.com/tokio-rs/console", rev = "f2c30d52c9f22de69bac38009a9183135808806c",  optional = true }

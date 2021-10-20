@@ -6804,11 +6804,11 @@ dependencies = [
 
 [[package]]
 name = "tokio-openssl"
-version = "0.6.2"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f24cddc8445a4dc8359cdd9e91c19d544fc95f672e32afe8945852b9381a09fe"
+checksum = "c08f9ffb7809f1b20c1b398d92acf4cc719874b3b2b2d9ea2f09b4a80350878a"
 dependencies = [
- "futures 0.3.17",
+ "futures-util",
  "openssl",
  "openssl-sys",
  "tokio",
