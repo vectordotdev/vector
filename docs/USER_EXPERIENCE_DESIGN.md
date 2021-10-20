@@ -100,8 +100,9 @@ for the following reasons:
    of Vector.
 3. Deviation from the user's data mental model introduces uncessary friction.
    Vector should not surprise users by moving their log fields around.
-4. We do not want to be in the business of maintaining log schemas. An exercise
-   that has proven precarious with the proliferation of log schema standards.
+4. Vector does not want to be in the business of maintaining log schemas. An
+   exercise that has proven precarious with the proliferation of log schema
+   standards.
 
 In general, we believe Vector's flexible nature with log schemas is a boon for
 Vector's UX. A rigid schema is not required to achieve a best-in-class UX. 
