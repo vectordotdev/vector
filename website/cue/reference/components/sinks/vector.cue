@@ -13,7 +13,7 @@ components: sinks: vector: {
 		commonly_used: false
 		delivery:      "best_effort"
 		development:   "beta"
-		egress_method: "stream"
+		egress_method: "batch"
 		service_providers: []
 		stateful: false
 	}
@@ -21,6 +21,11 @@ components: sinks: vector: {
 		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
+			batch: {
+				enabled:      true
+				common:       false
+				timeout_secs: 1
+			}
 			compression: enabled:       false
 			encoding: enabled:          false
 			send_buffer_bytes: enabled: true
