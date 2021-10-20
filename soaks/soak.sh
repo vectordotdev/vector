@@ -21,7 +21,7 @@ SOAK_NAME="${1:-}"
 BASELINE="${2:-}"
 COMPARISON="${3:-}"
 WARMUP_GRACE=90
-TOTAL_SAMPLES=300
+TOTAL_SAMPLES=120
 
 collect_samples() {
     local PROM_URL
@@ -29,13 +29,11 @@ collect_samples() {
     local EXPERIMENT_TYPE="${1}"
     local CAPTURE_FILE="${2}"
 
-    local sample_idx=0
-    while [ $sample_idx -ne $TOTAL_SAMPLES ]
+    for ((sample_idx=1;sample_idx<=TOTAL_SAMPLES;sample_idx++));
     do
         SAMPLE=$(curl --silent "${PROM_URL}/api/v1/query?query=""sum(rate((bytes_written\[1m\])))" | jq '.data.result[0].value[1]' | sed 's/"//g')
         echo -e "${EXPERIMENT_TYPE}\t${sample_idx}\t${SAMPLE}" >> "${CAPTURE_FILE}"
         sleep 1
-        sample_idx=$sample_idx+1
     done
 }
 
