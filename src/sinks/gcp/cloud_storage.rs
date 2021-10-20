@@ -202,7 +202,6 @@ impl GcsSink {
 
     fn service(self, config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<VectorSink> {
         let request = config.request.unwrap_with(&TowerRequestConfig {
-            concurrency: Concurrency::Fixed(25),
             rate_limit_num: Some(1000),
             ..Default::default()
         });

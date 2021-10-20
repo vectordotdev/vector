@@ -33,9 +33,8 @@ components: sinks: loki: {
 			}
 			proxy: enabled: true
 			request: {
-				enabled:     true
-				concurrency: 5
-				headers:     false
+				enabled: true
+				headers: false
 			}
 			tls: {
 				enabled:                true

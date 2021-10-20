@@ -108,7 +108,6 @@ impl SinkConfig for LokiConfig {
         }
 
         let request_settings = self.request.unwrap_with(&TowerRequestConfig {
-            concurrency: Concurrency::Fixed(5),
             ..Default::default()
         });
 

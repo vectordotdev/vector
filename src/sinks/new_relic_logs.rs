@@ -143,12 +143,7 @@ impl NewRelicLogsConfig {
             ..self.batch
         };
 
-        let tower = TowerRequestConfig {
-            // The default throughput ceiling defaults are relatively
-            // conservative so we crank them up for New Relic.
-            concurrency: (self.request.concurrency).if_none(Concurrency::Fixed(100)),
-            ..self.request
-        };
+        let tower = TowerRequestConfig { ..self.request };
 
         let request = RequestConfig { tower, headers };
 
@@ -216,10 +211,7 @@ mod tests {
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
-        assert_eq!(
-            http_config.request.tower.concurrency,
-            Concurrency::Fixed(100)
-        );
+        assert_eq!(http_config.request.tower.concurrency, Concurrency::Adaptive,);
         assert_eq!(
             http_config.request.tower.rate_limit_num,
             Some(RATE_LIMIT_NUM_DEFAULT)

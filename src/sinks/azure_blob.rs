@@ -131,7 +131,6 @@ impl SinkConfig for AzureBlobSinkConfig {
 impl AzureBlobSinkConfig {
     pub fn new(&self, client: Arc<ContainerClient>, cx: SinkContext) -> Result<VectorSink> {
         let request = self.request.unwrap_with(&TowerRequestConfig {
-            concurrency: Concurrency::Fixed(50),
             rate_limit_num: Some(250),
             ..Default::default()
         });
