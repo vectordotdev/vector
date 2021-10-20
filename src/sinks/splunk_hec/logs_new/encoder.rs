@@ -8,9 +8,7 @@ use vector_core::{
 use super::{service::Encoding, sink::ProcessedEvent};
 use crate::{
     internal_events::{SplunkEventEncodeError, SplunkEventSent},
-    sinks::{
-        util::encoding::{Encoder, EncodingConfig, EncodingConfiguration},
-    },
+    sinks::util::encoding::{Encoder, EncodingConfiguration},
 };
 use serde_json::json;
 

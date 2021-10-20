@@ -1,6 +1,6 @@
 use crate::event::Event;
 use crate::sinks::splunk_hec::logs_new::config::HecSinkLogsConfig;
-use crate::sinks::util::{http::HttpSink};
+use crate::sinks::util::http::HttpSink;
 // use crate::sinks::util::test::load_sink;
 use chrono::Utc;
 use serde::Deserialize;

@@ -1,12 +1,25 @@
 use futures_util::FutureExt;
 use snafu::ResultExt;
 use tower::ServiceBuilder;
-use vector_core::{sink::VectorSink, stream::BatcherSettings, transform::DataType};
+use vector_core::{sink::VectorSink, transform::DataType};
 
-use crate::{config::{GenerateConfig, SinkConfig, SinkContext}, http::HttpClient, sinks::{Healthcheck, UriParseError, splunk_hec::{
+use crate::{
+    config::{GenerateConfig, SinkConfig, SinkContext},
+    http::HttpClient,
+    sinks::{
+        splunk_hec::{
             common::{build_healthcheck, build_uri, create_client, host_key},
             logs_new::service::Encoding,
-        }, util::{BatchConfig, BatchSettings, Buffer, Compression, ServiceBuilderExt, TowerRequestConfig, encoding::{EncodingConfig, EncodingConfiguration, StandardEncodings}}}, template::Template, tls::TlsOptions};
+        },
+        util::{
+            encoding::{EncodingConfig, EncodingConfiguration, StandardEncodings},
+            BatchConfig, BatchSettings, Buffer, Compression, ServiceBuilderExt, TowerRequestConfig,
+        },
+        Healthcheck, UriParseError,
+    },
+    template::Template,
+    tls::TlsOptions,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -30,7 +43,7 @@ pub struct HecSinkLogsConfig {
     pub index: Option<Template>,
     pub sourcetype: Option<Template>,
     pub source: Option<Template>,
-    pub encoding: EncodingConfig<Encoding>,
+    pub encoding: Encoding,
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
@@ -51,7 +64,7 @@ impl GenerateConfig for HecSinkLogsConfig {
             index: None,
             sourcetype: None,
             source: None,
-            encoding: Encoding::Text.into(),
+            encoding: Encoding::Text,
             compression: Compression::default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
@@ -90,7 +103,7 @@ impl HecSinkLogsConfig {
     ) -> crate::Result<VectorSink> {
         // Build the encoder that will be used to turn Vec<Event> into Vec<u8>
         let encoding = HecLogsEncoder {
-            encoding: self.encoding.codec().clone(),
+            encoding: self.encoding.clone(),
         };
         // Build the request builder that will be used to build HecLogsRequests out of encoded Events
         let request_builder = HecLogsRequestBuilder {

@@ -1,7 +1,6 @@
 use std::{fmt, num::NonZeroUsize};
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use futures_util::{future, stream::BoxStream, StreamExt};
 use tower::Service;
 use vector_core::{
@@ -15,10 +14,9 @@ use vector_core::{
 
 use crate::{
     config::SinkContext,
-    http::HttpClient,
     sinks::{
         splunk_hec::common::render_template_string,
-        util::{Compression, SinkBuilderExt},
+        util::{SinkBuilderExt},
     },
     template::Template,
 };
@@ -45,7 +43,7 @@ where
     S::Error: fmt::Debug + Into<crate::Error> + Send,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let sourcetype= self.sourcetype.as_ref();
+        let sourcetype = self.sourcetype.as_ref();
         let source = self.source.as_ref();
         let index = self.index.as_ref();
         let indexed_fields = self.indexed_fields.as_slice();
@@ -132,14 +130,12 @@ fn process_log(
     indexed_fields: &[String],
 ) -> Option<ProcessedEvent> {
     println!("[sink::process_log] {:?}", log);
-    let sourcetype = sourcetype
-        .and_then(|sourcetype| render_template_string(sourcetype, &log, "sourcetype"));
+    let sourcetype =
+        sourcetype.and_then(|sourcetype| render_template_string(sourcetype, &log, "sourcetype"));
 
-    let source = source
-        .and_then(|source| render_template_string(source, &log, "source"));
+    let source = source.and_then(|source| render_template_string(source, &log, "source"));
 
-    let index = index
-        .and_then(|index| render_template_string(index, &log, "index"));
+    let index = index.and_then(|index| render_template_string(index, &log, "index"));
 
     let host = log.get(host_key).cloned();
 

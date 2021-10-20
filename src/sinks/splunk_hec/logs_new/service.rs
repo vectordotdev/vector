@@ -4,8 +4,14 @@ use std::{
     task::{Context, Poll},
 };
 
-use crate::{internal_events::EventsSent, sinks::{UriParseError, util::{ElementCount, encoding::EncodingConfigFixed, http::HttpBatchService}}};
-use futures_util::{FutureExt, future::BoxFuture};
+use crate::{
+    internal_events::EventsSent,
+    sinks::{
+        util::{encoding::EncodingConfigFixed, http::HttpBatchService, ElementCount},
+        UriParseError,
+    },
+};
+use futures_util::{future::BoxFuture, FutureExt};
 use http::{
     uri::{PathAndQuery, Scheme},
     Request, Uri,
@@ -14,7 +20,12 @@ use hyper::Body;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tower::{Service, ServiceExt};
-use vector_core::{ByteSizeOf, buffers::Ackable, config::log_schema, event::{Event, EventFinalizers, EventStatus, Finalizable, LogEvent, Value}};
+use vector_core::{
+    buffers::Ackable,
+    config::log_schema,
+    event::{Event, EventFinalizers, EventStatus, Finalizable, LogEvent, Value},
+    ByteSizeOf,
+};
 
 use crate::{
     http::HttpClient,
@@ -38,10 +49,6 @@ use super::{encoder::HecLogsEncoder, sink::ProcessedEvent};
 
 #[derive(Clone)]
 pub struct HecLogsService {
-    // pub client: HttpClient,
-    // pub uri: Uri,
-    // pub compression: Compression,
-    // pub token: String,
     pub batch_service: HttpBatchService<
         BoxFuture<'static, Result<Request<Vec<u8>>, crate::Error>>,
         HecLogsRequest,
@@ -53,8 +60,8 @@ impl HecLogsService {
         let http_request_builder = Arc::new(http_request_builder);
         let batch_service = HttpBatchService::new(client, move |req| {
             let request_builder = Arc::clone(&http_request_builder);
-            let future: BoxFuture<'static, Result<http::Request<Vec<u8>>, crate::Error>> = 
-            Box::pin(async move { request_builder.build_request(req).await });
+            let future: BoxFuture<'static, Result<http::Request<Vec<u8>>, crate::Error>> =
+                Box::pin(async move { request_builder.build_request(req).await });
             future
         });
         Self { batch_service }
@@ -90,47 +97,8 @@ impl Service<HecLogsRequest> for HecLogsService {
                 EventStatus::Failed
             };
 
-            Ok(HecLogsResponse {
-                event_status
-            })
+            Ok(HecLogsResponse { event_status })
         })
-        // let mut builder = Request::post(self.uri.clone())
-        //     .header("Content-Type", "application/json")
-        //     .header("Authorization", format!("Splunk {}", self.token));
-
-        // if let Some(ce) = self.compression.content_encoding() {
-        //     builder = builder.header("Content-Encoding", ce);
-        // }
-
-        // let request = builder.body(req.body).unwrap();
-        // // .map_err(Into::into).unwrap();
-        // let byte_size = request.body().len();
-        // let request = request.map(Body::from);
-
-        // // Simplify the URI in the request to remove the "query" portion.
-        // let mut parts = request.uri().clone().into_parts();
-        // parts.path_and_query = parts.path_and_query.map(|pq| {
-        //     pq.path()
-        //         .parse::<PathAndQuery>()
-        //         .unwrap_or_else(|_| unreachable!())
-        // });
-        // let scheme = parts.scheme.clone();
-        // let endpoint = Uri::from_parts(parts)
-        //     .unwrap_or_else(|_| unreachable!())
-        //     .to_string();
-
-        // let mut client = self.client.clone();
-        // Box::pin(async move {
-        //     let response = client.call(request).await?;
-        //     if response.status().is_success() {
-        //         emit!(&EndpointBytesSent {
-        //             byte_size,
-        //             protocol: scheme.unwrap_or(Scheme::HTTP).as_str(),
-        //             endpoint: &endpoint
-        //         });
-        //     }
-        //     Ok(HecLogsResponse {})
-        // })
     }
 }
 
