@@ -14,10 +14,7 @@ use vector_core::{
 
 use crate::{
     config::SinkContext,
-    sinks::{
-        splunk_hec::common::render_template_string,
-        util::{SinkBuilderExt},
-    },
+    sinks::{splunk_hec::common::render_template_string, util::SinkBuilderExt},
     template::Template,
 };
 

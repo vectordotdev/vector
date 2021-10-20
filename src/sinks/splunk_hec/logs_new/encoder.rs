@@ -1,11 +1,8 @@
 use std::io;
 
-use vector_core::{
-    config::log_schema,
-    event::{Event},
-};
+use vector_core::{config::log_schema, event::Event};
 
-use super::{sink::ProcessedEvent};
+use super::sink::ProcessedEvent;
 use crate::{
     internal_events::{SplunkEventEncodeError, SplunkEventSent},
     sinks::util::encoding::{Encoder, EncodingConfiguration},

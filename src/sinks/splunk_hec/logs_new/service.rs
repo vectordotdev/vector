@@ -11,11 +11,9 @@ use crate::{
         UriParseError,
     },
 };
-use futures_util::{future::BoxFuture};
-use http::{
-    Request, 
-};
-use serde::{Deserialize, Serialize};
+use bytes::Bytes;
+use futures_util::future::BoxFuture;
+use http::{Request, Response};
 use tower::{Service, ServiceExt};
 use vector_core::{
     buffers::Ackable,
@@ -26,9 +24,7 @@ use vector_core::{
 use crate::{
     http::HttpClient,
     sinks::{
-        splunk_hec::{
-            common::{build_uri},
-        },
+        splunk_hec::common::build_uri,
         util::{
             encoding::{Encoder, EncodingConfig},
             retries::RetryLogic,
@@ -36,7 +32,7 @@ use crate::{
         },
     },
 };
-use snafu::{ResultExt, Snafu};
+use snafu::ResultExt;
 
 use super::{encoder::HecLogsEncoder, sink::ProcessedEvent};
 
@@ -89,7 +85,10 @@ impl Service<HecLogsRequest> for HecLogsService {
                 EventStatus::Failed
             };
 
-            Ok(HecLogsResponse { event_status })
+            Ok(HecLogsResponse {
+                http_response: response,
+                event_status,
+            })
         })
     }
 }
@@ -127,49 +126,13 @@ impl Finalizable for HecLogsRequest {
 }
 
 pub struct HecLogsResponse {
+    pub http_response: Response<Bytes>,
     event_status: EventStatus,
 }
 
 impl AsRef<EventStatus> for HecLogsResponse {
     fn as_ref(&self) -> &EventStatus {
         &self.event_status
-    }
-}
-
-#[derive(Debug, Snafu)]
-pub enum HecLogsError {
-    #[snafu(display("Server responded with an error."))]
-    ServerError,
-    #[snafu(display("Failed to make HTTP(S) request: {}", error))]
-    HttpError { error: crate::http::HttpError },
-    #[snafu(display("Client sent a payload that is too large."))]
-    PayloadTooLarge,
-    #[snafu(display("Client request was not valid for unknown reasons."))]
-    BadRequest,
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct HecLogsRetry;
-
-impl RetryLogic for HecLogsRetry {
-    type Error = HecLogsError;
-    type Response = HecLogsResponse;
-
-    fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        false
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Derivative)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Text,
-    Json,
-}
-
-impl Default for Encoding {
-    fn default() -> Self {
-        Self::Text
     }
 }
 
@@ -223,10 +186,7 @@ impl RequestBuilder<((), Vec<ProcessedEvent>)> for HecLogsRequestBuilder {
     fn split_input(&self, input: ((), Vec<ProcessedEvent>)) -> (Self::Metadata, Self::Events) {
         let (_, mut events) = input;
         let finalizers = events.take_finalizers();
-        let events_byte_size: usize = events
-            .iter()
-            .map(|x| x.log.size_of())
-            .sum();
+        let events_byte_size: usize = events.iter().map(|x| x.log.size_of()).sum();
 
         ((events.len(), events_byte_size, finalizers), events)
     }

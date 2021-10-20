@@ -1,3 +1,4 @@
+use crate::sinks::splunk_hec::logs_new::encoder::HecLogsEncoder;
 use crate::test_util::retry_until;
 use crate::{assert_downcast_matches, tls::TlsSettings};
 use crate::{
@@ -21,7 +22,6 @@ use std::net::SocketAddr;
 use tokio::time::{sleep, Duration};
 use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 use warp::Filter;
-use crate::sinks::splunk_hec::logs_new::encoder::HecLogsEncoder;
 
 const USERNAME: &str = "admin";
 const PASSWORD: &str = "password";

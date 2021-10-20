@@ -1,7 +1,6 @@
 use crate::event::Event;
 use crate::sinks::splunk_hec::logs_new::config::HecSinkLogsConfig;
 use crate::sinks::splunk_hec::logs_new::encoder::HecLogsEncoder;
-use crate::sinks::splunk_hec::logs_new::service::Encoding;
 use crate::sinks::splunk_hec::logs_new::sink::process_log;
 use crate::sinks::util::http::HttpSink;
 use crate::sinks::util::test::load_sink;
@@ -31,7 +30,9 @@ struct HecEventText {
 
 fn get_processed_event() -> ProcessedEvent {
     let mut event = Event::from("hello world");
-    event.as_mut_log().insert("event_sourcetype", "test_sourcetype");
+    event
+        .as_mut_log()
+        .insert("event_sourcetype", "test_sourcetype");
     event.as_mut_log().insert("event_source", "test_source");
     event.as_mut_log().insert("event_index", "test_index");
     event.as_mut_log().insert("event_field1", "test_value1");
@@ -40,17 +41,28 @@ fn get_processed_event() -> ProcessedEvent {
 
     let sourcetype = Template::try_from("{{ event_sourcetype }}".to_string()).ok();
     let source = Template::try_from("{{ event_source }}".to_string()).ok();
-    let index= Template::try_from("{{ event_index }}".to_string()).ok();
+    let index = Template::try_from("{{ event_index }}".to_string()).ok();
     let indexed_fields = vec!["event_field1".to_string(), "event_field2".to_string()];
 
-    process_log(event.into_log(), sourcetype.as_ref(), source.as_ref(), index.as_ref(), "host_key", indexed_fields.as_slice()).unwrap()
+    process_log(
+        event.into_log(),
+        sourcetype.as_ref(),
+        source.as_ref(),
+        index.as_ref(),
+        "host_key",
+        indexed_fields.as_slice(),
+    )
+    .unwrap()
 }
 
 #[test]
 fn splunk_process_log_event() {
     let processed_event = get_processed_event();
 
-    assert_eq!(processed_event.sourcetype, Some("test_sourcetype".to_string()));
+    assert_eq!(
+        processed_event.sourcetype,
+        Some("test_sourcetype".to_string())
+    );
     assert_eq!(processed_event.source, Some("test_source".to_string()));
     assert_eq!(processed_event.index, Some("test_index".to_string()));
     assert!(processed_event.fields.contains("event_field1"));
@@ -65,9 +77,7 @@ fn splunk_encode_log_event_json() {
     let hec_event = serde_json::from_slice::<HecEventJson>(&bytes[..]).unwrap();
     let event = &hec_event.event;
 
-    assert_eq!(
-        event.get(&"key".to_string()).unwrap(), 
-        &"value".to_string());
+    assert_eq!(event.get(&"key".to_string()).unwrap(), &"value".to_string());
     assert_eq!(
         event[&log_schema().message_key().to_string()],
         "hello world".to_string()

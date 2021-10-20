@@ -6,12 +6,10 @@ use crate::{
     config::{GenerateConfig, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
-        splunk_hec::{
-            common::{build_healthcheck, create_client, host_key},
-        },
+        splunk_hec::common::{build_healthcheck, create_client, host_key},
         util::{
-            encoding::{EncodingConfig},
-            BatchConfig, BatchSettings, Buffer, Compression, ServiceBuilderExt, TowerRequestConfig,
+            encoding::EncodingConfig, BatchConfig, BatchSettings, Buffer, Compression,
+            ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck,
     },
@@ -23,7 +21,8 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     encoder::HecLogsEncoder,
-    service::{HecLogsRequestBuilder, HecLogsRetry, HecLogsService, HttpRequestBuilder},
+    retry::HecLogsRetry,
+    service::{HecLogsRequestBuilder, HecLogsService, HttpRequestBuilder},
     sink::HecLogsSink,
 };
 
@@ -98,10 +97,6 @@ impl HecSinkLogsConfig {
         client: HttpClient,
         cx: SinkContext,
     ) -> crate::Result<VectorSink> {
-        // Build the encoder that will be used to turn Vec<Event> into Vec<u8>
-        // let encoding = HecLogsEncoder {
-        //     encoding: self.encoding.clone(),
-        // };
         // Build the request builder that will be used to build HecLogsRequests out of encoded Events
         let request_builder = HecLogsRequestBuilder {
             encoding: self.encoding.clone(),
@@ -117,6 +112,7 @@ impl HecSinkLogsConfig {
             content_encoding: content_encoding,
         };
         let service = ServiceBuilder::new()
+            // .settings(request_settings, HecLogsRetry)
             .settings(request_settings, HecLogsRetry)
             .service(HecLogsService::new(client.clone(), http_request_builder));
 
