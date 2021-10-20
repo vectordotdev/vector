@@ -21,7 +21,7 @@ fi
 SOAK_NAME="${1:-}"
 COMMIT_SHA="${2:-}"
 
-# shellcheck disable=SC1091
+# shellcheck source=/dev/null
 . "${SOAK_ROOT}/${SOAK_NAME}/FEATURES"
 
 FEATURE_SHA=$(echo -n "${FEATURES}" | sha256sum - | head -c40)

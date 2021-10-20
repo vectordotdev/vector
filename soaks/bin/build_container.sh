@@ -46,7 +46,8 @@ fi
 SOAK_NAME="${1:-}"
 COMMIT_SHA="${2:-}"
 
-# shellcheck disable=SC1091
+# shellcheck source=/dev/null
 . "${SOAK_ROOT}/${SOAK_NAME}/FEATURES"
+
 IMAGE=$(./bin/container_name.sh "${SOAK_NAME}" "${COMMIT_SHA}")
 docker image inspect "${IMAGE}" > /dev/null || build_vector "${IMAGE}" "${COMMIT_SHA}"
