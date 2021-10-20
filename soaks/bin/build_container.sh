@@ -48,8 +48,5 @@ COMMIT_SHA="${2:-}"
 
 SOAK_DIR="${SOAK_ROOT}/${SOAK_NAME}"
 . "${SOAK_DIR}/FEATURES"
-FEATURE_SHA=$(echo -n "${FEATURES}" | sha256sum - | head -c40)
-IMAGE="vector:${COMMIT_SHA}-${FEATURE_SHA}"
-
+IMAGE=$(./bin/container_name.sh "${SOAK_NAME}" "${COMMIT_SHA}")
 docker image inspect "${IMAGE}" > /dev/null || build_vector "${IMAGE}" "${COMMIT_SHA}"
-echo "${IMAGE}"

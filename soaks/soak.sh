@@ -41,8 +41,10 @@ collect_samples() {
 
 
 pushd "${__dir}"
-BASELINE_IMAGE=$(./bin/build.sh "${SOAK_NAME}" "${BASELINE}")
-COMPARISON_IMAGE=$(./bin/build.sh "${SOAK_NAME}" "${COMPARISON}")
+./bin/build_container.sh "${SOAK_NAME}" "${BASELINE}"
+./bin/build_container.sh "${SOAK_NAME}" "${COMPARISON}"
+BASELINE_IMAGE=$(./bin/container_name.sh "${SOAK_NAME}" "${BASELINE}")
+COMPARISON_IMAGE=$(./bin/container_name.sh "${SOAK_NAME}" "${COMPARISON}")
 
 capture_file=$(mktemp /tmp/"${SOAK_NAME}"-captures.XXXXXX)
 echo "Captures will be recorded to ${capture_file}"
