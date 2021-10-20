@@ -98,8 +98,8 @@ for the following reasons:
 2. Vector should be able to replace legacy pipelines without introducing
    downstream schema changes, something that would likely prevent the adoption
    of Vector.
-3. Deviation from the user's data mental model introduces uncessary friction. We
-   should not surpried users by moving their attributes around.
+3. Deviation from the user's data mental model introduces uncessary friction.
+   Vector should not surprise users by moving their log fields around.
 4. We do not want to be in the business of maintaining log schemas. An exercise
    that has proven precarious with the proliferation of log schema standards.
 
