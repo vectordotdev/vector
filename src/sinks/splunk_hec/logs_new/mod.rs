@@ -1,8 +1,8 @@
 pub mod config;
-pub mod encoder;
+mod encoder;
 #[cfg(all(test, feature = "splunk-integration-tests"))]
-pub mod integration_tests;
-pub mod service;
-pub mod sink;
+mod integration_tests;
+mod service;
+mod sink;
 #[cfg(test)]
-pub mod tests;
+mod tests;
