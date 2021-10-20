@@ -1,7 +1,7 @@
 use crate::conditions::{AnyCondition, Condition};
 use crate::config::{DataType, TransformConfig, TransformContext, TransformDescription};
 use crate::event::Event;
-use crate::internal_events::TemplateRenderingFailed;
+use crate::internal_events::{TemplateRenderingFailed, ThrottleEventDiscarded};
 use crate::template::Template;
 use crate::transforms::{TaskTransform, Transform};
 
@@ -151,7 +151,7 @@ where
                                                 output.push(event);
                                             }
                                             _ => {
-                                                // Dropping event
+                                                emit!(&ThrottleEventDiscarded{key})
                                             }
                                         }
                                     }
