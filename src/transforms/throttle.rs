@@ -199,7 +199,7 @@ window = 5
         )
         .unwrap();
 
-        let throttle = Throttle::new(&config, &TransformContext::default(), clock)
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
             .map(Transform::task)
             .unwrap();
 
@@ -226,11 +226,19 @@ window = 5
         // We should be back to pending, having the second event dropped
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
 
+        clock.advance(Duration::from_secs(3));
+
         tx.send(Event::new_empty_log()).await.unwrap();
+
+        // The rate limiter should now be refreshed and allow an additional event through
+        if let Some(_event) = out_stream.next().await {
+        } else {
+            panic!("Unexpectedly recieved None in output stream");
+        }
 
         // We should be back to pending, having nothing waiting for us
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
-        // Close the input stream which should trigger the shutting down flush
+
         tx.disconnect();
 
         // And still nothing there
@@ -239,38 +247,44 @@ window = 5
 
     #[tokio::test]
     async fn dont_throttle_events() {
-        let throttle = toml::from_str::<ThrottleConfig>(
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
             r#"
-threshold = 60
-window = 60
+threshold = 2
+window = 5
 "#,
         )
-        .unwrap()
-        .build(&TransformContext::default())
-        .await
         .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
+            .map(Transform::task)
+            .unwrap();
 
         let throttle = throttle.into_task();
 
         let (mut tx, rx) = futures::channel::mpsc::channel(10);
         let mut out_stream = throttle.transform(Box::pin(rx));
 
-        tokio::time::pause();
-
         // tokio interval is always immediately ready, so we poll once to make sure
         // we trip it/set the interval in the future
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
 
-        // Now send our events
+        tx.send(Event::new_empty_log()).await.unwrap();
+        tx.send(Event::new_empty_log()).await.unwrap();
 
-        // We won't have flushed yet b/c the interval hasn't elapsed, so no outputs
-        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
-        // Now fast foward time enough that our flush should trigger.
-        tokio::time::advance(Duration::from_secs(10)).await;
+        let mut count = 0_u8;
+        while count < 2 {
+            if let Some(_event) = out_stream.next().await {
+                count += 1;
+            } else {
+                panic!("Unexpectedly recieved None in output stream");
+            }
+        }
+        assert_eq!(2, count);
 
-        // We should be back to pending, having nothing waiting for us
+        // We should be back to pending, having received two events
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
-        // Close the input stream which should trigger the shutting down flush
+        //
         tx.disconnect();
 
         // And still nothing there
