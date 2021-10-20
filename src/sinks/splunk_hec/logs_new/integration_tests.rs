@@ -1,6 +1,5 @@
 #[cfg(all(test, feature = "splunk-integration-tests"))]
 mod integration_tests {
-    // use super::{self::*};
     use crate::{config::{SinkConfig, SinkContext}, sinks::{
             splunk_hec::{
                 logs_new::{config::HecSinkLogsConfig, service::Encoding},
@@ -16,7 +15,6 @@ mod integration_tests {
     use std::future::ready;
     use tokio::time::{sleep, Duration};
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
-    // use super::*;
     use crate::{assert_downcast_matches, tls::TlsSettings};
     use crate::test_util::retry_until;
     use std::net::SocketAddr;
@@ -265,77 +263,77 @@ mod integration_tests {
         assert_eq!("hello", asdf);
     }
 
-    // #[tokio::test]
-    // async fn splunk_hostname() {
-    //     let cx = SinkContext::new_test();
+    #[tokio::test]
+    async fn splunk_hostname() {
+        let cx = SinkContext::new_test();
 
-    //     let indexed_fields = vec!["asdf".into()];
-    //     let config = config(Encoding::Json, indexed_fields).await;
-    //     let (sink, _) = config.build(cx).await.unwrap();
+        let indexed_fields = vec!["asdf".into()];
+        let config = config(Encoding::Json, indexed_fields).await;
+        let (sink, _) = config.build(cx).await.unwrap();
 
-    //     let message = random_string(100);
-    //     let mut event = Event::from(message.clone());
-    //     event.as_mut_log().insert("asdf", "hello");
-    //     event.as_mut_log().insert("host", "example.com:1234");
-    //     components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+        let message = random_string(100);
+        let mut event = Event::from(message.clone());
+        event.as_mut_log().insert("asdf", "hello");
+        event.as_mut_log().insert("host", "example.com:1234");
+        components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
 
-    //     let entry = find_entry(message.as_str()).await;
+        let entry = find_entry(message.as_str()).await;
 
-    //     assert_eq!(message, entry["message"].as_str().unwrap());
-    //     let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
-    //     assert_eq!("hello", asdf);
-    //     let host = entry["host"].as_array().unwrap()[0].as_str().unwrap();
-    //     assert_eq!("example.com:1234", host);
-    // }
+        assert_eq!(message, entry["message"].as_str().unwrap());
+        let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
+        assert_eq!("hello", asdf);
+        let host = entry["host"].as_array().unwrap()[0].as_str().unwrap();
+        assert_eq!("example.com:1234", host);
+    }
 
-    // #[tokio::test]
-    // async fn splunk_sourcetype() {
-    //     let cx = SinkContext::new_test();
+    #[tokio::test]
+    async fn splunk_sourcetype() {
+        let cx = SinkContext::new_test();
 
-    //     let indexed_fields = vec!["asdf".to_string()];
-    //     let mut config = config(Encoding::Json, indexed_fields).await;
-    //     config.sourcetype = Template::try_from("_json".to_string()).ok();
+        let indexed_fields = vec!["asdf".to_string()];
+        let mut config = config(Encoding::Json, indexed_fields).await;
+        config.sourcetype = Template::try_from("_json".to_string()).ok();
 
-    //     let (sink, _) = config.build(cx).await.unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
-    //     let message = random_string(100);
-    //     let mut event = Event::from(message.clone());
-    //     event.as_mut_log().insert("asdf", "hello");
-    //     components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+        let message = random_string(100);
+        let mut event = Event::from(message.clone());
+        event.as_mut_log().insert("asdf", "hello");
+        components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
 
-    //     let entry = find_entry(message.as_str()).await;
+        let entry = find_entry(message.as_str()).await;
 
-    //     assert_eq!(message, entry["message"].as_str().unwrap());
-    //     let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
-    //     assert_eq!("hello", asdf);
-    //     let sourcetype = entry["sourcetype"].as_str().unwrap();
-    //     assert_eq!("_json", sourcetype);
-    // }
+        assert_eq!(message, entry["message"].as_str().unwrap());
+        let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
+        assert_eq!("hello", asdf);
+        let sourcetype = entry["sourcetype"].as_str().unwrap();
+        assert_eq!("_json", sourcetype);
+    }
 
-    // #[tokio::test]
-    // async fn splunk_configure_hostname() {
-    //     let cx = SinkContext::new_test();
+    #[tokio::test]
+    async fn splunk_configure_hostname() {
+        let cx = SinkContext::new_test();
 
-    //     let config = HecSinkLogsConfig {
-    //         host_key: "roast".into(),
-    //         ..config(Encoding::Json, vec!["asdf".to_string()]).await
-    //     };
+        let config = HecSinkLogsConfig {
+            host_key: "roast".into(),
+            ..config(Encoding::Json, vec!["asdf".to_string()]).await
+        };
 
-    //     let (sink, _) = config.build(cx).await.unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
-    //     let message = random_string(100);
-    //     let mut event = Event::from(message.clone());
-    //     event.as_mut_log().insert("asdf", "hello");
-    //     event.as_mut_log().insert("host", "example.com:1234");
-    //     event.as_mut_log().insert("roast", "beef.example.com:1234");
-    //     components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+        let message = random_string(100);
+        let mut event = Event::from(message.clone());
+        event.as_mut_log().insert("asdf", "hello");
+        event.as_mut_log().insert("host", "example.com:1234");
+        event.as_mut_log().insert("roast", "beef.example.com:1234");
+        components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
 
-    //     let entry = find_entry(message.as_str()).await;
+        let entry = find_entry(message.as_str()).await;
 
-    //     assert_eq!(message, entry["message"].as_str().unwrap());
-    //     let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
-    //     assert_eq!("hello", asdf);
-    //     let host = entry["host"].as_array().unwrap()[0].as_str().unwrap();
-    //     assert_eq!("beef.example.com:1234", host);
-    // }
+        assert_eq!(message, entry["message"].as_str().unwrap());
+        let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
+        assert_eq!("hello", asdf);
+        let host = entry["host"].as_array().unwrap()[0].as_str().unwrap();
+        assert_eq!("beef.example.com:1234", host);
+    }
 }

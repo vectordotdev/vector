@@ -88,6 +88,16 @@ impl HecSinkLogsConfig {
         client: HttpClient,
         cx: SinkContext,
     ) -> crate::Result<VectorSink> {
+        // Build the encoder that will be used to turn Vec<Event> into Vec<u8>
+        let encoding = HecLogsEncoder {
+            encoding: self.encoding.codec().clone(),
+        };
+        // Build the request builder that will be used to build HecLogsRequests out of encoded Events
+        let request_builder = HecLogsRequestBuilder {
+            encoding: encoding.into(),
+            compression: self.compression.clone(),
+        };
+
         // Build the service that will make requests
         let content_encoding = self.compression.content_encoding();
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
@@ -99,24 +109,6 @@ impl HecSinkLogsConfig {
         let service = ServiceBuilder::new()
             .settings(request_settings, HecLogsRetry)
             .service(HecLogsService::new(client.clone(), http_request_builder));
-
-        // Build the encoder that will be used to turn Vec<Event> into Vec<u8>
-        let encoding = HecLogsEncoder {
-            encoding: self.encoding.codec().clone(),
-        };
-
-        // Build the request builder that will be used to build Requests out of encoded Events
-        let request_builder = HecLogsRequestBuilder {
-            encoding: encoding.into(),
-            compression: self.compression.clone(),
-            endpoint: self.endpoint.clone(),
-            indexed_fields: self.indexed_fields.clone(),
-            index: self.index.clone(),
-            sourcetype: self.sourcetype.clone(),
-            source: self.source.clone(),
-            host_key: self.host_key.clone(),
-            // encoding_standard: self.encoding_standard.clone(),
-        };
 
         let batch_settings = BatchSettings::<Buffer>::default()
             .bytes(1_000_000)
@@ -130,9 +122,11 @@ impl HecSinkLogsConfig {
             request_builder,
             context: cx,
             batch_settings: batch_settings,
+            sourcetype: self.sourcetype.clone(),
             source: self.source.clone(),
             index: self.index.clone(),
             indexed_fields: self.indexed_fields.clone(),
+            host: self.host_key.clone(),
         };
 
         Ok(VectorSink::Stream(Box::new(sink)))

@@ -30,9 +30,11 @@ pub struct HecLogsSink<S> {
     pub service: S,
     pub request_builder: HecLogsRequestBuilder,
     pub batch_settings: BatcherSettings,
+    pub sourcetype: Option<Template>,
     pub source: Option<Template>,
     pub index: Option<Template>,
     pub indexed_fields: Vec<String>,
+    pub host: String,
 }
 
 impl<S> HecLogsSink<S>
@@ -43,10 +45,11 @@ where
     S::Error: fmt::Debug + Into<crate::Error> + Send,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        // is clone needed here?
-        let source = self.source.clone();
-        let index = self.index;
-        let indexed_fields = self.indexed_fields;
+        let sourcetype= self.sourcetype.as_ref();
+        let source = self.source.as_ref();
+        let index = self.index.as_ref();
+        let indexed_fields = self.indexed_fields.as_slice();
+        let host = self.host.as_ref();
 
         let builder_limit = NonZeroUsize::new(64);
         let sink = input
@@ -54,11 +57,11 @@ where
             .filter_map(move |log| {
                 future::ready(process_log(
                     log,
-                    None,
-                    source.as_ref(),
-                    index.as_ref(),
-                    "".to_string(),
-                    indexed_fields.as_slice(),
+                    sourcetype,
+                    source,
+                    index,
+                    host,
+                    indexed_fields,
                 ))
             })
             .batched(NullPartitioner::new(), self.batch_settings)
@@ -125,7 +128,7 @@ fn process_log(
     sourcetype: Option<&Template>,
     source: Option<&Template>,
     index: Option<&Template>,
-    host_key: String,
+    host_key: &str,
     indexed_fields: &[String],
 ) -> Option<ProcessedEvent> {
     println!("[sink::process_log] {:?}", log);
@@ -138,7 +141,7 @@ fn process_log(
     let index = index
         .and_then(|index| render_template_string(index, &log, "index"));
 
-    let host = log.get(host_key.clone()).cloned();
+    let host = log.get(host_key).cloned();
 
     let timestamp = match log.remove(log_schema().timestamp_key()) {
         Some(Value::Timestamp(ts)) => ts,
