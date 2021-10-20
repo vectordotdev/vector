@@ -9,7 +9,6 @@ use super::{service::Encoding, sink::ProcessedEvent};
 use crate::{
     internal_events::{SplunkEventEncodeError, SplunkEventSent},
     sinks::{
-        splunk_hec::common::render_template_string,
         util::encoding::{Encoder, EncodingConfig, EncodingConfiguration},
     },
 };

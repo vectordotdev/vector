@@ -132,6 +132,7 @@ impl HecSinkLogsConfig {
             batch_settings: batch_settings,
             source: self.source.clone(),
             index: self.index.clone(),
+            indexed_fields: self.indexed_fields.clone(),
         };
 
         Ok(VectorSink::Stream(Box::new(sink)))

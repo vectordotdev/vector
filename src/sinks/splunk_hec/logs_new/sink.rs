@@ -32,6 +32,7 @@ pub struct HecLogsSink<S> {
     pub batch_settings: BatcherSettings,
     pub source: Option<Template>,
     pub index: Option<Template>,
+    pub indexed_fields: Vec<String>,
 }
 
 impl<S> HecLogsSink<S>
@@ -45,6 +46,7 @@ where
         // is clone needed here?
         let source = self.source.clone();
         let index = self.index;
+        let indexed_fields = self.indexed_fields;
 
         let builder_limit = NonZeroUsize::new(64);
         let sink = input
@@ -56,7 +58,7 @@ where
                     source.as_ref(),
                     index.as_ref(),
                     "".to_string(),
-                    Vec::new(),
+                    indexed_fields.as_slice(),
                 ))
             })
             .batched(NullPartitioner::new(), self.batch_settings)
@@ -124,12 +126,11 @@ fn process_log(
     source: Option<&Template>,
     index: Option<&Template>,
     host_key: String,
-    indexed_fields: Vec<String>,
+    indexed_fields: &[String],
 ) -> Option<ProcessedEvent> {
     println!("[sink::process_log] {:?}", log);
     let sourcetype = sourcetype
         .and_then(|sourcetype| render_template_string(sourcetype, &log, "sourcetype"));
-    println!("[sink::process_log] {:?}", sourcetype);
 
     let source = source
         .and_then(|source| render_template_string(source, &log, "source"));

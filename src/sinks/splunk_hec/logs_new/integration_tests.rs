@@ -215,55 +215,55 @@ mod integration_tests {
         assert_eq!("custom_index", index);
     }
 
-    // #[tokio::test]
-    // async fn splunk_insert_many() {
-    //     let cx = SinkContext::new_test();
+    #[tokio::test]
+    async fn splunk_insert_many() {
+        let cx = SinkContext::new_test();
 
-    //     let config = config(Encoding::Text, vec![]).await;
-    //     let (sink, _) = config.build(cx).await.unwrap();
+        let config = config(Encoding::Text, vec![]).await;
+        let (sink, _) = config.build(cx).await.unwrap();
 
-    //     let (messages, events) = random_lines_with_stream(100, 10, None);
-    //     components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+        let (messages, events) = random_lines_with_stream(100, 10, None);
+        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
 
-    //     let mut found_all = false;
-    //     for _ in 0..20 {
-    //         let entries = recent_entries(None).await;
+        let mut found_all = false;
+        for _ in 0..20 {
+            let entries = recent_entries(None).await;
 
-    //         found_all = messages.iter().all(|message| {
-    //             entries
-    //                 .iter()
-    //                 .any(|entry| entry["_raw"].as_str().unwrap() == message)
-    //         });
+            found_all = messages.iter().all(|message| {
+                entries
+                    .iter()
+                    .any(|entry| entry["_raw"].as_str().unwrap() == message)
+            });
 
-    //         if found_all {
-    //             break;
-    //         }
+            if found_all {
+                break;
+            }
 
-    //         sleep(Duration::from_millis(100)).await;
-    //     }
+            sleep(Duration::from_millis(100)).await;
+        }
 
-    //     assert!(found_all);
-    // }
+        assert!(found_all);
+    }
 
-    // #[tokio::test]
-    // async fn splunk_custom_fields() {
-    //     let cx = SinkContext::new_test();
+    #[tokio::test]
+    async fn splunk_custom_fields() {
+        let cx = SinkContext::new_test();
 
-    //     let indexed_fields = vec!["asdf".into()];
-    //     let config = config(Encoding::Json, indexed_fields).await;
-    //     let (sink, _) = config.build(cx).await.unwrap();
+        let indexed_fields = vec!["asdf".into()];
+        let config = config(Encoding::Json, indexed_fields).await;
+        let (sink, _) = config.build(cx).await.unwrap();
 
-    //     let message = random_string(100);
-    //     let mut event = Event::from(message.clone());
-    //     event.as_mut_log().insert("asdf", "hello");
-    //     components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+        let message = random_string(100);
+        let mut event = Event::from(message.clone());
+        event.as_mut_log().insert("asdf", "hello");
+        components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
 
-    //     let entry = find_entry(message.as_str()).await;
+        let entry = find_entry(message.as_str()).await;
 
-    //     assert_eq!(message, entry["message"].as_str().unwrap());
-    //     let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
-    //     assert_eq!("hello", asdf);
-    // }
+        assert_eq!(message, entry["message"].as_str().unwrap());
+        let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
+        assert_eq!("hello", asdf);
+    }
 
     // #[tokio::test]
     // async fn splunk_hostname() {
