@@ -1,6 +1,10 @@
 use std::{
+    cmp,
     collections::BTreeMap,
+    convert::TryInto,
     io::{self, Write},
+    mem,
+    time::Instant,
 };
 
 use chrono::{DateTime, Utc};
@@ -9,7 +13,7 @@ use serde::Serialize;
 use snafu::{ResultExt, Snafu};
 use vector_core::event::{metric::MetricSketch, Metric, MetricValue};
 
-use crate::sinks::util::{encode_namespace, encoding::as_tracked_write, Compressor};
+use crate::sinks::util::{encode_namespace, Compressor};
 
 use super::config::{
     DatadogMetricsEndpoint, MAXIMUM_SERIES_PAYLOAD_COMPRESSED_SIZE, MAXIMUM_SERIES_PAYLOAD_SIZE,
@@ -38,8 +42,17 @@ pub enum EncoderError {
     #[snafu(display("I/O error encountered during encoding/finishing: {}", source))]
     Io { source: io::Error },
 
+    #[snafu(display("Failed to encode series metrics to JSON: {}", source))]
+    JsonEncodingFailed { source: serde_json::Error },
+
+    #[snafu(display("Failed to encode sketch metrics to Protocol Buffers: {}", source))]
+    ProtoEncodingFailed { source: prost::EncodeError },
+
     #[snafu(display("Finished payload exceeded the (un)compressed size limits"))]
-    TooLarge { metrics: Vec<Metric> },
+    TooLarge {
+        metrics: Vec<Metric>,
+        recommended_splits: usize,
+    },
 }
 
 impl From<io::Error> for EncoderError {
@@ -68,51 +81,63 @@ pub enum DatadogMetricType {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 struct DatadogPoint<T>(i64, T);
 
-pub struct DatadogMetricsEncoder {
-    endpoint: DatadogMetricsEndpoint,
-    default_namespace: Option<String>,
-    uncompressed_limit: Option<usize>,
-    compressed_limit: Option<usize>,
-
+struct EncoderState {
     writer: Compressor,
     written: usize,
     buf: Vec<u8>,
 
+    pending: Vec<Metric>,
     processed: Vec<Metric>,
+}
+
+impl Default for EncoderState {
+    fn default() -> Self {
+        EncoderState {
+            // We use the "zlib default" compressor because it's all Datadog supports, and adding it
+            // generically to `Compression` would make things a little weird because of the
+            // conversion trait implementations that are also only none vs gzip.
+            writer: Compressor::zlib_default(),
+            written: 0,
+            buf: Vec::with_capacity(1024),
+            pending: Vec::new(),
+            processed: Vec::new(),
+        }
+    }
+}
+
+pub struct DatadogMetricsEncoder {
+    endpoint: DatadogMetricsEndpoint,
+    default_namespace: Option<String>,
+    uncompressed_limit: usize,
+    compressed_limit: usize,
+
+    state: EncoderState,
+    last_sent: Option<Instant>,
 }
 
 impl DatadogMetricsEncoder {
     /// Creates a new `DatadogMetricsEncoder` for the given endpoint.
-    ///
-    /// Depending on the endpoint, different payload size limitations will be applied.
-    pub fn new(
-        endpoint: DatadogMetricsEndpoint,
-        default_namespace: Option<String>,
-    ) -> io::Result<Self> {
+    pub fn new(endpoint: DatadogMetricsEndpoint, default_namespace: Option<String>) -> Self {
         // Calculate the payload size limits for the given endpoint.
-        let (uncompressed_limit, compressed_limit) = get_endpoint_payload_size_limits(endpoint);
+        let (uncompressed_limit, compressed_limit) = get_endpoint_payload_size_limits();
 
-        // Create our compressor and get the header in place.  We use the "zlib default" compressor
-        // because it's all Datadog supports, and adding it generically to `Compression` would make
-        // things a little weird because of the conversion trait implementations that are also only
-        // none vs gzip.
-        let mut writer = Compressor::zlib_default();
-        let _ = write_payload_header(endpoint, &mut writer)?;
-
-        Ok(Self {
+        Self {
             endpoint,
             default_namespace,
-            writer,
-            written: 0,
-            buf: Vec::new(),
             uncompressed_limit,
             compressed_limit,
-            processed: Vec::new(),
-        })
+            state: EncoderState::default(),
+            last_sent: None,
+        }
     }
 }
 
 impl DatadogMetricsEncoder {
+    fn reset_state(&mut self) -> EncoderState {
+        self.last_sent = Some(Instant::now());
+        mem::take(&mut self.state)
+    }
+
     fn get_namespaced_name(&self, metric: &Metric) -> String {
         encode_namespace(
             metric
@@ -123,42 +148,124 @@ impl DatadogMetricsEncoder {
         )
     }
 
-    fn encode_metric_for_endpoint(&mut self, metric: &Metric) -> Result<usize, EncoderError> {
+    fn encode_single_metric(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
+        // Clear our temporary buffer before any encoding.
+        self.state.buf.clear();
+
         match self.endpoint {
-            DatadogMetricsEndpoint::Series => self.encode_series_metric(metric),
-            DatadogMetricsEndpoint::Sketches => self.encode_sketch_metric(metric),
+            // Series metrics are encoded via JSON, in an incremental fashion.
+            DatadogMetricsEndpoint::Series => {
+                // A single `Metric` might generate multiple Datadog series metrics.
+                let all_series = self.generate_series_metrics(&metric)?;
+
+                // We handle adding the JSON array separator (comma) manually since the encoding is
+                // happening incrementally.
+                let has_processed = !self.state.processed.is_empty();
+                for (i, series) in all_series.iter().enumerate() {
+                    // Add a array delimiter if we already have other metrics encoded.
+                    if has_processed || i > 0 {
+                        let _ = write_payload_delimiter(self.endpoint, &mut self.state.buf)
+                            .context(Io)?;
+                    }
+                    let _ = serde_json::to_writer(&mut self.state.buf, series)
+                        .context(JsonEncodingFailed)?;
+                }
+            }
+            // We can't encode sketches incrementally (yet), so we don't do any encoding here.  We
+            // simply store it for later, and in `pre_finish`, any such pending metrics will be
+            // encoded in a single operation.
+            DatadogMetricsEndpoint::Sketches => {}
         }
+
+        // If we actually encoded a metric, we try to see if our temporary buffer can be compressed
+        // and added to the overall payload.  Otherwise, it means we're deferring the metric for
+        // later encoding, so we store it off to the side.
+        if !self.state.buf.is_empty() {
+            // Compressing the temporary buffer would violate our payload size limits, so we give
+            // the metric back to the caller.
+            if !self.try_compress_buffer().context(Io)? {
+                return Ok(Some(metric));
+            }
+
+            self.state.processed.push(metric);
+        } else {
+            self.state.pending.push(metric);
+        }
+
+        Ok(None)
     }
 
-    fn encode_series_metric(&mut self, metric: &Metric) -> Result<usize, EncoderError> {
+    fn generate_series_metrics(
+        &mut self,
+        metric: &Metric,
+    ) -> Result<Vec<DatadogSeriesMetric>, EncoderError> {
         let namespaced_name = self.get_namespaced_name(metric);
         let ts = encode_timestamp(metric.timestamp());
         let tags = metric.tags().map(encode_tags);
-        let series = match metric.value() {
-            MetricValue::Counter { value } => DatadogSeriesMetric {
+        let interval = self
+            .last_sent
+            .map(|then| then.elapsed())
+            .map(|d| d.as_secs().try_into().unwrap_or(i64::MAX));
+
+        let results = match metric.value() {
+            MetricValue::Counter { value } => vec![DatadogSeriesMetric {
                 metric: namespaced_name,
                 r#type: DatadogMetricType::Count,
-                // TODO: how tf do we shuttle the interval in here? need the actual batch
-                // time out, like how long actually elapsed since the previous batch for this endpoint,
-                // not the maximum allowed batch timeout value
-                interval: None,
+                interval,
                 points: vec![DatadogPoint(ts, *value)],
                 tags,
-            },
-            MetricValue::Set { values } => DatadogSeriesMetric {
+            }],
+            MetricValue::Set { values } => vec![DatadogSeriesMetric {
                 metric: namespaced_name,
                 r#type: DatadogMetricType::Gauge,
                 interval: None,
                 points: vec![DatadogPoint(ts, values.len() as f64)],
                 tags,
-            },
-            MetricValue::Gauge { value } => DatadogSeriesMetric {
+            }],
+            MetricValue::Gauge { value } => vec![DatadogSeriesMetric {
                 metric: namespaced_name,
                 r#type: DatadogMetricType::Gauge,
                 interval: None,
                 points: vec![DatadogPoint(ts, *value)],
                 tags,
-            },
+            }],
+            MetricValue::AggregatedSummary {
+                quantiles,
+                count,
+                sum,
+            } => {
+                let mut results = vec![
+                    DatadogSeriesMetric {
+                        metric: format!("{}.count", &namespaced_name),
+                        r#type: DatadogMetricType::Rate,
+                        interval,
+                        points: vec![DatadogPoint(ts, f64::from(*count))],
+                        tags: tags.clone(),
+                    },
+                    DatadogSeriesMetric {
+                        metric: format!("{}.sum", &namespaced_name),
+                        r#type: DatadogMetricType::Gauge,
+                        interval: None,
+                        points: vec![DatadogPoint(ts, *sum)],
+                        tags: tags.clone(),
+                    },
+                ];
+
+                for quantile in quantiles {
+                    results.push(DatadogSeriesMetric {
+                        metric: format!(
+                            "{}.{}percentile",
+                            &namespaced_name,
+                            quantile.as_percentile()
+                        ),
+                        r#type: DatadogMetricType::Gauge,
+                        interval: None,
+                        points: vec![DatadogPoint(ts, quantile.value)],
+                        tags: tags.clone(),
+                    })
+                }
+                results
+            }
             value => {
                 return Err(EncoderError::InvalidMetric {
                     endpoint: self.endpoint,
@@ -167,39 +274,15 @@ impl DatadogMetricsEncoder {
             }
         };
 
-        let result = as_tracked_write(&mut self.buf, &series, |writer, item| {
-            serde_json::to_writer(writer, item)
-        });
-        result.map_err(Into::into).context(Io)
+        Ok(results)
     }
 
-    fn encode_sketch_metric(&self, _metric: &Metric) -> Result<usize, EncoderError> {
-        // We don't write anything here because sketches are encoded in `DatadogMetricsEncoder::pre_finish`.
-        Ok(0)
-    }
-
-    pub fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
-        // Start out by encoding the metric into our temporary buffer.  We additionally write a
-        // payload delimiter before the metric if we've already written at least one metric so far.
-        // This ensures that we don't leave a dangling delimiter if we had to back out a metric from
-        // encoding.
-        //
-        // I also realize that we're grabbing the length of the temporary buffer even though we got
-        // back the number of bytes written by the actual encode function, but this is purely to
-        // ensure that the number we're considering is the true buffer length, rather than any
-        // intermediate number that may have unintentionally been passed back.
-        self.buf.clear();
-        if !self.processed.is_empty() {
-            let _ = write_payload_delimiter(self.endpoint, &mut self.buf).context(Io)?;
-        }
-        let _ = self.encode_metric_for_endpoint(&metric)?;
-        let n = self.buf.len();
+    fn try_compress_buffer(&mut self) -> io::Result<bool> {
+        let n = self.state.buf.len();
 
         // If we're over our uncompressed size limit with this metric, inform the caller.
-        if let Some(uncompressed_limit) = self.uncompressed_limit {
-            if self.written + n > uncompressed_limit {
-                return Ok(Some(metric));
-            }
+        if self.state.written + n > self.uncompressed_limit {
+            return Ok(false);
         }
 
         // Calculating the compressed size is slightly more tricky, because we can only speculate
@@ -234,22 +317,43 @@ impl DatadogMetricsEncoder {
         // We eat a little bit of memory usage holding on to the metrics, but not a ton.  It's much
         // better than continually cloning the compression buffer in order to roll it back if we
         // exceed the compressed size limit.
-        if let Some(compressed_limit) = self.compressed_limit {
-            let compressed_len = self.writer.get_ref().len();
-            if compressed_len + n > compressed_limit {
-                return Ok(Some(metric));
-            }
+        let compressed_len = self.state.writer.get_ref().len();
+        if compressed_len + n > self.compressed_limit {
+            return Ok(false);
         }
 
         // We should be safe to write our holding buffer to the compressor and store the metric.
-        let _ = self.writer.write_all(&self.buf).context(Io)?;
-        self.written += n;
-        self.processed.push(metric);
-
-        Ok(None)
+        let _ = self.state.writer.write_all(&self.state.buf)?;
+        self.state.written += n;
+        Ok(true)
     }
 
-    fn pre_finish(&mut self) -> Result<(), EncoderError> {
+    /// Attempts to encode a single metric into this encoder.
+    ///
+    /// For some metric types, the metric will be encoded immediately and we will attempt to
+    /// compress it.  For some other metric types, we will store the metric until `finish` is
+    /// called, due to the inability to incrementally encode them.
+    ///
+    /// If the metric could not be encoded into this encoder due to hitting the limits on the sizer
+    /// of the encoded/compressed payload, it will be returned via `Ok(Some(Metric))`, otherwise `Ok(None)`
+    /// will be returned.
+    ///
+    /// If `Ok(Some(Metric))` is returned, callers must call `finish` to finalize the payload.
+    /// Further calls to `try_encode` without first calling `finish` may or may not succeed.
+    ///
+    /// # Errors
+    ///
+    /// If an error is encountered while attempting to encode the metric, an error variant will be returned.
+    pub fn try_encode(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
+        // Make sure we've written our header already.
+        if self.state.written == 0 {
+            let _ = write_payload_header(self.endpoint, &mut self.state.writer).context(Io)?;
+        }
+
+        self.encode_single_metric(metric)
+    }
+
+    fn try_encode_pending(&mut self) -> Result<(), EncoderError> {
         // This function allows us to co-opt the "processed" metrics for another purpose: generating
         // sketch payloads.  Since there's no readily-available Protocol Buffer incremental encoder
         // that I can find, we can't truly emulate what the Datadog Agent does, which is encode
@@ -264,13 +368,31 @@ impl DatadogMetricsEncoder {
         // allows the caller to try and split the batch the split and try to run through the
         // encoding process again.
 
+        // The Datadog Agent uses a particular Protocol Buffers library to incrementally encode the
+        // DDSketch structures into a payload, similiar to how we incrementally encode the series
+        // metrics.  Unfortunately, there's no existing Rust crate that allows writing out Protocol
+        // Buffers payloads by hand, so we have to cheat a little and buffer up the metrics until
+        // the very end.
+        //
+        // `try_encode`, and thus `encode_single_metric`, specifically store sketch-oriented metrics
+        // off to the side for this very purpose, letting us gather them all here, encoding them
+        // into a single Protocol Buffers payload.
+        //
+        // Naturally, this means we might actually generate a payload that's too big.  This is a
+        // problem for the caller to figure out.  Presently, the only usage of this encoder will
+        // naively attempt to split the batch into two and try again.
+
         // Only go through this if we're targeting the sketch endpoint.
         if !(matches!(self.endpoint, DatadogMetricsEndpoint::Sketches)) {
             return Ok(());
         }
 
+        // We consume all the pending metrics, since we need to add them to the "processed" vector
+        // if we successfully encode them and can compress the payload.
+        let pending = mem::replace(&mut self.state.pending, Vec::new());
+
         let mut sketches = Vec::new();
-        for metric in &self.processed {
+        for metric in &pending {
             match metric.value() {
                 MetricValue::Sketch { sketch } => match sketch {
                     MetricSketch::AgentDDSketch(ddsketch) => {
@@ -336,38 +458,62 @@ impl DatadogMetricsEncoder {
             sketches,
         };
 
-        // Now try encoding this sketch payload, and then write it to the compressor.
-        self.buf.clear();
+        // Now try encoding this sketch payload, and then try to compress it.
+        self.state.buf.clear();
         let _ = sketch_payload
-            .encode(&mut self.buf)
-            .expect("encoding sketches into Vec<u8> should be infallible");
+            .encode(&mut self.state.buf)
+            .context(ProtoEncodingFailed)?;
 
-        self.writer.write_all(&self.buf).context(Io)
+        if self.try_compress_buffer()? {
+            self.state.processed.extend(pending);
+            Ok(())
+        } else {
+            // The payload was too big overall, which we can't do anything about.  Up to the caller
+            // now to split the batch or something else.
+            Err(EncoderError::TooLarge {
+                metrics: pending,
+                // Hard-coded split code for now because we need to hoist up the logic for
+                // calculating the recommended splits to an instance method or something.
+                recommended_splits: 2,
+            })
+        }
     }
 
-    pub fn finish(mut self) -> Result<(Vec<u8>, Vec<Metric>), EncoderError> {
-        let _ = self.pre_finish()?;
+    pub fn finish(&mut self) -> Result<(Vec<u8>, Vec<Metric>), EncoderError> {
+        // Try to encode any pending metrics we had stored up.
+        let _ = self.try_encode_pending()?;
 
-        let _ = write_payload_footer(self.endpoint, &mut self.writer).context(Io)?;
-        let payload = self.writer.finish().context(Io)?;
+        // Write any payload footer necessary for the configured endpoint.
+        let _ = write_payload_footer(self.endpoint, &mut self.state.writer).context(Io)?;
+
+        // Consume the encoder state so we can do our final checks and return the necessary data.
+        let state = self.reset_state();
+        let payload = state.writer.finish().context(Io)?;
+        let processed = state.processed;
 
         info!(message = "finished encoding/compression request",
-            uncompressed_len = self.written, compressed_len = payload.len(),
-            endpoint = ?self.endpoint, processed_len = self.processed.len());
+            uncompressed_len = state.written, compressed_len = payload.len(),
+            endpoint = ?self.endpoint, processed_len = processed.len());
 
-        // A compressed limit is only set if we're actually compressing, so we check for that, and
-        // then the uncompressed size, and if neither are set, we default to returning the payload.
-        let within_limit = self
-            .compressed_limit
-            .or(self.uncompressed_limit)
-            .map(|limit| payload.len() <= limit)
-            .unwrap_or(true);
+        // We should have configured our limits such that if all calls to `try_compress_buffer` have
+        // succeeded up until this point, then our payload should be within the limits after writing
+        // the footer and finishing the compressor.
+        //
+        // We're not only double checking that here, but we're figuring out how much bigger than the
+        // limit the payload is, if it is indeed bigger, so that we can recommend how many splits
+        // should be used to bring the given set of metrics down to chunks that can be encoded
+        // without hitting the limits.
+        let compressed_splits = payload.len() / self.compressed_limit;
+        let uncompressed_splits = state.written / self.uncompressed_limit;
+        let target_splits = cmp::max(compressed_splits, uncompressed_splits);
 
-        if within_limit {
-            Ok((payload, self.processed))
+        if target_splits == 0 {
+            // No splits means our payload didn't exceed either of the limits.
+            Ok((payload, processed))
         } else {
             Err(EncoderError::TooLarge {
-                metrics: self.processed,
+                metrics: processed,
+                recommended_splits: target_splits + 1,
             })
         }
     }
@@ -390,23 +536,24 @@ fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
     }
 }
 
-fn get_endpoint_payload_size_limits(
-    _endpoint: DatadogMetricsEndpoint,
-) -> (Option<usize>, Option<usize>) {
-    // Estimate the potential overhead of the compression container itself.
-    //
-    // TODO: We're estimating the expected size of the compressor overhead -- file header,
-    // checksum, etc -- and computing our actual compressed limit from that.  This should be
-    // reasonably accurate for gzip, but might not be for other compression algorithms.
-    //
-    // flate2 does not expose a way for us to get the exact numbers, but it would be nice if
-    // it did.
-    let estimated_compressed_header_len = 24;
-
+fn get_endpoint_payload_size_limits() -> (usize, usize) {
     // According to the datadog-agent code, sketches use the same payload size limits as series
     // data. We're just gonna go with that for now.
     let uncompressed_limit = MAXIMUM_SERIES_PAYLOAD_SIZE;
     let compressed_limit = MAXIMUM_SERIES_PAYLOAD_COMPRESSED_SIZE;
+
+    // Estimate the potential overhead of the compression container itself.
+    //
+    // We use zlib, which uses Deflate under the hood.  zlib itself can take up to 6 bytes. For
+    // Deflate, the output can only ever be marginally larger than the input as Deflate will resort
+    // to storing uncompressed blocks if the compressed versions were somehow larger. Thus, we can
+    // expect "an overhead of five bytes per 16 KB block (about 0.03%)"[1] in overhead.
+    //
+    // Thus, we take 1/32nd of the compressed limit (about 0.03%) and the zlib header length as our
+    // estimated maximum overhead.
+    //
+    // [1] - https://www.zlib.net/zlib_tech.html
+    let estimated_max_compression_overhead = 6 + (compressed_limit - 6) / 32;
 
     // We already know we'll have to write the header/footer for the series payload by hand
     // to allow encoding incrementally, so figure out the size of that so we can remove it.
@@ -414,14 +561,14 @@ fn get_endpoint_payload_size_limits(
 
     // This is a sanity check to ensure that our chosen limits are reasonable.
     assert!(uncompressed_limit > header_len);
-    assert!(compressed_limit > header_len + estimated_compressed_header_len);
+    assert!(compressed_limit > header_len + estimated_max_compression_overhead);
 
     // Adjust for the known/estimated sizes of headers, footers, compression container
     // overhead, etc.
     let uncompressed_limit = uncompressed_limit - header_len;
-    let compressed_limit = compressed_limit - header_len + estimated_compressed_header_len;
+    let compressed_limit = compressed_limit - header_len - estimated_max_compression_overhead;
 
-    (Some(uncompressed_limit), Some(compressed_limit))
+    (uncompressed_limit, compressed_limit)
 }
 
 fn write_payload_header(

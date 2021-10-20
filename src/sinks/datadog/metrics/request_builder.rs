@@ -11,7 +11,8 @@ use crate::sinks::util::IncrementalRequestBuilder;
 /// Incremental request builder specific to Datadog metrics.
 pub struct DatadogMetricsRequestBuilder {
     endpoint_configuration: DatadogMetricsEndpointConfiguration,
-    default_namespace: Option<String>,
+    series_encoder: DatadogMetricsEncoder,
+    sketches_encoder: DatadogMetricsEncoder,
 }
 
 impl DatadogMetricsRequestBuilder {
@@ -21,7 +22,21 @@ impl DatadogMetricsRequestBuilder {
     ) -> Self {
         Self {
             endpoint_configuration,
-            default_namespace,
+            series_encoder: DatadogMetricsEncoder::new(
+                DatadogMetricsEndpoint::Series,
+                default_namespace.clone(),
+            ),
+            sketches_encoder: DatadogMetricsEncoder::new(
+                DatadogMetricsEndpoint::Sketches,
+                default_namespace,
+            ),
+        }
+    }
+
+    fn get_encoder(&mut self, endpoint: DatadogMetricsEndpoint) -> &mut DatadogMetricsEncoder {
+        match endpoint {
+            DatadogMetricsEndpoint::Series => &mut self.series_encoder,
+            DatadogMetricsEndpoint::Sketches => &mut self.sketches_encoder,
         }
     }
 }
@@ -35,17 +50,17 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
     type Error = EncoderError;
 
     fn encode_events_incremental(
-        &self,
+        &mut self,
         input: (DatadogMetricsEndpoint, Vec<Metric>),
     ) -> Result<Vec<(Self::Metadata, Self::Payload)>, Self::Error> {
         let (endpoint, mut metrics) = input;
+        let encoder = self.get_encoder(endpoint);
         let mut metric_drain = metrics.drain(..);
 
         let mut results = Vec::new();
         let mut pending = None;
         while metric_drain.len() != 0 {
             let mut n = 0;
-            let mut encoder = DatadogMetricsEncoder::new(endpoint, self.default_namespace.clone())?;
 
             loop {
                 // Grab the previously pending metric, or the next metric from the drain.
@@ -88,26 +103,45 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
                         // Protocol Buffers data, similiar to how the Datadog Agent does it with
                         // `molecule`, we can wrap all of the sketch encoding into the same
                         // incremental encoding paradigm and avoid this.
-                        EncoderError::TooLarge { metrics } => {
-                            let mut first = metrics;
-                            let second = first.split_off(first.len() / 2);
+                        EncoderError::TooLarge {
+                            mut metrics,
+                            recommended_splits,
+                        } => {
+                            // The encoder recommends how many splits we should do based on how much
+                            // the set of processed metrics exceeded the payload size limits, so we
+                            // do those splits here.
+                            let mut chunks = Vec::new();
+                            let mut n = recommended_splits;
+                            let mut remaining = metrics.len();
+                            let stride = remaining / n;
 
-                            let result = encode_now_or_never(
-                                first,
-                                endpoint,
-                                self.default_namespace.clone(),
-                            )?;
-                            results.push(result);
+                            while n > 1 {
+                                remaining -= stride;
+                                let chunk = metrics.split_off(remaining);
+                                chunks.push(chunk);
+                                n -= 1;
+                            }
+                            chunks.push(metrics);
 
-                            let result = encode_now_or_never(
-                                second,
-                                endpoint,
-                                self.default_namespace.clone(),
-                            )?;
-                            results.push(result);
+                            // Now encode them.
+                            for chunk in chunks {
+                                let _chunk_size = chunk.len();
+                                match encode_now_or_never(encoder, endpoint, chunk) {
+                                    Ok(result) => results.push(result),
+                                    Err(_) => {
+                                        // We failed to encode the chunk, consider it lost.
+                                        // TODO: emit metrics here to signal that we lost metrics
+                                        // due to an encoder failure.
+                                    }
+                                }
+                            }
                         }
                         // Not an error we can do anything about, so just forward it on.
-                        suberr => return Err(suberr),
+                        suberr => {
+                            // TODO: emit metrics here to signal that we lost metrics due to an
+                            // encoder failure.
+                            return Err(suberr);
+                        }
                     },
                 }
             }
@@ -116,7 +150,7 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
         Ok(results)
     }
 
-    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(&mut self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
         let (endpoint, batch_size, finalizers) = metadata;
         let uri = self.endpoint_configuration.get_uri_for_endpoint(endpoint);
 
@@ -136,19 +170,28 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
 /// able to _actually_ encode Protocol Buffers data incrementally.  We split batches that end up
 /// being too large, and simply try to encode them here: in isolation, without further splitting.
 fn encode_now_or_never(
-    metrics: Vec<Metric>,
+    encoder: &mut DatadogMetricsEncoder,
     endpoint: DatadogMetricsEndpoint,
-    default_namespace: Option<String>,
+    mut metrics: Vec<Metric>,
 ) -> Result<((DatadogMetricsEndpoint, usize, EventFinalizers), Bytes), EncoderError> {
     let mut n = 0;
-    let mut encoder = DatadogMetricsEncoder::new(endpoint, default_namespace)?;
-    for metric in metrics {
-        if let Some(_) = encoder.try_encode(metric)? {
-            // We're co-opting the TooLarge error here, but any error that a caller receives from
-            // this method implies we failed, and that they need to tpack up and go home.
-            return Err(EncoderError::TooLarge {
-                metrics: Vec::new(),
-            });
+
+    // We don't return `EncoderError::TooLarge` during a `try_encode` call, so if we get an error
+    // here, it's unrecoverable.  If we failed to encode all of the metrics, we just break from the
+    // loop early and return `EncoderError::TooLarge` ourselves.  Since we used the recommended
+    // number of splits directly from the encoder to get here, if we're hitting the limits before
+    // encoding all the metrics in the batch, then something is super wrong and, again, essentially
+    // unrecoverable.
+    while let Some(metric) = metrics.pop() {
+        match encoder.try_encode(metric)? {
+            Some(metric) => {
+                metrics.push(metric);
+                return Err(EncoderError::TooLarge {
+                    metrics: Vec::new(),
+                    recommended_splits: 0,
+                });
+            }
+            None => {}
         }
         n += 1;
     }

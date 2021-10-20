@@ -49,7 +49,6 @@ impl Partitioner for DatadogMetricsTypePartitioner {
 pub struct DatadogMetricsSink<S> {
     service: S,
     acker: Acker,
-    request_builder_limit: Option<NonZeroUsize>,
     request_builder: DatadogMetricsRequestBuilder,
     batch_settings: BatcherSettings,
 }
@@ -71,14 +70,6 @@ where
         DatadogMetricsSink {
             service,
             acker: cx.acker(),
-            // TODO: This should likely be configurable, but how? It primarily affects request
-            // building throughput, which is more a function of Vector resource usage than anything
-            // else, and we currently don't really expose any knobs/tunables for adjusting how many
-            // resources Vector itself uses.
-            //
-            // For this and other code like it, maybe it should be the number of CPUs, which would
-            // correspond to the number of Tokio executor threads, or some multiple thereof?
-            request_builder_limit: NonZeroUsize::new(64),
             request_builder,
             batch_settings,
         }
@@ -100,7 +91,7 @@ where
             // limits on payload size, so we keep adding metrics to a request until we reach the
             // limit, and then create a new request, and so on and so forth, until all metrics have
             // been turned into a request.
-            .incremental_request_builder(self.request_builder_limit, self.request_builder)
+            .incremental_request_builder(self.request_builder)
             // This unrolls our vector of requests to get us back to Stream<Item = DatadogMetricsRequest>.
             .flat_map(stream::iter)
             // Generating requests _can_ fail, so we log and filter out errors here.

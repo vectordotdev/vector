@@ -1,6 +1,6 @@
 use std::{fmt, future::Future, hash::Hash, num::NonZeroUsize, pin::Pin, sync::Arc};
 
-use futures_util::Stream;
+use futures_util::{stream::Map, Stream, StreamExt};
 use tower::Service;
 use vector_core::{
     buffers::{Ackable, Acker},
@@ -112,18 +112,15 @@ pub trait SinkBuilderExt: Stream {
     /// and can generate multiple payloads.  This is the maximally flexible approach to encoding,
     /// but means that the trait doesn't provide any default methods like `RequestBuilder` does.
     ///
-    /// Each input is transformed concurrently, up to the given limit.  A limit of `None` is
-    /// self-describing, as it imposes no concurrency limit, and `Some(n)` limits this stage to `n`
-    /// concurrent operations at any given time.
+    /// Each input is transformed serially.
     ///
     /// Encoding and compression are handled internally, deferring to the builder at the necessary
     /// checkpoints for adjusting the event before encoding/compression, as well as generating the
     /// correct request object with the result of encoding/compressing the events.
     fn incremental_request_builder<B>(
         self,
-        limit: Option<NonZeroUsize>,
-        builder: B,
-    ) -> ConcurrentMap<Self, Vec<Result<B::Request, B::Error>>>
+        mut builder: B,
+    ) -> Map<Self, Box<dyn FnMut(Self::Item) -> Vec<Result<B::Request, B::Error>> + Send + Sync>>
     where
         Self: Sized,
         Self::Item: Send + 'static,
@@ -131,28 +128,22 @@ pub trait SinkBuilderExt: Stream {
         B::Error: Send,
         B::Request: Send,
     {
-        let builder = Arc::new(builder);
+        self.map(Box::new(move |input| {
+            let mut results = Vec::new();
 
-        self.concurrent_map(limit, move |input| {
-            let builder = Arc::clone(&builder);
-
-            Box::pin(async move {
-                let mut results = Vec::new();
-
-                // Encode the events, generating potentially many metadata/payload pairs.
-                match builder.encode_events_incremental(input) {
-                    Ok(pairs) => {
-                        // Now build the actual requests.
-                        for (metadata, payload) in pairs {
-                            results.push(Ok(builder.build_request(metadata, payload)));
-                        }
+            // Encode the events, generating potentially many metadata/payload pairs.
+            match builder.encode_events_incremental(input) {
+                Ok(pairs) => {
+                    // Now build the actual requests.
+                    for (metadata, payload) in pairs {
+                        results.push(Ok(builder.build_request(metadata, payload)));
                     }
-                    Err(e) => results.push(Err(e)),
                 }
+                Err(e) => results.push(Err(e)),
+            }
 
-                results
-            })
-        })
+            results
+        }))
     }
 
     /// Normalizes a stream of [`Metric`] events with the provided normalizer.
