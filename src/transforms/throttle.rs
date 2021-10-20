@@ -50,15 +50,15 @@ impl TransformConfig for ThrottleConfig {
 }
 
 #[derive(Clone)]
-pub struct Throttle<'a, C: clock::Clock<Instant = I>, I: clock::Reference> {
+pub struct Throttle<C: 'static + clock::Clock<Instant = I>, I: clock::Reference> {
     quota: Quota,
     flush_keys_interval: Duration,
     key_field: Option<Template>,
     exclude: Option<Box<dyn Condition>>,
-    clock: &'a C,
+    clock: &'static C,
 }
 
-impl<'a, C, I> Throttle<'a, C, I>
+impl<C, I> Throttle<C, I>
 where
     C: clock::Clock<Instant = I>,
     I: clock::Reference,
@@ -66,7 +66,7 @@ where
     pub fn new(
         config: &ThrottleConfig,
         context: &TransformContext,
-        clock: &'a C,
+        clock: &'static C,
     ) -> crate::Result<Self> {
         let flush_keys_interval = Duration::from_secs_f64(config.window.clone());
 
@@ -97,9 +97,9 @@ where
     }
 }
 
-impl<'a, C, I> TaskTransform for Throttle<'a, C, I>
+impl<C, I> TaskTransform for Throttle<C, I>
 where
-    C: clock::Clock<Instant = I> + Send + Sync,
+    C: 'static + clock::Clock<Instant = I> + Send + Sync,
     I: clock::Reference + Send,
 {
     fn transform(
@@ -235,6 +235,8 @@ window = 5
 
         // And still nothing there
         assert_eq!(Poll::Ready(None), futures::poll!(out_stream.next()));
+
+        drop(out_stream);
     }
 
     #[tokio::test]
