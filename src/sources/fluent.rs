@@ -372,7 +372,7 @@ impl From<FluentFrame> for LogEvent {
         log.insert(log_schema().timestamp_key(), timestamp);
         log.insert("tag", tag);
         for (key, value) in record.into_iter() {
-            log.insert_flat(key, value)
+            log.insert_flat(key, value);
         }
         log
     }

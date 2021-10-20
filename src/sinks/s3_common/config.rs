@@ -1,3 +1,4 @@
+use super::service::S3Service;
 use crate::config::ProxyConfig;
 use crate::rusoto;
 use crate::rusoto::{AwsAuthentication, RegionOrEndpoint};
@@ -112,18 +113,19 @@ pub fn build_healthcheck(bucket: String, client: S3Client) -> crate::Result<Heal
     Ok(healthcheck.boxed())
 }
 
-pub fn create_client(
+pub fn create_service(
     region: &RegionOrEndpoint,
     auth: &AwsAuthentication,
     assume_role: Option<String>,
     proxy: &ProxyConfig,
-) -> crate::Result<S3Client> {
+) -> crate::Result<S3Service> {
     let region = region.try_into()?;
     let client = rusoto::client(proxy)?;
 
     let creds = auth.build(&region, assume_role)?;
 
-    Ok(S3Client::new_with(client, creds, region))
+    let client = S3Client::new_with(client, creds, region.clone());
+    Ok(S3Service::new(client, region))
 }
 
 #[cfg(test)]

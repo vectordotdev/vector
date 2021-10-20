@@ -6,6 +6,7 @@ component_type: sinks
 weight: 3
 tags: ["components", "sinks"]
 aliases: ["/sinks"]
+no_toc: true
 ---
 
 ## Available sinks

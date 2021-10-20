@@ -1,10 +1,11 @@
 use crate::{
-    codecs::{self, DecodingConfig},
+    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
     config::{
         log_schema, DataType, GenerateConfig, SourceConfig, SourceContext, SourceDescription,
     },
     event::Event,
     internal_events::NatsEventsReceived,
+    serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util::TcpError,
     Pipeline,
@@ -24,7 +25,8 @@ enum BuildError {
     NatsSubscribeError { source: std::io::Error },
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct NatsSourceConfig {
     url: String,
@@ -32,8 +34,12 @@ pub struct NatsSourceConfig {
     connection_name: String,
     subject: String,
     queue: Option<String>,
-    #[serde(flatten, default)]
-    decoding: DecodingConfig,
+    #[serde(default = "default_framing_message_based")]
+    #[derivative(Default(value = "default_framing_message_based()"))]
+    framing: Box<dyn FramingConfig>,
+    #[serde(default = "default_decoding")]
+    #[derivative(Default(value = "default_decoding()"))]
+    decoding: Box<dyn ParserConfig>,
 }
 
 inventory::submit! {
@@ -57,11 +63,12 @@ impl GenerateConfig for NatsSourceConfig {
 impl SourceConfig for NatsSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let (connection, subscription) = create_subscription(self).await?;
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
 
         Ok(Box::pin(nats_source(
             connection,
             subscription,
-            self.decoding.build()?,
+            decoder,
             cx.shutdown,
             cx.out,
         )))
@@ -129,12 +136,12 @@ async fn nats_source(
                         count: events.len()
                     });
 
+                    let now = Utc::now();
+
                     for mut event in events {
                         if let Event::Log(ref mut log) = event {
-                            log.insert(log_schema().timestamp_key(), Utc::now());
-
-                            // Add source type
-                            log.insert(log_schema().source_type_key(), Bytes::from("nats"));
+                            log.try_insert(log_schema().source_type_key(), Bytes::from("nats"));
+                            log.try_insert(log_schema().timestamp_key(), now);
                         }
 
                         out.send(event)
@@ -197,20 +204,18 @@ mod integration_tests {
             subject: subject.clone(),
             url: "nats://127.0.0.1:4222".to_owned(),
             queue: None,
-            decoding: Default::default(),
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
         };
 
         let (nc, sub) = create_subscription(&conf).await.unwrap();
         let nc_pub = nc.clone();
 
         let (tx, rx) = Pipeline::new_test();
-        tokio::spawn(nats_source(
-            nc,
-            sub,
-            conf.decoding.build().unwrap(),
-            ShutdownSignal::noop(),
-            tx,
-        ));
+        let decoder = DecodingConfig::new(conf.framing.clone(), conf.decoding.clone())
+            .build()
+            .unwrap();
+        tokio::spawn(nats_source(nc, sub, decoder, ShutdownSignal::noop(), tx));
         let msg = "my message";
         nc_pub.publish(&subject, msg).await.unwrap();
 
