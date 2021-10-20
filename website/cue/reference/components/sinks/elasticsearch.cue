@@ -162,9 +162,9 @@ components: sinks: elasticsearch: {
 			}
 		}
 		bulk: {
-			common: true
+			common:      true
 			description: "Options for the bulk mode."
-			required: false
+			required:    false
 			warnings: []
 			type: object: {
 				examples: []
