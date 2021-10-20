@@ -1,5 +1,5 @@
 use crate::event::{EventFinalizers, Finalizable, LogEvent};
-use crate::sinks::util::encoding::{as_tracked_write, Encoder, EncodingConfiguration};
+use crate::sinks::util::encoding::{as_tracked_write, Encoder, EncodingConfiguration, VisitLogMut};
 use std::io::Write;
 
 use crate::sinks::elasticsearch::BulkAction;
@@ -93,19 +93,8 @@ fn write_bulk_action(
     )
 }
 
-impl<E> Encoder<Vec<ProcessedEvent>> for E
-where
-    E: EncodingConfiguration,
-    E::Codec: Encoder<Vec<ProcessedEvent>>,
-{
-    fn encode_input(
-        &self,
-        mut input: Vec<ProcessedEvent>,
-        writer: &mut dyn io::Write,
-    ) -> io::Result<usize> {
-        for event in input.iter_mut() {
-            self.apply_rules(&mut event.log);
-        }
-        self.codec().encode_input(input, writer)
+impl VisitLogMut for ProcessedEvent {
+    fn visit_logs_mut<F>(&mut self, func: F) where F: Fn(&mut LogEvent) {
+        func(&mut self.log);
     }
 }
