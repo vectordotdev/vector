@@ -124,7 +124,7 @@ pub fn create_client(
         proxy,
         // S3 closes idle connections after 20 seconds,
         // so we can close idle connections ahead of time to prevent re-using them
-        client::Client::builder().pool_idle_timeout(Duration::from_secs(10)),
+        client::Client::builder().pool_idle_timeout(Duration::from_secs(15)),
     )?;
 
     let creds = auth.build(&region, assume_role)?;
