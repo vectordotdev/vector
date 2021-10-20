@@ -113,25 +113,6 @@ impl SinkConfig for DatadogEventsConfig {
     }
 }
 
-// #[derive(Clone)]
-// pub struct DatadogEventsRetryLogic;
-//
-// impl RetryLogic for DatadogEventsRetryLogic {
-//     type Error = HttpError;
-//     type Response = DatadogEventsResponse;
-//
-//     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-//         true
-//     }
-//
-//     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
-//         match response.event_status {
-//             EventStatus::Delivered => RetryAction::Successful,
-//             EventStatus::Failed => RetryAction::DontRetry()
-//         }
-//     }
-// }
-
 #[cfg(test)]
 mod tests {
     use crate::sinks::datadog::events::config::DatadogEventsConfig;

@@ -46,6 +46,7 @@ impl ElementCount for DatadogEventsRequest {
 pub struct Metadata {
     pub finalizers: EventFinalizers,
     pub api_key: Option<Arc<str>>,
+    pub event_byte_size: usize,
 }
 
 pub struct DatadogEventsRequestBuilder {
@@ -80,6 +81,7 @@ impl RequestBuilder<LogEvent> for DatadogEventsRequestBuilder {
         let metadata = Metadata {
             finalizers: log.take_finalizers(),
             api_key: log.metadata_mut().datadog_api_key().clone(),
+            event_byte_size: log.size_of()
         };
         (metadata, log)
     }

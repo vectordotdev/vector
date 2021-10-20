@@ -65,11 +65,6 @@ impl<St, Svc> Driver<St, Svc> {
     }
 }
 
-pub trait SinkServiceResponse {
-    fn event_status(&self) -> EventStatus;
-    fn events_sent(&self) -> EventsSent;
-}
-
 impl<St, Svc> Driver<St, Svc>
 where
     St: Stream,
@@ -77,7 +72,7 @@ where
     Svc: Service<St::Item>,
     Svc::Error: fmt::Debug + 'static,
     Svc::Future: Send + 'static,
-    Svc::Response: SinkServiceResponse,
+    Svc::Response: AsRef<EventStatus>,
 {
     /// Runs the driver until the input stream is exhausted.
     ///
@@ -192,18 +187,14 @@ where
                                 let status = match result {
                                     Err(error) => {
                                         error!(message = "Service call failed.", ?error, seqno);
-                                        finalizers.update_status(EventStatus::Failed);
+                                        EventStatus::Failed
                                     },
                                     Ok(response) => {
                                         trace!(message = "Service call succeeded.", seqno);
-                                        let event_status = response.event_status();
-                                        finalizers.update_status(event_status);
-                                        if event_status == EventStatus::Delivered {
-                                            emit!(&response.events_sent());
-                                        }
+                                        *response.as_ref()
                                     }
                                 };
-
+                                finalizers.update_status(status);
                                 (seqno, ack_size)
                             })
                             .instrument(info_span!("request", request_id = %seqno));

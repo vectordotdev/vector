@@ -7,7 +7,8 @@ use crate::event::{Event, EventStatus, Finalizable};
 use serde_json::json;
 use std::sync::Arc;
 use http::Request;
-use crate::internal_events::{DatadogEventsProcessed, DatadogEventsFieldInvalid};
+use crate::internal_events::{DatadogEventsProcessed, DatadogEventsFieldInvalid, EventsSent};
+use crate::emit;
 use crate::config::log_schema;
 use crate::event::PathComponent;
 use tower::{Service, ServiceExt};
@@ -18,7 +19,6 @@ use crate::http::HttpClient;
 use futures::{future, FutureExt};
 use crate::sinks::datadog::events::request_builder::DatadogEventsRequest;
 use crate::sinks::util::sink::Response;
-
 
 pub struct DatadogEventsResponse {
     pub event_status: EventStatus,
@@ -89,6 +89,7 @@ impl Service<DatadogEventsRequest> for DatadogEventsService {
 
         Box::pin(async move {
             http_service.ready().await?;
+            let event_byte_size = req.metadata.event_byte_size;
             let http_response = http_service.call(req).await?;
             let event_status = if http_response.is_successful() {
                 EventStatus::Delivered
@@ -97,6 +98,12 @@ impl Service<DatadogEventsRequest> for DatadogEventsService {
             } else {
                 EventStatus::Failed
             };
+            if event_status == EventStatus::Delivered {
+                emit!(&EventsSent {
+                    count: 1,
+                    byte_size: event_byte_size
+                });
+            }
             Ok(DatadogEventsResponse {
                 event_status,
                 http_status: http_response.status()
