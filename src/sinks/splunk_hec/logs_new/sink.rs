@@ -60,6 +60,7 @@ where
                 ))
             })
             .batched(NullPartitioner::new(), self.batch_settings)
+            .map(|(_, batch)| batch)
             .request_builder(builder_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {

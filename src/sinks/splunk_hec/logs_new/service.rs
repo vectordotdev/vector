@@ -27,7 +27,6 @@ use crate::{
         splunk_hec::common::build_uri,
         util::{
             encoding::{Encoder, EncodingConfig},
-            retries::RetryLogic,
             Compression, RequestBuilder,
         },
     },
@@ -167,7 +166,7 @@ pub struct HecLogsRequestBuilder {
     pub encoding: EncodingConfig<HecLogsEncoder>,
 }
 
-impl RequestBuilder<((), Vec<ProcessedEvent>)> for HecLogsRequestBuilder {
+impl RequestBuilder<Vec<ProcessedEvent>> for HecLogsRequestBuilder {
     type Metadata = (usize, usize, EventFinalizers);
     type Events = Vec<ProcessedEvent>;
     type Encoder = EncodingConfig<HecLogsEncoder>;
@@ -183,8 +182,8 @@ impl RequestBuilder<((), Vec<ProcessedEvent>)> for HecLogsRequestBuilder {
         &self.encoding
     }
 
-    fn split_input(&self, input: ((), Vec<ProcessedEvent>)) -> (Self::Metadata, Self::Events) {
-        let (_, mut events) = input;
+    fn split_input(&self, input: Vec<ProcessedEvent>) -> (Self::Metadata, Self::Events) {
+        let mut events = input;
         let finalizers = events.take_finalizers();
         let events_byte_size: usize = events.iter().map(|x| x.log.size_of()).sum();
 
