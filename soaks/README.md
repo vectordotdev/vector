@@ -26,7 +26,7 @@ of feature flags for building vector, a set of terraform to install vector and
 support programs in a minikube and some glue code to observe vector in
 operation. Consider this command:
 
-```
+```shell
 > ./soaks/soak.sh datadog_agent_remap_datadog_logs a32c7fd09978f76a3f1bd360c3a8d07a49538b70 be8ceafbf994d06f505bdd9fb392b00e0ba661f2
 ```
 
@@ -42,7 +42,7 @@ in terraform, see [`soaks/datadog_agent_remap_datadog_logs/terraform`].
 After running this command you will, in about ten minutes depending on whether
 you need to build containers or not, see a summary:
 
-```
+```shell
 ...
 Apply complete! Resources: 16 added, 0 changed, 0 destroyed.
 Recording 'comparison' captures to /tmp/datadog_agent_remap_datadog_logs-captures.ZSRFXO
