@@ -38,7 +38,6 @@ components: sinks: azure_blob: {
 			}
 			request: {
 				enabled:        true
-				concurrency:    50
 				rate_limit_num: 250
 				headers:        false
 			}
