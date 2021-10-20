@@ -4,6 +4,7 @@ use super::{
     metadata::EventMetadata,
     util, Lookup, PathComponent, Value,
 };
+use crate::event::MaybeAsLogMut;
 use crate::{config::log_schema, ByteSizeOf};
 use bytes::Bytes;
 use chrono::Utc;
@@ -270,6 +271,12 @@ impl LogEvent {
             }
         }
         self.metadata.merge(incoming.metadata);
+    }
+}
+
+impl MaybeAsLogMut for LogEvent {
+    fn maybe_as_log_mut(&mut self) -> Option<&mut LogEvent> {
+        Some(self)
     }
 }
 
