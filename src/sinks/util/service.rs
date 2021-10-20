@@ -64,7 +64,7 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
 pub struct TowerRequestConfig {
     #[serde(default)]
     #[serde(skip_serializing_if = "concurrency_is_none")]
-    pub concurrency: Concurrency,              // adaptive
+    pub concurrency: Concurrency, // adaptive
     pub timeout_secs: Option<u64>,             // 1 minute
     pub rate_limit_duration_secs: Option<u64>, // 1 second
     pub rate_limit_num: Option<u64>,           // i64::MAX
@@ -334,15 +334,6 @@ mod tests {
             .expect_err("Invalid concurrency setting didn't fail on negative number");
     }
 
-<<<<<<< HEAD
-=======
-    #[test]
-    fn backward_compatibility_with_in_flight_limit_param_works() {
-        let cfg = toml::from_str::<TowerRequestConfig>("in_flight_limit = 10")
-            .expect("Fixed concurrency failed for in_flight_limit param");
-        assert_eq!(cfg.concurrency(), &Concurrency::Fixed(10));
-    }
-
     #[test]
     fn config_merging_defaults_concurrency_to_none_if_unset() {
         let cfg = TowerRequestConfig::default().unwrap_with(&TowerRequestConfig::default());
@@ -350,7 +341,6 @@ mod tests {
         assert_eq!(cfg.concurrency, None);
     }
 
->>>>>>> 86bed9ae8 (fix(sinks): Default sink concurrency to adaptive)
     #[tokio::test]
     async fn partition_sink_retry_concurrency() {
         let cfg = TowerRequestConfig {
