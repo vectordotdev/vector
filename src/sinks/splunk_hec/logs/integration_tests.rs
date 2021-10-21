@@ -1,11 +1,11 @@
 use crate::{
     config::{SinkConfig, SinkContext},
     sinks::{
-        splunk_hec::{logs::{config::HecSinkLogsConfig, encoder::HecLogsEncoder}, common::integration_test_helpers::get_token},
-        util::{
-            encoding::{EncodingConfig},
-            BatchConfig, Compression, TowerRequestConfig,
+        splunk_hec::{
+            common::integration_test_helpers::get_token,
+            logs::{config::HecSinkLogsConfig, encoder::HecLogsEncoder},
         },
+        util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
     },
     template::Template,
     test_util::components::{self, HTTP_SINK_TAGS},
@@ -86,7 +86,6 @@ async fn config(
         tls: None,
     }
 }
-
 
 #[tokio::test]
 async fn splunk_insert_message() {

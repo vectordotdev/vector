@@ -1,6 +1,6 @@
 use std::io;
 
-use vector_core::{config::log_schema, event::Event};
+use vector_core::{config::log_schema, event::MaybeAsLogMut};
 
 use super::sink::ProcessedEvent;
 use crate::{
@@ -73,6 +73,12 @@ impl HecLogsEncoder {
     }
 }
 
+impl MaybeAsLogMut for ProcessedEvent {
+    fn maybe_as_log_mut(&mut self) -> Option<&mut vector_core::event::LogEvent> {
+        self.log.maybe_as_log_mut()
+    }
+}
+
 impl Encoder<Vec<ProcessedEvent>> for HecLogsEncoder {
     fn encode_input(
         &self,
@@ -101,7 +107,7 @@ where
         writer: &mut dyn io::Write,
     ) -> io::Result<usize> {
         for event in input.iter_mut() {
-            self.apply_rules(&mut Event::from(event.log.clone()));
+            self.apply_rules(event);
         }
         self.codec().encode_input(input, writer)
     }

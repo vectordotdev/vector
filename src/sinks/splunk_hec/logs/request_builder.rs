@@ -3,10 +3,7 @@ use vector_core::{
     ByteSizeOf,
 };
 
-use crate::sinks::util::{
-    encoding::{Encoder, EncodingConfig},
-    Compression, RequestBuilder,
-};
+use crate::sinks::util::{encoding::EncodingConfig, Compression, RequestBuilder};
 
 use super::{encoder::HecLogsEncoder, service::HecLogsRequest, sink::ProcessedEvent};
 
@@ -37,12 +34,6 @@ impl RequestBuilder<Vec<ProcessedEvent>> for HecLogsRequestBuilder {
         let events_byte_size: usize = events.iter().map(|e| e.log.size_of()).sum();
 
         ((events.len(), events_byte_size, finalizers), events)
-    }
-
-    fn encode_events(&self, events: Self::Events) -> Result<Self::Payload, Self::Error> {
-        let mut payload = Vec::new();
-        self.encoding.encode_input(events, &mut payload)?;
-        Ok(payload)
     }
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {

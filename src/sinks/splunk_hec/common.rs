@@ -269,8 +269,8 @@ mod integration_tests {
     use super::{build_healthcheck, create_client, integration_test_helpers::get_token};
     use crate::{assert_downcast_matches, sinks::splunk_hec::common::HealthcheckError};
     use http::StatusCode;
-    use vector_core::config::proxy::ProxyConfig;
     use std::net::SocketAddr;
+    use vector_core::config::proxy::ProxyConfig;
     use warp::Filter;
 
     #[tokio::test]
@@ -311,7 +311,6 @@ mod integration_tests {
             );
         }
     }
-
 }
 
 #[cfg(all(test, feature = "splunk-integration-tests"))]

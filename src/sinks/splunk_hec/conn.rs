@@ -75,7 +75,7 @@ mod tests {
     use super::*;
     use crate::event::Event;
     use crate::sinks::splunk_hec::common::build_uri;
-    use http::{Request};
+    use http::Request;
     use std::path::PathBuf;
     use wiremock::matchers::{body_string, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
