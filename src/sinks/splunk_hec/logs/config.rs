@@ -135,6 +135,30 @@ impl HecSinkLogsConfig {
     }
 }
 
+// Add a compatibility alias to avoid breaking existing configs
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct HecSinkCompatConfig {
+    #[serde(flatten)]
+    config: HecSinkLogsConfig,
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "splunk_hec")]
+impl SinkConfig for HecSinkCompatConfig {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        self.config.build(cx).await
+    }
+
+    fn input_type(&self) -> DataType {
+        self.config.input_type()
+    }
+
+    fn sink_type(&self) -> &'static str {
+        "splunk_hec"
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::HecSinkLogsConfig;
