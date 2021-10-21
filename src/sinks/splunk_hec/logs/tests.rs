@@ -4,6 +4,7 @@ use crate::sinks::splunk_hec::logs::sink::process_log;
 use crate::template::Template;
 use chrono::Utc;
 use serde::Deserialize;
+use vector_core::ByteSizeOf;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use vector_core::config::log_schema;
@@ -35,6 +36,7 @@ fn get_processed_event() -> ProcessedEvent {
     event.as_mut_log().insert("event_field1", "test_value1");
     event.as_mut_log().insert("event_field2", "test_value2");
     event.as_mut_log().insert("key", "value");
+    let event_byte_size = event.size_of();
 
     let sourcetype = Template::try_from("{{ event_sourcetype }}".to_string()).ok();
     let source = Template::try_from("{{ event_source }}".to_string()).ok();
@@ -43,6 +45,7 @@ fn get_processed_event() -> ProcessedEvent {
 
     process_log(
         event.into_log(),
+        event_byte_size,
         sourcetype.as_ref(),
         source.as_ref(),
         index.as_ref(),
