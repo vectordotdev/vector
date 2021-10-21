@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum HecLogsEncoder {
     Json,
     Text,

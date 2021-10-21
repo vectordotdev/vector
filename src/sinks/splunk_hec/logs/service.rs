@@ -79,7 +79,7 @@ impl Service<HecLogsRequest> for HecLogsService {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct HecLogsRequest {
     pub body: Vec<u8>,
     pub events_count: usize,
