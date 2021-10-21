@@ -169,7 +169,7 @@ impl GcsSinkConfig {
     fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
         Ok(KeyPartitioner::new(
             Template::try_from(self.key_prefix.as_deref().unwrap_or("date=%F/"))
-                .context(kKeyPrefixTemplate)?,
+                .context(KeyPrefixTemplate)?,
         ))
     }
 }
