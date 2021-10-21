@@ -1,30 +1,12 @@
-use crate::{
-    buffers::Acker,
-    config::ProxyConfig,
-    http::HttpClient,
-    sinks,
-    sinks::util::buffer::Compression,
-    sinks::util::http::BatchedHttpSink,
-    sinks::util::http::HttpSink,
-    sinks::util::service::TowerRequestConfig,
-    sinks::util::{BatchConfig, BatchSettings, Buffer},
-    sinks::UriParseError,
-    sinks::{Healthcheck, VectorSink},
-    tls::{TlsOptions, TlsSettings},
-};
+use crate::{buffers::Acker, config::ProxyConfig, http::HttpClient, sinks, sinks::UriParseError, sinks::util::buffer::Compression, sinks::{splunk_hec::common::build_healthcheck, util::http::HttpSink}, sinks::util::service::TowerRequestConfig, sinks::util::{BatchConfig, BatchSettings, Buffer}, sinks::{
+        splunk_hec::common::{build_uri, HealthcheckError},
+        util::http::BatchedHttpSink,
+    }, sinks::{Healthcheck, VectorSink}, tls::{TlsOptions, TlsSettings}};
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use snafu::{ResultExt, Snafu};
 use std::convert::TryFrom;
-
-#[derive(Debug, Snafu)]
-enum HealthcheckError {
-    #[snafu(display("Invalid HEC token"))]
-    InvalidToken,
-    #[snafu(display("Queues are full"))]
-    QueuesFull,
-}
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -66,50 +48,9 @@ where
     )
     .sink_map_err(|error| error!(message = "Fatal splunk_hec sink error.", %error));
 
-    let healthcheck = healthcheck(endpoint.to_string(), token.to_string(), client).boxed();
+    let healthcheck = build_healthcheck(endpoint.to_string(), token.to_string(), client).boxed();
 
     Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
-}
-
-pub async fn build_request(
-    endpoint: &str,
-    token: &str,
-    compression: Compression,
-    events: Vec<u8>,
-) -> crate::Result<Request<Vec<u8>>> {
-    let uri = build_uri(endpoint, "/services/collector/event").context(UriParseError)?;
-
-    let mut builder = Request::post(uri)
-        .header("Content-Type", "application/json")
-        .header("Authorization", format!("Splunk {}", token));
-
-    if let Some(ce) = compression.content_encoding() {
-        builder = builder.header("Content-Encoding", ce);
-    }
-
-    builder.body(events).map_err(Into::into)
-}
-
-async fn healthcheck(endpoint: String, token: String, client: HttpClient) -> crate::Result<()> {
-    let uri =
-        build_uri(endpoint.as_str(), "/services/collector/health/1.0").context(UriParseError)?;
-
-    let request = Request::get(uri)
-        .header("Authorization", format!("Splunk {}", token))
-        .body(Body::empty())
-        .unwrap();
-
-    let response = client.send(request).await?;
-    match response.status() {
-        StatusCode::OK => Ok(()),
-        StatusCode::BAD_REQUEST => Err(HealthcheckError::InvalidToken.into()),
-        StatusCode::SERVICE_UNAVAILABLE => Err(HealthcheckError::QueuesFull.into()),
-        other => Err(sinks::HealthcheckError::UnexpectedStatus { status: other }.into()),
-    }
-}
-
-fn build_uri(host: &str, path: &str) -> Result<Uri, http::uri::InvalidUri> {
-    format!("{}{}", host.trim_end_matches('/'), path).parse::<Uri>()
 }
 
 fn validate_host(host: &str) -> crate::Result<()> {
@@ -129,84 +70,6 @@ mod tests {
     use std::path::PathBuf;
     use wiremock::matchers::{body_string, header, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
-
-    #[tokio::test]
-    async fn test_build_request_compression_none_returns_expected_request() {
-        let endpoint = "http://localhost:8888";
-        let token = "token";
-        let compression = Compression::None;
-        let events = "events".as_bytes().to_vec();
-
-        let request = build_request(endpoint, token, compression, events.clone())
-            .await
-            .unwrap();
-
-        assert_eq!(
-            request.uri(),
-            &Uri::from_static("http://localhost:8888/services/collector/event")
-        );
-
-        assert_eq!(
-            request.headers().get("Content-Type"),
-            Some(&HeaderValue::from_static("application/json"))
-        );
-
-        assert_eq!(
-            request.headers().get("Authorization"),
-            Some(&HeaderValue::from_static("Splunk token"))
-        );
-
-        assert_eq!(request.headers().get("Content-Encoding"), None);
-
-        assert_eq!(request.body(), &events)
-    }
-
-    #[tokio::test]
-    async fn test_build_request_compression_gzip_returns_expected_request() {
-        let endpoint = "http://localhost:8888";
-        let token = "token";
-        let compression = Compression::gzip_default();
-        let events = "events".as_bytes().to_vec();
-
-        let request = build_request(endpoint, token, compression, events.clone())
-            .await
-            .unwrap();
-
-        assert_eq!(
-            request.uri(),
-            &Uri::from_static("http://localhost:8888/services/collector/event")
-        );
-
-        assert_eq!(
-            request.headers().get("Content-Type"),
-            Some(&HeaderValue::from_static("application/json"))
-        );
-
-        assert_eq!(
-            request.headers().get("Authorization"),
-            Some(&HeaderValue::from_static("Splunk token"))
-        );
-
-        assert_eq!(
-            request.headers().get("Content-Encoding"),
-            Some(&HeaderValue::from_static("gzip"))
-        );
-
-        assert_eq!(request.body(), &events)
-    }
-
-    #[tokio::test]
-    async fn test_build_request_uri_invalid_uri_returns_error() {
-        let endpoint = "invalid";
-        let token = "token";
-        let compression = Compression::gzip_default();
-        let events = "events".as_bytes().to_vec();
-
-        let err = build_request(endpoint, token, compression, events.clone())
-            .await
-            .unwrap_err();
-        assert_eq!(err.to_string(), "URI parse error: invalid format")
-    }
 
     #[tokio::test]
     async fn test_build_sink_sink_calls_expected_endpoint() {
@@ -240,123 +103,6 @@ mod tests {
 
         sink.send(Event::from("test event")).await.unwrap();
         sink.flush().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_build_sink_healthcheck_200_response_returns_ok() {
-        let mock_server = MockServer::start().await;
-
-        Mock::given(method("GET"))
-            .and(path("/services/collector/health/1.0"))
-            .and(header("Authorization", "Splunk token"))
-            .respond_with(ResponseTemplate::new(200))
-            .mount(&mock_server)
-            .await;
-
-        let (_, healthcheck) = build_sink(
-            StubSink::default(),
-            &TowerRequestConfig::default(),
-            &None,
-            &ProxyConfig::default(),
-            BatchConfig::default(),
-            Compression::None,
-            Acker::Null,
-            &mock_server.uri(),
-            "token",
-        )
-        .unwrap();
-
-        assert!(healthcheck.await.is_ok())
-    }
-
-    #[tokio::test]
-    async fn test_build_sink_healthcheck_400_response_returns_error() {
-        let mock_server = MockServer::start().await;
-
-        Mock::given(method("GET"))
-            .and(path("/services/collector/health/1.0"))
-            .and(header("Authorization", "Splunk token"))
-            .respond_with(ResponseTemplate::new(400))
-            .mount(&mock_server)
-            .await;
-
-        let (_, healthcheck) = build_sink(
-            StubSink::default(),
-            &TowerRequestConfig::default(),
-            &None,
-            &ProxyConfig::default(),
-            BatchConfig::default(),
-            Compression::None,
-            Acker::Null,
-            &mock_server.uri(),
-            "token",
-        )
-        .unwrap();
-
-        assert_eq!(
-            &healthcheck.await.unwrap_err().to_string(),
-            "Invalid HEC token"
-        );
-    }
-
-    #[tokio::test]
-    async fn test_build_sink_healthcheck_503_response_returns_error() {
-        let mock_server = MockServer::start().await;
-
-        Mock::given(method("GET"))
-            .and(path("/services/collector/health/1.0"))
-            .and(header("Authorization", "Splunk token"))
-            .respond_with(ResponseTemplate::new(503))
-            .mount(&mock_server)
-            .await;
-
-        let (_, healthcheck) = build_sink(
-            StubSink::default(),
-            &TowerRequestConfig::default(),
-            &None,
-            &ProxyConfig::default(),
-            BatchConfig::default(),
-            Compression::None,
-            Acker::Null,
-            &mock_server.uri(),
-            "token",
-        )
-        .unwrap();
-
-        assert_eq!(
-            &healthcheck.await.unwrap_err().to_string(),
-            "Queues are full"
-        );
-    }
-
-    #[tokio::test]
-    async fn test_build_sink_healthcheck_500_response_returns_error() {
-        let mock_server = MockServer::start().await;
-
-        Mock::given(method("GET"))
-            .and(path("/services/collector/health/1.0"))
-            .and(header("Authorization", "Splunk token"))
-            .respond_with(ResponseTemplate::new(500))
-            .mount(&mock_server)
-            .await;
-
-        let (_, healthcheck) = build_sink(
-            StubSink::default(),
-            &TowerRequestConfig::default(),
-            &None,
-            &ProxyConfig::default(),
-            BatchConfig::default(),
-            Compression::None,
-            Acker::Null,
-            &mock_server.uri(),
-            "token",
-        )
-        .unwrap();
-
-        assert_eq!(
-            &healthcheck.await.unwrap_err().to_string(),
-            "Unexpected status: 500 Internal Server Error"
-        );
     }
 
     #[tokio::test]
@@ -545,6 +291,7 @@ mod integration_tests {
     use integration_test_helpers::get_token;
     use std::net::SocketAddr;
     use warp::Filter;
+    use splunk_hec::common::{HealthcheckError};
 
     #[tokio::test]
     async fn splunk_healthcheck() {

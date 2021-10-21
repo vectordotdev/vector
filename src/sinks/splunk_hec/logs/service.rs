@@ -4,13 +4,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use crate::{
-    internal_events::EventsSent,
-    sinks::{
-        util::{http::HttpBatchService, ElementCount},
-        UriParseError,
-    },
-};
+use crate::{internal_events::EventsSent, sinks::{UriParseError, splunk_hec::common::build_request, util::{http::HttpBatchService, ElementCount}}};
 use bytes::Bytes;
 use futures_util::future::BoxFuture;
 use http::{Request, Response};
@@ -138,7 +132,7 @@ impl AsRef<EventStatus> for HecLogsResponse {
 pub struct HttpRequestBuilder {
     pub endpoint: String,
     pub token: String,
-    pub content_encoding: Option<&'static str>,
+    pub compression: Compression,
 }
 
 impl HttpRequestBuilder {
@@ -146,18 +140,7 @@ impl HttpRequestBuilder {
         &self,
         req: HecLogsRequest,
     ) -> Result<Request<Vec<u8>>, crate::Error> {
-        let uri = build_uri(self.endpoint.as_str(), "/services/collector/event")
-            .context(UriParseError)?;
-
-        let mut builder = Request::post(uri)
-            .header("Content-Type", "application/json")
-            .header("Authorization", format!("Splunk {}", self.token.as_str()));
-
-        if let Some(ce) = self.content_encoding {
-            builder = builder.header("Content-Encoding", ce);
-        }
-
-        builder.body(req.body).map_err(Into::into)
+        build_request(self.endpoint.as_str(), self.token.as_str(), self.compression, req.body).await
     }
 }
 

@@ -114,32 +114,32 @@ mod tests {
         time: f64,
     }
 
-    #[test]
-    fn humio_valid_time_field() {
-        let event = Event::from("hello world");
+    // #[test]
+    // fn humio_valid_time_field() {
+    //     let event = Event::from("hello world");
 
-        let (config, _cx) = load_sink::<HumioLogsConfig>(
-            r#"
-            token = "alsdkfjaslkdfjsalkfj"
-            host = "https://127.0.0.1"
-            encoding = "json"
-        "#,
-        )
-        .unwrap();
-        let config = config.build_hec_config();
+    //     let (config, _cx) = load_sink::<HumioLogsConfig>(
+    //         r#"
+    //         token = "alsdkfjaslkdfjsalkfj"
+    //         host = "https://127.0.0.1"
+    //         encoding = "json"
+    //     "#,
+    //     )
+    //     .unwrap();
+    //     let config = config.build_hec_config();
 
-        let bytes = config.encode_event(event).unwrap();
-        let hec_event = serde_json::from_slice::<HecEventJson>(&bytes[..]).unwrap();
+    //     let bytes = config.encode_event(event).unwrap();
+    //     let hec_event = serde_json::from_slice::<HecEventJson>(&bytes[..]).unwrap();
 
-        let now = Utc::now().timestamp_millis() as f64 / 1000f64;
-        assert!(
-            (hec_event.time - now).abs() < 0.2,
-            "hec_event.time = {}, now = {}",
-            hec_event.time,
-            now
-        );
-        assert_eq!((hec_event.time * 1000f64).fract(), 0f64);
-    }
+    //     let now = Utc::now().timestamp_millis() as f64 / 1000f64;
+    //     assert!(
+    //         (hec_event.time - now).abs() < 0.2,
+    //         "hec_event.time = {}, now = {}",
+    //         hec_event.time,
+    //         now
+    //     );
+    //     assert_eq!((hec_event.time * 1000f64).fract(), 0f64);
+    // }
 }
 
 #[cfg(test)]

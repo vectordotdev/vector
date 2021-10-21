@@ -11,7 +11,7 @@ use snafu::{ResultExt, Snafu};
 use vector_core::{config::proxy::ProxyConfig, event::EventRef};
 
 #[derive(Debug, Snafu)]
-enum HealthcheckError {
+pub enum HealthcheckError {
     #[snafu(display("Invalid HEC token"))]
     InvalidToken,
     #[snafu(display("Queues are full"))]
@@ -48,6 +48,25 @@ pub async fn build_healthcheck(
     }
 }
 
+pub async fn build_request(
+    endpoint: &str,
+    token: &str,
+    compression: Compression,
+    events: Vec<u8>,
+) -> crate::Result<Request<Vec<u8>>> {
+    let uri = build_uri(endpoint, "/services/collector/event").context(UriParseError)?;
+
+    let mut builder = Request::post(uri)
+        .header("Content-Type", "application/json")
+        .header("Authorization", format!("Splunk {}", token));
+
+    if let Some(ce) = compression.content_encoding() {
+        builder = builder.header("Content-Encoding", ce);
+    }
+
+    builder.body(events).map_err(Into::into)
+}
+
 pub fn build_uri(host: &str, path: &str) -> Result<Uri, http::uri::InvalidUri> {
     format!("{}{}", host.trim_end_matches('/'), path).parse::<Uri>()
 }
@@ -75,13 +94,11 @@ pub fn render_template_string<'a>(
 
 #[cfg(test)]
 mod tests {
+    use http::{Uri, HeaderValue};
     use vector_core::config::proxy::ProxyConfig;
-    use wiremock::{
-        matchers::{header, method, path},
-        Mock, MockServer, ResponseTemplate,
-    };
+    use wiremock::{Mock, MockServer, ResponseTemplate, matchers::{header, method, path}};
 
-    use crate::sinks::splunk_hec::common::build_healthcheck;
+    use crate::sinks::{splunk_hec::common::{build_healthcheck, build_request}, util::Compression};
 
     use super::create_client;
 
@@ -160,5 +177,83 @@ mod tests {
             &healthcheck.await.unwrap_err().to_string(),
             "Unexpected status: 500 Internal Server Error"
         );
+    }
+
+    #[tokio::test]
+    async fn test_build_request_compression_none_returns_expected_request() {
+        let endpoint = "http://localhost:8888";
+        let token = "token";
+        let compression = Compression::None;
+        let events = "events".as_bytes().to_vec();
+
+        let request = build_request(endpoint, token, compression, events.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            request.uri(),
+            &Uri::from_static("http://localhost:8888/services/collector/event")
+        );
+
+        assert_eq!(
+            request.headers().get("Content-Type"),
+            Some(&HeaderValue::from_static("application/json"))
+        );
+
+        assert_eq!(
+            request.headers().get("Authorization"),
+            Some(&HeaderValue::from_static("Splunk token"))
+        );
+
+        assert_eq!(request.headers().get("Content-Encoding"), None);
+
+        assert_eq!(request.body(), &events)
+    }
+
+    #[tokio::test]
+    async fn test_build_request_compression_gzip_returns_expected_request() {
+        let endpoint = "http://localhost:8888";
+        let token = "token";
+        let compression = Compression::gzip_default();
+        let events = "events".as_bytes().to_vec();
+
+        let request = build_request(endpoint, token, compression, events.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            request.uri(),
+            &Uri::from_static("http://localhost:8888/services/collector/event")
+        );
+
+        assert_eq!(
+            request.headers().get("Content-Type"),
+            Some(&HeaderValue::from_static("application/json"))
+        );
+
+        assert_eq!(
+            request.headers().get("Authorization"),
+            Some(&HeaderValue::from_static("Splunk token"))
+        );
+
+        assert_eq!(
+            request.headers().get("Content-Encoding"),
+            Some(&HeaderValue::from_static("gzip"))
+        );
+
+        assert_eq!(request.body(), &events)
+    }
+
+    #[tokio::test]
+    async fn test_build_request_uri_invalid_uri_returns_error() {
+        let endpoint = "invalid";
+        let token = "token";
+        let compression = Compression::gzip_default();
+        let events = "events".as_bytes().to_vec();
+
+        let err = build_request(endpoint, token, compression, events.clone())
+            .await
+            .unwrap_err();
+        assert_eq!(err.to_string(), "URI parse error: invalid format")
     }
 }

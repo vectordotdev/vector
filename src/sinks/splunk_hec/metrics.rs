@@ -16,7 +16,7 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::iter;
 
-use super::common::render_template_string;
+use super::common::{build_request, render_template_string};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -174,7 +174,7 @@ impl HttpSink for HecSinkMetricsConfig {
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
-        conn::build_request(&self.endpoint, &self.token, self.compression, events).await
+        build_request(&self.endpoint, &self.token, self.compression, events).await
     }
 }
 
