@@ -8,7 +8,7 @@ use crate::{
         http::{BatchedHttpSink, HttpSink},
         Batch, PushResult, BatchConfig, BatchSettings, Compression, TowerRequestConfig,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::TlsSettings,
 };
 use futures::{future, FutureExt, SinkExt};
 use http::{Request, Uri};
@@ -369,8 +369,7 @@ pub struct NewRelicConfig {
     #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
-    pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>
+    pub request: TowerRequestConfig
 }
 
 impl_generate_config_from_default!(NewRelicConfig);
@@ -388,7 +387,7 @@ impl SinkConfig for NewRelicConfig {
             .timeout(self.timeout.unwrap_or(30))
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
-        let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let tls_settings = TlsSettings::from_options(&None)?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
         let sink = BatchedHttpSink::new(
