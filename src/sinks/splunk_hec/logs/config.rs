@@ -97,14 +97,11 @@ impl HecSinkLogsConfig {
         client: HttpClient,
         cx: SinkContext,
     ) -> crate::Result<VectorSink> {
-        // Build the request builder that will be used to build HecLogsRequests out of encoded Events
         let request_builder = HecLogsRequestBuilder {
             encoding: self.encoding.clone(),
             compression: self.compression,
         };
 
-        // Build the service that will make requests
-        // let content_encoding = self.compression.content_encoding();
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let http_request_builder = HttpRequestBuilder {
             endpoint: self.endpoint.clone(),
@@ -112,7 +109,6 @@ impl HecSinkLogsConfig {
             compression: self.compression,
         };
         let service = ServiceBuilder::new()
-            // .settings(request_settings, HecLogsRetry)
             .settings(request_settings, HecLogsRetry)
             .service(HecLogsService::new(client.clone(), http_request_builder));
 
@@ -122,7 +118,6 @@ impl HecSinkLogsConfig {
             .parse_config(self.batch)?
             .into_batcher_settings()?;
 
-        // Build the sink with a request builder, service, context
         let sink = HecLogsSink {
             service,
             request_builder,

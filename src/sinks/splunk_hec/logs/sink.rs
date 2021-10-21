@@ -114,7 +114,6 @@ impl ByteSizeOf for ProcessedEvent {
             + self.source.allocated_bytes()
             + self.index.allocated_bytes()
             + self.host.allocated_bytes()
-            + self.timestamp.allocated_bytes()
             + self.fields.allocated_bytes()
     }
 }
@@ -127,7 +126,6 @@ pub fn process_log(
     host_key: &str,
     indexed_fields: &[String],
 ) -> Option<ProcessedEvent> {
-    println!("[sink::process_log] {:?}", log);
     let sourcetype =
         sourcetype.and_then(|sourcetype| render_template_string(sourcetype, &log, "sourcetype"));
 

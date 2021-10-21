@@ -182,14 +182,12 @@ impl RequestBuilder<Vec<ProcessedEvent>> for HecLogsRequestBuilder {
     }
 
     fn encode_events(&self, events: Self::Events) -> Result<Self::Payload, Self::Error> {
-        println!("[HecLogsRequestBuilder::encode_events] {:?}", events);
         let mut payload = Vec::new();
         self.encoding.encode_input(events, &mut payload)?;
         Ok(payload)
     }
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        println!("[HecLogsRequestBuilder::build_request] {:?}", metadata);
         let (events_count, events_byte_size, finalizers) = metadata;
         HecLogsRequest {
             body: payload,
