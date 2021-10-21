@@ -184,6 +184,10 @@ num-format = { version = "0.4.0", default-features = false, features = ["with-nu
 number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
 tui = { version = "0.16.0", optional = true, default-features = false, features = ["crossterm"] }
 
+# Datadog Pipelines
+sha2 = { version = "0.9.8", optional = true }
+hex = { version = "0.4.3", optional = true }
+
 # VRL Lang
 vrl = { path = "lib/vrl/core" }
 vrl-stdlib = { path = "lib/vrl/stdlib" }
@@ -277,8 +281,6 @@ zstd = { version = "0.6", default-features = false, optional = true }
 tonic = { version = "0.5", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls"] }
 data-encoding = { version = "2.2", default-features = false, features = ["std"], optional = true }
 trust-dns-proto = { version = "0.20", features = ["dnssec"], optional = true }
-sha2 = "0.9.8"
-hex = "0.4.3"
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1.19"
@@ -653,6 +655,8 @@ sinks-vector = ["sinks-utils-udp", "tonic", "tonic-build", "prost-build"]
 datadog-pipelines = [
   "sources-internal_metrics",
   "sinks-datadog",
+  "sha2",
+  "hex"
 ]
 
 # Identifies that the build is a nightly build

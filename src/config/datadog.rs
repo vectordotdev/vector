@@ -63,7 +63,9 @@ pub fn try_attach(config: &mut Config) -> bool {
 
     // Create an internal metrics source. We're using a distinct source here and not
     // attempting to reuse an existing one, to configure it according to enterprise requirements.
-    let mut internal_metrics = InternalMetricsConfig::enterprise(config.hash.clone());
+    let mut internal_metrics = InternalMetricsConfig::enterprise(
+        config.hash.as_ref().expect("Config should contain hash"),
+    );
 
     // Override default scrape interval.
     internal_metrics.scrape_interval_secs(config.datadog.reporting_interval_secs);
