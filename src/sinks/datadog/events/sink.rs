@@ -7,8 +7,8 @@ use crate::sinks::datadog::events::request_builder::{
 };
 use crate::sinks::datadog::events::service::DatadogEventsResponse;
 use crate::sinks::util::{SinkBuilderExt, StreamSink};
-use async_graphql::futures_util::stream::BoxStream;
 use async_trait::async_trait;
+use futures::stream::BoxStream;
 use futures::StreamExt;
 use std::num::NonZeroUsize;
 use tower::util::BoxService;
