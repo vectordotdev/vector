@@ -78,18 +78,18 @@ would be usable even between different versions of Vector.
 ### Implementation
 
 - Rewrite disk buffers, switching to an append-only log format.
-    - Primarily, no more LevelDB.  No more C/C++ libraries.  All Rust code.  Code that we control.
-    - Conceptually, this would look a lot like the writer side simply writing lines to a file, and
-      the reader side tailing that file.
-    - We would end up having some small metadata on disk that the writer used to keep track of log
-      files, and the reader would similarly have some small metadata on disk to track its read
-      progress.
-    - Records would be checksummed on disk in order to detect corruption.  We would use a CRC32
-      checksum at the end of each record for speed and reasonable resiliency.
-      ([#8671](https://github.com/vectordotdev/vector/issues/8671))
-    - For disk buffers, fsync behavior would be configurable, allowing users to choose how often
-      (time) the buffer should be synchronized to disk.
-      ([#8540](https://github.com/vectordotdev/vector/issues/8540))
+  - Primarily, no more LevelDB.  No more C/C++ libraries.  All Rust code.  Code that we control.
+  - Conceptually, this would look a lot like the writer side simply writing lines to a file, and
+    the reader side tailing that file.
+  - We would end up having some small metadata on disk that the writer used to keep track of log
+    files, and the reader would similarly have some small metadata on disk to track its read
+    progress.
+  - Records would be checksummed on disk in order to detect corruption.  We would use a CRC32
+    checksum at the end of each record for speed and reasonable resiliency.
+    ([#8671](https://github.com/vectordotdev/vector/issues/8671))
+  - For disk buffers, fsync behavior would be configurable, allowing users to choose how often
+    (time) the buffer should be synchronized to disk.
+    ([#8540](https://github.com/vectordotdev/vector/issues/8540))
 - In-memory buffering would simply stay as it exists now, as a raw channel.
 - Disk buffering and external buffers would become independent reader and writer Tokio tasks that
   are communicated with via channels.
@@ -97,76 +97,79 @@ would be usable even between different versions of Vector.
   functioning like normal topology components, we don’t want to share code between them and existing
   sources/sinks.
 - Buffers as a whole would be tweaked to become composable in the same style as `tower::Service`:
-    - All buffers would represent themselves via simple MPSC channels.
-    - Two new types, for sending and receiving, would be created as the public-facing side of a
-      buffer.  These types would provide a `Sink` and `Stream` implementation, respectively:
+  - All buffers would represent themselves via simple MPSC channels.
+  - Two new types, for sending and receiving, would be created as the public-facing side of a
+    buffer.  These types would provide a `Sink` and `Stream` implementation, respectively:
+
+    ```rust
+    struct BufferSender {
+      base: PollSender,
+      base_ready: bool,
+      overflow: Option<BufferSender>,
+      overflow_ready: bool,
+    }
+
+    struct BufferReceiver {
+      base: PollReceiver,
+      overflow: Option<BufferReceiver>,
+    }
+    ```
+
+  - The buffer wrapper types would coordinate how the internal buffer channels are used, such that
+    they were used in a cascading fashion:
 
       ```rust
-      struct BufferSender {
-        base: PollSender,
-        base_ready: bool,
-        overflow: Option<BufferSender>,
-        overflow_ready: bool,
-      }
-
-      struct BufferReceiver {
-        base: PollReceiver,
-        overflow: Option<BufferReceiver>,
-      }
-      ```
-    - The buffer wrapper types would coordinate how the internal buffer channels are used, such that
-      they were used in a cascading fashion:
-        ```rust
-        impl Sink<Event> for BufferSender {
-          fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-            // Figure out if our base sender is ready, and if not, and we have an overflow sender configured, see if _they're_ ready.
-            match self.base.poll_ready(cx) {
-              Poll::Ready(Ok(())) => self.base_ready = true,
-              _ => if let Some(overflow) = self.overflow {
-                if let Poll::Ready(Ok(())) = overflow.poll_ready(cx) {
-                  self.overflow_ready = true;
-                }
+      impl Sink<Event> for BufferSender {
+        fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+          // Figure out if our base sender is ready, and if not, and we have an overflow sender configured, see if _they're_ ready.
+          match self.base.poll_ready(cx) {
+            Poll::Ready(Ok(())) => self.base_ready = true,
+            _ => if let Some(overflow) = self.overflow {
+              if let Poll::Ready(Ok(())) = overflow.poll_ready(cx) {
+                self.overflow_ready = true;
               }
-            }
-
-            // Some logic here to handle dropping the event or blocking.
-
-            // Either our base sender or overflow is ready, so can we proceed.
-            if self.base_ready || self.overflow_ready {
-              Poll::Ready(Ok(()))
-            } else {
-              Poll::Pending
             }
           }
 
-          fn start_send(self: Pin<&mut Self>, item: Item) -> Result<(), Self::Error> {
-            let result = if self.base_ready {
-              self.base.start_send(item)
-            } else if self.overflow_ready {
-              match self.overflow {
-                Some(overflow) => overflow.start_send(item),
-                None => Err("overflow ready but no overflow configured")
-              }
-            } else {
-              Err("called start_send without ready")
-            };
+          // Some logic here to handle dropping the event or blocking.
 
-            self.base_ready = false;
-            self.overflow_ready = false;
-            result
+          // Either our base sender or overflow is ready, so can we proceed.
+          if self.base_ready || self.overflow_ready {
+            Poll::Ready(Ok(()))
+          } else {
+            Poll::Pending
           }
         }
-        ```
-    - Thus, `BufferSender` and `BufferReceiver` would contain a "base" sender/receiver that
+
+        fn start_send(self: Pin<&mut Self>, item: Item) -> Result<(), Self::Error> {
+          let result = if self.base_ready {
+            self.base.start_send(item)
+          } else if self.overflow_ready {
+            match self.overflow {
+              Some(overflow) => overflow.start_send(item),
+              None => Err("overflow ready but no overflow configured")
+            }
+          } else {
+            Err("called start_send without ready")
+          };
+
+          self.base_ready = false;
+          self.overflow_ready = false;
+          result
+        }
+      }
+      ```
+
+  - Thus, `BufferSender` and `BufferReceiver` would contain a "base" sender/receiver that
       represents the "primary" buffer channel for that instance, with the ability to "overflow" to
       another instance of `BufferSender`/`BufferReceiver`.  While `BufferSender` would try the base
       sender first, and then the overflow sender, `BufferReceiver` would operate in reverse, trying
       the overflow receiver first, then the base receiver
-    - This design isn’t necessarily novel, but if designed right, allows us to arbitrarily augment
+  - This design isn’t necessarily novel, but if designed right, allows us to arbitrarily augment
       the in-memory channel with an overflow strategy, potentially nested even further: in-memory
       overflowing to external overflowing to disk, etc.
-    - To tie back it back to `tower::Service`, in this sense, all implementations would share a common
-      interface that allows them to be layered/wrapped in a generic way.
+  - To tie back it back to `tower::Service`, in this sense, all implementations would share a common
+    interface that allows them to be layered/wrapped in a generic way.
 - Augment the buffer configuration logic/types such that multiple buffers can be defined for a
   single sink, with enough logic so that we can parse both the old-style single buffer and the
   new-style chained buffers.
@@ -201,6 +204,7 @@ potential issues in the future as this code is put through its paces in customer
 ## Prior Art
 
 Many of the alternatives to Vector offer some form of what we call buffering:
+
 - Tremor offers a WAL, or write-ahead log, operator that serializes all events in a pipeline through
   a write-then-read on disk, similar to the current disk buffering behavior of Vector.
 - Cribl offers disk-backed overflow buffering, called Persistent Queues, which only sends events to
@@ -215,6 +219,7 @@ tweak our approach based on how they have done it.
 In terms of the implementation of the RFC, there exists only one crate that is fairly close to our
 desire for a disk-based reader/writer channel, and that is hopper. However, hopper itself is not a
 direct fit for our use case:
+
 - it does not have an asynchronous API, which would lead us back to the same design that we
   currently use with LevelDB
 - it implements an in-memory channel w/ disk overflow as the base, which means that we would have to
@@ -244,11 +249,11 @@ cost.
   SQS, or S3 vs GCP.
   - **Answer:** We'll start with implementing S3 as the first external buffer type.
 - [x] Should we reconsider using the existing sinks/sources to power external buffers?
-    - Supporting batching of values to make it more efficient, handling service-specific
+  - Supporting batching of values to make it more efficient, handling service-specific
       authentication, etc, would be trivial if we used the existing code.
-    - It may also inextricably tie us to code that is hard to test and hard to document in terms of
+  - It may also inextricably tie us to code that is hard to test and hard to document in terms of
       invariants and behavior.
-    - **Answer:** No, we will stick with the isolated code design/approach.
+  - **Answer:** No, we will stick with the isolated code design/approach.
 - [x] Is it actually possible for us to (de)serialize the buffer configuration in a way that we can
   detect both modes without overlap?
   - **Answer:** We should be able to wrap the existing buffer configuration type with an enum, and
