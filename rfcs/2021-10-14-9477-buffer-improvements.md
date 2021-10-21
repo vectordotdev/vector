@@ -252,7 +252,7 @@ cost.
 - [x] Is it actually possible for us to (de)serialize the buffer configuration in a way that we can
   detect both modes without overlap?
   - **Answer:** We should be able to wrap the existing buffer configuration type with an enum, and
-    add another variant to support an "extended" configuration.  We already have examples of 
+    add another variant to support an "extended" configuration.  We already have examples of
     `serde::Serializer` implementations that can generate varying outputs based on the value of a
     given field, so we will add a new field, tentatively called `advanced`, that can be set to
     `true` to unlock support for defining a series of buffer types that get nested within one another.
