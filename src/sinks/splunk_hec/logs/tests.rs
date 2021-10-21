@@ -4,10 +4,10 @@ use crate::sinks::splunk_hec::logs::sink::process_log;
 use crate::template::Template;
 use chrono::Utc;
 use serde::Deserialize;
-use vector_core::ByteSizeOf;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use vector_core::config::log_schema;
+use vector_core::ByteSizeOf;
 
 use super::sink::ProcessedEvent;
 

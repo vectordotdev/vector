@@ -10,12 +10,12 @@ use crate::{
     tls::TlsOptions,
     transforms::metric_to_log::MetricToLogConfig,
 };
+use async_trait::async_trait;
 use futures::{stream, StreamExt};
 use futures_util::stream::BoxStream;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use vector_core::{event::Event, sink::StreamSink, transform::Transform};
-use async_trait::async_trait;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct HumioMetricsConfig {
@@ -119,11 +119,13 @@ pub struct HumioMetricsSink {
 impl StreamSink for HumioMetricsSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mut transform = self.transform;
-        self.inner.run(input.flat_map(move |e| {
-            let mut buf = Vec::with_capacity(1);
-            transform.as_function().transform(&mut buf, e);
-            stream::iter(buf.into_iter())
-        })).await
+        self.inner
+            .run(input.flat_map(move |e| {
+                let mut buf = Vec::with_capacity(1);
+                transform.as_function().transform(&mut buf, e);
+                stream::iter(buf.into_iter())
+            }))
+            .await
     }
 }
 
