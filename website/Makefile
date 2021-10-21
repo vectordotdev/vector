@@ -27,7 +27,7 @@ cue-vet:
 	${CUE} vet
 
 config-examples:
-	yarn run config-examples
+	yarn config-examples
 
 structured-data: cue-build config-examples
 
@@ -66,9 +66,9 @@ check-links: production-build run-link-checker
 
 # Search
 algolia:
-	yarn run algolia-config
-	yarn run algolia-index
-	yarn run algolia-upload
+	yarn algolia-config
+	yarn algolia-index
+	yarn algolia-upload
 
 # Useful for locally debugging issues that arise only on the deployed production site
 run-production-site-locally:
@@ -82,3 +82,6 @@ quick-build: clean structured-data production-build
 local-production-build: clean setup structured-data production-build run-link-checker
 
 local-preview-build: clean setup structured-data preview-build run-link-checker
+
+lighthouse-report:
+	yarn lighthouse
