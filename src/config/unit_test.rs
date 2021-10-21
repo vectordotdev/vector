@@ -580,6 +580,8 @@ async fn build_unit_test(
         );
     }
 
+    enrichment_tables.finish_load();
+
     if !errors.is_empty() {
         Err(errors)
     } else {

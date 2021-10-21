@@ -1648,7 +1648,7 @@ mod tests {
         acking_mode: AckingMode,
         inner: impl Future<Output = ()>,
     ) -> Vec<Event> {
-        components::init();
+        components::init_test();
 
         let (tx, rx) = if acking_mode == Acks {
             let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);

@@ -1,0 +1,111 @@
+use crate::event::{EventFinalizers, Finalizable, LogEvent};
+use crate::sinks::util::encoding::{as_tracked_write, Encoder, EncodingConfiguration};
+use std::io::Write;
+
+use crate::sinks::elasticsearch::BulkAction;
+
+use crate::internal_events::ElasticSearchEventEncoded;
+
+use std::io;
+use vector_core::ByteSizeOf;
+
+pub struct ProcessedEvent {
+    pub index: String,
+    pub bulk_action: BulkAction,
+    pub log: LogEvent,
+    pub id: Option<String>,
+}
+
+impl Finalizable for ProcessedEvent {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.log.metadata_mut().take_finalizers()
+    }
+}
+
+impl ByteSizeOf for ProcessedEvent {
+    fn allocated_bytes(&self) -> usize {
+        self.index.allocated_bytes() + self.log.allocated_bytes() + self.id.allocated_bytes()
+    }
+}
+
+#[derive(PartialEq, Default, Clone, Debug)]
+pub struct ElasticSearchEncoder {
+    pub doc_type: String,
+}
+
+impl Encoder<Vec<ProcessedEvent>> for ElasticSearchEncoder {
+    fn encode_input(
+        &self,
+        input: Vec<ProcessedEvent>,
+        writer: &mut dyn Write,
+    ) -> std::io::Result<usize> {
+        let mut written_bytes = 0;
+        for event in input {
+            written_bytes += write_bulk_action(
+                writer,
+                event.bulk_action.as_str(),
+                &event.index,
+                &self.doc_type,
+                &event.id,
+            )?;
+            written_bytes +=
+                as_tracked_write::<_, _, io::Error>(writer, &event.log, |mut writer, log| {
+                    writer.write_all(&[b'\n'])?;
+                    serde_json::to_writer(&mut writer, log)?;
+                    writer.write_all(&[b'\n'])?;
+                    Ok(())
+                })?;
+
+            emit!(&ElasticSearchEventEncoded {
+                byte_size: written_bytes,
+                index: event.index,
+            });
+        }
+        Ok(written_bytes)
+    }
+}
+
+fn write_bulk_action(
+    writer: &mut dyn Write,
+    bulk_action: &str,
+    index: &str,
+    doc_type: &str,
+    id: &Option<String>,
+) -> std::io::Result<usize> {
+    as_tracked_write(
+        writer,
+        (bulk_action, index, doc_type, id),
+        |writer, (bulk_action, index, doc_type, id)| {
+            if let Some(id) = id {
+                write!(
+                    writer,
+                    r#"{{"{}":{{"_index":"{}","_type":"{}","_id":"{}"}}}}"#,
+                    bulk_action, index, doc_type, id
+                )
+            } else {
+                write!(
+                    writer,
+                    r#"{{"{}":{{"_index":"{}","_type":"{}"}}}}"#,
+                    bulk_action, index, doc_type
+                )
+            }
+        },
+    )
+}
+
+impl<E> Encoder<Vec<ProcessedEvent>> for E
+where
+    E: EncodingConfiguration,
+    E::Codec: Encoder<Vec<ProcessedEvent>>,
+{
+    fn encode_input(
+        &self,
+        mut input: Vec<ProcessedEvent>,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<usize> {
+        for event in input.iter_mut() {
+            self.apply_rules(&mut event.log);
+        }
+        self.codec().encode_input(input, writer)
+    }
+}

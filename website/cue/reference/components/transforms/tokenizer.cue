@@ -40,7 +40,7 @@ components: transforms: tokenizer: {
 			"""
 			\(tokenizer._remap_deprecation_notice)
 
-			```vrl
+			```coffee
 			.message = parse_tokens(.message)
 			```
 			""",

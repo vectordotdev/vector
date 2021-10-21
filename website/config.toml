@@ -119,7 +119,6 @@ weight = 3
 [[languages.en.menus.navbar]]
 name = "Docs"
 url = "/docs"
-params = { flyout = true }
 weight = 1
 
 [[languages.en.menus.navbar]]
@@ -308,92 +307,3 @@ weight = 1
 name = "Privacy policy"
 url = "https://github.com/vectordotdev/vector/blob/master/PRIVACY.md"
 weight = 2
-
-[[languages.en.menus.flyout]]
-name = "Documentation"
-identifier = "docs"
-url = "/docs"
-weight = 1
-
-[[languages.en.menus.flyout]]
-name = "Quickstart"
-parent = "docs"
-url = "/docs/setup/quickstart"
-weight = 1
-
-[[languages.en.menus.flyout]]
-name = "Components"
-identifier = "components"
-url = "/components"
-weight = 2
-
-[[languages.en.menus.flyout]]
-name = "Sources"
-parent = "components"
-url = "/docs/reference/configuration/sources"
-weight = 1
-
-[[languages.en.menus.flyout]]
-name = "Transforms"
-parent = "components"
-url = "/docs/reference/configuration/transforms"
-weight = 2
-
-[[languages.en.menus.flyout]]
-name = "Sinks"
-parent = "components"
-url = "/docs/reference/configuration/sinks"
-weight = 3
-
-[[languages.en.menus.flyout]]
-name = "Vector Remap Language"
-identifier = "vrl"
-url = "/docs/reference/vrl"
-weight = 3
-
-[[languages.en.menus.flyout]]
-name = "Functions"
-parent = "vrl"
-url = "/docs/reference/vrl/functions"
-weight = 1
-
-[[languages.en.menus.flyout]]
-name = "Errors"
-parent = "vrl"
-url = "/docs/reference/vrl/errors"
-weight = 2
-
-[[languages.en.menus.flyout]]
-name = "Examples"
-parent = "vrl"
-url = "/docs/reference/vrl/examples"
-weight = 3
-
-[[languages.en.menus.flyout]]
-name = "Expressions"
-parent = "vrl"
-url = "/docs/reference/vrl/expressions"
-weight = 4
-
-[[languages.en.enus.flyout]]
-name = "Pages"
-identifier = "pages"
-weight = 4
-
-[[languages.en.menus.flyout]]
-name = "Download"
-parent = "pages"
-url = "/download"
-weight = 1
-
-[[languages.en.menus.flyout]]
-name = "Releases"
-parent = "pages"
-url = "/releases"
-weight = 2
-
-[[languages.en.menus.flyout]]
-name = "Highlights"
-parent = "pages"
-url = "/highlights"
-weight = 3
