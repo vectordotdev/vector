@@ -18,7 +18,7 @@ use crate::{
     template::Template,
 };
 
-use super::service::{HecLogsRequest, HecLogsRequestBuilder};
+use super::{request_builder::HecLogsRequestBuilder, service::HecLogsRequest};
 
 pub struct HecLogsSink<S> {
     pub context: SinkContext,

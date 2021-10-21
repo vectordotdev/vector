@@ -21,8 +21,9 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     encoder::HecLogsEncoder,
+    request_builder::HecLogsRequestBuilder,
     retry::HecLogsRetry,
-    service::{HecLogsRequestBuilder, HecLogsService, HttpRequestBuilder},
+    service::{HecLogsService, HttpRequestBuilder},
     sink::HecLogsSink,
 };
 
