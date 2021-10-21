@@ -1,7 +1,4 @@
-use vector_core::{
-    event::{EventFinalizers, Finalizable},
-    ByteSizeOf,
-};
+use vector_core::event::{EventFinalizers, Finalizable};
 
 use crate::sinks::util::{encoding::EncodingConfig, Compression, RequestBuilder};
 
@@ -31,7 +28,7 @@ impl RequestBuilder<Vec<ProcessedEvent>> for HecLogsRequestBuilder {
     fn split_input(&self, input: Vec<ProcessedEvent>) -> (Self::Metadata, Self::Events) {
         let mut events = input;
         let finalizers = events.take_finalizers();
-        let events_byte_size: usize = events.iter().map(|e| e.log.size_of()).sum();
+        let events_byte_size: usize = events.iter().map(|e| e.event_byte_size).sum();
 
         ((events.len(), events_byte_size, finalizers), events)
     }

@@ -48,10 +48,11 @@ where
 
         let builder_limit = NonZeroUsize::new(64);
         let sink = input
-            .map(|event| event.into_log())
-            .filter_map(move |log| {
+            .map(|event| (event.size_of(), event.into_log()))
+            .filter_map(move |(event_byte_size, log)| {
                 future::ready(process_log(
                     log,
+                    event_byte_size,
                     sourcetype,
                     source,
                     index,
@@ -93,6 +94,7 @@ where
 #[derive(PartialEq, Default, Clone, Debug)]
 pub struct ProcessedEvent {
     pub log: LogEvent,
+    pub event_byte_size: usize,
     pub sourcetype: Option<String>,
     pub source: Option<String>,
     pub index: Option<String>,
@@ -120,6 +122,7 @@ impl ByteSizeOf for ProcessedEvent {
 
 pub fn process_log(
     mut log: LogEvent,
+    event_byte_size: usize,
     sourcetype: Option<&Template>,
     source: Option<&Template>,
     index: Option<&Template>,
@@ -148,6 +151,7 @@ pub fn process_log(
 
     Some(ProcessedEvent {
         log,
+        event_byte_size,
         sourcetype,
         source,
         index,
