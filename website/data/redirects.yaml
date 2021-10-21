@@ -30,6 +30,7 @@ sinks:
 - loki
 - nats
 - new_relic_logs
+- new_relic
 - papertrail
 - prometheus_exporter
 - prometheus_remote_write
