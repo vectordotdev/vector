@@ -27,8 +27,6 @@ pub mod datadog;
 mod diff;
 pub mod format;
 mod graph;
-#[cfg(feature = "datadog-pipelines")]
-mod hash;
 mod id;
 mod loading;
 pub mod provider;
@@ -40,8 +38,6 @@ pub mod watcher;
 pub use builder::ConfigBuilder;
 pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
-#[cfg(feature = "datadog-pipelines")]
-pub use hash::ConfigHash;
 pub use id::{ComponentKey, ComponentScope, OutputId};
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
@@ -94,8 +90,7 @@ impl ConfigPath {
 pub struct Config {
     #[cfg(feature = "api")]
     pub api: api::Options,
-    #[cfg(feature = "datadog-pipelines")]
-    pub hash: ConfigHash,
+    pub hash: String,
     #[cfg(feature = "datadog-pipelines")]
     pub datadog: datadog::Options,
     pub global: GlobalOptions,
@@ -933,10 +928,7 @@ mod test {
         )
         .unwrap();
 
-        assert_eq!(
-            config1.to_hash().sha256_hex(),
-            config2.to_hash().sha256_hex()
-        )
+        assert_eq!(config1.sha256_hash(), config2.sha256_hash())
     }
 }
 
