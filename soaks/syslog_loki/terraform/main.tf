@@ -1,3 +1,6 @@
+# Set up the providers needed to run this soak and other terraform related
+# business. Here we only require 'kubernetes' to interact with the soak
+# minikube.
 terraform {
   required_providers {
     kubernetes = {
@@ -7,11 +10,22 @@ terraform {
   }
 }
 
+# Rig the kubernetes provider to communicate with minikube. The details of
+# adjusting `~/.kube/config` are addressed by the soak control scripts.
 provider "kubernetes" {
   config_path = "~/.kube/config"
 }
 
+# Setup background monitoring details. These are needed by the soak control to
+# understand what vector et al's running behavior is.
+module "monitoring" {
+  source = "../../common/terraform/modules/monitoring"
+}
 
+# Setup the soak pieces
+#
+# This soak config sets up a vector soak with lading/tcp-gen feeding into vector,
+# lading/http-blackhole receiving.
 resource "kubernetes_namespace" "soak" {
   metadata {
     name = "soak"
