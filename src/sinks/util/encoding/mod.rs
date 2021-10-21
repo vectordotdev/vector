@@ -224,9 +224,8 @@ impl VisitLogMut for Event {
     where
         F: Fn(&mut LogEvent),
     {
-        match self {
-            Event::Log(log_event) => func(log_event),
-            _ => {}
+        if let Event::Log(log_event) = self {
+            func(log_event)
         }
     }
 }

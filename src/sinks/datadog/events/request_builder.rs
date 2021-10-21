@@ -47,6 +47,7 @@ pub struct Metadata {
     pub event_byte_size: usize,
 }
 
+#[derive(Default)]
 pub struct DatadogEventsRequestBuilder {
     encoder: EncodingConfigFixed<StandardJsonEncoding>,
 }

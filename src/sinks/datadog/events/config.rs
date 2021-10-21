@@ -74,7 +74,7 @@ impl SinkConfig for DatadogEventsConfig {
         let healthcheck = healthcheck(
             self.get_api_endpoint(),
             self.default_api_key.clone(),
-            http_client.clone(),
+            http_client,
         )
         .boxed();
 

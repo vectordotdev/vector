@@ -60,7 +60,7 @@ impl DatadogEventsService {
             future::ready(request)
         });
         Self {
-            default_api_key: Arc::from(default_api_key.to_owned()),
+            default_api_key: Arc::from(default_api_key),
             uri: uri.to_owned(),
             batch_http_service,
         }
