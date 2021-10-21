@@ -76,6 +76,6 @@ popd
 echo "Captures recorded to ${capture_file}"
 echo ""
 echo "Here is a statistical summary of that file. Units are bytes."
-echo "Higher numbers in the 'comparision' is better."
+echo "Higher numbers in the 'comparison' is better."
 echo ""
 mlr --tsv --from "${capture_file}" stats1 -a 'min,p90,p99,max,skewness,kurtosis' -g EXPERIMENT -f SAMPLE | column -t
