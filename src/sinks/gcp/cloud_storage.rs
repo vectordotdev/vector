@@ -17,7 +17,7 @@ use crate::{
         util::{
             batch::{BatchConfig, BatchSettings},
             encoding::{EncodingConfig, EncodingConfiguration},
-            Compression, Concurrency, ServiceBuilderExt, TowerRequestConfig,
+            Compression, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -145,7 +145,6 @@ impl GcsSinkConfig {
         cx: SinkContext,
     ) -> crate::Result<VectorSink> {
         let request = self.request.unwrap_with(&TowerRequestConfig {
-            concurrency: Concurrency::Fixed(25),
             rate_limit_num: Some(1000),
             ..Default::default()
         });
@@ -170,7 +169,7 @@ impl GcsSinkConfig {
     fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
         Ok(KeyPartitioner::new(
             Template::try_from(self.key_prefix.as_deref().unwrap_or("date=%F/"))
-                .context(KeyPrefixTemplate)?,
+                .context(kKeyPrefixTemplate)?,
         ))
     }
 }

@@ -1,0 +1,1 @@
+FEATURES="sources-internal_metrics,sources-syslog,transforms-remap,transforms-log_to_metric,sinks-prometheus,sinks-datadog"

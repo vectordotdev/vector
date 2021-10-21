@@ -79,6 +79,7 @@ harness = false
 
 [[bench]]
 name = "event"
+path = "benches/event/main.rs"
 harness = false
 
 [[bench]]
