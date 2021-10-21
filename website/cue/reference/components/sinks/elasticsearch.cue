@@ -154,11 +154,47 @@ components: sinks: elasticsearch: {
 				Currently, Vector only supports `index` and `create`. `update` and `delete` actions are not supported.
 				"""
 			required:    false
-			warnings: []
+			warnings: ["This option has been deprecated, the `normal.bulk_action` option should be used."]
 			type: string: {
 				default: "index"
 				examples: ["index", "create", "{{ action }}"]
 				syntax: "template"
+			}
+		}
+		bulk: {
+			common:      true
+			description: "Options for the bulk mode."
+			required:    false
+			warnings: []
+			type: object: {
+				examples: []
+				options: {
+					action: {
+						common:      false
+						description: """
+							Action to use when making requests to the [Elasticsearch Bulk API](\(urls.elasticsearch_bulk)).
+							Currently, Vector only supports `index` and `create`. `update` and `delete` actions are not supported.
+							"""
+						required:    false
+						warnings: []
+						type: string: {
+							default: "index"
+							examples: ["index", "create", "{{ action }}"]
+							syntax: "template"
+						}
+					}
+					index: {
+						common:      true
+						description: "Index name to write events to."
+						required:    false
+						warnings: []
+						type: string: {
+							default: "vector-%F"
+							examples: ["application-{{ application_id }}-%Y-%m-%d", "vector-%Y-%m-%d"]
+							syntax: "template"
+						}
+					}
+				}
 			}
 		}
 		data_stream: {
@@ -257,7 +293,7 @@ components: sinks: elasticsearch: {
 			common:      true
 			description: "Index name to write events to."
 			required:    false
-			warnings: []
+			warnings: ["This option has been deprecated, the `normal.index` option should be used."]
 			type: string: {
 				default: "vector-%F"
 				examples: ["application-{{ application_id }}-%Y-%m-%d", "vector-%Y-%m-%d"]
@@ -289,12 +325,12 @@ components: sinks: elasticsearch: {
 		}
 		mode: {
 			common:      true
-			description: "The type of index mechanism. If `data_stream` mode is enabled, the `bulk_action` is set to `create`."
+			description: "The type of index mechanism. If `data_stream` mode is enabled, the `bulk.action` is set to `create`."
 			required:    false
 			warnings: []
 			type: string: {
-				default: "normal"
-				examples: ["normal", "data_stream"]
+				default: "bulk"
+				examples: ["bulk", "data_stream"]
 				syntax: "literal"
 			}
 		}

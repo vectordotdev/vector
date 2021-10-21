@@ -58,15 +58,23 @@
 //! accomplish this without a bunch of magic.  [`EncodingConfigFixed`] goes a step further and
 //! provides a way to force a codec, disallowing an override from being specified.
 mod codec;
+
 pub use codec::{StandardEncodings, StandardJsonEncoding, StandardTextEncoding};
+
 mod config;
+
 pub use config::EncodingConfig;
+
 mod fixed;
+
 pub use fixed::EncodingConfigFixed;
+
 mod with_default;
 
+pub use codec::as_tracked_write;
 pub use with_default::EncodingConfigWithDefault;
 
+use crate::event::{LogEvent, MaybeAsLogMut};
 use crate::{
     event::{Event, PathComponent, PathIter, Value},
     Result,
@@ -100,70 +108,52 @@ pub trait EncodingConfiguration {
     fn except_fields(&self) -> &Option<Vec<String>>;
     fn timestamp_format(&self) -> &Option<TimestampFormat>;
 
-    fn apply_only_fields(&self, event: &mut Event) {
+    fn apply_only_fields(&self, log: &mut LogEvent) {
         if let Some(only_fields) = &self.only_fields() {
-            match event {
-                Event::Log(log_event) => {
-                    let mut to_remove = log_event
-                        .keys()
-                        .filter(|field| {
-                            let field_path = PathIter::new(field).collect::<Vec<_>>();
-                            !only_fields.iter().any(|only| {
-                                // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-                                field_path.starts_with(&only[..])
-                            })
-                        })
-                        .collect::<Vec<_>>();
+            let mut to_remove = log
+                .keys()
+                .filter(|field| {
+                    let field_path = PathIter::new(field).collect::<Vec<_>>();
+                    !only_fields.iter().any(|only| {
+                        // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+                        field_path.starts_with(&only[..])
+                    })
+                })
+                .collect::<Vec<_>>();
 
-                    // reverse sort so that we delete array elements at the end first rather than
-                    // the start so that any `nulls` at the end are dropped and empty arrays are
-                    // pruned
-                    to_remove.sort_by(|a, b| b.cmp(a));
+            // reverse sort so that we delete array elements at the end first rather than
+            // the start so that any `nulls` at the end are dropped and empty arrays are
+            // pruned
+            to_remove.sort_by(|a, b| b.cmp(a));
 
-                    for removal in to_remove {
-                        log_event.remove_prune(removal, true);
-                    }
-                }
-                Event::Metric(_) => {
-                    // Metrics don't get affected by this one!
-                }
+            for removal in to_remove {
+                log.remove_prune(removal, true);
             }
         }
     }
-    fn apply_except_fields(&self, event: &mut Event) {
+    fn apply_except_fields(&self, log: &mut LogEvent) {
         if let Some(except_fields) = &self.except_fields() {
-            match event {
-                Event::Log(log_event) => {
-                    for field in except_fields {
-                        log_event.remove(field);
-                    }
-                }
-                Event::Metric(_) => (), // Metrics don't get affected by this one!
+            for field in except_fields {
+                log.remove(field);
             }
         }
     }
-    fn apply_timestamp_format(&self, event: &mut Event) {
+    fn apply_timestamp_format(&self, log: &mut LogEvent) {
         if let Some(timestamp_format) = &self.timestamp_format() {
-            match event {
-                Event::Log(log_event) => {
-                    match timestamp_format {
-                        TimestampFormat::Unix => {
-                            let mut unix_timestamps = Vec::new();
-                            for (k, v) in log_event.all_fields() {
-                                if let Value::Timestamp(ts) = v {
-                                    unix_timestamps
-                                        .push((k.clone(), Value::Integer(ts.timestamp())));
-                                }
-                            }
-                            for (k, v) in unix_timestamps {
-                                log_event.insert(k, v);
-                            }
+            match timestamp_format {
+                TimestampFormat::Unix => {
+                    let mut unix_timestamps = Vec::new();
+                    for (k, v) in log.all_fields() {
+                        if let Value::Timestamp(ts) = v {
+                            unix_timestamps.push((k.clone(), Value::Integer(ts.timestamp())));
                         }
-                        // RFC3339 is the default serialization of a timestamp.
-                        TimestampFormat::Rfc3339 => (),
+                    }
+                    for (k, v) in unix_timestamps {
+                        log.insert(k, v);
                     }
                 }
-                Event::Metric(_) => (), // Metrics don't get affected by this one!
+                // RFC3339 is the default serialization of a timestamp.
+                TimestampFormat::Rfc3339 => (),
             }
         }
     }
@@ -192,11 +182,17 @@ pub trait EncodingConfiguration {
     /// Apply the EncodingConfig rules to the provided event.
     ///
     /// Currently, this is idempotent.
-    fn apply_rules(&self, event: &mut Event) {
-        // Ordering in here should not matter.
-        self.apply_except_fields(event);
-        self.apply_only_fields(event);
-        self.apply_timestamp_format(event);
+    fn apply_rules<T>(&self, event: &mut T)
+    where
+        T: MaybeAsLogMut,
+    {
+        // No rules are currently applied to metrics
+        if let Some(log) = event.maybe_as_log_mut() {
+            // Ordering in here should not matter.
+            self.apply_except_fields(log);
+            self.apply_only_fields(log);
+            self.apply_timestamp_format(log);
+        }
     }
 }
 
@@ -205,9 +201,9 @@ where
     E: EncodingConfiguration,
     E::Codec: Encoder<Event>,
 {
-    fn encode_input(&self, mut input: Event, writer: &mut dyn io::Write) -> io::Result<usize> {
-        self.apply_rules(&mut input);
-        self.codec().encode_input(input, writer)
+    fn encode_input(&self, mut event: Event, writer: &mut dyn io::Write) -> io::Result<usize> {
+        self.apply_rules(&mut event);
+        self.codec().encode_input(event, writer)
     }
 }
 
@@ -244,6 +240,7 @@ mod tests {
         Snoot,
         Boop,
     }
+
     #[derive(Deserialize, Serialize, Debug)]
     #[serde(deny_unknown_fields)]
     struct TestConfig {
@@ -256,6 +253,7 @@ mod tests {
     }
 
     const TOML_SIMPLE_STRING: &str = r#"encoding = "Snoot""#;
+
     #[test]
     fn config_string() {
         let config: TestConfig = toml::from_str(TOML_SIMPLE_STRING).unwrap();
@@ -268,6 +266,7 @@ mod tests {
         encoding.except_fields = ["Doop"]
         encoding.only_fields = ["Boop"]
     "#};
+
     #[test]
     fn config_struct() {
         let config: TestConfig = toml::from_str(TOML_SIMPLE_STRUCT).unwrap();
@@ -285,6 +284,7 @@ mod tests {
         encoding.except_fields = ["Doop"]
         encoding.only_fields = ["Doop"]
     "#};
+
     #[test]
     fn exclusivity_violation() {
         let config: std::result::Result<TestConfig, _> = toml::from_str(TOML_EXCLUSIVITY_VIOLATION);
@@ -295,6 +295,7 @@ mod tests {
         encoding.codec = "Snoot"
         encoding.except_fields = ["a.b.c", "b", "c[0].y", "d\\.z", "e"]
     "#};
+
     #[test]
     fn test_except() {
         let config: TestConfig = toml::from_str(TOML_EXCEPT_FIELD).unwrap();
@@ -330,6 +331,7 @@ mod tests {
         encoding.codec = "Snoot"
         encoding.only_fields = ["a.b.c", "b", "c[0].y", "g\\.z"]
     "#};
+
     #[test]
     fn test_only() {
         let config: TestConfig = toml::from_str(TOML_ONLY_FIELD).unwrap();
@@ -374,6 +376,7 @@ mod tests {
         encoding.codec = "Snoot"
         encoding.timestamp_format = "unix"
     "#};
+
     #[test]
     fn test_timestamp() {
         let config: TestConfig = toml::from_str(TOML_TIMESTAMP_FORMAT).unwrap();
