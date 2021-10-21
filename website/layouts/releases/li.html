@@ -3,7 +3,8 @@
 {{ $isLatest := eq $version $latest }}
 {{ $release := index site.Data.docs.releases $version }}
 <a href="{{ .RelPermalink }}">
-  <div class="border shadow-sm rounded-md py-4 px-6 dark:border-gray-700 hover:border-secondary dark:hover:border-primary">
+  <div
+    class="border shadow-sm rounded-md py-4 px-6 dark:border-gray-700 hover:border-secondary dark:hover:border-primary">
     <span class="flex items-center justify-between">
       <span class="flex items-center space-x-4">
         <span class="font-bold dark:text-gray-300 text-lg">
@@ -19,8 +20,15 @@
       {{ $date := $release.date | dateFormat "January 2, 2006" }}
       <time datetime="{{ $date }}" class="font-sm font-light tracking-tight text-dark dark:text-gray-300">
         {{ $date }}
-      </span>
-      {{ end }}
+      </time>
+    </span>
+    {{ end }}
     </span>
   </div>
 </a>
+
+{{ with $release.description }}
+<div class="border-l border-gray-100 dark:border-gray-800 pl-8 py-4 prose dark:prose-dark max-w-none">
+  {{ . | markdownify }}
+</div>
+{{ end }}
