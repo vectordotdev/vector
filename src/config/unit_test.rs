@@ -43,7 +43,6 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
         })
         .collect();
 
-    #[cfg(feature = "datadog-pipelines")]
     let hash = builder.sha256_hash();
 
     // Don't let this escape since it's not validated
@@ -53,7 +52,6 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
         api: builder.api,
         #[cfg(feature = "datadog-pipelines")]
         datadog: builder.datadog,
-        #[cfg(feature = "datadog-pipelines")]
         hash,
         healthchecks: builder.healthchecks,
         enrichment_tables: builder.enrichment_tables,
