@@ -9,7 +9,6 @@ use super::{
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 use vector_core::{config::GlobalOptions, default_data_dir, transform::TransformConfig};
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -253,6 +252,7 @@ impl ConfigBuilder {
     /// an order-stable JSON of the config builder and feeding its bytes into a SHA256 hasher.
     pub fn sha256_hash(&self) -> String {
         use sha2::{Digest, Sha256};
+        use std::collections::BTreeMap;
 
         #[derive(Serialize)]
         struct ConfigBuilderHash<'a> {
