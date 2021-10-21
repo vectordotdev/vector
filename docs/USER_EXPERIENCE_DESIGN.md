@@ -105,7 +105,7 @@ for the following reasons:
    standards.
 
 In general, we believe Vector's flexible nature with log schemas is a boon for
-Vector's UX. A rigid schema is not required to achieve a best-in-class UX. 
+Vector's UX. A rigid schema is not required to achieve a best-in-class UX.
 
 ### Defaults
 
