@@ -15,6 +15,7 @@ In order to run a soak locally you will need:
 * minikube
 * [miller](https://github.com/johnkerl/miller)
 * docker
+* terraform
 
 The CPU and RAM requirements are currently hard-coded but might be made
 flexible, possibly on a per-soak basis.
