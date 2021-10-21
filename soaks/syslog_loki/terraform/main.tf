@@ -37,7 +37,7 @@ module "vector" {
   type         = var.type
   vector_image = var.vector_image
   sha          = var.sha
-  test_name    = "syslog_regex_logs2metric_ddmetrics"
+  test_name    = "syslog_loki"
   vector-toml  = file("${path.module}/vector.toml")
   namespace    = kubernetes_namespace.soak.metadata[0].name
   depends_on   = [module.http-blackhole]
