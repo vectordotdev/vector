@@ -8,23 +8,21 @@ use tower::ServiceBuilder;
 use uuid::Uuid;
 use vector_core::ByteSizeOf;
 
-use crate::sinks::azure_common;
-use crate::sinks::azure_common::config::AzureBlobMetadata;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext},
     event::{Event, Finalizable},
     sinks::{
         azure_common::{
+            self,
+            config::AzureBlobMetadata,
             config::{AzureBlobRequest, AzureBlobRetryLogic},
             service::AzureBlobService,
             sink::AzureBlobSink,
         },
-        util::encoding::StandardEncodings,
-        util::partitioner::KeyPartitioner,
-        util::RequestBuilder,
         util::{
-            encoding::EncodingConfig, BatchConfig, BatchSettings, Compression, Concurrency,
-            ServiceBuilderExt, TowerRequestConfig,
+            encoding::EncodingConfig, encoding::StandardEncodings, partitioner::KeyPartitioner,
+            BatchConfig, BatchSettings, Compression, RequestBuilder, ServiceBuilderExt,
+            TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -91,7 +89,7 @@ impl SinkConfig for AzureBlobSinkConfig {
 }
 
 const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
-    TowerRequestConfig::new(Concurrency::Fixed(50)).rate_limit_num(250);
+    TowerRequestConfig::const_default().rate_limit_num(250);
 
 const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = {
     BatchSettings::const_default()

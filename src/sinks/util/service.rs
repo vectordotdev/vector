@@ -64,7 +64,7 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
 pub struct TowerRequestConfig {
     #[serde(default)]
     #[serde(skip_serializing_if = "concurrency_is_none")]
-    pub concurrency: Concurrency, // 1024
+    pub concurrency: Concurrency, // adaptive
     pub timeout_secs: Option<u64>,             // 1 minute
     pub rate_limit_duration_secs: Option<u64>, // 1 second
     pub rate_limit_num: Option<u64>,           // i64::MAX
@@ -101,6 +101,10 @@ impl TowerRequestConfig {
             retry_initial_backoff_secs: Some(RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT),
             adaptive_concurrency: AdaptiveConcurrencySettings::const_default(),
         }
+    }
+
+    pub const fn const_default() -> Self {
+        Self::new(CONCURRENCY_DEFAULT)
     }
 
     pub const fn rate_limit_num(mut self, rate_limit_num: u64) -> Self {
@@ -332,6 +336,13 @@ mod tests {
 
         toml::from_str::<TowerRequestConfig>(r#"concurrency = -9"#)
             .expect_err("Invalid concurrency setting didn't fail on negative number");
+    }
+
+    #[test]
+    fn config_merging_defaults_concurrency_to_none_if_unset() {
+        let cfg = TowerRequestConfig::default().unwrap_with(&TowerRequestConfig::default());
+
+        assert_eq!(cfg.concurrency, None);
     }
 
     #[tokio::test]
