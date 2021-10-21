@@ -15,10 +15,17 @@ internal tracing has its own [RFC].
 
 ### Some details about traces handling by the Agent
 
-Traces are collected by a dedicated agent (the `trace-agent`). It has its own runtime, comes with a lot of configuration
-settings, but it shares global option like `site` to select the Datadog region where to send data.
+Offical "Datadog Agent" bundles (rpm/deb/msi/container image) actually ship multiple binaries, collectively named
+"agents". Each of these "agents" is tasked to collect some data. For example "the core agent" (often shortened to "the
+agent", because it was the first of those agents to be released) is the one collecting metrics, logs and running checks.
+There are other agents like the process-agent, the security-agent or the trace-agent. But all of those are part of the
+official "Datadog Agent" distribution logic, and they all come out of the [datadog-agent] codebase. So we are focusing
+on the `trace-agent` which is one of the several binaries shipped along with others agents.
 
-It exposes a [local API], that is used by [tracing libraries] to submit traces & profiling data.
+Traces are collected by this specific agent, that comes with a lot of dedicated configuration settings (usually under
+the `apm_config` prefix), but it also shares some global option like `site` with other agents to select the Datadog
+region where to send data. It exposes a [local API], that is used by [tracing libraries] to submit traces & profiling
+data.
 
 It has several communication channels to Datadog:
 
@@ -26,8 +33,8 @@ It has several communication channels to Datadog:
 * Additional profiling data are relayed to `intake.profile.<SITE>` (can be overridden by the
   `apm_config.profiling_dd_url` config key), they are not processed by the trace-agent and [relayed directly to Datadog]
 * Some debug log are simply [proxified] to the log endpoint `http-intake.logs.<SITE>` (can be overridden by the
-  `apm_config.debugger_dd_url` config key), it is fairly [recent], tracing libs may not use it yet.
-* It emits [metrics] over [dogstatsd]
+  `apm_config.debugger_dd_url` config key), it is fairly [recent], and unused as of October 2021.
+* It emits [metrics] over [dogstatsd].
 
 Profiling and Tracing are enabled independently on traced applications. But they can be correlated once ingested at
 Datadog, mainly to refine a span with profiling data.
@@ -40,6 +47,8 @@ to the trace endpoint contain two major kind of data:
   by Datadog those selected spans are used under the hood to better identify & contextualize traces, they can be fully
   indexed as well ([short description of APM events])
 
+[datadog-agent]: https://github.com/DataDog/datadog-agent/
+[official container image]: gcr.io/datadoghq/agent
 [local API]: https://github.com/DataDog/datadog-agent/blob/main/pkg/trace/api/endpoints.go
 [tracing libraries]: https://docs.datadoghq.com/developers/community/libraries/#apm--continuous-profiler-client-libraries
 [relayed directly to Datadog]: https://github.com/DataDog/datadog-agent/blob/44eec15/pkg/trace/api/endpoints.go#L83-L86
