@@ -12,12 +12,12 @@ use std::sync::Arc;
 use crate::http::HttpClient;
 use crate::sinks::datadog::events::request_builder::DatadogEventsRequest;
 use crate::sinks::util::sink::Response;
-use futures::future::BoxFuture;
 use futures::future;
+use futures::future::BoxFuture;
+use futures::future::Ready;
 use hyper::Body;
 use std::task::{Context, Poll};
 use tower::{Service, ServiceExt};
-use futures::future::Ready;
 
 pub struct DatadogEventsResponse {
     pub event_status: EventStatus,
@@ -34,10 +34,8 @@ impl AsRef<EventStatus> for DatadogEventsResponse {
 pub struct DatadogEventsService {
     uri: String,
     default_api_key: ApiKey,
-    batch_http_service: HttpBatchService<
-        Ready<Result<http::Request<Vec<u8>>, crate::Error>>,
-        DatadogEventsRequest,
-    >,
+    batch_http_service:
+        HttpBatchService<Ready<Result<http::Request<Vec<u8>>, crate::Error>>, DatadogEventsRequest>,
 }
 
 impl DatadogEventsService {
