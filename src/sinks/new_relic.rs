@@ -357,8 +357,6 @@ pub struct NewRelicConfig {
     pub account_id: String,
     pub region: Option<NewRelicRegion>,
     pub api: NewRelicApi,
-    pub buffer_size: Option<usize>,
-    pub timeout: Option<u64>,
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
     #[serde(
@@ -383,8 +381,8 @@ impl SinkConfig for NewRelicConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
 
         let batch = BatchSettings::<NewRelicBuffer>::default()
-            .events(self.buffer_size.unwrap_or(50))
-            .timeout(self.timeout.unwrap_or(30))
+            .events(self.batch.max_events.unwrap_or(50))
+            .timeout(self.batch.timeout_secs.unwrap_or(30))
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let tls_settings = TlsSettings::from_options(&None)?;
