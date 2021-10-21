@@ -33,8 +33,10 @@ It has several communication channels to Datadog:
 * Additional profiling data are relayed to `intake.profile.<SITE>` (can be overridden by the
   `apm_config.profiling_dd_url` config key), they are not processed by the trace-agent and [relayed directly to Datadog]
 * Some debug log are simply [proxified] to the log endpoint `http-intake.logs.<SITE>` (can be overridden by the
-  `apm_config.debugger_dd_url` config key), it is fairly [recent], and unused as of October 2021.
-* It emits [metrics] over [dogstatsd].
+  `apm_config.debugger_dd_url` config key), it is fairly [recent] and unused as of October 2021.
+* It emits [metrics], it does so for observability purpose, those metrics are sent to the core agent using the
+  [dogstatsd] protocol, usually running on the same host (it could be in a different container if using the official
+  Helm chart). The core agent then forward all those metrics with additional enrichment (hostname, tags) to Datadog.
 
 Profiling and Tracing are enabled independently on traced applications. But they can be correlated once ingested at
 Datadog, mainly to refine a span with profiling data.
