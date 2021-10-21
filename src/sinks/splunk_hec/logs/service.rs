@@ -62,7 +62,7 @@ impl Service<HecLogsRequest> for HecLogsService {
             let event_status = if response.status().is_success() {
                 emit!(&EventsSent {
                     count: events_count,
-                    byte_size: byte_size,
+                    byte_size,
                 });
                 EventStatus::Delivered
             } else if response.status().is_server_error() {

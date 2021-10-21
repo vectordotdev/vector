@@ -74,9 +74,10 @@ fn validate_host(host: &str) -> crate::Result<()> {
 mod tests {
     use super::*;
     use crate::event::Event;
-    use http::HeaderValue;
+    use crate::sinks::splunk_hec::common::build_uri;
+    use http::{Request};
     use std::path::PathBuf;
-    use wiremock::matchers::{body_string, header, method, path};
+    use wiremock::matchers::{body_string, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     #[tokio::test]
@@ -289,94 +290,5 @@ mod tests {
 
             Request::post(uri).body(events).map_err(Into::into)
         }
-    }
-}
-
-#[cfg(all(test, feature = "splunk-integration-tests"))]
-mod integration_tests {
-    use super::*;
-    use crate::{assert_downcast_matches, tls::TlsSettings};
-    use integration_test_helpers::get_token;
-    use splunk_hec::common::HealthcheckError;
-    use std::net::SocketAddr;
-    use warp::Filter;
-
-    #[tokio::test]
-    async fn splunk_healthcheck() {
-        let create_healthcheck = |endpoint: String, token: String| {
-            let tls_settings = TlsSettings::from_options(&None).unwrap();
-            let proxy = ProxyConfig::default();
-            let client = HttpClient::new(tls_settings, &proxy).unwrap();
-            super::healthcheck(endpoint, token, client)
-        };
-
-        // OK
-        {
-            let healthcheck =
-                create_healthcheck("http://localhost:8088/".to_string(), get_token().await);
-            healthcheck.await.unwrap();
-        }
-
-        // Server not listening at address
-        {
-            let healthcheck =
-                create_healthcheck("http://localhost:1111".to_string(), get_token().await);
-            healthcheck.await.unwrap_err();
-        }
-
-        // Unhealthy server
-        {
-            let healthcheck =
-                create_healthcheck("http://localhost:5503".to_string(), get_token().await);
-
-            let unhealthy = warp::any()
-                .map(|| warp::reply::with_status("i'm sad", StatusCode::SERVICE_UNAVAILABLE));
-            let server = warp::serve(unhealthy).bind("0.0.0.0:5503".parse::<SocketAddr>().unwrap());
-            tokio::spawn(server);
-
-            assert_downcast_matches!(
-                healthcheck.await.unwrap_err(),
-                HealthcheckError,
-                HealthcheckError::QueuesFull
-            );
-        }
-    }
-}
-
-#[cfg(all(test, feature = "splunk-integration-tests"))]
-pub mod integration_test_helpers {
-    use crate::test_util::retry_until;
-    use serde_json::Value as JsonValue;
-    use tokio::time::Duration;
-
-    const USERNAME: &str = "admin";
-    const PASSWORD: &str = "password";
-
-    pub async fn get_token() -> String {
-        let client = reqwest::Client::builder()
-            .danger_accept_invalid_certs(true)
-            .build()
-            .unwrap();
-
-        let res = retry_until(
-            || {
-                client
-                    .get("https://localhost:8089/services/data/inputs/http?output_mode=json")
-                    .basic_auth(USERNAME, Some(PASSWORD))
-                    .send()
-            },
-            Duration::from_millis(500),
-            Duration::from_secs(30),
-        )
-        .await;
-
-        let json: JsonValue = res.json().await.unwrap();
-        let entries = json["entry"].as_array().unwrap().clone();
-
-        if entries.is_empty() {
-            panic!("You don't have any HTTP Event Collector inputs set up in Splunk");
-        }
-
-        entries[0]["content"]["token"].as_str().unwrap().to_owned()
     }
 }

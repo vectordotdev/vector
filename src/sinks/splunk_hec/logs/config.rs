@@ -123,7 +123,7 @@ impl HecSinkLogsConfig {
             service,
             request_builder,
             context: cx,
-            batch_settings: batch_settings,
+            batch_settings,
             sourcetype: self.sourcetype.clone(),
             source: self.source.clone(),
             index: self.index.clone(),

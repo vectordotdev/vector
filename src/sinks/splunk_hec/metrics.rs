@@ -572,7 +572,7 @@ mod integration_tests {
     use crate::{
         config::{SinkConfig, SinkContext},
         event::{Metric, MetricKind},
-        sinks::splunk_hec::conn::integration_test_helpers::get_token,
+        sinks::splunk_hec::common::integration_test_helpers::get_token,
         test_util::components::{self, HTTP_SINK_TAGS},
     };
     use serde_json::Value as JsonValue;

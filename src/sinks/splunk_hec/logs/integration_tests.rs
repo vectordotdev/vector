@@ -1,12 +1,9 @@
-use crate::sinks::splunk_hec::logs_new::encoder::HecLogsEncoder;
-use crate::test_util::retry_until;
-use crate::{assert_downcast_matches, tls::TlsSettings};
 use crate::{
     config::{SinkConfig, SinkContext},
     sinks::{
-        splunk_hec::logs_new::{config::HecSinkLogsConfig, service::Encoding},
+        splunk_hec::{logs::{config::HecSinkLogsConfig, encoder::HecLogsEncoder}, common::integration_test_helpers::get_token},
         util::{
-            encoding::{EncodingConfig, StandardEncodings},
+            encoding::{EncodingConfig},
             BatchConfig, Compression, TowerRequestConfig,
         },
     },
@@ -18,41 +15,11 @@ use futures::stream;
 use serde_json::Value as JsonValue;
 use std::convert::TryFrom;
 use std::future::ready;
-use std::net::SocketAddr;
 use tokio::time::{sleep, Duration};
 use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
-use warp::Filter;
 
 const USERNAME: &str = "admin";
 const PASSWORD: &str = "password";
-
-pub async fn get_token() -> String {
-    let client = reqwest::Client::builder()
-        .danger_accept_invalid_certs(true)
-        .build()
-        .unwrap();
-
-    let res = retry_until(
-        || {
-            client
-                .get("https://localhost:8089/services/data/inputs/http?output_mode=json")
-                .basic_auth(USERNAME, Some(PASSWORD))
-                .send()
-        },
-        Duration::from_millis(500),
-        Duration::from_secs(30),
-    )
-    .await;
-
-    let json: JsonValue = res.json().await.unwrap();
-    let entries = json["entry"].as_array().unwrap().clone();
-
-    if entries.is_empty() {
-        panic!("You don't have any HTTP Event Collector inputs set up in Splunk");
-    }
-
-    entries[0]["content"]["token"].as_str().unwrap().to_owned()
-}
 
 async fn recent_entries(index: Option<&str>) -> Vec<JsonValue> {
     let client = reqwest::Client::builder()
@@ -119,6 +86,7 @@ async fn config(
         tls: None,
     }
 }
+
 
 #[tokio::test]
 async fn splunk_insert_message() {
