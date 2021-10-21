@@ -13,10 +13,11 @@ use crate::http::HttpClient;
 use crate::sinks::datadog::events::request_builder::DatadogEventsRequest;
 use crate::sinks::util::sink::Response;
 use futures::future::BoxFuture;
-use futures::{future, FutureExt};
+use futures::future;
 use hyper::Body;
 use std::task::{Context, Poll};
 use tower::{Service, ServiceExt};
+use futures::future::Ready;
 
 pub struct DatadogEventsResponse {
     pub event_status: EventStatus,
@@ -34,7 +35,7 @@ pub struct DatadogEventsService {
     uri: String,
     default_api_key: ApiKey,
     batch_http_service: HttpBatchService<
-        BoxFuture<'static, Result<http::Request<Vec<u8>>, crate::Error>>,
+        Ready<Result<http::Request<Vec<u8>>, crate::Error>>,
         DatadogEventsRequest,
     >,
 }
@@ -58,10 +59,7 @@ impl DatadogEventsService {
                 .header("Content-Length", req.body.len())
                 .body(req.body)
                 .map_err(|x| x.into());
-
-            //TODO: remove box here
-            future::ready(request).boxed()
-            // future::ok::<_, crate::Error>(request).boxed()
+            future::ready(request)
         });
         Self {
             default_api_key: Arc::from(default_api_key.to_owned()),

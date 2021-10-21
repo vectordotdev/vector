@@ -46,7 +46,6 @@ pub trait SinkBuilderExt: Stream {
     fn concurrent_map<F, T>(self, limit: Option<NonZeroUsize>, f: F) -> ConcurrentMap<Self, T>
     where
         Self: Sized,
-        // TODO: remove the Pin<Box<_>>
         F: Fn(Self::Item) -> Pin<Box<dyn Future<Output = T> + Send + 'static>> + Send + 'static,
         T: Send + 'static,
     {
