@@ -10,4 +10,4 @@ set -euo pipefail
 FILES=()
 while IFS='' read -r LINE; do FILES+=("$LINE"); done < <(git ls-files | grep '\.sh')
 
-shellcheck --shell bash "${FILES[@]}"
+shellcheck --external-sources --shell bash "${FILES[@]}"
