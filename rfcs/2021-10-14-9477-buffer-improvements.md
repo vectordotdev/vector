@@ -242,7 +242,7 @@ cost.
 
 - [x] Should we prioritize a particular external buffer implementation first?  For example, Kafka vs
   SQS, or S3 vs GCP.
-  - **Answer:** We'll start with implementing Kafka as the first external buffer type.
+  - **Answer:** We'll start with implementing S3 as the first external buffer type.
 - [x] Should we reconsider using the existing sinks/sources to power external buffers?
     - Supporting batching of values to make it more efficient, handling service-specific
       authentication, etc, would be trivial if we used the existing code.
