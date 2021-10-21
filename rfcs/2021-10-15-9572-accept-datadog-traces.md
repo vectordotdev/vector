@@ -92,8 +92,9 @@ N/A
 
 ## Pain
 
-* Vector does not support any traces (full json representation may be ingested as log event) at the moment and it is a
-  key part of observability
+Vector does not support any traces (full json representation may be ingested as log event) at the moment and it is a
+key part of observability. Therefore, users cannot use Vector for the business-level user cases on trace data, like
+cost control and reduction, redacting PII, routing, and more.
 
 ## Proposal
 
@@ -185,7 +186,7 @@ https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/pr
 
 ## Future Improvements
 
-* Support for additional trace formats, probably OpenTelemetry first
+* Support for additional trace sources and sinks, probably OpenTelemetry first
 * Profile support
 * Ingest traces from Datadog tracing libraries directly
 * Opentelemetry exporter support (the Datadog export would probably be easily supported once this RFC has been
