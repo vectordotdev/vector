@@ -4,7 +4,13 @@ use std::{
     task::{Context, Poll},
 };
 
-use crate::{internal_events::EventsSent, sinks::{UriParseError, splunk_hec::common::build_request, util::{http::HttpBatchService, ElementCount}}};
+use crate::{
+    internal_events::EventsSent,
+    sinks::{
+        splunk_hec::common::build_request,
+        util::{http::HttpBatchService, ElementCount},
+    },
+};
 use bytes::Bytes;
 use futures_util::future::BoxFuture;
 use http::{Request, Response};
@@ -17,15 +23,11 @@ use vector_core::{
 
 use crate::{
     http::HttpClient,
-    sinks::{
-        splunk_hec::common::build_uri,
-        util::{
-            encoding::{Encoder, EncodingConfig},
-            Compression, RequestBuilder,
-        },
+    sinks::util::{
+        encoding::{Encoder, EncodingConfig},
+        Compression, RequestBuilder,
     },
 };
-use snafu::ResultExt;
 
 use super::{encoder::HecLogsEncoder, sink::ProcessedEvent};
 
@@ -140,7 +142,13 @@ impl HttpRequestBuilder {
         &self,
         req: HecLogsRequest,
     ) -> Result<Request<Vec<u8>>, crate::Error> {
-        build_request(self.endpoint.as_str(), self.token.as_str(), self.compression, req.body).await
+        build_request(
+            self.endpoint.as_str(),
+            self.token.as_str(),
+            self.compression,
+            req.body,
+        )
+        .await
     }
 }
 

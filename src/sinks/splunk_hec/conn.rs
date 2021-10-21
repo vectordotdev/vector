@@ -1,10 +1,18 @@
-use crate::{buffers::Acker, config::ProxyConfig, http::HttpClient, sinks, sinks::UriParseError, sinks::util::buffer::Compression, sinks::{splunk_hec::common::build_healthcheck, util::http::HttpSink}, sinks::util::service::TowerRequestConfig, sinks::util::{BatchConfig, BatchSettings, Buffer}, sinks::{
-        splunk_hec::common::{build_uri, HealthcheckError},
-        util::http::BatchedHttpSink,
-    }, sinks::{Healthcheck, VectorSink}, tls::{TlsOptions, TlsSettings}};
+use crate::{
+    buffers::Acker,
+    config::ProxyConfig,
+    http::HttpClient,
+    sinks::util::buffer::Compression,
+    sinks::util::http::BatchedHttpSink,
+    sinks::util::service::TowerRequestConfig,
+    sinks::util::{BatchConfig, BatchSettings, Buffer},
+    sinks::UriParseError,
+    sinks::{splunk_hec::common::build_healthcheck, util::http::HttpSink},
+    sinks::{Healthcheck, VectorSink},
+    tls::{TlsOptions, TlsSettings},
+};
 use futures::{FutureExt, SinkExt};
-use http::{Request, StatusCode, Uri};
-use hyper::Body;
+use http::Uri;
 use snafu::{ResultExt, Snafu};
 use std::convert::TryFrom;
 
@@ -289,9 +297,9 @@ mod integration_tests {
     use super::*;
     use crate::{assert_downcast_matches, tls::TlsSettings};
     use integration_test_helpers::get_token;
+    use splunk_hec::common::HealthcheckError;
     use std::net::SocketAddr;
     use warp::Filter;
-    use splunk_hec::common::{HealthcheckError};
 
     #[tokio::test]
     async fn splunk_healthcheck() {

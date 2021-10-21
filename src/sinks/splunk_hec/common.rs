@@ -94,11 +94,17 @@ pub fn render_template_string<'a>(
 
 #[cfg(test)]
 mod tests {
-    use http::{Uri, HeaderValue};
+    use http::{HeaderValue, Uri};
     use vector_core::config::proxy::ProxyConfig;
-    use wiremock::{Mock, MockServer, ResponseTemplate, matchers::{header, method, path}};
+    use wiremock::{
+        matchers::{header, method, path},
+        Mock, MockServer, ResponseTemplate,
+    };
 
-    use crate::sinks::{splunk_hec::common::{build_healthcheck, build_request}, util::Compression};
+    use crate::sinks::{
+        splunk_hec::common::{build_healthcheck, build_request},
+        util::Compression,
+    };
 
     use super::create_client;
 
