@@ -208,11 +208,16 @@ where
     init_test();
     match sink {
         VectorSink::Sink(mut sink) => {
-            sink.send_all(&mut events).await.expect("Sending event stream to sink failed");
-        },
+            sink.send_all(&mut events)
+                .await
+                .expect("Sending event stream to sink failed");
+        }
         VectorSink::Stream(stream) => {
-            let events = events.filter_map(|x|async move {x.ok()}).boxed();
-            stream.run(events).await.expect("Sending event stream to sink failed");
+            let events = events.filter_map(|x| async move { x.ok() }).boxed();
+            stream
+                .run(events)
+                .await
+                .expect("Sending event stream to sink failed");
         }
     }
     SINK_TESTS.assert(tags);

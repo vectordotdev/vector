@@ -1,15 +1,17 @@
-use crate::sinks::util::{StreamSink, SinkBuilderExt};
-use async_graphql::futures_util::stream::BoxStream;
-use crate::event::{Event, LogEvent};
-use crate::sinks::datadog::events::service::{DatadogEventsService, DatadogEventsResponse};
-use futures::{future, StreamExt};
-use crate::config::log_schema;
-use crate::internal_events::{DatadogEventsProcessed, DatadogEventsFieldInvalid};
-use crate::sinks::datadog::events::request_builder::{DatadogEventsRequest, DatadogEventsRequestBuilder};
-use tower::util::BoxService;
-use async_trait::async_trait;
-use std::num::NonZeroUsize;
 use crate::buffers::Acker;
+use crate::config::log_schema;
+use crate::event::{Event, LogEvent};
+use crate::internal_events::DatadogEventsFieldInvalid;
+use crate::sinks::datadog::events::request_builder::{
+    DatadogEventsRequest, DatadogEventsRequestBuilder,
+};
+use crate::sinks::datadog::events::service::DatadogEventsResponse;
+use crate::sinks::util::{SinkBuilderExt, StreamSink};
+use async_graphql::futures_util::stream::BoxStream;
+use async_trait::async_trait;
+use futures::StreamExt;
+use std::num::NonZeroUsize;
+use tower::util::BoxService;
 
 pub struct DatadogEventsSink {
     pub service: BoxService<DatadogEventsRequest, DatadogEventsResponse, crate::Error>,
@@ -18,7 +20,6 @@ pub struct DatadogEventsSink {
 
 impl DatadogEventsSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-
         let concurrency_limit = NonZeroUsize::new(50);
 
         let driver = input
@@ -55,8 +56,8 @@ async fn ensure_required_fields(mut log: LogEvent) -> Option<LogEvent> {
             log.insert("text", message);
         } else {
             emit!(&DatadogEventsFieldInvalid {
-                    field: log_schema.message_key()
-                });
+                field: log_schema.message_key()
+            });
             return None;
         }
     }

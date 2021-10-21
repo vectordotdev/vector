@@ -17,6 +17,7 @@ use hyper::{body, Body};
 use indexmap::IndexMap;
 use pin_project::pin_project;
 use serde::{Deserialize, Serialize};
+use std::marker::PhantomData;
 use std::{
     fmt,
     future::Future,
@@ -28,7 +29,6 @@ use std::{
 };
 use tower::Service;
 use vector_core::ByteSizeOf;
-use std::marker::PhantomData;
 
 #[async_trait::async_trait]
 pub trait HttpSink: Send + Sync + 'static {
@@ -61,8 +61,8 @@ pub struct BatchedHttpSink<
 > where
     B: Batch,
     B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
-    RL: RetryLogic<Response=http::Response<Bytes>> + Send + 'static,
-    SL: ServiceLogic<Response=http::Response<Bytes>> + Send + 'static,
+    RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
+    SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
 {
     sink: Arc<T>,
     #[pin]
@@ -79,10 +79,10 @@ pub struct BatchedHttpSink<
 }
 
 impl<T, B> BatchedHttpSink<T, B>
-    where
-        B: Batch,
-        B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
-        T: HttpSink<Input=B::Input, Output=B::Output>,
+where
+    B: Batch,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
+    T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     pub fn new(
         sink: T,
@@ -106,12 +106,12 @@ impl<T, B> BatchedHttpSink<T, B>
 }
 
 impl<T, B, RL, SL> BatchedHttpSink<T, B, RL, SL>
-    where
-        B: Batch,
-        B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
-        RL: RetryLogic<Response=http::Response<Bytes>, Error=HttpError> + Send + 'static,
-        SL: ServiceLogic<Response=http::Response<Bytes>> + Send + 'static,
-        T: HttpSink<Input=B::Input, Output=B::Output>,
+where
+    B: Batch,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
+    RL: RetryLogic<Response = http::Response<Bytes>, Error = HttpError> + Send + 'static,
+    SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
+    T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     pub fn with_logic(
         sink: T,
@@ -151,12 +151,12 @@ impl<T, B, RL, SL> BatchedHttpSink<T, B, RL, SL>
 }
 
 impl<T, B, RL, SL> Sink<Event> for BatchedHttpSink<T, B, RL, SL>
-    where
-        B: Batch,
-        B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
-        T: HttpSink<Input=B::Input, Output=B::Output>,
-        RL: RetryLogic<Response=http::Response<Bytes>> + Send + 'static,
-        SL: ServiceLogic<Response=http::Response<Bytes>> + Send + 'static,
+where
+    B: Batch,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
+    T: HttpSink<Input = B::Input, Output = B::Output>,
+    RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
+    SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
 {
     type Error = crate::Error;
 
@@ -208,13 +208,13 @@ impl<T, B, RL, SL> Sink<Event> for BatchedHttpSink<T, B, RL, SL>
 
 #[pin_project]
 pub struct PartitionHttpSink<T, B, K, RL = HttpRetryLogic>
-    where
-        B: Batch,
-        B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
-        B::Input: Partition<K>,
-        K: Hash + Eq + Clone + Send + 'static,
-        RL: RetryLogic<Response=http::Response<Bytes>> + Send + 'static,
-        T: HttpSink<Input=B::Input, Output=B::Output>,
+where
+    B: Batch,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
+    B::Input: Partition<K>,
+    K: Hash + Eq + Clone + Send + 'static,
+    RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
+    T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     sink: Arc<T>,
     #[pin]
@@ -229,12 +229,12 @@ pub struct PartitionHttpSink<T, B, K, RL = HttpRetryLogic>
 }
 
 impl<T, B, K> PartitionHttpSink<T, B, K, HttpRetryLogic>
-    where
-        B: Batch,
-        B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
-        B::Input: Partition<K>,
-        K: Hash + Eq + Clone + Send + 'static,
-        T: HttpSink<Input=B::Input, Output=B::Output>,
+where
+    B: Batch,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
+    B::Input: Partition<K>,
+    K: Hash + Eq + Clone + Send + 'static,
+    T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     pub fn new(
         sink: T,
@@ -257,13 +257,13 @@ impl<T, B, K> PartitionHttpSink<T, B, K, HttpRetryLogic>
 }
 
 impl<T, B, K, RL> PartitionHttpSink<T, B, K, RL>
-    where
-        B: Batch,
-        B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
-        B::Input: Partition<K>,
-        K: Hash + Eq + Clone + Send + 'static,
-        RL: RetryLogic<Response=http::Response<Bytes>, Error=HttpError> + Send + 'static,
-        T: HttpSink<Input=B::Input, Output=B::Output>,
+where
+    B: Batch,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
+    B::Input: Partition<K>,
+    K: Hash + Eq + Clone + Send + 'static,
+    RL: RetryLogic<Response = http::Response<Bytes>, Error = HttpError> + Send + 'static,
+    T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     pub fn with_retry_logic(
         sink: T,
@@ -308,13 +308,13 @@ impl<T, B, K, RL> PartitionHttpSink<T, B, K, RL>
 }
 
 impl<T, B, K, RL> Sink<Event> for PartitionHttpSink<T, B, K, RL>
-    where
-        B: Batch,
-        B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
-        B::Input: Partition<K>,
-        K: Hash + Eq + Clone + Send + 'static,
-        T: HttpSink<Input=B::Input, Output=B::Output>,
-        RL: RetryLogic<Response=http::Response<Bytes>> + Send + 'static,
+where
+    B: Batch,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
+    B::Input: Partition<K>,
+    K: Hash + Eq + Clone + Send + 'static,
+    T: HttpSink<Input = B::Input, Output = B::Output>,
+    RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
 {
     type Error = crate::Error;
 
@@ -384,9 +384,9 @@ impl<F, B> HttpBatchService<F, B> {
 }
 
 impl<F, B> Service<B> for HttpBatchService<F, B>
-    where
-        F: Future<Output=crate::Result<hyper::Request<Vec<u8>>>> + Send + 'static,
-        B: ByteSizeOf + ElementCount + Send + 'static,
+where
+    F: Future<Output = crate::Result<hyper::Request<Vec<u8>>>> + Send + 'static,
+    B: ByteSizeOf + ElementCount + Send + 'static,
 {
     type Response = http::Response<Bytes>;
     type Error = crate::Error;
@@ -495,8 +495,10 @@ pub struct HttpStatusRetryLogic<F, T> {
 }
 
 impl<F, T> HttpStatusRetryLogic<F, T>
-where F: Fn(&T) -> StatusCode + Clone + Send + Sync + 'static,
-      T: Send + Sync + 'static {
+where
+    F: Fn(&T) -> StatusCode + Clone + Send + Sync + 'static,
+    T: Send + Sync + 'static,
+{
     pub fn new(func: F) -> HttpStatusRetryLogic<F, T> {
         HttpStatusRetryLogic {
             func,
@@ -506,8 +508,10 @@ where F: Fn(&T) -> StatusCode + Clone + Send + Sync + 'static,
 }
 
 impl<F, T> RetryLogic for HttpStatusRetryLogic<F, T>
-    where F: Fn(&T) -> StatusCode + Clone + Send + Sync + 'static,
-          T: Send + Sync + 'static {
+where
+    F: Fn(&T) -> StatusCode + Clone + Send + Sync + 'static,
+    T: Send + Sync + 'static,
+{
     type Error = HttpError;
     type Response = T;
 
@@ -530,12 +534,14 @@ impl<F, T> RetryLogic for HttpStatusRetryLogic<F, T>
     }
 }
 
-impl <F, T> Clone for HttpStatusRetryLogic<F, T>
-where F: Clone {
+impl<F, T> Clone for HttpStatusRetryLogic<F, T>
+where
+    F: Clone,
+{
     fn clone(&self) -> Self {
         Self {
             func: self.func.clone(),
-            request: PhantomData
+            request: PhantomData,
         }
     }
 }

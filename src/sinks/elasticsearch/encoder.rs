@@ -1,5 +1,5 @@
 use crate::event::{EventFinalizers, Finalizable, LogEvent};
-use crate::sinks::util::encoding::{as_tracked_write, Encoder, EncodingConfiguration, VisitLogMut};
+use crate::sinks::util::encoding::{as_tracked_write, Encoder, VisitLogMut};
 use std::io::Write;
 
 use crate::sinks::elasticsearch::BulkAction;
@@ -94,7 +94,10 @@ fn write_bulk_action(
 }
 
 impl VisitLogMut for ProcessedEvent {
-    fn visit_logs_mut<F>(&mut self, func: F) where F: Fn(&mut LogEvent) {
+    fn visit_logs_mut<F>(&mut self, func: F)
+    where
+        F: Fn(&mut LogEvent),
+    {
         func(&mut self.log);
     }
 }

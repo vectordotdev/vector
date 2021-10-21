@@ -1,4 +1,5 @@
 use super::*;
+use crate::event::Event;
 use crate::{
     config::SinkConfig,
     sinks::util::test::{build_test_server_status, load_sink},
@@ -14,16 +15,14 @@ use futures::{
 use hyper::StatusCode;
 use indoc::indoc;
 use pretty_assertions::assert_eq;
-use vector_core::event::{BatchNotifier, BatchStatus};
 use std::sync::Arc;
-use crate::event::Event;
-
+use vector_core::event::{BatchNotifier, BatchStatus};
 
 fn random_events_with_stream(
     len: usize,
     count: usize,
     batch: Option<Arc<BatchNotifier>>,
-) -> (Vec<String>, impl Stream<Item=Event>) {
+) -> (Vec<String>, impl Stream<Item = Event>) {
     let (lines, stream) = random_lines_with_stream(len, count, batch);
     (
         lines,
@@ -107,7 +106,7 @@ async fn api_key_in_metadata() {
     let (mut config, cx) = load_sink::<DatadogEventsConfig>(indoc! {r#"
             default_api_key = "atoken"
         "#})
-        .unwrap();
+    .unwrap();
 
     let addr = next_addr();
     // Swap out the endpoint so we can force send it

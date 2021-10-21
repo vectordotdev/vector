@@ -1,28 +1,26 @@
-use crate::sinks::datadog::events::config::DatadogEventsConfig;
 use crate::sinks::datadog::ApiKey;
-use crate::sinks::util::encoding::{EncodingConfigWithDefault, TimestampFormat, EncodingConfiguration};
-use crate::sinks::util::http::{HttpSink, HttpBatchService};
-use crate::sinks::util::{PartitionInnerBuffer, BoxedRawValue};
-use crate::event::{Event, EventStatus, Finalizable};
-use serde_json::json;
-use std::sync::Arc;
-use http::Request;
-use crate::internal_events::{DatadogEventsProcessed, DatadogEventsFieldInvalid, EventsSent};
+
+use crate::sinks::util::http::HttpBatchService;
+
+use crate::event::EventStatus;
+
 use crate::emit;
-use crate::config::log_schema;
-use crate::event::PathComponent;
-use tower::{Service, ServiceExt};
-use std::task::{Context, Poll};
-use futures::future::BoxFuture;
-use hyper::Body;
+use crate::internal_events::EventsSent;
+use http::Request;
+use std::sync::Arc;
+
 use crate::http::HttpClient;
-use futures::{future, FutureExt};
 use crate::sinks::datadog::events::request_builder::DatadogEventsRequest;
 use crate::sinks::util::sink::Response;
+use futures::future::BoxFuture;
+use futures::{future, FutureExt};
+use hyper::Body;
+use std::task::{Context, Poll};
+use tower::{Service, ServiceExt};
 
 pub struct DatadogEventsResponse {
     pub event_status: EventStatus,
-    pub http_status: http::StatusCode
+    pub http_status: http::StatusCode,
 }
 
 impl AsRef<EventStatus> for DatadogEventsResponse {
@@ -42,35 +40,33 @@ pub struct DatadogEventsService {
 }
 
 impl DatadogEventsService {
-    pub fn new(uri: &str, default_api_key: &str, http_client: HttpClient<Body>,) -> Self {
-
+    pub fn new(uri: &str, default_api_key: &str, http_client: HttpClient<Body>) -> Self {
         let owned_uri = uri.to_owned();
-        let default_api_key= default_api_key.to_owned();
+        let default_api_key = default_api_key.to_owned();
         let default_api_key_clone = default_api_key.clone();
         let batch_http_service = HttpBatchService::new(http_client, move |req| {
-            let mut req:DatadogEventsRequest = req;
+            let req: DatadogEventsRequest = req;
 
             let api_key = match req.metadata.api_key.as_ref() {
                 Some(x) => x.as_ref(),
-                None => &default_api_key_clone
+                None => &default_api_key_clone,
             };
 
             let request = Request::post(owned_uri.as_str())
-            .header("Content-Type", "application/json")
-            .header("DD-API-KEY", api_key)
-            .header("Content-Length", req.body.len())
-            .body(req.body)
-            .map_err(|x|x.into());
+                .header("Content-Type", "application/json")
+                .header("DD-API-KEY", api_key)
+                .header("Content-Length", req.body.len())
+                .body(req.body)
+                .map_err(|x| x.into());
 
             //TODO: remove box here
             future::ready(request).boxed()
             // future::ok::<_, crate::Error>(request).boxed()
-
         });
         Self {
             default_api_key: Arc::from(default_api_key.to_owned()),
             uri: uri.to_owned(),
-            batch_http_service
+            batch_http_service,
         }
     }
 }
@@ -80,7 +76,7 @@ impl Service<DatadogEventsRequest> for DatadogEventsService {
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
@@ -106,7 +102,7 @@ impl Service<DatadogEventsRequest> for DatadogEventsService {
             }
             Ok(DatadogEventsResponse {
                 event_status,
-                http_status: http_response.status()
+                http_status: http_response.status(),
             })
         })
     }

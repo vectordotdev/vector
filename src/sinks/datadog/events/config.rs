@@ -1,25 +1,18 @@
-use crate::config::{SinkConfig, SinkContext, DataType, GenerateConfig};
-use crate::sinks::{VectorSink, Healthcheck};
-use std::time::Duration;
-use vector_core::ByteSizeOf;
-use crate::sinks::util::{Batch, PartitionInnerBuffer, Concurrency, TowerRequestConfig, PartitionBuffer, BatchSettings, BatchConfig, JsonArrayBuffer};
-use crate::sinks::util::http::{HttpSink, PartitionHttpSink, HttpRetryLogic, HttpStatusRetryLogic};
-use crate::sinks::datadog::{ApiKey, healthcheck};
-use crate::tls::{MaybeTlsSettings, TlsConfig};
-use crate::http::{HttpClient, HttpError};
-use futures::{FutureExt, SinkExt};
-use serde::{Serialize, Deserialize};
-use crate::sinks::datadog::events::service::{DatadogEventsService, DatadogEventsResponse};
-use indoc::indoc;
-use crate::sinks::datadog::events::sink::DatadogEventsSink;
-use tower::ServiceBuilder;
-use crate::sinks::util::ServiceBuilderExt;
-use crate::sinks::util::encoding::{EncodingConfigWithDefault, TimestampFormat, EncodingConfigFixed, StandardJsonEncoding};
-use tower::util::BoxService;
-use crate::sinks::util::retries::{RetryLogic, RetryAction};
-use crate::event::{Event, EventStatus, Finalizable};
-use crate::sinks::datadog::events::request_builder::DatadogEventsRequest;
+use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
+use crate::sinks::{Healthcheck, VectorSink};
 
+use crate::http::HttpClient;
+use crate::sinks::datadog::events::service::{DatadogEventsResponse, DatadogEventsService};
+use crate::sinks::datadog::events::sink::DatadogEventsSink;
+use crate::sinks::datadog::healthcheck;
+use crate::sinks::util::http::HttpStatusRetryLogic;
+use crate::sinks::util::ServiceBuilderExt;
+use crate::sinks::util::TowerRequestConfig;
+use crate::tls::{MaybeTlsSettings, TlsConfig};
+use futures::FutureExt;
+use indoc::indoc;
+use serde::{Deserialize, Serialize};
+use tower::ServiceBuilder;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -45,7 +38,7 @@ impl GenerateConfig for DatadogEventsConfig {
         toml::from_str(indoc! {r#"
             default_api_key = "${DATADOG_API_KEY_ENV_VAR}"
         "#})
-            .unwrap()
+        .unwrap()
     }
 }
 
@@ -61,7 +54,6 @@ impl DatadogEventsConfig {
     }
 }
 
-
 #[async_trait::async_trait]
 #[typetag::serde(name = "datadog_events")]
 impl SinkConfig for DatadogEventsConfig {
@@ -73,24 +65,20 @@ impl SinkConfig for DatadogEventsConfig {
 
         let http_client = HttpClient::new(tls_settings, cx.proxy())?;
 
-        let service = DatadogEventsService::new(
-            &self.get_uri(),
-            &self.default_api_key,
-            http_client.clone()
-        );
+        let service =
+            DatadogEventsService::new(&self.get_uri(), &self.default_api_key, http_client.clone());
 
-        let mut request_opts = self.request;
+        let request_opts = self.request;
         let request_settings = request_opts.unwrap_with(&TowerRequestConfig::default());
-
 
         let healthcheck = healthcheck(
             self.get_api_endpoint(),
             self.default_api_key.clone(),
             http_client.clone(),
         )
-            .boxed();
+        .boxed();
 
-        let retry_logic = HttpStatusRetryLogic::new(|req: &DatadogEventsResponse |req.http_status);
+        let retry_logic = HttpStatusRetryLogic::new(|req: &DatadogEventsResponse| req.http_status);
 
         let service = ServiceBuilder::new()
             .settings(request_settings, retry_logic)
@@ -98,7 +86,7 @@ impl SinkConfig for DatadogEventsConfig {
 
         let sink = DatadogEventsSink {
             service,
-            acker: cx.acker()
+            acker: cx.acker(),
         };
 
         Ok((VectorSink::Stream(Box::new(sink)), healthcheck))

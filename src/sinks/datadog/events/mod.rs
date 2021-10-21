@@ -1,22 +1,14 @@
 pub mod config;
+pub mod request_builder;
 pub mod service;
 pub mod sink;
-pub mod request_builder;
 
 #[cfg(test)]
 mod tests;
 
-use config::DatadogEventsConfig;
 use crate::config::SinkDescription;
-
+use config::DatadogEventsConfig;
 
 inventory::submit! {
     SinkDescription::new::<DatadogEventsConfig>("datadog_events")
 }
-
-
-
-
-
-
-

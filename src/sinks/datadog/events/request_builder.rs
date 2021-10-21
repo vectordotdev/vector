@@ -1,11 +1,11 @@
-use crate::sinks::util::{RequestBuilder, Compression, ElementCount};
-use crate::event::{LogEvent, EventFinalizers, Finalizable};
-use crate::sinks::util::encoding::{EncodingConfigFixed, StandardJsonEncoding, TimestampFormat};
-use std::io;
-use crate::internal_events::{DatadogEventsProcessed, DatadogEventsFieldInvalid};
 use crate::event::PathComponent;
+use crate::event::{EventFinalizers, Finalizable, LogEvent};
+use crate::internal_events::DatadogEventsProcessed;
+use crate::sinks::util::encoding::{EncodingConfigFixed, StandardJsonEncoding, TimestampFormat};
+use crate::sinks::util::{Compression, ElementCount, RequestBuilder};
+use std::io;
 use std::sync::Arc;
-use crate::sinks::datadog::events::service::DatadogEventsResponse;
+
 use crate::buffers::Ackable;
 use vector_core::ByteSizeOf;
 
@@ -29,8 +29,7 @@ impl Ackable for DatadogEventsRequest {
 
 impl ByteSizeOf for DatadogEventsRequest {
     fn allocated_bytes(&self) -> usize {
-        self.body.allocated_bytes()
-            + self.metadata.finalizers.allocated_bytes()
+        self.body.allocated_bytes() + self.metadata.finalizers.allocated_bytes()
     }
 }
 
@@ -40,7 +39,6 @@ impl ElementCount for DatadogEventsRequest {
         1
     }
 }
-
 
 #[derive(Clone)]
 pub struct Metadata {
@@ -55,9 +53,7 @@ pub struct DatadogEventsRequestBuilder {
 
 impl DatadogEventsRequestBuilder {
     pub fn new() -> DatadogEventsRequestBuilder {
-        DatadogEventsRequestBuilder {
-            encoder: encoder()
-        }
+        DatadogEventsRequestBuilder { encoder: encoder() }
     }
 }
 
@@ -81,7 +77,7 @@ impl RequestBuilder<LogEvent> for DatadogEventsRequestBuilder {
         let metadata = Metadata {
             finalizers: log.take_finalizers(),
             api_key: log.metadata_mut().datadog_api_key().clone(),
-            event_byte_size: log.size_of()
+            event_byte_size: log.size_of(),
         };
         (metadata, log)
     }
@@ -92,10 +88,7 @@ impl RequestBuilder<LogEvent> for DatadogEventsRequestBuilder {
             byte_size: body.len(),
         });
 
-        DatadogEventsRequest {
-            body,
-            metadata,
-        }
+        DatadogEventsRequest { body, metadata }
     }
 }
 
@@ -117,9 +110,9 @@ fn encoder() -> EncodingConfigFixed<StandardJsonEncoding> {
                 "text",
                 "title",
             ]
-                .iter()
-                .map(|field| vec![PathComponent::Key((*field).into())])
-                .collect(),
+            .iter()
+            .map(|field| vec![PathComponent::Key((*field).into())])
+            .collect(),
         ),
         // DataDog Event API requires unix timestamp.
         timestamp_format: Some(TimestampFormat::Unix),

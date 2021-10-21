@@ -81,8 +81,6 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, io, sync::Arc};
-use std::slice::IterMut;
-use std::iter::FlatMap;
 
 pub trait Encoder<T> {
     /// Encodes the input into the provided writer.
@@ -90,8 +88,8 @@ pub trait Encoder<T> {
 }
 
 impl<E, T> Encoder<T> for Arc<E>
-    where
-        E: Encoder<T>,
+where
+    E: Encoder<T>,
 {
     fn encode_input(&self, input: T, writer: &mut dyn io::Write) -> io::Result<usize> {
         (**self).encode_input(input, writer)
@@ -167,7 +165,7 @@ pub trait EncodingConfiguration {
     /// For example, this checks if `except_fields` and `only_fields` items are mutually exclusive.
     fn validate(&self) -> Result<()> {
         if let (Some(only_fields), Some(except_fields)) =
-        (&self.only_fields(), &self.except_fields())
+            (&self.only_fields(), &self.except_fields())
         {
             if except_fields.iter().any(|f| {
                 let path_iter = PathIter::new(f).collect::<Vec<_>>();
@@ -185,8 +183,8 @@ pub trait EncodingConfiguration {
     ///
     /// Currently, this is idempotent.
     fn apply_rules<T>(&self, event: &mut T)
-        where
-            T: MaybeAsLogMut,
+    where
+        T: MaybeAsLogMut,
     {
         // No rules are currently applied to metrics
         if let Some(log) = event.maybe_as_log_mut() {
@@ -203,14 +201,18 @@ pub trait EncodingConfiguration {
 // Ideally this would return an iterator, but that's not the easiest thing to make generic
 pub trait VisitLogMut {
     fn visit_logs_mut<F>(&mut self, func: F)
-        where F: Fn(&mut LogEvent);
+    where
+        F: Fn(&mut LogEvent);
 }
 
 impl<T> VisitLogMut for Vec<T>
-    where T: VisitLogMut {
-
+where
+    T: VisitLogMut,
+{
     fn visit_logs_mut<F>(&mut self, func: F)
-        where F: Fn(&mut LogEvent) {
+    where
+        F: Fn(&mut LogEvent),
+    {
         for item in self {
             item.visit_logs_mut(&func);
         }
@@ -218,7 +220,10 @@ impl<T> VisitLogMut for Vec<T>
 }
 
 impl VisitLogMut for Event {
-    fn visit_logs_mut<F>(&mut self, func: F) where F: Fn(&mut LogEvent) {
+    fn visit_logs_mut<F>(&mut self, func: F)
+    where
+        F: Fn(&mut LogEvent),
+    {
         match self {
             Event::Log(log_event) => func(log_event),
             _ => {}
@@ -226,25 +231,27 @@ impl VisitLogMut for Event {
     }
 }
 impl VisitLogMut for LogEvent {
-    fn visit_logs_mut<F>(&mut self, func: F) where F: Fn(&mut LogEvent) {
+    fn visit_logs_mut<F>(&mut self, func: F)
+    where
+        F: Fn(&mut LogEvent),
+    {
         func(self);
     }
 }
 
 impl<E, T> Encoder<T> for E
-    where
-        E: EncodingConfiguration,
-        E::Codec: Encoder<T>,
-        T: VisitLogMut
+where
+    E: EncodingConfiguration,
+    E::Codec: Encoder<T>,
+    T: VisitLogMut,
 {
     fn encode_input(&self, mut input: T, writer: &mut dyn io::Write) -> io::Result<usize> {
-        input.visit_logs_mut(|log|{
+        input.visit_logs_mut(|log| {
             self.apply_rules(log);
         });
         self.codec().encode_input(input, writer)
     }
 }
-
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
