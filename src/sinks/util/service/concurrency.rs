@@ -24,7 +24,7 @@ impl Concurrency {
     }
 
     pub const fn parse_concurrency(&self, default: &Self) -> Option<usize> {
-        match self.if_none(default) {
+        match self.if_none(*default) {
             Concurrency::None | Concurrency::Adaptive => None,
             Concurrency::Fixed(limit) => Some(limit),
         }
