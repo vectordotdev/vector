@@ -17,8 +17,8 @@ releases: "0.17.0": {
 	* An enhancement to the [`host_metrics`](\(urls.vector_host_metrics_source)) to fetch memory and CPU metrics for cgroups
 	* New VRL functions: [find](\(urls.vrl_functions)/#find), [unique](\(urls.vrl_functions)/#unique), and, a set of functions for dynamically looking up event fields, [get](\(urls.vrl_functions)/#get), [set](\(urls.vrl_functions)/#set), and [remove](\(urls.vrl_functions)/#remove).
 
-	It also contains a number of additional enhancements and bug fixes. Check out the [highlights](#highlights) and
-	[changelog](#changelog) for more details.
+	It also contains a number of additional enhancements and bug fixes. Check out the
+	[highlights](/releases/0.17.0#highlights) and [changelog](/releases/0.17.0#changelog) for more details.
 	"""
 
 	whats_next: [
