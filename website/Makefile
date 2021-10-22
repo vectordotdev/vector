@@ -82,6 +82,3 @@ quick-build: clean structured-data production-build
 local-production-build: clean setup structured-data production-build run-link-checker
 
 local-preview-build: clean setup structured-data preview-build run-link-checker
-
-lighthouse-report:
-	yarn lighthouse

@@ -83,3 +83,9 @@ for = "/index.json"
 [headers.values]
 Access-Control-Allow-Origin = "*"
 
+# Netlify plugins
+[[plugins]]
+package = "@netlify/plugin-lighthouse"
+
+[plugins.inputs]
+output_path = "static/.hidden/lighthouse/index.html"
