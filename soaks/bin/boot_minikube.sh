@@ -17,10 +17,13 @@ fi
 
 BASELINE_IMG="${1:-}"
 COMPARISON_IMG="${2:-}"
+CAPTURE_DIRECTORY="${3:-}"
 
 minikube stop || true
 minikube delete || true
-minikube start --cpus=6 --memory=8g
+minikube start --cpus=7 --memory=8g
+
+minikube mount "${CAPTURE_DIRECTORY}:/captures"
 
 minikube image load "${BASELINE_IMG}"
 minikube image load "${COMPARISON_IMG}"

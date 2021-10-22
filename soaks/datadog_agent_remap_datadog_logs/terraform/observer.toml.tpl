@@ -1,4 +1,4 @@
-startup_delay_seconds = 90
+startup_delay_seconds = 75
 prometheus = "http://prometheus:9090"
 query = "${query}"
 experiment_name = "${experiment_name}"

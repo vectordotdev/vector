@@ -136,7 +136,7 @@ impl Worker {
 
         sleep(Duration::from_secs(self.startup_delay)).await;
         println!("EXPERIMENT\tVECTOR-ID\tTIME\tQUERY\tVALUE");
-        for _ in 0..60 {
+        loop {
             let request = client.get(self.url.clone()).build()?;
             let body = client
                 .execute(request)
