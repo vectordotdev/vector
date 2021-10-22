@@ -16,10 +16,20 @@ provider "kubernetes" {
   config_path = "~/.kube/config"
 }
 
+data "template_file" "soak-observer" {
+  template = file("${path.module}/observer.toml.tpl")
+  vars = {
+    experiment_name = "datadog_agent_remap_datadog_logs"
+    vector_id       = var.vector_image
+    query           = "sum(rate((bytes_written[1m])))"
+  }
+}
+
 # Setup background monitoring details. These are needed by the soak control to
 # understand what vector et al's running behavior is.
 module "monitoring" {
-  source = "../../common/terraform/modules/monitoring"
+  source        = "../../common/terraform/modules/monitoring"
+  observer-toml = data.template_file.soak-observer.rendered
 }
 
 # Setup the soak pieces
