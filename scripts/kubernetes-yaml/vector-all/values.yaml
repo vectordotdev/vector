@@ -9,7 +9,7 @@ global:
 
     commonEnvKV:
       # Set the log level reasonably high.
-      VECTOR_LOG: info
+      LOG: info
 
 vector-agent:
   extraConfigDirSources:

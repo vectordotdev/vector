@@ -4,7 +4,7 @@ image:
 
 env:
   # Set the log level reasonably high.
-  - name: VECTOR_LOG
+  - name: LOG
     value: info
 
 extraConfigDirSources:

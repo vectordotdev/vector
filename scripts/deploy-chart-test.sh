@@ -80,7 +80,7 @@ up() {
   # overwriting console output.
   split-container-image "$CONTAINER_IMAGE"
   HELM_VALUES+=(
-    --set "global.vector.commonEnvKV.VECTOR_LOG=info"
+    --set "global.vector.commonEnvKV.LOG=info"
     --set "global.vector.image.repository=$CONTAINER_IMAGE_REPOSITORY"
     --set "global.vector.image.tag=$CONTAINER_IMAGE_TAG"
   )
