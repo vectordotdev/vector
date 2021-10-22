@@ -118,6 +118,7 @@ components: sources: logstash: {
 						count => 1
 					}
 				}
+				```
 
 				Output if sent to stdout logstash output:
 
