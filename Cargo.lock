@@ -201,9 +201,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql"
-version = "2.10.0"
+version = "2.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3fae8d9e26ef1e63d128b6a39da27b86070d6f52a0e31fb9613e084f1ef1242a"
+checksum = "36ff0e5d1c6dcd8d0e71f0ed7ecd6ef183cbbf25898caa444d6b656dc5744eee"
 dependencies = [
  "async-graphql-derive",
  "async-graphql-parser",
@@ -230,9 +230,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-derive"
-version = "2.10.0"
+version = "2.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01e95362be954a8e16074a56fbebd85b96b2ca239462286c6f3879a4b91fa915"
+checksum = "e841204282c12f73644c29c06d8486198bc9d189565eb246e51178e61eaa4a30"
 dependencies = [
  "Inflector",
  "async-graphql-parser",
@@ -246,9 +246,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-parser"
-version = "2.10.0"
+version = "2.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "265e65ea8b8f5e9083539adb78bccbc63697c06a460b8f978f687d8ed7cf136c"
+checksum = "5892c335696008c7d11c2bbdeb151d042f6d3e72528ddea7857ebde14636e912"
 dependencies = [
  "async-graphql-value",
  "pest",
@@ -259,9 +259,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-value"
-version = "2.10.0"
+version = "2.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e1c76e120c4ad75cdf8a0e49b95ddca050b609bda932b3aac94347c43088490"
+checksum = "4f0aa55f7c3846454bf0579ec5b3b77f1bf64466bfdefd6673e7275481cc6830"
 dependencies = [
  "bytes 1.1.0",
  "serde",
@@ -270,9 +270,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-warp"
-version = "2.10.0"
+version = "2.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1c989ab5eef7503026bcee4a1f22915b7b35e397bfee8f4162999b21d1feead"
+checksum = "4480c41a0e195ae7b98685e4534ece733f14ec31d5cc194a7ff6b3c3f516be78"
 dependencies = [
  "async-graphql",
  "futures-util",
@@ -7269,7 +7269,7 @@ version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f559b464de2e2bdabcac6a210d12e9b5a5973c251e102c44c585c71d51bd78e"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "static_assertions",
 ]
 
