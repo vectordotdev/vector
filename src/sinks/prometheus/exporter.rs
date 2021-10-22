@@ -28,7 +28,7 @@ use std::{
     net::SocketAddr,
     ops::{Deref, DerefMut},
     sync::{Arc, RwLock},
-    time::{Duration, Instant},
+    time::Instant,
 };
 use stream_cancel::{Trigger, Tripwire};
 
