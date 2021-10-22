@@ -1,14 +1,18 @@
 use std::io;
 
-use vector_core::{config::log_schema, event::MaybeAsLogMut};
+use vector_core::{config::log_schema, event::LogEvent};
 
-use super::sink::ProcessedEvent;
 use crate::{
     internal_events::{SplunkEventEncodeError, SplunkEventSent},
-    sinks::util::encoding::{Encoder, EncodingConfiguration},
+    sinks::util::{
+        encoding::{Encoder, EncodingConfiguration},
+        processed_event::ProcessedEvent,
+    },
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+
+use super::sink::HecLogsProcessedEventMetadata;
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -24,8 +28,12 @@ impl Default for HecLogsEncoder {
 }
 
 impl HecLogsEncoder {
-    pub fn encode_event(&self, processed_event: ProcessedEvent) -> Option<Vec<u8>> {
-        let log = processed_event.log;
+    pub fn encode_event(
+        &self,
+        processed_event: ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>,
+    ) -> Option<Vec<u8>> {
+        let log = processed_event.event;
+        let metadata = processed_event.metadata;
 
         let event = match self {
             HecLogsEncoder::Json => json!(&log),
@@ -37,24 +45,24 @@ impl HecLogsEncoder {
 
         let mut body = json!({
             "event": event,
-            "fields": processed_event.fields,
-            "time": processed_event.timestamp
+            "fields": metadata.fields,
+            "time": metadata.timestamp
         });
 
-        if let Some(host) = processed_event.host {
+        if let Some(host) = metadata.host {
             let host = host.to_string_lossy();
             body["host"] = json!(host);
         }
 
-        if let Some(index) = processed_event.index {
+        if let Some(index) = metadata.index {
             body["index"] = json!(index.as_str());
         }
 
-        if let Some(source) = processed_event.source {
+        if let Some(source) = metadata.source {
             body["source"] = json!(source.as_str());
         }
 
-        if let Some(sourcetype) = processed_event.sourcetype {
+        if let Some(sourcetype) = metadata.sourcetype {
             body["sourcetype"] = json!(sourcetype.as_str());
         }
 
@@ -73,16 +81,10 @@ impl HecLogsEncoder {
     }
 }
 
-impl MaybeAsLogMut for ProcessedEvent {
-    fn maybe_as_log_mut(&mut self) -> Option<&mut vector_core::event::LogEvent> {
-        self.log.maybe_as_log_mut()
-    }
-}
-
-impl Encoder<Vec<ProcessedEvent>> for HecLogsEncoder {
+impl Encoder<Vec<ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>>> for HecLogsEncoder {
     fn encode_input(
         &self,
-        input: Vec<ProcessedEvent>,
+        input: Vec<ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>>,
         writer: &mut dyn std::io::Write,
     ) -> std::io::Result<usize> {
         let encoded_input: Vec<u8> = input
@@ -96,14 +98,14 @@ impl Encoder<Vec<ProcessedEvent>> for HecLogsEncoder {
     }
 }
 
-impl<E> Encoder<Vec<ProcessedEvent>> for E
+impl<E> Encoder<Vec<ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>>> for E
 where
     E: EncodingConfiguration,
-    E::Codec: Encoder<Vec<ProcessedEvent>>,
+    E::Codec: Encoder<Vec<ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>>>,
 {
     fn encode_input(
         &self,
-        mut input: Vec<ProcessedEvent>,
+        mut input: Vec<ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>>,
         writer: &mut dyn io::Write,
     ) -> io::Result<usize> {
         for event in input.iter_mut() {

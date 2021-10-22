@@ -1,15 +1,17 @@
 use crate::event::Event;
 use crate::sinks::splunk_hec::logs::encoder::HecLogsEncoder;
 use crate::sinks::splunk_hec::logs::sink::process_log;
+use crate::sinks::util::processed_event::ProcessedEvent;
 use crate::template::Template;
 use chrono::Utc;
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use vector_core::config::log_schema;
+use vector_core::event::LogEvent;
 use vector_core::ByteSizeOf;
 
-use super::sink::ProcessedEvent;
+use super::sink::HecLogsProcessedEventMetadata;
 
 #[derive(Deserialize, Debug)]
 struct HecEventJson {
@@ -26,7 +28,7 @@ struct HecEventText {
     fields: BTreeMap<String, String>,
 }
 
-fn get_processed_event() -> ProcessedEvent {
+fn get_processed_event() -> ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata> {
     let mut event = Event::from("hello world");
     event
         .as_mut_log()
@@ -58,15 +60,13 @@ fn get_processed_event() -> ProcessedEvent {
 #[test]
 fn splunk_process_log_event() {
     let processed_event = get_processed_event();
+    let metadata = processed_event.metadata;
 
-    assert_eq!(
-        processed_event.sourcetype,
-        Some("test_sourcetype".to_string())
-    );
-    assert_eq!(processed_event.source, Some("test_source".to_string()));
-    assert_eq!(processed_event.index, Some("test_index".to_string()));
-    assert!(processed_event.fields.contains("event_field1"));
-    assert!(processed_event.fields.contains("event_field2"));
+    assert_eq!(metadata.sourcetype, Some("test_sourcetype".to_string()));
+    assert_eq!(metadata.source, Some("test_source".to_string()));
+    assert_eq!(metadata.index, Some("test_index".to_string()));
+    assert!(metadata.fields.contains("event_field1"));
+    assert!(metadata.fields.contains("event_field2"));
 }
 
 #[test]

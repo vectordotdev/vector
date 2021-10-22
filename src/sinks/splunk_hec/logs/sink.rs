@@ -5,7 +5,7 @@ use futures_util::{future, stream::BoxStream, StreamExt};
 use tower::Service;
 use vector_core::{
     config::log_schema,
-    event::{Event, EventFinalizers, EventStatus, Finalizable, LogEvent, Value},
+    event::{Event, EventStatus, LogEvent, Value},
     partition::NullPartitioner,
     sink::StreamSink,
     stream::BatcherSettings,
@@ -14,7 +14,10 @@ use vector_core::{
 
 use crate::{
     config::SinkContext,
-    sinks::{splunk_hec::common::render_template_string, util::SinkBuilderExt},
+    sinks::{
+        splunk_hec::common::render_template_string,
+        util::{processed_event::ProcessedEvent, SinkBuilderExt},
+    },
     template::Template,
 };
 
@@ -92,8 +95,7 @@ where
 }
 
 #[derive(PartialEq, Default, Clone, Debug)]
-pub struct ProcessedEvent {
-    pub log: LogEvent,
+pub struct HecLogsProcessedEventMetadata {
     pub event_byte_size: usize,
     pub sourcetype: Option<String>,
     pub source: Option<String>,
@@ -103,16 +105,9 @@ pub struct ProcessedEvent {
     pub fields: LogEvent,
 }
 
-impl Finalizable for ProcessedEvent {
-    fn take_finalizers(&mut self) -> EventFinalizers {
-        self.log.metadata_mut().take_finalizers()
-    }
-}
-
-impl ByteSizeOf for ProcessedEvent {
+impl ByteSizeOf for HecLogsProcessedEventMetadata {
     fn allocated_bytes(&self) -> usize {
-        self.log.allocated_bytes()
-            + self.sourcetype.allocated_bytes()
+        self.sourcetype.allocated_bytes()
             + self.source.allocated_bytes()
             + self.index.allocated_bytes()
             + self.host.allocated_bytes()
@@ -128,7 +123,7 @@ pub fn process_log(
     index: Option<&Template>,
     host_key: &str,
     indexed_fields: &[String],
-) -> Option<ProcessedEvent> {
+) -> Option<ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>> {
     let sourcetype =
         sourcetype.and_then(|sourcetype| render_template_string(sourcetype, &log, "sourcetype"));
 
@@ -149,8 +144,7 @@ pub fn process_log(
         .filter_map(|field| log.get(field).map(|value| (field, value.clone())))
         .collect::<LogEvent>();
 
-    Some(ProcessedEvent {
-        log,
+    let metadata = HecLogsProcessedEventMetadata {
         event_byte_size,
         sourcetype,
         source,
@@ -158,5 +152,10 @@ pub fn process_log(
         host,
         timestamp,
         fields,
+    };
+
+    Some(ProcessedEvent {
+        event: log,
+        metadata,
     })
 }

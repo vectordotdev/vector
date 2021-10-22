@@ -1,17 +1,23 @@
-use vector_core::event::{EventFinalizers, Finalizable};
+use vector_core::event::{EventFinalizers, Finalizable, LogEvent};
 
-use crate::sinks::util::{encoding::EncodingConfig, Compression, RequestBuilder};
+use crate::sinks::util::{
+    encoding::EncodingConfig, processed_event::ProcessedEvent, Compression, RequestBuilder,
+};
 
-use super::{encoder::HecLogsEncoder, service::HecLogsRequest, sink::ProcessedEvent};
+use super::{
+    encoder::HecLogsEncoder, service::HecLogsRequest, sink::HecLogsProcessedEventMetadata,
+};
 
 pub struct HecLogsRequestBuilder {
     pub compression: Compression,
     pub encoding: EncodingConfig<HecLogsEncoder>,
 }
 
-impl RequestBuilder<Vec<ProcessedEvent>> for HecLogsRequestBuilder {
+impl RequestBuilder<Vec<ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>>>
+    for HecLogsRequestBuilder
+{
     type Metadata = (usize, usize, EventFinalizers);
-    type Events = Vec<ProcessedEvent>;
+    type Events = Vec<ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>>;
     type Encoder = EncodingConfig<HecLogsEncoder>;
     type Payload = Vec<u8>;
     type Request = HecLogsRequest;
@@ -25,10 +31,13 @@ impl RequestBuilder<Vec<ProcessedEvent>> for HecLogsRequestBuilder {
         &self.encoding
     }
 
-    fn split_input(&self, input: Vec<ProcessedEvent>) -> (Self::Metadata, Self::Events) {
+    fn split_input(
+        &self,
+        input: Vec<ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>>,
+    ) -> (Self::Metadata, Self::Events) {
         let mut events = input;
         let finalizers = events.take_finalizers();
-        let events_byte_size: usize = events.iter().map(|e| e.event_byte_size).sum();
+        let events_byte_size: usize = events.iter().map(|e| e.metadata.event_byte_size).sum();
 
         ((events.len(), events_byte_size, finalizers), events)
     }

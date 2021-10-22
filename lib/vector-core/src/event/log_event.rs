@@ -2,7 +2,7 @@ use super::{
     finalization::{BatchNotifier, EventFinalizer},
     legacy_lookup::Segment,
     metadata::EventMetadata,
-    util, Lookup, PathComponent, Value,
+    util, Finalizable, Lookup, PathComponent, Value,
 };
 use crate::event::MaybeAsLogMut;
 use crate::{config::log_schema, ByteSizeOf};
@@ -443,6 +443,12 @@ impl From<&tracing::Event<'_>> for LogEvent {
         log.insert("metadata.target", meta.target().to_string());
 
         log
+    }
+}
+
+impl Finalizable for LogEvent {
+    fn take_finalizers(&mut self) -> super::EventFinalizers {
+        self.metadata_mut().take_finalizers()
     }
 }
 
