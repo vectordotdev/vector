@@ -25,7 +25,7 @@ components: sinks: datadog_logs: {
 				codec: enabled: false
 			}
 			proxy: enabled:   true
-			request: enabled: false
+			request: enabled: true
 			tls: {
 				enabled:                true
 				can_enable:             true
