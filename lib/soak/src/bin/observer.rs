@@ -24,6 +24,8 @@ struct Opts {
 /// Main configuration struct for this program
 #[derive(Debug, Deserialize)]
 pub struct Config {
+    /// The time to sleep prior to beginning query scrapes
+    pub startup_delay_seconds: u64,
     /// Location to scrape prometheus
     pub prometheus: String,
     /// The name of the experiment being observed
@@ -109,6 +111,7 @@ struct Worker {
     vector_id: String,
     experiment_name: String,
     query: String,
+    startup_delay: u64,
 }
 
 impl Worker {
@@ -124,12 +127,14 @@ impl Worker {
             vector_id: config.vector_id,
             experiment_name: config.experiment_name,
             query: config.query,
+            startup_delay: config.startup_delay_seconds,
         }
     }
 
     async fn run(self) -> Result<(), Error> {
         let client: reqwest::Client = reqwest::Client::new();
 
+        sleep(Duration::from_secs(self.startup_delay)).await;
         println!("EXPERIMENT\tVECTOR-ID\tTIME\tQUERY\tVALUE");
         for _ in 0..60 {
             let request = client.get(self.url.clone()).build()?;
@@ -139,12 +144,16 @@ impl Worker {
                 .json::<QueryResponse>()
                 .await?;
 
-            let time = body.data.result[0].value.time;
-            let value = body.data.result[0].value.value.parse::<f64>()?;
-            println!(
-                "{}\t{}\t{}\t{}\t{}",
-                &self.experiment_name, &self.vector_id, time, &self.query, value
-            );
+            if !body.data.result.is_empty() {
+                let time = body.data.result[0].value.time;
+                let value = body.data.result[0].value.value.parse::<f64>()?;
+                println!(
+                    "{}\t{}\t{}\t{}\t{}",
+                    &self.experiment_name, &self.vector_id, time, &self.query, value
+                );
+            } else {
+                // TODO log error to stderr or what not
+            }
             sleep(Duration::from_secs(1)).await;
         }
         Ok(())
