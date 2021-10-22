@@ -21,7 +21,8 @@ releases: "0.15.0": {
 		* [`redis` sink](\(urls.vector_redis_sink)) for forwarding logs to [Redis](\(urls.redis)).
 		* [`eventstoredb_metrics` source](\(urls.vector_eventstoredb_metrics_source)) for collecting metrics from [EventStoreDB](\(urls.eventstoredb)).
 
-		It also contains a number of additional enhancements and bug fixes.  Check out the [highlights](#highlights) and [changelog](#changelog) for more details.
+		It also contains a number of additional enhancements and bug fixes.  Check out the
+		[highlights](/releases/0.15.0#highlights) and [changelog](/releases/0.15.0#changelog) for more details.
 		"""
 
 	commits: [
