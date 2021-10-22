@@ -20,4 +20,4 @@ yarn-error.log
 .env
 
 # Generated HTML reports for Lighthouse
-static/.hidden/lighthouse/index.html
+reports/lighthouse.html
