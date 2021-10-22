@@ -16,6 +16,10 @@ components: sources: socket: {
 
 	features: {
 		multiline: enabled: false
+		codecs: {
+			enabled:         true
+			default_framing: "`newline_delimited` for TCP and Unix stream, `bytes` for UDP and Unix datagram"
+		}
 		receive: {
 			from: {
 				service: services.socket_client
@@ -87,7 +91,7 @@ components: sources: socket: {
 		}
 		max_length: {
 			common:      true
-			description: "The maximum bytes size of incoming messages before they are discarded."
+			description: "The maximum buffer size of incoming messages. Messages larger than this are truncated."
 			required:    false
 			warnings: []
 			type: uint: {
@@ -168,5 +172,7 @@ components: sources: socket: {
 		connection_send_errors_total:     components.sources.internal_metrics.output.metrics.connection_send_errors_total
 		connection_send_ack_errors_total: components.sources.internal_metrics.output.metrics.connection_send_ack_errors_total
 		connection_shutdown_total:        components.sources.internal_metrics.output.metrics.connection_shutdown_total
+		component_received_bytes_total:   components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_events_total:  components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }

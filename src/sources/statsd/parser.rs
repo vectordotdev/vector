@@ -5,6 +5,7 @@ use std::{
     collections::BTreeMap,
     error, fmt,
     num::{ParseFloatError, ParseIntError},
+    str::Utf8Error,
 };
 
 lazy_static! {
@@ -194,6 +195,7 @@ fn convert_to_statistic(unit: &str) -> StatisticKind {
 
 #[derive(Debug, PartialEq)]
 pub enum ParseError {
+    InvalidUtf8(Utf8Error),
     Malformed(&'static str),
     UnknownMetricType(String),
     InvalidInteger(ParseIntError),

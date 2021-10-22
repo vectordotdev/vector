@@ -31,6 +31,7 @@ use std::{
     task::Poll,
 };
 use tower::Service;
+use vector_core::ByteSizeOf;
 
 #[derive(Clone)]
 struct InfluxDbSvc {
@@ -146,11 +147,12 @@ impl InfluxDbSvc {
                 sink::StdServiceLogic::default(),
             )
             .with_flat_map(move |event: Event| {
-                stream::iter(
+                stream::iter({
+                    let byte_size = event.size_of();
                     normalizer
                         .apply(event)
-                        .map(|metric| Ok(EncodedEvent::new(metric))),
-                )
+                        .map(|metric| Ok(EncodedEvent::new(metric, byte_size)))
+                })
             })
             .sink_map_err(|error| error!(message = "Fatal influxdb sink error.", %error));
 

@@ -1,4 +1,4 @@
-use super::{filter_result, HostMetricsConfig};
+use super::{filter_result, HostMetrics};
 use crate::event::metric::Metric;
 use chrono::Utc;
 use futures::{stream, StreamExt};
@@ -7,7 +7,7 @@ use heim::cpu::os::linux::CpuTimeExt;
 use heim::units::time::second;
 use shared::btreemap;
 
-impl HostMetricsConfig {
+impl HostMetrics {
     pub async fn cpu_metrics(&self) -> Vec<Metric> {
         match heim::cpu::times().await {
             Ok(times) => {
@@ -63,11 +63,13 @@ impl HostMetricsConfig {
 #[cfg(test)]
 mod tests {
     use super::super::tests::{all_counters, count_name, count_tag};
-    use super::super::HostMetricsConfig;
+    use super::super::{HostMetrics, HostMetricsConfig};
 
     #[tokio::test]
     async fn generates_cpu_metrics() {
-        let metrics = HostMetricsConfig::default().cpu_metrics().await;
+        let metrics = HostMetrics::new(HostMetricsConfig::default())
+            .cpu_metrics()
+            .await;
         assert!(!metrics.is_empty());
         assert!(all_counters(&metrics));
 

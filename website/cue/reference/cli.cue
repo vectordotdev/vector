@@ -5,7 +5,7 @@ package metadata
 _default_flags: {
 	"help": {
 		_short:      "h"
-		description: "Prints help information"
+		description: "Prints help information "
 	}
 	"version": {
 		_short:      "V"
@@ -17,39 +17,45 @@ _config_options: {
 	"config": {
 		_short: "c"
 		description: """
-			Read configuration from one or more files. Wildcard paths are
-			supported. If zero files are specified the default config path
-			`/etc/vector/vector.toml` will be targeted.
-			TOML, YAML and JSON file formats are supported.
-			The format to interpret the file with is determined from
-			the file extension (.toml, .yaml, .json).
-			We will fallback to TOML if we are unable to detect
-			a supported format.
+			Read configuration from one or more files. Wildcard paths are supported. If no files are
+			specified the default config path `/etc/vector/vector.toml` is targeted. TOML, YAML and
+			JSON file formats are supported. The format to interpret the file with is determined from
+			the file extension (`.toml`, `.yaml`, `.json`). Vector falls back to TOML if it can't
+			detect a supported format.
 			"""
 		type:    "string"
 		default: "/etc/vector/vector.toml"
 		env_var: "VECTOR_CONFIG"
 	}
+	"config-dir": {
+		description: """
+			Read configuration from files in one or more directories. The file format is detected
+			from the file name. Files not ending in `.toml`, `.json`, `.yaml`, or `.yml` are
+			ignored.
+			"""
+		type:    "string"
+		env_var: "VECTOR_CONFIG_DIR"
+	}
 	"config-toml": {
 		description: """
-			Read configuration from one or more files. Wildcard paths are
-			supported. TOML file format is assumed.
+			Read configuration from one or more files. Wildcard paths are supported. TOML file
+			format is assumed.
 			"""
 		type:    "string"
 		env_var: "VECTOR_CONFIG_TOML"
 	}
 	"config-json": {
 		description: """
-			Read configuration from one or more files. Wildcard paths are
-			supported. JSON file format is assumed.
+			Read configuration from one or more files. Wildcard paths are supported. JSON file
+			format is assumed.
 			"""
 		type:    "string"
 		env_var: "VECTOR_CONFIG_JSON"
 	}
 	"config-yaml": {
 		description: """
-			Read configuration from one or more files. Wildcard paths are
-			supported. YAML file format is assumed.
+			Read configuration from one or more files. Wildcard paths are supported. YAML file
+			format is assumed.
 			"""
 		type:    "string"
 		env_var: "VECTOR_CONFIG_YAML"
@@ -59,6 +65,7 @@ _config_options: {
 cli: {
 	#Args: [Arg=string]: {
 		description: !=""
+		required:    bool | *false
 		name:        Arg
 		type:        #ArgType
 		default?:    string | [...string]
@@ -69,6 +76,7 @@ cli: {
 	#Commands: [Command=string]: {
 		description:  !=""
 		name:         Command
+		example?:     string
 		flags?:       #Flags
 		options?:     #Options
 		args?:        #Args
@@ -131,8 +139,7 @@ cli: {
 		"quiet": {
 			_short: "q"
 			description: """
-				Reduce detail of internal logging. Repeat to reduce further. Overrides
-				`--verbose`
+				Reduce detail of internal logging. Repeat to reduce further. Overrides `--verbose`.
 				"""
 		}
 		"require-healthy": {
@@ -142,20 +149,12 @@ cli: {
 		}
 		"verbose": {
 			_short:      "v"
-			description: "Enable more detailed logging. Repeat to reduce further. Overrides `--verbose`"
+			description: "Enable more detailed logging. Repeat to reduce further. Overrides `--verbose`."
 		}
 		"watch-config": {
 			_short:      "w"
 			description: "Watch for changes in the configuration file and reload accordingly"
 			env_var:     "VECTOR_WATCH_CONFIG"
-		}
-		"enable-datadog-tracing": {
-			description: """
-				Send internal tracing spans to a local APM-enabled
-				Datadog agent with a granularity matching the current log level.
-				"""
-			env_var:      "VECTOR_ENABLE_DATADOG_TRACING"
-			experimental: true
 		}
 	}
 
@@ -164,23 +163,22 @@ cli: {
 			description: "Control when ANSI terminal formatting is used."
 			default:     "auto"
 			enum: {
-				always: "Enable ANSI terminal formatting always."
-				auto:   "Detect ANSI terminal formatting and enable if supported."
-				never:  "Disable ANSI terminal formatting."
+				always: "Always enable ANSI terminal formatting always"
+				auto:   "Detect ANSI terminal formatting and enable if supported"
+				never:  "Disable ANSI terminal formatting"
 			}
 			env_var: "VECTOR_COLOR"
 		}
 		"threads": {
 			_short: "t"
 			description: """
-				Number of threads to use for processing (default is number of
-				available cores)
+				The number of threads to use for processing (the default is the number of available cores)
 				"""
 			type:    "integer"
 			env_var: "VECTOR_THREADS"
 		}
 		"log-format": {
-			description: "Set the logging format [default: text]"
+			description: "Set the logging format"
 			default:     "text"
 			enum: {
 				json: "Output Vector's logs as JSON."
@@ -193,17 +191,13 @@ cli: {
 	commands: {
 		"graph": {
 			description: """
-				Generate a visual representation of topologies. The output is in the [DOT format](\(urls.dot_format))
+				Generate a visual representation of topologies. The output is in the [DOT format](\(urls.dot_format)),
 				which can be rendered using [GraphViz](\(urls.graphviz)).
-
-				Example:
-
-				```shell
-				vector graph --config /etc/vector/vector.toml | dot -Tsvg > graph.svg
-				```
 
 				You can also visualize the output online at [webgraphviz.com](http://www.webgraphviz.com/).
 				"""
+
+			example: "vector graph --config /etc/vector/vector.toml | dot -Tsvg > graph.svg"
 
 			options: _config_options
 		}
@@ -259,7 +253,7 @@ cli: {
 			description: """
 				Run Vector config unit tests, then exit. This command is experimental and
 				therefore subject to change. For guidance on how to write unit tests check
-				out the [unit testing documentation](\(urls.vector_unit_testing)).
+				out the [unit testing documentation](\(urls.vector_unit_tests)).
 				"""
 
 			options: {
@@ -340,7 +334,7 @@ cli: {
 				components: {
 					type: "list"
 					description: """
-						    Components to observe (comma-separated; accepts glob patterns).
+						Components to observe (comma-separated; accepts glob patterns).
 						"""
 					default: "*"
 				}

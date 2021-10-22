@@ -32,7 +32,7 @@ remap: functions: sha3: {
 
 	examples: [
 		{
-			title: "Calaculate sha3 hash"
+			title: "Calculate sha3 hash"
 			source: #"""
 				sha3("foo", variant: "SHA3-224")
 				"""#

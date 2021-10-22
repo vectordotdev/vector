@@ -14,7 +14,7 @@ jobs:
   sync-install:
     runs-on: ubuntu-18.04
     steps:
-      - uses: actions/checkout@v2.3.4
+      - uses: actions/checkout@v2.3.5
       - run: sudo apt-get install --yes python3-setuptools python3.6-dev
       - run: pip3 install awscli --upgrade --user
       - env:

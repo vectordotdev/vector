@@ -21,9 +21,6 @@ shared vision of good user experience -- the purpose of this document.
    1. [Logical boundaries](#logical-boundaries)
       1. [Source & sink boundaries](#source--sink-boundaries)
       1. [Transform boundaries](#transform-boundaries)
-   1. [Naming](#naming)
-      1. [Option naming](#option-naming)
-      1. [Metric naming](#metric-naming)
 1. [Adherence](#adherence)
    1. [Roles](#roles)
       1. [Contributors](#contributors)
@@ -50,23 +47,23 @@ we strive to be the best in this domain.
 
 Examples:
 
-- Avoiding analytics specific use cases.
-- Leaning into tools like Kafka instead of trying to replace them.
+* Avoiding analytics specific use cases.
+* Leaning into tools like Kafka instead of trying to replace them.
 
 ### Be opinionated & reduce decisions
 
 As an extension of the previous principle, aligning on specific use cases
 allows us to make assumptions about the user and be opinionated with solutions.
-This approach reduces the number of decisions a user has to make, a hallmark of
-a good user experience. Therefore, as much as possible, we should offer
-opinionated models for use cases core to Vector's purpose and not leave them as
-creative exercises for the user.
+This approach reduces the number of decisions a user has to make and follows
+[Hicks Law], a hallmark of a good user experience. Therefore, as much as
+possible, we should offer opinionated models for use cases core to Vector's
+purpose and not leave them as creative exercises for the user.
 
 Examples:
 
-- Vector's pipeline model as a solution to team collaboration as opposed to
+* Vector's pipeline model as a solution to team collaboration as opposed to
   generic config files.
-- Vector's metric data model as a solution for metrics interoperability as
+* Vector's metric data model as a solution for metrics interoperability as
   opposed to specifically structured log lines.
 
 ### Build momentum with consistency
@@ -82,12 +79,33 @@ error handling, since this often results in data loss.
 
 Examples:
 
-- Using the same `codec` option name in both sources and sinks that support it.
-- Defaulting to applying back pressure regardless of the component or topology.
+* Using the same `codec` option name in both sources and sinks that support it.
+* Defaulting to applying back pressure regardless of the component or topology.
 
 ## Guidelines
 
 The following guidelines help to uphold the above principles.
+
+### Data model
+
+#### Log schemas should be fluid
+
+Logs should be flexible, fluid data structures that do not impose a rigid schema
+for the following reasons:
+
+1. Unlike other data types, there is no functional requirement of logs that
+   requires a strict schema. Logs simply describe a point-in-time event.
+2. Vector should be able to replace legacy pipelines without introducing
+   downstream schema changes, something that would likely prevent the adoption
+   of Vector.
+3. Deviation from the user's data mental model introduces uncessary friction.
+   Vector should not surprise users by moving their log fields around.
+4. Vector does not want to be in the business of maintaining log schemas. An
+   exercise that has proven precarious with the proliferation of log schema
+   standards.
+
+In general, we believe Vector's flexible nature with log schemas is a boon for
+Vector's UX. A rigid schema is not required to achieve a best-in-class UX.
 
 ### Defaults
 
@@ -100,8 +118,8 @@ an opt-in choice by the user.
 
 Examples:
 
-- Choose back pressure over shedding load
-- Retry failed requests in sinks until the service recovers
+* Choose back pressure over shedding load
+* Retry failed requests in sinks until the service recovers
 
 ### Logical boundaries
 
@@ -120,11 +138,11 @@ composability.
 
 Examples:
 
-- A `syslog` source as opposed to a `syslogng` source since it aligns with the
+* A `syslog` source as opposed to a `syslogng` source since it aligns with the
   Syslog protocol.
-- A `datadog_agent` source as opposed to a `datadog_api` source since it aligns
+* A `datadog_agent` source as opposed to a `datadog_api` source since it aligns
   on intent and reduces scope.
-- Again, a `syslog` source _in addition_ to a `socket` source with the `codec`
+* Again, a `syslog` source _in addition_ to a `socket` source with the `codec`
   option set to `syslog` since it is more specific and discoverable.
 
 #### Transform boundaries
@@ -138,58 +156,10 @@ both.
 
 Examples:
 
-- A `remap` transform as opposed to multiple `parse_json`, `parse_syslog`, etc
+* A `remap` transform as opposed to multiple `parse_json`, `parse_syslog`, etc
   transforms.
-- A `filter` transform as opposed to a `filter_regex`, `filter_datadog_search`,
+* A `filter` transform as opposed to a `filter_regex`, `filter_datadog_search`,
   etc transforms.
-
-### Naming
-
-#### Option naming
-
-Configuration option names should adhere to the following rules:
-
-- Alphanumeric, lowercase, snake case format
-- Use nouns, not verbs, as names (e.g., `fingerprint` instead of `fingerprinting`)
-- Suffix options with their unit. (e.g., `_seconds`, `_bytes`, etc.)
-- Be consistent with units within the same scope. (e.g., don't mix seconds and milliseconds)
-- Don't repeat the name space in the option name (e.g., `fingerprint.bytes` instead of `fingerprint.fingerprint_bytes`)
-
-#### Metric naming
-
-For metric naming, Vector broadly follows the
-[Prometheus metric naming standards](https://prometheus.io/docs/practices/naming/).
-Hence, a metric name:
-
-- Must only contain valid characters, which are ASCII letters and digits, as
-  well as underscores. It should match the regular expression: `[a-z_][a-z0-9_]*`.
-- Metrics have a broad template:
-
-  `<namespace>_<name>_<unit>_[total]`
-
-  - The `namespace` is a single word prefix that groups metrics from a specific
-    source, for example host-based metrics like CPU, disk, and memory are
-    prefixed with `host`, Apache metrics are prefixed with `apache`, etc.
-  - The `name` describes what the metric measures.
-  - The `unit` is a [single base unit](https://en.wikipedia.org/wiki/SI_base_unit),
-    for example seconds, bytes, metrics.
-  - The suffix should describe the unit in plural form: seconds, bytes.
-    Accumulating counts, both with units or without, should end in `total`,
-    for example `disk_written_bytes_total` and `http_requests_total`.
-
-- Where required, use tags to differentiate the characteristic of the
-  measurement. For example, whilst `host_cpu_seconds_total` is name of the
-  metric, we also record the `mode` that is being used for each CPU. The `mode`
-  and the specific CPU then become tags on the metric:
-
-```text
-host_cpu_seconds_total{cpu="0",mode="idle"}
-host_cpu_seconds_total{cpu="0",mode="idle"}
-host_cpu_seconds_total{cpu="0",mode="nice"}
-host_cpu_seconds_total{cpu="0",mode="system"}
-host_cpu_seconds_total{cpu="0",mode="user"}
-host_cpu_seconds_total
-```
 
 ## Adherence
 
@@ -232,3 +202,5 @@ As a user experience design committee member, you are responsible for:
 * Reviewing and approving proposed user experience changes in RFCs.
 * Reviewing and approving user-facing changes in pull requests.
 * Updating and evolving guides to reflect new Vector changes.
+
+[Hicks Law]: https://en.wikipedia.org/wiki/Hick%27s_law

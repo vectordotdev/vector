@@ -1,7 +1,7 @@
 use super::{host_key, Encoding};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    sinks::splunk_hec::HecSinkConfig,
+    sinks::splunk_hec::logs::HecSinkLogsConfig,
     sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
     sinks::{Healthcheck, VectorSink},
     template::Template,
@@ -76,10 +76,10 @@ impl SinkConfig for HumioLogsConfig {
 }
 
 impl HumioLogsConfig {
-    fn build_hec_config(&self) -> HecSinkConfig {
+    fn build_hec_config(&self) -> HecSinkLogsConfig {
         let endpoint = self.endpoint.clone().unwrap_or_else(|| HOST.to_string());
 
-        HecSinkConfig {
+        HecSinkLogsConfig {
             token: self.token.clone(),
             endpoint,
             host_key: self.host_key.clone(),
@@ -150,13 +150,12 @@ mod integration_tests {
         config::{log_schema, SinkConfig, SinkContext},
         event::Event,
         sinks::util::Compression,
-        test_util::random_string,
+        test_util::{components, components::HTTP_SINK_TAGS, random_string},
     };
     use chrono::Utc;
-    use futures::stream;
     use indoc::indoc;
     use serde_json::{json, Value as JsonValue};
-    use std::{collections::HashMap, convert::TryFrom, future::ready};
+    use std::{collections::HashMap, convert::TryFrom};
 
     // matches humio container address
     const HOST: &str = "http://localhost:8080";
@@ -177,7 +176,7 @@ mod integration_tests {
         let log = event.as_mut_log();
         log.insert(log_schema().host_key(), host.clone());
 
-        sink.run(stream::once(ready(event))).await.unwrap();
+        components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
 
         let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -213,7 +212,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.run(stream::once(ready(event))).await.unwrap();
+        components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
 
         let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -246,7 +245,7 @@ mod integration_tests {
                 .as_mut_log()
                 .insert("@timestamp", Utc::now().to_rfc3339());
 
-            sink.run(stream::once(ready(event))).await.unwrap();
+            components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
 
             let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -269,7 +268,7 @@ mod integration_tests {
             let message = random_string(100);
             let event = Event::from(message.clone());
 
-            sink.run(stream::once(ready(event))).await.unwrap();
+            components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
 
             let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 

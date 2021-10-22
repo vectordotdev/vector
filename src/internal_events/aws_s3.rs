@@ -1,6 +1,6 @@
-#[cfg(feature = "sources-aws_s3")]
+// ## skip check-events ##
+
 pub mod source {
-    use crate::internal_events::InternalEvent;
     use crate::sources::aws_s3::sqs::ProcessingError;
     use metrics::counter;
     use rusoto_core::RusotoError;
@@ -8,6 +8,7 @@ pub mod source {
         BatchResultErrorEntry, DeleteMessageBatchError, DeleteMessageBatchRequestEntry,
         DeleteMessageBatchResultEntry, ReceiveMessageError,
     };
+    use vector_core::internal_event::InternalEvent;
 
     #[derive(Debug)]
     pub struct SqsS3EventReceived {
@@ -16,6 +17,7 @@ pub mod source {
 
     impl InternalEvent for SqsS3EventReceived {
         fn emit_metrics(&self) {
+            counter!("component_received_events_total", 1);
             counter!("events_in_total", 1);
             counter!("processed_bytes_total", self.byte_size as u64);
         }
@@ -162,25 +164,6 @@ pub mod source {
 
         fn emit_metrics(&self) {
             counter!("sqs_s3_event_record_ignored_total", 1, "ignore_type" => "invalid_event_kind");
-        }
-    }
-}
-
-#[cfg(feature = "sinks-aws_s3")]
-pub mod sink {
-    use metrics::counter;
-
-    use crate::internal_events::InternalEvent;
-
-    pub struct S3EventsSent {
-        pub byte_size: usize,
-    }
-
-    impl InternalEvent for S3EventsSent {
-        fn emit_logs(&self) {}
-
-        fn emit_metrics(&self) {
-            counter!("processed_bytes_total", self.byte_size as u64);
         }
     }
 }

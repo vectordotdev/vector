@@ -80,7 +80,7 @@ impl FunctionTransform for JsonParser {
                 let to_parse = value.as_bytes();
                 serde_json::from_slice::<Value>(to_parse.as_ref())
                     .map_err(|error| {
-                        emit!(JsonParserFailedParse {
+                        emit!(&JsonParserFailedParse {
                             field: &self.field,
                             value: value.to_string_lossy().as_str(),
                             error,
@@ -103,7 +103,7 @@ impl FunctionTransform for JsonParser {
                     let contains_target = log.contains(&target_field);
 
                     if contains_target && !self.overwrite_target {
-                        emit!(JsonParserTargetExists { target_field })
+                        emit!(&JsonParserTargetExists { target_field })
                     } else {
                         if self.drop_field {
                             log.remove(&self.field);

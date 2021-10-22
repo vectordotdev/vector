@@ -93,7 +93,7 @@ module.exports = {
               'p + .highlight': {
                 'margin-top': '0.75rem',
               },
-              'p, h1, h2, h3, h4, h5, h6': {
+              'h1, h2, h3, h4, h5, h6': {
                 margin: 0,
                 padding: 0,
               },
@@ -113,9 +113,8 @@ module.exports = {
               'border-bottom-color': theme('colors.gray.700'),
             },
             code: {
-              color: theme('colors.primary', 'currentColor'),
+              color: theme('colors.gray.100', 'currentColor'),
               '&:not([class^="language-"])': {
-                color: theme('colors.gray.100'),
                 'background-color': theme('colors.gray.700'),
               }
             },

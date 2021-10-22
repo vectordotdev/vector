@@ -45,6 +45,7 @@ const WAIT_FOR_SECS: u64 = 5; // The default time to wait in `wait_for`
 const WAIT_FOR_MIN_MILLIS: u64 = 5; // The minimum time to pause before retrying
 const WAIT_FOR_MAX_MILLIS: u64 = 500; // The maximum time to pause before retrying
 
+pub mod components;
 pub mod stats;
 
 #[macro_export]
@@ -112,7 +113,7 @@ pub fn trace_init() {
 
     let levels = std::env::var("TEST_LOG").unwrap_or_else(|_| "error".to_string());
 
-    trace::init(color, false, &levels, false);
+    trace::init(color, false, &levels);
 }
 
 pub async fn send_lines(
@@ -304,6 +305,7 @@ pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     output.lines().map(|s| s.to_owned()).collect()
 }
 
+#[cfg(feature = "sources-aws_s3")]
 pub fn lines_from_zst_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     trace!(message = "Reading zst file.", path = %path.as_ref().display());
     let mut file = File::open(path).unwrap();

@@ -1,3 +1,8 @@
+#[cfg(feature = "codecs")]
+use crate::codecs::{
+    BytesDecoderConfig, BytesParserConfig, FramingConfig, NewlineDelimitedDecoderConfig,
+    ParserConfig,
+};
 use indexmap::map::IndexMap;
 use serde::{de, Deserialize, Serialize};
 use std::fmt;
@@ -10,6 +15,28 @@ pub const fn default_true() -> bool {
 
 pub const fn default_false() -> bool {
     false
+}
+
+/// The default max length of the input buffer.
+///
+/// Any input exceeding this limit will be discarded.
+pub fn default_max_length() -> usize {
+    bytesize::kib(100u64) as usize
+}
+
+#[cfg(feature = "codecs")]
+pub fn default_framing_message_based() -> Box<dyn FramingConfig> {
+    Box::new(BytesDecoderConfig::new())
+}
+
+#[cfg(feature = "codecs")]
+pub fn default_framing_stream_based() -> Box<dyn FramingConfig> {
+    Box::new(NewlineDelimitedDecoderConfig::new())
+}
+
+#[cfg(feature = "codecs")]
+pub fn default_decoding() -> Box<dyn ParserConfig> {
+    Box::new(BytesParserConfig::new())
 }
 
 pub fn to_string(value: impl serde::Serialize) -> String {

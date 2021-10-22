@@ -255,7 +255,7 @@ components: sources: internal_metrics: {
 			tags:              _internal_metrics_tags
 		}
 		checkpoint_write_errors_total: {
-			description:       "The total number of errors writing checkpoints."
+			description:       "The total number of errors writing checkpoints. This metric is deprecated in favor of `component_errors_total`."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
@@ -452,42 +452,22 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		events_in_total: {
-			description: """
+			description:       """
 				The number of events accepted by this component either from tagged
-				origin like file and uri, or cumulatively from other origins.
+				origins like file and uri, or cumulatively from other origins.
+				This metric is deprecated and will be removed in a future version.
+				Use [`component_received_events_total`](\(urls.vector_sources)/internal_metrics/#component_received_events_total) instead.
 				"""
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags & {
-				file: {
-					description: "The file from which the event originates."
-					required:    false
-				}
-				uri: {
-					description: "The sanitized URI from which the event originates."
-					required:    false
-				}
-				container_name: {
-					description: "The name of the container from which the event originates."
-					required:    false
-				}
-				pod_name: {
-					description: "The name of the pod from which the event originates."
-					required:    false
-				}
-				peer_addr: {
-					description: "The IP from which the event originates."
-					required:    false
-				}
-				peer_path: {
-					description: "The pathname from which the event originates."
-					required:    false
-				}
-				mode: _mode
-			}
+			tags:              component_received_events_total.tags
 		}
 		events_out_total: {
-			description:       "The total number of events emitted by this component."
+			description:       """
+				The total number of events emitted by this component.
+				This metric is deprecated and will be removed in a future version.
+				Use [`component_sent_events_total`](\(urls.vector_sources)/internal_metrics/#component_sent_events_total) instead.
+				"""
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
@@ -496,9 +476,136 @@ components: sources: internal_metrics: {
 			description:       """
 				The total number of events processed by this component.
 				This metric is deprecated in place of using
-				[`events_in_total`](\(urls.vector_sources)/internal_metrics/#events_in_total) and
-				[`events_out_total`](\(urls.vector_sources)/internal_metrics/#events_out_total) metrics.
+				[`component_received_events_total`](\(urls.vector_sources)/internal_metrics/#component_received_events_total) and
+				[`component_sent_events_total`](\(urls.vector_sources)/internal_metrics/#component_sent_events_total) metrics.
 				"""
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_byte_size: {
+			description:       "The number of bytes current in the buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_events: {
+			description:       "The number of events currently in the buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_discarded_events_total: {
+			description:       "The number of events dropped by this non-blocking buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_received_event_bytes_total: {
+			description:       "The number of bytes received by this buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_received_events_total: {
+			description:       "The number of events received by this buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_sent_event_bytes_total: {
+			description:       "The number of bytes sent by this buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		buffer_sent_events_total: {
+			description:       "The number of events sent by this buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		component_received_bytes_total: {
+			description:       "The number of raw bytes accepted by this component from source origins."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              component_received_events_total.tags
+		}
+		component_received_events_total: {
+			description: """
+				The number of events accepted by this component either from tagged
+				origins like file and uri, or cumulatively from other origins.
+				"""
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags & {
+				file: {
+					description: "The file from which the data originated."
+					required:    false
+				}
+				uri: {
+					description: "The sanitized URI from which the data originated."
+					required:    false
+				}
+				container_name: {
+					description: "The name of the container from which the data originated."
+					required:    false
+				}
+				pod_name: {
+					description: "The name of the pod from which the data originated."
+					required:    false
+				}
+				peer_addr: {
+					description: "The IP from which the data originated."
+					required:    false
+				}
+				peer_path: {
+					description: "The pathname from which the data originated."
+					required:    false
+				}
+				mode: _mode
+			}
+		}
+		component_received_event_bytes_total: {
+			description: """
+				The number of event bytes accepted by this component either from
+				tagged origins like file and uri, or cumulatively from other origins.
+				"""
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              component_received_events_total.tags
+		}
+		component_sent_bytes_total: {
+			description:       "The number of raw bytes sent by this component to destination sinks."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags & {
+				endpoint: {
+					description: "The endpoint to which the bytes were sent. For HTTP, this will be the host and path only, excluding the query string."
+					required:    false
+				}
+				file: {
+					description: "The absolute path of the destination file."
+					required:    false
+				}
+				protocol: {
+					description: "The protocol used to send the bytes."
+					required:    true
+				}
+				region: {
+					description: "The AWS region name to which the bytes were sent. In some configurations, this may be a literal hostname."
+					required:    false
+				}
+			}
+		}
+		component_sent_events_total: {
+			description:       "The total number of events emitted by this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		component_sent_event_bytes_total: {
+			description:       "The total number of event bytes emitted by this component."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
@@ -564,7 +671,7 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		file_delete_errors_total: {
-			description:       "The total number of failures to delete a file."
+			description:       "The total number of failures to delete a file. This metric is deprecated in favor of `component_errors_total`."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags & {
@@ -572,7 +679,7 @@ components: sources: internal_metrics: {
 			}
 		}
 		file_watch_errors_total: {
-			description:       "The total number of errors encountered when watching files."
+			description:       "The total number of errors encountered when watching files. This metric is deprecated in favor of `component_errors_total`."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags & {
@@ -612,7 +719,7 @@ components: sources: internal_metrics: {
 			}
 		}
 		fingerprint_read_errors_total: {
-			description:       "The total number of times Vector failed to read a file for fingerprinting."
+			description:       "The total number of times Vector failed to read a file for fingerprinting. This metric is deprecated in favor of `component_errors_total`."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags & {
@@ -620,7 +727,7 @@ components: sources: internal_metrics: {
 			}
 		}
 		glob_errors_total: {
-			description:       "The total number of errors encountered when globbing paths."
+			description:       "The total number of errors encountered when globbing paths. This metric is deprecated in favor of `component_errors_total`."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags & {
@@ -754,6 +861,15 @@ components: sources: internal_metrics: {
 					required:    false
 				}
 				mode: _mode
+			}
+		}
+		component_errors_total: {
+			description:       "The total number of errors encountered by this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags & {
+				error_type: _error_type
+				stage:      _stage
 			}
 		}
 		processing_errors_total: {
@@ -991,11 +1107,10 @@ components: sources: internal_metrics: {
 
 		// Helpful tag groupings
 		_component_tags: _internal_metrics_tags & {
-			component_kind:  _component_kind
-			component_id:    _component_id
-			component_scope: _component_scope
-			component_name:  _component_name
-			component_type:  _component_type
+			component_kind: _component_kind
+			component_id:   _component_id
+			component_name: _component_name
+			component_type: _component_type
 		}
 
 		// All available tags
@@ -1017,11 +1132,6 @@ components: sources: internal_metrics: {
 			required:    true
 			examples: ["my_source", "my_sink"]
 		}
-		_component_scope: {
-			description: "The Vector component scope."
-			required:    true
-			examples: ["global", "pipeline:appname"]
-		}
 		_component_name: {
 			description: "Deprecated, use `component_id` instead. The value is the same as `component_id`."
 			required:    true
@@ -1041,18 +1151,25 @@ components: sources: internal_metrics: {
 			description: "The type of the error"
 			required:    true
 			enum: {
+				"delete_failed":               "The file deletion failed."
+				"encode_failed":               "The encode operation failed."
 				"field_missing":               "The event field was missing."
+				"glob_failed":                 "The glob pattern match operation failed."
+				"http_error":                  "The HTTP request resulted in an error code."
 				"invalid_metric":              "The metric was invalid."
 				"mapping_failed":              "The mapping failed."
 				"match_failed":                "The match operation failed."
-				"out_of_order":				   "The event was out of order."
+				"out_of_order":                "The event was out of order."
 				"parse_failed":                "The parsing operation failed."
+				"read_failed":                 "The file read operation failed."
 				"render_error":                "The rendering operation failed."
 				"type_conversion_failed":      "The type conversion operating failed."
 				"type_field_does_not_exist":   "The type field does not exist."
 				"type_ip_address_parse_error": "The IP address did not parse."
-				"unlabeled_event":			   "The event was not labeled."
+				"unlabeled_event":             "The event was not labeled."
 				"value_invalid":               "The value was invalid."
+				"watch_failed":                "The file watch operation failed."
+				"write_failed":                "The file write operation failed."
 			}
 		}
 		_file: {
@@ -1073,6 +1190,15 @@ components: sources: internal_metrics: {
 				unix: "Unix domain socket"
 			}
 		}
+		_stage: {
+			description: "The stage within the component at which the error occurred."
+			required:    true
+			enum: {
+				receiving:  "While receiving data."
+				processing: "While processing data within the component."
+				sending:    "While sending data."
+			}
+		}
 		_status: {
 			description: "The HTTP status code of the request."
 			required:    false
@@ -1086,7 +1212,7 @@ components: sources: internal_metrics: {
 			required:    true
 			enum: {
 				"out_of_order": "The event was out of order."
-				"oversized":    "The event was too large."				
+				"oversized":    "The event was too large."
 			}
 		}
 	}

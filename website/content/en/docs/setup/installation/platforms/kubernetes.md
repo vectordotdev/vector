@@ -50,7 +50,7 @@ namespace: vector
 
 bases:
   # Include Vector recommended base (from git).
-  - github.com/timberio/vector/distribution/kubernetes/vector-agent?ref=v{{< version >}}
+  - github.com/vectordotdev/vector/distribution/kubernetes/vector-agent?ref=v{{< version >}}
 
 images:
   # Override the Vector image to avoid use of the sliding tag.
@@ -101,7 +101,7 @@ kubectl kustomize
 ##### Install Vector
 
 ```shell
-kubectl install -k .
+kubectl apply -k .
 ```
 
 ##### Tail Vector logs
@@ -131,7 +131,7 @@ namespace: vector
 
 bases:
   # Include Vector recommended base (from git).
-  - github.com/timberio/vector/distribution/kubernetes/vector-aggregator?ref=v{{< version >}}
+  - github.com/vectordotdev/vector/distribution/kubernetes/vector-aggregator?ref=v{{< version >}}
 
 images:
   # Override the Vector image to avoid use of the sliding tag.
@@ -197,7 +197,7 @@ kubectl kustomize
 ##### Install Vector
 
 ```shell
-kubectl install -k .
+kubectl apply -k .
 ```
 
 ##### Tail Vector logs

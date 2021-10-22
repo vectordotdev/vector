@@ -25,7 +25,7 @@ remap: functions: slice: {
 		},
 		{
 			name:        "end"
-			description: "The inclusive end position. A zero-based index that can be negative."
+			description: "The exclusive end position. A zero-based index that can be negative."
 			required:    false
 			default:     "String length"
 			type: ["integer"]
@@ -36,7 +36,7 @@ remap: functions: slice: {
 
 	examples: [
 		{
-			title: "Slice a string (positve index)"
+			title: "Slice a string (positive index)"
 			source: #"""
 				slice!("Supercalifragilisticexpialidocious", start: 5, end: 13)
 				"""#

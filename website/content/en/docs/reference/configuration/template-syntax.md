@@ -27,9 +27,9 @@ Notice that Vector allows direct field references as well as strftime specifiers
 }
 ```
 
-The value of the key_prefix option would equal:
+The value of the `key_prefix` option would equal:
 
-```
+```raw
 application_id=1/date=2020-02-14
 ```
 
@@ -112,7 +112,7 @@ option = "{{ parent.child[0] }}"
 ```
 
 
-[1692]: https://github.com/timberio/vector/issues/1692
+[1692]: https://github.com/vectordotdev/vector/issues/1692
 [aws_s3]: /docs/reference/configuration/sinks/aws_s3
 [fields]: /docs/reference/configuration/field-path-notation
 [log]: /docs/about/under-the-hood/architecture/data-model/log

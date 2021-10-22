@@ -10,9 +10,8 @@ use crate::{
             encoding::{EncodingConfig, EncodingConfiguration},
             retries::RetryLogic,
             sink::Response,
-            BatchConfig, BatchSettings, Buffer, Compression, Concurrency, EncodedEvent,
-            PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
-            TowerRequestConfig,
+            BatchConfig, BatchSettings, Buffer, Compression, EncodedEvent, PartitionBatchSink,
+            PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -39,6 +38,7 @@ use std::{
 use tower::{Service, ServiceBuilder};
 use tracing_futures::Instrument;
 use uuid::Uuid;
+use vector_core::ByteSizeOf;
 
 #[derive(Clone)]
 pub struct AzureBlobSink {
@@ -130,7 +130,6 @@ impl SinkConfig for AzureBlobSinkConfig {
 impl AzureBlobSinkConfig {
     pub fn new(&self, client: Arc<ContainerClient>, cx: SinkContext) -> Result<VectorSink> {
         let request = self.request.unwrap_with(&TowerRequestConfig {
-            concurrency: Concurrency::Fixed(50),
             rate_limit_num: Some(250),
             ..Default::default()
         });
@@ -227,15 +226,15 @@ impl Service<AzureBlobSinkRequest> for AzureBlobSink {
                 .inspect_err(|reason| {
                     match reason.downcast_ref::<HttpError>() {
                         Some(HttpError::UnexpectedStatusCode { received, .. }) => {
-                            emit!(AzureBlobErrorResponse { code: *received })
+                            emit!(&AzureBlobErrorResponse { code: *received })
                         }
-                        _ => emit!(AzureBlobHttpError {
+                        _ => emit!(&AzureBlobHttpError {
                             error: reason.to_string()
                         }),
                     };
                 })
                 .inspect_ok(|result| {
-                    emit!(AzureBlobEventSent {
+                    emit!(&AzureBlobEventSent {
                         request_id: result.request_id,
                         byte_size
                     })
@@ -279,7 +278,7 @@ fn encode_event(
     let key = blob_prefix
         .render_string(&event)
         .map_err(|error| {
-            emit!(TemplateRenderingFailed {
+            emit!(&TemplateRenderingFailed {
                 error,
                 field: Some("blob_prefix"),
                 drop_event: true,
@@ -287,6 +286,7 @@ fn encode_event(
         })
         .ok()?;
 
+    let byte_size = event.size_of();
     encoding.apply_rules(&mut event);
 
     let log = event.into_log();
@@ -307,10 +307,10 @@ fn encode_event(
         }
     };
 
-    Some(EncodedEvent::new(PartitionInnerBuffer::new(
-        bytes,
-        key.into(),
-    )))
+    Some(EncodedEvent::new(
+        PartitionInnerBuffer::new(bytes, key.into()),
+        byte_size,
+    ))
 }
 
 fn build_request(

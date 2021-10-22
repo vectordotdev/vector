@@ -233,13 +233,13 @@ impl IngestorProcess {
         let messages = self.receive_messages().await;
         let messages = messages
             .map(|messages| {
-                emit!(SqsMessageReceiveSucceeded {
+                emit!(&SqsMessageReceiveSucceeded {
                     count: messages.len(),
                 });
                 messages
             })
             .map_err(|err| {
-                emit!(SqsMessageReceiveFailed { error: &err });
+                emit!(&SqsMessageReceiveFailed { error: &err });
                 err
             })
             .unwrap_or_default();
@@ -264,7 +264,7 @@ impl IngestorProcess {
 
             match self.handle_sqs_message(message).await {
                 Ok(()) => {
-                    emit!(SqsMessageProcessingSucceeded {
+                    emit!(&SqsMessageProcessingSucceeded {
                         message_id: &message_id
                     });
                     if self.state.delete_message {
@@ -275,7 +275,7 @@ impl IngestorProcess {
                     }
                 }
                 Err(err) => {
-                    emit!(SqsMessageProcessingFailed {
+                    emit!(&SqsMessageProcessingFailed {
                         message_id: &message_id,
                         error: &err,
                     });
@@ -291,19 +291,19 @@ impl IngestorProcess {
                     // Batch deletes can have partial successes/failures, so we have to check
                     // for both cases and emit accordingly.
                     if !result.successful.is_empty() {
-                        emit!(SqsMessageDeleteSucceeded {
+                        emit!(&SqsMessageDeleteSucceeded {
                             message_ids: result.successful,
                         });
                     }
 
                     if !result.failed.is_empty() {
-                        emit!(SqsMessageDeletePartialFailure {
+                        emit!(&SqsMessageDeletePartialFailure {
                             entries: result.failed
                         });
                     }
                 }
                 Err(err) => {
-                    emit!(SqsMessageDeleteBatchFailed {
+                    emit!(&SqsMessageDeleteBatchFailed {
                         entries: cloned_entries,
                         error: err,
                     });
@@ -340,7 +340,7 @@ impl IngestorProcess {
         }
 
         if s3_event.event_name.kind != "ObjectCreated" {
-            emit!(SqsS3EventRecordInvalidEventIgnored {
+            emit!(&SqsS3EventRecordInvalidEventIgnored {
                 bucket: &s3_event.s3.bucket.name,
                 key: &s3_event.s3.object.key,
                 kind: &s3_event.event_name.kind,
@@ -435,7 +435,7 @@ impl IngestorProcess {
                 let aws_region = Bytes::from(s3_event.aws_region.as_str().as_bytes().to_vec());
 
                 let mut stream = lines.filter_map(|line| {
-                    emit!(SqsS3EventReceived {
+                    emit!(&SqsS3EventReceived {
                         byte_size: line.len()
                     });
 
@@ -445,6 +445,7 @@ impl IngestorProcess {
                     log.insert_flat("bucket", bucket_name.clone());
                     log.insert_flat("object", object_key.clone());
                     log.insert_flat("region", aws_region.clone());
+                    log.insert_flat(log_schema().source_type_key(), Bytes::from("aws_s3"));
                     log.insert_flat(log_schema().timestamp_key(), timestamp);
 
                     if let Some(metadata) = &metadata {

@@ -27,7 +27,12 @@ impl Function for ParseAwsAlbLog {
         }]
     }
 
-    fn compile(&self, _state: &state::Compiler, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _ctx: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(ParseAwsAlbLogFn::new(value)))
@@ -145,8 +150,8 @@ fn parse_log(mut input: &str) -> Result<Value> {
     field_raw!("type", take_while1(|c| matches!(c, 'a'..='z' | '0'..='9')));
     field!("timestamp", '0'..='9' | '.' | '-' | ':' | 'T' | 'Z');
     field_raw!("elb", take_anything);
-    field!("client_host", '0'..='9' | '.' | ':' | '-');
-    field!("target_host", '0'..='9' | '.' | ':' | '-');
+    field!("client_host", '0'..='9' | 'a'..='f' | '.' | ':' | '-');
+    field!("target_host", '0'..='9' | 'a'..='f' | '.' | ':' | '-');
     field_parse!("request_processing_time", '0'..='9' | '.' | '-', f64);
     field_parse!("target_processing_time", '0'..='9' | '.' | '-', f64);
     field_parse!("response_processing_time", '0'..='9' | '.' | '-', f64);
@@ -197,7 +202,7 @@ fn parse_log(mut input: &str) -> Result<Value> {
     field_raw!("error_reason", take_quoted1);
     field_raw!(
         "target_port_list",
-        take_maybe_quoted_list(|c| matches!(c, '0'..='9' | '.' | ':' | '-'))
+        take_maybe_quoted_list(|c| matches!(c, '0'..='9' | 'a'..='f' | '.' | ':' | '-'))
     );
     field_raw!(
         "target_status_code_list",
@@ -619,6 +624,42 @@ mod tests {
                              error_reason: null,
                              target_port_list: [],
                              target_status_code_list: [],
+                             classification: null,
+                             classification_reason: null})),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+        }
+
+        eleven {
+            args: func_args![value: r#"https 2021-03-16T20:20:00.135052Z app/awseb-AWSEB-1MVD8OW91UMOH/a32a5528b8fdaa6b 2601:6bbc:c529:9dad:6bbc:c529:9dad:6bbc:50599 fd6d:6bbc:c529:6::face:ed83:f46:80 0.001 0.052 0.000 200 200 589 2084 "POST https://test.domain.com:443/api/deposits/transactions:search?detailsLevel=FULL&offset=0&limit=50 HTTP/1.1" "User 1.0" ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2 arn:aws:elasticloadbalancing:us-east-1:755269215481:targetgroup/awseb-AWSEB-91MZX0WA1A0F/5a03cc723870f039 "Root=1-605112f0-31f367be4fd3da651daa4157" "some.domain.com" "arn:aws:acm:us-east-1:765229915481:certificate/d8450a8a-b4f6-4714-8535-17c625c36899" 0 2021-03-16T20:20:00.081000Z "waf,forward" "-" "-" "fd6d:6bbc:c529:27ff:b::dead:ed84:80" "200" "-" "-""#],
+            want: Ok(value!({type: "https",
+                             timestamp: "2021-03-16T20:20:00.135052Z",
+                             elb: "app/awseb-AWSEB-1MVD8OW91UMOH/a32a5528b8fdaa6b",
+                             client_host: "2601:6bbc:c529:9dad:6bbc:c529:9dad:6bbc:50599",
+                             target_host: "fd6d:6bbc:c529:6::face:ed83:f46:80",
+                             request_processing_time: 0.001,
+                             target_processing_time: 0.052,
+                             response_processing_time: 0.0,
+                             elb_status_code: "200",
+                             target_status_code: "200",
+                             received_bytes: 589,
+                             sent_bytes: 2084,
+                             request_method: "POST",
+                             request_url: "https://test.domain.com:443/api/deposits/transactions:search?detailsLevel=FULL&offset=0&limit=50",
+                             request_protocol: "HTTP/1.1",
+                             user_agent: "User 1.0",
+                             ssl_cipher: "ECDHE-RSA-AES128-GCM-SHA256",
+                             ssl_protocol: "TLSv1.2",
+                             target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:755269215481:targetgroup/awseb-AWSEB-91MZX0WA1A0F/5a03cc723870f039",
+                             trace_id: "Root=1-605112f0-31f367be4fd3da651daa4157",
+                             domain_name: "some.domain.com",
+                             chosen_cert_arn: "arn:aws:acm:us-east-1:765229915481:certificate/d8450a8a-b4f6-4714-8535-17c625c36899",
+                             matched_rule_priority: "0",
+                             request_creation_time: "2021-03-16T20:20:00.081000Z",
+                             actions_executed: "waf,forward",
+                             redirect_url: null,
+                             error_reason: null,
+                             target_port_list: ["fd6d:6bbc:c529:27ff:b::dead:ed84:80"],
+                             target_status_code_list: ["200"],
                              classification: null,
                              classification_reason: null})),
             tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),

@@ -1,7 +1,9 @@
 use crate::{
     config::Resource,
     event::Event,
-    internal_events::{ConnectionOpen, OpenGauge, TcpSendAckError, TcpSocketConnectionError},
+    internal_events::{
+        ConnectionOpen, OpenGauge, TcpBytesReceived, TcpSendAckError, TcpSocketConnectionError,
+    },
     shutdown::ShutdownSignal,
     sources::util::TcpError,
     tcp::TcpKeepaliveConfig,
@@ -11,11 +13,15 @@ use crate::{
 use bytes::Bytes;
 use futures::{future::BoxFuture, FutureExt, Sink, SinkExt, StreamExt};
 use listenfd::ListenFd;
+use pin_project::pin_project;
 use serde::{de, Deserialize, Deserializer, Serialize};
+use smallvec::SmallVec;
 use socket2::SockRef;
-use std::{fmt, io, mem::drop, net::SocketAddr, time::Duration};
+use std::net::{IpAddr, SocketAddr};
+use std::task::{Context, Poll};
+use std::{fmt, io, mem::drop, pin::Pin, time::Duration};
 use tokio::{
-    io::AsyncWriteExt,
+    io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf},
     net::{TcpListener, TcpStream},
     time::sleep,
 };
@@ -62,13 +68,14 @@ where
     // Should be default: `std::io::Error`.
     // Right now this is unstable: https://github.com/rust-lang/rust/issues/29661
     type Error: From<io::Error> + TcpError + std::fmt::Debug + std::fmt::Display + Send;
-    type Decoder: Decoder<Error = Self::Error> + Send + 'static + Send;
+    type Item: Into<SmallVec<[Event; 1]>> + Send;
+    type Decoder: Decoder<Item = (Self::Item, usize), Error = Self::Error> + Send + 'static;
 
     fn decoder(&self) -> Self::Decoder;
 
-    fn build_event(&self, frame: <Self::Decoder as Decoder>::Item, host: Bytes) -> Option<Event>;
+    fn handle_events(&self, _events: &mut [Event], _host: Bytes, _byte_size: usize) {}
 
-    fn build_ack(&self, _frame: &<Self::Decoder as Decoder>::Item) -> Bytes {
+    fn build_ack(&self, _item: &Self::Item) -> Bytes {
         Bytes::new()
     }
 
@@ -132,9 +139,8 @@ where
                             }
                         };
 
-                        let peer_addr = socket.peer_addr().ip().to_string();
+                        let peer_addr = socket.peer_addr();
                         let span = info_span!("connection", %peer_addr);
-                        let host = Bytes::from(peer_addr);
 
                         let tripwire = tripwire
                             .map(move |_| {
@@ -146,11 +152,10 @@ where
                             .boxed();
 
                         span.in_scope(|| {
-                            let peer_addr = socket.peer_addr();
                             debug!(message = "Accepted a new connection.", peer_addr = %peer_addr);
 
                             let open_token =
-                                connection_gauge.open(|count| emit!(ConnectionOpen { count }));
+                                connection_gauge.open(|count| emit!(&ConnectionOpen { count }));
 
                             let fut = handle_stream(
                                 shutdown_signal,
@@ -159,7 +164,7 @@ where
                                 receive_buffer_bytes,
                                 source,
                                 tripwire,
-                                host,
+                                peer_addr.ip(),
                                 out,
                             );
 
@@ -182,7 +187,7 @@ async fn handle_stream<T>(
     receive_buffer_bytes: Option<usize>,
     source: T,
     mut tripwire: BoxFuture<'static, ()>,
-    host: Bytes,
+    peer_addr: IpAddr,
     mut out: impl Sink<Event> + Send + 'static + Unpin,
 ) where
     <<T as TcpSource>::Decoder as tokio_util::codec::Decoder>::Item: std::marker::Send,
@@ -191,7 +196,7 @@ async fn handle_stream<T>(
     tokio::select! {
         result = socket.handshake() => {
             if let Err(error) = result {
-                emit!(TcpSocketConnectionError { error });
+                emit!(&TcpSocketConnectionError { error });
                 return;
             }
         },
@@ -212,7 +217,9 @@ async fn handle_stream<T>(
         }
     }
 
+    let socket = TcpSocketWrapper::new(socket, peer_addr);
     let mut reader = FramedRead::new(socket, source.decoder());
+    let host = Bytes::from(peer_addr.to_string());
 
     loop {
         tokio::select! {
@@ -221,7 +228,7 @@ async fn handle_stream<T>(
                 debug!("Start graceful shutdown.");
                 // Close our write part of TCP socket to signal the other side
                 // that it should stop writing and close the channel.
-                let socket = reader.get_ref();
+                let socket = reader.get_ref().get_ref();
                 if let Some(stream) = socket.get_ref() {
                     let socket = SockRef::from(stream);
                     if let Err(error) = socket.shutdown(std::net::Shutdown::Write) {
@@ -235,16 +242,16 @@ async fn handle_stream<T>(
             },
             res = reader.next() => {
                 match res {
-                    Some(Ok(frame)) => {
-                        let host = host.clone();
-                        let ack = source.build_ack(&frame);
-
-                        if let Some(event) = source.build_event(frame, host) {
+                    Some(Ok((item, byte_size))) => {
+                        let ack = source.build_ack(&item);
+                        let mut events = item.into();
+                        source.handle_events(&mut events, host.clone(), byte_size);
+                        for event in events {
                             match out.send(event).await {
                                 Ok(_) => {
                                     let stream = reader.get_mut();
                                     if let Err(error) = stream.write_all(&ack).await {
-                                        emit!(TcpSendAckError{ error });
+                                        emit!(&TcpSendAckError{ error });
                                         break;
                                     }
                                 }
@@ -317,6 +324,62 @@ where
             .checked_sub(1)
             .ok_or_else(|| de::Error::custom("systemd indices start from 1, found 0")),
         _ => Err(de::Error::custom("must start with \"systemd\"")),
+    }
+}
+
+/// This wraps the inner socket and emits `BytesReceived` with the
+/// actual number of bytes read before handling framing.
+#[pin_project]
+struct TcpSocketWrapper<T> {
+    #[pin]
+    inner: T,
+    peer_addr: IpAddr,
+}
+
+impl<T> TcpSocketWrapper<T> {
+    const fn new(inner: T, peer_addr: IpAddr) -> Self {
+        Self { inner, peer_addr }
+    }
+
+    const fn get_ref(&self) -> &T {
+        &self.inner
+    }
+}
+
+impl<T: AsyncRead> AsyncRead for TcpSocketWrapper<T> {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<tokio::io::Result<()>> {
+        let before = buf.filled().len();
+        let this = self.project();
+        let result = this.inner.poll_read(cx, buf);
+        if let Poll::Ready(Ok(())) = result {
+            emit!(&TcpBytesReceived {
+                byte_size: buf.filled().len() - before,
+                peer_addr: *this.peer_addr,
+            });
+        }
+        result
+    }
+}
+
+impl<T: AsyncWrite> AsyncWrite for TcpSocketWrapper<T> {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<Result<usize, io::Error>> {
+        self.project().inner.poll_write(cx, buf)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        self.project().inner.poll_flush(cx)
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        self.project().inner.poll_shutdown(cx)
     }
 }
 

@@ -134,9 +134,7 @@ impl Batch for LokiBuffer {
         config: BatchConfig,
         defaults: BatchSettings<Self>,
     ) -> Result<BatchSettings<Self>, BatchError> {
-        Ok(config
-            .use_size_as_events()?
-            .get_settings_or_default(defaults))
+        Ok(config.get_settings_or_default(defaults))
     }
 
     fn push(&mut self, mut item: Self::Input) -> PushResult<Self::Input> {
@@ -157,11 +155,11 @@ impl Batch for LokiBuffer {
         if item.event.timestamp < latest_timestamp {
             match self.out_of_order_action {
                 OutOfOrderAction::Drop => {
-                    emit!(LokiOutOfOrderEventDropped);
+                    emit!(&LokiOutOfOrderEventDropped);
                     return PushResult::Ok(self.is_full());
                 }
                 OutOfOrderAction::RewriteTimestamp => {
-                    emit!(LokiOutOfOrderEventRewritten);
+                    emit!(&LokiOutOfOrderEventRewritten);
                     item.event.timestamp = latest_timestamp;
                 }
             }
@@ -222,6 +220,10 @@ impl Batch for LokiBuffer {
     }
 
     fn finish(self) -> Self::Output {
+        if self.is_empty() {
+            return json!({ "streams": [] });
+        }
+
         let (partition, labels) = self.partition.expect("Batch is empty");
 
         let mut events = self.stream;
@@ -239,7 +241,7 @@ impl Batch for LokiBuffer {
 
         self.global_timestamps.insert(partition, latest_timestamp);
         if self.latest_timestamp == Some(None) {
-            emit!(LokiUniqueStream);
+            emit!(&LokiUniqueStream);
         }
 
         json!({
@@ -271,6 +273,18 @@ mod tests {
         );
         // Does the output JSON match what we expect?
         assert_eq!(json, expected_json);
+    }
+
+    #[test]
+    fn insert_nothing() {
+        let buffer = LokiBuffer::new(
+            BatchSettings::default().size,
+            Default::default(),
+            Default::default(),
+        );
+        assert_eq!(buffer.num_items, 0);
+        assert!(buffer.stream.is_empty());
+        test_finish(buffer, r#"{"streams":[]}"#);
     }
 
     #[test]

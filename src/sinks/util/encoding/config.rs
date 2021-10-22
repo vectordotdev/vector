@@ -26,27 +26,33 @@ pub struct EncodingConfig<E> {
     pub(crate) schema: Option<String>,
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
-    pub(crate) only_fields: Option<Vec<Vec<PathComponent>>>,
+    pub(crate) only_fields: Option<Vec<Vec<PathComponent<'static>>>>,
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) except_fields: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) timestamp_format: Option<TimestampFormat>,
 }
 
-impl<E> EncodingConfiguration<E> for EncodingConfig<E> {
-    fn codec(&self) -> &E {
+impl<E> EncodingConfiguration for EncodingConfig<E> {
+    type Codec = E;
+
+    fn codec(&self) -> &Self::Codec {
         &self.codec
     }
+
     fn schema(&self) -> &Option<String> {
         &self.schema
     }
+
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>> {
+    fn only_fields(&self) -> &Option<Vec<Vec<PathComponent<'static>>>> {
         &self.only_fields
     }
+
     fn except_fields(&self) -> &Option<Vec<String>> {
         &self.except_fields
     }
+
     fn timestamp_format(&self) -> &Option<TimestampFormat> {
         &self.timestamp_format
     }
@@ -156,7 +162,11 @@ where
             only_fields: inner.only_fields.map(|fields| {
                 fields
                     .iter()
-                    .map(|only| PathIter::new(only).collect())
+                    .map(|only| {
+                        PathIter::new(only)
+                            .map(|component| component.into_static())
+                            .collect()
+                    })
                     .collect()
             }),
             except_fields: inner.except_fields,

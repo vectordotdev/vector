@@ -8,6 +8,7 @@ use headers::{Authorization, HeaderMapExt};
 use http::{header::HeaderValue, request::Builder, uri::InvalidUri, HeaderMap, Request};
 use hyper::{
     body::{Body, HttpBody},
+    client,
     client::{Client, HttpConnector},
 };
 use hyper_openssl::HttpsConnector;
@@ -50,6 +51,14 @@ where
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
     ) -> Result<HttpClient<B>, HttpError> {
+        HttpClient::new_with_custom_client(tls_settings, proxy_config, &mut Client::builder())
+    }
+
+    pub fn new_with_custom_client(
+        tls_settings: impl Into<MaybeTlsSettings>,
+        proxy_config: &ProxyConfig,
+        client_builder: &mut client::Builder,
+    ) -> Result<HttpClient<B>, HttpError> {
         let mut http = HttpConnector::new();
         http.enforce_http(false);
 
@@ -70,7 +79,7 @@ where
         proxy_config
             .configure(&mut proxy)
             .context(MakeProxyConnector)?;
-        let client = Client::builder().build(proxy);
+        let client = client_builder.build(proxy);
 
         let version = crate::get_version();
         let user_agent = HeaderValue::from_str(&format!("Vector/{}", version))
@@ -88,7 +97,7 @@ where
 
         default_request_headers(&mut request, &self.user_agent);
 
-        emit!(http_client::AboutToSendHttpRequest { request: &request });
+        emit!(&http_client::AboutToSendHttpRequest { request: &request });
 
         let response = self.client.request(request);
 
@@ -108,7 +117,7 @@ where
             let response = response_result
                 .map_err(|error| {
                     // Emit the error into the internal events system.
-                    emit!(http_client::GotHttpError {
+                    emit!(&http_client::GotHttpError {
                         error: &error,
                         roundtrip
                     });
@@ -117,7 +126,7 @@ where
                 .context(CallRequest)?;
 
             // Emit the response into the internal events system.
-            emit!(http_client::GotHttpResponse {
+            emit!(&http_client::GotHttpResponse {
                 response: &response,
                 roundtrip
             });
@@ -149,7 +158,7 @@ impl<B> Service<Request<B>> for HttpClient<B>
 where
     B: fmt::Debug + HttpBody + Send + 'static,
     B::Data: Send,
-    B::Error: Into<crate::Error>,
+    B::Error: Into<crate::Error> + Send,
 {
     type Response = http::Response<Body>;
     type Error = HttpError;

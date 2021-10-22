@@ -1,6 +1,7 @@
-use super::InternalEvent;
+use crate::event::metric::{MetricKind, MetricValue};
 use metrics::counter;
 use serde_json::Error;
+use vector_core::internal_event::InternalEvent;
 
 #[cfg(feature = "sources-splunk_hec")]
 pub use self::source::*;
@@ -26,33 +27,44 @@ impl InternalEvent for SplunkEventEncodeError {
         error!(
             message = "Error encoding Splunk HEC event to JSON.",
             error = ?self.error,
+            error_type = "encode_failed",
+            stage = "processing",
             internal_log_rate_secs = 30,
         );
     }
 
     fn emit_metrics(&self) {
+        counter!("component_errors_total", 1, "error_type" => "encode_failed", "stage" => "processing");
         counter!("encode_errors_total", 1);
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct SplunkInvalidMetricReceived<'a> {
+    pub value: &'a MetricValue,
+    pub kind: &'a MetricKind,
+}
+
+impl<'a> InternalEvent for SplunkInvalidMetricReceived<'a> {
+    fn emit_logs(&self) {
+        warn!(
+            message = "Invalid metric received kind; dropping event.",
+            value = ?self.value,
+            kind = ?self.kind,
+            internal_log_rate_secs = 30,
+        )
+    }
+
+    fn emit_metrics(&self) {
+        counter!("processing_errors_total", 1, "error_type" => "invalid_metric_kind");
     }
 }
 
 #[cfg(feature = "sources-splunk_hec")]
 mod source {
-    use super::InternalEvent;
     use crate::sources::splunk_hec::ApiError;
     use metrics::counter;
-
-    #[derive(Debug)]
-    pub struct SplunkHecEventReceived;
-
-    impl InternalEvent for SplunkHecEventReceived {
-        fn emit_logs(&self) {
-            trace!(message = "Received one event.");
-        }
-
-        fn emit_metrics(&self) {
-            counter!("events_in_total", 1);
-        }
-    }
+    use vector_core::internal_event::InternalEvent;
 
     #[derive(Debug)]
     pub struct SplunkHecRequestReceived<'a> {
@@ -74,20 +86,24 @@ mod source {
     }
 
     #[derive(Debug)]
-    pub struct SplunkHecRequestBodyInvalid {
+    pub struct SplunkHecRequestBodyInvalidError {
         pub error: std::io::Error,
     }
 
-    impl InternalEvent for SplunkHecRequestBodyInvalid {
+    impl InternalEvent for SplunkHecRequestBodyInvalidError {
         fn emit_logs(&self) {
             error!(
                 message = "Invalid request body.",
                 error = ?self.error,
+                error_type = "parse_failed",
+                stage = "processing",
                 internal_log_rate_secs = 10
             );
         }
 
-        fn emit_metrics(&self) {}
+        fn emit_metrics(&self) {
+            counter!("component_errors_total", 1, "error_type" => "parse_failed", "stage" => "processing")
+        }
     }
 
     #[derive(Debug)]
@@ -100,12 +116,15 @@ mod source {
             error!(
                 message = "Error processing request.",
                 error = ?self.error,
+                error_type = "http_error",
+                stage = "receiving",
                 internal_log_rate_secs = 10
             );
         }
 
         fn emit_metrics(&self) {
             counter!("http_request_errors_total", 1);
+            counter!("component_errors_total", 1, "error_type" => "http_error", "stage" => "receiving")
         }
     }
 }

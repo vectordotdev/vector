@@ -1,4 +1,4 @@
-use crate::{Condition, IndexHandle, Table, TableRegistry};
+use crate::{Case, Condition, IndexHandle, Table, TableRegistry};
 use shared::btreemap;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -25,21 +25,48 @@ impl DummyEnrichmentTable {
             indexes,
         }
     }
+
+    pub(crate) fn new_with_data(data: BTreeMap<String, Value>) -> Self {
+        Self {
+            data,
+            indexes: Default::default(),
+        }
+    }
 }
 
 impl Table for DummyEnrichmentTable {
     fn find_table_row(
         &self,
+        _case: Case,
         _condition: &[Condition],
+        _select: Option<&[String]>,
         _index: Option<IndexHandle>,
     ) -> Result<BTreeMap<String, Value>, String> {
         Ok(self.data.clone())
     }
 
-    fn add_index(&mut self, fields: &[&str]) -> Result<IndexHandle, String> {
+    fn find_table_rows(
+        &self,
+        _case: Case,
+        _condition: &[Condition],
+        _select: Option<&[String]>,
+        _index: Option<IndexHandle>,
+    ) -> Result<Vec<BTreeMap<String, Value>>, String> {
+        Ok(vec![self.data.clone()])
+    }
+
+    fn add_index(&mut self, _case: Case, fields: &[&str]) -> Result<IndexHandle, String> {
         let mut indexes = self.indexes.lock().unwrap();
         indexes.push(fields.iter().map(|s| (*s).to_string()).collect());
         Ok(IndexHandle(indexes.len() - 1))
+    }
+
+    fn index_fields(&self) -> Vec<(Case, Vec<String>)> {
+        Vec::new()
+    }
+
+    fn needs_reload(&self) -> bool {
+        false
     }
 }
 
@@ -52,6 +79,23 @@ pub(crate) fn get_table_registry() -> TableRegistry {
     tables.insert("dummy2".to_string(), Box::new(DummyEnrichmentTable::new()));
 
     registry.load(tables);
+
+    registry
+}
+
+/// Create a table registry with dummy data
+pub(crate) fn get_table_registry_with_tables(
+    tables: Vec<(String, DummyEnrichmentTable)>,
+) -> TableRegistry {
+    let registry = TableRegistry::default();
+
+    let mut tablesmap: HashMap<String, Box<dyn Table + Send + Sync>> = HashMap::new();
+
+    for (name, table) in tables.into_iter() {
+        tablesmap.insert(name, Box::new(table) as Box<dyn Table + Send + Sync>);
+    }
+
+    registry.load(tablesmap);
 
     registry
 }

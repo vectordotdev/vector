@@ -53,8 +53,9 @@ components: {
 
 		configuration: #Schema
 
-		// `description` describes the components with a single paragraph.
-		// It is used for SEO purposes and should be full of relevant keywords.
+		// `description` describes the components with a single paragraph. It
+		// should be 1-3 sentences.  It is used for SEO purposes and should be
+		// full of relevant keywords.
 		description?: =~"[.]$"
 
 		env_vars: #EnvVars
@@ -172,6 +173,7 @@ components: {
 			collect?:  #FeaturesCollect
 			generate?: #FeaturesGenerate
 			multiline: #FeaturesMultiline
+			codecs?:   #FeaturesCodecs
 			encoding?: #FeaturesEncoding
 			receive?:  #FeaturesReceive
 		}
@@ -270,6 +272,11 @@ components: {
 		enabled: bool
 	}
 
+	#FeaturesCodecs: {
+		enabled:         bool
+		default_framing: string
+	}
+
 	#FeaturesEncoding: {
 		enabled: bool
 	}
@@ -354,7 +361,7 @@ components: {
 					enabled: bool
 
 					if enabled {
-						default: #EncodingCodec | null
+						batched: bool | *false
 						enum:    [#EncodingCodec, ...#EncodingCodec] | null
 					}
 				}
@@ -970,7 +977,7 @@ components: {
 					The global URL to proxy HTTPS requests through.
 
 					If another HTTPS proxy is set in the configuration file or at a component level,
-					this one will be overriden.
+					this one will be overridden.
 
 					The lowercase variant has priority over the uppercase one.
 					"""
@@ -1001,7 +1008,7 @@ components: {
 					"""
 				type: string: {
 					default: null
-					examples: ["localhost,.exampl.com,192.168.0.0./16", "*"]
+					examples: ["localhost,.example.com,192.168.0.0./16", "*"]
 					syntax: "literal"
 				}
 			}

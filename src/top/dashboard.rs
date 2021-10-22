@@ -1,5 +1,6 @@
 use super::{events::capture_key_press, state};
 use crossterm::{
+    cursor::Show,
     event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
@@ -82,9 +83,8 @@ impl HumanFormatter for i64 {
     }
 }
 
-static HEADER: [&str; 8] = [
+static HEADER: [&str; 7] = [
     "ID",
-    "Pipeline",
     "Kind",
     "Type",
     "Events In",
@@ -149,13 +149,12 @@ impl<'a> Widgets<'a> {
         let items = state.iter().map(|(_, r)| {
             let mut data = vec![
                 r.key.id().to_string(),
-                r.key.pipeline_str().unwrap_or_default().into(),
                 r.kind.clone(),
                 r.component_type.clone(),
             ];
 
             let formatted_metrics = [
-                match r.events_in_total {
+                match r.received_events_total {
                     0 => "N/A".to_string(),
                     v => format!(
                         "{} ({}/s)",
@@ -164,10 +163,10 @@ impl<'a> Widgets<'a> {
                         } else {
                             v.thousands_format()
                         },
-                        r.events_in_throughput_sec.human_format()
+                        r.received_events_throughput_sec.human_format()
                     ),
                 },
-                match r.events_out_total {
+                match r.sent_events_total {
                     0 => "N/A".to_string(),
                     v => format!(
                         "{} ({}/s)",
@@ -176,7 +175,7 @@ impl<'a> Widgets<'a> {
                         } else {
                             v.thousands_format()
                         },
-                        r.events_out_throughput_sec.human_format()
+                        r.sent_events_throughput_sec.human_format()
                     ),
                 },
                 match r.processed_bytes_total {
@@ -317,6 +316,7 @@ pub async fn init_dashboard<'a>(
     // Clean-up terminal
     terminal.backend_mut().execute(DisableMouseCapture)?;
     terminal.backend_mut().execute(LeaveAlternateScreen)?;
+    terminal.backend_mut().execute(Show)?;
 
     disable_raw_mode()?;
 

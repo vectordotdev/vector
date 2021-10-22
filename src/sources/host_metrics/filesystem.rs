@@ -1,4 +1,4 @@
-use super::{filter_result, FilterList, HostMetricsConfig};
+use super::{filter_result, FilterList, HostMetrics};
 use crate::event::metric::Metric;
 use chrono::Utc;
 use futures::{stream, StreamExt};
@@ -18,7 +18,7 @@ pub(super) struct FilesystemConfig {
     mountpoints: FilterList,
 }
 
-impl HostMetricsConfig {
+impl HostMetrics {
     pub async fn filesystem_metrics(&self) -> Vec<Metric> {
         match heim::disk::partitions().await {
             Ok(partitions) => {
@@ -28,7 +28,8 @@ impl HostMetricsConfig {
                     })
                     // Filter on configured mountpoints
                     .map(|partition| {
-                        self.filesystem
+                        self.config
+                            .filesystem
                             .mountpoints
                             .contains_path(Some(partition.mount_point()))
                             .then(|| partition)
@@ -36,7 +37,8 @@ impl HostMetricsConfig {
                     .filter_map(|partition| async { partition })
                     // Filter on configured devices
                     .map(|partition| {
-                        self.filesystem
+                        self.config
+                            .filesystem
                             .devices
                             .contains_path(partition.device().map(|d| d.as_ref()))
                             .then(|| partition)
@@ -44,7 +46,8 @@ impl HostMetricsConfig {
                     .filter_map(|partition| async { partition })
                     // Filter on configured filesystems
                     .map(|partition| {
-                        self.filesystem
+                        self.config
+                            .filesystem
                             .filesystems
                             .contains_str(Some(partition.file_system().as_str()))
                             .then(|| partition)
@@ -111,7 +114,7 @@ impl HostMetricsConfig {
                     .await
             }
             Err(error) => {
-                error!(message = "Failed to load partitions info", %error, internal_log_rate_secs = 60);
+                error!(message = "Failed to load partitions info.", %error, internal_log_rate_secs = 60);
                 vec![]
             }
         }
@@ -121,13 +124,15 @@ impl HostMetricsConfig {
 #[cfg(test)]
 mod tests {
     use super::super::tests::{all_gauges, assert_filtered_metrics, count_name, count_tag};
-    use super::super::HostMetricsConfig;
+    use super::super::{HostMetrics, HostMetricsConfig};
     use super::FilesystemConfig;
 
     #[cfg(not(target_os = "windows"))]
     #[tokio::test]
     async fn generates_filesystem_metrics() {
-        let metrics = HostMetricsConfig::default().filesystem_metrics().await;
+        let metrics = HostMetrics::new(HostMetricsConfig::default())
+            .filesystem_metrics()
+            .await;
         assert!(!metrics.is_empty());
         assert!(metrics.len() % 4 == 0);
         assert!(all_gauges(&metrics));
@@ -155,7 +160,9 @@ mod tests {
     #[cfg(target_os = "windows")]
     #[tokio::test]
     async fn generates_filesystem_metrics() {
-        let metrics = HostMetricsConfig::default().filesystem_metrics().await;
+        let metrics = HostMetrics::new(HostMetricsConfig::default())
+            .filesystem_metrics()
+            .await;
         assert!(!metrics.is_empty());
         assert!(metrics.len() % 3 == 0);
         assert!(all_gauges(&metrics));
@@ -182,13 +189,13 @@ mod tests {
     #[tokio::test]
     async fn filesystem_metrics_filters_on_device() {
         assert_filtered_metrics("device", |devices| async {
-            HostMetricsConfig {
+            HostMetrics::new(HostMetricsConfig {
                 filesystem: FilesystemConfig {
                     devices,
                     ..Default::default()
                 },
                 ..Default::default()
-            }
+            })
             .filesystem_metrics()
             .await
         })
@@ -198,13 +205,13 @@ mod tests {
     #[tokio::test]
     async fn filesystem_metrics_filters_on_filesystem() {
         assert_filtered_metrics("filesystem", |filesystems| async {
-            HostMetricsConfig {
+            HostMetrics::new(HostMetricsConfig {
                 filesystem: FilesystemConfig {
                     filesystems,
                     ..Default::default()
                 },
                 ..Default::default()
-            }
+            })
             .filesystem_metrics()
             .await
         })
@@ -214,13 +221,13 @@ mod tests {
     #[tokio::test]
     async fn filesystem_metrics_filters_on_mountpoint() {
         assert_filtered_metrics("mountpoint", |mountpoints| async {
-            HostMetricsConfig {
+            HostMetrics::new(HostMetricsConfig {
                 filesystem: FilesystemConfig {
                     mountpoints,
                     ..Default::default()
                 },
                 ..Default::default()
-            }
+            })
             .filesystem_metrics()
             .await
         })

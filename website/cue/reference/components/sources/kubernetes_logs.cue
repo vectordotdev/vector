@@ -112,6 +112,15 @@ components: sources: kubernetes_logs: {
 							syntax:  "literal"
 						}
 					}
+					pod_annotations: {
+						common:      false
+						description: "Event field for Pod annotations."
+						required:    false
+						type: string: {
+							default: "kubernetes.pod_annotations"
+							syntax:  "literal"
+						}
+					}
 					pod_name: {
 						common:      false
 						description: "Event field for Pod name."
@@ -145,6 +154,15 @@ components: sources: kubernetes_logs: {
 						required:    false
 						type: string: {
 							default: "kubernetes.pod_uid"
+							syntax:  "literal"
+						}
+					}
+					pod_owner: {
+						common:      false
+						description: "Event field for Pod owner reference."
+						required:    false
+						type: string: {
+							default: "kubernetes.pod_owner"
 							syntax:  "literal"
 						}
 					}
@@ -349,6 +367,15 @@ components: sources: kubernetes_logs: {
 					options: {}
 				}
 			}
+			"kubernetes.pod_annotations": {
+				description: "Set of annotations attached to the Pod."
+				required:    false
+				common:      true
+				type: object: {
+					examples: [{"myannotation": "myvalue"}]
+					options: {}
+				}
+			}
 			"kubernetes.pod_name": {
 				description: "Pod name."
 				required:    false
@@ -439,6 +466,9 @@ components: sources: kubernetes_logs: {
 					"addonmanager.kubernetes.io/mode": "Reconcile"
 					"gcp-auth-skip-secret":            "true"
 					"integration-test":                "storage-provisioner"
+				}
+				"kubernetes.pod_annotations": {
+					"prometheus.io/scrape": "false"
 				}
 				"kubernetes.pod_name":      "storage-provisioner"
 				"kubernetes.pod_namespace": "kube-system"
@@ -586,7 +616,7 @@ components: sources: kubernetes_logs: {
 						```
 
 						As with all Kubernetes resource limit recommendations, **use these
-						as a reference point and adjust as ncessary**. If your configured
+						as a reference point and adjust as necessary**. If your configured
 						Vector pipeline is complex, you may need more resources; if you
 						have a more straightforward pipeline, you may need less.
 						"""
@@ -636,7 +666,7 @@ components: sources: kubernetes_logs: {
 
 				If your cluster doesn't use any access control scheme	and doesn't
 				restrict access to the Kubernetes API, you don't need to do any extra
-				configuration - Vector willjust work.
+				configuration - Vector will just work.
 
 				Clusters using legacy ABAC scheme are not officially supported
 				(although Vector might work if you configure access properly) -
@@ -663,5 +693,6 @@ components: sources: kubernetes_logs: {
 		k8s_watcher_http_error_total:           components.sources.internal_metrics.output.metrics.k8s_watcher_http_error_total
 		processed_bytes_total:                  components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:                 components.sources.internal_metrics.output.metrics.processed_events_total
+		component_received_events_total:        components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }

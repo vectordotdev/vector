@@ -20,7 +20,6 @@ components: sinks: datadog_metrics: {
 			proxy: enabled:       true
 			request: {
 				enabled:                    true
-				concurrency:                5
 				rate_limit_duration_secs:   1
 				rate_limit_num:             5
 				retry_initial_backoff_secs: 1
@@ -79,5 +78,10 @@ components: sinks: datadog_metrics: {
 			set:          false
 			summary:      false
 		}
+	}
+
+	telemetry: metrics: {
+		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
 	}
 }

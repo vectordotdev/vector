@@ -3,8 +3,8 @@ use crate::{
     event::{proto::EventWrapper, Event},
     proto::vector as proto,
     sinks::util::{
-        retries::RetryLogic, sink, BatchConfig, BatchSettings, BatchSink, EncodedEvent,
-        EncodedLength, ServiceBuilderExt, TowerRequestConfig, VecBuffer,
+        retries::RetryLogic, BatchConfig, BatchSettings, BatchSink, EncodedEvent, EncodedLength,
+        ServiceBuilderExt, TowerRequestConfig, VecBuffer,
     },
     sinks::{Healthcheck, VectorSink},
     tls::{tls_connector_builder, MaybeTlsSettings, TlsConfig},
@@ -19,9 +19,9 @@ use snafu::Snafu;
 use std::task::{Context, Poll};
 use tonic::{body::BoxBody, IntoRequest};
 use tower::ServiceBuilder;
+use vector_core::ByteSizeOf;
 
 type Client = proto::Client<HyperSvc>;
-type Response = Result<tonic::Response<proto::PushEventsResponse>, tonic::Status>;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -235,21 +235,20 @@ impl tower::Service<Vec<EventWrapper>> for Client {
 }
 
 fn encode_event(mut event: Event) -> EncodedEvent<EventWrapper> {
+    let byte_size = event.size_of();
     let finalizers = event.metadata_mut().take_finalizers();
     let item = event.into();
 
-    EncodedEvent { item, finalizers }
+    EncodedEvent {
+        item,
+        finalizers,
+        byte_size,
+    }
 }
 
 impl EncodedLength for EventWrapper {
     fn encoded_length(&self) -> usize {
         self.encoded_len()
-    }
-}
-
-impl sink::Response for Response {
-    fn is_successful(&self) -> bool {
-        self.is_ok()
     }
 }
 

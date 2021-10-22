@@ -29,6 +29,8 @@
 //! implements `vrl:EnrichmentTableSearch` through with the enrichment tables
 //! can be searched.
 
+use crate::Case;
+
 use super::{Condition, IndexHandle, Table};
 use arc_swap::ArcSwap;
 use std::collections::{BTreeMap, HashMap};
@@ -44,7 +46,9 @@ pub struct TableRegistry {
 }
 
 impl TableRegistry {
-    /// Load the given Enrichment Tables into the registry.
+    /// Load the given Enrichment Tables into the registry. This can be new tables
+    /// loaded from the config, or tables that need to be reloaded because the
+    /// underlying data has changed.
     ///
     /// If there are no tables currently loaded into the registry, this is a
     /// simple operation, we simply load the tables into the `loading` field.
@@ -67,9 +71,6 @@ impl TableRegistry {
     /// Once loading is complete, the data is swapped out of `loading` and we
     /// return to a single copy of the tables.
     ///
-    /// TODO This function currently does nothing to reload the the underlying
-    /// data should it have changed in the enrichment source.
-    ///
     /// # Panics
     ///
     /// Panics if the Mutex is poisoned.
@@ -78,11 +79,13 @@ impl TableRegistry {
         let existing = self.tables.load();
         if let Some(existing) = &**existing {
             // We already have some tables
-            tables.extend(
-                existing
-                    .iter()
-                    .map(|(key, value)| (key.clone(), value.clone())),
-            );
+            let extend = existing
+                .iter()
+                .filter(|(key, _)| !tables.contains_key(*key))
+                .map(|(key, value)| (key.clone(), value.clone()))
+                .collect::<HashMap<_, _>>();
+
+            tables.extend(extend);
         }
         match *loading {
             None => *loading = Some(tables),
@@ -127,14 +130,19 @@ impl TableRegistry {
     /// # Panics
     ///
     /// Panics if the Mutex is poisoned.
-    pub fn add_index(&mut self, table: &str, fields: &[&str]) -> Result<IndexHandle, String> {
+    pub fn add_index(
+        &mut self,
+        table: &str,
+        case: Case,
+        fields: &[&str],
+    ) -> Result<IndexHandle, String> {
         let mut locked = self.loading.lock().unwrap();
 
         match *locked {
             None => Err("finish_load has been called".to_string()),
             Some(ref mut tables) => match tables.get_mut(table) {
                 None => Err(format!("table '{}' not loaded", table)),
-                Some(table) => table.add_index(fields),
+                Some(table) => table.add_index(case, fields),
             },
         }
     }
@@ -143,6 +151,30 @@ impl TableRegistry {
     /// access to the enrichment tables.
     pub fn as_readonly(&self) -> TableSearch {
         TableSearch(self.tables.clone())
+    }
+
+    /// Returns the indexes that have been applied to the given table.
+    /// If the table is reloaded we need these to reapply them to the new reloaded tables.
+    pub fn index_fields(&self, table: &str) -> Vec<(Case, Vec<String>)> {
+        match &**self.tables.load() {
+            Some(tables) => tables
+                .get(table)
+                .map(|table| table.index_fields())
+                .unwrap_or_default(),
+            None => Vec::new(),
+        }
+    }
+
+    /// Checks if the table needs reloading.
+    /// If in doubt (the table isn't in our list) we return true.
+    pub fn needs_reload(&self, table: &str) -> bool {
+        match &**self.tables.load() {
+            Some(tables) => tables
+                .get(table)
+                .map(|table| table.needs_reload())
+                .unwrap_or(true),
+            None => true,
+        }
     }
 }
 
@@ -165,14 +197,38 @@ impl TableSearch {
     pub fn find_table_row<'a>(
         &self,
         table: &str,
+        case: Case,
         condition: &'a [Condition<'a>],
+        select: Option<&[String]>,
         index: Option<IndexHandle>,
     ) -> Result<BTreeMap<String, vrl_core::Value>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
                 None => Err(format!("table {} not loaded", table)),
-                Some(table) => table.find_table_row(condition, index),
+                Some(table) => table.find_table_row(case, condition, select, index),
+            }
+        } else {
+            Err("finish_load not called".to_string())
+        }
+    }
+
+    /// Search the enrichment table data with the given condition.
+    /// All conditions must match (AND).
+    /// Can return multiple matched records
+    pub fn find_table_rows<'a>(
+        &self,
+        table: &str,
+        case: Case,
+        condition: &'a [Condition<'a>],
+        select: Option<&[String]>,
+        index: Option<IndexHandle>,
+    ) -> Result<Vec<BTreeMap<String, vrl_core::Value>>, String> {
+        let tables = self.0.load();
+        if let Some(ref tables) = **tables {
+            match tables.get(table) {
+                None => Err(format!("table {} not loaded", table)),
+                Some(table) => table.find_table_rows(case, condition, select, index),
             }
         } else {
             Err("finish_load not called".to_string())
@@ -238,7 +294,10 @@ mod tests {
         tables.insert("dummy1".to_string(), Box::new(dummy));
         let mut registry = super::TableRegistry::default();
         registry.load(tables);
-        assert_eq!(Ok(IndexHandle(0)), registry.add_index("dummy1", &["erk"]));
+        assert_eq!(
+            Ok(IndexHandle(0)),
+            registry.add_index("dummy1", Case::Sensitive, &["erk"])
+        );
 
         let indexes = indexes.lock().unwrap();
         assert_eq!(vec!["erk".to_string()], *indexes[0]);
@@ -257,10 +316,12 @@ mod tests {
             Err("finish_load not called".to_string()),
             tables.find_table_row(
                 "dummy1",
+                Case::Sensitive,
                 &[Condition::Equals {
                     field: "thing",
                     value: Value::from("thang"),
                 }],
+                None,
                 None
             )
         );
@@ -276,7 +337,7 @@ mod tests {
         registry.finish_load();
         assert_eq!(
             Err("finish_load has been called".to_string()),
-            registry.add_index("dummy1", &["erk"])
+            registry.add_index("dummy1", Case::Sensitive, &["erk"])
         );
     }
 
@@ -298,10 +359,12 @@ mod tests {
             }),
             tables_search.find_table_row(
                 "dummy1",
+                Case::Sensitive,
                 &[Condition::Equals {
                     field: "thing",
                     value: Value::from("thang"),
                 }],
+                None,
                 None
             )
         );
@@ -331,5 +394,59 @@ mod tests {
         table_ids.sort();
 
         assert_eq!(vec!["dummy1".to_string(), "dummy2".to_string()], table_ids,);
+    }
+
+    #[test]
+    fn reloads_existing_tables() {
+        let mut tables: TableMap = HashMap::new();
+        tables.insert("dummy1".to_string(), Box::new(DummyEnrichmentTable::new()));
+        tables.insert("dummy2".to_string(), Box::new(DummyEnrichmentTable::new()));
+
+        let registry = super::TableRegistry::default();
+        registry.load(tables);
+        registry.finish_load();
+
+        // After we finish load there are no tables in the list
+        assert!(registry.table_ids().is_empty());
+
+        let mut new_data = BTreeMap::new();
+        new_data.insert("thing".to_string(), Value::Null);
+
+        let mut tables: TableMap = HashMap::new();
+        tables.insert(
+            "dummy2".to_string(),
+            Box::new(DummyEnrichmentTable::new_with_data(new_data)),
+        );
+
+        // A load should put both tables back into the list.
+        registry.load(tables);
+        let tables = registry.loading.lock().unwrap();
+        let tables = tables.clone().unwrap();
+
+        // dummy1 should still have old data.
+        assert_eq!(
+            Value::from("result"),
+            tables
+                .get("dummy1")
+                .unwrap()
+                .find_table_row(Case::Sensitive, &Vec::new(), None, None)
+                .unwrap()
+                .get("field")
+                .cloned()
+                .unwrap()
+        );
+
+        // dummy2 should have new data.
+        assert_eq!(
+            Value::Null,
+            tables
+                .get("dummy2")
+                .unwrap()
+                .find_table_row(Case::Sensitive, &Vec::new(), None, None)
+                .unwrap()
+                .get("thing")
+                .cloned()
+                .unwrap()
+        );
     }
 }

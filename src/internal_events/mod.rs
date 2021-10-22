@@ -19,8 +19,10 @@ mod aws_ecs_metrics;
 mod aws_kinesis_firehose;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 mod aws_kinesis_streams;
-#[cfg(any(feature = "sources-aws_s3", feature = "sinks-aws_s3"))]
+#[cfg(feature = "sources-aws_s3")]
 pub(crate) mod aws_s3;
+#[cfg(feature = "sinks-aws_s3")]
+pub(crate) mod aws_s3_sink;
 #[cfg(feature = "sinks-aws_sqs")]
 mod aws_sqs;
 #[cfg(feature = "sinks-azure_blob")]
@@ -29,6 +31,7 @@ mod batch;
 mod blackhole;
 #[cfg(feature = "transforms-coercer")]
 mod coercer;
+mod common;
 #[cfg(feature = "transforms-concat")]
 mod concat;
 mod conditions;
@@ -133,7 +136,6 @@ mod tcp;
 mod template;
 #[cfg(feature = "transforms-tokenizer")]
 mod tokenizer;
-mod topology;
 mod udp;
 mod unix;
 mod vector;
@@ -159,12 +161,15 @@ pub use self::aws_ecs_metrics::*;
 pub use self::aws_kinesis_firehose::*;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 pub use self::aws_kinesis_streams::*;
+#[cfg(feature = "sinks-aws_s3")]
+pub use self::aws_s3_sink::*;
 #[cfg(feature = "sinks-aws_sqs")]
 pub use self::aws_sqs::*;
 pub use self::batch::*;
 pub use self::blackhole::*;
 #[cfg(feature = "transforms-coercer")]
 pub(crate) use self::coercer::*;
+pub use self::common::*;
 #[cfg(feature = "transforms-concat")]
 pub use self::concat::*;
 pub use self::conditions::*;
@@ -207,7 +212,13 @@ pub(crate) use self::grok_parser::*;
 pub use self::heartbeat::*;
 #[cfg(feature = "sources-host_metrics")]
 pub(crate) use self::host_metrics::*;
-#[cfg(any(feature = "sources-utils-http", feature = "sinks-http"))]
+#[cfg(any(
+    feature = "sources-utils-http",
+    feature = "sources-utils-http-encoding",
+    feature = "sinks-http",
+    feature = "sources-datadog",
+    feature = "sources-splunk_hec",
+))]
 pub(crate) use self::http::*;
 #[cfg(all(unix, feature = "sources-journald"))]
 pub(crate) use self::journald::*;
@@ -273,7 +284,6 @@ pub use self::tcp::*;
 pub use self::template::*;
 #[cfg(feature = "transforms-tokenizer")]
 pub(crate) use self::tokenizer::*;
-pub use self::topology::*;
 pub use self::udp::*;
 pub use self::unix::*;
 pub use self::vector::*;
@@ -282,20 +292,20 @@ pub use self::windows::*;
 #[cfg(feature = "sources-mongodb_metrics")]
 pub use mongodb_metrics::*;
 
-pub trait InternalEvent {
-    fn emit_logs(&self) {}
-    fn emit_metrics(&self) {}
+#[cfg(test)]
+#[macro_export]
+macro_rules! emit {
+    ($event:expr) => {{
+        crate::test_util::components::record_internal_event(stringify!($event));
+        vector_core::internal_event::emit($event)
+    }};
 }
 
-pub fn emit(event: impl InternalEvent) {
-    event.emit_logs();
-    event.emit_metrics();
-}
-
+#[cfg(not(test))]
 #[macro_export]
 macro_rules! emit {
     ($event:expr) => {
-        $crate::internal_events::emit($event)
+        vector_core::internal_event::emit($event)
     };
 }
 

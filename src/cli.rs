@@ -117,19 +117,6 @@ pub struct RootOpts {
     )]
     pub config_paths_yaml: Vec<PathBuf>,
 
-    /// Read pipeline configuration from files in one or more directories.
-    /// File format is detected from the file name.
-    ///
-    /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
-    #[structopt(
-        name = "pipeline-dir",
-        short = "P",
-        long,
-        env = "VECTOR_PIPELINE_DIR",
-        use_delimiter(true)
-    )]
-    pub pipeline_dirs: Vec<PathBuf>,
-
     /// Exit on startup if any sinks fail healthchecks
     #[structopt(short, long, env = "VECTOR_REQUIRE_HEALTHY")]
     pub require_healthy: Option<bool>,
@@ -163,11 +150,6 @@ pub struct RootOpts {
     /// Watch for changes in configuration file, and reload accordingly.
     #[structopt(short, long, env = "VECTOR_WATCH_CONFIG")]
     pub watch_config: bool,
-
-    /// Send internal tracing spans to a local APM-enabled Datadog agent with
-    /// a granularity matching the current log level. This is experimental.
-    #[structopt(long, env = "VECTOR_ENABLE_DATADOG_TRACING", takes_value(false))]
-    pub enable_datadog_tracing: bool,
 }
 
 impl RootOpts {
@@ -186,10 +168,6 @@ impl RootOpts {
                 .map(|dir| config::ConfigPath::Dir(dir.to_path_buf())),
         )
         .collect()
-    }
-
-    pub const fn pipeline_paths(&self) -> &Vec<PathBuf> {
-        &self.pipeline_dirs
     }
 }
 

@@ -31,12 +31,12 @@ Download Vector's source:
 ```shell
 # Latest ({{< version >}})
 mkdir -p vector && \
-  curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v{{< version >}} | \
+  curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/vectordotdev/vector/tarball/v{{< version >}} | \
   tar xzf - -C vector --strip-components=1
 
 # Master
 mkdir -p vector && \
-  curl -sSfL --proto '=https' --tlsv1.2 https://github.com/timberio/vector/archive/master.tar.gz | \
+  curl -sSfL --proto '=https' --tlsv1.2 https://github.com/vectordotdev/vector/archive/master.tar.gz | \
   tar xzf - -C vector --strip-components=1
 ```
 
@@ -78,12 +78,12 @@ Get Vector's source using Git:
 
 ```shell
 # Latest
-git clone https://github.com/timberio/vector
+git clone https://github.com/vectordotdev/vector
 git checkout v{{< version >}}
 cd vector
 
 # Master
-git clone https://github.com/timberio/vector
+git clone https://github.com/vectordotdev/vector
 cd vector
 ```
 
@@ -109,12 +109,12 @@ First, download Vector's source:
 ```shell
 # Latest ({{< version >}})
 mkdir -p vector && \
-  curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/timberio/vector/tarball/v{{< version >}} | \
+  curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/vectordotdev/vector/tarball/v{{< version >}} | \
   tar xzf - -C vector --strip-components=1
 
 # Master
 mkdir -p vector && \
-  curl -sSfL --proto '=https' --tlsv1.2 https://github.com/timberio/vector/archive/master.tar.gz | \
+  curl -sSfL --proto '=https' --tlsv1.2 https://github.com/vectordotdev/vector/archive/master.tar.gz | \
   tar xzf - -C vector --strip-components=1
 ```
 
@@ -224,7 +224,7 @@ In addition, it is possible to pick only a subset of Vector's components for the
 {{< details title="Click to see all component features" >}}
 <!-- TODO: create a dedicated shortcode for this -->
 
-**Vector component features**
+#### Vector component features
 
 Name | Description
 :----|:-----------
@@ -289,7 +289,7 @@ Name | Description
 | `sinks-sematext_logs`                                | Enables building the [`sematext_logs` sink](/docs/reference/configuration/sinks/sematext_logs)
 | `sinks-sematext_metrics`                             | Enables building the [`sematext_metrics` sink](/docs/reference/configuration/sinks/sematext_metrics)
 | `sinks-socket`                                       | Enables building the [`socket` sink](/docs/reference/configuration/sinks/socket)
-| `sinks-splunk_hec`                                   | Enables building the [`splunk_hec` sink](/docs/reference/configuration/sinks/splunk_hec)
+| `sinks-splunk_hec`                                 | Enables building the [`splunk_hec_logs` sink](/docs/reference/configuration/sinks/splunk_hec_logs)
 | `sinks-statsd`                                       | Enables building the [`statsd` sink](/docs/reference/configuration/sinks/statsd)
 | `sinks-vector`                                       | Enables building the [`vector` sink](/docs/reference/configuration/sinks/vector)
 {{< /details >}}

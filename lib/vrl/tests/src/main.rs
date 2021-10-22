@@ -1,3 +1,5 @@
+mod test_enrichment;
+
 use ansi_term::Colour;
 use chrono::{DateTime, SecondsFormat, Utc};
 use chrono_tz::Tz;
@@ -79,19 +81,22 @@ fn main() {
         })
         .chain({
             let mut tests = vec![];
-            stdlib::all().into_iter().for_each(|function| {
-                function.examples().iter().for_each(|example| {
-                    let test = Test::from_example(function.identifier(), example);
+            stdlib::all()
+                .into_iter()
+                .chain(enrichment::vrl_functions())
+                .for_each(|function| {
+                    function.examples().iter().for_each(|example| {
+                        let test = Test::from_example(function.identifier(), example);
 
-                    if let Some(pat) = &cmd.pattern {
-                        if !format!("{}/{}", test.category, test.name).contains(pat) {
-                            return;
+                        if let Some(pat) = &cmd.pattern {
+                            if !format!("{}/{}", test.category, test.name).contains(pat) {
+                                return;
+                            }
                         }
-                    }
 
-                    tests.push(test)
-                })
-            });
+                        tests.push(test)
+                    })
+                });
 
             tests.into_iter()
         })
@@ -125,7 +130,11 @@ fn main() {
 
         let state = state::Runtime::default();
         let mut runtime = Runtime::new(state);
-        let program = vrl::compile(&test.source, &stdlib::all(), None);
+        let mut functions = stdlib::all();
+        functions.append(&mut enrichment::vrl_functions());
+        let test_enrichment = Box::new(test_enrichment::test_enrichment_table());
+        let program = vrl::compile(&test.source, &functions, Some(test_enrichment.clone()));
+        test_enrichment.finish_load();
 
         let want = test.result.clone();
         let timezone = cmd.timezone();

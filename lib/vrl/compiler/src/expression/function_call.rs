@@ -1,5 +1,5 @@
 use crate::expression::{levenstein, ExpressionError, FunctionArgument, Noop};
-use crate::function::{ArgumentList, Parameter};
+use crate::function::{ArgumentList, FunctionCompileContext, Parameter};
 use crate::parser::{Ident, Node};
 use crate::{value::Kind, Context, Expression, Function, Resolved, Span, State, TypeDef};
 
@@ -162,8 +162,10 @@ impl FunctionCall {
                 })
             })?;
 
+        let compile_ctx = FunctionCompileContext { span: call_span };
+
         let mut expr = function
-            .compile(state, list)
+            .compile(state, &compile_ctx, list)
             .map_err(|error| Error::Compilation { call_span, error })?;
 
         // Asking for an infallible function to abort on error makes no sense.

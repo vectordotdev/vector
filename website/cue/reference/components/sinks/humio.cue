@@ -46,14 +46,12 @@ components: sinks: _humio: {
 				enabled: true
 				codec: {
 					enabled: true
-					default: null
 					enum: ["json", "text"]
 				}
 			}
 			proxy: enabled: true
 			request: {
 				enabled:                    true
-				concurrency:                10
 				rate_limit_duration_secs:   1
 				rate_limit_num:             10
 				retry_initial_backoff_secs: 1
@@ -174,5 +172,12 @@ components: sinks: _humio: {
 				syntax: "literal"
 			}
 		}
+	}
+
+	telemetry: metrics: {
+		component_sent_bytes_total:       components.sources.internal_metrics.output.metrics.component_sent_bytes_total
+		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
 	}
 }

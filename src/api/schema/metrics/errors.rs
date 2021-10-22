@@ -45,7 +45,7 @@ impl ComponentErrorsTotal {
         let component_key = metric.tag_value("component_id").expect(
             "Returned a metric without a `component_id`, which shouldn't happen. Please report.",
         );
-        let component_key = ComponentKey::from((metric.tag_value("pipeline_id"), component_key));
+        let component_key = ComponentKey::from(component_key);
 
         Self {
             component_key,
@@ -59,11 +59,6 @@ impl ComponentErrorsTotal {
     /// Component id
     async fn component_id(&self) -> &str {
         self.component_key.id()
-    }
-
-    /// Pipeline id
-    async fn pipeline_id(&self) -> Option<&str> {
-        self.component_key.pipeline_str()
     }
 
     /// Errors processed metric

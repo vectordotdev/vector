@@ -14,6 +14,10 @@ components: sources: stdin: {
 
 	features: {
 		multiline: enabled: false
+		codecs: {
+			enabled:         true
+			default_framing: "newline_delimited"
+		}
 		receive: {
 			from: {
 				service: services.stdin
@@ -106,9 +110,10 @@ components: sources: stdin: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:          components.sources.internal_metrics.output.metrics.events_in_total
-		processed_bytes_total:    components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:   components.sources.internal_metrics.output.metrics.processed_events_total
-		stdin_reads_failed_total: components.sources.internal_metrics.output.metrics.stdin_reads_failed_total
+		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
+		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:          components.sources.internal_metrics.output.metrics.processed_events_total
+		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
+		stdin_reads_failed_total:        components.sources.internal_metrics.output.metrics.stdin_reads_failed_total
 	}
 }

@@ -98,7 +98,7 @@ components: transforms: dedupe: {
 	}
 
 	how_it_works: {
-		cache_bahavior: {
+		cache_behavior: {
 			title: "Cache Behavior"
 			body: """
 				This transform is backed by an LRU cache of size `cache.num_events`.

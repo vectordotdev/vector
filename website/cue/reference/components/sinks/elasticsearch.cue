@@ -154,11 +154,47 @@ components: sinks: elasticsearch: {
 				Currently, Vector only supports `index` and `create`. `update` and `delete` actions are not supported.
 				"""
 			required:    false
-			warnings: []
+			warnings: ["This option has been deprecated, the `normal.bulk_action` option should be used."]
 			type: string: {
 				default: "index"
 				examples: ["index", "create", "{{ action }}"]
 				syntax: "template"
+			}
+		}
+		bulk: {
+			common:      true
+			description: "Options for the bulk mode."
+			required:    false
+			warnings: []
+			type: object: {
+				examples: []
+				options: {
+					action: {
+						common:      false
+						description: """
+							Action to use when making requests to the [Elasticsearch Bulk API](\(urls.elasticsearch_bulk)).
+							Currently, Vector only supports `index` and `create`. `update` and `delete` actions are not supported.
+							"""
+						required:    false
+						warnings: []
+						type: string: {
+							default: "index"
+							examples: ["index", "create", "{{ action }}"]
+							syntax: "template"
+						}
+					}
+					index: {
+						common:      true
+						description: "Index name to write events to."
+						required:    false
+						warnings: []
+						type: string: {
+							default: "vector-%F"
+							examples: ["application-{{ application_id }}-%Y-%m-%d", "vector-%Y-%m-%d"]
+							syntax: "template"
+						}
+					}
+				}
 			}
 		}
 		data_stream: {
@@ -244,7 +280,7 @@ components: sinks: elasticsearch: {
 		}
 		id_key: {
 			common:      false
-			description: "The name of the event key that should map to Elasticsearch's [`_id` field](\(urls.elasticsearch_id_field)). By default, Vector does not set the `_id` field, which allows Elasticsearch to set this automatically. You should think carefully about setting your own Elasticsearch IDs, since this can [hinder perofrmance](\(urls.elasticsearch_id_performance))."
+			description: "The name of the event key that should map to Elasticsearch's [`_id` field](\(urls.elasticsearch_id_field)). By default, Vector does not set the `_id` field, which allows Elasticsearch to set this automatically. You should think carefully about setting your own Elasticsearch IDs, since this can [hinder performance](\(urls.elasticsearch_id_performance))."
 			required:    false
 			warnings: []
 			type: string: {
@@ -257,7 +293,7 @@ components: sinks: elasticsearch: {
 			common:      true
 			description: "Index name to write events to."
 			required:    false
-			warnings: []
+			warnings: ["This option has been deprecated, the `normal.index` option should be used."]
 			type: string: {
 				default: "vector-%F"
 				examples: ["application-{{ application_id }}-%Y-%m-%d", "vector-%Y-%m-%d"]
@@ -289,12 +325,12 @@ components: sinks: elasticsearch: {
 		}
 		mode: {
 			common:      true
-			description: "The type of index mechanism. If `data_stream` mode is enabled, the `bulk_action` is set to `create`."
+			description: "The type of index mechanism. If `data_stream` mode is enabled, the `bulk.action` is set to `create`."
 			required:    false
 			warnings: []
 			type: string: {
-				default: "normal"
-				examples: ["normal", "data_stream"]
+				default: "bulk"
+				examples: ["bulk", "data_stream"]
 				syntax: "literal"
 			}
 		}
@@ -362,7 +398,11 @@ components: sinks: elasticsearch: {
 	}
 
 	telemetry: metrics: {
-		events_discarded_total:  components.sources.internal_metrics.output.metrics.events_discarded_total
-		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
+		component_sent_bytes_total:       components.sources.internal_metrics.output.metrics.component_sent_bytes_total
+		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		events_discarded_total:           components.sources.internal_metrics.output.metrics.events_discarded_total
+		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
+		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

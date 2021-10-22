@@ -13,7 +13,7 @@ components: sinks: vector: {
 		commonly_used: false
 		delivery:      "best_effort"
 		development:   "beta"
-		egress_method: "stream"
+		egress_method: "batch"
 		service_providers: []
 		stateful: false
 	}
@@ -21,6 +21,11 @@ components: sinks: vector: {
 		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
+			batch: {
+				enabled:      true
+				common:       false
+				timeout_secs: 1
+			}
 			compression: enabled:       false
 			encoding: enabled:          false
 			send_buffer_bytes: enabled: true
@@ -28,7 +33,7 @@ components: sinks: vector: {
 			request: {
 				enabled:       true
 				headers:       false
-				relevant_when: "version = \"v2\""
+				relevant_when: "version = \"2\""
 			}
 
 			tls: {
@@ -109,8 +114,10 @@ components: sinks: vector: {
 	how_it_works: components.sources.vector.how_it_works
 
 	telemetry: metrics: {
-		processed_bytes_total:        components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:       components.sources.internal_metrics.output.metrics.processed_events_total
-		protobuf_decode_errors_total: components.sources.internal_metrics.output.metrics.protobuf_decode_errors_total
+		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		processed_bytes_total:            components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:           components.sources.internal_metrics.output.metrics.processed_events_total
+		protobuf_decode_errors_total:     components.sources.internal_metrics.output.metrics.protobuf_decode_errors_total
 	}
 }

@@ -6,11 +6,11 @@ use futures::stream::Stream;
 use pin_project::pin_project;
 use std::collections::HashMap;
 use std::hash::{BuildHasherDefault, Hash};
-use std::mem;
 use std::num::NonZeroUsize;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
+use std::{cmp, mem};
 use tokio_util::time::delay_queue::Key;
 use tokio_util::time::DelayQueue;
 use twox_hash::XxHash64;
@@ -28,7 +28,7 @@ pub struct ExpirationQueue<K> {
 impl<K> ExpirationQueue<K> {
     /// Creates a new `ExpirationQueue`.
     ///
-    /// `timeout is used for all insertions and resets.
+    /// `timeout` is used for all insertions and resets.
     pub fn new(timeout: Duration) -> Self {
         Self {
             timeout,
@@ -133,24 +133,33 @@ where
 {
     /// Create a new Batch instance
     ///
-    /// Creates a new batch instance with specific element and allocation
-    /// limits. The element limit is a maximum cap on the number of `I`
-    /// instances. The allocation limit is a soft-max on the number of allocated
-    /// bytes stored in this batch, not taking into account overhead from this
-    /// structure itself. Caller is responsible for ensuring that `I` will fit
-    /// inside the allocation limit.
+    /// Creates a new batch instance with specific element and allocation limits. The element limit
+    /// is a maximum cap on the number of `I` instances. The allocation limit is a soft-max on the
+    /// number of allocated bytes stored in this batch, not taking into account overhead from this
+    /// structure itself.
     ///
-    /// # Panics
-    ///
-    /// This function will panic if the allocation limit will not store at least
-    /// 1 instance of `I`, as measured by `mem::size_of`.
+    /// If `allocation_limit` is smaller than the size of `I` as reported by `std::mem::size_of`,
+    /// then the allocation limit will be raised such that the batch can hold a single instance of
+    /// `I`.  Likewise, `element_limit` will be raised such that it is always at least 1, ensuring
+    /// that a new batch can be pushed into.
     fn new(element_limit: usize, allocation_limit: usize) -> Self {
-        assert!(allocation_limit >= mem::size_of::<I>());
+        // SAFETY: `element_limit` is always non-zero because `BatcherSettings` can only be
+        // constructed with `NonZeroUsize` versions of allocation limit/item limit.  `Batch` is also
+        // only constructable via `Batcher`.
+
+        // TODO: This may need to be reworked, because it's subtly wrong as-is.
+        // ByteSizeOf::size_of() always returns the size of the type itself, plus any "allocated
+        // bytes".  Thus, there are times when an item will be bigger than simply the size of the
+        // type itself (aka mem::size_of::<I>()) and thus than type of item would never fit in a
+        // batch where the `allocation_limit` is at or lower than the size of that item.
+        //
+        // We're counteracting this here by ensuring that the element limit is always at least 1.
+        let allocation_limit = cmp::max(allocation_limit, mem::size_of::<I>());
         Self {
             allocated_bytes: 0,
             element_limit,
             allocation_limit,
-            elements: Vec::with_capacity(element_limit),
+            elements: Vec::with_capacity(128),
         }
     }
 
@@ -201,6 +210,34 @@ where
     }
 }
 
+/// Controls the behavior of the batcher in terms of batch size and flush interval.
+///
+/// This is a temporary solution for pushing in a fixed settings structure so we don't have to worry
+/// about misordering parameters and what not.  At some point, we will pull
+/// `BatchConfig`/`BatchSettings`/`BatchSize` out of `vector` and move them into `vector_core`, and
+/// make it more generalized. We can't do that yet, though, until we've converted all of the sinks
+/// with their various specialized batch buffers.
+#[derive(Copy, Clone, Debug)]
+pub struct BatcherSettings {
+    timeout: Duration,
+    size_limit: usize,
+    item_limit: usize,
+}
+
+impl BatcherSettings {
+    pub const fn new(
+        timeout: Duration,
+        size_limit: NonZeroUsize,
+        item_limit: NonZeroUsize,
+    ) -> Self {
+        BatcherSettings {
+            timeout,
+            size_limit: size_limit.get(),
+            item_limit: item_limit.get(),
+        }
+    }
+}
+
 #[pin_project]
 pub struct Batcher<St, Prt, KT>
 where
@@ -229,23 +266,18 @@ where
 
 impl<St, Prt> Batcher<St, Prt, ExpirationQueue<Prt::Key>>
 where
-    St: Stream + Unpin,
+    St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
+    Prt::Key: Eq + Hash + Clone,
+    Prt::Item: ByteSizeOf,
 {
-    pub fn new(
-        stream: St,
-        partitioner: Prt,
-        batch_timeout: Duration,
-        batch_item_limit: NonZeroUsize,
-        batch_allocation_limit: Option<NonZeroUsize>,
-    ) -> Self {
+    pub fn new(stream: St, partitioner: Prt, settings: BatcherSettings) -> Self {
         Self {
-            batch_allocation_limit: batch_allocation_limit
-                .map_or(usize::max_value(), NonZeroUsize::get),
-            batch_item_limit: batch_item_limit.get(),
+            batch_allocation_limit: settings.size_limit,
+            batch_item_limit: settings.item_limit,
             batches: HashMap::default(),
             closed_batches: Vec::default(),
-            timer: ExpirationQueue::new(batch_timeout),
+            timer: ExpirationQueue::new(settings.timeout),
             partitioner,
             stream,
         }
@@ -254,8 +286,10 @@ where
 
 impl<St, Prt, KT> Batcher<St, Prt, KT>
 where
-    St: Stream + Unpin,
+    St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
+    Prt::Key: Eq + Hash + Clone,
+    Prt::Item: ByteSizeOf,
 {
     pub fn with_timer(
         stream: St,
@@ -279,7 +313,7 @@ where
 
 impl<St, Prt, KT> Stream for Batcher<St, Prt, KT>
 where
-    St: Stream<Item = Prt::Item> + Unpin,
+    St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
     Prt::Key: Eq + Hash + Clone,
     Prt::Item: ByteSizeOf,
@@ -443,12 +477,12 @@ mod test {
             .prop_map(TestTimer::new)
     }
 
-    #[pin_project]
-    #[derive(Debug)]
     /// A test partitioner
     ///
     /// This partitioner is nothing special. It has a large-ish key space but
     /// not so large that we'll never see batches accumulate properly.
+    #[pin_project]
+    #[derive(Debug)]
     struct TestPartitioner {
         key_space: NonZeroU8,
     }
@@ -649,6 +683,7 @@ mod test {
     }
 
     #[tokio::test(start_paused = true)]
+    #[allow(clippy::semicolon_if_nothing_returned)] // https://github.com/rust-lang/rust-clippy/issues/7438
     async fn expiration_queue_impl_keyed_timer() {
         // Asserts that ExpirationQueue properly implements KeyedTimer. We are
         // primarily concerned with whether expiration is properly observed.

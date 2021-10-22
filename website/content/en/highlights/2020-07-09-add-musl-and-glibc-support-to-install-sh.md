@@ -43,7 +43,7 @@ You **should not need to do anything**. If you are using a normal, recommended m
 If you're provisioning Vector, the best way to make sure you get the most up to date stable version is to run this:
 
 ```bash title="provision_vector.sh"
-curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh -s -- -y
+curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash -s -- -y
 ```
 
 If you don't need the latest and greatest, **check your official distribution repository.** Some distributions, such as [NixOS][urls.nixos], have official Vector packages. You can also find Vector packages in the official [FreeBSD][urls.freebsd] repositories.
@@ -51,8 +51,8 @@ If you don't need the latest and greatest, **check your official distribution re
 Interested in packaging Vector for your OS? We are too. [Why don't you let us know it's important to you?][urls.new_feature_request]
 
 [urls.freebsd]: https://www.freebsd.org/
-[urls.new_bug_report]: https://github.com/timberio/vector/issues/new?labels=type%3A+bug
-[urls.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature
+[urls.new_bug_report]: https://github.com/vectordotdev/vector/issues/new?labels=type%3A+bug
+[urls.new_feature_request]: https://github.com/vectordotdev/vector/issues/new?labels=type%3A+new+feature
 [urls.nixos]: https://nixos.org/
 [urls.vector_download]: https://vector.dev/releases/latest/download/
-[urls.vector_glibc_benchmarks]: https://github.com/timberio/vector/issues/2313
+[urls.vector_glibc_benchmarks]: https://github.com/vectordotdev/vector/issues/2313

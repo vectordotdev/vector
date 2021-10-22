@@ -43,7 +43,8 @@ ignore = [
     # https://github.com/timberio/vector/issues/5585
     "RUSTSEC-2020-0056",
 
-    # difference is unmaintained
-    # https://github.com/timberio/vector/issues/6224
-    "RUSTSEC-2020-0095",
+    # Potential segfault in the time crate
+    # https://github.com/vectordotdev/vector/issues/9673
+    "RUSTSEC-2020-0071",
+    "RUSTSEC-2020-0159"
 ]

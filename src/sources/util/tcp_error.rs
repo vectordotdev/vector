@@ -2,6 +2,9 @@
 
 use tokio_util::codec::LinesCodecError;
 
+// TODO: Rename to reflect that this error can generally appear in stream based
+// decoding operations rather than only in TCP streams.
+//
 /// An error that occurs in the context of TCP connections.
 pub trait TcpError {
     /// Whether it is reasonable to assume that continuing to read from the TCP

@@ -37,6 +37,7 @@ use tokio::{
     net::TcpStream,
     time::sleep,
 };
+use vector_core::ByteSizeOf;
 
 #[derive(Debug, Snafu)]
 enum TcpError {
@@ -175,13 +176,13 @@ impl TcpConnector {
         loop {
             match self.connect().await {
                 Ok(socket) => {
-                    emit!(TcpSocketConnectionEstablished {
+                    emit!(&TcpSocketConnectionEstablished {
                         peer_addr: socket.peer_addr().ok(),
                     });
                     return socket;
                 }
                 Err(error) => {
-                    emit!(TcpSocketConnectionFailed { error });
+                    emit!(&TcpSocketConnectionFailed { error });
                     sleep(backoff.next().unwrap()).await;
                 }
             }
@@ -249,22 +250,27 @@ impl TcpSink {
 
 #[async_trait]
 impl StreamSink for TcpSink {
-    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         // We need [Peekable](https://docs.rs/futures/0.3.6/futures/stream/struct.Peekable.html) for initiating
         // connection only when we have something to send.
         let encode_event = Arc::clone(&self.encode_event);
         let mut input = input
             .map(|mut event| {
+                let byte_size = event.size_of();
                 let finalizers = event.metadata_mut().take_finalizers();
                 encode_event(event)
-                    .map(|item| EncodedEvent { item, finalizers })
-                    .unwrap_or_else(|| EncodedEvent::new(Bytes::new()))
+                    .map(|item| EncodedEvent {
+                        item,
+                        finalizers,
+                        byte_size,
+                    })
+                    .unwrap_or_else(|| EncodedEvent::new(Bytes::new(), 0))
             })
             .peekable();
 
         while Pin::new(&mut input).peek().await.is_some() {
             let mut sink = self.connect().await;
-            let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
+            let _open_token = OpenGauge::new().open(|count| emit!(&ConnectionOpen { count }));
 
             let result = match sink
                 .send_all_peekable(&mut (&mut input).map(|item| item.item).peekable())
@@ -276,9 +282,9 @@ impl StreamSink for TcpSink {
 
             if let Err(error) = result {
                 if error.kind() == ErrorKind::Other && error.to_string() == "ShutdownCheck::Close" {
-                    emit!(TcpSocketConnectionShutdown {});
+                    emit!(&TcpSocketConnectionShutdown {});
                 } else {
-                    emit!(TcpSocketError { error });
+                    emit!(&TcpSocketError { error });
                 }
             }
         }

@@ -8,6 +8,8 @@ use http::{
     Method, Request, Response, StatusCode,
 };
 use hyper::body::{Body, HttpBody};
+use once_cell::sync::OnceCell;
+use regex::bytes::RegexSet;
 use rusoto_core::{
     request::{
         DispatchSignedRequest, DispatchSignedRequestFuture, HttpDispatchError, HttpResponse,
@@ -32,13 +34,24 @@ use tower::{Service, ServiceExt};
 pub mod auth;
 pub mod region;
 pub use auth::AwsAuthentication;
+use hyper::client;
 pub use region::{region_from_endpoint, RegionOrEndpoint};
+use rusoto_core::credential::ProfileProvider;
 
 pub type Client = HttpClient<super::http::HttpClient<RusotoBody>>;
 
 pub fn client(proxy: &ProxyConfig) -> crate::Result<Client> {
     let settings = MaybeTlsSettings::enable_client()?;
     let client = super::http::HttpClient::new(settings, proxy)?;
+    Ok(HttpClient { client })
+}
+
+pub fn custom_client(
+    proxy: &ProxyConfig,
+    client_builder: &mut client::Builder,
+) -> crate::Result<Client> {
+    let settings = MaybeTlsSettings::enable_client()?;
+    let client = super::http::HttpClient::new_with_custom_client(settings, proxy, client_builder)?;
     Ok(HttpClient { client })
 }
 
@@ -98,6 +111,7 @@ pub enum AwsCredentialsProvider {
     Default(AutoRefreshingProvider<CustomChainProvider>),
     Role(AutoRefreshingProvider<StsAssumeRoleSessionCredentialsProvider>),
     Static(StaticProvider),
+    File(AutoRefreshingProvider<ProfileProvider>),
 }
 
 impl fmt::Debug for AwsCredentialsProvider {
@@ -106,6 +120,7 @@ impl fmt::Debug for AwsCredentialsProvider {
             Self::Default(_) => "default",
             Self::Role(_) => "role",
             Self::Static(_) => "static",
+            Self::File(_) => "file",
         };
 
         f.debug_tuple("AwsCredentialsProvider")
@@ -158,6 +173,15 @@ impl AwsCredentialsProvider {
             secret_key.into(),
         ))
     }
+
+    pub fn new_with_credentials_file(credentials_file: &str, profile: &str) -> crate::Result<Self> {
+        let creds = AutoRefreshingProvider::new(ProfileProvider::with_configuration(
+            credentials_file,
+            profile,
+        ))
+        .context(InvalidAwsCredentials)?;
+        Ok(Self::File(creds))
+    }
 }
 
 #[async_trait]
@@ -167,6 +191,7 @@ impl ProvideAwsCredentials for AwsCredentialsProvider {
             Self::Default(p) => p.credentials(),
             Self::Role(p) => p.credentials(),
             Self::Static(p) => p.credentials(),
+            Self::File(p) => p.credentials(),
         };
         fut.await
     }
@@ -339,14 +364,43 @@ impl From<Option<SignedRequestPayload>> for RusotoBody {
     }
 }
 
+static RETRIABLE_CODES: OnceCell<RegexSet> = OnceCell::new();
+
 pub fn is_retriable_error<T>(error: &RusotoError<T>) -> bool {
     match error {
         RusotoError::HttpDispatch(_) => true,
-        RusotoError::Unknown(res)
-            if res.status.is_server_error()
-                || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
-        {
-            true
+        RusotoError::Unknown(response) => {
+            // This header is a direct indication that we should retry the request. Eventually it'd
+            // be nice to actually schedule the retry after the given delay, but for now we just
+            // check that it contains a positive value.
+            let retry_header = response
+                .headers
+                .get("x-amz-retry-after")
+                .and_then(|value| value.parse::<isize>().ok())
+                .filter(|duration| *duration > 0);
+
+            // Certain 400-level responses will contain an error code indicating that the request
+            // should be retried. Since we don't retry 400-level responses by default, we'll look
+            // for these specifically before falling back to more general heuristics. Because AWS
+            // services use a mix of XML and JSON response bodies and Rusoto doesn't give us
+            // a parsed representation, we resort to a simple string match.
+            //
+            // S3: RequestTimeout
+            // SQS: RequestExpired, ThrottlingException
+            // ECS: RequestExpired, ThrottlingException
+            // Kinesis: RequestExpired, ThrottlingException
+            // Cloudwatch: RequestExpired, ThrottlingException
+            //
+            // Now just look for those when it's a client_error
+            let re = RETRIABLE_CODES.get_or_init(|| {
+                RegexSet::new(&["RequestTimeout", "RequestExpired", "ThrottlingException"])
+                    .expect("invalid regex")
+            });
+
+            retry_header.is_some()
+                || response.status.is_server_error()
+                || response.status == http::StatusCode::TOO_MANY_REQUESTS
+                || (response.status.is_client_error() && re.is_match(&response.body))
         }
         _ => false,
     }

@@ -1,8 +1,16 @@
 #![deny(missing_docs)]
 
+mod bytes;
 mod character_delimited;
+mod length_delimited;
+mod newline_delimited;
+mod octet_counting;
 
+pub use self::bytes::{BytesCodec, BytesDecoderConfig};
 pub use character_delimited::{CharacterDelimitedCodec, CharacterDelimitedDecoderConfig};
+pub use length_delimited::{LengthDelimitedCodec, LengthDelimitedDecoderConfig};
+pub use newline_delimited::{NewlineDelimitedCodec, NewlineDelimitedDecoderConfig};
+pub use octet_counting::{OctetCountingCodec, OctetCountingDecoderConfig};
 
 use crate::sources::util::TcpError;
 use ::bytes::Bytes;
@@ -47,22 +55,25 @@ impl TcpError for BoxedFramingError {
 
 /// Produce byte frames from a byte stream / byte message.
 pub trait Framer:
-    tokio_util::codec::Decoder<Item = Bytes, Error = BoxedFramingError> + DynClone + Send + Sync
+    tokio_util::codec::Decoder<Item = Bytes, Error = BoxedFramingError> + DynClone + Debug + Send + Sync
 {
 }
 
 /// Default implementation for `Framer`s that implement
-/// `tokio_util::codec::Decoder` and `Clone`.
+/// `tokio_util::codec::Decoder`.
 impl<Decoder> Framer for Decoder where
-    Decoder:
-        tokio_util::codec::Decoder<Item = Bytes, Error = BoxedFramingError> + Clone + Send + Sync
+    Decoder: tokio_util::codec::Decoder<Item = Bytes, Error = BoxedFramingError>
+        + Clone
+        + Debug
+        + Send
+        + Sync
 {
 }
 
 dyn_clone::clone_trait_object!(Framer);
 
-/// A `Box` containing a thread-safe `Framer`.
-pub type BoxedFramer = Box<dyn Framer + Send + Sync>;
+/// A `Box` containing a `Framer`.
+pub type BoxedFramer = Box<dyn Framer>;
 
 /// Define options for a framer and build it from the config object.
 ///

@@ -1,6 +1,7 @@
 name: Integration Test Suite
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - master
@@ -19,7 +20,7 @@ on:
       - "Cargo.toml"
       - "Makefile"
       - "rust-toolchain"
-  workflow_dispatch:
+  pull_request:
 
 env:
   AUTOINSTALL: true
@@ -45,46 +46,39 @@ jobs:
           access_token: ${{ secrets.GITHUB_TOKEN }}
           all_but_latest: true # can cancel workflows scheduled later
 
-  test-integration-aws:
-    name: Integration - Linux, AWS
+  test-integration:
+    name: Integration - Linux, ${{ matrix.test }}
     runs-on: ubuntu-20.04
+    if: |
+      !github.event.pull_request
+        || contains(github.event.pull_request.labels.*.name, 'ci-condition: integration tests enable')
+    strategy:
+      fail-fast: false
+      matrix:
+       include:
+         - test: 'aws'
+         - test: 'azure'
+         - test: 'clickhouse'
+         - test: 'docker-logs'
+         - test: 'elasticsearch'
+         - test: 'eventstoredb_metrics'
+         - test: 'fluent'
+         - test: 'gcp'
+         - test: 'humio'
+         - test: 'influxdb'
+         - test: 'kafka'
+         - test: 'logstash'
+         - test: 'loki'
+         - test: 'mongodb_metrics'
+         - test: 'nginx'
+         - test: 'postgresql_metrics'
+         - test: 'prometheus'
+         - test: 'pulsar'
+         - test: 'redis'
+         - test: 'splunk'
+         - test: 'dnstap'
     steps:
-      - uses: actions/checkout@v2.3.4
-      - run: make ci-sweep
-      - uses: actions/cache@v2.1.6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test-integration-aws
-
-  test-integration-clickhouse:
-    name: Integration - Linux, Clickhouse
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2.3.4
-      - run: make ci-sweep
-      - uses: actions/cache@v2.1.6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: make slim-builds
-      - run: make test-integration-clickhouse
-
-  test-integration-dnstap:
-    name: Integration - Linux, Dnstap
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.5
       - run: make ci-sweep
       - uses: actions/cache@v2.1.4
         with:
@@ -96,351 +90,23 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
-      - run: make test-integration-dnstap
+      - run: make test-integration-${{ matrix.test }}
 
-  test-integration-docker-logs:
-    name: Integration - Linux, Docker
-    runs-on: ubuntu-20.04
+  test-integration-check:
+    name: test-integration-check
+    runs-on: ubuntu-latest
+    needs:
+      - test-integration
     steps:
-      - uses: actions/checkout@v2.3.4
-      - run: make ci-sweep
-      - uses: actions/cache@v2.1.6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test-integration-docker-logs
-
-  test-integration-elasticsearch:
-    name: Integration - Linux, ES
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2.3.4
-      - run: make ci-sweep
-      - uses: actions/cache@v2.1.6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test-integration-elasticsearch
-
-  test-integration-fluent:
-    name: Integration - Linux, Fluent
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2.3.4
-      - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test-integration-fluent
-
-
-  test-integration-eventstoredb_metrics:
-    name: Integration - Linux, EventStoreDB Metrics
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-      - run: make ci-sweep
-      - uses: actions/cache@v2.1.4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test-integration-eventstoredb_metrics
-
-  test-integration-gcp:
-    name: Integration - Linux, GCP
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2.3.4
-      - run: make ci-sweep
-      - uses: actions/cache@v2.1.6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test-integration-gcp
-
-  test-integration-humio:
-    name: Integration - Linux, Humio
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2.3.4
-      - run: make ci-sweep
-      - uses: actions/cache@v2.1.6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test-integration-humio
-
-  test-integration-influxdb:
-    name: Integration - Linux, Influx
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2.3.4
-      - run: make ci-sweep
-      - uses: actions/cache@v2.1.6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test-integration-influxdb
-
-  test-integration-kafka:
-    name: Integration - Linux, Kafka
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2.3.4
-      - run: make ci-sweep
-      - uses: actions/cache@v2.1.6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test-integration-kafka
-
-  test-integration-logstash:
-    name: Integration - Linux, logstash
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2.3.4
-      - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test-integration-logstash
-
-  test-integration-loki:
-    name: Integration - Linux, Loki
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2.3.4
-      - run: make ci-sweep
-      - uses: actions/cache@v2.1.6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test-integration-loki
-
-  test-integration-mongodb_metrics:
-    name: Integration - Linux, MongoDB Metrics
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2.3.4
-      - run: make ci-sweep
-      - uses: actions/cache@v2.1.6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test-integration-mongodb_metrics
-
-  test-integration-nats:
-    name: Integration - Linux, NATS
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2.3.4
-      - run: make ci-sweep
-      - uses: actions/cache@v2.1.6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test-integration-nats
-
-  test-integration-nginx:
-    name: Integration - Linux, Nginx Metrics
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2.3.4
-      - run: make ci-sweep
-      - uses: actions/cache@v2.1.6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test-integration-nginx
-
-  test-integration-postgresql_metrics:
-    name: Integration - Linux, PostgreSQL Metrics
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2.3.4
-      - run: make ci-sweep
-      - uses: actions/cache@v2.1.6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: make slim-builds
-      - run: make test-integration-postgresql_metrics
-
-
-  test-integration-prometheus:
-    name: Integration - Linux, Prometheus
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2.3.4
-      - run: make ci-sweep
-      - uses: actions/cache@v2.1.6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test-integration-prometheus
-
-  test-integration-pulsar:
-    name: Integration - Linux, Pulsar
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2.3.4
-      - run: make ci-sweep
-      - uses: actions/cache@v2.1.6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test-integration-pulsar
-
-  test-integration-splunk:
-    name: Integration - Linux, Splunk
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2.3.4
-      - run: make ci-sweep
-      - uses: actions/cache@v2.1.6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test-integration-splunk
-
-  test-integration-redis:
-    name: Integration - Linux, Redis
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-      - run: make ci-sweep
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test-integration-redis
+      - name: validate
+        run: echo "OK"
 
   master-failure:
     name: master-failure
     if: failure() && github.ref == 'refs/heads/master'
     needs:
       - cancel-previous
-      - test-integration-aws
-      - test-integration-clickhouse
-      - test-integration-dnstap
-      - test-integration-docker-logs
-      - test-integration-elasticsearch
-      - test-integration-gcp
-      - test-integration-humio
-      - test-integration-influxdb
-      - test-integration-kafka
-      - test-integration-loki
-      - test-integration-pulsar
-      - test-integration-redis
-      - test-integration-splunk
+      - test-integration-check
     runs-on: ubuntu-20.04
     steps:
     - name: Discord notification

@@ -3,6 +3,16 @@
 
 #![deny(missing_docs)]
 
+mod bytes;
+mod json;
+#[cfg(feature = "sources-syslog")]
+mod syslog;
+
+pub use self::bytes::{BytesParser, BytesParserConfig};
+#[cfg(feature = "sources-syslog")]
+pub use self::syslog::{SyslogParser, SyslogParserConfig};
+pub use json::{JsonParser, JsonParserConfig};
+
 use crate::event::Event;
 use ::bytes::Bytes;
 use dyn_clone::DynClone;
@@ -10,7 +20,7 @@ use smallvec::SmallVec;
 use std::fmt::Debug;
 
 /// Parse structured events from bytes.
-pub trait Parser: DynClone + Send + Sync {
+pub trait Parser: DynClone + Debug + Send + Sync {
     /// Parses structured events from bytes.
     ///
     /// It returns a `SmallVec` rather than an `Event` directly, since one byte
@@ -22,8 +32,8 @@ pub trait Parser: DynClone + Send + Sync {
 
 dyn_clone::clone_trait_object!(Parser);
 
-/// A `Box` containing a thread-safe `Parser`.
-pub type BoxedParser = Box<dyn Parser + Send + Sync>;
+/// A `Box` containing a `Parser`.
+pub type BoxedParser = Box<dyn Parser>;
 
 /// Define options for a parser and build it from the config object.
 ///
