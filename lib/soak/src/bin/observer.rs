@@ -1,6 +1,5 @@
 //! `observer` is a program that inspects a prometheus with a configured query,
 //! writes the result out to disk. It replaces curl-in-a-loop in our soak infra.
-
 use argh::FromArgs;
 use reqwest::Url;
 use serde::Deserialize;
@@ -15,7 +14,7 @@ fn default_config_path() -> String {
 }
 
 #[derive(FromArgs)]
-/// `tcp_gen` options
+/// vector soak `observer` options
 struct Opts {
     /// path on disk to the configuration file
     #[argh(option, default = "default_config_path()")]
