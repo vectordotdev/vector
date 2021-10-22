@@ -171,7 +171,7 @@ Datadog API key management would be the same as it is for Datadog logs & metrics
 
 [OpenTelemetry trace format]:
 https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/trace/v1/trace.proto
-[OLTP->Datadog]: https://github.com/DataDog/datadog-agent/blob/637b43e/pkg/trace/api/otlp.go#L305-L377
+[OTLP->Datadog]: https://github.com/DataDog/datadog-agent/blob/637b43e/pkg/trace/api/otlp.go#L305-L377
 
 ## Outstanding Questions
 
