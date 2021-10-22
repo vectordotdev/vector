@@ -13,7 +13,7 @@ use crate::{
             service::S3Service,
         },
         util::{
-            encoding::EncodingConfig, BatchConfig, Compression, Concurrency, ServiceBuilderExt,
+            encoding::EncodingConfig, BatchConfig, Compression, ServiceBuilderExt,
             TowerRequestConfig,
         },
         Healthcheck,
