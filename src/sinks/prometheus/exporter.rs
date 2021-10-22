@@ -28,6 +28,7 @@ use std::{
     net::SocketAddr,
     ops::{Deref, DerefMut},
     sync::{Arc, RwLock},
+    time::{Duration, Instant},
 };
 use stream_cancel::{Trigger, Tripwire};
 
@@ -179,7 +180,7 @@ fn handle(
         (&Method::GET, "/metrics") => {
             let mut s = collector::StringCollector::new();
 
-            for (MetricEntry(metric), _) in metrics {
+            for (MetricEntry { metric, .. }, _) in metrics {
                 s.encode_metric(default_namespace, buckets, quantiles, expired, metric);
             }
 
@@ -304,21 +305,31 @@ impl StreamSink for PrometheusExporter {
                 metrics.map = metrics
                     .map
                     .drain(..)
-                    .map(|(MetricEntry(mut metric), is_incremental_set)| {
+                    .map(|(mut entry, is_incremental_set)| {
                         if is_incremental_set {
-                            metric.zero();
+                            entry.metric.zero();
                         }
-                        (MetricEntry(metric), is_incremental_set)
+                        (entry, is_incremental_set)
+                    })
+                    .filter(|(MetricEntry { updated_at, .. }, _)| {
+                        updated_at.elapsed().as_secs() > self.config.flush_period_secs
                     })
                     .collect();
             }
 
             match item.kind() {
                 MetricKind::Incremental => {
-                    let mut entry = MetricEntry(item.into_absolute());
-                    if let Some((MetricEntry(mut existing), _)) = metrics.map.remove_entry(&entry) {
-                        if existing.update(&entry) {
-                            entry = MetricEntry(existing);
+                    let updated_at = Instant::now();
+                    let mut entry = MetricEntry {
+                        metric: item.into_absolute(),
+                        updated_at,
+                    };
+                    if let Some((mut existing_entry, _)) = metrics.map.remove_entry(&entry) {
+                        if existing_entry.metric.update(&entry) {
+                            entry = MetricEntry {
+                                metric: existing_entry.metric,
+                                updated_at,
+                            };
                         } else {
                             warn!(message = "Metric changed type, dropping old value.", series = %entry.series());
                         }
@@ -327,7 +338,11 @@ impl StreamSink for PrometheusExporter {
                     metrics.map.insert(entry, is_set);
                 }
                 MetricKind::Absolute => {
-                    let new = MetricEntry(item);
+                    let updated_at = Instant::now();
+                    let new = MetricEntry {
+                        metric: item,
+                        updated_at,
+                    };
                     metrics.map.remove(&new);
                     metrics.map.insert(new, false);
                 }
@@ -339,24 +354,36 @@ impl StreamSink for PrometheusExporter {
     }
 }
 
-struct MetricEntry(Metric);
+struct MetricEntry {
+    metric: Metric,
+    updated_at: Instant,
+}
+
+impl From<Metric> for MetricEntry {
+    fn from(metric: Metric) -> Self {
+        Self {
+            metric,
+            updated_at: Instant::now(),
+        }
+    }
+}
 
 impl Deref for MetricEntry {
     type Target = Metric;
     fn deref(&self) -> &Metric {
-        &self.0
+        &self.metric
     }
 }
 
 impl DerefMut for MetricEntry {
     fn deref_mut(&mut self) -> &mut Metric {
-        &mut self.0
+        &mut self.metric
     }
 }
 
 impl AsRef<MetricData> for MetricEntry {
     fn as_ref(&self) -> &MetricData {
-        self.0.as_ref()
+        self.metric.as_ref()
     }
 }
 
@@ -364,7 +391,7 @@ impl Eq for MetricEntry {}
 
 impl Hash for MetricEntry {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        let metric = &self.0;
+        let metric = &self.metric;
         metric.series().hash(state);
         metric.kind().hash(state);
         discriminant(metric.value()).hash(state);
@@ -622,12 +649,12 @@ mod tests {
         let map = &internal_metrics.read().unwrap().map;
 
         assert_eq!(
-            map.get_full(&MetricEntry(m1)).unwrap().1.value(),
+            map.get_full(&MetricEntry::from(m1)).unwrap().1.value(),
             &MetricValue::Counter { value: 40. }
         );
 
         assert_eq!(
-            map.get_full(&MetricEntry(m2)).unwrap().1.value(),
+            map.get_full(&MetricEntry::from(m2)).unwrap().1.value(),
             &MetricValue::Counter { value: 33. }
         );
     }
