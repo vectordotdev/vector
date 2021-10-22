@@ -312,7 +312,7 @@ impl StreamSink for PrometheusExporter {
                         (entry, is_incremental_set)
                     })
                     .filter(|(MetricEntry { updated_at, .. }, _)| {
-                        updated_at.elapsed().as_secs() > self.config.flush_period_secs
+                        updated_at.elapsed().as_secs() < self.config.flush_period_secs
                     })
                     .collect();
             }
@@ -678,6 +678,7 @@ mod integration_tests {
         prometheus_scrapes_metrics().await;
         time::sleep(time::Duration::from_millis(500)).await;
         reset_on_flush_period().await;
+        expire_on_flush_period().await;
     }
 
     async fn prometheus_scrapes_metrics() {
@@ -766,6 +767,66 @@ mod integration_tests {
             result["data"]["result"][0]["value"][1],
             Value::String("2".into())
         );
+    }
+
+    async fn expire_on_flush_period() {
+        let config = PrometheusExporterConfig {
+            address: PROMETHEUS_ADDRESS.parse().unwrap(),
+            flush_period_secs: 3,
+            ..Default::default()
+        };
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (tx, rx) = mpsc::unbounded_channel();
+        tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
+
+        // metrics that will not be updated for a full flush period and therefore should expire
+        let (name1, event) = tests::create_metric_set(None, vec!["42"]);
+        tx.send(event).expect("Failed to send.");
+        let (name2, event) = tests::create_metric_gauge(None, 100.0);
+        tx.send(event).expect("Failed to send.");
+
+        // Wait a bit for the sink to process the events
+        time::sleep(time::Duration::from_secs(1)).await;
+
+        // Exporter should present both metrics at first
+        let body = fetch_exporter_body().await;
+        assert!(body.contains(&name1));
+        assert!(body.contains(&name2));
+
+        // Wait long enough to put us past flush_period_secs for the metric that wasn't updated
+        for _ in 0..7 {
+            // Update the first metric, ensuring it doesn't expire
+            let (_, event) = tests::create_metric_set(Some(name1.clone()), vec!["43"]);
+            tx.send(event).expect("Failed to send.");
+
+            // Wait a bit for time to pass
+            time::sleep(time::Duration::from_secs(1)).await;
+        }
+
+        // Exporter should present only the one that got updated
+        let body = fetch_exporter_body().await;
+        assert!(body.contains(&name1));
+        dbg!(&name1);
+        dbg!(&name2);
+        println!("{}", &body);
+        assert!(!body.contains(&name2));
+    }
+
+    async fn fetch_exporter_body() -> String {
+        let url = format!("http://{}/metrics", PROMETHEUS_ADDRESS);
+        let request = Request::get(url)
+            .body(Body::empty())
+            .expect("Error creating request.");
+        let proxy = ProxyConfig::default();
+        let result = HttpClient::new(None, &proxy)
+            .unwrap()
+            .send(request)
+            .await
+            .expect("Could not send request");
+        let result = hyper::body::to_bytes(result.into_body())
+            .await
+            .expect("Error fetching body");
+        String::from_utf8_lossy(&result).to_string()
     }
 
     async fn prometheus_query(query: &str) -> Value {
