@@ -115,8 +115,6 @@ implementation can be added for arrays of `Event`.
 impl Sink<EventVec> for Pipeline { … }
 ```
 
-#### Split the `Pipeline` implementation
-
 #### Introduce transform variants for arrays
 
 There currently exist three types of transforms, expressed as traits:
