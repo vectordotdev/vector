@@ -115,7 +115,7 @@ implementation can be added for arrays of `Event`.
 impl Sink<EventVec> for Pipeline { … }
 ```
 
-#### Introduce transform variants for arrays
+#### Arrays of events in transforms
 
 There currently exist three types of transforms, expressed as traits:
 
@@ -159,7 +159,7 @@ impl<T: FallibleFunctionTransform<Event>> From<T> for Transform { … }
 impl<T: TaskTransform<Event>> From<T> for Transform { … }
 ```
 
-#### Sinks
+#### Arrays of events in sinks
 
 There are two kinds of sinks in Vector:
 
