@@ -1,17 +1,16 @@
 use crate::event::Event;
 use crate::sinks::splunk_hec::logs::encoder::HecLogsEncoder;
 use crate::sinks::splunk_hec::logs::sink::process_log;
-use crate::sinks::util::processed_event::ProcessedEvent;
 use crate::template::Template;
 use chrono::Utc;
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use vector_core::config::log_schema;
-use vector_core::event::{LogEvent, Value};
+use vector_core::event::Value;
 use vector_core::ByteSizeOf;
 
-use super::sink::{HecLogsProcessedEventMetadata, HecProcessedEvent};
+use super::sink::HecProcessedEvent;
 
 #[derive(Deserialize, Debug)]
 struct HecEventJson {

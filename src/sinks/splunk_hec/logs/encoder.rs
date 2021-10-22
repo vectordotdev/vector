@@ -35,7 +35,7 @@ pub struct HecData {
 }
 
 impl HecData {
-    pub fn new(event: HecEvent, fields: LogEvent, time: f64) -> Self {
+    pub const fn new(event: HecEvent, fields: LogEvent, time: f64) -> Self {
         Self {
             event,
             fields,
