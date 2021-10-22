@@ -56,11 +56,6 @@ impl Transform {
         self.0.component_key.id()
     }
 
-    /// Transform component_id
-    pub async fn pipeline_id(&self) -> Option<&str> {
-        self.0.component_key.pipeline_str()
-    }
-
     /// Transform type
     pub async fn component_type(&self) -> &str {
         &*self.get_component_type()

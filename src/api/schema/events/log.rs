@@ -33,16 +33,6 @@ impl Log {
         self.output_id.component.id()
     }
 
-    /// Id of the pipeline associated with the log event
-    async fn pipeline_id(&self) -> Option<&str> {
-        self.output_id.component.pipeline_str()
-    }
-
-    /// Id of the pipeline associated with the log event
-    async fn port(&self) -> Option<&str> {
-        self.output_id.port.as_deref()
-    }
-
     /// Log message
     async fn message(&self) -> Option<String> {
         self.get_message()

@@ -83,9 +83,8 @@ impl HumanFormatter for i64 {
     }
 }
 
-static HEADER: [&str; 8] = [
+static HEADER: [&str; 7] = [
     "ID",
-    "Pipeline",
     "Kind",
     "Type",
     "Events In",
@@ -150,7 +149,6 @@ impl<'a> Widgets<'a> {
         let items = state.iter().map(|(_, r)| {
             let mut data = vec![
                 r.key.id().to_string(),
-                r.key.pipeline_str().unwrap_or_default().into(),
                 r.kind.clone(),
                 r.component_type.clone(),
             ];

@@ -35,35 +35,35 @@ ignore_older = 86400                         # 1 day
 
 # Structure and parse via Timber's Remap Language
 [transforms.remap]
-inputs       = ["apache_logs"]
-type         = "remap"
-source       = '''
+inputs = ["apache_logs"]
+type   = "remap"
+source = '''
 . = parse_apache_log(.message)
 '''
 
 # Sample the data to save on cost
 [transforms.apache_sampler]
-inputs       = ["apache_parser"]
-type         = "sampler"
-rate         = 50                            # only keep 50%
+inputs = ["apache_parser"]
+type   = "sampler"
+rate   = 50                   # only keep 50%
 
 # Send structured data to a short-term storage
 [sinks.es_cluster]
-inputs       = ["apache_sampler"]            # only take sampled data
-type         = "elasticsearch"
-host         = "http://79.12.221.222:9200"   # local or external host
-index        = "vector-%Y-%m-%d"             # daily indices
+inputs = ["apache_sampler"]             # only take sampled data
+type   = "elasticsearch"
+host   = "http://79.12.221.222:9200"    # local or external host
+index  = "vector-%Y-%m-%d"              # daily indices
 
 # Send structured data to a cost-effective long-term storage
 [sinks.s3_archives]
-inputs       = ["apache_parser"]             # don't sample for S3
-type         = "aws_s3"
-region       = "us-east-1"
-bucket       = "my-log-archives"
-key_prefix   = "date=%Y-%m-%d"               # daily partitions, hive friendly format
-compression  = "gzip"                        # compress final objects
-encoding     = "ndjson"                      # new line delimited JSON
-batch.max_size   = 10000000                  # 10mb uncompressed
+inputs          = ["apache_parser"]    # don't sample for S3
+type            = "aws_s3"
+region          = "us-east-1"
+bucket          = "my-log-archives"
+key_prefix      = "date=%Y-%m-%d"      # daily partitions, hive friendly format
+compression     = "gzip"               # compress final objects
+encoding        = "ndjson"             # new line delimited JSON
+batch.max_bytes = 10000000             # 10mb uncompressed
 ```
 
 {{< /tab >}}
@@ -106,7 +106,7 @@ sinks:
     compression: gzip
     encoding: ndjson
     batch:
-      max_size: 10000000
+      max_bytes: 10000000
 ```
 
 {{< /tab >}}
@@ -160,7 +160,7 @@ sinks:
       "compression": "gzip",
       "encoding": "ndjson",
       "batch": {
-        "max_size": 10000000
+        "max_bytes": 10000000
       }
     }
   }

@@ -80,10 +80,12 @@ components: sources: [Name=string]: {
 					type: object: options: {
 						method: {
 							description: "The framing method."
-							required:    true
+							required:    false
+							common:      true
 							type: string: {
+								default: features.codecs.default_framing
 								enum: {
-									bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between packets for UDP or between segments for TCP)."
+									bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
 									character_delimited: "Byte frames which are delimited by a chosen character."
 									length_delimited:    "Byte frames whose length is encoded in a header."
 									newline_delimited:   "Byte frames which are delimited by a newline character."
@@ -110,7 +112,7 @@ components: sources: [Name=string]: {
 									required:    false
 									common:      false
 									type: uint: {
-										default: 102400
+										default: null
 										examples: [65535, 102400]
 										unit: "bytes"
 									}
@@ -128,7 +130,7 @@ components: sources: [Name=string]: {
 									required:    false
 									common:      false
 									type: uint: {
-										default: 102400
+										default: null
 										examples: [65535, 102400]
 										unit: "bytes"
 									}
@@ -146,7 +148,7 @@ components: sources: [Name=string]: {
 									required:    false
 									common:      false
 									type: uint: {
-										default: 102400
+										default: null
 										examples: [65535, 102400]
 										unit: "bytes"
 									}
@@ -162,8 +164,10 @@ components: sources: [Name=string]: {
 					type: object: options: {
 						codec: {
 							description: "The decoding method."
-							required:    true
+							required:    false
+							common:      true
 							type: string: {
+								default: "bytes"
 								enum: {
 									bytes:  "Events containing the byte frame as-is."
 									json:   "Events being parsed from a JSON string."

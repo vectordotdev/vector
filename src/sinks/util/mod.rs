@@ -3,7 +3,6 @@ pub mod batch;
 pub mod buffer;
 pub mod builder;
 pub mod compressor;
-pub mod concurrent_map;
 pub mod encoding;
 pub mod http;
 pub mod request_builder;
@@ -34,7 +33,6 @@ pub use buffer::vec::{EncodedLength, VecBuffer};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
 pub use builder::SinkBuilderExt;
 pub use compressor::Compressor;
-pub use concurrent_map::ConcurrentMap;
 pub use request_builder::RequestBuilder;
 pub use service::{
     Concurrency, ServiceBuilderExt, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
@@ -55,14 +53,18 @@ enum SinkBuildError {
 pub struct EncodedEvent<I> {
     pub item: I,
     pub finalizers: EventFinalizers,
+    pub byte_size: usize,
 }
 
 impl<I> EncodedEvent<I> {
     /// Create a trivial input with no metadata. This method will be
     /// removed when all sinks are converted.
-    pub fn new(item: I) -> Self {
-        let finalizers = Default::default();
-        Self { item, finalizers }
+    pub fn new(item: I, byte_size: usize) -> Self {
+        Self {
+            item,
+            finalizers: Default::default(),
+            byte_size,
+        }
     }
 
     // This should be:
@@ -77,6 +79,16 @@ impl<I> EncodedEvent<I> {
         Self {
             item: I::from(that.item),
             finalizers: that.finalizers,
+            byte_size: that.byte_size,
+        }
+    }
+
+    /// Remap the item using an adapter
+    pub fn map<T>(self, doit: impl Fn(I) -> T) -> EncodedEvent<T> {
+        EncodedEvent {
+            item: doit(self.item),
+            finalizers: self.finalizers,
+            byte_size: self.byte_size,
         }
     }
 }

@@ -17,18 +17,18 @@ derivative = { version = "2.2.0", default-features = false }
 dyn-clone = { version = "1.0.4", default-features = false }
 enrichment = { path = "../enrichment", optional = true }
 futures = { version = "0.3.17", default-features = false, features = ["std"] }
+futures-util = { version = "0.3.17", default-features = false, features = ["std"] }
 getset = { version = "0.1.1", default-features = false }
 http = { version = "0.2.5", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
-# pinned due to https://github.com/tkaitchuck/aHash/issues/95
-indexmap = { version = "~1.6.2", default-features = false, features = ["serde"] }
+indexmap = { version = "~1.7.0", default-features = false, features = ["serde"] }
 core_common = { path = "core-common", default-features = false }
 lazy_static = { version = "1.4.0", default-features = false }
 lookup = { path = "../lookup", features = ["arbitrary"] }
 metrics = { version = "0.17.0", default-features = false, features = ["std"]}
 metrics-tracing-context = { version = "0.8.0", default-features = false }
 metrics-util = { version = "0.10.1", default-features = false, features = ["std"] }
-mlua = { version = "0.6.5", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { version = "0.6.6", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 no-proxy = { version  = "0.3.1", default-features = false, features = ["serialize"] }
 once_cell = { version = "1.8", default-features = false }
 pest = { version = "2.1.3", default-features = false }
@@ -46,7 +46,7 @@ tokio = { version = "1.12.0", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, optional = true }
 tokio-util = { version = "0.6.8", default-features = false, features = ["time"] }
 toml = { version = "0.5.8", default-features = false }
-tower = { version = "0.4", default-features = false }
+tower = { version = "0.4", default-features = false, features = ["util"] }
 tracing = { version = "0.1.29", default-features = false }
 tracing-core = { version = "0.1.21", default-features = false }
 tracing-log = { version = "0.1.2", default-features = false }
@@ -79,6 +79,7 @@ harness = false
 
 [[bench]]
 name = "event"
+path = "benches/event/main.rs"
 harness = false
 
 [[bench]]

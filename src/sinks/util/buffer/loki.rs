@@ -134,9 +134,7 @@ impl Batch for LokiBuffer {
         config: BatchConfig,
         defaults: BatchSettings<Self>,
     ) -> Result<BatchSettings<Self>, BatchError> {
-        Ok(config
-            .use_size_as_events()?
-            .get_settings_or_default(defaults))
+        Ok(config.get_settings_or_default(defaults))
     }
 
     fn push(&mut self, mut item: Self::Input) -> PushResult<Self::Input> {

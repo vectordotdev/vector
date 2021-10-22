@@ -1,11 +1,12 @@
 use crate::{
-    codecs::{self, DecodingConfig},
+    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::Event,
     internal_events::HttpDecompressError,
+    serde::{default_decoding, default_framing_message_based},
     sources::{
         self,
         util::{ErrorMessage, TcpError},
@@ -43,8 +44,10 @@ pub struct DatadogAgentConfig {
     tls: Option<TlsConfig>,
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
-    #[serde(flatten, default)]
-    decoding: DecodingConfig,
+    #[serde(default = "default_framing_message_based")]
+    framing: Box<dyn FramingConfig>,
+    #[serde(default = "default_decoding")]
+    decoding: Box<dyn ParserConfig>,
 }
 
 inventory::submit! {
@@ -63,7 +66,8 @@ impl GenerateConfig for DatadogAgentConfig {
             address: "0.0.0.0:8080".parse().unwrap(),
             tls: None,
             store_api_key: true,
-            decoding: Default::default(),
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
         })
         .unwrap()
     }
@@ -73,7 +77,8 @@ impl GenerateConfig for DatadogAgentConfig {
 #[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let source = DatadogAgentSource::new(self.store_api_key, self.decoding.build()?);
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+        let source = DatadogAgentSource::new(self.store_api_key, decoder);
 
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let listener = tls.bind(&self.address).await?;
@@ -260,17 +265,17 @@ impl DatadogAgentSource {
                     Ok(Some((events, _byte_size))) => {
                         for mut event in events {
                             if let Event::Log(ref mut log) = event {
-                                log.insert_flat(self.log_schema_timestamp_key, now);
-                                log.insert_flat(
+                                log.try_insert_flat("status", message.status.clone());
+                                log.try_insert_flat("timestamp", message.timestamp);
+                                log.try_insert_flat("hostname", message.hostname.clone());
+                                log.try_insert_flat("service", message.service.clone());
+                                log.try_insert_flat("ddsource", message.ddsource.clone());
+                                log.try_insert_flat("ddtags", message.ddtags.clone());
+                                log.try_insert_flat(
                                     self.log_schema_source_type_key,
                                     Bytes::from("datadog_agent"),
                                 );
-                                log.insert_flat("status", message.status.clone());
-                                log.insert_flat("timestamp", message.timestamp);
-                                log.insert_flat("hostname", message.hostname.clone());
-                                log.insert_flat("service", message.service.clone());
-                                log.insert_flat("ddsource", message.ddsource.clone());
-                                log.insert_flat("ddtags", message.ddtags.clone());
+                                log.try_insert_flat(self.log_schema_timestamp_key, now);
                                 if let Some(k) = &api_key {
                                     log.metadata_mut().set_datadog_api_key(Some(Arc::clone(k)));
                                 }
@@ -358,6 +363,7 @@ mod tests {
         codecs::{self, BytesCodec, BytesParser},
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus},
+        serde::{default_decoding, default_framing_message_based},
         sources::datadog::agent::DatadogAgentSource,
         test_util::{next_addr, spawn_collect_n, trace_init, wait_for_tcp},
         Pipeline,
@@ -434,7 +440,8 @@ mod tests {
                 address,
                 tls: None,
                 store_api_key,
-                decoding: Default::default(),
+                framing: default_framing_message_based(),
+                decoding: default_decoding(),
             }
             .build(context)
             .await

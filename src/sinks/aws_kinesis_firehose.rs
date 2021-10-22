@@ -26,6 +26,7 @@ use std::{
 };
 use tower::Service;
 use tracing_futures::Instrument;
+use vector_core::ByteSizeOf;
 
 // AWS Kinesis Firehose API accepts payloads up to 4MB or 500 events
 // https://docs.aws.amazon.com/firehose/latest/dev/limits.html
@@ -155,7 +156,7 @@ impl KinesisFirehoseService {
         client: KinesisFirehoseClient,
         cx: SinkContext,
     ) -> crate::Result<impl Sink<Event, Error = ()>> {
-        let batch_config = config.batch.use_size_as_bytes()?;
+        let batch_config = config.batch;
 
         if batch_config.max_bytes.unwrap_or_default() > MAX_PAYLOAD_SIZE {
             return Err(Box::new(BuildError::BatchMaxSize));
@@ -263,6 +264,7 @@ enum HealthcheckError {
 }
 
 fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> EncodedEvent<Record> {
+    let byte_size = event.size_of();
     encoding.apply_rules(&mut event);
     let log = event.into_log();
     let data = match encoding.codec() {
@@ -276,7 +278,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Encode
 
     let data = Bytes::from(data);
 
-    EncodedEvent::new(Record { data })
+    EncodedEvent::new(Record { data }, byte_size)
 }
 
 #[cfg(test)]

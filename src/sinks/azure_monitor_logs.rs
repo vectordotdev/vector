@@ -91,7 +91,7 @@ const API_VERSION: &str = "2016-04-01";
 impl SinkConfig for AzureMonitorLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let batch_settings = BatchSettings::default()
-            .bytes(bytesize::kib(5000u64))
+            .bytes(5_000_000)
             .timeout(1)
             .parse_config(self.batch)?;
 

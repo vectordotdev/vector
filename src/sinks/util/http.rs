@@ -8,7 +8,7 @@ use crate::{
     buffers::Acker,
     event::Event,
     http::{HttpClient, HttpError},
-    internal_events::{EndpointBytesSent, EventsSent},
+    internal_events::EndpointBytesSent,
 };
 use bytes::{Buf, Bytes};
 use futures::{future::BoxFuture, ready, Sink};
@@ -176,9 +176,14 @@ where
     }
 
     fn start_send(self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
+        let byte_size = event.size_of();
         let finalizers = event.metadata_mut().take_finalizers();
         if let Some(item) = self.sink.encode_event(event) {
-            *self.project().slot = Some(EncodedEvent { item, finalizers });
+            *self.project().slot = Some(EncodedEvent {
+                item,
+                finalizers,
+                byte_size,
+            });
         }
 
         Ok(())
@@ -330,8 +335,13 @@ where
 
     fn start_send(self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
         let finalizers = event.metadata_mut().take_finalizers();
+        let byte_size = event.size_of();
         if let Some(item) = self.sink.encode_event(event) {
-            *self.project().slot = Some(EncodedEvent { item, finalizers });
+            *self.project().slot = Some(EncodedEvent {
+                item,
+                finalizers,
+                byte_size,
+            });
         }
 
         Ok(())
@@ -388,8 +398,6 @@ where
         let mut http_client = self.inner.clone();
 
         Box::pin(async move {
-            let events_count = body.element_count();
-            let events_bytes = body.size_of();
             let request = request_builder(body).await?;
             let byte_size = request.body().len();
             let request = request.map(Body::from);
@@ -409,10 +417,6 @@ where
             let response = http_client.call(request).await?;
 
             if response.status().is_success() {
-                emit!(&EventsSent {
-                    count: events_count,
-                    byte_size: events_bytes,
-                });
                 emit!(&EndpointBytesSent {
                     byte_size,
                     protocol: scheme.unwrap_or(Scheme::HTTP).as_str(),
@@ -501,7 +505,7 @@ impl RequestConfig {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{config::ProxyConfig, sinks::util::service::Concurrency, test_util::next_addr};
+    use crate::{config::ProxyConfig, test_util::next_addr};
     use futures::{future::ready, StreamExt};
     use hyper::{
         service::{make_service_fn, service_fn},
@@ -578,12 +582,5 @@ mod test {
 
         let (body, _rest) = rx.into_future().await;
         assert_eq!(body.unwrap(), "hello");
-    }
-
-    #[test]
-    fn alias_in_flight_limit_works() {
-        let cfg = toml::from_str::<RequestConfig>("in_flight_limit = 10")
-            .expect("Fixed concurrency failed for in_flight_limit param");
-        assert_eq!(cfg.tower.concurrency(), &Concurrency::Fixed(10));
     }
 }

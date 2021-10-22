@@ -36,4 +36,4 @@ data_dir = "/var/lib/vector"
   compression  = "gzip"                        # compress final objects
   encoding     = "ndjson"                      # new line delimited JSON
   [sinks.s3_archives.batch]
-    max_size   = 10000000                      # 10mb uncompressed
+    max_bytes   = 10000000                      # 10mb uncompressed

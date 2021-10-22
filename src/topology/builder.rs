@@ -14,7 +14,7 @@ use crate::{
     transforms::Transform,
     Pipeline,
 };
-use futures::{future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use std::pin::Pin;
 use std::{
@@ -23,7 +23,10 @@ use std::{
     sync::{Arc, Mutex},
 };
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
-use tokio::time::{timeout, Duration};
+use tokio::{
+    select,
+    time::{timeout, Duration},
+};
 use vector_core::ByteSizeOf;
 
 lazy_static! {
@@ -39,19 +42,46 @@ pub async fn load_enrichment_tables<'a>(
     let mut errors = vec![];
 
     // Build enrichment tables
-    for (name, table) in config
-        .enrichment_tables
-        .iter()
-        .filter(|(name, _)| diff.enrichment_tables.contains_new(name))
-    {
-        let table = match table.inner.build(&config.global).await {
-            Ok(table) => table,
-            Err(error) => {
-                errors.push(format!("Enrichment Table \"{}\": {}", name, error));
-                continue;
+    'tables: for (name, table) in config.enrichment_tables.iter() {
+        let table_name = name.to_string();
+        if ENRICHMENT_TABLES.needs_reload(&table_name) {
+            let indexes = if !diff.enrichment_tables.contains_new(name) {
+                // If this is an existing enrichment table, we need to store the indexes to reapply
+                // them again post load.
+                Some(ENRICHMENT_TABLES.index_fields(&table_name))
+            } else {
+                None
+            };
+
+            let mut table = match table.inner.build(&config.global).await {
+                Ok(table) => table,
+                Err(error) => {
+                    errors.push(format!("Enrichment Table \"{}\": {}", name, error));
+                    continue;
+                }
+            };
+
+            if let Some(indexes) = indexes {
+                for (case, index) in indexes {
+                    match table
+                        .add_index(case, &index.iter().map(|s| s.as_ref()).collect::<Vec<_>>())
+                    {
+                        Ok(_) => (),
+                        Err(error) => {
+                            // If there is an error adding an index we do not want to use the reloaded
+                            // data, the previously loaded data will still need to be used.
+                            // Just report the error and continue.
+                            error!(message = "Unable to add index to reloaded enrichment table.",
+                                    table = ?name.to_string(),
+                                    %error);
+                            continue 'tables;
+                        }
+                    }
+                }
             }
-        };
-        enrichment_tables.insert(name.to_string(), table);
+
+            enrichment_tables.insert(table_name, table);
+        }
     }
 
     ENRICHMENT_TABLES.load(enrichment_tables);
@@ -128,12 +158,21 @@ pub async fn build_pieces(
         // force_shutdown_tripwire. That means that if the force_shutdown_tripwire resolves while
         // the server Task is still running the Task will simply be dropped on the floor.
         let server = async {
-            match future::try_select(server, force_shutdown_tripwire.unit_error().boxed()).await {
-                Ok(_) => {
+            let result = select! {
+                biased;
+
+                _ = force_shutdown_tripwire => {
+                    Ok(())
+                },
+                result = server => result,
+            };
+
+            match result {
+                Ok(()) => {
                     debug!("Finished.");
                     Ok(TaskOutput::Source)
                 }
-                Err(_) => Err(()),
+                Err(()) => Err(()),
             }
         };
         let server = Task::new(key.clone(), typetag, server);
@@ -169,12 +208,15 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx, _) =
-            vector_core::buffers::build(vector_core::buffers::Variant::Memory {
+        let (input_tx, input_rx, _) = vector_core::buffers::build(
+            vector_core::buffers::Variant::Memory {
                 max_events: 100,
                 when_full: vector_core::buffers::WhenFull::Block,
-            })
-            .unwrap();
+                instrument: false,
+            },
+            tracing::Span::none(),
+        )
+        .unwrap();
         let mut input_rx = crate::utilization::wrap(Pin::new(input_rx));
 
         let task = match transform {
@@ -187,7 +229,7 @@ pub async fn build_pieces(
                     .inspect(|events| {
                         emit!(&EventsReceived {
                             count: events.len(),
-                            byte_size: events.iter().map(|e| e.size_of()).sum(),
+                            byte_size: events.size_of(),
                         });
                     })
                     .flat_map(move |events| {
@@ -200,7 +242,7 @@ pub async fn build_pieces(
                         }
                         emit!(&EventsSent {
                             count: output.len(),
-                            byte_size: output.iter().map(|event| event.size_of()).sum(),
+                            byte_size: output.size_of(),
                         });
                         stream::iter(output.into_iter()).map(Ok)
                     })
@@ -236,8 +278,7 @@ pub async fn build_pieces(
                         // TODO: account for error outputs separately?
                         emit!(&EventsSent {
                             count: buf.len() + err_buf.len(),
-                            byte_size: buf.iter().map(|event| event.size_of()).sum::<usize>()
-                                + err_buf.iter().map(|event| event.size_of()).sum::<usize>(),
+                            byte_size: buf.size_of() + err_buf.size_of(),
                         });
 
                         for event in buf {
@@ -319,7 +360,21 @@ pub async fn build_pieces(
         let (tx, rx, acker) = if let Some(buffer) = buffers.remove(key) {
             buffer
         } else {
-            let buffer = sink.buffer.build(&config.global.data_dir, key);
+            let buffer_type = match sink.buffer {
+                buffers::BufferConfig::Memory { .. } => "memory",
+                #[cfg(feature = "disk-buffer")]
+                buffers::BufferConfig::Disk { .. } => "disk",
+            };
+            let buffer_span = error_span!(
+                "sink",
+                component_kind = "sink",
+                component_id = %key.id(),
+                component_scope = %key.scope(),
+                component_type = typetag,
+                component_name = %key.id(),
+                buffer_type = buffer_type,
+            );
+            let buffer = sink.buffer.build(&config.global.data_dir, key, buffer_span);
             match buffer {
                 Err(error) => {
                     errors.push(format!("Sink \"{}\": {}", key, error));
@@ -359,7 +414,7 @@ pub async fn build_pieces(
                 .take()
                 .expect("Task started but input has been taken.");
 
-            let mut rx = Box::pin(crate::utilization::wrap(rx));
+            let mut rx = crate::utilization::wrap(rx);
 
             sink.run(
                 rx.by_ref()
@@ -398,7 +453,6 @@ pub async fn build_pieces(
                                 component_kind = "sink",
                                 component_type = typetag,
                                 component_id = %component_key.id(),
-                                component_scope = %component_key.scope(),
                                 // maintained for compatibility
                                 component_name = %component_key.id(),
                             );
@@ -410,7 +464,6 @@ pub async fn build_pieces(
                                 component_kind = "sink",
                                 component_type = typetag,
                                 component_id = %component_key.id(),
-                                component_scope = %component_key.scope(),
                                 // maintained for compatibility
                                 component_name = %component_key.id(),
                             );
@@ -434,7 +487,7 @@ pub async fn build_pieces(
 
     // We should have all the data for the enrichment tables loaded now, so switch them over to
     // readonly.
-    ENRICHMENT_TABLES.finish_load();
+    enrichment_tables.finish_load();
 
     let mut finalized_outputs = HashMap::new();
     for (id, output) in outputs {
@@ -453,7 +506,7 @@ pub async fn build_pieces(
             healthchecks,
             shutdown_coordinator,
             detach_triggers,
-            enrichment_tables: ENRICHMENT_TABLES.clone(),
+            enrichment_tables: enrichment_tables.clone(),
         };
 
         Ok(pieces)
