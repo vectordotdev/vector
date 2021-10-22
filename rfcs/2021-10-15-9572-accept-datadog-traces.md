@@ -13,7 +13,7 @@ internal tracing has its own [RFC].
 
 [RFC]: https://github.com/vectordotdev/vector/blob/97f8eb7/rfcs/2021-08-13-8025-internal-tracing.md
 
-### Some details about traces handling by the Agent
+### Some details about traces handling by the Datadog Agent
 
 Offical "Datadog Agent" bundles (rpm/deb/msi/container image) actually ship multiple binaries, collectively named
 "agents". Each of these "agents" is tasked to collect some data. For example "the core agent" (often shortened to "the
@@ -80,7 +80,7 @@ N/A
 
 ### Out of scope
 
-* Profiling data, but as the trace-agent only proxifies profiling data, the same behaviour can be implemented rather
+* Profiling data, but as the trace-agent only proxies profiling data, the same behaviour can be implemented rather
   quickly in Vector.
 * Debugger logs can be already diverted to Vector (untested but it should work as Vector supports datadog logs and there
   is an config option to explicitly configure the debugger log destination)
@@ -110,33 +110,36 @@ N/A
 
 ### Implementation
 
-The first item to be addressed would be to add a new event type that will represent traces. This would materialise as a
-new member of the `Event` enum. As it would be implemented in vector-core, it's probably better to stay relatively
-vendor agnostic, so basing it on the [OpenTelemetry trace format] with additional fields as required is probably a safe
-option. Overall, there is no huge discrepancy between Datadog traces and OpenTelemetry traces (The trace-agent already
-offers [OLTP->Datadog] conversion). The main difference is that Datadog spans come with a string/double map containing
-metrics and a string/string map for some metadata whereas OTLP traces come with a list of key/value (value mimics json
-values). The easiest way do deal with that would be for the Vector trace struct to keep the OLTP generic key/value list
-as a generic structured metadata holder along with a tags map for Datadog string/string formatted maps and a
-string/double metrics map.
+To keep vector-core as generic as possible, the first implementation will decode datadog traces as `LogEvent`, the
+resulting event will be deeper than usual but this should not be a problem. To keep track that those `LogEvent`s are
+traces, we could add a simple `Option<bool>` to the `EventMetadata` struct. However this may not be immediately
+required. While being naive this does not predates future vector evolution towards event traits by not adding a new
+concrete type into the `Event` enum.
 
-This `Trace` struct shall represent APM events (specific spans extracted by the trace-agent), so this `Trace` struct has
-to support standalone spans/or single span traces.
+Upcoming [work][schema-rfc] on having the ability to validate a `LogEvent` against a schema would provide a
+nice way (with the performance question) of ensuring that a `datadog-traces` sinks would receive a properly structured
+`LogEvent`.
 
-Based on the aforementioned work a source & sink would then be added to Vector:
+Based on the aforementioned work the following source & sink addition would have to be done:
 
-* A `datadog_agent` addition that decodes incoming [gzip'ed protobuf over http] to the internal represention implemented
-  in the prior step. .proto files are located in the [datadog-agent repository]
-* A `datadog_trace` sink that does the opposite conversion and sends the trace to Datadog to the relevant region
-  according to the sink config
+* A `datadog_agent` addition that decodes incoming [gzip'ed protobuf over http] to a `LogEvent` .proto files are located
+  in the [datadog-agent repository].
+* A new `datadog_trace` sink that does the opposite conversion and sends the trace to Datadog to the relevant region
+  according to the sink config.
+
+The `datadog_agent` agent addition would materialize as new filter (like the [one dedicated to receive
+logs][event-filter]), ideally colocated the trace decoding logic in its own source file
+(./src/sources/datadog/traces.rs). The filter would be attached to the  warp server upon a new configuration flags. This
+way the traces related code would be isolated. New configuration flags would be three booleans, for logs, metrics and
+traces enabling/disabling each datatype. This way the user can multiplex all three datatype over a single socket, or a
+socket per one or more datatype at users convenience.
 
 Datadog API key management would be the same as it is for Datadog logs & metrics.
 
-[OpenTelemetry trace format]: https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/trace/v1/trace.proto
-[OLTP->Datadog]: https://github.com/DataDog/datadog-agent/blob/637b43e/pkg/trace/api/otlp.go#L305-L377
+[schema-rfc]: https://github.com/vectordotdev/vector/pull/9388
 [gzip'ed protobuf over http]: https://github.com/DataDog/datadog-agent/blob/8b63d85/pkg/trace/writer/trace.go#L230-L269
 [datadog-agent repository]: https://github.com/DataDog/datadog-agent/blob/0a19a75/pkg/trace/pb/trace_payload.proto
-
+[event-filter]: https://github.com/vectordotdev/vector/blob/a0ca04c/src/sources/datadog/agent.rs#L206-L233
 
 ## Rationale
 
@@ -157,24 +160,28 @@ Datadog API key management would be the same as it is for Datadog logs & metrics
 
 ## Alternatives
 
-* Regarding implementation, traces could also be represented as a log event. Conversion to/from json should
-  theoretically not be a problem for traces/spans, but it would generate a deeper than usual structure (should not be a
-  problem though)
-* Traces could be represented themselves as a enum with specific implementation per vendor, allowing almost direct
-  mapping from protocol definition into Rust struct(s).
+* Regarding internal traces representation, instead of reusing the `LogEvent` type, a new `Trace` concrete type could be
+  added to the `Event` enum:
+  * Either specific implementation per vendor, allowing almost direct mapping from protocol definition into Rust
+    struct(s).
+  * Or generic enough struct, most likely based on the [OpenTelemetry trace format], possibly with additional fields to
+    cover corner cases and/or metadata that may not be properly mapped into the OTLP trace structure. Overall, there is
+    no huge discrepancy between Datadog traces and OpenTelemetry traces (The trace-agent already offers [OTLP->Datadog]
+    conversion).
+
+[OpenTelemetry trace format]:
+https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/trace/v1/trace.proto
+[OLTP->Datadog]: https://github.com/DataDog/datadog-agent/blob/637b43e/pkg/trace/api/otlp.go#L305-L377
 
 ## Outstanding Questions
 
-* Confirm that this RFC only addresses traces
-* Should we reuse some parts of this [Rust OpenTelemetry project]
-
-[Rust OpenTelemetry project]: https://github.com/open-telemetry/opentelemetry-rust
+* Confirm that this RFC only addresses traces.
+* Confirm wether we rely on `LogEvent` or if we introduce a new type to represent traces inside Vector.
 
 ## Plan Of Attack
 
-* [ ] Submit a PR introducing the trace event type
-* [ ] Submit a PR introducing traces support in the `datadog_agent` source
-* [ ] Submit a PR introducing the `datadog_trace` sink
+* [ ] Submit a PR introducing traces support in the `datadog_agent` source emitting a `LogEvent` for each trace and each APM event.
+* [ ] Submit a PR introducing the `datadog_trace` sink that would
 
 ## Future Improvements
 
@@ -185,7 +192,5 @@ Datadog API key management would be the same as it is for Datadog logs & metrics
   implemented as it's using the same [Datadog endpoint] as the trace-agent
 * Traces helpers in VRL
 * Trace-agent configuration with a `vector.traces.url` & `vector.traces.enabled`
-* In some situation disabling certain datatypes/only enabling one datatype for the `datadog_agent` might be useful, so
-  introducing a config list like: `accept: [metrics, traces]` might be desirable for some users
 
 [Datadog endpoint]: https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/04f97ec/exporter/datadogexporter/config/config.go#L288-L290
