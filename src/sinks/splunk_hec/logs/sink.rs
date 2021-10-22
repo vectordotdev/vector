@@ -115,6 +115,8 @@ impl ByteSizeOf for HecLogsProcessedEventMetadata {
     }
 }
 
+pub type HecProcessedEvent = ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>;
+
 pub fn process_log(
     mut log: LogEvent,
     event_byte_size: usize,
@@ -123,7 +125,7 @@ pub fn process_log(
     index: Option<&Template>,
     host_key: &str,
     indexed_fields: &[String],
-) -> Option<ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>> {
+) -> Option<HecProcessedEvent> {
     let sourcetype =
         sourcetype.and_then(|sourcetype| render_template_string(sourcetype, &log, "sourcetype"));
 

@@ -11,7 +11,7 @@ use vector_core::config::log_schema;
 use vector_core::event::{LogEvent, Value};
 use vector_core::ByteSizeOf;
 
-use super::sink::HecLogsProcessedEventMetadata;
+use super::sink::{HecLogsProcessedEventMetadata, HecProcessedEvent};
 
 #[derive(Deserialize, Debug)]
 struct HecEventJson {
@@ -35,7 +35,7 @@ struct HecEventText {
     host: Option<String>,
 }
 
-fn get_processed_event() -> ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata> {
+fn get_processed_event() -> HecProcessedEvent {
     let mut event = Event::from("hello world");
     event
         .as_mut_log()
