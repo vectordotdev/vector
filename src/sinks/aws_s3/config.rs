@@ -110,7 +110,7 @@ impl S3SinkConfig {
         // requests into in order to ship files to S3.  We build this here in
         // order to configure the client/service with retries, concurrency
         // limits, rate limits, and whatever else the client should have.
-        let request_limits = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_limits = self.request.unwrap_with(&Default::default());
         let service = ServiceBuilder::new()
             .settings(request_limits, S3RetryLogic)
             .service(service);

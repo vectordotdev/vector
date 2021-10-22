@@ -142,7 +142,7 @@ impl DatadogArchivesSinkConfig {
     ) -> std::result::Result<VectorSink, ConfigError> {
         // we use lower default limits, because we send 100mb batches,
         // thus no need in the the higher number of outcoming requests
-        let request_limits = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_limits = self.request.unwrap_with(&Default::default());
         let service = ServiceBuilder::new()
             .settings(request_limits, S3RetryLogic)
             .service(service);
