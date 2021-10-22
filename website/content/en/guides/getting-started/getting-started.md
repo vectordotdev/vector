@@ -172,12 +172,13 @@ check out:
 
 * All of Vector's [sources][docs.sources], [transforms][docs.transforms], and [sinks][docs.sinks].
 * The [Vector Remap Language][docs.vrl], the heart of data processing in Vector.
-* More details on [managing complex configuration files](guides.complex_config) in Vector.
+* More details on [component configuration][docs.configuration] in Vector.
 * Finally, [deploying Vector][docs.deployment] to launch Vector in your production environment.
 
 [docs.deployment]: /docs/setup/deployment/
 [docs.installation]: /docs/setup/installation/
 [docs.setup.configuration]: /docs/setup/configuration/
+[docs.configuration]: /docs/reference/configuration/
 [docs.sinks]: /docs/reference/configuration/sinks/
 [docs.sinks.console]: /docs/reference/configuration/sinks/console/
 [docs.sources]: /docs/reference/configuration/sources/
@@ -187,5 +188,4 @@ check out:
 [docs.transforms]: /docs/reference/configuration/transforms/
 [docs.vrl]: /docs/reference/vrl/
 [docs.vrl.parse_syslog]: /docs/reference/vrl/functions/#parse_syslog
-[guides.complex_config]: /guides/level-up/managing-complex-configs/
 [pages.components]: /components/
