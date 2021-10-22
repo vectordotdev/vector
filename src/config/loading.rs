@@ -263,13 +263,13 @@ fn load_builder_from_dir(
                         }
                         Some(name) => {
                             // ignore hidden folders
-                            if !name.starts_with('.') {
+                            if name.starts_with('.') {
+                                Ok(Vec::new())
+                            } else {
                                 Err(vec![format!(
                                     "Couldn't identify component type for folder {:?}",
                                     entry_path
                                 )])
-                            } else {
-                                Ok(Vec::new())
                             }
                         }
                         None => Ok(Vec::new()),
