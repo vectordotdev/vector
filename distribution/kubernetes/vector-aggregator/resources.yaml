@@ -38,31 +38,31 @@ data:
   managed.toml: |
     # Configuration for vector.
     # Docs: https://vector.dev/docs/
-
+    
     data_dir = "/vector-data-dir"
-
+    
     [api]
       enabled = false
       address = "0.0.0.0:8686"
       playground = true
-
+    
     [log_schema]
       host_key = "host"
       message_key = "message"
       source_type_key = "source_type"
       timestamp_key = "timestamp"
-
+    
     # Accept logs from Vector agents.
     [sources.vector]
       address = "0.0.0.0:9000"
       type = "vector"
       version = "2"
-
-
+    
+    
     # Emit internal Vector metrics.
     [sources.internal_metrics]
       type = "internal_metrics"
-
+    
     # Expose metrics for scraping in the Prometheus format.
     [sinks.prometheus_sink]
       address = "0.0.0.0:9090"
@@ -140,14 +140,14 @@ spec:
   template:
     metadata:
       annotations:
-
-
+        
+        
       labels:
         app.kubernetes.io/name: vector-aggregator
         app.kubernetes.io/instance: vector
         app.kubernetes.io/component: aggregator
         vector.dev/exclude: "true"
-    spec:
+    spec:      
       serviceAccountName: vector-aggregator
       securityContext:
         {}
@@ -161,8 +161,8 @@ spec:
             - --config-dir
             - /etc/vector/
           env:
-
-            - name: VECTOR_LOG
+            
+            - name: LOG
               value: info
           ports:
             - name: metrics

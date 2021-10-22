@@ -38,24 +38,24 @@ data:
   managed.toml: |
     # Configuration for vector.
     # Docs: https://vector.dev/docs/
-
+    
     data_dir = "/vector-data-dir"
-
+    
     [api]
       enabled = false
       address = "0.0.0.0:8686"
       playground = true
-
+    
     [log_schema]
       host_key = "host"
       message_key = "message"
       source_type_key = "source_type"
       timestamp_key = "timestamp"
-
+    
     # Ingest logs from Kubernetes.
     [sources.kubernetes_logs]
       type = "kubernetes_logs"
-
+    
     # Capture the metrics from the host.
     [sources.host_metrics]
       type = "host_metrics"
@@ -66,12 +66,12 @@ data:
           excludes = ["binfmt_misc"]
         [sources.host_metrics.filesystem.mountpoints]
           excludes = ["*/proc/sys/fs/binfmt_misc"]
-
-
+    
+    
     # Emit internal Vector metrics.
     [sources.internal_metrics]
       type = "internal_metrics"
-
+    
     # Expose metrics for scraping in the Prometheus format.
     [sinks.prometheus_sink]
       address = "0.0.0.0:9090"
@@ -140,13 +140,13 @@ spec:
   template:
     metadata:
       annotations:
-
-
+        
+        
       labels:
         app.kubernetes.io/name: vector-agent
         app.kubernetes.io/instance: vector
         vector.dev/exclude: "true"
-    spec:
+    spec:      
       serviceAccountName: vector-agent
       securityContext:
         {}
@@ -178,8 +178,8 @@ spec:
               value: /host/proc
             - name: SYSFS_ROOT
               value: /host/sys
-
-            - name: VECTOR_LOG
+            
+            - name: LOG
               value: info
           ports:
             - name: metrics
