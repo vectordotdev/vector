@@ -257,7 +257,7 @@ redis = { version = "0.21.3", default-features = false, features = ["connection-
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
 seahash = { version = "4.1.0", default-features = false, optional = true }
 semver = { version = "1.0.4", default-features = false, features = ["serde", "std"], optional = true }
-smallvec = { version = "1", optional = true }
+smallvec = { version = "1", optional = true, features = ["union"] }
 snafu = { version = "0.6.10", default-features = false, features = ["futures"] }
 snap = { version = "1.0.5", default-features = false, optional = true }
 socket2 = { version = "0.4.2", default-features = false }
