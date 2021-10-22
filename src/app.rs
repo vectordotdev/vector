@@ -51,8 +51,11 @@ impl Application {
     pub fn prepare_from_opts(opts: Opts) -> Result<Self, exitcode::ExitCode> {
         openssl_probe::init_ssl_cert_env_vars();
 
-        let level = std::env::var("LOG")
-            .or_else(|_| std::env::var("VECTOR_LOG"))
+        let level = std::env::var("VECTOR_LOG")
+            .or_else(|_| {
+                warn!(message = "Use of $LOG is deprecated. Please use $VECTOR_LOG instead.");
+                std::env::var("LOG")
+            })
             .unwrap_or_else(|_| match opts.log_level() {
                 "off" => "off".to_owned(),
                 #[cfg(feature = "tokio-console")]
