@@ -34,7 +34,7 @@ interpreted as described in [RFC 2119].
 Vector is a highly flexible observability data pipeline due to its directed
 acyclic graph processing model. Each node in the graph is a Vector Component,
 and in order to meet our [high user experience expectations] each Component must
-adhere to a common set of behaviorial rules. This document aims to clearly
+adhere to a common set of behavioral rules. This document aims to clearly
 outline these rules to guide new component development and ongoing maintenance.
 
 ## Scope
