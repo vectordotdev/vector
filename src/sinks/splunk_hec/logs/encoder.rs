@@ -10,7 +10,6 @@ use crate::{
     },
 };
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 
 use super::sink::HecLogsProcessedEventMetadata;
 
@@ -34,39 +33,22 @@ impl HecLogsEncoder {
     ) -> Option<Vec<u8>> {
         let log = processed_event.event;
         let metadata = processed_event.metadata;
-
         let event = match self {
-            HecLogsEncoder::Json => json!(&log),
-            HecLogsEncoder::Text => json!(log
-                .get(log_schema().message_key())
-                .map(|v| v.to_string_lossy())
-                .unwrap_or_else(|| "".into())),
+            HecLogsEncoder::Json => HecEvent::Json(log),
+            HecLogsEncoder::Text => HecEvent::Text(
+                log.get(log_schema().message_key())
+                    .map(|v| v.to_string_lossy())
+                    .unwrap_or_else(|| "".to_string()),
+            ),
         };
 
-        let mut body = json!({
-            "event": event,
-            "fields": metadata.fields,
-            "time": metadata.timestamp
-        });
+        let mut hec_data = HecData::new(event, metadata.fields, metadata.timestamp);
+        hec_data.host = metadata.host.map(|host| host.to_string_lossy());
+        hec_data.index = metadata.index;
+        hec_data.source = metadata.source;
+        hec_data.sourcetype = metadata.sourcetype;
 
-        if let Some(host) = metadata.host {
-            let host = host.to_string_lossy();
-            body["host"] = json!(host);
-        }
-
-        if let Some(index) = metadata.index {
-            body["index"] = json!(index.as_str());
-        }
-
-        if let Some(source) = metadata.source {
-            body["source"] = json!(source.as_str());
-        }
-
-        if let Some(sourcetype) = metadata.sourcetype {
-            body["sourcetype"] = json!(sourcetype.as_str());
-        }
-
-        match serde_json::to_vec(&body) {
+        match serde_json::to_vec(&hec_data) {
             Ok(value) => {
                 emit!(&SplunkEventSent {
                     byte_size: value.len()
@@ -112,5 +94,43 @@ where
             self.apply_rules(event);
         }
         self.codec().encode_input(input, writer)
+    }
+}
+
+#[derive(Serialize, Debug)]
+pub enum HecEvent {
+    #[serde(rename = "event")]
+    Json(LogEvent),
+    #[serde(rename = "event")]
+    Text(String),
+}
+
+#[derive(Serialize, Debug)]
+pub struct HecData {
+    #[serde(flatten)]
+    pub event: HecEvent,
+    pub fields: LogEvent,
+    pub time: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub host: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub index: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sourcetype: Option<String>,
+}
+
+impl HecData {
+    pub fn new(event: HecEvent, fields: LogEvent, time: f64) -> Self {
+        Self {
+            event,
+            fields,
+            time,
+            host: None,
+            index: None,
+            source: None,
+            sourcetype: None,
+        }
     }
 }
