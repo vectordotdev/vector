@@ -2,7 +2,7 @@
 name = "k8s-e2e-tests"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@timber.io>"]
-edition = "2018"
+edition = "2021"
 description = "End-to-end tests of Vector in the Kubernetes environment"
 publish = false
 license = "MPL-2.0"
