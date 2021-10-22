@@ -85,9 +85,12 @@ simple iteration (ie batching in sinks).
 
 ```rust
 trait EventContainer: ByteSizeOf {
-    fn into_events(self) -> impl Iterator<Item = Event>;
-    fn into_logs(self) -> impl Iterator<Item = LogEvent>;
-    fn into_metrics(self) -> impl Iterator<Item = Metric>;
+    type EventIter;
+    type LogIter;
+    type MetricIter;
+    fn into_events(self) -> Self::EventIter;
+    fn into_logs(self) -> Self::LogIter;
+    fn into_metrics(self) -> Self::MetricIter;
 }
 
 impl IntoIterator for EventVec { … }
