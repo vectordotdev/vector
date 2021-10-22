@@ -273,6 +273,28 @@ configuration: {
 				```
 				"""
 		}
+		automatic_namespacing: {
+			title: "Automatic namespacing of component files"
+			body: """
+				You can split your configuration files in component-type related folders.
+				That way, you can create the sink `foo` in the folder `/path/to/vector/config/sinks/foo.toml` and
+				configure it as follow.
+
+				```toml
+				type = "sink_type"
+				# here the sinks options
+				```
+
+				You can do the same for other kinds of components like `sources`, `transforms`, `tests` and `enrichment_tables`.
+
+				For vector to find and load the different configuration files, you need to load your configuration with
+				the `--config-dir` argument.
+
+				```bash
+				vector --config-dir /path/to/vector/config
+				```
+				"""
+		}
 		wildcards: {
 			title: "Wildcards in component names"
 			body: """
