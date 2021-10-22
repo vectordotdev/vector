@@ -155,7 +155,7 @@ When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site
 
 ## Lighthouse scores
 
-[Lighthouse] scores for the website are produced automatically by [Netlify's Lighthouse plugin][plugin]. Those reports are available at `${ROOT}/.hidden/lighthouse`, where `ROOT` is the root URL for a version of the site. Thus, reports for the production version of the site would be available at https://vector.dev/.hidden/lighthouse. Reports are also generated for deploy previews and branch deploys.
+[Lighthouse] scores for the website are produced automatically by [Netlify's Lighthouse plugin][plugin]. Those reports are available at `${ROOT}/reports/lighthouse`, where `ROOT` is the root URL for a version of the site. Thus, reports for the production version of the site would be available at https://vector.dev/reports/lighthouse. Reports are also generated for deploy previews and branch deploys.
 
 ## Known issues
 
