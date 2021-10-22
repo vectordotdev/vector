@@ -48,8 +48,6 @@ use super::util::{
     BatchSettings, Compression, RequestBuilder,
 };
 
-const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
-    TowerRequestConfig::new(Concurrency::Fixed(50)).rate_limit_num(250);
 const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = BatchSettings::const_default()
     .timeout(900)
     .bytes(100_000_000)
@@ -145,7 +143,7 @@ impl DatadogArchivesSinkConfig {
     ) -> std::result::Result<VectorSink, ConfigError> {
         // we use lower default limits, because we send 100mb batches,
         // thus no need in the the higher number of outcoming requests
-        let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
+        let request_limits = self.request.unwrap_with(&TowerRequestConfig::default);
         let service = ServiceBuilder::new()
             .settings(request_limits, S3RetryLogic)
             .service(service);
