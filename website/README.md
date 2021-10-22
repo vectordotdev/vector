@@ -153,6 +153,18 @@ When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site
 
     The `title` should reflect the version, while the `weight` should be the weight of the next most recent version plus 1. The file for version 0.8.1, for example, has a weight of 8, which means the weight for version 0.8.2 (the next higher version) is 9. This metadata is necessary because Hugo can't sort semantic versions, so we need to make the ordering explicit. If Hugo ever does allow for semver sorting, we should remove the `weight`s.
 
+### Generate Lighthouse scores
+
+You can generate [Lighthouse] page performance scores by running:
+
+```shell
+make lighthouse-report
+```
+
+The report automatically opens in the browser as soon as it's been generated. A Google Chrome installation on your machine is a prerequisite.
+
+Initially this report only covers the landing page, but later can be expanded to include a wider range of pages.
+
 ## Known issues
 
 * Tailwind's [typography] plugin is used to render text throughout the site. It's a decent library in general but is also rather buggy, with some rendering glitches in things like lists and tables that we've tried to compensate for in the `extend.typography` block in the [Tailwind config](./tailwind.config.js), but it will take some time to iron all of these issues out.
@@ -172,6 +184,7 @@ When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site
 [hugo]: https://gohugo.io
 [hugo pipes]: https://gohugo.io/hugo-pipes
 [ionicons]: https://ionic.io/ionicons
+[lighthouse]: https://web.dev/performance-scoring
 [netlify]: https://netlify.com
 [netlify_project]: https://app.netlify.com/sites/vector-project/overview
 [node.js]: https://nodejs.org

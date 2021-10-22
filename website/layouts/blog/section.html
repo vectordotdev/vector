@@ -22,7 +22,7 @@
     {{ end }}
 
     <div class="mt-8">
-      <a type="button" href="{{ $rss.RelPermalink }}" class="inline-flex items-center px-3 py-1.5 space-x-1.5 border border-transparent shadow-sm text-xs md:text-sm leading-4 font-medium rounded text-white bg-rss-orange focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-rss-orange hover:bg-orange-600" target="_blank">
+      <a type="button" href="{{ $rss.RelPermalink }}" class="inline-flex items-center px-3 py-1.5 space-x-1.5 border border-transparent shadow-sm text-xs md:text-sm leading-4 font-medium rounded text-white bg-rss-orange focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-rss-orange hover:bg-orange-600" rel="noopener" target="_blank">
         <ion-icon name="logo-rss"></ion-icon>
         <span>
           RSS
