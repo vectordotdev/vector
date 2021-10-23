@@ -6,6 +6,8 @@ use serde::Deserialize;
 use snafu::Snafu;
 use std::io::Read;
 use std::time::Duration;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 use tokio::runtime::Builder;
 use tokio::time::sleep;
 
@@ -34,6 +36,8 @@ pub struct Config {
     pub vector_id: String,
     /// The query to make of the experiment
     pub query: String,
+    /// The file to record captures into
+    pub capture_path: String,
 }
 
 #[derive(Debug, Snafu)]
@@ -112,6 +116,7 @@ struct Worker {
     experiment_name: String,
     query: String,
     startup_delay: u64,
+    capture_path: String,
 }
 
 impl Worker {
@@ -128,14 +133,18 @@ impl Worker {
             experiment_name: config.experiment_name,
             query: config.query,
             startup_delay: config.startup_delay_seconds,
+            capture_path: config.capture_path,
         }
     }
 
     async fn run(self) -> Result<(), Error> {
         let client: reqwest::Client = reqwest::Client::new();
 
+        let mut file = File::create(self.capture_path).await?;
+
         sleep(Duration::from_secs(self.startup_delay)).await;
-        println!("EXPERIMENT\tVECTOR-ID\tTIME\tQUERY\tVALUE");
+        file.write_all(b"EXPERIMENT\tVECTOR-ID\tTIME\tQUERY\tVALUE")
+            .await?;
         loop {
             let request = client.get(self.url.clone()).build()?;
             let body = client
@@ -147,16 +156,19 @@ impl Worker {
             if !body.data.result.is_empty() {
                 let time = body.data.result[0].value.time;
                 let value = body.data.result[0].value.value.parse::<f64>()?;
-                println!(
-                    "{}\t{}\t{}\t{}\t{}",
-                    &self.experiment_name, &self.vector_id, time, &self.query, value
-                );
+                file.write_all(
+                    format!(
+                        "{}\t{}\t{}\t{}\t{}",
+                        &self.experiment_name, &self.vector_id, time, &self.query, value,
+                    )
+                    .as_bytes(),
+                )
+                .await?;
             } else {
                 // TODO log error to stderr or what not
             }
             sleep(Duration::from_secs(1)).await;
         }
-        Ok(())
     }
 }
 

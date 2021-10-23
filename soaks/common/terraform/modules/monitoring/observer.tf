@@ -38,8 +38,10 @@ resource "kubernetes_deployment" "observer" {
         automount_service_account_token = false
         container {
           image_pull_policy = "IfNotPresent"
-          image             = "ghcr.io/vectordotdev/vector/soak-observer:sha-55446e9592d5105260cce878489121f9daf20bef"
+          image             = "ghcr.io/vectordotdev/vector/soak-observer:sha-8e70584783b5e07fc2ba5840884fc08ce1c44bd3"
           name              = "observer"
+          command = ["/bin/sh"]
+          args = ["-c", "/usr/bin/observer > /captures/observer.log"]
 
           volume_mount {
             mount_path = "/captures"
@@ -54,19 +56,19 @@ resource "kubernetes_deployment" "observer" {
 
           resources {
             limits = {
-              cpu    = "10m"
-              memory = "8Mi"
+              cpu    = "100m"
+              memory = "32Mi"
             }
             requests = {
-              cpu    = "10m"
-              memory = "8Mi"
+              cpu    = "100m"
+              memory = "32Mi"
             }
           }
         }
 
         volume {
           name = "captures"
-          host_path = {
+          host_path {
             path = "/captures"
           }
         }
