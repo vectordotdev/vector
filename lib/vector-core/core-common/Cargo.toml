@@ -7,3 +7,4 @@ publish = false
 
 [dependencies]
 serde_json = { version = "1.0.68", default-features = false, features = ["raw_value"] }
+metrics = { version = "0.17.0", default-features = false, features = ["std"] }

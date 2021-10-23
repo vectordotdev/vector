@@ -1,6 +1,5 @@
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
-    emit,
     event::{Event, VrlTarget},
     internal_events::VrlConditionExecutionError,
 };

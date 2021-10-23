@@ -11,7 +11,7 @@ use hyper::{Body, Request};
 use std::task::{Context, Poll};
 use tower::ServiceExt;
 
-use crate::internal_events::EventsSent;
+use vector_core::internal_event::EventsSent;
 use crate::rusoto::AwsCredentialsProvider;
 use crate::sinks::util::{Compression, ElementCount};
 use http::header::HeaderName;

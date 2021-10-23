@@ -9,7 +9,7 @@ use crate::{
         ComponentKey, DataType, OutputId, ProxyConfig, SinkContext, SourceContext, TransformContext,
     },
     event::Event,
-    internal_events::{EventsReceived, EventsSent},
+    internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
     transforms::Transform,
     Pipeline,
@@ -28,6 +28,7 @@ use tokio::{
     time::{timeout, Duration},
 };
 use vector_core::ByteSizeOf;
+use vector_core::internal_event::EventsSent;
 
 lazy_static! {
     static ref ENRICHMENT_TABLES: enrichment::TableRegistry = enrichment::TableRegistry::default();

@@ -37,7 +37,8 @@ use super::{
     service::{Map, ServiceBuilderExt},
     EncodedEvent,
 };
-use crate::{buffers::Acker, event::EventStatus, internal_events::EventsSent};
+use crate::{buffers::Acker, event::EventStatus};
+use vector_core::internal_event::EventsSent;
 use futures::{
     future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream, TryFutureExt,
 };

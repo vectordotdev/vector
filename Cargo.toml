@@ -12,7 +12,7 @@ default-run = "vector"
 autobenches = false # our benchmarks are not runnable on their own either way
 
 [[bin]]
-name = "graphql-schema"
+name = "graphql-schxema"
 path = "src/api/schema/gen.rs"
 required-features = ["default-no-api-client"]
 

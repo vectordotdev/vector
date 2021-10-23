@@ -8,3 +8,6 @@
 
 pub mod byte_size_of;
 pub mod internal_event;
+
+// #[cfg(test)]
+pub mod event_test_util;

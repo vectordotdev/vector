@@ -1,4 +1,5 @@
-use crate::{internal_events::EventsSent, transforms::FunctionTransform};
+use crate::transforms::FunctionTransform;
+use vector_core::internal_event::EventsSent;
 use futures::{channel::mpsc, task::Poll, Sink};
 #[cfg(test)]
 use futures::{Stream, StreamExt};
