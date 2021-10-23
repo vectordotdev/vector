@@ -143,7 +143,7 @@ impl Worker {
         let mut file = File::create(self.capture_path).await?;
 
         sleep(Duration::from_secs(self.startup_delay)).await;
-        file.write_all(b"EXPERIMENT\tVECTOR-ID\tTIME\tQUERY\tVALUE")
+        file.write_all(b"EXPERIMENT\tVECTOR-ID\tTIME\tQUERY\tVALUE\n")
             .await?;
         loop {
             let request = client.get(self.url.clone()).build()?;
@@ -158,7 +158,7 @@ impl Worker {
                 let value = body.data.result[0].value.value.parse::<f64>()?;
                 file.write_all(
                     format!(
-                        "{}\t{}\t{}\t{}\t{}",
+                        "{}\t{}\t{}\t{}\t{}\n",
                         &self.experiment_name, &self.vector_id, time, &self.query, value,
                     )
                     .as_bytes(),
