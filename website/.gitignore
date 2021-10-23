@@ -20,4 +20,4 @@ yarn-error.log
 .env
 
 # Generated HTML reports for Lighthouse
-lighthouse/*.html
+reports/lighthouse.html
