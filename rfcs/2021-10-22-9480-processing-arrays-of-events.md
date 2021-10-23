@@ -192,19 +192,28 @@ impl<T: StreamSink<Event> + Send> From<T> for VectorSink { … }
 
 ## Rationale
 
-- Why is this change worth it?
-- What is the impact of not doing this?
-- How does this position us for success in the future?
+The primary rationale for these changes stems straight from the
+motivation: performance. By working on arrays of events at a time, we
+reduce the per-event overhead of all processing steps, improving our
+margins of performance with minimal code changes. Further, it unlocks
+options for further optimizations down the road that are only possible
+when working on arrays.
+
+By introducing a trait to represent a container of events, it will make
+experiments with alternate representations easier once the trait is
+fully utilized.
 
 ## Drawbacks
 
-- Why should we not do this?
-- What kind on ongoing burden does this place on the team?
+This change necessarily moves the complexity of dealing with arrays of
+events into all consuming components. Even if no such component is
+modified beyond the trivial wrapper functions, this will require a
+growth in the code required to consume events, albeit small.
 
-## Prior Art
-
-- List prior art, the good and bad.
-- Why can't we simply use or copy them?
+Additionally, there may be some memory effects caused by moving events
+to and from a heap-allocated vector. It is likely those effects will be
+negligible if present, but that cannot be determined without before
+making the changes.
 
 ## Alternatives
 
