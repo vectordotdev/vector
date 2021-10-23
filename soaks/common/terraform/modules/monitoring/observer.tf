@@ -1,3 +1,12 @@
+data "template_file" "soak-observer" {
+  template = file("${path.module}/observer.toml.tpl")
+  vars = {
+    experiment_name = var.type
+    vector_id       = var.vector_image
+    query           = "sum(rate((bytes_written[1m])))"
+  }
+}
+
 resource "kubernetes_config_map" "observer" {
   metadata {
     name      = "observer"
@@ -5,7 +14,7 @@ resource "kubernetes_config_map" "observer" {
   }
 
   data = {
-    "observer.toml" = var.observer-toml
+    "observer.toml" = data.template_file.soak-observer.rendered
   }
 }
 
@@ -38,7 +47,7 @@ resource "kubernetes_deployment" "observer" {
         automount_service_account_token = false
         container {
           image_pull_policy = "IfNotPresent"
-          image             = "ghcr.io/vectordotdev/vector/soak-observer:sha-cbeda534eeeaaa771adfe0dba615ac9a03e72e0b"
+          image             = "ghcr.io/vectordotdev/vector/soak-observer:sha-d108935d14ea7d3405567edb27f55ee03ef7b43d"
           name              = "observer"
 
           volume_mount {

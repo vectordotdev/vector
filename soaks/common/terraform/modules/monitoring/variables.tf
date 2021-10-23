@@ -1,4 +1,9 @@
-variable "observer-toml" {
-  description = "The rendered observer.toml for this test"
+variable "type" {
+  description = "The type of the vector install, whether 'baseline' or 'comparison'"
+  type        = string
+}
+
+variable "vector_image" {
+  description = "The image of vector to use in this investigation"
   type        = string
 }
