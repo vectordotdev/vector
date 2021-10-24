@@ -97,7 +97,7 @@ impl IntoIterator for EventVec { … }
 impl IntoIterator for Event { … }
 ```
 
-#### Make `Pipeline` accept Enhancing the `Pipeline`
+#### Enhancing the `Pipeline`
 
 The `Pipeline` structure stands as the primary unit for moving data
 between components in Vector. It receives from a source or transform,
@@ -109,7 +109,9 @@ In order to receive events asynchronously from sources, the pipeline
 implements the `Sink` trait for single events. This trait is
 parameterized over the type which the pipeline can receive. The current
 implementation allows for sending a single `Event`, and an additional
-implementation can be added for arrays of `Event`.
+implementation can be added for event arrays. This allows sources to be
+converted individually to send arrays while retaining compatibility with
+existing sources.
 
 ```rust
 impl Sink<EventVec> for Pipeline { … }
