@@ -3,7 +3,7 @@
 set -o errexit
 set -o pipefail
 set -o nounset
-#set -o xtrace
+set -o xtrace
 
 __dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -23,59 +23,62 @@ COMPARISON="${3:-}"
 WARMUP_GRACE=90
 TOTAL_SAMPLES=120
 
-collect_samples() {
-    local PROM_URL
-    PROM_URL=$(minikube service --url --namespace monitoring prometheus)
-    local EXPERIMENT_TYPE="${1}"
-    local CAPTURE_FILE="${2}"
-
-    for ((sample_idx=1;sample_idx<=TOTAL_SAMPLES;sample_idx++));
-    do
-        SAMPLE=$(curl --silent "${PROM_URL}/api/v1/query?query=""sum(rate((bytes_written\[1m\])))" | jq '.data.result[0].value[1]' | sed 's/"//g')
-        echo -e "${EXPERIMENT_TYPE}\t${sample_idx}\t${SAMPLE}" >> "${CAPTURE_FILE}"
-        sleep 1
-    done
-}
-
-
 pushd "${__dir}"
 ./bin/build_container.sh "${SOAK_NAME}" "${BASELINE}"
 ./bin/build_container.sh "${SOAK_NAME}" "${COMPARISON}"
 BASELINE_IMAGE=$(./bin/container_name.sh "${SOAK_NAME}" "${BASELINE}")
 COMPARISON_IMAGE=$(./bin/container_name.sh "${SOAK_NAME}" "${COMPARISON}")
 
-capture_file=$(mktemp /tmp/"${SOAK_NAME}"-captures.XXXXXX)
-echo "Captures will be recorded to ${capture_file}"
-echo -e "EXPERIMENT\tSAMPLE-IDX\tSAMPLE" > "${capture_file}"
+capture_dir=$(mktemp -d /tmp/"${SOAK_NAME}".XXXXXX)
+echo "Captures will be recorded into ${capture_dir}"
 
-./bin/boot_minikube.sh "${BASELINE_IMAGE}" "${COMPARISON_IMAGE}"
-pushd "${__dir}/${SOAK_NAME}/terraform"
-
-terraform init
 #
 # BASELINE
 #
-terraform apply -var 'type=baseline' -var 'type=baseline' -var "vector_image=${BASELINE_IMAGE}" -var "sha=${BASELINE}" --auto-approve
+./bin/boot_minikube.sh "${BASELINE_IMAGE}"
+minikube mount "${capture_dir}:/captures" &
+MOUNT_PID=$!
+
+pushd "${__dir}/${SOAK_NAME}/terraform"
+terraform init
+terraform apply -var 'type=baseline' -var 'type=baseline' -var "vector_image=${BASELINE_IMAGE}" --auto-approve
+echo "Captures will be recorded into ${capture_dir}"
+echo "Sleeping for ${WARMUP_GRACE} seconds to allow warm-up"
 sleep "${WARMUP_GRACE}"
-echo "Recording 'baseline' captures to ${capture_file}"
-collect_samples "baseline" "${capture_file}"
-terraform apply -var 'type=baseline' -var "vector_image=${BASELINE_IMAGE}" -var "sha=${BASELINE}" --destroy --auto-approve
+echo "Recording 'baseline' captures to ${capture_dir}"
+sleep "${TOTAL_SAMPLES}"
+kill "${MOUNT_PID}"
+popd
+./bin/shutdown_minikube.sh
+
 
 #
 # COMPARISON
 #
-terraform apply -var 'type=comparison' -var "vector_image=${COMPARISON_IMAGE}" -var "sha=${COMPARISON}" --auto-approve
-sleep "${WARMUP_GRACE}"
-echo "Recording 'comparison' captures to ${capture_file}"
-collect_samples "comparision" "${capture_file}"
+./bin/boot_minikube.sh "${COMPARISON_IMAGE}"
+minikube mount "${capture_dir}:/captures" &
+MOUNT_PID=$!
 
+pushd "${__dir}/${SOAK_NAME}/terraform"
+terraform init
+terraform apply -var 'type=comparison' -var 'type=comparison' -var "vector_image=${COMPARISON_IMAGE}" --auto-approve
+echo "Captures will be recorded into ${capture_dir}"
+echo "Sleeping for ${WARMUP_GRACE} seconds to allow warm-up"
+sleep "${WARMUP_GRACE}"
+echo "Recording 'comparison' captures to ${capture_dir}"
+sleep "${TOTAL_SAMPLES}"
+kill "${MOUNT_PID}"
 popd
 ./bin/shutdown_minikube.sh
 
 popd
-echo "Captures recorded to ${capture_file}"
+
+echo "Captures recorded into ${capture_dir}"
 echo ""
 echo "Here is a statistical summary of that file. Units are bytes."
 echo "Higher numbers in the 'comparison' is better."
 echo ""
-mlr --tsv --from "${capture_file}" stats1 -a 'min,p90,p99,max,skewness,kurtosis' -g EXPERIMENT -f SAMPLE | column -t
+mlr --tsv \
+    --from "${capture_dir}/baseline.captures" \
+    --from "${capture_dir}/comparison.captures" \
+    stats1 -a 'min,p90,p99,max,skewness,kurtosis' -g EXPERIMENT -f VALUE

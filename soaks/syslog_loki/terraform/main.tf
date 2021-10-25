@@ -20,6 +20,8 @@ provider "kubernetes" {
 # understand what vector et al's running behavior is.
 module "monitoring" {
   source = "../../common/terraform/modules/monitoring"
+  type         = var.type
+  vector_image = var.vector_image
 }
 
 # Setup the soak pieces
@@ -36,7 +38,6 @@ module "vector" {
   source       = "../../common/terraform/modules/vector"
   type         = var.type
   vector_image = var.vector_image
-  sha          = var.sha
   test_name    = "syslog_loki"
   vector-toml  = file("${path.module}/vector.toml")
   namespace    = kubernetes_namespace.soak.metadata[0].name

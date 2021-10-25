@@ -153,17 +153,9 @@ When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site
 
     The `title` should reflect the version, while the `weight` should be the weight of the next most recent version plus 1. The file for version 0.8.1, for example, has a weight of 8, which means the weight for version 0.8.2 (the next higher version) is 9. This metadata is necessary because Hugo can't sort semantic versions, so we need to make the ordering explicit. If Hugo ever does allow for semver sorting, we should remove the `weight`s.
 
-### Generate Lighthouse scores
+## Lighthouse scores
 
-You can generate [Lighthouse] page performance scores by running:
-
-```shell
-make lighthouse-report
-```
-
-The report automatically opens in the browser as soon as it's been generated. A Google Chrome installation on your machine is a prerequisite.
-
-Initially this report only covers the landing page, but later can be expanded to include a wider range of pages.
+[Lighthouse] scores for the website are produced automatically by [Netlify's Lighthouse plugin][plugin]. Those reports are available at `${ROOT}/reports/lighthouse`, where `ROOT` is the root URL for a version of the site. Thus, reports for the production version of the site would be available at https://vector.dev/reports/lighthouse. Reports are also generated for deploy previews and branch deploys.
 
 ## Known issues
 
@@ -188,6 +180,7 @@ Initially this report only covers the landing page, but later can be expanded to
 [netlify]: https://netlify.com
 [netlify_project]: https://app.netlify.com/sites/vector-project/overview
 [node.js]: https://nodejs.org
+[plugin]: https://www.npmjs.com/package/@netlify/plugin-lighthouse
 [postcss]: https://github.com/postcss/postcss
 [purgecss]: https://purgecss.com
 [react.js]: https://reactjs.org
