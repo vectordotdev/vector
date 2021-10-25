@@ -300,6 +300,24 @@ pub use self::windows::*;
 #[cfg(feature = "sources-mongodb_metrics")]
 pub use mongodb_metrics::*;
 
+#[cfg(test)]
+#[macro_export]
+macro_rules! emit {
+    ($event:expr) => {
+        vector_core::internal_event::emit(&vector_core::internal_event::NamedInternalEvent {
+            event: $event,
+            name: stringify!($event)
+        })
+    };
+}
+
+#[cfg(not(test))]
+#[macro_export]
+macro_rules! emit {
+    ($event:expr) => {
+        vector_core::internal_event::emit($event)
+    };
+}
 
 const ELLIPSIS: &str = "[...]";
 

@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Value};
+use crate::emit;
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
 pub struct VrlConfig {

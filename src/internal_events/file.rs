@@ -42,6 +42,7 @@ mod source {
     use file_source::FileSourceInternalEvents;
     use metrics::counter;
     use std::{io::Error, path::Path, time::Duration};
+    use crate::emit;
 
     #[derive(Debug)]
     pub struct FileBytesReceived<'a> {

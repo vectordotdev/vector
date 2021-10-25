@@ -40,7 +40,6 @@ pub mod time;
 pub use core_common::byte_size_of::ByteSizeOf;
 pub use core_common::internal_event;
 pub use core_common::event_test_util;
-pub use core_common::emit;
 
 use std::path::PathBuf;
 
