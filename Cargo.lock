@@ -832,7 +832,7 @@ dependencies = [
  "tokio",
  "tokio-test",
  "tracing 0.1.29",
- "tracing-subscriber",
+ "tracing-subscriber 0.3.0",
 ]
 
 [[package]]
@@ -1155,7 +1155,7 @@ dependencies = [
  "tonic",
  "tracing 0.1.29",
  "tracing-core 0.1.21",
- "tracing-subscriber",
+ "tracing-subscriber 0.2.25",
 ]
 
 [[package]]
@@ -3628,7 +3628,7 @@ dependencies = [
  "once_cell",
  "tracing 0.1.29",
  "tracing-core 0.1.21",
- "tracing-subscriber",
+ "tracing-subscriber 0.2.25",
 ]
 
 [[package]]
@@ -7106,7 +7106,7 @@ dependencies = [
  "mock_instant",
  "tracing 0.1.29",
  "tracing-core 0.1.21",
- "tracing-subscriber",
+ "tracing-subscriber 0.3.0",
 ]
 
 [[package]]
@@ -7150,6 +7150,17 @@ dependencies = [
  "tracing-core 0.1.21",
  "tracing-log",
  "tracing-serde",
+]
+
+[[package]]
+name = "tracing-subscriber"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5cf865b5ddc38e503a29c41c4843e616a73028ae18c637bc3eb2afaef4909c84"
+dependencies = [
+ "sharded-slab",
+ "thread_local",
+ "tracing-core 0.1.21",
 ]
 
 [[package]]
@@ -7269,7 +7280,7 @@ version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f559b464de2e2bdabcac6a210d12e9b5a5973c251e102c44c585c71d51bd78e"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "static_assertions",
 ]
 
@@ -7640,7 +7651,7 @@ dependencies = [
  "tracing-futures 0.2.5",
  "tracing-limit",
  "tracing-log",
- "tracing-subscriber",
+ "tracing-subscriber 0.3.0",
  "tracing-tower",
  "trust-dns-proto",
  "tui",
@@ -7739,7 +7750,7 @@ dependencies = [
  "tracing 0.1.29",
  "tracing-core 0.1.21",
  "tracing-log",
- "tracing-subscriber",
+ "tracing-subscriber 0.3.0",
  "twox-hash",
  "typetag",
  "vrl",
@@ -7894,7 +7905,7 @@ dependencies = [
  "serde_json",
  "shared",
  "structopt",
- "tracing-subscriber",
+ "tracing-subscriber 0.3.0",
  "vrl",
  "vrl-parser",
  "vrl-stdlib",
