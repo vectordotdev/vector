@@ -68,7 +68,7 @@ where
         context: &TransformContext,
         clock: C,
     ) -> crate::Result<Self> {
-        let flush_keys_interval = Duration::from_secs_f64(config.window.clone());
+        let flush_keys_interval = Duration::from_secs_f64(config.window);
 
         let threshold = match NonZeroU32::new(config.threshold) {
             Some(threshold) => threshold,
@@ -120,13 +120,8 @@ where
               loop {
                 let mut output = Vec::new();
                 let done = tokio::select! {
-                    _ = flush_stream.tick() => {
-                        false
-                    }
-                    _ = flush_keys.tick() => {
-                        limiter.retain_recent();
-                        false
-                    }
+                    biased;
+
                     maybe_event = input_rx.next() => {
                         match maybe_event {
                             None => true,
@@ -159,6 +154,13 @@ where
                                 false
                             }
                         }
+                    }
+                    _ = flush_keys.tick() => {
+                        limiter.retain_recent();
+                        false
+                    }
+                    _ = flush_stream.tick() => {
+                        false
                     }
                 };
                 yield stream::iter(output.into_iter());
