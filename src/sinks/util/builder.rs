@@ -129,20 +129,13 @@ pub trait SinkBuilderExt: Stream {
         B::Request: Send,
     {
         self.map(Box::new(move |input| {
-            let mut results = Vec::new();
-
-            // Encode the events, generating potentially many metadata/payload pairs.
-            match builder.encode_events_incremental(input) {
-                Ok(pairs) => {
-                    // Now build the actual requests.
-                    for (metadata, payload) in pairs {
-                        results.push(Ok(builder.build_request(metadata, payload)));
-                    }
-                }
-                Err(e) => results.push(Err(e)),
-            }
-
-            results
+            builder
+                .encode_events_incremental(input)
+                .into_iter()
+                .map(|result| {
+                    result.map(|(metadata, payload)| builder.build_request(metadata, payload))
+                })
+                .collect()
         }))
     }
 

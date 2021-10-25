@@ -6,8 +6,11 @@ use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::sync::Arc;
 
+#[cfg(feature = "sinks-datadog_events")]
 pub mod events;
+#[cfg(feature = "sinks-datadog_logs")]
 pub mod logs;
+#[cfg(feature = "sinks-datadog_metrics")]
 pub mod metrics;
 
 type ApiKey = Arc<str>;

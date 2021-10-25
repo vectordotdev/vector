@@ -15,7 +15,9 @@ use vector_core::{
     stream::BatcherSettings,
 };
 
-use crate::{config::SinkContext, sinks::util::SinkBuilderExt};
+use crate::{
+    config::SinkContext, internal_events::DatadogMetricsEncodingError, sinks::util::SinkBuilderExt,
+};
 
 use super::{
     config::DatadogMetricsEndpoint, normalizer::DatadogMetricsNormalizer,
@@ -92,13 +94,17 @@ where
             // limit, and then create a new request, and so on and so forth, until all metrics have
             // been turned into a request.
             .incremental_request_builder(self.request_builder)
-            // This unrolls our vector of requests to get us back to Stream<Item = DatadogMetricsRequest>.
+            // This unrolls the vector of request results that our request builder generates.
             .flat_map(stream::iter)
             // Generating requests _can_ fail, so we log and filter out errors here.
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        error!("Failed to build Datadog Metrics request: {:?}.", e);
+                        let (error, dropped_events) = e.into_parts();
+                        emit!(&DatadogMetricsEncodingError {
+                            error,
+                            dropped_events,
+                        });
                         None
                     }
                     Ok(req) => Some(req),

@@ -37,10 +37,12 @@ mod concat;
 mod conditions;
 #[cfg(feature = "sinks-console")]
 mod console;
-#[cfg(feature = "sinks-datadog")]
+#[cfg(feature = "sinks-datadog_events")]
 mod datadog_events;
-#[cfg(feature = "sinks-datadog")]
+#[cfg(feature = "sinks-datadog_logs")]
 mod datadog_logs;
+#[cfg(feature = "sinks-datadog_metrics")]
+mod datadog_metrics;
 #[cfg(any(feature = "codecs"))]
 mod decoder;
 #[cfg(feature = "transforms-dedupe")]
@@ -175,10 +177,12 @@ pub use self::concat::*;
 pub use self::conditions::*;
 #[cfg(feature = "sinks-console")]
 pub use self::console::*;
-#[cfg(feature = "sinks-datadog")]
+#[cfg(feature = "sinks-datadog_events")]
 pub use self::datadog_events::*;
-#[cfg(feature = "sinks-datadog")]
+#[cfg(feature = "sinks-datadog_logs")]
 pub use self::datadog_logs::*;
+#[cfg(feature = "sinks-datadog_metrics")]
+pub use self::datadog_metrics::*;
 #[cfg(any(feature = "codecs"))]
 pub use self::decoder::*;
 #[cfg(feature = "transforms-dedupe")]

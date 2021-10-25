@@ -209,7 +209,7 @@ impl DatadogMetricsConfig {
         let request_builder = DatadogMetricsRequestBuilder::new(
             endpoint_configuration,
             self.default_namespace.clone(),
-        );
+        )?;
 
         let sink = DatadogMetricsSink::new(cx, service, request_builder, batcher_settings);
 

@@ -97,13 +97,7 @@ fn main() {
     // Always rerun if the build script itself changes.
     println!("cargo:rerun-if-changed=build.rs");
 
-    #[cfg(any(
-        feature = "sources-datadog",
-        feature = "sources-vector",
-        feature = "sources-dnstap",
-        feature = "sinks-datadog_metrics",
-        feature = "sinks-vector"
-    ))]
+    #[cfg(feature = "protobuf-build")]
     {
         println!("cargo:rerun-if-changed=proto/vector.proto");
         println!("cargo:rerun-if-changed=proto/dnstap.proto");

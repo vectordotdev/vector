@@ -49,13 +49,13 @@ pub trait IncrementalRequestBuilder<Input> {
     type Metadata;
     type Payload;
     type Request;
-    type Error: From<io::Error>;
+    type Error;
 
     /// Incrementally encodes the given input, potentially generating multiple payloads.
     fn encode_events_incremental(
         &mut self,
         input: Input,
-    ) -> Result<Vec<(Self::Metadata, Self::Payload)>, Self::Error>;
+    ) -> Vec<Result<(Self::Metadata, Self::Payload), Self::Error>>;
 
     /// Builds a request for the given metadata and payload.
     fn build_request(&mut self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request;

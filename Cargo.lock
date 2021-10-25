@@ -7671,6 +7671,7 @@ dependencies = [
  "postgres-openssl",
  "pretty_assertions",
  "prometheus-parser",
+ "proptest",
  "prost",
  "prost-build",
  "prost-types",
