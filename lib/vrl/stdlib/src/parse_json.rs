@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -90,11 +92,14 @@ struct ParseJsonFn {
 
 impl Expression for ParseJsonFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
+        // TODO Obviously try_bytes shouldn't take ownership anymore..
+        let bytes = self.value.resolve(ctx)?;
+        let bytes = bytes.borrow();
+        let bytes = bytes.as_bytes().unwrap();
         let value = serde_json::from_slice::<'_, Value>(&bytes)
             .map_err(|e| format!("unable to parse json: {}", e))?;
 
-        Ok(value)
+        Ok(Rc::new(RefCell::new(value)))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

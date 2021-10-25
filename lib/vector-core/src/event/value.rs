@@ -4,11 +4,13 @@ use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use lookup::{Field, FieldBuf, Lookup, LookupBuf, Segment, SegmentBuf};
 use serde::{Deserialize, Serialize, Serializer};
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
+use std::rc::Rc;
 use toml::value::Value as TomlValue;
 
 #[derive(PartialOrd, Debug, Clone, Deserialize)]
@@ -300,17 +302,23 @@ impl From<vrl_core::Value> for Value {
             Array, Boolean, Bytes, Float, Integer, Null, Object, Regex, Timestamp,
         };
 
-        match v {
+        let noog = match v {
             Bytes(v) => Value::Bytes(v),
             Integer(v) => Value::Integer(v),
             Float(v) => Value::Float(*v),
             Boolean(v) => Value::Boolean(v),
-            Object(v) => Value::Map(v.into_iter().map(|(k, v)| (k, v.into())).collect()),
-            Array(v) => Value::Array(v.into_iter().map(Into::into).collect()),
+            Object(v) => Value::Map(
+                v.into_iter()
+                    .map(|(k, v)| (k, v.borrow().clone().into()))
+                    .collect(),
+            ),
+            Array(v) => Value::Array(v.into_iter().map(|v| v.borrow().clone().into()).collect()),
             Timestamp(v) => Value::Timestamp(v),
             Regex(v) => Value::Bytes(bytes::Bytes::copy_from_slice(v.to_string().as_bytes())),
             Null => Value::Null,
-        }
+        };
+
+        noog
     }
 }
 
@@ -324,9 +332,43 @@ impl From<Value> for vrl_core::Value {
             Value::Integer(v) => v.into(),
             Value::Float(v) => v.into(),
             Value::Boolean(v) => v.into(),
-            Value::Map(v) => Object(v.into_iter().map(|(k, v)| (k, v.into())).collect()),
-            Value::Array(v) => Array(v.into_iter().map(Into::into).collect()),
+            Value::Map(v) => Object(
+                v.into_iter()
+                    .map(|(k, v)| (k, Rc::new(RefCell::new(v.into()))))
+                    .collect(),
+            ),
+            Value::Array(v) => Array(
+                v.into_iter()
+                    .map(|v| Rc::new(RefCell::new(v.into())))
+                    .collect(),
+            ),
             Value::Timestamp(v) => v.into(),
+            Value::Null => ().into(),
+        }
+    }
+}
+
+#[cfg(feature = "vrl")]
+impl From<&Value> for vrl_core::Value {
+    fn from(v: &Value) -> Self {
+        use vrl_core::Value::{Array, Object};
+
+        match v {
+            Value::Bytes(v) => v.clone().into(),
+            Value::Integer(v) => (*v).into(),
+            Value::Float(v) => (*v).into(),
+            Value::Boolean(v) => (*v).into(),
+            Value::Map(v) => Object(
+                v.iter()
+                    .map(|(k, v)| (k.clone(), Rc::new(RefCell::new(v.into()))))
+                    .collect(),
+            ),
+            Value::Array(v) => Array(
+                v.into_iter()
+                    .map(|v| Rc::new(RefCell::new(v.into())))
+                    .collect(),
+            ),
+            Value::Timestamp(v) => (*v).into(),
             Value::Null => ().into(),
         }
     }

@@ -93,6 +93,10 @@ is aborted, we don't do anything since the original event is still unmodified.
 Currently, the only point at which data is mutated is when updating the event. With this change mutation would occur when updating the VRL data store.
 
 
+Some changes will need to be made:
+
+1. `trait Expression` can no longer be `Send + Sync` since `Rc` is `!Send`
+
 #### Use a Bump Allocator?
 
 We could use a library such as [bumpalo](https://crates.io/crates/bumpalo).

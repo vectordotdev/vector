@@ -24,11 +24,11 @@ pub struct LogEvent {
     // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
     #[derivative(Default(value = "Value::from(BTreeMap::default())"))]
     #[serde(flatten)]
-    fields: Value,
+    pub fields: Value,
 
     #[getset(get = "pub", get_mut = "pub")]
     #[serde(skip)]
-    metadata: EventMetadata,
+    pub metadata: EventMetadata,
 }
 
 impl Default for LogEvent {

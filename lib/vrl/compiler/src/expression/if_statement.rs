@@ -1,6 +1,8 @@
 use crate::expression::{Block, Expr, Literal, Predicate, Resolved};
 use crate::{Context, Expression, State, TypeDef, Value};
+use std::cell::RefCell;
 use std::fmt;
+use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct IfStatement {
@@ -27,7 +29,12 @@ impl IfStatement {
 
 impl Expression for IfStatement {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let predicate = self.predicate.resolve(ctx)?.try_boolean()?;
+        let predicate = self
+            .predicate
+            .resolve(ctx)?
+            .borrow()
+            .clone()
+            .try_boolean()?;
 
         match predicate {
             true => self.consequent.resolve(ctx),
@@ -35,7 +42,7 @@ impl Expression for IfStatement {
                 .alternative
                 .as_ref()
                 .map(|block| block.resolve(ctx))
-                .unwrap_or(Ok(Value::Null)),
+                .unwrap_or_else(|| Ok(Rc::new(RefCell::new(Value::Null)))),
         }
     }
 

@@ -47,24 +47,30 @@ pub(crate) fn evaluate_condition<'a>(
     value: &expression::Expr,
 ) -> Result<Condition<'a>> {
     let value = value.resolve(ctx)?;
+    let value = value.borrow();
 
-    Ok(match value {
+    Ok(match &*value {
         Value::Object(map) if map.contains_key("from") && map.contains_key("to") => {
             Condition::BetweenDates {
                 field: key,
                 from: *map
                     .get("from")
                     .expect("should contain from")
+                    .borrow()
                     .as_timestamp()
                     .ok_or("from in condition must be a timestamp")?,
                 to: *map
                     .get("to")
                     .expect("should contain to")
+                    .borrow()
                     .as_timestamp()
                     .ok_or("to in condition must be a timestamp")?,
             }
         }
-        _ => Condition::Equals { field: key, value },
+        _ => Condition::Equals {
+            field: key,
+            value: value.clone(),
+        },
     })
 }
 

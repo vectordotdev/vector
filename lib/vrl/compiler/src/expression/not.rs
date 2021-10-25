@@ -1,8 +1,11 @@
 use crate::expression::{Expr, Noop, Resolved};
 use crate::parser::Node;
+use crate::Value;
 use crate::{value::Kind, Context, Expression, Span, State, TypeDef};
 use diagnostic::{DiagnosticError, Label, Note, Urls};
+use std::cell::RefCell;
 use std::fmt;
+use std::rc::Rc;
 
 pub type Result = std::result::Result<Not, Error>;
 
@@ -38,7 +41,9 @@ impl Not {
 
 impl Expression for Not {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        Ok((!self.inner.resolve(ctx)?.try_boolean()?).into())
+        Ok(Rc::new(RefCell::new(Value::Boolean(
+            !self.inner.resolve(ctx)?.borrow().clone().try_boolean()?,
+        ))))
     }
 
     fn type_def(&self, state: &State) -> TypeDef {

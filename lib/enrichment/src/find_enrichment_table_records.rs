@@ -2,7 +2,7 @@ use crate::{
     vrl_util::{self, add_index, evaluate_condition},
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
 };
-use std::collections::BTreeMap;
+use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 use vrl_core::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -76,9 +76,9 @@ impl Function for FindEnrichmentTableRecords {
 
         let case_sensitive = arguments
             .optional_literal("case_sensitive")?
-            .map(|literal| literal.to_value().try_boolean())
-            .transpose()
-            .expect("case_sensitive should be boolean") // This will have been caught by the type checker.
+            .map(|literal| literal.to_value().borrow().as_boolean().unwrap())
+            //.transpose()
+            //.expect("case_sensitive should be boolean") // This will have been caught by the type checker.
             .map(|case_sensitive| {
                 if case_sensitive {
                     Case::Sensitive
@@ -120,10 +120,10 @@ impl Expression for FindEnrichmentTableRecordsFn {
         let select = self
             .select
             .as_ref()
-            .map(|array| match array.resolve(ctx)? {
+            .map(|array| match &*array.resolve(ctx)?.borrow() {
                 Value::Array(arr) => arr
                     .iter()
-                    .map(|value| Ok(value.try_bytes_utf8_lossy()?.to_string()))
+                    .map(|value| Ok(value.borrow().try_bytes_utf8_lossy()?.to_string()))
                     .collect::<std::result::Result<Vec<_>, _>>(),
                 value => Err(value::Error::Expected {
                     got: value.kind(),
@@ -142,10 +142,10 @@ impl Expression for FindEnrichmentTableRecordsFn {
                 self.index,
             )?
             .into_iter()
-            .map(Value::Object)
+            .map(|o| Rc::new(RefCell::new(Value::Object(o))))
             .collect();
 
-        Ok(Value::Array(data))
+        Ok(Rc::new(RefCell::new(Value::Array(data))))
     }
 
     fn update_state(

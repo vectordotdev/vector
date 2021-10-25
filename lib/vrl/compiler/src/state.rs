@@ -1,5 +1,7 @@
 use crate::expression::assignment;
 use crate::{parser::ast::Ident, TypeDef, Value};
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::{any::Any, collections::HashMap};
 
 /// The state held by the compiler.
@@ -122,7 +124,7 @@ impl Compiler {
 #[derive(Debug, Default)]
 pub struct Runtime {
     /// The [`Value`] stored in each variable.
-    variables: HashMap<Ident, Value>,
+    variables: HashMap<Ident, Rc<RefCell<Value>>>,
 }
 
 impl Runtime {
@@ -134,15 +136,15 @@ impl Runtime {
         self.variables.clear();
     }
 
-    pub fn variable(&self, ident: &Ident) -> Option<&Value> {
-        self.variables.get(ident)
+    pub fn variable(&self, ident: &Ident) -> Option<Rc<RefCell<Value>>> {
+        self.variables.get(ident).cloned()
     }
 
-    pub fn variable_mut(&mut self, ident: &Ident) -> Option<&mut Value> {
-        self.variables.get_mut(ident)
+    pub fn variable_mut(&mut self, ident: &Ident) -> Option<Rc<RefCell<Value>>> {
+        self.variables.get_mut(ident).cloned()
     }
 
-    pub(crate) fn insert_variable(&mut self, ident: Ident, value: Value) {
+    pub(crate) fn insert_variable(&mut self, ident: Ident, value: Rc<RefCell<Value>>) {
         self.variables.insert(ident, value);
     }
 }

@@ -2,7 +2,9 @@ use crate::expression::{self, Expr, Noop, Resolved};
 use crate::parser::{ast, Node};
 use crate::{value, Context, Expression, State, TypeDef, Value};
 use diagnostic::{DiagnosticError, Label, Note, Span, Urls};
+use std::cell::RefCell;
 use std::fmt;
+use std::rc::Rc;
 
 #[derive(Clone, PartialEq)]
 pub struct Op {
@@ -89,27 +91,30 @@ impl Expression for Op {
         let lhs = self.lhs.resolve(ctx);
         let mut rhs = || self.rhs.resolve(ctx);
 
-        match self.opcode {
-            Mul => lhs?.try_mul(rhs()?),
-            Div => lhs?.try_div(rhs()?),
-            Add => lhs?.try_add(rhs()?),
-            Sub => lhs?.try_sub(rhs()?),
-            Rem => lhs?.try_rem(rhs()?),
-            Or => lhs?.try_or(rhs),
-            And => match lhs? {
-                Null | Boolean(false) => Ok(false.into()),
-                v => v.try_and(rhs()?),
-            },
-            Err => Ok(lhs.or_else(|_| rhs())?),
-            Eq => Ok(lhs?.eq_lossy(&rhs()?).into()),
-            Ne => Ok((!lhs?.eq_lossy(&rhs()?)).into()),
-            Gt => lhs?.try_gt(rhs()?),
-            Ge => lhs?.try_ge(rhs()?),
-            Lt => lhs?.try_lt(rhs()?),
-            Le => lhs?.try_le(rhs()?),
-            Merge => lhs?.try_merge(rhs()?),
-        }
-        .map_err(Into::into)
+        let res = match self.opcode {
+            Mul => lhs?.borrow().try_mul(rhs()?.clone())?,
+            Div => lhs?.borrow().try_div(rhs()?.clone())?,
+            Add => lhs?.borrow().try_add(rhs()?.clone())?,
+            Sub => lhs?.borrow().try_sub(rhs()?.clone())?,
+            Eq => Value::Boolean(lhs?.borrow().eq_lossy(rhs()?.clone())),
+            Rem => todo!(), // lhs?.borrow().try_rem(*rhs()?.borrow())?,
+            Or => todo!(),  // lhs?.borrow().try_or(rhs),
+            And => todo!(), /*match lhs? {
+            Null | Boolean(false) => Ok(false.into()),
+            v => v.try_and(rhs()?.borrow()),
+            }*/
+            /*Err => todo!(), //lhs.or_else(|_| rhs()),
+            Ne => Value::Boolean(!lhs?.borrow().eq_lossy(&*rhs()?.borrow())),
+            Gt => lhs?.borrow().try_gt(*rhs()?.borrow())?,
+            Ge => lhs?.borrow().try_ge(*rhs()?.borrow())?,
+            Lt => lhs?.borrow().try_lt(*rhs()?.borrow())?,
+            Le => lhs?.borrow().try_le(*rhs()?.borrow())?,
+            */
+            Merge => lhs?.borrow().try_merge(rhs()?.clone())?,
+            _ => todo!(),
+        };
+
+        Ok(Rc::new(RefCell::new(res)))
     }
 
     fn type_def(&self, state: &State) -> TypeDef {

@@ -1,4 +1,6 @@
 use regex::Regex;
+use std::cell::RefCell;
+use std::rc::Rc;
 use vrl::prelude::*;
 
 use crate::util;
@@ -84,9 +86,16 @@ pub(crate) struct ParseRegexFn {
 
 impl Expression for ParseRegexFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
+        let bytes = self.value.resolve(ctx)?;
+        let bytes = bytes.borrow();
+        let bytes = bytes.as_bytes().unwrap();
         let value = String::from_utf8_lossy(&bytes);
-        let numeric_groups = self.numeric_groups.resolve(ctx)?.try_boolean()?;
+        let numeric_groups = self
+            .numeric_groups
+            .resolve(ctx)?
+            .borrow()
+            .as_boolean()
+            .unwrap();
 
         let parsed = self
             .pattern
@@ -94,7 +103,7 @@ impl Expression for ParseRegexFn {
             .map(|capture| util::capture_regex_to_map(&self.pattern, capture, numeric_groups))
             .ok_or("could not find any pattern matches")?;
 
-        Ok(parsed.into())
+        Ok(Rc::new(RefCell::new(parsed.into())))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

@@ -2,7 +2,7 @@ use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, Value};
 use crate::config::log_schema;
 use lookup::LookupBuf;
 use snafu::Snafu;
-use std::{collections::BTreeMap, convert::TryFrom};
+use std::{cell::RefCell, collections::BTreeMap, convert::TryFrom, rc::Rc};
 
 const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .timestamp, .kind, .tags";
 
@@ -20,18 +20,18 @@ const MAX_METRIC_PATH_DEPTH: usize = 3;
 pub enum VrlTarget {
     // `LogEvent` is essentially just a destructured `event::LogEvent`, but without the semantics
     // that `fields` must always be a `Map` variant.
-    LogEvent(Value, EventMetadata),
+    LogEvent(Rc<RefCell<vrl_core::Value>>, EventMetadata),
     Metric(Metric),
 }
 
 impl VrlTarget {
-    pub fn new(event: Event) -> Self {
+    pub fn new(event: &Event) -> Self {
         match event {
-            Event::Log(event) => {
-                let (fields, metadata) = event.into_parts();
-                VrlTarget::LogEvent(Value::Map(fields), metadata)
-            }
-            Event::Metric(event) => VrlTarget::Metric(event),
+            Event::Log(event) => VrlTarget::LogEvent(
+                Rc::new(RefCell::new((&event.fields).into())),
+                event.metadata.clone(),
+            ),
+            Event::Metric(_event) => todo!(), // VrlTarget::Metric(event),
         }
     }
 
@@ -52,13 +52,19 @@ impl VrlTarget {
 }
 
 impl vrl_core::Target for VrlTarget {
-    fn insert(&mut self, path: &LookupBuf, value: vrl_core::Value) -> Result<(), String> {
+    fn insert(
+        &mut self,
+        path: &LookupBuf,
+        value: Rc<RefCell<vrl_core::Value>>,
+    ) -> Result<(), String> {
         match self {
             VrlTarget::LogEvent(ref mut log, _) => log
-                .insert(path.clone(), value)
+                .insert(path, value)
                 .map(|_| ())
                 .map_err(|err| err.to_string()),
             VrlTarget::Metric(ref mut metric) => {
+                todo!()
+                /*
                 if path.is_root() {
                     return Err(MetricPathError::SetPathError.to_string());
                 }
@@ -121,17 +127,23 @@ impl vrl_core::Target for VrlTarget {
                     expected: VALID_METRIC_PATHS_SET,
                 }
                 .to_string())
+                    */
             }
         }
     }
 
-    fn get(&self, path: &LookupBuf) -> std::result::Result<Option<vrl_core::Value>, String> {
+    fn get(
+        &self,
+        path: &LookupBuf,
+    ) -> std::result::Result<Option<Rc<RefCell<vrl_core::Value>>>, String> {
         match self {
             VrlTarget::LogEvent(log, _) => log
                 .get(path)
                 .map(|val| val.map(|val| val.clone().into()))
                 .map_err(|err| err.to_string()),
             VrlTarget::Metric(metric) => {
+                todo!()
+                /*
                 if path.is_root() {
                     let mut map = BTreeMap::<String, vrl_core::Value>::new();
                     map.insert("name".to_string(), metric.series.name.name.clone().into());
@@ -192,6 +204,7 @@ impl vrl_core::Target for VrlTarget {
                 // We only reach this point if we have requested a tag that doesn't exist or an empty
                 // field.
                 Ok(None)
+                */
             }
         }
     }
@@ -200,15 +213,18 @@ impl vrl_core::Target for VrlTarget {
         &mut self,
         path: &LookupBuf,
         compact: bool,
-    ) -> Result<Option<vrl_core::Value>, String> {
+    ) -> Result<Option<Rc<RefCell<vrl_core::Value>>>, String> {
         match self {
             VrlTarget::LogEvent(ref mut log, _) => {
                 if path.is_root() {
+                    todo!()
+                    /*
                     Ok(Some({
                         let mut map = Value::Map(BTreeMap::new());
                         std::mem::swap(log, &mut map);
                         map.into()
                     }))
+                    */
                 } else {
                     log.remove(path, compact)
                         .map(|val| val.map(|val| val.into()))
@@ -216,6 +232,8 @@ impl vrl_core::Target for VrlTarget {
                 }
             }
             VrlTarget::Metric(ref mut metric) => {
+                todo!()
+                /*
                 if path.is_root() {
                     return Err(MetricPathError::SetPathError.to_string());
                 }
@@ -245,14 +263,9 @@ impl vrl_core::Target for VrlTarget {
                 }
 
                 Ok(None)
+                    */
             }
         }
-    }
-}
-
-impl From<Event> for VrlTarget {
-    fn from(event: Event) -> Self {
-        VrlTarget::new(event)
     }
 }
 
@@ -262,23 +275,40 @@ impl From<Event> for VrlTarget {
 //   * If an element is an object, create an event using that as fields.
 //   * If an element is anything else, assign to the `message` key.
 // * If `.` is anything else, assign to the `message` key.
-fn value_into_log_events(value: Value, metadata: EventMetadata) -> impl Iterator<Item = Event> {
-    match value {
-        Value::Map(object) => Box::new(std::iter::once(Event::from(LogEvent::from_parts(
-            object, metadata,
-        )))) as Box<dyn Iterator<Item = Event>>,
-        Value::Array(values) => Box::new(values.into_iter().map(move |v| match v {
-            Value::Map(object) => Event::from(LogEvent::from_parts(object, metadata.clone())),
-            v => {
-                let mut log = LogEvent::new_with_metadata(metadata.clone());
-                log.insert(log_schema().message_key(), v);
-                Event::from(log)
+fn value_into_log_events(
+    value: Rc<RefCell<vrl_core::Value>>,
+    metadata: EventMetadata,
+) -> impl Iterator<Item = Event> {
+    match &*value.borrow() {
+        vrl_core::Value::Object(object) => {
+            Box::new(std::iter::once(Event::from(LogEvent::from_parts(
+                object
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.borrow().clone().into()))
+                    .collect(),
+                metadata,
+            )))) as Box<dyn Iterator<Item = Event>>
+        }
+        vrl_core::Value::Array(values) => {
+            todo!()
+            /*Box::new(values.into_iter().map(move |v| match v {
+                Value::Map(object) => Event::from(LogEvent::from_parts(object, metadata.clone())),
+                v => {
+                    let mut log = LogEvent::new_with_metadata(metadata.clone());
+                    log.insert(log_schema().message_key(), v);
+                    Event::from(log)
+                }
             }
-        })) as Box<dyn Iterator<Item = Event>>,
+                    )) as Box<dyn Iterator<Item = Event>>
+                    */
+        }
         v => {
+            todo!()
+            /*
             let mut log = LogEvent::new_with_metadata(metadata);
             log.insert(log_schema().message_key(), v);
             Box::new(std::iter::once(Event::from(log))) as Box<dyn Iterator<Item = Event>>
+                */
         }
     }
 }

@@ -75,19 +75,7 @@ pub struct Vrl {
 
 impl Vrl {
     fn run(&self, event: &Event) -> vrl::RuntimeResult {
-        // TODO(jean): This clone exists until vrl-lang has an "immutable"
-        // mode.
-        //
-        // For now, mutability in reduce "vrl ends-when conditions" is
-        // allowed, but it won't mutate the original event, since we cloned it
-        // here.
-        //
-        // Having first-class immutability support in the language allows for
-        // more performance (one less clone), and boot-time errors when a
-        // program wants to mutate its events.
-        //
-        // see: https://github.com/timberio/vector/issues/4744
-        let mut target = VrlTarget::new(event.clone());
+        let mut target = VrlTarget::new(&event);
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
         Runtime::default().resolve(&mut target, &self.program, &timezone)

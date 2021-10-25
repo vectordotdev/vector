@@ -2,11 +2,13 @@
 use super::repl;
 use super::Error;
 use shared::TimeZone;
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{self, Read};
 use std::iter::IntoIterator;
 use std::path::PathBuf;
+use std::rc::Rc;
 use structopt::StructOpt;
 use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, Value};
 
@@ -56,18 +58,20 @@ impl Opts {
         }
     }
 
-    fn read_into_objects(&self) -> Result<Vec<Value>, Error> {
+    fn read_into_objects(&self) -> Result<Vec<Rc<RefCell<Value>>>, Error> {
         let input = match self.input_file.as_ref() {
             Some(path) => read(File::open(path)?),
             None => read(io::stdin()),
         }?;
 
         match input.as_str() {
-            "" => Ok(vec![Value::Object(BTreeMap::default())]),
+            "" => Ok(vec![Rc::new(RefCell::new(Value::Object(
+                BTreeMap::default(),
+            )))]),
             _ => input
                 .lines()
                 .map(|line| Ok(serde_to_vrl(serde_json::from_str(line)?)))
-                .collect::<Result<Vec<Value>, Error>>(),
+                .collect::<Result<Vec<Rc<RefCell<Value>>>, Error>>(),
         }
     }
 
@@ -109,7 +113,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
         for mut object in objects {
             let result = execute(&mut object, &program, &tz).map(|v| {
                 if opts.print_object {
-                    object.to_string()
+                    object.borrow().to_string()
                 } else {
                     v.to_string()
                 }
@@ -125,7 +129,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
     }
 }
 
-fn repl(objects: Vec<Value>, timezone: &TimeZone) -> Result<(), Error> {
+fn repl(objects: Vec<Rc<RefCell<Value>>>, timezone: &TimeZone) -> Result<(), Error> {
     if cfg!(feature = "repl") {
         repl::run(objects, timezone);
         Ok(())
@@ -147,22 +151,24 @@ fn execute(
         .map_err(Error::Runtime)
 }
 
-fn serde_to_vrl(value: serde_json::Value) -> Value {
-    use serde_json::Value;
-
-    match value {
-        Value::Null => vrl::Value::Null,
-        Value::Object(v) => v
+fn serde_to_vrl(value: serde_json::Value) -> Rc<RefCell<Value>> {
+    let res = match value {
+        serde_json::Value::Null => vrl::Value::Null,
+        serde_json::Value::Object(v) => v
             .into_iter()
             .map(|(k, v)| (k, serde_to_vrl(v)))
             .collect::<BTreeMap<_, _>>()
             .into(),
-        Value::Bool(v) => v.into(),
-        Value::Number(v) if v.is_f64() => v.as_f64().unwrap().into(),
-        Value::Number(v) => v.as_i64().unwrap_or(i64::MAX).into(),
-        Value::String(v) => v.into(),
-        Value::Array(v) => v.into_iter().map(serde_to_vrl).collect::<Vec<_>>().into(),
-    }
+        serde_json::Value::Bool(v) => v.into(),
+        serde_json::Value::Number(v) if v.is_f64() => v.as_f64().unwrap().into(),
+        serde_json::Value::Number(v) => v.as_i64().unwrap_or(i64::MAX).into(),
+        serde_json::Value::String(v) => v.into(),
+        serde_json::Value::Array(v) => {
+            Value::Array(v.into_iter().map(serde_to_vrl).collect::<Vec<_>>())
+        }
+    };
+
+    Rc::new(RefCell::new(res))
 }
 
 fn read<R: Read>(mut reader: R) -> Result<String, Error> {
@@ -172,6 +178,6 @@ fn read<R: Read>(mut reader: R) -> Result<String, Error> {
     Ok(buffer)
 }
 
-fn default_objects() -> Vec<Value> {
-    vec![Value::Object(BTreeMap::new())]
+fn default_objects() -> Vec<Rc<RefCell<Value>>> {
+    vec![Rc::new(RefCell::new(Value::Object(BTreeMap::new())))]
 }

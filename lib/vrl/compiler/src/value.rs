@@ -11,24 +11,48 @@ mod target;
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
 use ordered_float::NotNan;
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fmt;
+use std::rc::Rc;
 
 pub use self::regex::Regex;
 pub use error::Error;
 pub use kind::Kind;
 
-#[derive(Debug, Clone, Hash, PartialEq)]
+// A threadsafe value
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct EzValue;
+
+impl From<Value> for EzValue {
+    fn from(_: Value) -> Self {
+        EzValue
+    }
+}
+
+impl From<EzValue> for Value {
+    fn from(_: EzValue) -> Self {
+        Value::Null
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Bytes(Bytes),
     Integer(i64),
     Float(NotNan<f64>),
     Boolean(bool),
-    Object(BTreeMap<String, Value>),
-    Array(Vec<Value>),
+    Object(BTreeMap<String, Rc<RefCell<Value>>>),
+    Array(Vec<Rc<RefCell<Value>>>),
     Timestamp(DateTime<Utc>),
     Regex(Regex),
     Null,
+}
+
+impl Default for Value {
+    fn default() -> Self {
+        Value::Null
+    }
 }
 
 impl Eq for Value {}
@@ -50,7 +74,7 @@ impl fmt::Display for Value {
             Value::Object(map) => {
                 let joined = map
                     .iter()
-                    .map(|(key, val)| format!(r#""{}": {}"#, key, val))
+                    .map(|(key, val)| format!(r#""{}": {}"#, key, *val.borrow()))
                     .collect::<Vec<_>>()
                     .join(", ");
                 write!(f, "{{ {} }}", joined)
@@ -58,7 +82,7 @@ impl fmt::Display for Value {
             Value::Array(array) => {
                 let joined = array
                     .iter()
-                    .map(|val| format!("{}", val))
+                    .map(|val| format!("{}", *val.borrow()))
                     .collect::<Vec<_>>()
                     .join(", ");
                 write!(f, "[{}]", joined)

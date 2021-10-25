@@ -1,6 +1,8 @@
 use crate::expression::{Expr, Resolved};
 use crate::{Context, Expression, State, TypeDef, Value};
+use std::cell::RefCell;
 use std::collections::BTreeMap;
+use std::rc::Rc;
 use std::{fmt, ops::Deref};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -28,15 +30,15 @@ impl Expression for Object {
             .iter()
             .map(|(key, expr)| expr.resolve(ctx).map(|v| (key.to_owned(), v)))
             .collect::<Result<BTreeMap<_, _>, _>>()
-            .map(Value::Object)
+            .map(|o| Rc::new(RefCell::new(Value::Object(o))))
     }
 
-    fn as_value(&self) -> Option<Value> {
+    fn as_value(&self) -> Option<Rc<RefCell<Value>>> {
         self.inner
             .iter()
             .map(|(key, expr)| expr.as_value().map(|v| (key.to_owned(), v)))
             .collect::<Option<BTreeMap<_, _>>>()
-            .map(Value::Object)
+            .map(|o| Rc::new(RefCell::new(Value::Object(o))))
     }
 
     fn type_def(&self, state: &State) -> TypeDef {

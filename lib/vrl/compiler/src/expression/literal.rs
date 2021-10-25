@@ -6,8 +6,10 @@ use diagnostic::{DiagnosticError, Label, Note, Urls};
 use ordered_float::NotNan;
 use parser::ast::{self, Node};
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::fmt;
+use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
@@ -21,10 +23,10 @@ pub enum Literal {
 }
 
 impl Literal {
-    pub fn to_value(&self) -> Value {
+    pub fn to_value(&self) -> Rc<RefCell<Value>> {
         use Literal::*;
 
-        match self {
+        Rc::new(RefCell::new(match self {
             String(v) => Value::Bytes(v.clone()),
             Integer(v) => Value::Integer(*v),
             Float(v) => Value::Float(v.to_owned()),
@@ -32,7 +34,7 @@ impl Literal {
             Regex(v) => Value::Regex(v.clone()),
             Timestamp(v) => Value::Timestamp(v.to_owned()),
             Null => Value::Null,
-        }
+        }))
     }
 }
 
@@ -66,7 +68,7 @@ impl Expression for Literal {
         Ok(self.to_value())
     }
 
-    fn as_value(&self) -> Option<Value> {
+    fn as_value(&self) -> Option<Rc<RefCell<Value>>> {
         Some(self.to_value())
     }
 

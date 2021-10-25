@@ -69,6 +69,8 @@ impl Runtime {
         //
         // VRL technically supports any `Value` object as the root, but the
         // assumption is people are expected to use it to query objects.
+        /*
+         * TODO
         match target.get(&self.root_lookup) {
             Ok(Some(Value::Object(_))) => {}
             Ok(Some(value)) => {
@@ -92,6 +94,7 @@ impl Runtime {
                 ))
             }
         };
+        */
 
         let mut context = Context::new(target, &mut self.state, timezone);
 
@@ -105,6 +108,9 @@ impl Runtime {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(values.pop().unwrap_or(Value::Null))
+        Ok(values
+            .pop()
+            .map(|val| val.borrow().clone())
+            .unwrap_or(Value::Null))
     }
 }

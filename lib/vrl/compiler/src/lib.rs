@@ -19,6 +19,7 @@ pub use function::{Function, Parameter};
 pub use program::Program;
 pub use target::Target;
 pub use type_def::TypeDef;
+pub use value::EzValue;
 pub use value::Value;
 
 pub use paste::paste;

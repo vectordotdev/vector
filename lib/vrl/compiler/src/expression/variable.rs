@@ -1,14 +1,16 @@
 use crate::expression::{levenstein, Resolved};
 use crate::parser::ast::Ident;
-use crate::{Context, Expression, Span, State, TypeDef, Value};
+use crate::{Context, Expression, EzValue, Span, State, TypeDef, Value};
 
 use diagnostic::{DiagnosticError, Label};
+use std::cell::RefCell;
 use std::fmt;
+use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Variable {
     ident: Ident,
-    value: Option<Value>,
+    value: Option<EzValue>,
 }
 
 impl Variable {
@@ -25,15 +27,20 @@ impl Variable {
             }
         };
 
-        Ok(Self { ident, value })
+        Ok(Self {
+            ident,
+            value: value.map(|v| v.borrow().clone().into()),
+        })
     }
 
     pub fn ident(&self) -> &Ident {
         &self.ident
     }
 
-    pub fn value(&self) -> Option<&Value> {
-        self.value.as_ref()
+    pub fn value(&self) -> Option<Rc<RefCell<Value>>> {
+        self.value
+            .as_ref()
+            .map(|v| Rc::new(RefCell::new(v.clone().into())))
     }
 
     pub fn noop(ident: Ident) -> Self {
@@ -46,8 +53,7 @@ impl Expression for Variable {
         Ok(ctx
             .state()
             .variable(&self.ident)
-            .cloned()
-            .unwrap_or(Value::Null))
+            .unwrap_or_else(|| Rc::new(RefCell::new(Value::Null))))
     }
 
     fn type_def(&self, state: &State) -> TypeDef {

@@ -1,5 +1,7 @@
 use crate::expression::{Expr, Resolved};
 use crate::{Context, Expression, State, TypeDef, Value};
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::{fmt, ops::Deref};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -27,15 +29,15 @@ impl Expression for Array {
             .iter()
             .map(|expr| expr.resolve(ctx))
             .collect::<Result<Vec<_>, _>>()
-            .map(Value::Array)
+            .map(|arr| Rc::new(RefCell::new(Value::Array(arr))))
     }
 
-    fn as_value(&self) -> Option<Value> {
+    fn as_value(&self) -> Option<Rc<RefCell<Value>>> {
         self.inner
             .iter()
             .map(|expr| expr.as_value())
             .collect::<Option<Vec<_>>>()
-            .map(Value::Array)
+            .map(|arr| Rc::new(RefCell::new(Value::Array(arr))))
     }
 
     fn type_def(&self, state: &State) -> TypeDef {

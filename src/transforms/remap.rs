@@ -57,7 +57,7 @@ impl TransformConfig for RemapConfig {
 #[derive(Debug)]
 pub struct Remap {
     program: Program,
-    runtime: Runtime,
+    //runtime: Runtime,
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
@@ -95,16 +95,10 @@ impl Remap {
 
         Ok(Remap {
             program,
-            runtime: Runtime::default(),
             timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
         })
-    }
-
-    #[cfg(test)]
-    const fn runtime(&self) -> &Runtime {
-        &self.runtime
     }
 }
 
@@ -112,7 +106,6 @@ impl Clone for Remap {
     fn clone(&self) -> Self {
         Self {
             program: self.program.clone(),
-            runtime: Runtime::default(),
             timezone: self.timezone,
             drop_on_error: self.drop_on_error,
             drop_on_abort: self.drop_on_abort,
@@ -130,6 +123,7 @@ impl FunctionTransform for Remap {
         // The `drop_on_{error, abort}` transform config allows operators to
         // ignore events if their failed/aborted, in which case we can skip the
         // cloning, since any mutations made by VRL will be ignored regardless.
+        /*
         #[allow(clippy::if_same_then_else)]
         let original_event = if !self.drop_on_error && self.program.can_fail() {
             Some(event.clone())
@@ -138,13 +132,12 @@ impl FunctionTransform for Remap {
         } else {
             None
         };
+        */
 
-        let mut target: VrlTarget = event.into();
+        let mut target = VrlTarget::new(&event);
 
-        let result = self
-            .runtime
-            .resolve(&mut target, &self.program, &self.timezone);
-        self.runtime.clear();
+        let result = Runtime::default().resolve(&mut target, &self.program, &self.timezone);
+        //self.runtime.clear();
 
         match result {
             Ok(_) => {
@@ -158,7 +151,7 @@ impl FunctionTransform for Remap {
                 });
 
                 if !self.drop_on_abort {
-                    output.push(original_event.expect("event will be set"))
+                    output.push(event)
                 }
             }
             Err(Terminate::Error(error)) => {
@@ -168,7 +161,7 @@ impl FunctionTransform for Remap {
                 });
 
                 if !self.drop_on_error {
-                    output.push(original_event.expect("event will be set"))
+                    output.push(event)
                 }
             }
         }

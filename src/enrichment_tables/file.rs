@@ -3,10 +3,12 @@ use bytes::Bytes;
 use enrichment::{Case, Condition, IndexHandle, Table};
 use serde::{Deserialize, Serialize};
 use shared::{conversion::Conversion, datetime::TimeZone};
+use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::hash::Hasher;
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::time::SystemTime;
 use tracing::trace;
 use vrl::Value;
@@ -132,7 +134,14 @@ impl FileConfig {
                 Ok(row?
                     .iter()
                     .enumerate()
-                    .map(|(idx, col)| self.parse_column(timezone, &headers[idx], idx, col))
+                    .map(|(idx, col)| {
+                        Ok(Rc::new(RefCell::new(self.parse_column(
+                            timezone,
+                            &headers[idx],
+                            idx,
+                            col,
+                        )?)))
+                    })
                     .collect::<Result<Vec<_>, String>>()?)
             })
             .collect::<crate::Result<Vec<_>>>()?;
@@ -179,7 +188,7 @@ pub struct File {
     config: FileConfig,
     timezone: TimeZone,
     last_modified: SystemTime,
-    data: Vec<Vec<Value>>,
+    data: Vec<Vec<Rc<RefCell<Value>>>>,
     headers: Vec<String>,
     indexes: Vec<(
         Case,
@@ -211,11 +220,11 @@ impl File {
     }
 
     /// Does the given row match all the conditions specified?
-    fn row_equals(&self, case: Case, condition: &[Condition], row: &[Value]) -> bool {
+    fn row_equals(&self, case: Case, condition: &[Condition], row: &[Rc<RefCell<Value>>]) -> bool {
         condition.iter().all(|condition| match condition {
             Condition::Equals { field, value } => match self.column_index(field) {
                 None => false,
-                Some(idx) => match (case, &row[idx], value) {
+                Some(idx) => match (case, &*row[idx].borrow(), value) {
                     (Case::Insensitive, Value::Bytes(bytes1), Value::Bytes(bytes2)) => {
                         match (std::str::from_utf8(bytes1), std::str::from_utf8(bytes2)) {
                             (Ok(s1), Ok(s2)) => s1.to_lowercase() == s2.to_lowercase(),
@@ -228,7 +237,7 @@ impl File {
             },
             Condition::BetweenDates { field, from, to } => match self.column_index(field) {
                 None => false,
-                Some(idx) => match row[idx] {
+                Some(idx) => match &*row[idx].borrow() {
                     Value::Timestamp(date) => from <= &date && &date <= to,
                     _ => false,
                 },

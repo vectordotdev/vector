@@ -5,8 +5,10 @@ use crate::parser::Node;
 use crate::value::Kind;
 use crate::{Span, Value};
 use diagnostic::{DiagnosticError, Label, Note};
+use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
+use std::rc::Rc;
 
 pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticError>>;
 
@@ -117,7 +119,7 @@ impl ArgumentList {
             .map(|expr| match expr {
                 Expr::Literal(literal) => Ok(literal),
                 Expr::Variable(var) if var.value().is_some() => {
-                    match var.value().unwrap().clone().into_expr() {
+                    match (*var.value().unwrap().borrow()).clone().into_expr() {
                         Expr::Literal(literal) => Ok(literal),
                         expr => Err(Error::UnexpectedExpression {
                             keyword,
@@ -149,7 +151,7 @@ impl ArgumentList {
             .map(|value| {
                 variants
                     .iter()
-                    .find(|v| *v == &value)
+                    .find(|v| *v == &*value.borrow())
                     .cloned()
                     .ok_or(Error::InvalidEnumVariant {
                         keyword,
@@ -309,7 +311,7 @@ pub enum Error {
     #[error(r#"invalid enum variant""#)]
     InvalidEnumVariant {
         keyword: &'static str,
-        value: Value,
+        value: Rc<RefCell<Value>>,
         variants: Vec<Value>,
     },
 
@@ -362,7 +364,10 @@ impl diagnostic::DiagnosticError for Error {
                     format!(r#"invalid enum variant for argument "{}""#, keyword),
                     Span::default(),
                 ),
-                Label::context(format!("received: {}", value.to_string()), Span::default()),
+                Label::context(
+                    format!("received: {}", value.borrow().to_string()),
+                    Span::default(),
+                ),
                 Label::context(
                     format!(
                         "expected one of: {}",

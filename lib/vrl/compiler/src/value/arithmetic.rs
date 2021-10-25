@@ -1,19 +1,28 @@
+use ordered_float::NotNan;
+
 use super::{Error, Value};
 use crate::ExpressionError;
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
+use std::rc::Rc;
 
 impl Value {
     /// Similar to [`std::ops::Mul`], but fallible (e.g. `TryMul`).
-    pub fn try_mul(self, rhs: Self) -> Result<Self, Error> {
+    pub fn try_mul(&self, rhs: Rc<RefCell<Self>>) -> Result<Self, Error> {
+        let rhs = rhs.borrow();
         let err = || Error::Mul(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) if rhs.is_bytes() => rhs.try_bytes()?.repeat(lhv as usize).into(),
-            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 * rhs.try_float()?).into(),
-            Value::Integer(lhv) => (lhv * i64::try_from(&rhs).map_err(|_| err())?).into(),
-            Value::Float(lhv) => (lhv * f64::try_from(&rhs).map_err(|_| err())?).into(),
-            Value::Bytes(lhv) if rhs.is_integer() => lhv.repeat(rhs.try_integer()? as usize).into(),
+            Value::Integer(lhv) if rhs.is_bytes() => {
+                rhs.as_bytes().unwrap().repeat(*lhv as usize).into()
+            }
+            Value::Integer(lhv) if rhs.is_float() => (*lhv as f64 * rhs.as_float().unwrap()).into(),
+            Value::Integer(lhv) => todo!(), // (lhv * i64::try_from(rhs).map_err(|_| err())?).into(),
+            Value::Float(lhv) => todo!(), // (lhv * f64::try_from(rhs).map_err(|_| err())?).into(),
+            Value::Bytes(lhv) if rhs.is_integer() => {
+                lhv.repeat(rhs.as_integer().unwrap() as usize).into()
+            }
             _ => return Err(err()),
         };
 
@@ -21,7 +30,10 @@ impl Value {
     }
 
     /// Similar to [`std::ops::Div`], but fallible (e.g. `TryDiv`).
-    pub fn try_div(self, rhs: Self) -> Result<Self, Error> {
+    pub fn try_div(&self, rhs: Rc<RefCell<Self>>) -> Result<Self, Error> {
+        todo!()
+
+        /*
         let err = || Error::Div(self.kind(), rhs.kind());
 
         let rhv = f64::try_from(&rhs).map_err(|_| err())?;
@@ -37,24 +49,29 @@ impl Value {
         };
 
         Ok(value)
+        */
     }
 
     /// Similar to [`std::ops::Add`], but fallible (e.g. `TryAdd`).
-    pub fn try_add(self, rhs: Self) -> Result<Self, Error> {
+    pub fn try_add(&self, rhs: Rc<RefCell<Self>>) -> Result<Self, Error> {
+        let rhs = rhs.borrow();
+
         let err = || Error::Add(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 + rhs.try_float()?).into(),
-            Value::Integer(lhv) => (lhv + i64::try_from(&rhs).map_err(|_| err())?).into(),
-            Value::Float(lhv) => (lhv + f64::try_from(&rhs).map_err(|_| err())?).into(),
-            Value::Bytes(_) if rhs.is_null() => self,
+            Value::Integer(lhv) if rhs.is_float() => {
+                Value::Float(NotNan::new(*lhv as f64 + rhs.as_float().unwrap()).unwrap())
+            }
+            Value::Integer(lhv) => todo!(), // (lhv + i64::try_from(rhs).map_err(|_| err())?).into(),
+            Value::Float(lhv) => todo!(), // (lhv + f64::try_from(rhs).map_err(|_| err())?).into(),
+            Value::Bytes(_) if rhs.is_null() => self.clone(),
             Value::Bytes(_) if rhs.is_bytes() => format!(
                 "{}{}",
                 self.try_bytes_utf8_lossy()?,
                 rhs.try_bytes_utf8_lossy()?,
             )
             .into(),
-            Value::Null if rhs.is_bytes() => rhs,
+            Value::Null if rhs.is_bytes() => rhs.clone(),
             _ => return Err(err()),
         };
 
@@ -62,13 +79,15 @@ impl Value {
     }
 
     /// Similar to [`std::ops::Sub`], but fallible (e.g. `TrySub`).
-    pub fn try_sub(self, rhs: Self) -> Result<Self, Error> {
+    pub fn try_sub(&self, rhs: Rc<RefCell<Self>>) -> Result<Self, Error> {
+        let rhs = rhs.borrow();
+
         let err = || Error::Sub(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) if rhs.is_float() => (lhv as f64 - rhs.try_float()?).into(),
-            Value::Integer(lhv) => (lhv - i64::try_from(&rhs).map_err(|_| err())?).into(),
-            Value::Float(lhv) => (lhv - f64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Integer(lhv) if rhs.is_float() => (*lhv as f64 - rhs.as_float().unwrap()).into(),
+            Value::Integer(lhv) => todo!(), // (lhv - i64::try_from(rhs).map_err(|_| err())?).into(),
+            Value::Float(lhv) => todo!(), // (lhv - f64::try_from(rhs).map_err(|_| err())?).into(),
             _ => return Err(err()),
         };
 
@@ -194,15 +213,16 @@ impl Value {
         Ok(value)
     }
 
-    pub fn try_merge(self, rhs: Self) -> Result<Self, Error> {
+    pub fn try_merge(&self, rhs: Rc<RefCell<Self>>) -> Result<Self, Error> {
+        let rhs = rhs.borrow();
         let err = || Error::Merge(self.kind(), rhs.kind());
 
-        let value = match (&self, &rhs) {
+        let value = match (&self, &*rhs) {
             (Value::Object(lhv), Value::Object(rhv)) => lhv
                 .iter()
                 .chain(rhv.iter())
                 .map(|(k, v)| (k.clone(), v.clone()))
-                .collect::<BTreeMap<String, Value>>()
+                .collect::<BTreeMap<String, Rc<RefCell<Value>>>>()
                 .into(),
             _ => return Err(err()),
         };
@@ -212,19 +232,20 @@ impl Value {
 
     /// Similar to [`std::cmp::Eq`], but does a lossless comparison for integers
     /// and floats.
-    pub fn eq_lossy(&self, rhs: &Self) -> bool {
+    pub fn eq_lossy(&self, rhs: Rc<RefCell<Self>>) -> bool {
         use Value::*;
+        let rhs = rhs.borrow();
 
         match self {
-            Integer(lhv) => f64::try_from(rhs)
+            Integer(lhv) => f64::try_from(&*rhs)
                 .map(|rhv| *lhv as f64 == rhv)
                 .unwrap_or(false),
 
-            Float(lhv) => f64::try_from(rhs)
+            Float(lhv) => f64::try_from(&*rhs)
                 .map(|rhv| lhv.into_inner() == rhv)
                 .unwrap_or(false),
 
-            _ => self == rhs,
+            _ => self == &*rhs,
         }
     }
 }

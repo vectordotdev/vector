@@ -1,6 +1,8 @@
 use crate::expression::{Array, Block, Group, Object, Resolved, Value};
 use crate::{Context, Expression, State, TypeDef};
+use std::cell::RefCell;
 use std::fmt;
+use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Container {
@@ -33,7 +35,7 @@ impl Expression for Container {
         }
     }
 
-    fn as_value(&self) -> Option<Value> {
+    fn as_value(&self) -> Option<Rc<RefCell<Value>>> {
         use Variant::*;
 
         match &self.variant {

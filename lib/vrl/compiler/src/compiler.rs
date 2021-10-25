@@ -1,10 +1,12 @@
-use crate::expression::*;
+use crate::{expression::*, EzValue};
 use crate::{Function, Program, State, Value};
 use chrono::{TimeZone, Utc};
 use diagnostic::DiagnosticError;
 use ordered_float::NotNan;
 use parser::ast::{self, AssignmentOp, Node};
+use std::cell::RefCell;
 use std::convert::TryFrom;
+use std::rc::Rc;
 
 pub type Errors = Vec<Box<dyn DiagnosticError>>;
 
@@ -268,7 +270,7 @@ impl<'a> Compiler<'a> {
                             ok,
                             err,
                             expr,
-                            default: Value::Null,
+                            default: EzValue,
                         };
                         Node::new(span, node)
                     }
@@ -278,7 +280,7 @@ impl<'a> Compiler<'a> {
                             ok,
                             err,
                             expr,
-                            default: Value::Null,
+                            default: EzValue,
                         };
 
                         Node::new(span, node)

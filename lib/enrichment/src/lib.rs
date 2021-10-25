@@ -6,7 +6,7 @@ pub mod tables;
 mod test_util;
 mod vrl_util;
 use dyn_clone::DynClone;
-use std::collections::BTreeMap;
+use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 use vrl_core::Value;
 
 pub use tables::{TableRegistry, TableSearch};
@@ -46,7 +46,7 @@ pub trait Table: DynClone {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<BTreeMap<String, vrl_core::Value>, String>;
+    ) -> Result<BTreeMap<String, Rc<RefCell<vrl_core::Value>>>, String>;
 
     /// Search the enrichment table data with the given condition.
     /// All conditions must match (AND).
@@ -57,7 +57,7 @@ pub trait Table: DynClone {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<Vec<BTreeMap<String, vrl_core::Value>>, String>;
+    ) -> Result<Vec<BTreeMap<String, Rc<RefCell<vrl_core::Value>>>>, String>;
 
     /// Hints to the enrichment table what data is going to be searched to allow it to index the
     /// data in advance.

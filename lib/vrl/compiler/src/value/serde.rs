@@ -3,9 +3,11 @@ use bytes::Bytes;
 use chrono::SecondsFormat;
 use serde::de::{Error, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize, Serializer};
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::fmt;
+use std::rc::Rc;
 
 impl Serialize for Value {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -19,8 +21,8 @@ impl Serialize for Value {
             Integer(v) => serializer.serialize_i64(*v),
             Float(v) => serializer.serialize_f64(v.into_inner()),
             Boolean(v) => serializer.serialize_bool(*v),
-            Object(v) => serializer.collect_map(v),
-            Array(v) => serializer.collect_seq(v),
+            Object(v) => todo!(), // serializer.collect_map(v),
+            Array(v) => todo!(),  // serializer.collect_seq(v),
             Timestamp(v) => {
                 serializer.serialize_str(&v.to_rfc3339_opts(SecondsFormat::AutoSi, true))
             }
@@ -107,7 +109,7 @@ impl<'de> Deserialize<'de> for Value {
             {
                 let mut vec = Vec::new();
                 while let Some(value) = visitor.next_element()? {
-                    vec.push(value);
+                    vec.push(Rc::new(RefCell::new(value)));
                 }
 
                 Ok(Value::Array(vec))
@@ -119,7 +121,7 @@ impl<'de> Deserialize<'de> for Value {
             {
                 let mut map = BTreeMap::new();
                 while let Some((key, value)) = visitor.next_entry()? {
-                    map.insert(key, value);
+                    map.insert(key, Rc::new(RefCell::new(value)));
                 }
 
                 Ok(Value::Object(map))

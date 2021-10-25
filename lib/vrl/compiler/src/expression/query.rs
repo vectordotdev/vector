@@ -2,8 +2,10 @@ use crate::expression::{assignment, Container, FunctionCall, Resolved, Variable}
 use crate::parser::ast::Ident;
 use crate::{Context, Expression, State, TypeDef, Value};
 use lookup::LookupBuf;
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fmt;
+use std::rc::Rc;
 
 #[derive(Clone, PartialEq)]
 pub struct Query {
@@ -69,7 +71,7 @@ impl Expression for Query {
                     .get(&self.path)
                     .ok()
                     .flatten()
-                    .unwrap_or(Value::Null))
+                    .unwrap_or_else(|| Rc::new(RefCell::new(Value::Null))))
             }
             Internal(variable) => variable.resolve(ctx)?,
             FunctionCall(call) => call.resolve(ctx)?,
@@ -79,15 +81,14 @@ impl Expression for Query {
         Ok(crate::Target::get(&value, &self.path)
             .ok()
             .flatten()
-            .unwrap_or(Value::Null))
+            .unwrap_or_else(|| Rc::new(RefCell::new(Value::Null))))
     }
 
-    fn as_value(&self) -> Option<Value> {
+    fn as_value(&self) -> Option<Rc<RefCell<Value>>> {
         match self.target {
             Target::Internal(ref variable) => variable
                 .value()
-                .and_then(|v| v.get_by_path(self.path()))
-                .cloned(),
+                .and_then(|v| Value::get_by_path(v, self.path())),
             _ => None,
         }
     }

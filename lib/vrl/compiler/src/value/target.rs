@@ -1,21 +1,27 @@
 use crate::{Target, Value};
 use lookup::{FieldBuf, LookupBuf, SegmentBuf};
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::iter::Peekable;
+use std::rc::Rc;
 
-impl Target for Value {
-    fn insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
-        self.insert_by_path(path, value);
+impl Target for Rc<RefCell<Value>> {
+    fn insert(&mut self, path: &LookupBuf, value: Rc<RefCell<Value>>) -> Result<(), String> {
+        Value::insert_by_path(Rc::clone(&self), path, value);
         Ok(())
     }
 
-    fn get(&self, path: &LookupBuf) -> Result<Option<Value>, String> {
-        Ok(self.get_by_path(path).cloned())
+    fn get(&self, path: &LookupBuf) -> Result<Option<Rc<RefCell<Value>>>, String> {
+        Ok(Value::get_by_path(self.clone(), path))
     }
 
-    fn remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
+    fn remove(
+        &mut self,
+        path: &LookupBuf,
+        compact: bool,
+    ) -> Result<Option<Rc<RefCell<Value>>>, String> {
         let value = self.get(path)?;
-        self.remove_by_path(path, compact);
+        Value::remove_by_path(self.clone(), path, compact);
 
         Ok(value)
     }
@@ -75,15 +81,17 @@ impl Value {
     ///    assert_eq!(value.get_by_path(&path), Some(&Value::Boolean(true)))
     ///    ```
     ///
-    pub fn get_by_path(&self, path: &LookupBuf) -> Option<&Value> {
-        self.get_by_segments(path.as_segments().iter())
+    pub fn get_by_path(me: Rc<RefCell<Value>>, path: &LookupBuf) -> Option<Rc<RefCell<Value>>> {
+        Value::get_by_segments(me, path.as_segments().iter())
     }
 
+    /*
     /// Similar to [`Value::get_by_path`], but returns a mutable reference to
     /// the value.
     pub fn get_by_path_mut(&mut self, path: &LookupBuf) -> Option<&mut Value> {
         self.get_by_segments_mut(path.as_segments().iter())
     }
+    */
 
     /// Insert a value, given the provided path.
     ///
@@ -132,8 +140,8 @@ impl Value {
     /// )
     /// ```
     ///
-    pub fn insert_by_path(&mut self, path: &LookupBuf, new: Value) {
-        self.insert_by_segments(path.as_segments().iter().peekable(), new)
+    pub fn insert_by_path(me: Rc<RefCell<Value>>, path: &LookupBuf, new: Rc<RefCell<Value>>) {
+        Value::insert_by_segments(me, path.as_segments().iter().peekable(), new)
     }
 
     /// Remove a value, given the provided path.
@@ -147,32 +155,35 @@ impl Value {
     /// If the `compact` argument is set to `true`, then any `Array` or `Object`
     /// that had one of its elements removed and is now empty, is removed as
     /// well.
-    pub fn remove_by_path(&mut self, path: &LookupBuf, compact: bool) {
-        self.remove_by_segments(path.as_segments().iter().peekable(), compact)
+    pub fn remove_by_path(me: Rc<RefCell<Self>>, path: &LookupBuf, compact: bool) {
+        Value::remove_by_segments(me, path.as_segments().iter().peekable(), compact)
     }
 
-    fn get_by_segments<'a, T>(&self, mut segments: T) -> Option<&Value>
+    fn get_by_segments<'a, T>(me: Rc<RefCell<Self>>, mut segments: T) -> Option<Rc<RefCell<Value>>>
     where
         T: Iterator<Item = &'a SegmentBuf>,
     {
         let segment = match segments.next() {
             Some(segment) => segment,
-            None => return Some(self),
+            None => return Some(me),
         };
 
-        self.get_by_segment(segment)
-            .and_then(|value| value.get_by_segments(segments))
+        Value::get_by_segment(me, segment).and_then(|value| Value::get_by_segments(value, segments))
     }
 
-    fn get_by_segment(&self, segment: &SegmentBuf) -> Option<&Value> {
+    fn get_by_segment(me: Rc<RefCell<Self>>, segment: &SegmentBuf) -> Option<Rc<RefCell<Value>>> {
         match segment {
-            SegmentBuf::Field(FieldBuf { name, .. }) => {
-                self.as_object().and_then(|map| map.get(name.as_str()))
-            }
-            SegmentBuf::Coalesce(fields) => self
+            SegmentBuf::Field(FieldBuf { name, .. }) => me
+                .borrow()
                 .as_object()
-                .and_then(|map| fields.iter().find_map(|field| map.get(field.as_str()))),
-            SegmentBuf::Index(index) => self.as_array().and_then(|array| {
+                .and_then(|map| map.get(name.as_str()))
+                .cloned(),
+            SegmentBuf::Coalesce(fields) => me
+                .borrow()
+                .as_object()
+                .and_then(|map| fields.iter().find_map(|field| map.get(field.as_str())))
+                .cloned(),
+            SegmentBuf::Index(index) => me.borrow().as_array().and_then(|array| {
                 let len = array.len() as isize;
                 if *index >= len || index.abs() > len {
                     return None;
@@ -181,11 +192,14 @@ impl Value {
                 index
                     .checked_rem_euclid(len)
                     .and_then(|i| array.get(i as usize))
+                    .cloned()
             }),
         }
     }
 
-    fn get_by_segments_mut<'a, T>(&mut self, mut segments: T) -> Option<&mut Value>
+    /*
+     * We don't need _mut anymore sinc Rc<RefCell> is runtime mutable.
+    fn get_by_segments_mut<'a, T>(&mut self, mut segments: T) -> Option<Rc<RefCell<Value>>>
     where
         T: Iterator<Item = &'a SegmentBuf>,
     {
@@ -195,19 +209,21 @@ impl Value {
         };
 
         self.get_by_segment_mut(segment)
-            .and_then(|value| value.get_by_segments_mut(segments))
+            .and_then(|value| value.borrow_mut().get_by_segments_mut(segments).clone())
     }
 
-    fn get_by_segment_mut(&mut self, segment: &SegmentBuf) -> Option<&mut Value> {
+    fn get_by_segment_mut(&mut self, segment: &SegmentBuf) -> Option<Rc<RefCell<Value>>> {
         match segment {
             SegmentBuf::Field(FieldBuf { name, .. }) => self
                 .as_object_mut()
-                .and_then(|map| map.get_mut(name.as_str())),
+                .and_then(|map| map.get_mut(name.as_str()))
+                .cloned(),
             SegmentBuf::Coalesce(fields) => self.as_object_mut().and_then(|map| {
                 fields
                     .iter()
                     .find(|field| map.contains_key(field.as_str()))
                     .and_then(move |field| map.get_mut(field.as_str()))
+                    .cloned()
             }),
             SegmentBuf::Index(index) => self.as_array_mut().and_then(|array| {
                 let len = array.len() as isize;
@@ -218,35 +234,45 @@ impl Value {
                 index
                     .checked_rem_euclid(len)
                     .and_then(move |i| array.get_mut(i as usize))
+                    .cloned()
             }),
         }
     }
+    */
 
-    fn remove_by_segments<'a, T>(&mut self, mut segments: Peekable<T>, compact: bool)
+    fn remove_by_segments<'a, T>(me: Rc<RefCell<Value>>, mut segments: Peekable<T>, compact: bool)
     where
         T: Iterator<Item = &'a SegmentBuf> + Clone,
     {
         let segment = match segments.next() {
             Some(segments) => segments,
             None => {
-                return match self {
+                return match &mut *me.borrow_mut() {
                     Value::Object(v) => v.clear(),
                     Value::Array(v) => v.clear(),
-                    _ => *self = Value::Null,
-                }
+                    _ => {
+                        // TODO This needs serious testing.
+                        me.replace(Value::Null);
+                    }
+                };
             }
         };
 
         if segments.peek().is_none() {
-            return self.remove_by_segment(segment);
+            return me.borrow_mut().remove_by_segment(segment);
         }
 
-        if let Some(value) = self.get_by_segment_mut(segment) {
-            value.remove_by_segments(segments, compact);
+        if let Some(value) = Value::get_by_segment(Rc::clone(&me), segment) {
+            Value::remove_by_segments(Rc::clone(&value), segments, compact);
 
-            match value {
-                Value::Object(v) if compact & v.is_empty() => self.remove_by_segment(segment),
-                Value::Array(v) if compact & v.is_empty() => self.remove_by_segment(segment),
+            // TODO This needs serious testing.
+            match &*value.borrow() {
+                Value::Object(v) if compact & v.is_empty() => {
+                    me.borrow_mut().remove_by_segment(segment)
+                }
+                Value::Array(v) if compact & v.is_empty() => {
+                    me.borrow_mut().remove_by_segment(segment)
+                }
                 _ => {}
             }
         }
@@ -282,30 +308,37 @@ impl Value {
         };
     }
 
-    fn insert_by_segments<'a, T>(&mut self, mut segments: Peekable<T>, new: Value)
-    where
+    fn insert_by_segments<'a, T>(
+        me: Rc<RefCell<Self>>,
+        mut segments: Peekable<T>,
+        new: Rc<RefCell<Value>>,
+    ) where
         T: Iterator<Item = &'a SegmentBuf> + Clone,
     {
         let segment = match segments.peek() {
             Some(segment) => segment,
-            None => return *self = new,
+            None => {
+                // TODO, A swap may be the wrong thing here.
+                me.swap(&new); // return *self = new,
+                return;
+            }
         };
 
         // As long as the provided segments match the shape of the value, we'll
         // traverse down the tree. Once we encounter a value kind that does not
         // match the requested segment, we'll update the value to match and
         // continue on, until we're able to assign the final `new` value.
-        match self.get_by_segment_mut(segment) {
+        match Value::get_by_segment(Rc::clone(&me), segment) {
             Some(value) => {
                 // We have already consumed this element via a peek.
                 let _ = segments.next();
-                value.insert_by_segments(segments, new)
+                Value::insert_by_segments(value, segments, new)
             }
-            None => self.update_by_segments(segments, new),
+            None => me.borrow_mut().update_by_segments(segments, new),
         };
     }
 
-    fn update_by_segments<'a, T>(&mut self, mut segments: Peekable<T>, new: Value)
+    fn update_by_segments<'a, T>(&mut self, mut segments: Peekable<T>, new: Rc<RefCell<Value>>)
     where
         T: Iterator<Item = &'a SegmentBuf> + Clone,
     {
@@ -339,14 +372,14 @@ impl Value {
                 // or array depending on what the next segment is, and continue
                 // to add the next segment.
                 Some(next) => match next {
-                    SegmentBuf::Index(_) => map.insert(key, Value::Array(vec![])),
-                    _ => map.insert(key, BTreeMap::default().into()),
+                    SegmentBuf::Index(_) => {
+                        map.insert(key, Rc::new(RefCell::new(Value::Array(vec![]))))
+                    }
+                    _ => map.insert(key, Rc::new(RefCell::new(BTreeMap::default().into()))),
                 },
             };
 
-            map.get_mut(field)
-                .unwrap()
-                .insert_by_segments(segments, new);
+            Value::insert_by_segments(Rc::clone(map.get_mut(field).unwrap()), segments, new);
         };
 
         match segment {
@@ -383,7 +416,7 @@ impl Value {
 
                     // left-padded with null values
                     for _ in 1..abs - array.len() {
-                        array.insert(0, Value::Null)
+                        array.insert(0, Rc::new(RefCell::new(Value::Null)))
                     }
 
                     match segments.peek() {
@@ -392,21 +425,24 @@ impl Value {
                             return;
                         }
                         Some(next) => match next {
-                            SegmentBuf::Index(_) => array.insert(0, Value::Array(vec![])),
-                            _ => array.insert(0, BTreeMap::default().into()),
+                            SegmentBuf::Index(_) => {
+                                array.insert(0, Rc::new(RefCell::new(Value::Array(vec![]))))
+                            }
+                            _ => array.insert(0, Rc::new(RefCell::new(BTreeMap::default().into()))),
                         },
                     };
 
-                    array
-                        .first_mut()
-                        .expect("exists")
-                        .insert_by_segments(segments, new);
+                    Value::insert_by_segments(
+                        Rc::clone(array.first_mut().expect("exists")),
+                        segments,
+                        new,
+                    );
                 } else {
                     let index = index as usize;
 
                     // right-padded with null values
                     if array.len() < index {
-                        array.resize(index, Value::Null);
+                        array.resize(index, Rc::new(RefCell::new(Value::Null)));
                     }
 
                     match segments.peek() {
@@ -415,15 +451,18 @@ impl Value {
                             return;
                         }
                         Some(next) => match next {
-                            SegmentBuf::Index(_) => array.push(Value::Array(vec![])),
-                            _ => array.push(BTreeMap::default().into()),
+                            SegmentBuf::Index(_) => {
+                                array.push(Rc::new(RefCell::new(Value::Array(vec![]))))
+                            }
+                            _ => array.push(Rc::new(RefCell::new(BTreeMap::default().into()))),
                         },
                     }
 
-                    array
-                        .last_mut()
-                        .expect("exists")
-                        .insert_by_segments(segments, new);
+                    Value::insert_by_segments(
+                        Rc::clone(array.last_mut().expect("exists")),
+                        segments,
+                        new,
+                    );
                 }
             }
         }

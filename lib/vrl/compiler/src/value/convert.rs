@@ -5,9 +5,11 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
+use std::rc::Rc;
 
 impl Value {
     /// Convert a given [`Value`] into a [`Expression`] trait object.
@@ -28,6 +30,8 @@ impl Value {
             Float(v) => Literal::from(v).into(),
             Boolean(v) => Literal::from(v).into(),
             Object(v) => {
+                todo!()
+                /*
                 let object = crate::expression::Object::from(
                     v.into_iter()
                         .map(|(k, v)| (k, v.into_expr()))
@@ -35,13 +39,17 @@ impl Value {
                 );
 
                 Container::new(container::Variant::from(object)).into()
+                */
             }
             Array(v) => {
+                todo!()
+                /*
                 let array = crate::expression::Array::from(
                     v.into_iter().map(|v| v.into_expr()).collect::<Vec<_>>(),
                 );
 
                 Container::new(container::Variant::from(array)).into()
+                */
             }
             Timestamp(v) => Literal::from(v).into(),
             Regex(v) => Literal::from(v).into(),
@@ -404,21 +412,21 @@ impl Value {
         matches!(self, Value::Array(_))
     }
 
-    pub fn as_array(&self) -> Option<&[Value]> {
+    pub fn as_array(&self) -> Option<&[Rc<RefCell<Value>>]> {
         match self {
             Value::Array(v) => Some(v),
             _ => None,
         }
     }
 
-    pub fn as_array_mut(&mut self) -> Option<&mut Vec<Value>> {
+    pub fn as_array_mut(&mut self) -> Option<&mut Vec<Rc<RefCell<Value>>>> {
         match self {
             Value::Array(v) => Some(v),
             _ => None,
         }
     }
 
-    pub fn try_array(self) -> Result<Vec<Value>, Error> {
+    pub fn try_array(self) -> Result<Vec<Rc<RefCell<Value>>>, Error> {
         match self {
             Value::Array(v) => Ok(v),
             _ => Err(Error::Expected {
@@ -431,12 +439,13 @@ impl Value {
 
 impl<T: Into<Value>> From<Vec<T>> for Value {
     fn from(v: Vec<T>) -> Self {
-        Value::Array(v.into_iter().map(Into::into).collect::<Vec<_>>())
+        //Value::Array(v.into_iter().map(Into::into).collect::<Vec<_>>())
+        todo!()
     }
 }
 
-impl FromIterator<Value> for Value {
-    fn from_iter<I: IntoIterator<Item = Value>>(iter: I) -> Self {
+impl FromIterator<Rc<RefCell<Value>>> for Value {
+    fn from_iter<I: IntoIterator<Item = Rc<RefCell<Value>>>>(iter: I) -> Self {
         Value::Array(iter.into_iter().collect::<Vec<_>>())
     }
 }
@@ -448,21 +457,21 @@ impl Value {
         matches!(self, Value::Object(_))
     }
 
-    pub fn as_object(&self) -> Option<&BTreeMap<String, Value>> {
+    pub fn as_object(&self) -> Option<&BTreeMap<String, Rc<RefCell<Value>>>> {
         match self {
             Value::Object(v) => Some(v),
             _ => None,
         }
     }
 
-    pub fn as_object_mut(&mut self) -> Option<&mut BTreeMap<String, Value>> {
+    pub fn as_object_mut(&mut self) -> Option<&mut BTreeMap<String, Rc<RefCell<Value>>>> {
         match self {
             Value::Object(v) => Some(v),
             _ => None,
         }
     }
 
-    pub fn try_object(self) -> Result<BTreeMap<String, Value>, Error> {
+    pub fn try_object(self) -> Result<BTreeMap<String, Rc<RefCell<Value>>>, Error> {
         match self {
             Value::Object(v) => Ok(v),
             _ => Err(Error::Expected {
@@ -473,15 +482,16 @@ impl Value {
     }
 }
 
-impl From<BTreeMap<String, Value>> for Value {
-    fn from(value: BTreeMap<String, Value>) -> Self {
+impl From<BTreeMap<String, Rc<RefCell<Value>>>> for Value {
+    fn from(value: BTreeMap<String, Rc<RefCell<Value>>>) -> Self {
         Value::Object(value)
     }
 }
 
 impl FromIterator<(String, Value)> for Value {
     fn from_iter<I: IntoIterator<Item = (String, Value)>>(iter: I) -> Self {
-        Value::Object(iter.into_iter().collect::<BTreeMap<_, _>>())
+        //Value::Object(iter.into_iter().collect::<BTreeMap<_, _>>())
+        todo!()
     }
 }
 
