@@ -3669,7 +3669,7 @@ dependencies = [
  "parking_lot",
  "quanta",
  "radix_trie",
- "sketches-ddsketch 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sketches-ddsketch",
 ]
 
 [[package]]
@@ -6254,11 +6254,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "76a77a8fd93886010f05e7ea0720e569d6d16c65329dbe3ec033bbbccccb017b"
 
 [[package]]
-name = "sketches-ddsketch"
-version = "0.1.2"
-source = "git+https://github.com/vectordotdev/rust-sketches-ddsketch?branch=add-lower-bound-fn#d8a8fc6a01aa617f7a874077f301e5c8c9bbb5f6"
-
-[[package]]
 name = "slab"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7827,7 +7822,6 @@ dependencies = [
  "serde",
  "serde_json",
  "shared",
- "sketches-ddsketch 0.1.2 (git+https://github.com/vectordotdev/rust-sketches-ddsketch?branch=add-lower-bound-fn)",
  "snafu",
  "substring",
  "tokio",
