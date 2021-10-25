@@ -19,7 +19,7 @@ shows you how to use them in your Vector topology.
 *Which* logs Vector pipes through the `internal_logs` source is determined by the [log level](#levels), which defaults
 to `info`.
 
-In addition to the `internal_logs` source, Vector also writes its logs to [`stderr`][], which can be captured by
+In addition to the `internal_logs` source, Vector also writes its logs to [`stderr`][stderr], which can be captured by
 Kubernetes, SystemD, or however you are running Vector.
 
 ### Accessing logs

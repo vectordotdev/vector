@@ -12,7 +12,8 @@ releases: "0.13.0": {
 		of smaller enhancements, particularly around the [Vector Remap Language](\(urls.vrl_reference)) used by our
 		`remap`, `filter`, and `route` transforms.
 
-		Check out the [highlights](#highlights) and [changelog](#changelog) for more details.
+		Check out the [highlights](/releases/0.13.0#highlights) and [changelog](/releases/0.13.0#changelog) for more
+		details.
 		"""
 
 	whats_next: [

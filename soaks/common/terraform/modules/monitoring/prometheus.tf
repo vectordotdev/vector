@@ -1,9 +1,3 @@
-resource "kubernetes_namespace" "monitoring" {
-  metadata {
-    name = "monitoring"
-  }
-}
-
 resource "kubernetes_cluster_role" "prometheus" {
   metadata {
     name = "prometheus"
@@ -80,7 +74,7 @@ resource "kubernetes_deployment" "prometheus" {
     labels = {
       app = "prometheus"
     }
-  }
+   }
 
   spec {
     replicas = 1
@@ -136,13 +130,6 @@ resource "kubernetes_deployment" "prometheus" {
             container_port = 9090
             name           = "prometheus"
           }
-
-          # liveness_probe {
-          #   http_get {
-          #     port = 9598
-          #     path = "/metrics"
-          #   }
-          # }
         }
 
         volume {
@@ -155,7 +142,6 @@ resource "kubernetes_deployment" "prometheus" {
             name = kubernetes_config_map.prometheus.metadata[0].name
           }
         }
-
       }
     }
   }

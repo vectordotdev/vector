@@ -122,7 +122,7 @@
   {{/* Pull request chip */}}
   {{ with .pr_number }}
   {{ $link := printf "https://github.com/vectordotdev/vector/pull/%v" . }}
-  <a href="{{ $link }}" class="font-mono flex items-center space-x-1 py-1 px-2 rounded-md bg-gray-100 dark:bg-gray-500 text-dark dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600" target="_blank">
+  <a href="{{ $link }}" class="font-mono flex items-center space-x-1 py-1 px-2 rounded-md bg-gray-100 dark:bg-gray-500 text-dark dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600" rel="noopener" target="_blank">
     <ion-icon class="h-3 w-3" name="git-pull-request-sharp"></ion-icon>
 
     <span class="text-xs p-0">
