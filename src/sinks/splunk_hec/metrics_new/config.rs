@@ -1,8 +1,15 @@
+use futures_util::FutureExt;
 use serde::{Deserialize, Serialize};
+use vector_core::transform::DataType;
 
+use crate::config::{GenerateConfig, SinkConfig, SinkContext};
+use crate::http::HttpClient;
+use crate::sinks::Healthcheck;
+use crate::sinks::splunk_hec::common::{build_healthcheck, create_client, host_key};
+use crate::sinks::util::{BatchConfig, Compression, TowerRequestConfig};
 use crate::template::Template;
+use crate::tls::TlsOptions;
 use vector_core::sink::VectorSink;
-use crate::config::SinkConfig;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -10,7 +17,7 @@ pub struct HecMetricsSinkConfig {
     pub default_namespace: Option<String>,
     pub token: String,
     pub endpoint: String,
-    #[serde(default = "host_key")]
+    #[serde(default = "crate::sinks::splunk_hec::common::host_key")]
     pub host_key: String,
     pub index: Option<Template>,
     pub sourcetype: Option<Template>,
@@ -51,7 +58,7 @@ impl SinkConfig for HecMetricsSinkConfig {
         let healthcheck =
             build_healthcheck(self.endpoint.clone(), self.token.clone(), client.clone()).boxed();
         let sink = self.build_processor(client, cx)?;
-        Ok((sink, healthcheck)) 
+        Ok((sink, healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -69,15 +76,16 @@ impl HecMetricsSinkConfig {
         client: HttpClient,
         cx: SinkContext,
     ) -> crate::Result<VectorSink> {
-        // Create a request builder 
+        // Create a request builder
         let request_builder = todo!();
 
-        // Create a service for making HTTP requests 
+        // Create a service for making HTTP requests
         let service = todo!();
 
         // Create a HEC metrics sink
         let sink = todo!();
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        // Ok(VectorSink::Stream(Box::new(sink)))
+        todo!()
     }
 }
