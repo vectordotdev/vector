@@ -179,6 +179,8 @@ impl HostMetrics {
 
     async fn capture_metrics(&self) -> impl Iterator<Item = Event> {
         let hostname = crate::get_hostname();
+        let config_hash = self.config.config_hash.clone();
+
         let mut metrics = Vec::new();
         #[cfg(target_os = "linux")]
         if self.config.has_collector(Collector::CGroups) {
@@ -209,6 +211,11 @@ impl HostMetrics {
         if let Ok(hostname) = &hostname {
             for metric in &mut metrics {
                 metric.insert_tag("host".into(), hostname.into());
+            }
+        }
+        if let Some(config_hash) = &config_hash {
+            for metric in &mut metrics {
+                metric.insert_tag("config_hash".to_owned(), config_hash.clone());
             }
         }
         emit!(&HostMetricsEventReceived {
