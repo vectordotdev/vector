@@ -9,6 +9,7 @@ use vector_core::{
     stream::{Batcher, BatcherSettings, ConcurrentMap, Driver, ExpirationQueue},
     ByteSizeOf,
 };
+use vector_core::stream::DriverResponse;
 
 use super::RequestBuilder;
 
@@ -108,7 +109,7 @@ pub trait SinkBuilderExt: Stream {
         Svc: Service<Self::Item>,
         Svc::Error: fmt::Debug + 'static,
         Svc::Future: Send + 'static,
-        Svc::Response: AsRef<EventStatus>,
+        Svc::Response: DriverResponse,
     {
         Driver::new(self, service, acker)
     }

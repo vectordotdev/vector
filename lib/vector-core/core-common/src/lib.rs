@@ -9,5 +9,8 @@
 pub mod byte_size_of;
 pub mod internal_event;
 
+#[macro_use]
+extern crate tracing;
+
 // #[cfg(test)]
 pub mod event_test_util;

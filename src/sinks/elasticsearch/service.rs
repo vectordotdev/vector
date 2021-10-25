@@ -22,6 +22,7 @@ use rusoto_core::Region;
 use std::collections::HashMap;
 use std::sync::Arc;
 use vector_core::ByteSizeOf;
+use vector_core::stream::DriverResponse;
 
 #[derive(Clone)]
 pub struct ElasticSearchRequest {
@@ -179,11 +180,20 @@ fn sign_request(
 pub struct ElasticSearchResponse {
     pub http_response: Response<Bytes>,
     pub event_status: EventStatus,
+    pub batch_size: usize,
+    pub events_byte_size: usize,
 }
 
-impl AsRef<EventStatus> for ElasticSearchResponse {
-    fn as_ref(&self) -> &EventStatus {
-        &self.event_status
+impl DriverResponse for ElasticSearchResponse {
+    fn event_status(&self) -> EventStatus {
+        self.event_status
+    }
+
+    fn events_sent(&self) -> EventsSent {
+        EventsSent {
+            count: self.batch_size,
+            byte_size: self.events_byte_size
+        }
     }
 }
 
@@ -201,18 +211,13 @@ impl Service<ElasticSearchRequest> for ElasticSearchService {
         Box::pin(async move {
             http_service.ready().await?;
             let batch_size = req.batch_size;
-            let byte_size = req.events_byte_size;
+            let events_byte_size = req.events_byte_size;
             let http_response = http_service.call(req).await?;
-            let event_status = get_event_status(&http_response);
-            if event_status == EventStatus::Delivered {
-                emit!(&EventsSent {
-                    count: batch_size,
-                    byte_size
-                });
-            }
             Ok(ElasticSearchResponse {
+                event_status: get_event_status(&http_response),
                 http_response,
-                event_status,
+                batch_size,
+                events_byte_size
             })
         })
     }

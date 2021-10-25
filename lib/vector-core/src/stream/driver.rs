@@ -9,6 +9,7 @@ use std::{
 use tokio::{pin, select};
 use tower::{Service, ServiceExt};
 use tracing::Instrument;
+use crate::internal_event::EventsSent;
 
 #[derive(Eq)]
 struct PendingAcknowledgement {
@@ -72,7 +73,7 @@ where
     Svc: Service<St::Item>,
     Svc::Error: fmt::Debug + 'static,
     Svc::Future: Send + 'static,
-    Svc::Response: AsRef<EventStatus>,
+    Svc::Response: DriverResponse,
 {
     /// Runs the driver until the input stream is exhausted.
     ///
@@ -184,17 +185,18 @@ where
                         let fut = svc.call(req)
                             .err_into()
                             .map(move |result: Result<Svc::Response, Svc::Error>| {
-                                let status = match result {
+                                match result {
                                     Err(error) => {
                                         error!(message = "Service call failed.", ?error, seqno);
-                                        EventStatus::Failed
+                                        finalizers.update_status(EventStatus::Failed);
                                     },
                                     Ok(response) => {
                                         trace!(message = "Service call succeeded.", seqno);
-                                        *response.as_ref()
+                                        finalizers.update_status(response.event_status());
+                                        // emit
+                                        //TODO: emit EventsSent
                                     }
                                 };
-                                finalizers.update_status(status);
                                 (seqno, ack_size)
                             })
                             .instrument(info_span!("request", request_id = %seqno));
@@ -217,4 +219,9 @@ where
 
         Ok(())
     }
+}
+
+pub trait DriverResponse {
+    fn event_status(&self) -> EventStatus;
+    fn events_sent(&self) -> EventsSent;
 }

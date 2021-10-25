@@ -1,25 +1,33 @@
 use metrics::counter;
+use super::event_test_util;
 
 pub trait InternalEvent {
     fn emit_logs(&self) {}
     fn emit_metrics(&self) {}
-}
 
-pub fn emit(event: &impl InternalEvent) {
-    event.emit_logs();
-    event.emit_metrics();
+    // Optional for backwards compat until all events implement this
+    fn name(&self) -> Option<&str> {
+        None
+    }
 }
 
 #[cfg(test)]
-#[macro_export]
-macro_rules! emit {
-    ($event:expr) => {{
-        vector_core::test_util::components::record_internal_event(stringify!($event));
-        vector_core::internal_event::emit($event)
-    }};
+pub fn emit(event: &impl InternalEvent) {
+    event.emit_logs();
+    event.emit_metrics();
+    if let Some(name) = event.name() {
+        event_test_util::record_internal_event(name);
+    }
+
 }
 
 #[cfg(not(test))]
+pub fn emit(event: &impl InternalEvent) {
+    event.emit_logs();
+    event.emit_metrics();
+
+}
+
 #[macro_export]
 macro_rules! emit {
     ($event:expr) => {
@@ -37,7 +45,7 @@ pub struct EventsSent {
 
 impl InternalEvent for EventsSent {
     fn emit_logs(&self) {
-        // trace!(message = "Events sent.", count = %self.count, byte_size = %self.byte_size);
+        trace!(message = "Events sent.", count = %self.count, byte_size = %self.byte_size);
     }
 
     fn emit_metrics(&self) {
@@ -47,4 +55,6 @@ impl InternalEvent for EventsSent {
             // counter!("component_sent_event_bytes_total", self.byte_size as u64);
         }
     }
+
+    fn name(&self) -> Option<&str> {Some("EventsSent")}
 }
