@@ -90,9 +90,16 @@ pub fn try_attach(config: &mut Config) -> bool {
 mod tests {
     use super::*;
 
+    fn default_with_hash() -> Config {
+        Config {
+            hash: Some("".to_owned()),
+            ..Config::default()
+        }
+    }
+
     #[test]
     fn default() {
-        let config = Config::default();
+        let config = default_with_hash();
 
         // The Datadog config should be disabled by default.
         assert!(!config.datadog.enabled);
@@ -103,7 +110,7 @@ mod tests {
 
     #[test]
     fn disabled() {
-        let mut config = Config::default();
+        let mut config = default_with_hash();
 
         // Attaching config without an API enabled should avoid wiring up components.
         assert!(!try_attach(&mut config));
@@ -118,7 +125,7 @@ mod tests {
 
     #[test]
     fn enabled() {
-        let mut config = Config::default();
+        let mut config = default_with_hash();
 
         // Explicitly set to enabled and provide an API key to activate.
         config.datadog.enabled = true;
@@ -136,7 +143,7 @@ mod tests {
 
     #[test]
     fn default_reporting_interval_secs() {
-        let config = Config::default();
+        let config = default_with_hash();
 
         // Reporting interval should default to 5 seconds.
         assert_eq!(config.datadog.reporting_interval_secs, 5);
