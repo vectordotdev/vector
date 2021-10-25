@@ -95,7 +95,6 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             transforms,
             tests,
             expansions,
-            ..Config::default()
         };
 
         let warnings = validation::warnings(&config);
