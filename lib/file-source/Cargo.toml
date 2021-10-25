@@ -2,7 +2,7 @@
 name = "file-source"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@timber.io>", "Mark Story <mark@mark-story.com>"]
-edition = "2018"
+edition = "2021"
 publish = false
 license = "MIT"
 
