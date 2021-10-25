@@ -9,7 +9,7 @@ pub enum DataType {
     Metric,
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 pub enum ExpandType {
     Parallel,
     Serial,
