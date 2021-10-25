@@ -1,10 +1,12 @@
 extern crate lalrpop;
 
-use std::fmt::Write as fmt_write;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::path::Path;
-use std::{env, fs};
+use std::{
+    env,
+    fmt::Write as fmt_write,
+    fs::{self, File},
+    io::{BufRead, BufReader},
+    path::Path,
+};
 
 fn main() {
     lalrpop::Configuration::new()

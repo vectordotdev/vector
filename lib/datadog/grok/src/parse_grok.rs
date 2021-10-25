@@ -6,9 +6,7 @@ use itertools::{
 use lookup::LookupBuf;
 use shared::btreemap;
 
-use crate::grok_filter::apply_filter;
-use crate::insert_field::insert_field;
-use crate::parse_grok_rules::GrokRule;
+use crate::{grok_filter::apply_filter, insert_field::insert_field, parse_grok_rules::GrokRule};
 use tracing::warn;
 use vrl_compiler::Value;
 

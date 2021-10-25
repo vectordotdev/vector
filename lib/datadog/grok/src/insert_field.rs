@@ -1,7 +1,6 @@
 use lookup::{FieldBuf, LookupBuf, SegmentBuf};
 use snafu::Snafu;
-use std::collections::BTreeMap;
-use std::fmt::Debug;
+use std::{collections::BTreeMap, fmt::Debug};
 use vrl_compiler::Value;
 
 pub fn insert_field(

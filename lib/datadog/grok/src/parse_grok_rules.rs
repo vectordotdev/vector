@@ -5,9 +5,11 @@ use lazy_static::lazy_static;
 
 use lookup::LookupBuf;
 
-use crate::ast::{self, Destination, GrokPattern};
-use crate::grok_filter::GrokFilter;
-use crate::parse_grok_pattern::parse_grok_pattern;
+use crate::{
+    ast::{self, Destination, GrokPattern},
+    grok_filter::GrokFilter,
+    parse_grok_pattern::parse_grok_pattern,
+};
 use itertools::{Itertools, Position};
 use vrl_compiler::Value;
 
@@ -174,7 +176,7 @@ fn parse_grok_rule<'a>(
     Ok(GrokRule { pattern, filters })
 }
 
-/// replaces repeated field names with indexed versions, e.g. : field.name, field.name -> field.name.0, field.name.1 to avoid collisions in grok
+/// Replaces repeated field names with indexed versions, e.g. : field.name, field.name -> field.name.0, field.name.1 to avoid collisions in grok.
 fn index_repeated_fields(grok_patterns: Vec<GrokPattern>) -> Vec<GrokPattern> {
     grok_patterns
         .iter()
@@ -210,7 +212,7 @@ fn index_repeated_fields(grok_patterns: Vec<GrokPattern>) -> Vec<GrokPattern> {
 /// Converts each rule to a pure grok rule:
 ///  - strips filters and collects them to apply later
 ///  - replaces references to previous rules with actual definitions
-///  - replaces match functions with corresponding regex groups
+///  - replaces match functions with corresponding regex groups.
 fn purify_grok_pattern(
     pattern: &GrokPattern,
     mut filters: &mut HashMap<LookupBuf, Vec<GrokFilter>>,
@@ -322,7 +324,7 @@ include!(concat!(env!("OUT_DIR"), "/patterns.rs"));
 fn initialize_grok() -> Grok {
     let mut grok = grok::Grok::with_patterns();
 
-    // insert DataDog grok patterns
+    // Insert Datadog grok patterns.
     for &(key, value) in PATTERNS {
         grok.insert_definition(String::from(key), String::from(value));
     }

@@ -1,6 +1,9 @@
-use crate::ast::{Function, FunctionArgument};
-use crate::parse_grok::Error as GrokRuntimeError;
-use crate::parse_grok_rules::Error as GrokStaticError;
+use crate::{
+    ast::{Function, FunctionArgument},
+    parse_grok::Error as GrokRuntimeError,
+    parse_grok_rules::Error as GrokStaticError,
+};
+
 use ordered_float::NotNan;
 use std::{convert::TryFrom, string::ToString};
 use strum_macros::Display;
