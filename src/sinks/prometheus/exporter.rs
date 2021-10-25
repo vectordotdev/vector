@@ -162,8 +162,13 @@ struct PrometheusExporter {
 }
 
 struct ExpiringMetrics {
-    map: IndexMap<MetricEntry, bool>,
+    map: IndexMap<MetricEntry, MetricMetadata>,
     last_flush_timestamp: i64,
+}
+
+struct MetricMetadata {
+    is_incremental_set: bool,
+    updated_at: Instant,
 }
 
 fn handle(
@@ -172,7 +177,7 @@ fn handle(
     buckets: &[f64],
     quantiles: &[f64],
     expired: bool,
-    metrics: &IndexMap<MetricEntry, bool>,
+    metrics: &IndexMap<MetricEntry, MetricMetadata>,
 ) -> Response<Body> {
     let mut response = Response::new(Body::empty());
 
@@ -180,7 +185,7 @@ fn handle(
         (&Method::GET, "/metrics") => {
             let mut s = collector::StringCollector::new();
 
-            for (MetricEntry { metric, .. }, _) in metrics {
+            for (MetricEntry(metric), _) in metrics {
                 s.encode_metric(default_namespace, buckets, quantiles, expired, metric);
             }
 
@@ -305,46 +310,47 @@ impl StreamSink for PrometheusExporter {
                 metrics.map = metrics
                     .map
                     .drain(..)
-                    .map(|(mut entry, is_incremental_set)| {
-                        if is_incremental_set {
-                            entry.metric.zero();
+                    .map(|(mut entry, metadata)| {
+                        if metadata.is_incremental_set {
+                            entry.0.zero();
                         }
-                        (entry, is_incremental_set)
+                        (entry, metadata)
                     })
-                    .filter(|(MetricEntry { updated_at, .. }, _)| {
-                        updated_at.elapsed().as_secs() < self.config.flush_period_secs
+                    .filter(|(_metric, metadata)| {
+                        metadata.updated_at.elapsed().as_secs() < self.config.flush_period_secs
                     })
                     .collect();
             }
 
             match item.kind() {
                 MetricKind::Incremental => {
-                    let updated_at = Instant::now();
-                    let mut entry = MetricEntry {
-                        metric: item.into_absolute(),
-                        updated_at,
-                    };
-                    if let Some((mut existing_entry, _)) = metrics.map.remove_entry(&entry) {
-                        if existing_entry.metric.update(&entry) {
-                            entry = MetricEntry {
-                                metric: existing_entry.metric,
-                                updated_at,
-                            };
+                    let mut entry = MetricEntry(item.into_absolute());
+                    if let Some((MetricEntry(mut metric), _)) = metrics.map.remove_entry(&entry) {
+                        if metric.update(&entry) {
+                            entry = MetricEntry(metric);
                         } else {
                             warn!(message = "Metric changed type, dropping old value.", series = %entry.series());
                         }
                     }
                     let is_set = matches!(entry.value(), MetricValue::Set { .. });
-                    metrics.map.insert(entry, is_set);
+                    metrics.map.insert(
+                        entry,
+                        MetricMetadata {
+                            is_incremental_set: is_set,
+                            updated_at: Instant::now(),
+                        },
+                    );
                 }
                 MetricKind::Absolute => {
-                    let updated_at = Instant::now();
-                    let new = MetricEntry {
-                        metric: item,
-                        updated_at,
-                    };
+                    let new = MetricEntry(item);
                     metrics.map.remove(&new);
-                    metrics.map.insert(new, false);
+                    metrics.map.insert(
+                        new,
+                        MetricMetadata {
+                            is_incremental_set: false,
+                            updated_at: Instant::now(),
+                        },
+                    );
                 }
             };
 
@@ -354,36 +360,24 @@ impl StreamSink for PrometheusExporter {
     }
 }
 
-struct MetricEntry {
-    metric: Metric,
-    updated_at: Instant,
-}
-
-impl From<Metric> for MetricEntry {
-    fn from(metric: Metric) -> Self {
-        Self {
-            metric,
-            updated_at: Instant::now(),
-        }
-    }
-}
+struct MetricEntry(Metric);
 
 impl Deref for MetricEntry {
     type Target = Metric;
     fn deref(&self) -> &Metric {
-        &self.metric
+        &self.0
     }
 }
 
 impl DerefMut for MetricEntry {
     fn deref_mut(&mut self) -> &mut Metric {
-        &mut self.metric
+        &mut self.0
     }
 }
 
 impl AsRef<MetricData> for MetricEntry {
     fn as_ref(&self) -> &MetricData {
-        self.metric.as_ref()
+        self.0.as_ref()
     }
 }
 
@@ -391,7 +385,7 @@ impl Eq for MetricEntry {}
 
 impl Hash for MetricEntry {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        let metric = &self.metric;
+        let metric = &self.0;
         metric.series().hash(state);
         metric.kind().hash(state);
         discriminant(metric.value()).hash(state);
@@ -649,12 +643,12 @@ mod tests {
         let map = &internal_metrics.read().unwrap().map;
 
         assert_eq!(
-            map.get_full(&MetricEntry::from(m1)).unwrap().1.value(),
+            map.get_full(&MetricEntry(m1)).unwrap().1.value(),
             &MetricValue::Counter { value: 40. }
         );
 
         assert_eq!(
-            map.get_full(&MetricEntry::from(m2)).unwrap().1.value(),
+            map.get_full(&MetricEntry(m2)).unwrap().1.value(),
             &MetricValue::Counter { value: 33. }
         );
     }
