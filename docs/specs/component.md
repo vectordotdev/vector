@@ -59,12 +59,12 @@ follow the following guidelines.
 
 * MUST only contain ASCII alphanumeric, lowercase, and underscores.
 * MUST be a noun named after the protocol or service that the component integrates with.
-* MAY be suffixed with the event type, `logs`, `metrics`, or `traces` (e.g., `kubernetes_logs`, `apache_metrics`.)
+* MAY be suffixed with the event type, `logs`, `metrics`, or `traces` (e.g., `kubernetes_logs`, `apache_metrics`).
 
 ### Transform naming
 
 * MUST only contain ASCII alphanumeric, lowercase, and underscores.
-* MUST be a verb describing the broad purpose of the transform (e.g., `route`, `sample`, `delegate`.)
+* MUST be a verb describing the broad purpose of the transform (e.g., `route`, `sample`, `delegate`).
 
 ## Configuration
 
