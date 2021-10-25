@@ -3,12 +3,13 @@ use itertools::{
     Itertools,
 };
 
-use lookup::LookupBuf;
+use lookup::{Look, LookSegment, LookupBuf};
 use shared::btreemap;
 
-use crate::{grok_filter::apply_filter, insert_field::insert_field, parse_grok_rules::GrokRule};
+use crate::{grok_filter::apply_filter, parse_grok_rules::GrokRule};
+use std::collections::BTreeMap;
 use tracing::warn;
-use vrl_compiler::Value;
+use vrl_compiler::{Target, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -59,9 +60,18 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule) -> Result<Value, Error> {
             };
 
             if let Some(value) = value {
-                insert_field(&mut parsed, path.clone(), value).unwrap_or_else(
-                    |error| warn!(message = "Error updating field value", path = %path, %error),
-                );
+                match value {
+                    // root-level maps must be merged
+                    Value::Object(map) if path.is_root() || path.segments[0].is_index() => {
+                        parsed.as_object_mut().unwrap().extend(map);
+                    }
+                    // anything else at the root leve must be ignored
+                    _ if path.is_root() || path.segments[0].is_index() => {}
+                    // otherwise just apply VRL lookup logic
+                    _ => parsed.insert(&path, value).unwrap_or_else(
+                        |error| warn!(message = "Error updating field value", path = %path, %error),
+                    ),
+                };
             }
         }
 
@@ -272,31 +282,43 @@ mod tests {
     }
 
     #[test]
-    fn supports_filters_without_fields() {
-        // if the value, after filters applied, is a map then merge it at the root level
+    fn does_not_merge_field_maps() {
+        // only root-level maps are merged
         test_grok_pattern_without_field(vec![(
-            "%{notSpace:standalone_field} '%{data::json}' '%{data::json}'",
-            r#"value1 '{ "json_field1": "value2" }' '{ "json_field2": "value3" }'"#,
+            "'%{data:nested.json:json}' '%{data:nested.json:json}'",
+            r#"'{ "json_field1": "value2" }' '{ "json_field2": "value3" }'"#,
+            Ok(Value::from(btreemap! {
+                "nested" => btreemap! {
+                    "json" =>  Value::Array(vec! [
+                        Value::from(btreemap! { "json_field1" => Value::Bytes("value2".into()) }),
+                        Value::from(btreemap! { "json_field2" => Value::Bytes("value3".into()) }),
+                    ]),
+                }
+            })),
+        )]);
+    }
+
+    #[test]
+    fn supports_filters_without_fields() {
+        // if the root-level value, after filters applied, is a map then merge it at the root level,
+        // otherwise ignore it
+        test_grok_pattern_without_field(vec![(
+            "%{data::json}",
+            r#"{ "json_field1": "value2" }"#,
+            Ok(Value::from(btreemap! {
+                "json_field1" => Value::Bytes("value2".into()),
+            })),
+        )]);
+        test_grok_pattern_without_field(vec![(
+            "%{notSpace:standalone_field} '%{data::json}' '%{data::json}' %{number::number}",
+            r#"value1 '{ "json_field1": "value2" }' '{ "json_field2": "value3" }' 3"#,
             Ok(Value::from(btreemap! {
                 "standalone_field" => Value::Bytes("value1".into()),
                 "json_field1" => Value::Bytes("value2".into()),
                 "json_field2" => Value::Bytes("value3".into())
             })),
         )]);
-        test_grok_pattern_without_field(vec![(
-            "%{notSpace:standalone_field} '%{data:nested.json:json}' '%{data:nested.json:json}'",
-            r#"value1 '{ "json_field1": "value2" }' '{ "json_field2": "value3" }'"#,
-            Ok(Value::from(btreemap! {
-                "standalone_field" => Value::Bytes("value1".into()),
-                "nested" => btreemap! {
-                    "json" =>  btreemap! {
-                        "json_field1" => Value::Bytes("value2".into()),
-                        "json_field2" => Value::Bytes("value3".into())
-                    }
-                }
-            })),
-        )]);
-        // otherwise ignore it
+        // ignore non-map root-level fields
         test_grok_pattern_without_field(vec![(
             "%{notSpace:standalone_field} %{data::integer}",
             r#"value1 1"#,

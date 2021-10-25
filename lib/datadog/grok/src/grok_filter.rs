@@ -13,8 +13,10 @@ use vrl_compiler::Value;
 pub enum GrokFilter {
     Integer,
     IntegerExt,
+    // with scientific notation support, e.g. 1e10
     Number,
     NumberExt,
+    // with scientific notation support, e.g. 1.52e10
     NullIf(String),
     Scale(f64),
     Lowercase,
@@ -63,6 +65,8 @@ impl TryFrom<&Function> for GrokFilter {
     }
 }
 
+/// Applies a given Grok filter to the value and returns the result or error.
+/// For detailed description and examples of specific filters check out https://docs.datadoghq.com/logs/log_configuration/parsing/?tab=filters
 pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRuntimeError> {
     match filter {
         GrokFilter::Integer => match value {
