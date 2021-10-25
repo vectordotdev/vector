@@ -90,7 +90,8 @@ members = [
   "lib/vrl/tests",
   "lib/vrl/proptests",
   "lib/datadog/grok",
-  "lib/datadog/search-syntax"
+  "lib/datadog/search-syntax",
+  "lib/soak"
 ]
 
 [dependencies]
