@@ -1,4 +1,4 @@
-# Splunk HEC -> Splunk HEC Logs
+# Syslog -> Splunk HEC Logs
 
 This soak tests the syslog source feeding directly into the Splunk HEC logs
 sink. No transformation is done in the middle so throughput is limited solely by
