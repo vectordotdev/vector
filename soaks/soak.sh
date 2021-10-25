@@ -29,7 +29,7 @@ pushd "${__dir}"
 BASELINE_IMAGE=$(./bin/container_name.sh "${SOAK_NAME}" "${BASELINE}")
 COMPARISON_IMAGE=$(./bin/container_name.sh "${SOAK_NAME}" "${COMPARISON}")
 
-capture_dir=$(mktemp --directory /tmp/"${SOAK_NAME}".XXXXXX)
+capture_dir=$(mktemp -d /tmp/"${SOAK_NAME}".XXXXXX)
 echo "Captures will be recorded into ${capture_dir}"
 
 #
