@@ -7,7 +7,7 @@ use crate::transforms::{TaskTransform, Transform};
 
 use async_stream::stream;
 use futures::{stream, Stream, StreamExt};
-use governor::*;
+use governor::{clock, Quota, RateLimiter};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::num::NonZeroU32;
