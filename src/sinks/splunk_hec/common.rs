@@ -274,42 +274,48 @@ mod integration_tests {
     use warp::Filter;
 
     #[tokio::test]
-    async fn splunk_healthcheck() {
-        let create_healthcheck = |endpoint: String, token: String| {
-            let client = create_client(&None, &ProxyConfig::default()).unwrap();
-            build_healthcheck(endpoint, token, client)
-        };
+    async fn splunk_healthcheck_ok() {
+        let client = create_client(&None, &ProxyConfig::default()).unwrap();
+        let healthcheck = build_healthcheck(
+            "http://localhost:8088/".to_string(),
+            get_token().await,
+            client,
+        );
 
-        // OK
-        {
-            let healthcheck =
-                create_healthcheck("http://localhost:8088/".to_string(), get_token().await);
-            healthcheck.await.unwrap();
-        }
+        healthcheck.await.unwrap();
+    }
 
-        // Server not listening at address
-        {
-            let healthcheck =
-                create_healthcheck("http://localhost:1111".to_string(), get_token().await);
-            healthcheck.await.unwrap_err();
-        }
+    #[tokio::test]
+    async fn splunk_healthcheck_server_not_listening() {
+        let client = create_client(&None, &ProxyConfig::default()).unwrap();
+        let healthcheck = build_healthcheck(
+            "http://localhost:1111/".to_string(),
+            get_token().await,
+            client,
+        );
 
-        // Unhealthy server
-        {
-            let healthcheck =
-                create_healthcheck("http://localhost:5503".to_string(), get_token().await);
+        healthcheck.await.unwrap_err();
+    }
 
-            let unhealthy = warp::any()
-                .map(|| warp::reply::with_status("i'm sad", StatusCode::SERVICE_UNAVAILABLE));
-            let server = warp::serve(unhealthy).bind("0.0.0.0:5503".parse::<SocketAddr>().unwrap());
-            tokio::spawn(server);
+    #[tokio::test]
+    async fn splunk_healthcheck_server_unavailable() {
+        let client = create_client(&None, &ProxyConfig::default()).unwrap();
+        let healthcheck = build_healthcheck(
+            "http://localhost:5503/".to_string(),
+            get_token().await,
+            client,
+        );
 
-            assert_downcast_matches!(
-                healthcheck.await.unwrap_err(),
-                HealthcheckError,
-                HealthcheckError::QueuesFull
-            );
-        }
+        let unhealthy = warp::any()
+            .map(|| warp::reply::with_status("i'm sad", StatusCode::SERVICE_UNAVAILABLE));
+        let server = warp::serve(unhealthy).bind("0.0.0.0:5503".parse::<SocketAddr>().unwrap());
+        tokio::spawn(server);
+
+        assert_downcast_matches!(
+            healthcheck.await.unwrap_err(),
+            HealthcheckError,
+            HealthcheckError::QueuesFull
+        );
     }
 }
 
