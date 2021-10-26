@@ -39,6 +39,7 @@ fn get_processed_event(metric: Metric) -> HecProcessedEvent {
 
     process_metric(
         metric, 
+        metric.size_of(),
         sourcetype.as_ref(),
         source.as_ref(),
         index.as_ref(),

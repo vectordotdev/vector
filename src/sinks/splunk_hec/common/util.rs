@@ -101,10 +101,7 @@ mod tests {
         Mock, MockServer, ResponseTemplate,
     };
 
-    use crate::sinks::{
-        splunk_hec::util::{build_healthcheck, build_request},
-        util::Compression,
-    };
+    use crate::sinks::{splunk_hec::common::{build_healthcheck, create_client}, util::Compression};
 
     use super::create_client;
 

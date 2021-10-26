@@ -52,10 +52,11 @@ where
 
         let builder_limit = NonZeroUsize::new(64);
         let sink = input
-            .map(|event| event.into_metric())
-            .filter_map(move |metric| {
+            .map(|event| (event.size_of(), event.into_metric()))
+            .filter_map(move |(event_byte_size, metric)| {
                 future::ready(process_metric(
                     metric,
+                    event_byte_size,
                     sourcetype,
                     source,
                     index,
@@ -95,6 +96,7 @@ where
 }
 
 pub struct HecMetricsProcessedEventMetadata {
+    pub event_byte_size: usize,
     pub sourcetype: Option<String>,
     pub source: Option<String>,
     pub index: Option<String>,
@@ -143,6 +145,7 @@ pub type HecProcessedEvent = ProcessedEvent<Metric, HecMetricsProcessedEventMeta
 
 pub fn process_metric(
     metric: Metric,
+    event_byte_size: usize,
     sourcetype: Option<&Template>,
     source: Option<&Template>,
     index: Option<&Template>,
@@ -167,6 +170,7 @@ pub fn process_metric(
     let host = metric.tag_value(host_key);
 
     let metadata = HecMetricsProcessedEventMetadata {
+        event_byte_size,
         sourcetype,
         source,
         index,
