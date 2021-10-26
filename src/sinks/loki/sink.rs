@@ -19,11 +19,11 @@ use snafu::Snafu;
 use std::collections::HashMap;
 use std::num::NonZeroUsize;
 use vector_core::buffers::Acker;
-use vector_core::ByteSizeOf;
 use vector_core::event::{self, Event, EventFinalizers, Finalizable, Value};
 use vector_core::partition::Partitioner;
 use vector_core::sink::StreamSink;
 use vector_core::stream::BatcherSettings;
+use vector_core::ByteSizeOf;
 
 #[derive(Clone)]
 pub struct KeyPartitioner(Option<Template>);
@@ -124,7 +124,10 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
                 acc
             });
 
-        ((key.tenant_id, batch_size, finalizers, events_byte_size), events)
+        (
+            (key.tenant_id, batch_size, finalizers, events_byte_size),
+            events,
+        )
     }
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
@@ -138,7 +141,7 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
             finalizers,
             payload,
             tenant_id,
-            events_byte_size
+            events_byte_size,
         }
     }
 }

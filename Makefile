@@ -294,7 +294,7 @@ test-all: test test-behavior test-integration ## Runs all tests, unit, behaviori
 test-x86_64-unknown-linux-gnu: cross-test-x86_64-unknown-linux-gnu ## Runs unit tests on the x86_64-unknown-linux-gnu triple
 	${EMPTY}
 
-.PHONY: test-aarch64-unknown-linux-gnu
+.PHONY: test-aarch64-unknown-linux-gnu4
 test-aarch64-unknown-linux-gnu: cross-test-aarch64-unknown-linux-gnu ## Runs unit tests on the aarch64-unknown-linux-gnu triple
 	${EMPTY}
 

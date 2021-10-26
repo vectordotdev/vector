@@ -22,7 +22,7 @@ pub enum LokiError {
 #[derive(Debug, Snafu)]
 pub struct LokiResponse {
     batch_size: usize,
-    events_byte_size: usize
+    events_byte_size: usize,
 }
 
 impl DriverResponse for LokiResponse {
@@ -33,7 +33,7 @@ impl DriverResponse for LokiResponse {
     fn events_sent(&self) -> EventsSent {
         EventsSent {
             count: self.batch_size,
-            byte_size: self.events_byte_size
+            byte_size: self.events_byte_size,
         }
     }
 }
@@ -106,7 +106,10 @@ impl Service<LokiRequest> for LokiService {
                     let status = response.status();
 
                     match status {
-                        StatusCode::NO_CONTENT => Ok(LokiResponse { batch_size, events_byte_size }),
+                        StatusCode::NO_CONTENT => Ok(LokiResponse {
+                            batch_size,
+                            events_byte_size,
+                        }),
                         code => Err(LokiError::ServerError { code }),
                     }
                 }
