@@ -111,7 +111,7 @@ impl InfluxDbSettings for InfluxDb2Settings {
     }
 
     fn healthcheck_uri(&self, endpoint: String) -> crate::Result<Uri> {
-        encode_uri(&endpoint, "health", &[])
+        encode_uri(&endpoint, "ping", &[])
     }
 
     fn token(&self) -> String {
@@ -599,7 +599,7 @@ mod tests {
         let uri = settings
             .healthcheck_uri("http://localhost:9999".to_owned())
             .unwrap();
-        assert_eq!("http://localhost:9999/health", uri.to_string())
+        assert_eq!("http://localhost:9999/ping", uri.to_string())
     }
 
     #[test]

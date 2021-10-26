@@ -33,8 +33,8 @@ mod integration_tests {
 
         let config = config(&bucket, 1000000);
         let prefix = config.key_prefix.clone();
-        let client = config.create_client(&cx.globals.proxy).unwrap();
-        let sink = config.build_processor(client, cx).unwrap();
+        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let sink = config.build_processor(service, cx).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, 10);
         sink.run(events).await.unwrap();
@@ -68,8 +68,8 @@ mod integration_tests {
             ..config(&bucket, 10)
         };
         let prefix = config.key_prefix.clone();
-        let client = config.create_client(&cx.globals.proxy).unwrap();
-        let sink = config.build_processor(client, cx).unwrap();
+        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let sink = config.build_processor(service, cx).unwrap();
 
         let (lines, _events) = random_lines_with_stream(100, 30, None);
 
@@ -127,8 +127,8 @@ mod integration_tests {
         };
 
         let prefix = config.key_prefix.clone();
-        let client = config.create_client(&cx.globals.proxy).unwrap();
-        let sink = config.build_processor(client, cx).unwrap();
+        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let sink = config.build_processor(service, cx).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, batch_size * batch_multiplier);
         sink.run(events).await.unwrap();
@@ -183,8 +183,8 @@ mod integration_tests {
 
         let config = config(&bucket, 1000000);
         let prefix = config.key_prefix.clone();
-        let client = config.create_client(&cx.globals.proxy).unwrap();
-        let sink = config.build_processor(client, cx).unwrap();
+        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let sink = config.build_processor(service, cx).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, 10);
         sink.run(events).await.unwrap();
@@ -215,8 +215,8 @@ mod integration_tests {
         // Break the bucket name
         config.bucket = format!("BREAK{}IT", config.bucket);
         let prefix = config.key_prefix.clone();
-        let client = config.create_client(&cx.globals.proxy).unwrap();
-        let sink = config.build_processor(client, cx).unwrap();
+        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let sink = config.build_processor(service, cx).unwrap();
 
         let (_lines, events, receiver) = make_events_batch(1, 1);
         sink.run(events).await.unwrap();
@@ -233,15 +233,19 @@ mod integration_tests {
         create_bucket(&bucket, false).await;
 
         let config = config(&bucket, 1);
-        let client = config.create_client(&ProxyConfig::from_env()).unwrap();
-        config.build_healthcheck(client).unwrap();
+        let service = config.create_service(&ProxyConfig::from_env()).unwrap();
+        config.build_healthcheck(service.client()).unwrap();
     }
 
     #[tokio::test]
     async fn s3_healthchecks_invalid_bucket() {
         let config = config("s3_healthchecks_invalid_bucket", 1);
-        let client = config.create_client(&ProxyConfig::from_env()).unwrap();
-        assert!(config.build_healthcheck(client).unwrap().await.is_err());
+        let service = config.create_service(&ProxyConfig::from_env()).unwrap();
+        assert!(config
+            .build_healthcheck(service.client())
+            .unwrap()
+            .await
+            .is_err());
     }
 
     fn client() -> S3Client {

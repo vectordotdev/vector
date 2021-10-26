@@ -6,7 +6,7 @@ edition = "2018"
 publish = false
 
 [dependencies]
-async-graphql = { version = "2.10.0", default-features = false, optional = true }
+async-graphql = { version = "2.10.4", default-features = false, optional = true }
 async-trait = { version = "0.1", default-features = false }
 atomig = { version = "0.3.2", features = ["derive", "serde"] }
 buffers = { path = "buffers", default-features = false }
@@ -21,8 +21,7 @@ futures-util = { version = "0.3.17", default-features = false, features = ["std"
 getset = { version = "0.1.1", default-features = false }
 http = { version = "0.2.5", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
-# pinned due to https://github.com/tkaitchuck/aHash/issues/95
-indexmap = { version = "~1.6.2", default-features = false, features = ["serde"] }
+indexmap = { version = "~1.7.0", default-features = false, features = ["serde"] }
 core_common = { path = "core-common", default-features = false }
 lazy_static = { version = "1.4.0", default-features = false }
 lookup = { path = "../lookup", features = ["arbitrary"] }
@@ -80,6 +79,7 @@ harness = false
 
 [[bench]]
 name = "event"
+path = "benches/event/main.rs"
 harness = false
 
 [[bench]]
