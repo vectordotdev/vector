@@ -1,4 +1,3 @@
-use futures::future::BoxFuture;
 use snafu::Snafu;
 
 #[cfg(feature = "sources-apache_metrics")]
@@ -11,12 +10,18 @@ pub mod aws_kinesis_firehose;
 pub mod aws_s3;
 #[cfg(feature = "sources-datadog")]
 pub mod datadog;
+#[cfg(all(unix, feature = "sources-dnstap"))]
+pub mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
 pub mod docker_logs;
+#[cfg(feature = "sources-eventstoredb_metrics")]
+pub mod eventstoredb_metrics;
 #[cfg(feature = "sources-exec")]
 pub mod exec;
 #[cfg(feature = "sources-file")]
 pub mod file;
+#[cfg(feature = "sources-fluent")]
+pub mod fluent;
 #[cfg(feature = "sources-generator")]
 pub mod generator;
 #[cfg(feature = "sources-heroku_logs")]
@@ -33,10 +38,14 @@ pub mod internal_metrics;
 pub mod journald;
 #[cfg(all(feature = "sources-kafka", feature = "rdkafka"))]
 pub mod kafka;
-#[cfg(feature = "sources-kubernetes-logs")]
+#[cfg(feature = "sources-kubernetes_logs")]
 pub mod kubernetes_logs;
+#[cfg(all(feature = "sources-logstash"))]
+pub mod logstash;
 #[cfg(feature = "sources-mongodb_metrics")]
 pub mod mongodb_metrics;
+#[cfg(all(feature = "sources-nats"))]
+pub mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
 pub mod nginx_metrics;
 #[cfg(feature = "sources-postgresql_metrics")]
@@ -58,9 +67,9 @@ pub mod syslog;
 #[cfg(feature = "sources-vector")]
 pub mod vector;
 
-mod util;
+pub(crate) mod util;
 
-pub type Source = BoxFuture<'static, Result<(), ()>>;
+pub use vector_core::source::Source;
 
 /// Common build errors
 #[derive(Debug, Snafu)]

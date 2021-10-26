@@ -10,14 +10,14 @@ cat <<EOF > LICENSE.rtf
 \viewkind4\uc1
 \pard\f0\fs14\lang1033\par
 EOF
-sed 's/$/\\/' < vector-"${ARCHIVE_VERSION}"-x86_64-pc-windows-msvc/LICENSE.txt >> LICENSE.rtf
+sed 's/$/\\/' < collector-"${ARCHIVE_VERSION}"-x86_64-pc-windows-msvc/LICENSE.txt >> LICENSE.rtf
 echo -e '\n}' >> LICENSE.rtf
 
 echo "Substituting version..."
 VERSION="${ARCHIVE_VERSION}" envsubst < vector.wxs.tmpl > vector.wxs
 
 echo "Building the MSI package..."
-heat dir vector-"${ARCHIVE_VERSION}"-x86_64-pc-windows-msvc \
+heat dir collector-"${ARCHIVE_VERSION}"-x86_64-pc-windows-msvc \
   -cg Vector \
   -dr INSTALLDIR \
   -gg \
@@ -27,6 +27,6 @@ heat dir vector-"${ARCHIVE_VERSION}"-x86_64-pc-windows-msvc \
   -out components.wxs
 # See https://stackoverflow.com/questions/22932942/wix-heat-exe-win64-components-win64-yes
 sed -i'' 's/Component /Component Win64="yes" /g' components.wxs
-candle components.wxs -dVectorDir=vector-"${ARCHIVE_VERSION}"-x86_64-pc-windows-msvc
+candle components.wxs -dVectorDir=collector-"${ARCHIVE_VERSION}"-x86_64-pc-windows-msvc
 candle vector.wxs -ext WiXUtilExtension
 light vector.wixobj components.wixobj -out vector.msi -ext WixUIExtension -ext WiXUtilExtension
