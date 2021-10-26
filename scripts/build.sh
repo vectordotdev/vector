@@ -39,7 +39,7 @@ else
   TARGET_DIR="target"
 fi
 
-BINARY_PATH="$TARGET_DIR/release/vector"
+BINARY_PATH="$TARGET_DIR/release/collector"
 
 #
 # Abort early if possible
@@ -83,7 +83,7 @@ if [ "$NATIVE_BUILD" != "true" ]; then
 fi
 
 if [ "$FEATURES" == "default" ]; then
-  cargo build "${BUILD_FLAGS[@]}"
+  cargo build "${BUILD_FLAGS[@]}" --bin collector
 else
-  cargo build "${BUILD_FLAGS[@]}" --no-default-features --features "$FEATURES"
+  cargo build "${BUILD_FLAGS[@]}" --no-default-features --features "$FEATURES" --bin collector
 fi

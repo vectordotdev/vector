@@ -19,7 +19,7 @@ TARGET="${TARGET:?"You must specify a target triple, ex: x86_64-apple-darwin"}"
 
 PROJECT_ROOT="$(pwd)"
 PACKAGE_VERSION="$("$PROJECT_ROOT/scripts/version.sh")"
-ARCHIVE_NAME="vector-$PACKAGE_VERSION-$TARGET.tar.gz"
+ARCHIVE_NAME="collector-$PACKAGE_VERSION-$TARGET.tar.gz"
 ARCHIVE_PATH="target/artifacts/$ARCHIVE_NAME"
 
 #
@@ -62,7 +62,7 @@ mkdir -p \
 cp -av distribution/systemd/. "$RPMBUILD_DIR/SOURCES/systemd"
 
 # Copy the archive into the sources dir
-cp -av "$ARCHIVE_PATH" "$RPMBUILD_DIR/SOURCES/vector-$ARCH.tar.gz"
+cp -av "$ARCHIVE_PATH" "$RPMBUILD_DIR/SOURCES/collector-$ARCH.tar.gz"
 
 # Perform the build.
 rpmbuild \
@@ -77,4 +77,4 @@ rpmbuild \
 #
 
 ls "$RPMBUILD_DIR/RPMS/$ARCH"
-mv -v "$RPMBUILD_DIR/RPMS/$ARCH/vector-$CLEANED_VERSION-$RELEASE.$ARCH.rpm" "target/artifacts/vector-${CLEANED_VERSION}-${RELEASE}.${ARCH}.rpm"
+mv -v "$RPMBUILD_DIR/RPMS/$ARCH/collector-$CLEANED_VERSION-$RELEASE.$ARCH.rpm" "target/artifacts/collector-${CLEANED_VERSION}-${RELEASE}.${ARCH}.rpm"

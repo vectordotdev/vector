@@ -1,687 +1,479 @@
-# name: Release Suite
+name: Release Suite
 
-# on:
-#   push:
-#     tags:
-#       - v0.*
-#       - v1.*
+on:
+  push:
+    tags:
+      - v0.*
+      - v1.*
+    branches:
+      - release
 
+env:
+  AUTOINSTALL: true
+  VERBOSE: true
+  CI: true
+  DEBIAN_FRONTEND: noninteractive
+  CONTAINER_TOOL: docker
+  RUSTFLAGS: "-D warnings"
 
-# env:
-#   AUTOINSTALL: true
-#   VERBOSE: true
-#   CI: true
-#   DEBIAN_FRONTEND: noninteractive
+jobs:
+  build-plugins-package:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2.3.4
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: echo VECTOR_BIN_NAME_AS="collector" >> $GITHUB_ENV
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - run: mkdir -p target/plugins
+      - run: tar -czvf target/plugins/${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-plugins.tar.gz plugins
+      - uses: actions/upload-artifact@v1
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-plugins.tar.gz
+          path: "./target/plugins/${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-plugins.tar.gz"
 
-# jobs:
-#   build-x86_64-unknown-linux-musl-packages:
-#     runs-on: ubuntu-20.04
-#     steps:
-#       - uses: actions/checkout@v1
-#       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-#       - run: make ci-sweep
-#       - env:
-#           PASS_FEATURES: "default-cmake"
-#         run: make package-x86_64-unknown-linux-musl-all
-#       - uses: actions/upload-artifact@v1
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz
-#           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz"
+  build-x86_64-unknown-linux-musl-packages:
+    runs-on: [self-hosted, linux, x64, general]
+    steps:
+      - uses: actions/checkout@v2.3.4
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo VECTOR_BIN_NAME_AS="collector" >> $GITHUB_ENV
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - run: bash scripts/set-build-description.sh
+      - env:
+          PASS_FEATURES: "default-cmake"
+        run: make package-x86_64-unknown-linux-musl-all
+      - uses: actions/upload-artifact@v1
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz
+          path: "./target/artifacts/${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz"
 
-#   build-x86_64-unknown-linux-gnu-packages:
-#     runs-on: ubuntu-20.04
-#     steps:
-#       - uses: actions/checkout@v1
-#       - run: make ci-sweep
-#       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-#       - env:
-#           PASS_FEATURES: "default"
-#         run: make package-x86_64-unknown-linux-gnu-all
-#       - uses: actions/upload-artifact@v1
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz
-#           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz"
-#       - uses: actions/upload-artifact@v1
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
-#           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb"
-#       - uses: actions/upload-artifact@v1
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
-#           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm"
+  build-x86_64-unknown-linux-gnu-packages:
+    runs-on: [self-hosted, linux, x64, general]
+    steps:
+      - uses: actions/checkout@v2.3.4
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo VECTOR_BIN_NAME_AS="collector" >> $GITHUB_ENV
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - run: bash scripts/set-build-description.sh
+      - env:
+          PASS_FEATURES: "default"
+        run: make package-x86_64-unknown-linux-gnu-all
+      - uses: actions/upload-artifact@v1
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz
+          path: "./target/artifacts/${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-amd64.deb
+          path: "./target/artifacts/${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-amd64.deb"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
+          path: "./target/artifacts/${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-1.x86_64.rpm"
 
-#   build-aarch64-unknown-linux-musl-packages:
-#     runs-on: ubuntu-20.04
-#     steps:
-#       - uses: actions/checkout@v1
-#       - run: make ci-sweep
-#       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-#       - env:
-#           DOCKER_PRIVILEGED: "true"
-#           PASS_FEATURES: "default-cmake"
-#         run: make package-aarch64-unknown-linux-musl-all
-#       - uses: actions/upload-artifact@v1
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz
-#           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz"
+  build-aarch64-unknown-linux-musl-packages:
+    runs-on: [self-hosted, linux, x64, general]
+    steps:
+      - uses: actions/checkout@v2.3.4
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo VECTOR_BIN_NAME_AS="collector" >> $GITHUB_ENV
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - run: bash scripts/set-build-description.sh
+      - env:
+          DOCKER_PRIVILEGED: "true"
+          PASS_FEATURES: "default-cmake"
+        run: make package-aarch64-unknown-linux-musl-all
+      - uses: actions/upload-artifact@v1
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz
+          path: "./target/artifacts/${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz"
 
-#   build-aarch64-unknown-linux-gnu-packages:
-#     runs-on: ubuntu-20.04
-#     steps:
-#       - uses: actions/checkout@v1
-#       - run: make ci-sweep
-#       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-#       - env:
-#           DOCKER_PRIVILEGED: "true"
-#           PASS_FEATURES: "default"
-#         run: make package-aarch64-unknown-linux-gnu-all
-#       - uses: actions/upload-artifact@v1
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu.tar.gz
-#           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu.tar.gz"
-#       - uses: actions/upload-artifact@v1
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-arm64.deb
-#           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-arm64.deb"
-#       - uses: actions/upload-artifact@v1
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm
-#           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm"
+  build-aarch64-unknown-linux-gnu-packages:
+    runs-on: [self-hosted, linux, x64, general]
+    steps:
+      - uses: actions/checkout@v2.3.4
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo VECTOR_BIN_NAME_AS="collector" >> $GITHUB_ENV
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - run: bash scripts/set-build-description.sh
+      - env:
+          DOCKER_PRIVILEGED: "true"
+          PASS_FEATURES: "default"
+        run: make package-aarch64-unknown-linux-gnu-all
+      - uses: actions/upload-artifact@v1
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu.tar.gz
+          path: "./target/artifacts/${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu.tar.gz"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-arm64.deb
+          path: "./target/artifacts/${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-arm64.deb"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-1.aarch64.rpm
+          path: "./target/artifacts/${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-1.aarch64.rpm"
 
-#   build-armv7-unknown-linux-gnueabihf-packages:
-#     runs-on: ubuntu-20.04
-#     steps:
-#       - uses: actions/checkout@v1
-#       - run: make ci-sweep
-#       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-#       - env:
-#           DOCKER_PRIVILEGED: "true"
-#         run: make package-armv7-unknown-linux-gnueabihf-all
-#       - uses: actions/upload-artifact@v1
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf.tar.gz
-#           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf.tar.gz"
-#       - uses: actions/upload-artifact@v1
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-armhf.deb
-#           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-armhf.deb"
-#       - uses: actions/upload-artifact@v1
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm
-#           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm"
+  build-armv7-unknown-linux-gnueabihf-packages:
+    runs-on: [self-hosted, linux, x64, general]
+    steps:
+      - uses: actions/checkout@v2.3.4
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo VECTOR_BIN_NAME_AS="collector" >> $GITHUB_ENV
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - run: bash scripts/set-build-description.sh
+      - env:
+          DOCKER_PRIVILEGED: "true"
+        run: make package-armv7-unknown-linux-gnueabihf-all
+      - uses: actions/upload-artifact@v1
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf.tar.gz
+          path: "./target/artifacts/${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf.tar.gz"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-armhf.deb
+          path: "./target/artifacts/${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-armhf.deb"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-1.armv7.rpm
+          path: "./target/artifacts/${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-1.armv7.rpm"
 
-#   build-armv7-unknown-linux-musleabihf-packages:
-#     runs-on: ubuntu-20.04
-#     steps:
-#       - uses: actions/checkout@v1
-#       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-#       - run: make ci-sweep
-#       - env:
-#           DOCKER_PRIVILEGED: "true"
-#         run: make package-armv7-unknown-linux-musleabihf
-#       - uses: actions/upload-artifact@v1
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf.tar.gz
-#           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf.tar.gz"
+  build-armv7-unknown-linux-musleabihf-packages:
+    runs-on: [self-hosted, linux, x64, general]
+    steps:
+      - uses: actions/checkout@v2.3.4
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo VECTOR_BIN_NAME_AS="collector" >> $GITHUB_ENV
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - run: bash scripts/set-build-description.sh
+      - env:
+          DOCKER_PRIVILEGED: "true"
+        run: make package-armv7-unknown-linux-musleabihf
+      - uses: actions/upload-artifact@v1
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf.tar.gz
+          path: "./target/artifacts/${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf.tar.gz"
 
-#   build-x86_64-apple-darwin-packages:
-#     runs-on: macos-10.15
-#     steps:
-#       - uses: actions/checkout@v1
-#       - name: "Upgrade bash"
-#         run: brew install bash
-#       - name: "Install realpath dependency"
-#         run: brew install coreutils
-#       - name: Add version variable
-#         run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-#         shell: bash
-#       - name: "Build archive"
-#         env:
-#           TARGET: "x86_64-apple-darwin"
-#           NATIVE_BUILD: true
-#         run: |
-#           export PATH="$HOME/.cargo/bin:$PATH"
-#           make package
-#       - uses: actions/upload-artifact@v1
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz
-#           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz"
+  build-x86_64-apple-darwin-packages:
+    runs-on: macos-10.15
+    steps:
+      - uses: actions/checkout@v2.3.4
+      - name: "Upgrade bash"
+        run: brew install bash
+      - name: "Install realpath dependency"
+        run: brew install coreutils
+      - name: "Add Vector version"
+        run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - name: "Add Vector bin name"
+        run: echo VECTOR_BIN_NAME_AS="collector" >> $GITHUB_ENV
+        shell: bash
+      - name: "Set Vector build description"
+        run: ./scripts/set-build-description.sh
+        shell: bash
+      - name: "Set release flags"
+        run: ./scripts/environment/release-flags.sh
+        shell: bash
+      - name: "Build archive"
+        env:
+          TARGET: "x86_64-apple-darwin"
+          NATIVE_BUILD: true
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          make package
+      - uses: actions/upload-artifact@v1
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz
+          path: "./target/artifacts/${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz"
 
-#   build-x86_64-pc-windows-msvc-packages:
-#     runs-on: windows-2019
-#     steps:
-#       - uses: actions/checkout@v1
-#       - name: "Add Vector version"
-#         run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-#         shell: bash
-#       - name: "Download Perl"
-#         shell: bash
-#         env:
-#           VERSION: "5.32.0.1"
-#         run: |
-#           curl -sSfL https://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi
-#       - name: "Install Perl"
-#         shell: cmd # msiexec fails when called from bash
-#         run: |
-#           msiexec /quiet /i perl-installer.msi
-#           del perl-installer.msi
-#       - name: "Download CMake"
-#         shell: bash
-#         env:
-#           VERSION: "3.15.5"
-#         run: |
-#           curl -sSfL https://github.com/Kitware/CMake/releases/download/v$VERSION/cmake-$VERSION-win64-x64.msi > cmake-installer.msi
-#       - name: "Install CMake"
-#         shell: cmd # msiexec fails when called from bash
-#         run: |
-#           msiexec /quiet /i cmake-installer.msi
-#           del cmake-installer.msi
-#       - name: "Install Wix"
-#         shell: bash
-#         run: |
-#           mkdir -p /c/wix
-#           cd /c/wix
-#           curl -sSfL https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip > wix-binaries.zip
-#           unzip wix-binaries.zip
-#           rm wix-binaries.zip
-#       - run: choco install llvm
-#       - name: "Build archive"
-#         shell: bash
-#         run: |
-#           export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
-#           export RUSTFLAGS=-Ctarget-feature=+crt-static
-#           export FEATURES="default-msvc"
-#           export ARCHIVE_TYPE="zip"
-#           export KEEP_SYMBOLS="true"
-#           export RUST_LTO=""
-#           export TARGET="x86_64-pc-windows-msvc"
-#           export NATIVE_BUILD="true"
-#           make package
-#       - name: "Build package"
-#         shell: bash
-#         run: |
-#           export PATH="/c/wix:$PATH"
-#           ./scripts/package-msi.sh
-#       - uses: actions/upload-artifact@v1
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc.zip
-#           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc.zip"
-#       - uses: actions/upload-artifact@v1
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-x64.msi
-#           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x64.msi"
+  build-x86_64-pc-windows-msvc-packages:
+    runs-on: windows-2019
+    continue-on-error: true
+    env:
+      RUSTFLAGS: "-D warnings -Ctarget-feature=+crt-static"
+    steps:
+      - uses: actions/checkout@v2.3.4
+      - name: "Add Vector version"
+        run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+        shell: bash
+      - name: "Add Vector bin name"
+        run: echo VECTOR_BIN_NAME_AS="collector" >> $GITHUB_ENV
+        shell: bash
+      - name: "Set Vector build description"
+        run: ./scripts/set-build-description.sh
+        shell: bash
+      - name: "Set release flags"
+        run: ./scripts/environment/release-flags.sh
+        shell: bash
+      - name: "Download Perl"
+        shell: bash
+        env:
+          VERSION: "5.32.0.1"
+        run: |
+          curl -sSfL https://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi
+      - name: "Install Perl"
+        shell: cmd # msiexec fails when called from bash
+        run: |
+          msiexec /quiet /i perl-installer.msi
+          del perl-installer.msi
+      - name: "Download CMake"
+        shell: bash
+        env:
+          VERSION: "3.15.5"
+        run: |
+          curl -sSfL https://github.com/Kitware/CMake/releases/download/v$VERSION/cmake-$VERSION-win64-x64.msi > cmake-installer.msi
+      - name: "Install CMake"
+        shell: cmd # msiexec fails when called from bash
+        run: |
+          msiexec /quiet /i cmake-installer.msi
+          del cmake-installer.msi
+      - name: "Install Wix"
+        shell: bash
+        run: |
+          mkdir -p /c/wix
+          cd /c/wix
+          curl -sSfL https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip > wix-binaries.zip
+          unzip -o wix-binaries.zip
+          rm wix-binaries.zip
+      - run: choco install llvm
+      - name: "Build archive"
+        shell: bash
+        run: |
+          export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
+          export FEATURES="default-msvc"
+          export ARCHIVE_TYPE="zip"
+          export KEEP_SYMBOLS="true"
+          export RUST_LTO=""
+          export TARGET="x86_64-pc-windows-msvc"
+          export NATIVE_BUILD="true"
+          make package
+      - name: "Build package"
+        shell: bash
+        run: |
+          export PATH="/c/wix:$PATH"
+          ./scripts/package-msi.sh
+      - uses: actions/upload-artifact@v1
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc.zip
+          path: "./target/artifacts/${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc.zip"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-x64.msi
+          path: "./target/artifacts/${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-x64.msi"
 
-#   deb-verify:
-#     needs:
-#       - build-x86_64-unknown-linux-gnu-packages
-#     runs-on: ubuntu-20.04
-#     strategy:
-#       matrix:
-#         container: ["ubuntu:14.04","ubuntu:16.04","ubuntu:18.04","ubuntu:20.04","debian:8","debian:9","debian:10"]
-#     container:
-#       image: ${{ matrix.container }}
-#     steps:
-#       - name: checkout
-#         uses: actions/checkout@v1
-#       - run: |
-#           apt-get update && \
-#           apt-get install -y \
-#           ca-certificates \
-#           curl \
-#           git \
-#           systemd \
-#           make
-#       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
-#           path: target/artifacts
-#       - name: First install of DEB package.
-#         run: |
-#           dpkg -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb && vector --version
-#       - name: Second install of DEB package.
-#         run: |
-#           dpkg -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb && vector --version
+  deb-verify:
+    needs:
+      - build-x86_64-unknown-linux-gnu-packages
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        container: ["ubuntu:14.04","ubuntu:16.04","ubuntu:18.04","ubuntu:20.04","debian:8","debian:9","debian:10"]
+    container:
+      image: ${{ matrix.container }}
+    steps:
+      - run: |
+          apt-get update && \
+          apt-get install -y \
+          ca-certificates \
+          curl \
+          git \
+          systemd \
+          make
+      - name: checkout
+        uses: actions/checkout@v2.3.4
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - run: echo VECTOR_BIN_NAME_AS="collector" >> $GITHUB_ENV
+      - uses: actions/download-artifact@v2
+        id: download
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-amd64.deb
+          path: target/artifacts
+      - name: First install of DEB package.
+        run: |
+          dpkg -i ${{steps.download.outputs.download-path}}/${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-amd64.deb && collector --version
+      - name: Second install of DEB package.
+        run: |
+          dpkg -i ${{steps.download.outputs.download-path}}/${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-amd64.deb && collector --version
 
-#   rpm-verify:
-#     needs:
-#       - build-x86_64-unknown-linux-gnu-packages
-#     runs-on: ubuntu-20.04
-#     strategy:
-#       matrix:
-#         container: ["centos:7","centos:8","amazonlinux:1","amazonlinux:2","fedora:33"]
-#     container:
-#       image: ${{ matrix.container }}
-#     steps:
-#       - name: checkout
-#         uses: actions/checkout@v1
-#       - run: |
-#           yum update -y && \
-#           yum install -y \
-#           ca-certificates \
-#           curl \
-#           git \
-#           systemd \
-#           tar \
-#           make
-#       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name:  vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
-#           path: target/artifacts
-#       - name: First install of RPM package.
-#         run: |
-#           rpm -i --replacepkgs target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm && vector --version
-#       - name: Second install of RPM package.
-#         run: |
-#           rpm -i --replacepkgs target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm && vector --version
+  rpm-verify:
+    needs:
+      - build-x86_64-unknown-linux-gnu-packages
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        container: ["centos:7","centos:8","amazonlinux:1","amazonlinux:2","fedora:33"]
+    container:
+      image: ${{ matrix.container }}
+    steps:
+      - run: |
+          yum update -y && \
+          yum install -y \
+          ca-certificates \
+          curl \
+          git \
+          systemd \
+          tar \
+          make
+      - name: checkout
+        uses: actions/checkout@v2.3.4
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - run: echo VECTOR_BIN_NAME_AS="collector" >> $GITHUB_ENV
+      - uses: actions/download-artifact@v2
+        id: download
+        with:
+          name:  ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
+          path: target/artifacts
+      - name: First install of RPM package.
+        run: |
+          rpm -i --replacepkgs ${{steps.download.outputs.download-path}}/${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-1.x86_64.rpm && collector --version
+      - name: Second install of RPM package.
+        run: |
+          rpm -i --replacepkgs ${{steps.download.outputs.download-path}}/${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-1.x86_64.rpm && collector --version
 
-#   osx-verify:
-#     runs-on: macos-10.15
-#     needs:
-#       - build-x86_64-apple-darwin-packages
-#     steps:
-#       - name: checkout
-#         uses: actions/checkout@v1
-#       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name:  vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz
-#           path: target/artifacts
-#       - run: |
-#           tar -xvf target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz && vector-x86_64-apple-darwin/bin/vector --version
+  osx-verify:
+    runs-on: macos-10.15
+    needs:
+      - build-x86_64-apple-darwin-packages
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2.3.4
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - run: echo VECTOR_BIN_NAME_AS="collector" >> $GITHUB_ENV
+      - uses: actions/download-artifact@v2
+        with:
+          name:  ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz
+          path: target/artifacts
+      # The upload artifact verifiably corrupts tarballs on OSX so we verify we can unpack the original tar pre upload
+      - run: |
+          tar -xvf target/artifacts/${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz && collector-x86_64-apple-darwin/bin/collector --version
 
-#   release-docker:
-#     runs-on: ubuntu-20.04
-#     needs:
-#       - build-aarch64-unknown-linux-gnu-packages
-#       - build-aarch64-unknown-linux-musl-packages
-#       - build-x86_64-unknown-linux-gnu-packages
-#       - build-x86_64-unknown-linux-musl-packages
-#       - build-armv7-unknown-linux-musleabihf-packages
-#       - build-armv7-unknown-linux-gnueabihf-packages
-#       - deb-verify
-#     steps:
-#       - uses: actions/checkout@v1
-#       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-#       - name: Login to DockerHub
-#         uses: docker/login-action@v1
-#         with:
-#           username: ${{ secrets.CI_DOCKER_USERNAME }}
-#           password: ${{ secrets.CI_DOCKER_PASSWORD }}
-#       - name: Set up QEMU
-#         uses: docker/setup-qemu-action@v1
-#         with:
-#           platforms: all
-#       - name: Set up Docker Buildx
-#         id: buildx
-#         uses: docker/setup-buildx-action@v1
-#         with:
-#           version: latest
-#           install: true
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf.tar.gz
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-arm64.deb
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-armhf.deb
-#           path: target/artifacts
-#       - env:
-#           PLATFORM: "linux/amd64,linux/arm64,linux/arm/v7"
-#         run: |
-#           make release-docker
+  release-s3:
+    runs-on: ubuntu-18.04
+    needs:
+      - build-plugins-package
+      - build-x86_64-unknown-linux-gnu-packages
+      - build-x86_64-unknown-linux-musl-packages
+      - build-aarch64-unknown-linux-musl-packages
+      - build-aarch64-unknown-linux-gnu-packages
+      - build-x86_64-apple-darwin-packages
+      #- build-x86_64-pc-windows-msvc-packages
+      - build-armv7-unknown-linux-musleabihf-packages
+      - build-armv7-unknown-linux-gnueabihf-packages
+      - build-plugins-package
+      - deb-verify
+      - rpm-verify
+      - osx-verify
+    steps:
+      - uses: actions/checkout@v2.3.4
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - run: echo VECTOR_BIN_NAME_AS="collector" >> $GITHUB_ENV
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-amd64.deb
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-arm64.deb
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-armhf.deb
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz
+          path: target/artifacts
+      #- uses: actions/download-artifact@v2
+      #  with:
+      #    name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc.zip
+      #    path: target/artifacts
+      #- uses: actions/download-artifact@v2
+      #  with:
+      #    name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-x64.msi
+      #    path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-1.aarch64.rpm
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-1.armv7.rpm
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{ env.VECTOR_BIN_NAME_AS }}-${{ env.VECTOR_VERSION }}-plugins.tar.gz
+          path: "target/plugins"
+      # Uplaod to preprod bucket
+      - env:
+          AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
+          AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
+          S3_BUCKET: "collector-tar"
+        run: make release-s3
+      # Upload to prod bucket
+      - env:
+          AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID_PROD }}"
+          AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY_PROD }}"
+          S3_BUCKET: "prod-express-collector-origin"
+        run: make release-s3
 
-#   release-s3:
-#     runs-on: ubuntu-18.04
-#     needs:
-#       - build-x86_64-unknown-linux-gnu-packages
-#       - build-x86_64-unknown-linux-musl-packages
-#       - build-aarch64-unknown-linux-musl-packages
-#       - build-aarch64-unknown-linux-gnu-packages
-#       - build-x86_64-apple-darwin-packages
-#       - build-x86_64-pc-windows-msvc-packages
-#       - build-armv7-unknown-linux-musleabihf-packages
-#       - build-armv7-unknown-linux-gnueabihf-packages
-#       - deb-verify
-#       - rpm-verify
-#       - osx-verify
-#     steps:
-#       - uses: actions/checkout@v1
-#       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu.tar.gz
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf.tar.gz
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf.tar.gz
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-arm64.deb
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-armhf.deb
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc.zip
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-x64.msi
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm
-#           path: target/artifacts
-#       - env:
-#           AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
-#           AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
-#         run: make release-s3
-
-#   release-github:
-#     runs-on: ubuntu-20.04
-#     needs:
-#       - build-x86_64-unknown-linux-gnu-packages
-#       - build-x86_64-unknown-linux-musl-packages
-#       - build-aarch64-unknown-linux-musl-packages
-#       - build-aarch64-unknown-linux-gnu-packages
-#       - build-x86_64-apple-darwin-packages
-#       - build-x86_64-pc-windows-msvc-packages
-#       - build-armv7-unknown-linux-gnueabihf-packages
-#       - build-armv7-unknown-linux-musleabihf-packages
-#       - deb-verify
-#       - rpm-verify
-#       - osx-verify
-#     steps:
-#       - uses: actions/checkout@v1
-#       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu.tar.gz
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf.tar.gz
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf.tar.gz
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-arm64.deb
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc.zip
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-x64.msi
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-armhf.deb
-#           path: target/artifacts
-#       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-#       - run: bash scripts/environment/prepare.sh
-#       - run: |
-#           export SHA1="${{ github.sha }}"
-#           export GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
-#           make release-github
-
-#   release-homebrew:
-#     runs-on: ubuntu-20.04
-#     needs:
-#       - release-s3
-#     steps:
-#       - uses: actions/checkout@v1
-#       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-#       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-#       - run: bash scripts/environment/prepare.sh
-#       - run: |
-#           export GITHUB_TOKEN="${{ secrets.GH_PACKAGE_PUBLISHER_TOKEN }}"
-#           make release-homebrew
-
-#   release-cloudsmith:
-#     runs-on: ubuntu-20.04
-#     needs:
-#       - build-x86_64-unknown-linux-gnu-packages
-#       - build-aarch64-unknown-linux-gnu-packages
-#       - build-armv7-unknown-linux-gnueabihf-packages
-#       - deb-verify
-#       - rpm-verify
-#     steps:
-#       - uses: actions/checkout@v1
-#       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-arm64.deb
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-armhf.deb
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm
-#           path: target/artifacts
-#       - uses: actions/download-artifact@v2
-#         with:
-#           name: vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm
-#           path: target/artifacts
-#       - name: Push amd64 deb
-#         id: push-deb-amd64
-#         uses: cloudsmith-io/action@master
-#         with:
-#           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
-#           command: "push"
-#           format: "deb"
-#           owner: "timber"
-#           repo: "vector"
-#           distro: "any-distro"
-#           release: "any-version"
-#           republish: "true"
-#           file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb"
-#       - name: Push arm64 deb
-#         id: push-deb-arm64
-#         uses: cloudsmith-io/action@master
-#         with:
-#           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
-#           command: "push"
-#           format: "deb"
-#           owner: "timber"
-#           repo: "vector"
-#           distro: "any-distro"
-#           release: "any-version"
-#           republish: "true"
-#           file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-arm64.deb"
-#       - name: Push armhf deb
-#         id: push-deb-armhf
-#         uses: cloudsmith-io/action@master
-#         with:
-#           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
-#           command: "push"
-#           format: "deb"
-#           owner: "timber"
-#           repo: "vector"
-#           distro: "any-distro"
-#           release: "any-version"
-#           republish: "true"
-#           file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-armhf.deb"
-#       - name: Push x86_64 RPM
-#         id: push-rpm-x86_64
-#         uses: cloudsmith-io/action@master
-#         with:
-#           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
-#           command: "push"
-#           format: "rpm"
-#           owner: "timber"
-#           repo: "vector"
-#           distro: "any-distro"
-#           release: "any-version"
-#           republish: "true"
-#           file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm"
-#       - name: Push aarch64 RPM
-#         id: push-rpm-aarch64
-#         uses: cloudsmith-io/action@master
-#         with:
-#           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
-#           command: "push"
-#           format: "rpm"
-#           owner: "timber"
-#           repo: "vector"
-#           distro: "any-distro"
-#           release: "any-version"
-#           republish: "true"
-#           file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm"
-#       - name: Push armv7-gnu RPM
-#         id: push-rpm-armv7-gnu
-#         uses: cloudsmith-io/action@master
-#         with:
-#           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
-#           command: "push"
-#           format: "rpm"
-#           owner: "timber"
-#           repo: "vector"
-#           distro: "any-distro"
-#           release: "any-version"
-#           republish: "true"
-#           file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm"
-
-#   release-helm:
-#     runs-on: ubuntu-18.04
-#     needs:
-#       # This is not strictly required, but ensures that Helm Chart doesn't
-#       # appear before the image it refers to.
-#       - release-docker
-#     steps:
-#       - uses: actions/checkout@v1
-#       - name: Install Helm
-#         run: scripts/environment/setup-helm.sh
-#       - name: Release Helm Chart
-#         env:
-#           AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
-#           AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
-#         run: make release-helm
-
-#   release-failure:
-#     name: release-failure
-#     if: failure()
-#     needs:
-#       - build-x86_64-unknown-linux-gnu-packages
-#       - build-x86_64-unknown-linux-musl-packages
-#       - build-aarch64-unknown-linux-musl-packages
-#       - build-aarch64-unknown-linux-gnu-packages
-#       - build-x86_64-apple-darwin-packages
-#       - build-x86_64-pc-windows-msvc-packages
-#       - build-armv7-unknown-linux-gnueabihf-packages
-#       - build-armv7-unknown-linux-musleabihf-packages
-#       - deb-verify
-#       - rpm-verify
-#       - osx-verify
-#       - release-docker
-#       - release-s3
-#       - release-cloudsmith
-#       - release-github
-#       - release-helm
-#     runs-on: ubuntu-20.04
-#     steps:
-#     - name: Discord notification
-#       env:
-#         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-#       uses: Ilshidur/action-discord@0.3.0
-#       with:
-#         args: "Release failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
+  release-failure:
+    name: release-failure
+    if: failure()
+    needs:
+      - build-plugins-package
+      - build-x86_64-unknown-linux-gnu-packages
+      - build-x86_64-unknown-linux-musl-packages
+      - build-aarch64-unknown-linux-musl-packages
+      - build-aarch64-unknown-linux-gnu-packages
+      - build-x86_64-apple-darwin-packages
+      #- build-x86_64-pc-windows-msvc-packages
+      - build-armv7-unknown-linux-gnueabihf-packages
+      - build-armv7-unknown-linux-musleabihf-packages
+      - deb-verify
+      - rpm-verify
+      - osx-verify
+      - release-s3
+    runs-on: ubuntu-20.04
+    steps:
+      - run: echo Failed
+      - name: Slack Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_USERNAME: Github Actions
+          SLACK_COLOR: danger
+          SLACK_MESSAGE: Collector V2 Build Failed
+          SLACK_ICON: https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png
+          MSG_MINIMAL: actions url,commit

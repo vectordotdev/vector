@@ -10,12 +10,12 @@ set -euo pipefail
 CHANNEL="${CHANNEL:-"$(scripts/release-channel.sh)"}"
 VERSION="${VERSION:-"$(scripts/version.sh)"}"
 DATE="${DATE:-"$(date -u +%Y-%m-%d)"}"
-VERIFY_TIMEOUT="${VERIFY_TIMEOUT:-"30"}" # seconds
-VERIFY_RETRIES="${VERIFY_RETRIES:-"2"}"
 
 #
 # Setup
 #
+
+echo "Starting S3 release"
 
 td="$(mktemp -d)"
 cp -av "target/artifacts/." "$td"
@@ -39,6 +39,17 @@ for f in "$td_latest"/*; do
 done
 ls "$td_latest"
 
+echo "Unpacking plugins"
+td_plugins="$(mktemp -d)"
+tar -xzf "target/plugins/collector-$VERSION-plugins.tar.gz" -C "$td_plugins/"
+
+ls "$td_plugins"
+
+echo "Moving plugins to artifact destinations"
+cp -R "$td_plugins/plugins" "$td/"
+cp -R "$td_plugins/plugins" "$td_nightly/"
+cp -R "$td_plugins/plugins" "$td_latest/"
+
 #
 # A helper function for verifying a published artifact.
 #
@@ -55,37 +66,16 @@ verify_artifact() {
 
 if [[ "$CHANNEL" == "nightly" ]]; then
   # Add nightly files with the $DATE for posterity
-  echo "Uploading all artifacts to s3://packages.timber.io/vector/nightly/$DATE"
-  aws s3 cp "$td_nightly" "s3://packages.timber.io/vector/nightly/$DATE" --recursive --sse --acl public-read
+  echo "Uploading all artifacts to s3://${S3_BUCKET}/vector/nightly/$DATE"
+  aws s3 cp "$td_nightly" "s3://${S3_BUCKET}/vector/nightly/$DATE" --recursive --sse --acl private
   echo "Uploaded archives"
 
   # Add "latest" nightly files
-  echo "Uploading all artifacts to s3://packages.timber.io/vector/nightly/latest"
-  aws s3 rm --recursive "s3://packages.timber.io/vector/nightly/latest"
-  aws s3 cp "$td_nightly" "s3://packages.timber.io/vector/nightly/latest" --recursive --sse --acl public-read
+  echo "Uploading all artifacts to s3://${S3_BUCKET}/vector/nightly/latest"
+  aws s3 rm --recursive "s3://${S3_BUCKET}/vector/nightly/latest"
+  aws s3 cp "$td_nightly" "s3://${S3_BUCKET}/vector/nightly/latest" --recursive --sse --acl private
   echo "Uploaded archives"
 
-  echo "Redirecting old artifact names"
-  for file in $(aws s3api list-objects-v2 --bucket packages.timber.io --prefix "vector/$i/" --query 'Contents[*].Key' --output text  | tr "\t" "\n" | grep '\-nightly'); do
-    file=$(basename "$file")
-    # vector-nightly-amd64.deb -> vector-amd64.deb
-    echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/nightly/$DATE/${file/-nightly/}" --website-redirect "/vector/nightly/$DATE/$file" --acl public-read
-    echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/nightly/latest/${file/-nightly/}" --website-redirect "/vector/nightly/latest/$file" --acl public-read
-  done
-  echo "Redirected old artifact names"
-
-  # Verify that the files exist and can be downloaded
-  echo "Waiting for $VERIFY_TIMEOUT seconds before running the verifications"
-  sleep "$VERIFY_TIMEOUT"
-  verify_artifact \
-    "https://packages.timber.io/vector/nightly/$DATE/vector-nightly-x86_64-unknown-linux-musl.tar.gz" \
-    "$td_nightly/vector-nightly-x86_64-unknown-linux-musl.tar.gz"
-  verify_artifact \
-    "https://packages.timber.io/vector/nightly/latest/vector-nightly-x86_64-unknown-linux-musl.tar.gz" \
-    "$td_nightly/vector-nightly-x86_64-unknown-linux-musl.tar.gz"
-  verify_artifact \
-    "https://packages.timber.io/vector/nightly/latest/vector-nightly-x86_64-unknown-linux-gnu.tar.gz" \
-    "$td_nightly/vector-nightly-x86_64-unknown-linux-gnu.tar.gz"
 elif [[ "$CHANNEL" == "latest" ]]; then
   VERSION_EXACT="$VERSION"
   # shellcheck disable=SC2001
@@ -95,41 +85,14 @@ elif [[ "$CHANNEL" == "latest" ]]; then
 
   for i in "$VERSION_EXACT" "$VERSION_MINOR_X" "$VERSION_MAJOR_X" "latest"; do
     # Upload the specific version
-    echo "Uploading artifacts to s3://packages.timber.io/vector/$i/"
-    if [[ "$i" == "latest" ]] ; then
-      aws s3 cp "$td_latest" "s3://packages.timber.io/vector/$i/" --recursive --sse --acl public-read
-    else
-      aws s3 cp "$td" "s3://packages.timber.io/vector/$i/" --recursive --sse --acl public-read
-    fi
+    echo "Uploading artifacts to s3://${S3_BUCKET}/vector/$i/"
+    aws s3 cp "$td" "s3://${S3_BUCKET}/vector/$i/" --recursive --sse --acl private
 
-    if [[ "$i" == "${VERSION_MAJOR_X}" || "$i" == "${VERSION_MINOR_X}"  ]] ; then
-      # Delete anything that isn't the current version
-      echo "Deleting old artifacts from s3://packages.timber.io/vector/$i/"
-      aws s3 rm "s3://packages.timber.io/vector/$i/" --recursive --exclude "*$VERSION_EXACT*"
-      echo "Deleted old versioned artifacts"
-    fi
-
-    echo "Redirecting old artifact names in s3://packages.timber.io/vector/$i/"
-    for file in $(aws s3api list-objects-v2 --bucket packages.timber.io --prefix "vector/$i/" --query 'Contents[*].Key' --output text  | tr "\t" "\n" | grep "\-$VERSION_EXACT"); do
-      file=$(basename "$file")
-      # vector-$version-amd64.deb -> vector-amd64.deb
-      echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/$i/${file/-$VERSION_EXACT/}" --website-redirect "/vector/$i/$file" --acl public-read
-      echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/latest/${file/-$VERSION_EXACT/}" --website-redirect "/vector/latest/$file" --acl public-read
-    done
-    echo "Redirected old artifact names"
+    # Delete anything that isn't the current version
+    echo "Deleting old artifacts from s3://${S3_BUCKET}/vector/$i/"
+    aws s3 rm "s3://${S3_BUCKET}/vector/$i/" --recursive --exclude "*$VERSION_EXACT*" --exclude "*plugins*"
+    echo "Deleted old versioned artifacts"
   done
-
-  # Verify that the files exist and can be downloaded
-  sleep "$VERIFY_TIMEOUT"
-  echo "Waiting for $VERIFY_TIMEOUT seconds before running the verifications"
-  for i in "$VERSION_EXACT" "$VERSION_MINOR_X" "$VERSION_MAJOR_X"; do
-    verify_artifact \
-      "https://packages.timber.io/vector/$i/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz" \
-      "$td/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz"
-  done
-  verify_artifact \
-    "https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-gnu.tar.gz" \
-    "$td_latest/vector-latest-x86_64-unknown-linux-gnu.tar.gz"
 fi
 
 #
@@ -138,4 +101,3 @@ fi
 
 rm -rf "$td"
 rm -rf "$td_nightly"
-rm -rf "$td_latest"

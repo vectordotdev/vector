@@ -37,9 +37,9 @@ else
   TARGET_DIR="target"
 fi
 
-ARCHIVE_DIR_NAME="vector-$TARGET"
+ARCHIVE_DIR_NAME="collector-$TARGET"
 ARCHIVE_DIR="$TARGET_DIR/$ARCHIVE_DIR_NAME"
-ARCHIVE_NAME="vector-$ARCHIVE_VERSION-$TARGET.$ARCHIVE_TYPE"
+ARCHIVE_NAME="collector-$ARCHIVE_VERSION-$TARGET.$ARCHIVE_TYPE"
 ARTIFACTS_DIR="target/artifacts"
 
 #
@@ -60,7 +60,7 @@ fi
 # Header
 #
 
-echo "Packaging the Vector archive"
+echo "Packaging the Collector archive"
 echo "OVERWRITE: $OVERWRITE"
 echo "ARCHIVE_TYPE: $ARCHIVE_TYPE"
 echo "NATIVE_BUILD: $NATIVE_BUILD"
@@ -85,13 +85,17 @@ else
   SUFFIX=""
 fi
 cp -av README.md "$ARCHIVE_DIR/README.md$SUFFIX"
+cp -av MOOGSOFT_README.txt "$ARCHIVE_DIR/MOOGSOFT_README.txt$SUFFIX"
+cp -av MOOGSOFT_NOTICE "$ARCHIVE_DIR/MOOGSOFT_NOTICE$SUFFIX"
+cp -av MOOGSOFT_LICENSE "$ARCHIVE_DIR/MOOGSOFT_LICENSE$SUFFIX"
 # Create the license file for binary distributions (LICENSE + NOTICE)
 cat LICENSE NOTICE > "$ARCHIVE_DIR/LICENSE$SUFFIX"
+cp -rv licenses "$ARCHIVE_DIR/licenses"
 
 # Copy the vector binary to /bin
 
 mkdir -p "$ARCHIVE_DIR/bin"
-cp -av "$TARGET_DIR/release/vector" "$ARCHIVE_DIR/bin"
+cp -av "$TARGET_DIR/release/collector" "$ARCHIVE_DIR/bin"
 
 # Copy the entire config dir to /config
 
@@ -116,7 +120,7 @@ fi
     tar cvf - "./$ARCHIVE_DIR_NAME" | gzip -9 > "$ARCHIVE_NAME"
   elif [ "$ARCHIVE_TYPE" == "zip" ] && [[ $TARGET == *windows* ]]; then
     # shellcheck disable=SC2016
-    powershell '$progressPreference = "silentlyContinue"; Compress-Archive -DestinationPath vector-'"$ARCHIVE_VERSION"'-'"$TARGET"'.'"$ARCHIVE_TYPE"' -Path "./'"$ARCHIVE_DIR_NAME"'/*"'
+    powershell '$progressPreference = "silentlyContinue"; Compress-Archive -DestinationPath collector-'"$ARCHIVE_VERSION"'-'"$TARGET"'.'"$ARCHIVE_TYPE"' -Path "./'"$ARCHIVE_DIR_NAME"'/*"'
   else
     echo "Unsupported combination of ARCHIVE_TYPE and TARGET"
     exit 1

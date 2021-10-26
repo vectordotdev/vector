@@ -20,7 +20,7 @@ TARGET="${TARGET:?"You must specify a target triple, ex: x86_64-apple-darwin"}"
 
 PROJECT_ROOT="$(pwd)"
 PACKAGE_VERSION="${VECTOR_VERSION:-"$("$PROJECT_ROOT"/scripts/version.sh)"}"
-ARCHIVE_NAME="vector-$PACKAGE_VERSION-$TARGET.tar.gz"
+ARCHIVE_NAME="collector-$PACKAGE_VERSION-$TARGET.tar.gz"
 ARCHIVE_PATH="target/artifacts/$ARCHIVE_NAME"
 ABSOLUTE_ARCHIVE_PATH="$PROJECT_ROOT/$ARCHIVE_PATH"
 
@@ -40,7 +40,7 @@ td="$(mktemp -d)"
 pushd "$td"
 tar -xvf "$ABSOLUTE_ARCHIVE_PATH"
 mkdir -p "$PROJECT_ROOT/target/$TARGET/release"
-mv "vector-$TARGET/bin/vector" "$PROJECT_ROOT/target/$TARGET/release"
+mv "collector-$TARGET/bin/collector" "$PROJECT_ROOT/target/$TARGET/release"
 popd
 rm -rf "$td"
 
@@ -71,12 +71,12 @@ cat LICENSE NOTICE > "$PROJECT_ROOT/target/debian-license.txt"
 #   --no-build
 #     because this stop should follow a build
 
-cargo deb --target "$TARGET" --deb-version "$PACKAGE_VERSION" --variant "$TARGET" --no-build --no-strip
+cargo deb --target "$TARGET" --deb-version "$PACKAGE_VERSION" --variant "$TARGET" --no-build --no-strip -- --bin collector
 
 # Rename the resulting .deb file to remove TARGET from name and use - instead of
 # _ since this is consistent with our package naming scheme.
 for file in target/"${TARGET}"/debian/*.deb; do
-  base=$(basename "${file}")
+  base=$(basename "${file}" | sed 's/vector/collector/')
   nbase=${base//-${TARGET}/}
   nbase=${nbase//_/-}
   mv "${file}" target/"${TARGET}"/debian/"${nbase}";
