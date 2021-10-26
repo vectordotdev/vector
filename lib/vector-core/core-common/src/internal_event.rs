@@ -35,14 +35,12 @@ where
 pub fn emit(event: &impl InternalEvent) {
     event.emit_logs();
     event.emit_metrics();
-    println!("emitting: {:?}", event.name());
     if let Some(name) = event.name() {
         super::event_test_util::record_internal_event(name);
     }
 }
 #[cfg(not(any(test, feature = "test")))]
 pub fn emit(event: &impl InternalEvent) {
-    println!("emitting event during non-test");
     event.emit_logs();
     event.emit_metrics();
 }
