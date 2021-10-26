@@ -8,7 +8,6 @@ use shared::btreemap;
 
 use crate::{grok_filter::apply_filter, parse_grok_rules::GrokRule};
 use std::collections::BTreeMap;
-use tracing::warn;
 use vrl_compiler::{Target, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
@@ -19,6 +18,7 @@ pub enum Error {
     NoMatch,
 }
 
+/// Parses a given source field value by applying the list of grok rules until the first match found.
 pub fn parse_grok(source_field: &str, grok_rules: &[GrokRule]) -> Result<Value, Error> {
     grok_rules
         .iter()
@@ -33,6 +33,11 @@ pub fn parse_grok(source_field: &str, grok_rules: &[GrokRule]) -> Result<Value, 
         .into_inner()
 }
 
+/// Tries to parse a given string with a given grok rule.
+/// Returns a result value or an error otherwise.
+/// Possible errors:
+/// - FailedToApplyFilter - matches the rule, but there was a runtime error while applying on of the filters
+/// - NoMatch - this rule does not match a given string
 fn apply_grok_rule(source: &str, grok_rule: &GrokRule) -> Result<Value, Error> {
     let mut parsed = Value::from(btreemap! {});
 
@@ -90,11 +95,11 @@ mod tests {
     #[test]
     fn parses_simple_grok() {
         let rules = parse_grok_rules(
-            &[],
             &[
                 "simple %{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
                     .to_string(),
             ],
+            &[],
         )
         .expect("couldn't parse rules");
         let parsed = parse_grok("2020-10-02T23:22:12.223222Z info Hello world", &rules).unwrap();
@@ -112,6 +117,11 @@ mod tests {
     #[test]
     fn parses_complex_grok() {
         let rules = parse_grok_rules(
+            // parsing rules
+            &[
+                r#"access.common %{_client_ip} %{_ident} %{_auth} \[%{_date_access}\] "(?>%{_method} |)%{_url}(?> %{_version}|)" %{_status_code} (?>%{_bytes_written}|-)"#.to_string(),
+                r#"access.combined %{access.common} (%{number:duration:scale(1000000000)} )?"%{_referer}" "%{_user_agent}"( "%{_x_forwarded_for}")?.*"#.to_string()
+            ],
             // helper rules
             &[
                 r#"_auth %{notSpace:http.auth:nullIf("-")}"#.to_string(),
@@ -125,12 +135,7 @@ mod tests {
                 r#"_status_code %{integer:http.status_code}"#.to_string(),
                 r#"_method %{word:http.method}"#.to_string(),
                 r#"_date_access %{notSpace:date_access}"#.to_string(),
-                r#"_x_forwarded_for %{regex("[^\\\"]*"):http._x_forwarded_for:nullIf("-")}"#.to_string()],
-            // parsing rules
-            &[
-                r#"access.common %{_client_ip} %{_ident} %{_auth} \[%{_date_access}\] "(?>%{_method} |)%{_url}(?> %{_version}|)" %{_status_code} (?>%{_bytes_written}|-)"#.to_string(),
-                r#"access.combined %{access.common} (%{number:duration:scale(1000000000)} )?"%{_referer}" "%{_user_agent}"( "%{_x_forwarded_for}")?.*"#.to_string()
-            ]).expect("couldn't parse rules");
+                r#"_x_forwarded_for %{regex("[^\\\"]*"):http._x_forwarded_for:nullIf("-")}"#.to_string()]).expect("couldn't parse rules");
         let parsed = parse_grok(r##"127.0.0.1 - frank [13/Jul/2016:10:55:36] "GET /apache_pb.gif HTTP/1.0" 200 2326 0.202 "http://www.perdu.com/" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36" "-""##, &rules).unwrap();
 
         assert_eq!(
@@ -200,7 +205,7 @@ mod tests {
 
     fn test_grok_pattern_without_field(tests: Vec<(&str, &str, Result<Value, Error>)>) {
         for (filter, k, v) in tests {
-            let rules = parse_grok_rules(&[], &[format!(r#"test {}"#, filter)])
+            let rules = parse_grok_rules(&[format!(r#"test {}"#, filter)], &[])
                 .expect("should parse rules");
             let parsed = parse_grok(k, &rules);
 
@@ -214,7 +219,7 @@ mod tests {
 
     fn test_grok_pattern(tests: Vec<(&str, &str, Result<Value, Error>)>) {
         for (filter, k, v) in tests {
-            let rules = parse_grok_rules(&[], &[format!(r#"test {}"#, filter)])
+            let rules = parse_grok_rules(&[format!(r#"test {}"#, filter)], &[])
                 .expect("couldn't parse rules");
             let parsed = parse_grok(k, &rules);
 
@@ -234,7 +239,7 @@ mod tests {
     #[test]
     fn fails_on_invalid_grok_format() {
         assert_eq!(
-            parse_grok_rules(&[], &["%{data}".to_string()])
+            parse_grok_rules(&["%{data}".to_string()], &[])
                 .unwrap_err()
                 .to_string(),
             "failed to parse grok expression '%{data}': format must be: 'ruleName definition'"
@@ -244,7 +249,7 @@ mod tests {
     #[test]
     fn fails_on_unknown_pattern_definition() {
         assert_eq!(
-            parse_grok_rules(&[], &["test %{unknown}".to_string()])
+            parse_grok_rules(&["test %{unknown}".to_string()], &[])
                 .unwrap_err()
                 .to_string(),
             r#"failed to parse grok expression '^%{unknown}$': The given pattern definition name "unknown" could not be found in the definition map"#
@@ -254,7 +259,7 @@ mod tests {
     #[test]
     fn fails_on_unknown_filter() {
         assert_eq!(
-            parse_grok_rules(&[], &["test %{data:field:unknownFilter}".to_string()])
+            parse_grok_rules(&["test %{data:field:unknownFilter}".to_string()], &[])
                 .unwrap_err()
                 .to_string(),
             r#"unknown filter 'unknownFilter'"#
@@ -264,7 +269,7 @@ mod tests {
     #[test]
     fn fails_on_invalid_matcher_parameter() {
         assert_eq!(
-            parse_grok_rules(&[], &["test_rule %{regex(1):field}".to_string()])
+            parse_grok_rules(&["test_rule %{regex(1):field}".to_string()], &[])
                 .unwrap_err()
                 .to_string(),
             r#"invalid arguments for the function 'regex'"#
@@ -274,7 +279,7 @@ mod tests {
     #[test]
     fn fails_on_invalid_filter_parameter() {
         assert_eq!(
-            parse_grok_rules(&[], &["test_rule %{data:field:scale()}".to_string()])
+            parse_grok_rules(&["test_rule %{data:field:scale()}".to_string()], &[])
                 .unwrap_err()
                 .to_string(),
             r#"invalid arguments for the function 'scale'"#
@@ -347,11 +352,11 @@ mod tests {
     #[test]
     fn fails_on_no_match() {
         let rules = parse_grok_rules(
-            &[],
             &[
                 "test_rule %{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
                     .to_string(),
             ],
+            &[],
         )
         .expect("couldn't parse rules");
         let error = parse_grok("an ungrokkable message", &rules).unwrap_err();
@@ -362,11 +367,11 @@ mod tests {
     #[test]
     fn appends_to_the_same_field() {
         let rules = parse_grok_rules(
-            &[],
             &[
                 r#"simple %{integer:nested.field} %{notSpace:nested.field:uppercase} %{notSpace:nested.field:nullIf("-")}"#
                     .to_string(),
             ],
+            &[],
         )
             .expect("couldn't parse rules");
         let parsed = parse_grok("1 info -", &rules).unwrap();

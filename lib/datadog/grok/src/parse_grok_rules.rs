@@ -33,8 +33,11 @@ pub enum Error {
 Parses DD grok rules.
 
 Here is an example:
-access.common %{_client_ip} %{_ident} %{_auth} \[%{_date_access}\] "(?>%{_method} |)%{_url}(?> %{_version}|)" %{_status_code} (?>%{_bytes_written}|-)
-access.combined %{access.common} (%{number:duration:scale(1000000000)} )?"%{_referer}" "%{_user_agent}"( "%{_x_forwarded_for}")?.*"#
+patterns:
+%{access.common} \[%{_date_access}\] "(?>%{_method} |)%{_url}(?> %{_version}|)" %{_status_code} (?>%{_bytes_written}|-)
+%{access.common} (%{number:duration:scale(1000000000)} )?"%{_referer}" "%{_user_agent}"( "%{_x_forwarded_for}")?.*"#
+aliases:
+"access.common" : %{_client_ip} %{_ident} %{_auth}
 
 You can write parsing rules with the %{MATCHER:EXTRACT:FILTER} syntax:
 - Matcher: A rule (possibly a reference to another token rule) that describes what to expect (number, word, notSpace, etc.)
@@ -45,17 +48,14 @@ Each rule can reference parsing rules defined above itself in the list.
 Only one can match any given log. The first one that matches, from top to bottom, is the one that does the parsing.
 For further documentation and the full list of available matcher and filters check out https://docs.datadoghq.com/logs/processing/parsing
 */
-pub fn parse_grok_rules(
-    helper_rules: &[String],
-    parsing_rules: &[String],
-) -> Result<Vec<GrokRule>, Error> {
+pub fn parse_grok_rules(patterns: &[String], aliases: &[String]) -> Result<Vec<GrokRule>, Error> {
     let mut parsed_rules: HashMap<&str, ParsedGrokRule> = HashMap::new();
     let mut grok = initialize_grok();
 
     // parse helper rules to reference them later in the match rules
-    parse_rules(helper_rules, &mut parsed_rules, &mut grok)?;
+    parse_rules(aliases, &mut parsed_rules, &mut grok)?;
     // parse match rules and return them
-    parse_rules(parsing_rules, &mut parsed_rules, &mut grok)
+    parse_rules(patterns, &mut parsed_rules, &mut grok)
 }
 
 /// The result of parsing grok rules - pure grok definitions, which can be feed directly to the grok,
@@ -79,9 +79,10 @@ fn parse_rules<'a>(
         .collect::<Result<Vec<GrokRule>, Error>>()
 }
 
+/// Parses a given rule to a pure grok pattern with a set of post-processing filters.
 fn parse_grok_rule<'a>(
     rule: &'a str,
-    mut parsed_rules: &mut HashMap<&'a str, ParsedGrokRule>,
+    mut aliases: &mut HashMap<&'a str, ParsedGrokRule>,
     grok: &mut Grok,
 ) -> Result<GrokRule, Error> {
     let mut split_whitespace = rule.splitn(2, ' ');
@@ -126,7 +127,7 @@ fn parse_grok_rule<'a>(
     let mut filters: HashMap<LookupBuf, Vec<GrokFilter>> = HashMap::new();
     let pure_grok_patterns: Vec<String> = grok_patterns
         .iter()
-        .map(|pattern| purify_grok_pattern(&pattern, &mut filters, &mut parsed_rules))
+        .map(|pattern| purify_grok_pattern(&pattern, &mut filters, &mut aliases))
         .collect::<Result<Vec<String>, Error>>()?;
 
     // replace grok patterns with "purified" ones
@@ -160,7 +161,7 @@ fn parse_grok_rule<'a>(
     pattern.push('$');
 
     // store rule definitions and filters in case this rule is referenced in the next rules
-    parsed_rules.insert(
+    aliases.insert(
         rule_name,
         ParsedGrokRule {
             definition: rule_def,
