@@ -102,7 +102,7 @@ mod tests {
     };
 
     use crate::sinks::{
-        splunk_hec::common::{build_healthcheck, build_request},
+        splunk_hec::util::{build_healthcheck, build_request},
         util::Compression,
     };
 
@@ -267,7 +267,7 @@ mod tests {
 #[cfg(all(test, feature = "splunk-integration-tests"))]
 mod integration_tests {
     use super::{build_healthcheck, create_client, integration_test_helpers::get_token};
-    use crate::{assert_downcast_matches, sinks::splunk_hec::common::HealthcheckError};
+    use crate::{assert_downcast_matches, sinks::splunk_hec::util::HealthcheckError};
     use http::StatusCode;
     use std::net::SocketAddr;
     use vector_core::config::proxy::ProxyConfig;
