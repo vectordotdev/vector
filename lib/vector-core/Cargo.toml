@@ -2,11 +2,11 @@
 name = "vector_core"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@timber.io>"]
-edition = "2018"
+edition = "2021"
 publish = false
 
 [dependencies]
-async-graphql = { version = "2.10.0", default-features = false, optional = true }
+async-graphql = { version = "2.10.4", default-features = false, optional = true }
 async-trait = { version = "0.1", default-features = false }
 atomig = { version = "0.3.2", features = ["derive", "serde"] }
 buffers = { path = "buffers", default-features = false }
@@ -79,6 +79,7 @@ harness = false
 
 [[bench]]
 name = "event"
+path = "benches/event/main.rs"
 harness = false
 
 [[bench]]

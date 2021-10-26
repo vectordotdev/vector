@@ -1,0 +1,1 @@
+FEATURES="sources-internal_metrics,sinks-prometheus,sources-syslog,sinks-humio"
