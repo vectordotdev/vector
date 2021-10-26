@@ -67,6 +67,7 @@ impl Service<KafkaRequest> for KafkaService {
         let kafka_producer = self.kafka_producer.clone();
 
         Box::pin(async move {
+            let _ = &request;
             let mut record = FutureRecord::to(&request.metadata.topic).payload(&request.body);
             if let Some(key) = &request.metadata.key {
                 record = record.key(&key[..]);

@@ -122,7 +122,6 @@ scopes:
   - datadog_agent source # Anything `datadog_agent` source related
   - dnstap source # Anything `dnstap` source related
   - docker_logs source # Anything `docker_logs` source related
-  - exec source # Anything `exec` source related
   - file source # Anything `file` source related
   - fluent source # Anything `fluent` source related
   - generator source # Anything `generator` source related
@@ -190,6 +189,8 @@ scopes:
   - blackhole sink # Anything `blackhole` sink related
   - clickhouse sink # Anything `clickhouse` sink related
   - console sink # Anything `console` sink related
+  - datadog_archives sink # Anything `datadog_archives` sink related
+  - datadog_events sink # Anything `datadog_events` sink related
   - datadog_logs sink # Anything `datadog_logs` sink related
   - datadog_metrics sink # Anything `datadog_metrics` sink related
   - elasticsearch sink # Anything `elasticsearch` sink related

@@ -68,7 +68,7 @@ table = "vector-log-data"
 #### Levels
 
 Vector logs at the `info` level by default. You can set a different level when [starting] up your instance using either
-command-line flags or the `LOG` environment variable. The table below details these options:
+command-line flags or the `VECTOR_LOG` environment variable. The table below details these options:
 
 Method | Description
 :------|:-----------
@@ -77,7 +77,7 @@ Method | Description
 `-q` flag | Raises the log level to `warn`
 `-qq` flag | Raises the log level to `error`
 `-qqq` flag | Disables logging
-`LOG=<level>` environment variable | Set the log level. Must be one of `trace`, `debug`, `info`, `warn`, `error`, `off`.
+`VECTOR_LOG=<level>` environment variable | Set the log level. Must be one of `trace`, `debug`, `info`, `warn`, `error`, `off`.
 
 #### Stack traces
 
