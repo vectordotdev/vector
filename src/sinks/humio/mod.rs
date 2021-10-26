@@ -11,11 +11,11 @@ pub enum Encoding {
     Text,
 }
 
-impl From<Encoding> for splunk_hec::logs::Encoding {
+impl From<Encoding> for splunk_hec::logs::encoder::HecLogsEncoder {
     fn from(v: Encoding) -> Self {
         match v {
-            Encoding::Json => splunk_hec::logs::Encoding::Json,
-            Encoding::Text => splunk_hec::logs::Encoding::Text,
+            Encoding::Json => splunk_hec::logs::encoder::HecLogsEncoder::Json,
+            Encoding::Text => splunk_hec::logs::encoder::HecLogsEncoder::Text,
         }
     }
 }
