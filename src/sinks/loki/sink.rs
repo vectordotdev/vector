@@ -1,5 +1,5 @@
 use super::config::{Encoding, LokiConfig, OutOfOrderAction};
-use super::event::{GlobalTimestamps, LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey};
+use super::event::{LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey};
 use super::service::{LokiRequest, LokiService};
 use crate::config::log_schema;
 use crate::config::SinkContext;
@@ -231,44 +231,40 @@ impl EventEncoder {
 }
 
 struct RecordFilter {
-    global_timestamps: GlobalTimestamps,
+    timestamps: HashMap<PartitionKey, i64>,
     out_of_order_action: OutOfOrderAction,
 }
 
 impl RecordFilter {
-    const fn new(
-        global_timestamps: GlobalTimestamps,
-        out_of_order_action: OutOfOrderAction,
-    ) -> Self {
+    fn new(out_of_order_action: OutOfOrderAction) -> Self {
         Self {
-            global_timestamps,
+            timestamps: HashMap::new(),
             out_of_order_action,
         }
     }
 }
 
 impl RecordFilter {
-    pub fn filter_record(&self, mut record: LokiRecord) -> Option<LokiRecord> {
-        let partition = &record.partition;
-        let latest_timestamp = self.global_timestamps.take(partition);
-
-        let latest_timestamp = latest_timestamp.unwrap_or(record.event.timestamp);
-
-        if record.event.timestamp < latest_timestamp {
-            match self.out_of_order_action {
-                OutOfOrderAction::Drop => {
-                    emit!(&LokiOutOfOrderEventDropped);
-                    None
+    pub fn filter_record(&mut self, mut record: LokiRecord) -> Option<LokiRecord> {
+        if let Some(latest) = self.timestamps.get(&record.partition) {
+            if record.event.timestamp < *latest {
+                match self.out_of_order_action {
+                    OutOfOrderAction::Drop => {
+                        emit!(&LokiOutOfOrderEventDropped);
+                        None
+                    }
+                    OutOfOrderAction::RewriteTimestamp => {
+                        emit!(&LokiOutOfOrderEventRewritten);
+                        record.event.timestamp = *latest;
+                        Some(record)
+                    }
                 }
-                OutOfOrderAction::RewriteTimestamp => {
-                    emit!(&LokiOutOfOrderEventRewritten);
-                    record.event.timestamp = latest_timestamp;
-                    Some(record)
-                }
+            } else {
+                Some(record)
             }
         } else {
-            self.global_timestamps
-                .insert(partition.clone(), record.event.timestamp);
+            self.timestamps
+                .insert(record.partition.clone(), record.event.timestamp);
             Some(record)
         }
     }
@@ -309,10 +305,7 @@ impl LokiSink {
         let service = tower::ServiceBuilder::new().service(self.service);
 
         let encoder = self.encoder.clone();
-        let filter = RecordFilter::new(
-            GlobalTimestamps::default(),
-            self.out_of_order_action.clone(),
-        );
+        let mut filter = RecordFilter::new(self.out_of_order_action);
 
         let sink = input
             .map(|event| encoder.encode_event(event))
@@ -349,7 +342,6 @@ mod tests {
     use super::{EventEncoder, KeyPartitioner, RecordFilter};
     use crate::config::log_schema;
     use crate::sinks::loki::config::{Encoding, OutOfOrderAction};
-    use crate::sinks::loki::event::GlobalTimestamps;
     use crate::sinks::util::encoding::EncodingConfig;
     use crate::template::Template;
     use crate::test_util::random_lines;
@@ -478,7 +470,7 @@ mod tests {
                 event
             })
             .collect::<Vec<_>>();
-        let filter = RecordFilter::new(GlobalTimestamps::default(), OutOfOrderAction::Drop);
+        let mut filter = RecordFilter::new(OutOfOrderAction::Drop);
         let stream = futures::stream::iter(events)
             .map(|event| encoder.encode_event(event))
             .filter_map(|event| {

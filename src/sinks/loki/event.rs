@@ -1,9 +1,7 @@
 use crate::sinks::util::encoding::Encoder;
-use dashmap::DashMap;
 use serde::{ser::SerializeSeq, Serialize};
 use std::collections::HashMap;
 use std::io;
-use std::sync::Arc;
 use vector_core::event::{EventFinalizers, Finalizable};
 use vector_core::ByteSizeOf;
 
@@ -124,20 +122,5 @@ impl PartitionKey {
             tenant_id,
             labels: labels.iter().flat_map(|(a, b)| [a, "→", b, "∇"]).collect(),
         }
-    }
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct GlobalTimestamps {
-    map: Arc<DashMap<PartitionKey, i64>>,
-}
-
-impl GlobalTimestamps {
-    pub fn take(&self, partition: &PartitionKey) -> Option<i64> {
-        self.map.remove(partition).map(|(_k, v)| v)
-    }
-
-    pub fn insert(&self, partition: PartitionKey, timestamp: i64) {
-        self.map.insert(partition, timestamp);
     }
 }
