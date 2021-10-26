@@ -4,9 +4,9 @@ use vector_core::transform::DataType;
 
 use crate::config::{GenerateConfig, SinkConfig, SinkContext};
 use crate::http::HttpClient;
-use crate::sinks::Healthcheck;
 use crate::sinks::splunk_hec::common::{build_healthcheck, create_client, host_key};
 use crate::sinks::util::{BatchConfig, Compression, TowerRequestConfig};
+use crate::sinks::Healthcheck;
 use crate::template::Template;
 use crate::tls::TlsOptions;
 use vector_core::sink::VectorSink;
