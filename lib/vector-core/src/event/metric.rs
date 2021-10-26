@@ -1,4 +1,5 @@
 use super::{BatchNotifier, EventFinalizer, EventMetadata};
+use crate::event::{EventFinalizers, Finalizable};
 use crate::metrics::Handle;
 use crate::ByteSizeOf;
 use chrono::{DateTime, Utc};
@@ -46,6 +47,12 @@ impl AsRef<MetricData> for Metric {
 impl AsRef<MetricValue> for Metric {
     fn as_ref(&self) -> &MetricValue {
         &self.data.value
+    }
+}
+
+impl Finalizable for Metric {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.metadata_mut().take_finalizers()
     }
 }
 

@@ -66,18 +66,6 @@ impl Finalizable for Event {
     }
 }
 
-impl Finalizable for LogEvent {
-    fn take_finalizers(&mut self) -> EventFinalizers {
-        self.metadata_mut().take_finalizers()
-    }
-}
-
-impl Finalizable for Metric {
-    fn take_finalizers(&mut self) -> EventFinalizers {
-        self.metadata_mut().take_finalizers()
-    }
-}
-
 impl<T: Finalizable> Finalizable for Vec<T> {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.iter_mut()
