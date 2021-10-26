@@ -1,6 +1,5 @@
-{{ $algoliaTheme := site.Params.search.algolia_autocomplete_theme }}
-{{ $algoliaThemeCssUrl := printf "https://cdn.jsdelivr.net/npm/@algolia/autocomplete-theme-%s" $algoliaTheme }}
-@import url($algoliaThemeCssUrl)
+{{ $algoliaThemeCssUrl := printf "https://cdn.jsdelivr.net/npm/@algolia/autocomplete-theme-%s" site.Params.search.algolia_autocomplete_theme }}
+@import url({{ $algoliaThemeCssUrl }})
 @import toc
 @import syntax
 
