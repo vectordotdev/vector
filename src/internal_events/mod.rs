@@ -305,7 +305,7 @@ pub use mongodb_metrics::*;
 #[macro_export]
 macro_rules! emit {
     ($event:expr) => {
-        vector_core::internal_event::emit(&vector_core::internal_event::DefaultNameInternalEvent {
+        vector_core::internal_event::emit(&vector_core::internal_event::DefaultName {
             event: $event,
             name: stringify!($event),
         })

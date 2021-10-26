@@ -11,23 +11,23 @@ pub trait InternalEvent {
 }
 
 // Sets the name of an event if it doesn't have one
-pub struct DefaultNameInternalEvent<'a, 'b, E> {
+pub struct DefaultName<'a, 'b, E> {
     pub name: &'a str,
     pub event: &'b E,
 }
 
-impl<'a, 'b, E> InternalEvent for DefaultNameInternalEvent<'a, 'b, E>
+impl<'a, 'b, E> InternalEvent for DefaultName<'a, 'b, E>
 where
     E: InternalEvent,
 {
     fn emit_logs(&self) {
-        self.event.emit_logs()
+        self.event.emit_logs();
     }
     fn emit_metrics(&self) {
-        self.event.emit_metrics()
+        self.event.emit_metrics();
     }
     fn name(&self) -> Option<&str> {
-        Some(self.event.name().unwrap_or(&self.name))
+        Some(self.event.name().unwrap_or(self.name))
     }
 }
 
