@@ -8,11 +8,11 @@ use futures::stream::BoxStream;
 use futures_util::StreamExt;
 use std::{fmt, num::NonZeroUsize};
 use tower::Service;
+use vector_core::buffers::Acker;
+use vector_core::stream::DriverResponse;
 use vector_core::{
     buffers::Ackable, event::Finalizable, sink::StreamSink, stream::BatcherSettings,
 };
-use vector_core::{buffers::Acker};
-use vector_core::stream::DriverResponse;
 
 use crate::sinks::s3_common::partitioner::KeyPartitioner;
 

@@ -141,9 +141,9 @@ mod unix;
 mod vector;
 
 #[cfg(any(
-feature = "sources-file",
-feature = "sources-kubernetes_logs",
-feature = "sinks-file",
+    feature = "sources-file",
+    feature = "sources-kubernetes_logs",
+    feature = "sinks-file",
 ))]
 mod file;
 mod windows;
@@ -306,7 +306,7 @@ macro_rules! emit {
     ($event:expr) => {
         vector_core::internal_event::emit(&vector_core::internal_event::NamedInternalEvent {
             event: $event,
-            name: stringify!($event)
+            name: stringify!($event),
         })
     };
 }

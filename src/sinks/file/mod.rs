@@ -20,8 +20,8 @@ use futures::{
 };
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
-use vector_core::ByteSizeOf;
 use vector_core::internal_event::EventsSent;
+use vector_core::ByteSizeOf;
 
 use tokio::{
     fs::{self, File},

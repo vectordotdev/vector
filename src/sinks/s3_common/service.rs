@@ -1,5 +1,5 @@
 use super::config::S3Options;
-use crate::internal_events::{AwsBytesSent};
+use crate::internal_events::AwsBytesSent;
 use crate::serde::to_string;
 use bytes::Bytes;
 use futures::{future::BoxFuture, stream};
@@ -9,12 +9,12 @@ use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3}
 use std::task::{Context, Poll};
 use tower::Service;
 use tracing_futures::Instrument;
+use vector_core::internal_event::EventsSent;
+use vector_core::stream::DriverResponse;
 use vector_core::{
     buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
 };
-use vector_core::internal_event::EventsSent;
-use vector_core::stream::DriverResponse;
 
 #[derive(Debug, Clone)]
 pub struct S3Request {
@@ -49,7 +49,7 @@ pub struct S3Metadata {
 pub struct S3Response {
     inner: PutObjectOutput,
     count: usize,
-    events_byte_size: usize
+    events_byte_size: usize,
 }
 
 impl DriverResponse for S3Response {
@@ -60,7 +60,7 @@ impl DriverResponse for S3Response {
     fn events_sent(&self) -> EventsSent {
         EventsSent {
             count: self.count,
-            byte_size: self.events_byte_size
+            byte_size: self.events_byte_size,
         }
     }
 }
@@ -151,7 +151,11 @@ impl Service<S3Request> for S3Service {
                         byte_size: request_size,
                         region,
                     });
-                    S3Response { inner, count, events_byte_size }
+                    S3Response {
+                        inner,
+                        count,
+                        events_byte_size,
+                    }
                 })
         })
     }

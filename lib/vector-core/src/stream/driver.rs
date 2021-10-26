@@ -1,4 +1,6 @@
 use crate::event::{EventStatus, Finalizable};
+use crate::internal_event::emit;
+use crate::internal_event::EventsSent;
 use buffers::{Ackable, Acker};
 use futures::{poll, stream::FuturesUnordered, FutureExt, Stream, StreamExt, TryFutureExt};
 use std::{
@@ -9,8 +11,6 @@ use std::{
 use tokio::{pin, select};
 use tower::{Service, ServiceExt};
 use tracing::Instrument;
-use crate::internal_event::EventsSent;
-use crate::internal_event::emit;
 
 #[derive(Eq)]
 struct PendingAcknowledgement {

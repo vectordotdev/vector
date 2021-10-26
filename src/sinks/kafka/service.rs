@@ -30,7 +30,6 @@ pub struct KafkaResponse {
     event_byte_size: usize,
 }
 
-
 impl DriverResponse for KafkaResponse {
     fn event_status(&self) -> EventStatus {
         EventStatus::Delivered
@@ -39,7 +38,7 @@ impl DriverResponse for KafkaResponse {
     fn events_sent(&self) -> EventsSent {
         EventsSent {
             count: 1,
-            byte_size: self.event_byte_size
+            byte_size: self.event_byte_size,
         }
     }
 }
@@ -94,7 +93,9 @@ impl Service<KafkaRequest> for KafkaService {
 
             //rdkafka will internally retry forever if the queue is full
             let result = match kafka_producer.send(record, Timeout::Never).await {
-                Ok((_partition, _offset)) => Ok(KafkaResponse {event_byte_size: request.event_byte_size}),
+                Ok((_partition, _offset)) => Ok(KafkaResponse {
+                    event_byte_size: request.event_byte_size,
+                }),
                 Err((kafka_err, _original_record)) => Err(kafka_err),
             };
             result

@@ -2,14 +2,14 @@ use std::{fmt, future::Future, hash::Hash, num::NonZeroUsize, pin::Pin, sync::Ar
 
 use futures_util::Stream;
 use tower::Service;
+use vector_core::stream::DriverResponse;
 use vector_core::{
     buffers::{Ackable, Acker},
-    event::{Finalizable},
+    event::Finalizable,
     partition::Partitioner,
     stream::{Batcher, BatcherSettings, ConcurrentMap, Driver, ExpirationQueue},
     ByteSizeOf,
 };
-use vector_core::stream::DriverResponse;
 
 use super::RequestBuilder;
 

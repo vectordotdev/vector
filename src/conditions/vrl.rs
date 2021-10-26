@@ -1,3 +1,4 @@
+use crate::emit;
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
     event::{Event, VrlTarget},
@@ -7,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Value};
-use crate::emit;
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
 pub struct VrlConfig {

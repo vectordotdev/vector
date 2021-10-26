@@ -11,7 +11,6 @@ use hyper::{Body, Request};
 use std::task::{Context, Poll};
 use tower::ServiceExt;
 
-use vector_core::internal_event::EventsSent;
 use crate::rusoto::AwsCredentialsProvider;
 use crate::sinks::util::{Compression, ElementCount};
 use http::header::HeaderName;
@@ -21,8 +20,9 @@ use rusoto_core::signature::{SignedRequest, SignedRequestPayload};
 use rusoto_core::Region;
 use std::collections::HashMap;
 use std::sync::Arc;
-use vector_core::ByteSizeOf;
+use vector_core::internal_event::EventsSent;
 use vector_core::stream::DriverResponse;
+use vector_core::ByteSizeOf;
 
 #[derive(Clone)]
 pub struct ElasticSearchRequest {
@@ -192,7 +192,7 @@ impl DriverResponse for ElasticSearchResponse {
     fn events_sent(&self) -> EventsSent {
         EventsSent {
             count: self.batch_size,
-            byte_size: self.events_byte_size
+            byte_size: self.events_byte_size,
         }
     }
 }
@@ -219,7 +219,7 @@ impl Service<ElasticSearchRequest> for ElasticSearchService {
                 event_status,
                 http_response,
                 batch_size,
-                events_byte_size
+                events_byte_size,
             })
         })
     }

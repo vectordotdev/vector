@@ -142,8 +142,7 @@ impl ComponentTester {
 
     fn emitted_all_events(&mut self, names: &[&str]) {
         for name in names {
-            if !event_test_util::contains_name(name)
-            {
+            if !event_test_util::contains_name(name) {
                 self.errors.push(format!("Missing emitted event {}", name));
             }
         }

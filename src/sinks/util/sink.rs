@@ -38,7 +38,6 @@ use super::{
     EncodedEvent,
 };
 use crate::{buffers::Acker, event::EventStatus};
-use vector_core::internal_event::EventsSent;
 use futures::{
     future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream, TryFutureExt,
 };
@@ -57,6 +56,7 @@ use tokio::{
 };
 use tower::{Service, ServiceBuilder};
 use tracing_futures::Instrument;
+use vector_core::internal_event::EventsSent;
 
 // === StreamSink ===
 

@@ -13,12 +13,12 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 use tower::Service;
 use vector_core::buffers::Acker;
-use vector_core::ByteSizeOf;
 use vector_core::config::{log_schema, LogSchema};
 use vector_core::event::{Event, EventFinalizers, Finalizable, Value};
 use vector_core::partition::Partitioner;
 use vector_core::sink::StreamSink;
 use vector_core::stream::{BatcherSettings, DriverResponse};
+use vector_core::ByteSizeOf;
 #[derive(Default)]
 struct EventPartitioner;
 
@@ -204,7 +204,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
             compression: self.compression,
             body: payload,
             finalizers,
-            events_byte_size
+            events_byte_size,
         }
     }
 }

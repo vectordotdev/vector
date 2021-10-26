@@ -81,7 +81,7 @@ impl DriverResponse for LogApiResponse {
     fn events_sent(&self) -> EventsSent {
         EventsSent {
             count: self.count,
-            byte_size: self.events_byte_size
+            byte_size: self.events_byte_size,
         }
     }
 }
@@ -162,15 +162,15 @@ impl Service<LogApiRequest> for LogApiService {
                     //      time
                     match status {
                         StatusCode::BAD_REQUEST => Err(LogApiError::BadRequest),
-                        StatusCode::FORBIDDEN => Ok(LogApiResponse{
+                        StatusCode::FORBIDDEN => Ok(LogApiResponse {
                             event_status: EventStatus::Errored,
                             count,
-                            events_byte_size
+                            events_byte_size,
                         }),
-                        StatusCode::OK | StatusCode::ACCEPTED => Ok(LogApiResponse{
+                        StatusCode::OK | StatusCode::ACCEPTED => Ok(LogApiResponse {
                             event_status: EventStatus::Delivered,
                             count,
-                            events_byte_size
+                            events_byte_size,
                         }),
                         StatusCode::PAYLOAD_TOO_LARGE => Err(LogApiError::PayloadTooLarge),
                         _ => Err(LogApiError::ServerError),

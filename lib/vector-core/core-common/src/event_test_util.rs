@@ -7,8 +7,7 @@ thread_local!(
 );
 
 pub fn contains_name(name: &str) -> bool {
-    EVENTS_RECORDED
-        .with(|events| events.borrow().iter().any(|event| event.ends_with(name)))
+    EVENTS_RECORDED.with(|events| events.borrow().iter().any(|event| event.ends_with(name)))
 }
 
 pub fn clear_recorded_events() {

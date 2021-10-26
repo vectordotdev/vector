@@ -27,8 +27,8 @@ use tokio::{
     select,
     time::{timeout, Duration},
 };
-use vector_core::ByteSizeOf;
 use vector_core::internal_event::EventsSent;
+use vector_core::ByteSizeOf;
 
 lazy_static! {
     static ref ENRICHMENT_TABLES: enrichment::TableRegistry = enrichment::TableRegistry::default();
