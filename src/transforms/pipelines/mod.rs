@@ -182,17 +182,9 @@ mod tests {
     fn parsing() {
         let config = PipelinesConfig::from_toml(SAMPLE_CONFIG);
         assert_eq!(config.logs.pipelines.len(), 2);
-        let foo = config
-            .logs
-            .pipelines
-            .get("foo")
-            .unwrap();
+        let foo = config.logs.pipelines.get("foo").unwrap();
         assert_eq!(foo.transforms.len(), 2);
-        let bar = config
-            .logs
-            .pipelines
-            .get("bar")
-            .unwrap();
+        let bar = config.logs.pipelines.get("bar").unwrap();
         assert_eq!(bar.transforms.len(), 1);
     }
 }

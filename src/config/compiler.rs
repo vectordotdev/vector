@@ -130,7 +130,7 @@ pub(super) fn expand_macros(
             for (name, child) in expanded {
                 let full_name = ComponentKey::global(format!("{}.{}", k, name));
 
-                expanded_transforms.insert(
+                config.transforms.insert(
                     full_name.clone(),
                     TransformOuter {
                         inputs,
