@@ -79,7 +79,7 @@ async fn config(
         encoding: encoding.into(),
         compression: Compression::None,
         batch: BatchConfig {
-            max_events: Some(1),
+            max_events: Some(5),
             ..Default::default()
         },
         request: TowerRequestConfig::default(),
