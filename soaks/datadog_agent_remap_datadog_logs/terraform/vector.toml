@@ -1,8 +1,3 @@
-# Log aggregation config
-#
-# This configuration is meant to test vector in log aggregation mode, that is,
-# from datadog agent into vector and back out to datadog logs API.
-
 data_dir = "/var/lib/vector"
 
 ##

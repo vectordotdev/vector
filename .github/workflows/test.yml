@@ -65,6 +65,7 @@ jobs:
             deny:
               - 'deny.toml'
             dependencies:
+              - ".cargo/**"
               - 'Cargo.toml'
               - 'Cargo.lock'
               - 'rust-toolchain'

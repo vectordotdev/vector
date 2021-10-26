@@ -1,10 +1,16 @@
-p# Soak Tests
+# Soak Tests
 
 This directory contains vector's soak tests, the integrated variant of our
 benchmarks. The idea was first described in [RFC
 6531](../rfcs/2021-02-23-6531-performance-testing.md) and has been steadily
 improved as laid out in [Issue
 9515](https://github.com/vectordotdev/vector/issues/9515).
+
+## Index of Soaks
+
+* [Datadog Agent -> Remap -> Datadog Logs](./datadog_agent_remap_datadog_logs/README.md)
+* [Syslog -> Loki](./syslog_loki/README.md)
+* [Syslog -> Regex (VRL) -> Log2Metric ->  Datadog Metrics](./syslog_regex_logs2metric_ddmetrics/README.md)
 
 ## Requirements
 
@@ -43,8 +49,6 @@ in terraform, see [`soaks/datadog_agent_remap_datadog_logs/terraform`].
 After running this command you will, in about ten minutes depending on whether
 you need to build containers or not, see a summary:
 
-
-
 ```shell
 ...
 Apply complete! Resources: 16 added, 0 changed, 0 destroyed.
@@ -75,4 +79,99 @@ higher "tailedness". Improving this summary is a matter of importance.
 
 ## Defining Your Own Soak
 
-This is premature.
+Assuming you can follow the pattern of an existing soak test you _should_ be
+able to define a soak by copying the relevant soak into a new directory and
+updating the configuration that is present in that soak's terraform. Consider
+the "Datadog Agent -> Remap -> Datadog Logs" soak in
+[`datadog_agent_remap_datadog_logs/`](datadog_agent_remap_datadog_logs/). If you
+`tree` that directory you'll see:
+
+```shell
+> tree datadog_agent_remap_datadog_logs
+datadog_agent_remap_datadog_logs
+├── FEATURES
+├── README.md
+└── terraform
+    ├── http_blackhole.toml
+    ├── http_gen.toml
+    ├── main.tf
+    ├── prometheus.tf
+    ├── prometheus.yml
+    ├── variables.tf
+    └── vector.toml
+
+1 directory, 9 files
+```
+
+The `FEATURES` file defines which feature flags will be lit when vector is
+built. As of this writing that file contains:
+
+```shell
+FEATURES="sources-internal_metrics,sinks-prometheus,sources-datadog,sinks-datadog,transforms-remap"
+```
+
+This is a shell include file. You must set the features you need for vector to
+run for your test and the fewer flags you include the faster your build time
+will be. The `terraform/` sub-directory contains a small project
+definition. It's clear we can thin this out further -- the prometheus setup is
+common to all soaks -- but the primary things you need to concern yourself with are:
+
+* `main.tf`
+* `vector.toml`
+* `http_blackhole.toml`
+* `http_gen.toml`
+
+The `main.tf` contents are:
+
+```terraform
+terraform {
+  required_providers {
+    kubernetes = {
+      version = "~> 2.5.0"
+      source  = "hashicorp/kubernetes"
+    }
+  }
+}
+
+provider "kubernetes" {
+  config_path = "~/.kube/config"
+}
+
+
+resource "kubernetes_namespace" "soak" {
+  metadata {
+    name = "soak"
+  }
+}
+
+module "vector" {
+  source       = "../../common/terraform/modules/vector"
+  type         = var.type
+  vector_image = var.vector_image
+  sha          = var.sha
+  test_name    = "datadog_agent_remap_datadog_logs"
+  vector-toml  = file("${path.module}/vector.toml")
+  namespace    = kubernetes_namespace.soak.metadata[0].name
+  depends_on   = [module.http-blackhole]
+}
+module "http-blackhole" {
+  source              = "../../common/terraform/modules/lading_http_blackhole"
+  type                = var.type
+  http-blackhole-toml = file("${path.module}/http_blackhole.toml")
+  namespace           = kubernetes_namespace.soak.metadata[0].name
+}
+module "http-gen" {
+  source        = "../../common/terraform/modules/lading_http_gen"
+  type          = var.type
+  http-gen-toml = file("${path.module}/http_gen.toml")
+  namespace     = kubernetes_namespace.soak.metadata[0].name
+}
+```
+
+This sets up a kubernetes provider pegged to minikube, creates a namespace
+'soak' and installs three modules into that namespace: vector, http-blackhole
+and http-gen. The module definitions are in the `common/` directory but suffice
+to say they install vector and its lading test peers into 'soak', configuring
+with the `toml` files referenced above. There are a handful of modules available
+for use in soak testing; please add more as your infrastructure needs
+dictate. If at all possible do not require services external to the minikube.
