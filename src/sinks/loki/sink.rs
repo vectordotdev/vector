@@ -188,13 +188,15 @@ impl EventEncoder {
         let mut labels = self.build_labels(&event);
         self.remove_label_fields(&mut event);
 
-        let timestamp = match event.as_log().get(log_schema().timestamp_key()) {
+        let schema = log_schema();
+        let timestamp_key = schema.timestamp_key();
+        let timestamp = match event.as_log().get(timestamp_key) {
             Some(event::Value::Timestamp(ts)) => ts.timestamp_nanos(),
             _ => chrono::Utc::now().timestamp_nanos(),
         };
 
         if self.remove_timestamp {
-            event.as_mut_log().remove(log_schema().timestamp_key());
+            event.as_mut_log().remove(timestamp_key);
         }
 
         self.encoding.apply_rules(&mut event);
@@ -205,7 +207,7 @@ impl EventEncoder {
             }
 
             Encoding::Text => log
-                .get(log_schema().message_key())
+                .get(schema.message_key())
                 .map(Value::to_string_lossy)
                 .unwrap_or_default(),
 
