@@ -30,7 +30,6 @@ pub fn debug_print_events() {
 /// test `emit!` macro. The `check-events` script will test that emitted
 /// events contain the right fields, etc.
 pub fn record_internal_event(event: &str) {
-    println!("Recording internal event: {}", event);
     // Remove leading '&'
     // Remove trailing '{fields…}'
     let event = event.strip_prefix('&').unwrap_or(event);
