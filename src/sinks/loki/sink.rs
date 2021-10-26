@@ -21,7 +21,6 @@ use std::collections::HashMap;
 use std::num::NonZeroUsize;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::time::Duration;
 use vector_core::buffers::Acker;
 use vector_core::event::{self, Event, EventFinalizers, Finalizable, Value};
 use vector_core::partition::Partitioner;
@@ -311,7 +310,6 @@ pub struct LokiSink {
     request_builder: LokiRequestBuilder,
     pub(super) encoder: EventEncoder,
     batch_settings: BatcherSettings,
-    timeout: Duration,
     out_of_order_action: OutOfOrderAction,
     service: LokiService,
 }
@@ -332,7 +330,6 @@ impl LokiSink {
             batch_settings: BatchSettings::<()>::default()
                 .parse_config(config.batch)?
                 .into_batcher_settings()?,
-            timeout: Duration::from_secs(config.batch.timeout_secs.unwrap_or(1)),
             out_of_order_action: config.out_of_order_action,
             service: LokiService::new(client, config.endpoint, config.auth)?,
         })
