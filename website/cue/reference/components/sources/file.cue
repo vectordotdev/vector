@@ -437,7 +437,7 @@ components: sources: file: {
 				"""
 			sub_sections: [
 				{
-					title: "Example 1: Ruy Exceptions"
+					title: "Example 1: Ruby Exceptions"
 					body: #"""
 						Ruby exceptions, when logged, consist of multiple lines:
 

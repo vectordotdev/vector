@@ -105,10 +105,8 @@ impl ByteSizeOf for Value {
     fn allocated_bytes(&self) -> usize {
         match self {
             Value::Bytes(bytes) => bytes.len(),
-            Value::Map(map) => map
-                .iter()
-                .fold(0, |acc, (k, v)| acc + k.len() + v.size_of()),
-            Value::Array(arr) => arr.iter().fold(0, |acc, v| acc + v.size_of()),
+            Value::Map(map) => map.size_of(),
+            Value::Array(arr) => arr.size_of(),
             _ => 0,
         }
     }

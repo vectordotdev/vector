@@ -1,5 +1,3 @@
-// ## skip check-events ##
-
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
@@ -25,6 +23,32 @@ impl InternalEvent for EventsReceived {
 }
 
 #[derive(Debug)]
+pub struct HttpClientBytesReceived<'a> {
+    pub byte_size: usize,
+    pub protocol: &'a str,
+    pub endpoint: &'a str,
+}
+
+impl InternalEvent for HttpClientBytesReceived<'_> {
+    fn emit_logs(&self) {
+        trace!(
+            message = "Bytes received.",
+            byte_size = %self.byte_size,
+            protocol = %self.protocol,
+            endpoint = %self.endpoint,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_received_bytes_total", self.byte_size as u64,
+            "protocol" => self.protocol.to_owned(),
+            "endpoint" => self.endpoint.to_owned(),
+        );
+    }
+}
+
+#[derive(Debug)]
 pub struct EventsSent {
     pub count: usize,
     pub byte_size: usize,
@@ -37,7 +61,7 @@ impl InternalEvent for EventsSent {
 
     fn emit_metrics(&self) {
         if self.count > 0 {
-            counter!("events_out_total", self.count as u64);
+            // events_out_total is emitted by `Acker`
             counter!("component_sent_events_total", self.count as u64);
             counter!("component_sent_event_bytes_total", self.byte_size as u64);
         }
@@ -83,6 +107,27 @@ impl<'a> InternalEvent for EndpointBytesSent<'a> {
             "component_sent_bytes_total", self.byte_size as u64,
             "protocol" => self.protocol.to_string(),
             "endpoint" => self.endpoint.to_string()
+        );
+    }
+}
+
+#[cfg(feature = "rusoto")]
+pub struct AwsBytesSent {
+    pub byte_size: usize,
+    pub region: rusoto_core::Region,
+}
+
+#[cfg(feature = "rusoto")]
+impl InternalEvent for AwsBytesSent {
+    fn emit_logs(&self) {
+        trace!(message = "Bytes sent.", byte_size = %self.byte_size, region = ?self.region);
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_sent_bytes_total", self.byte_size as u64,
+            "protocol" => "https",
+            "region" => self.region.name().to_owned(),
         );
     }
 }

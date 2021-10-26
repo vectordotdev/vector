@@ -153,6 +153,10 @@ When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site
 
     The `title` should reflect the version, while the `weight` should be the weight of the next most recent version plus 1. The file for version 0.8.1, for example, has a weight of 8, which means the weight for version 0.8.2 (the next higher version) is 9. This metadata is necessary because Hugo can't sort semantic versions, so we need to make the ordering explicit. If Hugo ever does allow for semver sorting, we should remove the `weight`s.
 
+## Lighthouse scores
+
+[Lighthouse] scores for the website are produced automatically by [Netlify's Lighthouse plugin][plugin]. Those reports are available at `${ROOT}/reports/lighthouse`, where `ROOT` is the root URL for a version of the site. Thus, reports for the production version of the site would be available at https://vector.dev/reports/lighthouse. Reports are also generated for deploy previews and branch deploys.
+
 ## Known issues
 
 * Tailwind's [typography] plugin is used to render text throughout the site. It's a decent library in general but is also rather buggy, with some rendering glitches in things like lists and tables that we've tried to compensate for in the `extend.typography` block in the [Tailwind config](./tailwind.config.js), but it will take some time to iron all of these issues out.
@@ -172,9 +176,11 @@ When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site
 [hugo]: https://gohugo.io
 [hugo pipes]: https://gohugo.io/hugo-pipes
 [ionicons]: https://ionic.io/ionicons
+[lighthouse]: https://web.dev/performance-scoring
 [netlify]: https://netlify.com
 [netlify_project]: https://app.netlify.com/sites/vector-project/overview
 [node.js]: https://nodejs.org
+[plugin]: https://www.npmjs.com/package/@netlify/plugin-lighthouse
 [postcss]: https://github.com/postcss/postcss
 [purgecss]: https://purgecss.com
 [react.js]: https://reactjs.org

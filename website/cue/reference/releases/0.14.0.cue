@@ -10,7 +10,7 @@ releases: "0.14.0": {
 		This release includes a new `exec` source that can be used to execute arbitrary programs and use their output to
 		generate events in Vector along with a number of enhancements.
 
-		Check out the [changelog](#changelog) for more details.
+		Check out the [changelog](/releases/0.14.0#changelog) for more details.
 		"""
 
 	whats_next: [

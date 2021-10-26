@@ -90,7 +90,8 @@ members = [
   "lib/vrl/tests",
   "lib/vrl/proptests",
   "lib/datadog/grok",
-  "lib/datadog/search-syntax"
+  "lib/datadog/search-syntax",
+  "lib/soak"
 ]
 
 [dependencies]
@@ -113,7 +114,7 @@ async-stream = "0.3.2"
 async-trait = "0.1.51"
 futures = { version = "0.3.17", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.12.0", default-features = false, features = ["full"] }
-tokio-openssl = { version = "0.6.2", default-features = false }
+tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.7", default-features = false, features = ["net", "sync"] }
 tokio-util = { version = "0.6.8", default-features = false, features = ["codec", "time", "io"] }
 console-subscriber = { git = "https://github.com/tokio-rs/console", rev = "f2c30d52c9f22de69bac38009a9183135808806c",  optional = true }
@@ -150,7 +151,7 @@ azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev =
 reqwest = { version = "0.11", optional = true }
 
 # Tower
-tower = { version = "0.4.8", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util"] }
+tower = { version = "0.4.10", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util"] }
 tower-layer = { version = "0.3.1", default-features = false }
 
 # Serde
@@ -174,8 +175,8 @@ gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "2.10.0", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "2.10.0", default-features = false, optional = true }
+async-graphql = { version = "2.10.4", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "2.10.4", default-features = false, optional = true }
 itertools = { version = "0.10.1", default-features = false, optional = true }
 
 # API client
@@ -209,7 +210,7 @@ dashmap = { version = "4.0.2", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
 dyn-clone = { version = "1.0.4", default-features = false }
-encoding_rs = { version = "0.8.28", features = ["serde"] }
+encoding_rs = { version = "0.8.29", features = ["serde"] }
 evmap = { version = "10.0.2", default-features = false, optional = true }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.21", default-features = false }
@@ -218,7 +219,7 @@ getset = { version = "0.1.1", default-features = false }
 glob = { version = "0.3.0", default-features = false }
 grok = { version = "1.2.0", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default_features = false, optional  = true }
-headers = { version = "0.3.4", default-features = false }
+headers = { version = "0.3.5", default-features = false }
 heim = { git = "https://github.com/heim-rs/heim.git", rev="b292f1535bb27c03800cdb7509fa81a40859fbbb", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
 hostname = { version = "0.3.1", default-features = false }
 http = { version = "0.2.5", default-features = false }
@@ -226,8 +227,7 @@ hyper = { version = "0.14.13", default-features = false, features = ["stream"] }
 hyper-openssl = { version = "0.9.1", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 infer = { version = "0.5.0", default-features = false, optional = true}
-# pinned due to https://github.com/tkaitchuck/aHash/issues/95
-indexmap = { version = "~1.6.2", default-features = false, features = ["serde"] }
+indexmap = { version = "~1.7.0", default-features = false, features = ["serde"] }
 indoc = { version = "1.0.3", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
 k8s-openapi = { version = "0.13.1", default-features = true, features = ["api", "v1_16"], optional = true }
@@ -238,8 +238,8 @@ lru = { version = "0.7.0", default-features = false, optional = true }
 maxminddb = { version = "0.21.0", default-features = false, optional = true }
 md-5 = { version = "0.9", optional = true }
 # make sure to update the external docs when the Lua version changes
-mlua = { version = "0.6.5", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
-mongodb = { version = "2.0.0", default-features = false, features = ["tokio-runtime"], optional = true }
+mlua = { version = "0.6.6", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mongodb = { version = "2.0.1", default-features = false, features = ["tokio-runtime"], optional = true }
 async-nats = { version = "0.10.1", default-features = false, optional = true }
 nom = { version = "7.0.0", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
@@ -253,21 +253,21 @@ postgres-openssl = { version = "0.5.0", default-features = false, features = ["r
 pulsar = { version = "4.1", default-features = false, features = ["tokio-runtime"], optional = true }
 rand = { version = "0.8.4", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.2", default-features = false }
-rdkafka = { version = "0.26.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
-redis = { version = "0.21.2", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
+rdkafka = { version = "0.27.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
+redis = { version = "0.21.3", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
 seahash = { version = "4.1.0", default-features = false, optional = true }
 semver = { version = "1.0.4", default-features = false, features = ["serde", "std"], optional = true }
-smallvec = { version = "1", optional = true }
+smallvec = { version = "1", optional = true, features = ["union"] }
 snafu = { version = "0.6.10", default-features = false, features = ["futures"] }
 snap = { version = "1.0.5", default-features = false, optional = true }
 socket2 = { version = "0.4.2", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
-structopt = { version = "0.3.23", default-features = false }
+structopt = { version = "0.3.25", default-features = false }
 syslog = { version = "5.0.0", default-features = false, optional = true }
 syslog_loose = { version = "0.15.0", default-features = false, optional = true }
-tokio-postgres = { version = "0.7.3", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
+tokio-postgres = { version = "0.7.4", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = { version = "0.5.8", default-features = false }
 typetag = { version = "0.1.7", default-features = false }
 twox-hash = { version = "1.6.1", default-features = false }
@@ -299,11 +299,11 @@ approx = "0.5.0"
 assert_cmd = "2.0.2"
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
-libc = "0.2.103"
+libc = "0.2.104"
 libz-sys = "1.1.3"
 matches = "0.1.9"
 pretty_assertions = "1.0.0"
-reqwest = { version = "0.11.5", features = ["json"] }
+reqwest = { version = "0.11.6", features = ["json"] }
 tempfile = "3.2.0"
 tokio = { version = "1.12.0", features = ["test-util"] }
 tokio-test = "0.4.2"
@@ -346,6 +346,10 @@ target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "disk-buffer", "enr
 target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
 target-x86_64-unknown-linux-gnu = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
 target-x86_64-unknown-linux-musl = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+# Does not currently build
+target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+# currently doesn't build due to lack of support for 64-bit atomics
+target-powerpc-unknown-linux-gnu = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
 
 # Enables `rdkafka` dependency.
 # This feature is more portable, but requires `cmake` as build dependency. Use it if `rdkafka-plain` doesn't work.
@@ -795,6 +799,7 @@ required-features = ["statistic-benches"]
 
 [[bench]]
 name = "transform"
+path = "benches/transform/main.rs"
 harness = false
 test = false
 required-features = ["transform-benches"]

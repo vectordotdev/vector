@@ -2,7 +2,7 @@
 name = "vector-api-client"
 version = "0.1.2"
 authors = ["Vector Contributors <vector@timber.io>"]
-edition = "2018"
+edition = "2021"
 publish = false
 license = "MPL-2.0"
 
@@ -26,7 +26,7 @@ tokio-stream = { version = "0.1.7", features = ["sync"] }
 graphql_client = "0.10.0"
 
 # HTTP / WebSockets
-reqwest = { version = "0.11.5", features = ["json"] }
+reqwest = { version = "0.11.6", features = ["json"] }
 tokio-tungstenite = { version = "0.13.0", features = ["tls"] }
 
 # External libs

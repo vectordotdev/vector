@@ -16,7 +16,10 @@ components: sources: socket: {
 
 	features: {
 		multiline: enabled: false
-		codecs: enabled:    true
+		codecs: {
+			enabled:         true
+			default_framing: "`newline_delimited` for TCP and Unix stream, `bytes` for UDP and Unix datagram"
+		}
 		receive: {
 			from: {
 				service: services.socket_client
@@ -87,10 +90,9 @@ components: sources: socket: {
 			}
 		}
 		max_length: {
-			common:        true
-			description:   "The maximum bytes size of incoming messages before they are discarded."
-			relevant_when: "mode = `unix_datagram`"
-			required:      false
+			common:      true
+			description: "The maximum buffer size of incoming messages. Messages larger than this are truncated."
+			required:    false
 			warnings: []
 			type: uint: {
 				default: 102400

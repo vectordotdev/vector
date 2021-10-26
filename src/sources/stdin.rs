@@ -1,13 +1,15 @@
 use crate::{
-    codecs::DecodingConfig,
+    codecs::{DecodingConfig, FramingConfig, ParserConfig},
     config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
     internal_events::StdinEventsReceived,
+    serde::{default_decoding, default_framing_stream_based},
     shutdown::ShutdownSignal,
     sources::util::TcpError,
     Pipeline,
 };
 use async_stream::stream;
 use bytes::Bytes;
+use chrono::Utc;
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::{io, thread};
@@ -19,8 +21,10 @@ pub struct StdinConfig {
     #[serde(default = "crate::serde::default_max_length")]
     pub max_length: usize,
     pub host_key: Option<String>,
-    #[serde(flatten)]
-    pub decoding: DecodingConfig,
+    #[serde(default = "default_framing_stream_based")]
+    pub framing: Box<dyn FramingConfig>,
+    #[serde(default = "default_decoding")]
+    pub decoding: Box<dyn ParserConfig>,
 }
 
 impl Default for StdinConfig {
@@ -28,7 +32,8 @@ impl Default for StdinConfig {
         StdinConfig {
             max_length: crate::serde::default_max_length(),
             host_key: Default::default(),
-            decoding: Default::default(),
+            framing: default_framing_stream_based(),
+            decoding: default_decoding(),
         }
     }
 }
@@ -77,7 +82,7 @@ where
         .host_key
         .unwrap_or_else(|| log_schema().host_key().to_string());
     let hostname = crate::get_hostname().ok();
-    let decoder = config.decoding.build()?;
+    let decoder = DecodingConfig::new(config.framing.clone(), config.decoding.clone()).build()?;
 
     let (mut sender, receiver) = mpsc::channel(1024);
 
@@ -121,13 +126,16 @@ where
                             count: events.len()
                         });
 
+                        let now = Utc::now();
+
                         for mut event in events {
                             let log = event.as_mut_log();
 
-                            log.insert(log_schema().source_type_key(), Bytes::from("stdin"));
+                            log.try_insert(log_schema().source_type_key(), Bytes::from("stdin"));
+                            log.try_insert(log_schema().timestamp_key(), now);
 
                             if let Some(hostname) = &hostname {
-                                log.insert(&host_key, hostname.clone());
+                                log.try_insert(&host_key, hostname.clone());
                             }
 
                             yield event;

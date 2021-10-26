@@ -19,7 +19,7 @@ shows you how to use them in your Vector topology.
 *Which* logs Vector pipes through the `internal_logs` source is determined by the [log level](#levels), which defaults
 to `info`.
 
-In addition to the `internal_logs` source, Vector also writes its logs to [`stderr`][], which can be captured by
+In addition to the `internal_logs` source, Vector also writes its logs to [`stderr`][stderr], which can be captured by
 Kubernetes, SystemD, or however you are running Vector.
 
 ### Accessing logs
@@ -68,7 +68,7 @@ table = "vector-log-data"
 #### Levels
 
 Vector logs at the `info` level by default. You can set a different level when [starting] up your instance using either
-command-line flags or the `LOG` environment variable. The table below details these options:
+command-line flags or the `VECTOR_LOG` environment variable. The table below details these options:
 
 Method | Description
 :------|:-----------
@@ -77,7 +77,7 @@ Method | Description
 `-q` flag | Raises the log level to `warn`
 `-qq` flag | Raises the log level to `error`
 `-qqq` flag | Disables logging
-`LOG=<level>` environment variable | Set the log level. Must be one of `trace`, `debug`, `info`, `warn`, `error`, `off`.
+`VECTOR_LOG=<level>` environment variable | Set the log level. Must be one of `trace`, `debug`, `info`, `warn`, `error`, `off`.
 
 #### Stack traces
 

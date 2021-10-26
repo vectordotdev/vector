@@ -10,7 +10,7 @@ use crate::{
             batch::{BatchConfig, BatchSettings},
             encoding::{EncodingConfig, EncodingConfiguration},
             retries::{RetryAction, RetryLogic},
-            Buffer, Compression, Concurrency, EncodedEvent, PartitionBatchSink, PartitionBuffer,
+            Buffer, Compression, EncodedEvent, PartitionBatchSink, PartitionBuffer,
             PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -202,7 +202,6 @@ impl GcsSink {
 
     fn service(self, config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<VectorSink> {
         let request = config.request.unwrap_with(&TowerRequestConfig {
-            concurrency: Concurrency::Fixed(25),
             rate_limit_num: Some(1000),
             ..Default::default()
         });

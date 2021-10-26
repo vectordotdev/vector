@@ -266,7 +266,7 @@ where
 
 impl<St, Prt> Batcher<St, Prt, ExpirationQueue<Prt::Key>>
 where
-    St: Stream<Item = Prt::Item> + Unpin,
+    St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
     Prt::Key: Eq + Hash + Clone,
     Prt::Item: ByteSizeOf,
@@ -286,7 +286,7 @@ where
 
 impl<St, Prt, KT> Batcher<St, Prt, KT>
 where
-    St: Stream<Item = Prt::Item> + Unpin,
+    St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
     Prt::Key: Eq + Hash + Clone,
     Prt::Item: ByteSizeOf,
@@ -313,7 +313,7 @@ where
 
 impl<St, Prt, KT> Stream for Batcher<St, Prt, KT>
 where
-    St: Stream<Item = Prt::Item> + Unpin,
+    St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
     Prt::Key: Eq + Hash + Clone,
     Prt::Item: ByteSizeOf,

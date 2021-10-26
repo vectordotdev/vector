@@ -374,7 +374,6 @@ impl Visit for LimitVisitor {
 
     fn record_i64(&mut self, field: &Field, value: i64) {
         if field.name() == RATE_LIMIT_SECS_FIELD {
-            use std::convert::TryFrom;
             self.limit = Some(u64::try_from(value).unwrap_or_default());
         }
     }

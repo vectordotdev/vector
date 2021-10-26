@@ -13,7 +13,7 @@ use crate::{
             service::S3Service,
         },
         util::{
-            encoding::EncodingConfig, BatchConfig, Compression, Concurrency, ServiceBuilderExt,
+            encoding::EncodingConfig, BatchConfig, Compression, ServiceBuilderExt,
             TowerRequestConfig,
         },
         Healthcheck,
@@ -27,8 +27,6 @@ use vector_core::sink::VectorSink;
 
 use super::sink::S3RequestOptions;
 
-const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
-    TowerRequestConfig::new(Concurrency::Fixed(50)).rate_limit_num(250);
 const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = BatchSettings::const_default()
     .bytes(10_000_000)
     .timeout(300);
@@ -87,9 +85,9 @@ impl GenerateConfig for S3SinkConfig {
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = self.create_client(&cx.proxy)?;
-        let healthcheck = self.build_healthcheck(client.clone())?;
-        let sink = self.build_processor(client, cx)?;
+        let service = self.create_service(&cx.proxy)?;
+        let healthcheck = self.build_healthcheck(service.client())?;
+        let sink = self.build_processor(service, cx)?;
         Ok((sink, healthcheck))
     }
 
@@ -103,15 +101,19 @@ impl SinkConfig for S3SinkConfig {
 }
 
 impl S3SinkConfig {
-    pub fn build_processor(&self, client: S3Client, cx: SinkContext) -> crate::Result<VectorSink> {
+    pub fn build_processor(
+        &self,
+        service: S3Service,
+        cx: SinkContext,
+    ) -> crate::Result<VectorSink> {
         // Build our S3 client/service, which is what we'll ultimately feed
         // requests into in order to ship files to S3.  We build this here in
         // order to configure the client/service with retries, concurrency
         // limits, rate limits, and whatever else the client should have.
-        let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
+        let request_limits = self.request.unwrap_with(&Default::default());
         let service = ServiceBuilder::new()
             .settings(request_limits, S3RetryLogic)
-            .service(S3Service::new(client));
+            .service(service);
 
         // Configure our partitioning/batching.
         let batch_settings = DEFAULT_BATCH_SETTINGS
@@ -154,8 +156,8 @@ impl S3SinkConfig {
         s3_common::config::build_healthcheck(self.bucket.clone(), client)
     }
 
-    pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<S3Client> {
-        s3_common::config::create_client(&self.region, &self.auth, self.assume_role.clone(), proxy)
+    pub fn create_service(&self, proxy: &ProxyConfig) -> crate::Result<S3Service> {
+        s3_common::config::create_service(&self.region, &self.auth, self.assume_role.clone(), proxy)
     }
 }
 
