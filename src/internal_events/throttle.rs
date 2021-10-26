@@ -3,7 +3,7 @@ use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct ThrottleEventDiscarded {
-    pub key: Option<String>,
+    pub key: String,
 }
 
 impl InternalEvent for ThrottleEventDiscarded {
@@ -12,6 +12,9 @@ impl InternalEvent for ThrottleEventDiscarded {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_discarded_total", 1);
+        counter!(
+            "events_discarded_total", 1,
+            "key" => self.key.to_owned()
+        );
     }
 }

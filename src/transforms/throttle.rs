@@ -146,7 +146,11 @@ where
                                                 output.push(event);
                                             }
                                             _ => {
-                                                emit!(&ThrottleEventDiscarded{key})
+                                                if let Some(key) = key {
+                                                  emit!(&ThrottleEventDiscarded{key})
+                                                } else {
+                                                  emit!(&ThrottleEventDiscarded{key: "None".to_string()})
+                                                }
                                             }
                                         }
                                     }
