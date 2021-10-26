@@ -225,6 +225,27 @@ pub fn random_events_with_stream(
     (events, stream)
 }
 
+pub fn random_updated_events_with_stream<F>(
+    len: usize,
+    count: usize,
+    batch: Option<Arc<BatchNotifier>>,
+    update_fn: F,
+) -> (Vec<Event>, impl Stream<Item = Event>)
+where
+    F: Fn((usize, Event)) -> Event,
+{
+    let events = (0..count)
+        .map(|_| Event::from(random_string(len)))
+        .enumerate()
+        .map(update_fn)
+        .collect::<Vec<_>>();
+    let stream = map_batch_stream(
+        stream::iter(events.clone()).map(|event| event.into_log()),
+        batch,
+    );
+    (events, stream)
+}
+
 pub fn random_string(len: usize) -> String {
     thread_rng()
         .sample_iter(&Alphanumeric)
