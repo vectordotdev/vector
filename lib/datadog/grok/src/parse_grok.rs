@@ -3,11 +3,10 @@ use itertools::{
     Itertools,
 };
 
-use lookup::{Look, LookSegment, LookupBuf};
+use lookup::LookupBuf;
 use shared::btreemap;
 
 use crate::{grok_filter::apply_filter, parse_grok_rules::GrokRule};
-use std::collections::BTreeMap;
 use vrl_compiler::{Target, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
@@ -206,8 +205,8 @@ mod tests {
 
     fn test_grok_pattern_without_field(tests: Vec<(&str, &str, Result<Value, Error>)>) {
         for (filter, k, v) in tests {
-            let rules = parse_grok_rules(&[format!(r#"{}"#, filter)], btreemap! {})
-                .expect("should parse rules");
+            let rules =
+                parse_grok_rules(&[filter.to_string()], btreemap! {}).expect("should parse rules");
             let parsed = parse_grok(k, &rules);
 
             if v.is_ok() {
@@ -220,7 +219,7 @@ mod tests {
 
     fn test_grok_pattern(tests: Vec<(&str, &str, Result<Value, Error>)>) {
         for (filter, k, v) in tests {
-            let rules = parse_grok_rules(&[format!(r#"{}"#, filter)], btreemap! {})
+            let rules = parse_grok_rules(&[filter.to_string()], btreemap! {})
                 .expect("couldn't parse rules");
             let parsed = parse_grok(k, &rules);
 

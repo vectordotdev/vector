@@ -82,7 +82,7 @@ fn parse_pattern<'a>(
     pattern: &str,
     aliases: &BTreeMap<&'a str, String>,
     parsed_aliases: &mut HashMap<String, ParsedGrokRule>,
-    mut grok: &mut Grok,
+    grok: &mut Grok,
 ) -> Result<GrokRule, Error> {
     let parsed_pattern = parse_grok_rule(pattern, aliases, parsed_aliases)?;
     let mut pattern = String::new();
@@ -211,52 +211,56 @@ fn purify_grok_pattern(
 ) -> Result<String, Error> {
     let mut res = String::new();
 
-    if aliases.contains_key(pattern.match_fn.name.as_str()) {
-        // this is a reference to an alias - replace it and copy all filters from the alias
-        let definition = match parsed_aliases.get(pattern.match_fn.name.as_str()) {
-            Some(alias) => alias.definition.clone(),
-            None => {
-                // this alias is not parsed yet - let's parse it first
-                let alias = parse_grok_rule(&pattern.match_fn.name, aliases, parsed_aliases)?;
-                parsed_aliases.insert(pattern.match_fn.name.to_string(), alias.clone());
-                alias.definition
-            }
-        };
-        res.push_str(definition.as_str());
-        parsed_aliases
-            .get(pattern.match_fn.name.as_str())
-            .expect("alias was not found")
-            .filters
-            .iter()
-            .for_each(|(path, function)| {
-                filters.insert(path.to_owned(), function.to_owned());
-            });
-    } else if pattern.match_fn.name == "regex"
-        || pattern.match_fn.name == "date"
-        || pattern.match_fn.name == "boolean"
-    {
-        // these patterns will be converted to named capture groups e.g. (?<http.status_code>[0-9]{3})
-        res.push_str("(?<");
-        if let Some(destination) = &pattern.destination {
-            res.push_str(destination.path.to_string().as_str());
+    match aliases.get(pattern.match_fn.name.as_str()) {
+        Some(_) => {
+            // this is a reference to an alias - replace it and copy all filters from the alias
+            let definition = match parsed_aliases.get(pattern.match_fn.name.as_str()) {
+                Some(alias) => alias.definition.clone(),
+                None => {
+                    // this alias is not parsed yet - let's parse it first
+                    let alias = parse_grok_rule(&pattern.match_fn.name, aliases, parsed_aliases)?;
+                    parsed_aliases.insert(pattern.match_fn.name.to_string(), alias.clone());
+                    alias.definition
+                }
+            };
+            res.push_str(definition.as_str());
+            parsed_aliases
+                .get(pattern.match_fn.name.as_str())
+                .expect("alias was not found")
+                .filters
+                .iter()
+                .for_each(|(path, function)| {
+                    filters.insert(path.to_owned(), function.to_owned());
+                });
         }
-        res.push('>');
-        res.push_str(resolves_match_function(&mut filters, &pattern)?.as_str());
-        res.push(')');
-    } else {
-        // these will be converted to "pure" grok patterns %{PATTERN:DESTINATION} but without filters
-        res.push_str("%{");
-
-        res.push_str(resolves_match_function(&mut filters, &pattern)?.as_str());
-
-        if let Some(destination) = &pattern.destination {
-            if destination.path.is_empty() {
-                write!(res, r#":."#).unwrap(); // root
-            } else {
-                write!(res, ":{}", destination.path).unwrap();
+        None if pattern.match_fn.name == "regex"
+            || pattern.match_fn.name == "date"
+            || pattern.match_fn.name == "boolean" =>
+        {
+            // these patterns will be converted to named capture groups e.g. (?<http.status_code>[0-9]{3})
+            res.push_str("(?<");
+            if let Some(destination) = &pattern.destination {
+                res.push_str(destination.path.to_string().as_str());
             }
+            res.push('>');
+            res.push_str(resolves_match_function(&mut filters, &pattern)?.as_str());
+            res.push(')');
         }
-        res.push('}');
+        None => {
+            // these will be converted to "pure" grok patterns %{PATTERN:DESTINATION} but without filters
+            res.push_str("%{");
+
+            res.push_str(resolves_match_function(&mut filters, &pattern)?.as_str());
+
+            if let Some(destination) = &pattern.destination {
+                if destination.path.is_empty() {
+                    write!(res, r#":."#).unwrap(); // root
+                } else {
+                    write!(res, ":{}", destination.path).unwrap();
+                }
+            }
+            res.push('}');
+        }
     }
     Ok(res)
 }
