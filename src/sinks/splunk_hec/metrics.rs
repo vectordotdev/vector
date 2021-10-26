@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
     event::{Event, Metric, MetricValue},
     internal_events::SplunkInvalidMetricReceived,
     internal_events::{SplunkEventEncodeError, SplunkEventSent},
@@ -16,7 +16,7 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::iter;
 
-use super::common::{build_request, render_template_string};
+use super::common::{build_request, host_key, render_template_string};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -84,14 +84,6 @@ struct HecEvent<'a> {
     fields: FieldMap<'a>,
 
     event: &'a str,
-}
-
-fn host_key() -> String {
-    crate::config::log_schema().host_key().to_string()
-}
-
-inventory::submit! {
-    SinkDescription::new::<HecSinkMetricsConfig>("splunk_hec_metrics")
 }
 
 impl GenerateConfig for HecSinkMetricsConfig {
