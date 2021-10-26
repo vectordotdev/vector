@@ -78,9 +78,9 @@ struct ParsedGrokRule {
     pub filters: HashMap<LookupBuf, Vec<GrokFilter>>,
 }
 
-fn parse_pattern<'a>(
+fn parse_pattern(
     pattern: &str,
-    aliases: &BTreeMap<&'a str, String>,
+    aliases: &BTreeMap<&str, String>,
     parsed_aliases: &mut HashMap<String, ParsedGrokRule>,
     grok: &mut Grok,
 ) -> Result<GrokRule, Error> {
