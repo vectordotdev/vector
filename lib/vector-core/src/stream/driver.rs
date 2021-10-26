@@ -10,6 +10,7 @@ use tokio::{pin, select};
 use tower::{Service, ServiceExt};
 use tracing::Instrument;
 use crate::internal_event::EventsSent;
+use crate::internal_event::emit;
 
 #[derive(Eq)]
 struct PendingAcknowledgement {
@@ -193,8 +194,7 @@ where
                                     Ok(response) => {
                                         trace!(message = "Service call succeeded.", seqno);
                                         finalizers.update_status(response.event_status());
-                                        // emit
-                                        //TODO: emit EventsSent
+                                        emit(&response.events_sent());
                                     }
                                 };
                                 (seqno, ack_size)

@@ -2,7 +2,7 @@
 name = "vector"
 version = "0.18.0"
 authors = ["Vector Contributors <vector@timber.io>"]
-edition = "2018"
+edition = "2021"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
 homepage = "https://vector.dev"
 license = "MPL-2.0"
