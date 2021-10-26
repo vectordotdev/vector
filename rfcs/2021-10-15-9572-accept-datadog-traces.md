@@ -32,8 +32,13 @@ It has several communication channels to Datadog:
 * Processed traces are relayed to `trace.<SITE>` (can be overridden by the `apm_config.apm_dd_url` config key)
 * Additional profiling data are relayed to `intake.profile.<SITE>` (can be overridden by the
   `apm_config.profiling_dd_url` config key), they are not processed by the trace-agent and [relayed directly to Datadog]
-* Some debug log are simply [proxified] to the log endpoint `http-intake.logs.<SITE>` (can be overridden by the
+* Some debug logs are simply [proxied] to the log endpoint `http-intake.logs.<SITE>` (can be overridden by the
   `apm_config.debugger_dd_url` config key), it is fairly [recent] and unused as of October 2021.
+* It computes some [stats] on incoming traces, this is an aggregation of statistics [submitted][stats-endpoint] by some
+  tracing libraries and also computed by the `trace-agent`. [Aggregated stats][concentrator] are send back to
+  [Datadog][stats-writer] to the same host as processed traces (`trace.<SITE>`). Tracer-side stats are supported since
+  [Agent 7.25][client-stats-pr], but APM stats computed by the `trace-agent` itself are not strictly mandatory but they
+  produce very useful stats.
 * It emits [metrics], it does so for observability purpose, those metrics are sent to the core agent using the
   [dogstatsd] protocol, usually running on the same host (it could be in a different container if using the official
   Helm chart). The core agent then forward all those metrics with additional enrichment (hostname, tags) to Datadog.
@@ -54,8 +59,12 @@ to the trace endpoint contain two major kind of data:
 [local API]: https://github.com/DataDog/datadog-agent/blob/main/pkg/trace/api/endpoints.go
 [tracing libraries]: https://docs.datadoghq.com/developers/community/libraries/#apm--continuous-profiler-client-libraries
 [relayed directly to Datadog]: https://github.com/DataDog/datadog-agent/blob/44eec15/pkg/trace/api/endpoints.go#L83-L86
-[proxified]: https://github.com/DataDog/datadog-agent/blob/44eec15/pkg/trace/api/endpoints.go#L96-L98
-[recent]: https://github.com/DataDog/datadog-agent/blob/7.31.x/CHANGELOG.rst?plain=1#L60
+[proxied]: https://github.com/DataDog/datadog-agent/blob/44eec15/pkg/trace/api/endpoints.go#L96-L98
+[stats]: https://github.com/DataDog/datadog-agent/blob/dc2f202/pkg/trace/pb/stats.proto
+[stats-endpoint]: https://github.com/DataDog/datadog-agent/blob/44eec15/pkg/trace/api/endpoints.go#L87-L90
+[concentrator]: https://github.com/DataDog/datadog-agent/blob/dc2f202/pkg/trace/stats/concentrator.go#L23-L26
+[stats-writer]: https://github.com/DataDog/datadog-agent/blob/dc2f20229531af78c0431093d9f2f8510a0586d2/pkg/trace/writer/stats.go#L44-L57
+[client-stats-pr]: https://github.com/DataDog/datadog-agent/pull/6687
 [metrics]: https://docs.datadoghq.com/tracing/troubleshooting/agent_apm_metrics/
 [dogstatsd]: https://github.com/DataDog/datadog-agent/tree/44eec15/pkg/trace/metrics
 [datadog-agent repository]: https://github.com/DataDog/datadog-agent/blob/0a19a75/pkg/trace/pb/trace_payload.proto
@@ -137,10 +146,17 @@ socket per one or more datatype at users convenience.
 
 Datadog API key management would be the same as it is for Datadog logs & metrics.
 
+Regarding APM stats, if we envision the `datadog_trace` sink as a universal sender for any kind of traces ingested by
+Vector, it shall ultimately support computing APM stats, even if the stats payload is a bit [complex][apm-stats-proto]
+(it includes ddsketches) as this provides valuable stats on ingested traces. The Datadog OTLP traces exporter also
+[computes][otlp-exp-apm-stats] those stats.
+
 [schema-rfc]: https://github.com/vectordotdev/vector/pull/9388
 [gzip'ed protobuf over http]: https://github.com/DataDog/datadog-agent/blob/8b63d85/pkg/trace/writer/trace.go#L230-L269
 [datadog-agent repository]: https://github.com/DataDog/datadog-agent/blob/0a19a75/pkg/trace/pb/trace_payload.proto
 [event-filter]: https://github.com/vectordotdev/vector/blob/a0ca04c/src/sources/datadog/agent.rs#L206-L233
+[apm-stats-proto]: https://github.com/DataDog/datadog-agent/blob/dc2f202/pkg/trace/pb/stats.proto
+[otlp-exp-apm-stats]: https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/1b8f44f/exporter/datadogexporter/stats.go#L30-L88
 
 ## Rationale
 
@@ -178,11 +194,13 @@ https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/pr
 
 * Confirm that this RFC only addresses traces.
 * Confirm wether we rely on `LogEvent` or if we introduce a new type to represent traces inside Vector.
+* Confirm what to do with APM stats (seems we should ingest those no to loose accuracy), to be further investigated.
 
 ## Plan Of Attack
 
 * [ ] Submit a PR introducing traces support in the `datadog_agent` source emitting a `LogEvent` for each trace and each APM event.
 * [ ] Submit a PR introducing the `datadog_trace` sink that would
+* [ ] Compute APM stats in the `datadog_trace` sink
 
 ## Future Improvements
 
