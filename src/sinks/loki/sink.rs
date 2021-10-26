@@ -12,15 +12,12 @@ use crate::sinks::util::builder::SinkBuilderExt;
 use crate::sinks::util::encoding::{EncodingConfig, EncodingConfiguration};
 use crate::sinks::util::{BatchSettings, Compression, RequestBuilder};
 use crate::template::Template;
-use futures::stream::{BoxStream, Stream};
+use futures::stream::BoxStream;
 use futures::StreamExt;
-use pin_project::pin_project;
 use shared::encode_logfmt;
 use snafu::Snafu;
 use std::collections::HashMap;
 use std::num::NonZeroUsize;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 use vector_core::buffers::Acker;
 use vector_core::event::{self, Event, EventFinalizers, Finalizable, Value};
 use vector_core::partition::Partitioner;
@@ -233,70 +230,46 @@ impl EventEncoder {
     }
 }
 
-#[pin_project]
-struct EventFilter<St> {
-    #[pin]
-    input: St,
+struct RecordFilter {
     global_timestamps: GlobalTimestamps,
     out_of_order_action: OutOfOrderAction,
 }
 
-impl<St> EventFilter<St> {
+impl RecordFilter {
     const fn new(
-        input: St,
         global_timestamps: GlobalTimestamps,
         out_of_order_action: OutOfOrderAction,
     ) -> Self {
         Self {
-            input,
             global_timestamps,
             out_of_order_action,
         }
     }
 }
 
-impl<St> Stream for EventFilter<St>
-where
-    St: Stream<Item = LokiRecord> + Unpin,
-{
-    type Item = LokiRecord;
+impl RecordFilter {
+    pub fn filter_record(&self, mut record: LokiRecord) -> Option<LokiRecord> {
+        let partition = &record.partition;
+        let latest_timestamp = self.global_timestamps.take(partition);
 
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.input.size_hint()
-    }
+        let latest_timestamp = latest_timestamp.unwrap_or(record.event.timestamp);
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut this = self.project();
-
-        loop {
-            return match this.input.as_mut().poll_next(cx) {
-                Poll::Ready(Some(mut item)) => {
-                    let partition = &item.partition;
-                    let latest_timestamp = this.global_timestamps.take(partition);
-
-                    let latest_timestamp = latest_timestamp.unwrap_or(item.event.timestamp);
-
-                    if item.event.timestamp < latest_timestamp {
-                        match this.out_of_order_action {
-                            OutOfOrderAction::Drop => {
-                                emit!(&LokiOutOfOrderEventDropped);
-                                continue;
-                            }
-                            OutOfOrderAction::RewriteTimestamp => {
-                                emit!(&LokiOutOfOrderEventRewritten);
-                                item.event.timestamp = latest_timestamp;
-                                Poll::Ready(Some(item))
-                            }
-                        }
-                    } else {
-                        this.global_timestamps
-                            .insert(partition.clone(), item.event.timestamp);
-                        Poll::Ready(Some(item))
-                    }
+        if record.event.timestamp < latest_timestamp {
+            match self.out_of_order_action {
+                OutOfOrderAction::Drop => {
+                    emit!(&LokiOutOfOrderEventDropped);
+                    None
                 }
-                Poll::Ready(None) => Poll::Ready(None),
-                Poll::Pending => Poll::Pending,
-            };
+                OutOfOrderAction::RewriteTimestamp => {
+                    emit!(&LokiOutOfOrderEventRewritten);
+                    record.event.timestamp = latest_timestamp;
+                    Some(record)
+                }
+            }
+        } else {
+            self.global_timestamps
+                .insert(partition.clone(), record.event.timestamp);
+            Some(record)
         }
     }
 }
@@ -334,17 +307,19 @@ impl LokiSink {
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let service = tower::ServiceBuilder::new().service(self.service);
+
         let encoder = self.encoder.clone();
-
-        let input = input.map(|event| encoder.encode_event(event));
-
-        let filter = EventFilter::new(
-            input,
+        let filter = RecordFilter::new(
             GlobalTimestamps::default(),
             self.out_of_order_action.clone(),
         );
 
-        let sink = filter
+        let sink = input
+            .map(|event| encoder.encode_event(event))
+            .filter_map(|record| {
+                let res = filter.filter_record(record);
+                async { res }
+            })
             .batched(RecordPartitionner::default(), self.batch_settings)
             .request_builder(NonZeroUsize::new(1), self.request_builder)
             .filter_map(|request| async move {
@@ -371,45 +346,17 @@ impl StreamSink for LokiSink {
 
 #[cfg(test)]
 mod tests {
-    use super::{EventEncoder, EventFilter, KeyPartitioner};
+    use super::{EventEncoder, KeyPartitioner, RecordFilter};
     use crate::config::log_schema;
     use crate::sinks::loki::config::{Encoding, OutOfOrderAction};
     use crate::sinks::loki::event::GlobalTimestamps;
     use crate::sinks::util::encoding::EncodingConfig;
     use crate::template::Template;
     use crate::test_util::random_lines;
-    use futures::stream::{Stream, StreamExt};
+    use futures::stream::StreamExt;
     use std::collections::HashMap;
     use std::convert::TryFrom;
-    use std::pin::Pin;
-    use std::task::{Context, Poll};
     use vector_core::event::Event;
-
-    async fn collect<St, E>(mut input: St, abort_after: usize) -> Vec<E>
-    where
-        St: Stream<Item = E> + std::marker::Unpin,
-    {
-        let mut stream = Pin::new(&mut input);
-        let noop_waker = futures::task::noop_waker();
-        let mut cx = Context::from_waker(&noop_waker);
-        let mut res = Vec::new();
-        let mut none_count: usize = 0;
-        loop {
-            match stream.as_mut().poll_next(&mut cx) {
-                Poll::Pending => {}
-                Poll::Ready(None) => {
-                    none_count += 1;
-                    if none_count >= abort_after {
-                        return res;
-                    }
-                }
-                Poll::Ready(Some(item)) => {
-                    none_count = 0;
-                    res.push(item);
-                }
-            }
-        }
-    }
 
     #[test]
     fn encoder_no_labels() {
@@ -531,13 +478,18 @@ mod tests {
                 event
             })
             .collect::<Vec<_>>();
-        let mut stream = futures::stream::iter(events).map(|event| encoder.encode_event(event));
-        let filter = EventFilter::new(
-            &mut stream,
-            GlobalTimestamps::default(),
-            OutOfOrderAction::Drop,
-        );
-        let result = collect(filter, 2).await;
+        let filter = RecordFilter::new(GlobalTimestamps::default(), OutOfOrderAction::Drop);
+        let stream = futures::stream::iter(events)
+            .map(|event| encoder.encode_event(event))
+            .filter_map(|event| {
+                let res = filter.filter_record(event);
+                async { res }
+            });
+        tokio::pin!(stream);
+        let mut result = Vec::new();
+        while let Some(item) = stream.next().await {
+            result.push(item);
+        }
         assert_eq!(result.len(), 17);
     }
 }
