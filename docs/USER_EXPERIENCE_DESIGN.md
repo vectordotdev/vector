@@ -94,7 +94,7 @@ Logs should be flexible, fluid data structures that do not impose a rigid schema
 for the following reasons:
 
 1. Unlike other data types, there is no functional requirement of logs that
-   requires a strict sceham. Logs simply describe a point-in-time event.
+   requires a strict schema. Logs simply describe a point-in-time event.
 2. Vector should be able to replace legacy pipelines without introducing
    downstream schema changes, something that would likely prevent the adoption
    of Vector.

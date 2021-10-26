@@ -25,9 +25,8 @@ components: sinks: datadog_archives: {
 			encoding: enabled:    false
 			proxy: enabled:       false
 			request: {
-				enabled:        true
-				rate_limit_num: 250
-				headers:        false
+				enabled: true
+				headers: false
 			}
 			tls: enabled: false
 		}
