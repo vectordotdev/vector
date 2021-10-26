@@ -19,7 +19,9 @@ provider "kubernetes" {
 # Setup background monitoring details. These are needed by the soak control to
 # understand what vector et al's running behavior is.
 module "monitoring" {
-  source = "../../common/terraform/modules/monitoring"
+  source        = "../../common/terraform/modules/monitoring"
+  type         = var.type
+  vector_image = var.vector_image
 }
 
 # Setup the soak pieces
@@ -36,7 +38,6 @@ module "vector" {
   source       = "../../common/terraform/modules/vector"
   type         = var.type
   vector_image = var.vector_image
-  sha          = var.sha
   test_name    = "datadog_agent_remap_datadog_logs"
   vector-toml  = file("${path.module}/vector.toml")
   namespace    = kubernetes_namespace.soak.metadata[0].name

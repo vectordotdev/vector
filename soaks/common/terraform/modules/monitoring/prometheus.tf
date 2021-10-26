@@ -74,7 +74,7 @@ resource "kubernetes_deployment" "prometheus" {
     labels = {
       app = "prometheus"
     }
-   }
+  }
 
   spec {
     replicas = 1
