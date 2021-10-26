@@ -1,3 +1,6 @@
+use crate::sinks::aws_kinesis_streams::encode_event;
+use crate::sinks::util::sink;
+
 #[derive(Clone)]
 pub struct KinesisService {
     client: KinesisClient,

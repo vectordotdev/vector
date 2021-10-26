@@ -93,7 +93,10 @@ impl SinkConfig for KinesisSinkConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.create_client(&cx.proxy)?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
-        let sink = KinesisService::new(self.clone(), client, cx)?;
+        // let sink = KinesisService::new(self.clone(), client, cx)?;
+        let sink = KinesisSink {
+
+        };
         Ok((super::VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 
