@@ -146,9 +146,7 @@ impl<'de> de::Deserialize<'de> for Compression {
                         Some(_) => Err(de::Error::unknown_field("level", &[])),
                         None => Ok(Compression::None),
                     },
-                    "gzip" => Ok(Compression::Gzip(
-                        level.unwrap_or_else(flate2::Compression::default),
-                    )),
+                    "gzip" => Ok(Compression::Gzip(level.unwrap_or_default())),
                     algorithm => Err(de::Error::unknown_variant(algorithm, &["none", "gzip"])),
                 }
             }
