@@ -1,5 +1,5 @@
 use super::config::S3Options;
-use crate::internal_events::{AwsBytesSent, S3EventsSent};
+use crate::internal_events::{AwsBytesSent};
 use crate::serde::to_string;
 use bytes::Bytes;
 use futures::{future::BoxFuture, stream};
