@@ -234,33 +234,30 @@ impl EventEncoder {
 }
 
 #[pin_project]
-struct FilterEncoder<St> {
+struct EventFilter<St> {
     #[pin]
     input: St,
-    encoder: EventEncoder,
     global_timestamps: GlobalTimestamps,
     out_of_order_action: OutOfOrderAction,
 }
 
-impl<St> FilterEncoder<St> {
+impl<St> EventFilter<St> {
     const fn new(
         input: St,
-        encoder: EventEncoder,
         global_timestamps: GlobalTimestamps,
         out_of_order_action: OutOfOrderAction,
     ) -> Self {
         Self {
             input,
-            encoder,
             global_timestamps,
             out_of_order_action,
         }
     }
 }
 
-impl<St> Stream for FilterEncoder<St>
+impl<St> Stream for EventFilter<St>
 where
-    St: Stream<Item = Event> + Unpin,
+    St: Stream<Item = LokiRecord> + Unpin,
 {
     type Item = LokiRecord;
 
@@ -273,9 +270,7 @@ where
 
         loop {
             return match this.input.as_mut().poll_next(cx) {
-                Poll::Ready(Some(item)) => {
-                    let mut item = this.encoder.encode_event(item);
-
+                Poll::Ready(Some(mut item)) => {
                     let partition = &item.partition;
                     let latest_timestamp = this.global_timestamps.take(partition);
 
@@ -339,10 +334,12 @@ impl LokiSink {
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let service = tower::ServiceBuilder::new().service(self.service);
+        let encoder = self.encoder.clone();
 
-        let filter = FilterEncoder::new(
+        let input = input.map(|event| encoder.encode_event(event));
+
+        let filter = EventFilter::new(
             input,
-            self.encoder.clone(),
             GlobalTimestamps::default(),
             self.out_of_order_action.clone(),
         );
@@ -374,14 +371,14 @@ impl StreamSink for LokiSink {
 
 #[cfg(test)]
 mod tests {
-    use super::{EventEncoder, FilterEncoder, KeyPartitioner};
+    use super::{EventEncoder, EventFilter, KeyPartitioner};
     use crate::config::log_schema;
     use crate::sinks::loki::config::{Encoding, OutOfOrderAction};
     use crate::sinks::loki::event::GlobalTimestamps;
     use crate::sinks::util::encoding::EncodingConfig;
     use crate::template::Template;
     use crate::test_util::random_lines;
-    use futures::stream::Stream;
+    use futures::stream::{Stream, StreamExt};
     use std::collections::HashMap;
     use std::convert::TryFrom;
     use std::pin::Pin;
@@ -534,10 +531,9 @@ mod tests {
                 event
             })
             .collect::<Vec<_>>();
-        let mut stream = futures::stream::iter(events);
-        let filter = FilterEncoder::new(
+        let mut stream = futures::stream::iter(events).map(|event| encoder.encode_event(event));
+        let filter = EventFilter::new(
             &mut stream,
-            encoder,
             GlobalTimestamps::default(),
             OutOfOrderAction::Drop,
         );
