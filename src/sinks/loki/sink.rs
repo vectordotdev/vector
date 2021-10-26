@@ -271,35 +271,37 @@ where
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
 
-        match this.input.as_mut().poll_next(cx) {
-            Poll::Ready(Some(item)) => {
-                let mut item = this.encoder.encode_event(item);
+        loop {
+            return match this.input.as_mut().poll_next(cx) {
+                Poll::Ready(Some(item)) => {
+                    let mut item = this.encoder.encode_event(item);
 
-                let partition = &item.partition;
-                let latest_timestamp = this.global_timestamps.take(partition);
+                    let partition = &item.partition;
+                    let latest_timestamp = this.global_timestamps.take(partition);
 
-                let latest_timestamp = latest_timestamp.unwrap_or(item.event.timestamp);
+                    let latest_timestamp = latest_timestamp.unwrap_or(item.event.timestamp);
 
-                if item.event.timestamp < latest_timestamp {
-                    match this.out_of_order_action {
-                        OutOfOrderAction::Drop => {
-                            emit!(&LokiOutOfOrderEventDropped);
-                            Poll::Ready(None)
+                    if item.event.timestamp < latest_timestamp {
+                        match this.out_of_order_action {
+                            OutOfOrderAction::Drop => {
+                                emit!(&LokiOutOfOrderEventDropped);
+                                continue;
+                            }
+                            OutOfOrderAction::RewriteTimestamp => {
+                                emit!(&LokiOutOfOrderEventRewritten);
+                                item.event.timestamp = latest_timestamp;
+                                Poll::Ready(Some(item))
+                            }
                         }
-                        OutOfOrderAction::RewriteTimestamp => {
-                            emit!(&LokiOutOfOrderEventRewritten);
-                            item.event.timestamp = latest_timestamp;
-                            Poll::Ready(Some(item))
-                        }
+                    } else {
+                        this.global_timestamps
+                            .insert(partition.clone(), item.event.timestamp);
+                        Poll::Ready(Some(item))
                     }
-                } else {
-                    this.global_timestamps
-                        .insert(partition.clone(), item.event.timestamp);
-                    Poll::Ready(Some(item))
                 }
-            }
-            Poll::Ready(None) => Poll::Ready(None),
-            Poll::Pending => Poll::Pending,
+                Poll::Ready(None) => Poll::Ready(None),
+                Poll::Pending => Poll::Pending,
+            };
         }
     }
 }
