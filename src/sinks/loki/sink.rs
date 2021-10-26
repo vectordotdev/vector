@@ -350,7 +350,7 @@ impl LokiSink {
 
         let sink = filter
             .batched(RecordPartitionner::default(), self.batch_settings)
-            .request_builder(NonZeroUsize::new(1), self.request_builder.clone())
+            .request_builder(NonZeroUsize::new(1), self.request_builder)
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
