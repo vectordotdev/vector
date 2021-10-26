@@ -19,6 +19,7 @@ use snafu::Snafu;
 use std::collections::HashMap;
 use std::num::NonZeroUsize;
 use vector_core::buffers::Acker;
+use vector_core::ByteSizeOf;
 use vector_core::event::{self, Event, EventFinalizers, Finalizable, Value};
 use vector_core::partition::Partitioner;
 use vector_core::sink::StreamSink;
@@ -94,7 +95,7 @@ impl Default for LokiRequestBuilder {
 }
 
 impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
-    type Metadata = (Option<String>, usize, EventFinalizers);
+    type Metadata = (Option<String>, usize, EventFinalizers, usize);
     type Events = Vec<LokiRecord>;
     type Encoder = LokiBatchEncoder;
     type Payload = Vec<u8>;
@@ -115,6 +116,7 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
     ) -> (Self::Metadata, Self::Events) {
         let (key, mut events) = input;
         let batch_size = events.len();
+        let events_byte_size = events.size_of();
         let finalizers = events
             .iter_mut()
             .fold(EventFinalizers::default(), |mut acc, x| {
@@ -122,11 +124,11 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
                 acc
             });
 
-        ((key.tenant_id, batch_size, finalizers), events)
+        ((key.tenant_id, batch_size, finalizers, events_byte_size), events)
     }
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        let (tenant_id, batch_size, finalizers) = metadata;
+        let (tenant_id, batch_size, finalizers, events_byte_size) = metadata;
         emit!(&LokiEventsProcessed {
             byte_size: payload.len(),
         });
@@ -136,6 +138,7 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
             finalizers,
             payload,
             tenant_id,
+            events_byte_size
         }
     }
 }
