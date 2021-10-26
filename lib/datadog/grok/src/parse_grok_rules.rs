@@ -241,13 +241,13 @@ fn purify_grok_pattern(
             res.push_str(destination.path.to_string().as_str());
         }
         res.push('>');
-        res.push_str(process_match_function(&mut filters, &pattern)?.as_str());
+        res.push_str(resolves_match_function(&mut filters, &pattern)?.as_str());
         res.push(')');
     } else {
         // these will be converted to "pure" grok patterns %{PATTERN:DESTINATION} but without filters
         res.push_str("%{");
 
-        res.push_str(process_match_function(&mut filters, &pattern)?.as_str());
+        res.push_str(resolves_match_function(&mut filters, &pattern)?.as_str());
 
         if let Some(destination) = &pattern.destination {
             if destination.path.is_empty() {
@@ -261,7 +261,10 @@ fn purify_grok_pattern(
     Ok(res)
 }
 
-fn process_match_function(
+/// Process a match function from a given pattern:
+/// - returns a grok expression(a grok pattern or a regular expression) corresponding to a given match function
+/// - some match functions(e.g. number) implicitly introduce a filter to be applied to an extracted value - stores it to `filters`.
+fn resolves_match_function(
     filters: &mut HashMap<LookupBuf, Vec<GrokFilter>>,
     pattern: &ast::GrokPattern,
 ) -> Result<String, Error> {
@@ -276,46 +279,34 @@ fn process_match_function(
             }
             _ => Err(Error::InvalidFunctionArguments(match_fn.name.clone())),
         },
-        "integer" => replace_with_pattern_and_add_as_filter(
-            "integerStr",
-            GrokFilter::Integer,
-            filters,
-            pattern,
-        ),
-        "integerExt" => replace_with_pattern_and_add_as_filter(
-            "integerExtStr",
-            GrokFilter::IntegerExt,
-            filters,
-            pattern,
-        ),
-        "number" => replace_with_pattern_and_add_as_filter(
-            "numberStr",
-            GrokFilter::Number,
-            filters,
-            pattern,
-        ),
-        "numberExt" => replace_with_pattern_and_add_as_filter(
-            "numberExtStr",
-            GrokFilter::NumberExt,
-            filters,
-            pattern,
-        ),
+        "integer" => {
+            if let Some(destination) = &pattern.destination {
+                filters.insert(destination.path.clone(), vec![GrokFilter::Integer]);
+            }
+            Ok("integerStr".to_string())
+        }
+        "integerExt" => {
+            if let Some(destination) = &pattern.destination {
+                filters.insert(destination.path.clone(), vec![GrokFilter::IntegerExt]);
+            }
+            Ok("integerExtStr".to_string())
+        }
+        "number" => {
+            if let Some(destination) = &pattern.destination {
+                filters.insert(destination.path.clone(), vec![GrokFilter::Number]);
+            }
+            Ok("numberStr".to_string())
+        }
+        "numberExt" => {
+            if let Some(destination) = &pattern.destination {
+                filters.insert(destination.path.clone(), vec![GrokFilter::NumberExt]);
+            }
+            Ok("numberExtStr".to_string())
+        }
         // otherwise just add it as is, it should be a known grok pattern
         grok_pattern_name => Ok(grok_pattern_name.to_string()),
     };
     result
-}
-
-fn replace_with_pattern_and_add_as_filter(
-    new_pattern: &str,
-    filter: GrokFilter,
-    filters: &mut HashMap<LookupBuf, Vec<GrokFilter>>,
-    pattern: &ast::GrokPattern,
-) -> Result<String, Error> {
-    if let Some(destination) = &pattern.destination {
-        filters.insert(destination.path.clone(), vec![filter]);
-    }
-    Ok(new_pattern.to_string())
 }
 
 include!(concat!(env!("OUT_DIR"), "/patterns.rs"));
