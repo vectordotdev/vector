@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -43,9 +45,13 @@ struct UpcaseFn {
 
 impl Expression for UpcaseFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+        let bytes = self.value.resolve(ctx)?;
+        let bytes = bytes.borrow();
+        let bytes = bytes.as_bytes().unwrap();
 
-        Ok(value.try_bytes_utf8_lossy()?.to_uppercase().into())
+        Ok(Rc::new(RefCell::new(
+            String::from_utf8_lossy(&bytes).to_uppercase().into(),
+        )))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

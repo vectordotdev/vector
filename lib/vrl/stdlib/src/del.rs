@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+use std::rc::Rc;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -104,27 +106,28 @@ impl Expression for DelFn {
                 .remove(path, false)
                 .ok()
                 .flatten()
-                .unwrap_or(Value::Null));
+                .unwrap_or_else(|| Rc::new(RefCell::new(Value::Null))));
         }
 
         if let Some(ident) = self.query.variable_ident() {
             return match ctx.state_mut().variable_mut(ident) {
                 Some(value) => {
-                    let new_value = value.get_by_path(path).cloned();
-                    value.remove_by_path(path, false);
-                    Ok(new_value.unwrap_or(Value::Null))
+                    let new_value = Value::get_by_path(Rc::clone(&value), path);
+                    Value::remove_by_path(value, path, false);
+                    Ok(new_value.unwrap_or_else(|| Rc::new(RefCell::new(Value::Null))))
                 }
-                None => Ok(Value::Null),
+                None => Ok(Rc::new(RefCell::new(Value::Null))),
             };
         }
 
         if let Some(expr) = self.query.expression_target() {
             let value = expr.resolve(ctx)?;
 
-            return Ok(value.get_by_path(path).cloned().unwrap_or(Value::Null));
+            return Ok(Value::get_by_path(value, path)
+                .unwrap_or_else(|| Rc::new(RefCell::new(Value::Null))));
         }
 
-        Ok(Value::Null)
+        Ok(Rc::new(RefCell::new(Value::Null)))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

@@ -60,8 +60,8 @@ default = [
 #    "contains",
 #    "decode_base64",
 #    "decode_percent",
-#    "del",
-#    "downcase",
+    "del",
+    "downcase",
 #    "encode_base64",
 #    "encode_json",
 #    "encode_key_value",
@@ -166,7 +166,7 @@ default = [
 #    "truncate",
 #    "unique",
 #    "unnest",
-#    "upcase",
+    "upcase",
 #    "uuid_v4",
 ]
 
