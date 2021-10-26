@@ -1,4 +1,3 @@
-use super::event_test_util;
 use metrics::counter;
 
 pub trait InternalEvent {
@@ -11,13 +10,13 @@ pub trait InternalEvent {
     }
 }
 
-// overrides the InternalEvent name
-pub struct NamedInternalEvent<'a, 'b, E> {
+// Sets the name of an event if it doesn't have one
+pub struct DefaultNameInternalEvent<'a, 'b, E> {
     pub name: &'a str,
     pub event: &'b E,
 }
 
-impl<'a, 'b, E> InternalEvent for NamedInternalEvent<'a, 'b, E>
+impl<'a, 'b, E> InternalEvent for DefaultNameInternalEvent<'a, 'b, E>
 where
     E: InternalEvent,
 {
@@ -28,20 +27,20 @@ where
         self.event.emit_metrics()
     }
     fn name(&self) -> Option<&str> {
-        Some(self.name)
+        Some(self.event.name().unwrap_or(&self.name))
     }
 }
 
-#[cfg(feature = "test")]
+#[cfg(any(test, feature = "test"))]
 pub fn emit(event: &impl InternalEvent) {
     event.emit_logs();
     event.emit_metrics();
     println!("emitting: {:?}", event.name());
     if let Some(name) = event.name() {
-        event_test_util::record_internal_event(name);
+        super::event_test_util::record_internal_event(name);
     }
 }
-#[cfg(not(feature = "test"))]
+#[cfg(not(any(test, feature = "test")))]
 pub fn emit(event: &impl InternalEvent) {
     println!("emitting event during non-test");
     event.emit_logs();

@@ -18,7 +18,6 @@
 extern crate tracing;
 #[macro_use]
 extern crate derivative;
-#[macro_use]
 extern crate vector_core;
 #[cfg(feature = "vrl-cli")]
 extern crate vrl_cli;

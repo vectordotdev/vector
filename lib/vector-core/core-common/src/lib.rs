@@ -12,5 +12,5 @@ pub mod internal_event;
 #[macro_use]
 extern crate tracing;
 
-// #[cfg(test)]
+#[cfg(any(test, feature = "test"))]
 pub mod event_test_util;

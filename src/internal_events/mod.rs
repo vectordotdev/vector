@@ -300,11 +300,12 @@ pub use self::windows::*;
 #[cfg(feature = "sources-mongodb_metrics")]
 pub use mongodb_metrics::*;
 
+// this version won't be needed once all `InternalEvent`s implement `name()`
 #[cfg(test)]
 #[macro_export]
 macro_rules! emit {
     ($event:expr) => {
-        vector_core::internal_event::emit(&vector_core::internal_event::NamedInternalEvent {
+        vector_core::internal_event::emit(&vector_core::internal_event::DefaultNameInternalEvent {
             event: $event,
             name: stringify!($event),
         })
