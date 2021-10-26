@@ -11,6 +11,7 @@ use crate::{
     parse_grok_pattern::parse_grok_pattern,
 };
 use itertools::{Itertools, Position};
+use std::collections::BTreeMap;
 use vrl_compiler::Value;
 
 #[derive(Debug, Clone)]
@@ -29,89 +30,92 @@ pub enum Error {
     UnknownFilter(String),
 }
 
-/**
-Parses DD grok rules.
+///
+/// Parses DD grok rules.
+///
+/// Here is an example:
+/// patterns:
+///  %{access.common} \[%{_date_access}\] "(?>%{_method} |)%{_url}(?> %{_version}|)" %{_status_code} (?>%{_bytes_written}|-)
+///  %{access.common} (%{number:duration:scale(1000000000)} )?"%{_referer}" "%{_user_agent}"( "%{_x_forwarded_for}")?.*"#
+/// aliases:
+///  "access.common" : %{_client_ip} %{_ident} %{_auth}
+///
+/// You can write grok patterns with the %{MATCHER:EXTRACT:FILTER} syntax:
+/// - Matcher: A rule (possibly a reference to another token rule) that describes what to expect (number, word, notSpace, etc.)
+/// - Extract (optional): An identifier representing the capture destination for the piece of text matched by the Matcher.
+/// - Filter (optional): A post-processor of the match to transform it.
+///
+/// Rules can reference aliases as %{alias_name}, aliases can reference each other themselves, cross-references or circular dependencies are not allowed and result in an error.
+/// Only one can match any given log. The first one that matches, from top to bottom, is the one that does the parsing.
+/// For further documentation and the full list of available matcher and filters check out https://docs.datadoghq.com/logs/processing/parsing
+pub fn parse_grok_rules(
+    patterns: &[String],
+    aliases: BTreeMap<&str, String>,
+) -> Result<Vec<GrokRule>, Error> {
+    let mut parsed_aliases: HashMap<String, ParsedGrokRule> = HashMap::new();
 
-Here is an example:
-patterns:
-%{access.common} \[%{_date_access}\] "(?>%{_method} |)%{_url}(?> %{_version}|)" %{_status_code} (?>%{_bytes_written}|-)
-%{access.common} (%{number:duration:scale(1000000000)} )?"%{_referer}" "%{_user_agent}"( "%{_x_forwarded_for}")?.*"#
-aliases:
-"access.common" : %{_client_ip} %{_ident} %{_auth}
+    for (name, alias) in &aliases {
+        if !alias.is_empty() {
+            let parsed_alias = parse_grok_rule(&alias, &aliases, &mut parsed_aliases)?;
+            parsed_aliases.insert(name.to_string(), parsed_alias);
+        }
+    }
 
-You can write parsing rules with the %{MATCHER:EXTRACT:FILTER} syntax:
-- Matcher: A rule (possibly a reference to another token rule) that describes what to expect (number, word, notSpace, etc.)
-- Extract (optional): An identifier representing the capture destination for the piece of text matched by the Matcher.
-- Filter (optional): A post-processor of the match to transform it.
-
-Each rule can reference parsing rules defined above itself in the list.
-Only one can match any given log. The first one that matches, from top to bottom, is the one that does the parsing.
-For further documentation and the full list of available matcher and filters check out https://docs.datadoghq.com/logs/processing/parsing
-*/
-pub fn parse_grok_rules(patterns: &[String], aliases: &[String]) -> Result<Vec<GrokRule>, Error> {
-    let mut parsed_rules: HashMap<&str, ParsedGrokRule> = HashMap::new();
     let mut grok = initialize_grok();
 
-    // parse helper rules to reference them later in the match rules
-    parse_rules(aliases, &mut parsed_rules, &mut grok)?;
-    // parse match rules and return them
-    parse_rules(patterns, &mut parsed_rules, &mut grok)
+    patterns
+        .iter()
+        .filter(|&r| !r.is_empty())
+        .map(|r| parse_pattern(r, &aliases, &mut parsed_aliases, &mut grok))
+        .collect::<Result<Vec<GrokRule>, Error>>()
 }
 
 /// The result of parsing grok rules - pure grok definitions, which can be feed directly to the grok,
 /// and rule filters to post-process extracted fields
+#[derive(Debug, Clone)]
 struct ParsedGrokRule {
     pub definition: String,
     pub filters: HashMap<LookupBuf, Vec<GrokFilter>>,
 }
 
-/// Parses a set of grok rules and collects parsed rules along the way,
-/// in case they are referenced in the next rules.
-fn parse_rules<'a>(
-    parsing_rules: &'a [String],
-    mut parsed_rules: &mut HashMap<&'a str, ParsedGrokRule>,
+fn parse_pattern<'a>(
+    pattern: &str,
+    aliases: &BTreeMap<&'a str, String>,
+    parsed_aliases: &mut HashMap<String, ParsedGrokRule>,
     mut grok: &mut Grok,
-) -> Result<Vec<GrokRule>, Error> {
-    parsing_rules
-        .iter()
-        .filter(|&r| !r.is_empty())
-        .map(|r| parse_grok_rule(r, &mut parsed_rules, &mut grok))
-        .collect::<Result<Vec<GrokRule>, Error>>()
+) -> Result<GrokRule, Error> {
+    let parsed_pattern = parse_grok_rule(pattern, aliases, parsed_aliases)?;
+    let mut pattern = String::new();
+    pattern.push('^');
+    pattern.push_str(parsed_pattern.definition.as_str());
+    pattern.push('$');
+
+    // compile pattern
+    let pattern = Arc::new(
+        grok.compile(&pattern, true)
+            .map_err(|e| Error::InvalidGrokExpression(pattern, e.to_string()))?,
+    );
+
+    Ok(GrokRule {
+        pattern,
+        filters: parsed_pattern.filters,
+    })
 }
 
 /// Parses a given rule to a pure grok pattern with a set of post-processing filters.
 fn parse_grok_rule<'a>(
     rule: &'a str,
-    mut aliases: &mut HashMap<&'a str, ParsedGrokRule>,
-    grok: &mut Grok,
-) -> Result<GrokRule, Error> {
-    let mut split_whitespace = rule.splitn(2, ' ');
-    let split = split_whitespace.by_ref();
-    let rule_name = split.next().ok_or_else(|| {
-        Error::InvalidGrokExpression(
-            rule.to_string(),
-            "format must be: 'ruleName definition'".into(),
-        )
-    })?;
-    let mut rule_def = split
-        .next()
-        .ok_or_else(|| {
-            Error::InvalidGrokExpression(
-                rule.to_string(),
-                "format must be: 'ruleName definition'".into(),
-            )
-        })?
-        .to_string();
-
-    let rule_def_cloned = rule_def.clone();
+    aliases: &BTreeMap<&'a str, String>,
+    parsed_aliases: &mut HashMap<String, ParsedGrokRule>,
+) -> Result<ParsedGrokRule, Error> {
     lazy_static! {
         static ref GROK_PATTERN_RE: onig::Regex =
             onig::Regex::new(r#"%\{([^"\}]|(?<!\+)"(\\"|[^"])*(?<!\+)")+\}"#).unwrap();
     }
     // find all patterns %{}
     let raw_grok_patterns = GROK_PATTERN_RE
-        .find_iter(rule_def_cloned.as_str())
-        .map(|(start, end)| &rule_def_cloned[start..end])
+        .find_iter(rule)
+        .map(|(start, end)| &rule[start..end])
         .collect::<Vec<&str>>();
     // parse them
     let mut grok_patterns = raw_grok_patterns
@@ -127,16 +131,17 @@ fn parse_grok_rule<'a>(
     let mut filters: HashMap<LookupBuf, Vec<GrokFilter>> = HashMap::new();
     let pure_grok_patterns: Vec<String> = grok_patterns
         .iter()
-        .map(|pattern| purify_grok_pattern(&pattern, &mut filters, &mut aliases))
+        .map(|pattern| purify_grok_pattern(&pattern, &mut filters, aliases, parsed_aliases))
         .collect::<Result<Vec<String>, Error>>()?;
 
     // replace grok patterns with "purified" ones
+    let mut rule_definition = rule.to_string();
     for (r, pure) in raw_grok_patterns.iter().zip(pure_grok_patterns.iter()) {
-        rule_def = rule_def.replacen(r, pure.as_str(), 1);
+        rule_definition = rule_definition.replacen(r, pure.as_str(), 1);
     }
 
     // collect all filters to apply later
-    for pattern in grok_patterns {
+    for pattern in &grok_patterns {
         if let GrokPattern {
             destination:
                 Some(Destination {
@@ -155,26 +160,10 @@ fn parse_grok_rule<'a>(
         }
     }
 
-    let mut pattern = String::new();
-    pattern.push('^');
-    pattern.push_str(rule_def.as_str());
-    pattern.push('$');
-
-    // store rule definitions and filters in case this rule is referenced in the next rules
-    aliases.insert(
-        rule_name,
-        ParsedGrokRule {
-            definition: rule_def,
-            filters: filters.clone(),
-        },
-    );
-
-    let pattern = Arc::new(
-        grok.compile(&pattern, true)
-            .map_err(|e| Error::InvalidGrokExpression(pattern, e.to_string()))?,
-    );
-
-    Ok(GrokRule { pattern, filters })
+    Ok(ParsedGrokRule {
+        definition: rule_definition,
+        filters,
+    })
 }
 
 /// Replaces repeated field names with indexed versions, e.g. : field.name, field.name -> field.name.0, field.name.1 to avoid collisions in grok.
@@ -212,28 +201,36 @@ fn index_repeated_fields(grok_patterns: Vec<GrokPattern>) -> Vec<GrokPattern> {
 
 /// Converts each rule to a pure grok rule:
 ///  - strips filters and collects them to apply later
-///  - replaces references to previous rules with actual definitions
+///  - replaces references to aliases with their definitions
 ///  - replaces match functions with corresponding regex groups.
 fn purify_grok_pattern(
     pattern: &GrokPattern,
     mut filters: &mut HashMap<LookupBuf, Vec<GrokFilter>>,
-    parsed_rules: &mut HashMap<&str, ParsedGrokRule>,
+    aliases: &BTreeMap<&str, String>,
+    parsed_aliases: &mut HashMap<String, ParsedGrokRule>,
 ) -> Result<String, Error> {
     let mut res = String::new();
-    if parsed_rules.contains_key(pattern.match_fn.name.as_str()) {
-        // this is a reference to a previous rule - replace it and copy all destinations from the prev rule
-        res.push_str(
-            parsed_rules
-                .get(pattern.match_fn.name.as_str())
-                .unwrap()
-                .definition
-                .as_str(),
-        );
-        if let Some(prev_rule) = parsed_rules.get(pattern.match_fn.name.as_str()) {
-            prev_rule.filters.iter().for_each(|(path, function)| {
+
+    if aliases.contains_key(pattern.match_fn.name.as_str()) {
+        // this is a reference to an alias - replace it and copy all filters from the alias
+        let definition = match parsed_aliases.get(pattern.match_fn.name.as_str()) {
+            Some(alias) => alias.definition.clone(),
+            None => {
+                // this alias is not parsed yet - let's parse it first
+                let alias = parse_grok_rule(&pattern.match_fn.name, aliases, parsed_aliases)?;
+                parsed_aliases.insert(pattern.match_fn.name.to_string(), alias.clone());
+                alias.definition
+            }
+        };
+        res.push_str(definition.as_str());
+        parsed_aliases
+            .get(pattern.match_fn.name.as_str())
+            .expect("alias was not found")
+            .filters
+            .iter()
+            .for_each(|(path, function)| {
                 filters.insert(path.to_owned(), function.to_owned());
             });
-        }
     } else if pattern.match_fn.name == "regex"
         || pattern.match_fn.name == "date"
         || pattern.match_fn.name == "boolean"
