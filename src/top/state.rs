@@ -1,5 +1,5 @@
 use crate::config::ComponentKey;
-use std::collections::btree_map::BTreeMap;
+use std::collections::BTreeMap;
 use tokio::sync::mpsc;
 
 type IdentifiedMetric = (ComponentKey, i64);
