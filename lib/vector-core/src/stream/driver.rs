@@ -303,6 +303,7 @@ mod tests {
     use std::{
         collections::VecDeque,
         future::Future,
+        iter::repeat_with,
         num::NonZeroUsize,
         pin::Pin,
         sync::atomic::Ordering,
@@ -313,7 +314,7 @@ mod tests {
 
     use buffers::{Ackable, Acker};
     use futures_util::{ready, stream};
-    use proptest::{collection::vec_deque, prop_assert_eq, proptest, strategy::Strategy};
+    use proptest::{collection::vec as arb_vec, prop_assert_eq, proptest, strategy::Strategy};
     use rand::{prelude::StdRng, SeedableRng};
     use rand_distr::{Distribution, Pareto};
     use tokio::{
@@ -471,13 +472,8 @@ mod tests {
         #[test]
         fn acknowledgement_tracker_gauntlet(
             seq_ack_order in arb_shuffled_seq_nums(0..1000_usize),
-            // TODO: We ensure we have the same number of batch size values as we do sequence
-            // numbers to acknowledge, but since the batch size could be 0, we could theoretically
-            // have all zeroes and never actually mark any sequence numbers complete.  I tried
-            // finding a component for "deterministically seeded infinite integer iterator" but
-            // `proptest` doesn't seem to have one.  Might be worth writing one, but it would also
-            // be hard(er), maybe not possible at all, to shrink.... which feels important.  Maybe not?
-            mut ack_batch_size in vec_deque(0..100, 1000..=1000),
+            batch_size_seed in arb_vec(0..100_usize, 5..=10),
+            max_batch_size in 2..=10_usize,
         ) {
             // `AcknowledgementTracker` uses a newtype wrapper, `SequenceNumber`, to dole out its
             // sequence numbers in a way that ensures callers can't arbitrarily pass in sequence
@@ -512,11 +508,31 @@ mod tests {
             assert!(seq_nums.is_empty());
             assert_eq!(seq_ack_order.len(), reordered_seq_nums.len());
 
+            // Generate our batch sizes.  We want to ensure that we're able to eventually drain all
+            // sequence numbers from the input, while still letting `proptest` drive the batch sizes
+            // used.  This is problematic because `proptest` has no way to ask for an infinite
+            // iterator natively.  We approximate this by having it give us a set of batch size
+            // "seeds", as well as a variable max batch size, which we use to construct our own
+            // infinite iterator.  This iterator is obviously not _directly_ shrinkable by
+            // `proptest`, because values will immediately diverge from the seeds rather than simply
+            // being cycled endlessly, but it should suffice for generating random values over time
+            // that are, essentially, deterministic based on the given seed.
+            let mut next_base = batch_size_seed.into_iter().cycle();
+
+            let mut last_output: usize = 0;
+            let mut batch_sizes = repeat_with(move || {
+                let base = next_base.next().expect("repeat iterator should never be empty");
+                let modified = base + last_output;
+                let next_output = modified % max_batch_size;
+                last_output = next_output;
+                next_output
+            });
+
             // Now start acknowledging sequence numbers.  We do this in variable-sized chunks, based
             // on `ack_batch_size`, and get the ack depth at the end of the every batch,
             // accumulating it as part of the total.
             while !reordered_seq_nums.is_empty() {
-                let batch_size = ack_batch_size.pop_front().expect("should always have enough batch size values");
+                let batch_size = batch_sizes.next().expect("repeat iterator should never be empty");
                 for _ in 0..batch_size {
                     match reordered_seq_nums.pop_front() {
                         None => break,
@@ -545,13 +561,13 @@ mod tests {
         // RNG, so the test should always run in a fairly constant time between runs.
         //
         // TODO: Given the use of a deterministic RNG, we could likely transition this test to be
-        // driven via `proptest`, to also allow driving the the input requests.  The main thing that
-        // we do not control is the arrival of requests in the input stream itself, which means that
+        // driven via `proptest`, to also allow driving the input requests.  The main thing that we
+        // do not control is the arrival of requests in the input stream itself, which means that
         // the generated batches will almost always be the biggest possible size, since the stream
         // is always immediately available.
         //
         // It might be possible to spawn a background task to drive a true MPSC channel with
-        // requesats based on input provided from `proptest` to control not only the value (which
+        // requests based on input provided from `proptest` to control not only the value (which
         // determines ack size) but the delay between messages, as well... simulating delays between
         // bursts of messages, similar to real sources.
 
@@ -559,7 +575,7 @@ mod tests {
         let input_requests = (0..2048).into_iter().collect::<Vec<_>>();
         let input_total: usize = input_requests.iter().sum();
         let input_stream = stream::iter(input_requests.into_iter().map(DelayRequest));
-        let service = DelayService::new(10, Duration::from_millis(10), Duration::from_millis(175));
+        let service = DelayService::new(10, Duration::from_millis(5), Duration::from_millis(150));
         let (acker, counter) = Acker::new_for_testing();
         let driver = Driver::new(input_stream, service, acker);
 
