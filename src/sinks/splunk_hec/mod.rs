@@ -1,12 +1,11 @@
 use crate::config::SinkDescription;
 
 mod common;
-mod conn;
 pub mod logs;
 pub mod metrics;
-pub mod metrics_new;
 
-use logs::config::HecSinkLogsConfig;
+use self::logs::config::HecSinkLogsConfig;
+use self::metrics::config::HecMetricsSinkConfig;
 
 // legacy
 inventory::submit! {
@@ -18,5 +17,5 @@ inventory::submit! {
 }
 
 inventory::submit! {
-    SinkDescription::new::<metrics::HecSinkMetricsConfig>("splunk_hec_metrics")
+    SinkDescription::new::<HecMetricsSinkConfig>("splunk_hec_metrics")
 }

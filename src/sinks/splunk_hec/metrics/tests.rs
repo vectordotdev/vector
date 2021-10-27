@@ -1,7 +1,7 @@
 use super::config::HecMetricsSinkConfig;
 use super::sink::{process_metric, HecProcessedEvent};
 use crate::event::{Metric, MetricKind, MetricValue};
-use crate::sinks::splunk_hec::metrics_new::encoder::HecMetricsEncoder;
+use crate::sinks::splunk_hec::metrics::encoder::HecMetricsEncoder;
 use crate::template::Template;
 use chrono::{DateTime, Utc};
 use serde_json::json;
