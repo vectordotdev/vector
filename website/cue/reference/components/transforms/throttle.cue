@@ -103,14 +103,14 @@ components: transforms: throttle: {
 
 	how_it_works: {
 		rate_limiting: {
-			title: "Rate Limiting"
+			title: "Rate Limited Events"
 			body: #"""
-				The `throttle` transform will bucket events into rate limiters based on your provided `key_field`, or a
-				single bucket if not provided. The rate limiter will allow up to your `threshold` of events through and
+				The `throttle` transform buckets events into rate limiters based on the provided `key_field`, or a
+				single bucket if not provided. The rate limiter will allow up to `threshold` number of events through and
 				drop any further events for that particular bucket. Any event above the configured rate limit will be
-				discarded.
+				discarded and exposed by an `events_discarded_total` metric.
 				
-				This limit will replenish based on your configured `window` option, such that when the `threshold` has
+				This limit will replenish based on the configured `window` option, such that when the `threshold` has
 				been reached it will be fully replenished after the the entire `window` duration has passed. This is
 				replenished incrementally throughout the `window` period.
 				"""#
