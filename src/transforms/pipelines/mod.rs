@@ -4,7 +4,7 @@ mod router;
 use crate::config::{
     DataType, ExpandType, GenerateConfig, TransformConfig, TransformContext, TransformDescription,
 };
-use crate::transforms::Transform;
+use crate::transforms::{noop::Noop, Transform};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
@@ -54,12 +54,14 @@ impl Clone for PipelineConfig {
 
 impl PipelineConfig {
     fn into_serial(&self) -> Box<dyn TransformConfig> {
-        let pipelines: IndexMap<String, Box<dyn TransformConfig>> = self
+        let mut pipelines: IndexMap<String, Box<dyn TransformConfig>> = self
             .transforms
             .iter()
             .enumerate()
             .map(|(index, config)| (index.to_string(), config.clone()))
             .collect();
+
+        pipelines.insert("".to_string(), Box::new(Noop));
 
         Box::new(expander::ExpanderConfig::serial(pipelines))
     }
@@ -89,7 +91,7 @@ impl EventTypeConfig {
     }
 
     fn into_serial(&self) -> Box<dyn TransformConfig> {
-        let pipelines: IndexMap<String, Box<dyn TransformConfig>> = self
+        let mut pipelines: IndexMap<String, Box<dyn TransformConfig>> = self
             .names()
             .into_iter()
             .filter_map(|name| {
@@ -98,6 +100,8 @@ impl EventTypeConfig {
                     .map(|config| (name, config.into_serial()))
             })
             .collect();
+
+        pipelines.insert("".to_string(), Box::new(Noop));
 
         Box::new(expander::ExpanderConfig::serial(pipelines))
     }
@@ -112,16 +116,8 @@ pub struct PipelinesConfig {
     metrics: EventTypeConfig,
 }
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "pipelines")]
-impl TransformConfig for PipelinesConfig {
-    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Err("this transform must be expanded".into())
-    }
-
-    fn expand(
-        &mut self,
-    ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
+impl PipelinesConfig {
+    fn into_parallel(&self) -> IndexMap<String, Box<dyn TransformConfig>> {
         let mut map: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
 
         if !self.logs.is_empty() {
@@ -140,11 +136,28 @@ impl TransformConfig for PipelinesConfig {
             );
         }
 
-        if !map.is_empty() {
-            Ok(Some((map, ExpandType::Parallel)))
-        } else {
-            Err("must specify at least one pipeline".into())
-        }
+        map
+    }
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "pipelines")]
+impl TransformConfig for PipelinesConfig {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
+        Err("this transform must be expanded".into())
+    }
+
+    fn expand(
+        &mut self,
+    ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
+        let mut map: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
+        map.insert(
+            "inner".to_string(),
+            Box::new(expander::ExpanderConfig::parallel(self.into_parallel())),
+        );
+        map.insert(String::new(), Box::new(Noop));
+
+        Ok(Some((map, ExpandType::Serial)))
     }
 
     fn input_type(&self) -> DataType {

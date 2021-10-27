@@ -113,7 +113,7 @@ impl TransformConfig for RouteConfig {
         }
 
         if !map.is_empty() {
-            Ok(Some((map, ExpandType::Parallel)))
+            Ok(Some((map, ExpandType::Parallel { aggregates: false })))
         } else {
             Err("must specify at least one lane".into())
         }
