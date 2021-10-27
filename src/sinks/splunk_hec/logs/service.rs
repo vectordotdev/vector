@@ -3,23 +3,21 @@ use std::{
     task::{Context, Poll},
 };
 
-use crate::{
-    sinks::{
-        splunk_hec::common::build_request,
-        util::{http::HttpBatchService, ElementCount},
-    },
+use crate::sinks::{
+    splunk_hec::common::build_request,
+    util::{http::HttpBatchService, ElementCount},
 };
 use bytes::Bytes;
 use futures_util::future::BoxFuture;
 use http::{Request, Response};
 use tower::{Service, ServiceExt};
+use vector_core::internal_event::EventsSent;
+use vector_core::stream::DriverResponse;
 use vector_core::{
     buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
     ByteSizeOf,
 };
-use vector_core::internal_event::EventsSent;
-use vector_core::stream::DriverResponse;
 
 use crate::{http::HttpClient, sinks::util::Compression};
 
@@ -72,7 +70,7 @@ impl Service<HecLogsRequest> for HecLogsService {
                 http_response: response,
                 event_status,
                 events_count,
-                events_byte_size
+                events_byte_size,
             })
         })
     }
@@ -114,7 +112,7 @@ pub struct HecLogsResponse {
     pub http_response: Response<Bytes>,
     event_status: EventStatus,
     events_count: usize,
-    events_byte_size: usize
+    events_byte_size: usize,
 }
 
 impl DriverResponse for HecLogsResponse {
@@ -125,7 +123,7 @@ impl DriverResponse for HecLogsResponse {
     fn events_sent(&self) -> EventsSent {
         EventsSent {
             count: self.events_count,
-            byte_size: self.events_byte_size
+            byte_size: self.events_byte_size,
         }
     }
 }

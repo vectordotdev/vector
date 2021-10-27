@@ -3,9 +3,10 @@ use std::collections::HashSet;
 
 thread_local!(
     /// A buffer for recording internal events emitted by a single test.
-    static EVENTS_RECORDED: RefCell<HashSet<String>> = RefCell::new(Default::default());
+    static EVENTS_RECORDED: RefCell<HashSet<String>> = RefCell::new(HashSet::new());
 );
 
+#[must_use]
 pub fn contains_name(name: &str) -> bool {
     EVENTS_RECORDED.with(|events| events.borrow().iter().any(|event| event.ends_with(name)))
 }
@@ -33,6 +34,6 @@ pub fn record_internal_event(event: &str) {
     // Remove leading '&'
     // Remove trailing '{fields…}'
     let event = event.strip_prefix('&').unwrap_or(event);
-    let event = event.find('{').map(|par| &event[..par]).unwrap_or(event);
+    let event = event.find('{').map_or(event, |par| &event[..par]);
     EVENTS_RECORDED.with(|er| er.borrow_mut().insert(event.into()));
 }
