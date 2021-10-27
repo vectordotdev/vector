@@ -23,8 +23,8 @@ use vector_core::{
 use super::request_builder::HecMetricsRequestBuilder;
 
 pub struct HecMetricsSink<S> {
-    context: SinkContext,
-    service: S,
+    pub context: SinkContext,
+    pub service: S,
     pub batch_settings: BatcherSettings,
     pub request_builder: HecMetricsRequestBuilder,
     pub sourcetype: Option<Template>,

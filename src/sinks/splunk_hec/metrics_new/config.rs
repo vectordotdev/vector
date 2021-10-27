@@ -9,7 +9,8 @@ use crate::sinks::splunk_hec::common::retry::HecRetryLogic;
 use crate::sinks::splunk_hec::common::service::{HecService, HttpRequestBuilder};
 use crate::sinks::splunk_hec::common::{build_healthcheck, create_client, host_key};
 use crate::sinks::splunk_hec::metrics_new::request_builder::HecMetricsRequestBuilder;
-use crate::sinks::util::{BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig};
+use crate::sinks::splunk_hec::metrics_new::sink::HecMetricsSink;
+use crate::sinks::util::{BatchConfig, BatchSettings, Buffer, Compression, ServiceBuilderExt, TowerRequestConfig};
 use crate::sinks::Healthcheck;
 use crate::template::Template;
 use crate::tls::TlsOptions;
@@ -94,10 +95,23 @@ impl HecMetricsSinkConfig {
             .settings(request_settings, HecRetryLogic)
             .service(HecService::new(client, http_request_builder));
 
-        // Create a HEC metrics sink
-        let sink = todo!();
+        let batch_settings = BatchSettings::<Buffer>::default()
+            .bytes(1_000_000)
+            .timeout(1)
+            .parse_config(self.batch)?
+            .into_batcher_settings()?;
+        let sink = HecMetricsSink {
+            context: cx,
+            service,
+            batch_settings,
+            request_builder,
+            sourcetype: self.sourcetype.clone(),
+            source: self.source.clone(),
+            index: self.index.clone(),
+            host: self.host_key.clone(),
+            default_namespace: self.default_namespace.clone(),
+        };
 
-        // Ok(VectorSink::Stream(Box::new(sink)))
-        todo!()
+        Ok(VectorSink::Stream(Box::new(sink)))
     }
 }
