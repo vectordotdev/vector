@@ -10,6 +10,9 @@ use crate::sinks::aws_kinesis_streams::encode_event;
 use crate::sinks::aws_kinesis_streams::request_builder::KinesisRequest;
 use crate::sinks::util::sink;
 use std::fmt;
+use vector_core::internal_event::EventsSent;
+use vector_core::stream::DriverResponse;
+use crate::event::EventStatus;
 use crate::internal_events::AwsKinesisStreamsEventSent;
 
 
@@ -55,11 +58,17 @@ pub struct KinesisService {
 // }
 
 pub struct KinesisResponse {
-
+    count:
 }
 
 impl DriverResponse for KinesisResponse {
+    fn event_status(&self) -> EventStatus {
+        EventStatus::Delivered
+    }
 
+    fn events_sent(&self) -> EventsSent {
+        todo!()
+    }
 }
 
 impl Service<Vec<KinesisRequest>> for KinesisService {
