@@ -6,6 +6,7 @@ use crate::template::Template;
 use bytes::Bytes;
 use rdkafka::message::OwnedHeaders;
 use vector_core::config::LogSchema;
+use vector_core::ByteSizeOf;
 
 pub struct KafkaRequestBuilder {
     pub key_field: Option<String>,
@@ -26,9 +27,13 @@ impl KafkaRequestBuilder {
             topic,
         };
         let mut body = vec![];
+        let event_byte_size = event.size_of();
         self.encoder.encode_input(event, &mut body).ok()?;
-
-        Some(KafkaRequest { body, metadata })
+        Some(KafkaRequest {
+            body,
+            metadata,
+            event_byte_size,
+        })
     }
 }
 

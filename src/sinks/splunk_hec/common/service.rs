@@ -4,7 +4,6 @@ use std::{
 };
 
 use crate::{
-    internal_events::EventsSent,
     sinks::{
         splunk_hec::common::{build_request, request::HecRequest, response::HecResponse},
         util::http::HttpBatchService,
@@ -50,13 +49,9 @@ impl Service<HecRequest> for HecService {
         Box::pin(async move {
             http_service.ready().await?;
             let events_count = req.events_count;
-            let byte_size = req.events_byte_size;
+            let events_byte_size = req.events_byte_size;
             let response = http_service.call(req).await?;
             let event_status = if response.status().is_success() {
-                emit!(&EventsSent {
-                    count: events_count,
-                    byte_size,
-                });
                 EventStatus::Delivered
             } else if response.status().is_server_error() {
                 EventStatus::Errored
@@ -67,6 +62,8 @@ impl Service<HecRequest> for HecService {
             Ok(HecResponse {
                 http_response: response,
                 event_status,
+                events_count,
+                events_byte_size,
             })
         })
     }

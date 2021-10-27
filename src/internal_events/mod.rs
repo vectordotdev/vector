@@ -140,6 +140,14 @@ mod udp;
 mod unix;
 mod vector;
 
+#[cfg(any(
+    feature = "sources-file",
+    feature = "sources-kubernetes_logs",
+    feature = "sinks-file",
+))]
+mod file;
+mod windows;
+
 pub mod kubernetes;
 
 pub use self::adaptive_concurrency::*;
@@ -292,13 +300,16 @@ pub use self::windows::*;
 #[cfg(feature = "sources-mongodb_metrics")]
 pub use mongodb_metrics::*;
 
+// this version won't be needed once all `InternalEvent`s implement `name()`
 #[cfg(test)]
 #[macro_export]
 macro_rules! emit {
-    ($event:expr) => {{
-        crate::test_util::components::record_internal_event(stringify!($event));
-        vector_core::internal_event::emit($event)
-    }};
+    ($event:expr) => {
+        vector_core::internal_event::emit(&vector_core::internal_event::DefaultName {
+            event: $event,
+            name: stringify!($event),
+        })
+    };
 }
 
 #[cfg(not(test))]
@@ -308,15 +319,6 @@ macro_rules! emit {
         vector_core::internal_event::emit($event)
     };
 }
-
-// Modules that require emit! macro so they need to be defined after the macro.
-#[cfg(any(
-    feature = "sources-file",
-    feature = "sources-kubernetes_logs",
-    feature = "sinks-file",
-))]
-mod file;
-mod windows;
 
 const ELLIPSIS: &str = "[...]";
 

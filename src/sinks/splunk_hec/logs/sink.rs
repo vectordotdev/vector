@@ -3,9 +3,10 @@ use std::{fmt, num::NonZeroUsize};
 use async_trait::async_trait;
 use futures_util::{future, stream::BoxStream, StreamExt};
 use tower::Service;
+use vector_core::stream::DriverResponse;
 use vector_core::{
     config::log_schema,
-    event::{Event, EventStatus, LogEvent, Value},
+    event::{Event, LogEvent, Value},
     partition::NullPartitioner,
     sink::StreamSink,
     stream::BatcherSettings,
@@ -39,7 +40,7 @@ impl<S> HecLogsSink<S>
 where
     S: Service<HecRequest> + Send + 'static,
     S::Future: Send + 'static,
-    S::Response: AsRef<EventStatus> + Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
     S::Error: fmt::Debug + Into<crate::Error> + Send,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
@@ -86,7 +87,7 @@ impl<S> StreamSink for HecLogsSink<S>
 where
     S: Service<HecRequest> + Send + 'static,
     S::Future: Send + 'static,
-    S::Response: AsRef<EventStatus> + Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
     S::Error: fmt::Debug + Into<crate::Error> + Send,
 {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
