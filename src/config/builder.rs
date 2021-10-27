@@ -342,9 +342,9 @@ mod tests {
         match value {
             // Should serialize to a map.
             Value::Object(map) => {
-                // Check ordering.
-                for (i, (key, _)) in map.iter().enumerate() {
-                    assert_eq!(key, expected_keys[i])
+                for (k1, k2) in map.keys().zip(expected_keys) {
+                    // Check ordering.
+                    assert_eq!(k1, k2)
                 }
             }
             _ => panic!("should serialize to object"),
