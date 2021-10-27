@@ -5,7 +5,7 @@ use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkConte
 use crate::rusoto::{AwsAuthentication, RegionOrEndpoint};
 use crate::sinks::aws_kinesis_streams::service::KinesisService;
 use crate::sinks::util::{BatchConfig, Compression, TowerRequestConfig};
-use crate::sinks::util::encoding::EncodingConfig;
+use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
 use futures::FutureExt;
 
 #[derive(Debug, Snafu)]
@@ -30,7 +30,7 @@ pub struct KinesisSinkConfig {
     pub partition_key_field: Option<String>,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub encoding: EncodingConfig<Encoding>,
+    pub encoding: EncodingConfig<StandardEncodings>,
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
@@ -41,13 +41,6 @@ pub struct KinesisSinkConfig {
     assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Text,
-    Json,
 }
 
 impl KinesisSinkConfig {

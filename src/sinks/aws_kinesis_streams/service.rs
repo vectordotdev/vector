@@ -1,5 +1,17 @@
+use std::task::{Context, Poll};
+use futures::future::BoxFuture;
+use futures::TryFutureExt;
+use rusoto_core::RusotoError;
+use rusoto_kinesis::{Kinesis, KinesisClient, PutRecordsError, PutRecordsInput, PutRecordsOutput};
+use tower::Service;
+use tracing::Instrument;
+use crate::sinks::aws_kinesis_streams::config::KinesisSinkConfig;
 use crate::sinks::aws_kinesis_streams::encode_event;
+use crate::sinks::aws_kinesis_streams::request_builder::KinesisRequest;
 use crate::sinks::util::sink;
+use std::fmt;
+use crate::internal_events::AwsKinesisStreamsEventSent;
+
 
 #[derive(Clone)]
 pub struct KinesisService {
@@ -7,43 +19,51 @@ pub struct KinesisService {
     config: KinesisSinkConfig,
 }
 
-impl KinesisService {
-    pub fn new(
-        config: KinesisSinkConfig,
-        client: KinesisClient,
-        cx: SinkContext,
-    ) -> crate::Result<impl Sink<Event, Error = ()>> {
-        let batch = BatchSettings::default()
-            .bytes(5_000_000)
-            .events(500)
-            .timeout(1)
-            .parse_config(config.batch)?;
-        let request = config.request.unwrap_with(&TowerRequestConfig::default());
-        let encoding = config.encoding.clone();
-        let partition_key_field = config.partition_key_field.clone();
+// impl KinesisService {
+//     pub fn new(
+//         config: KinesisSinkConfig,
+//         client: KinesisClient,
+//         cx: SinkContext,
+//     ) -> crate::Result<impl Sink<Event, Error = ()>> {
+//         let batch = BatchSettings::default()
+//             .bytes(5_000_000)
+//             .events(500)
+//             .timeout(1)
+//             .parse_config(config.batch)?;
+//         let request = config.request.unwrap_with(&TowerRequestConfig::default());
+//         let encoding = config.encoding.clone();
+//         let partition_key_field = config.partition_key_field.clone();
+//
+//         let kinesis = KinesisService { client, config };
+//
+//         let sink = request
+//             .batch_sink(
+//                 KinesisRetryLogic,
+//                 kinesis,
+//                 VecBuffer::new(batch.size),
+//                 batch.timeout,
+//                 cx.acker(),
+//                 sink::StdServiceLogic::default(),
+//             )
+//             .sink_map_err(|error| error!(message = "Fatal kinesis streams sink error.", %error))
+//             .with_flat_map(move |e| {
+//                 stream::iter(encode_event(e, &partition_key_field, &encoding)).map(Ok)
+//             });
+//
+//         Ok(sink)
+//     }
+// }
 
-        let kinesis = KinesisService { client, config };
+pub struct KinesisResponse {
 
-        let sink = request
-            .batch_sink(
-                KinesisRetryLogic,
-                kinesis,
-                VecBuffer::new(batch.size),
-                batch.timeout,
-                cx.acker(),
-                sink::StdServiceLogic::default(),
-            )
-            .sink_map_err(|error| error!(message = "Fatal kinesis streams sink error.", %error))
-            .with_flat_map(move |e| {
-                stream::iter(encode_event(e, &partition_key_field, &encoding)).map(Ok)
-            });
-
-        Ok(sink)
-    }
 }
 
-impl Service<Vec<PutRecordsRequestEntry>> for KinesisService {
-    type Response = PutRecordsOutput;
+impl DriverResponse for KinesisResponse {
+
+}
+
+impl Service<Vec<KinesisRequest>> for KinesisService {
+    type Response = KinesisResponse;
     type Error = RusotoError<PutRecordsError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -51,13 +71,15 @@ impl Service<Vec<PutRecordsRequestEntry>> for KinesisService {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, records: Vec<PutRecordsRequestEntry>) -> Self::Future {
+    fn call(&mut self, requests: Vec<KinesisRequest>) -> Self::Future {
         debug!(
             message = "Sending records.",
-            events = %records.len(),
+            events = %requests.len(),
         );
 
-        let sizes: Vec<usize> = records.iter().map(|record| record.data.len()).collect();
+        let processed_bytes_total = requests.iter().map(|req|req.put_records_request.data.len()).sum();
+
+        let records = requests.iter().map(|req|req.put_records_request).collect();
 
         let client = self.client.clone();
         let request = PutRecordsInput {
@@ -66,15 +88,16 @@ impl Service<Vec<PutRecordsRequestEntry>> for KinesisService {
         };
 
         Box::pin(async move {
-            client
+            let response:() = client
                 .put_records(request)
                 .inspect_ok(|_| {
-                    for byte_size in sizes {
-                        emit!(&AwsKinesisStreamsEventSent { byte_size });
-                    }
+                    emit!(&AwsKinesisStreamsEventSent { processed_bytes_total });
                 })
                 .instrument(info_span!("request"))
-                .await
+                .await?;
+            Ok(KinesisResponse {
+
+            })
         })
     }
 }

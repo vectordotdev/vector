@@ -33,7 +33,7 @@ components: sinks: aws_kinesis_streams: components._aws & {
 				enabled: true
 				codec: {
 					enabled: true
-					enum: ["json", "text"]
+					enum: ["json", "text", "ndjson"]
 				}
 			}
 			proxy: enabled: true
