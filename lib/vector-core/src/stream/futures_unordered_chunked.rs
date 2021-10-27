@@ -33,6 +33,10 @@ impl<F: Future> FuturesUnorderedChunked<F> {
     ///
     /// The returned `FuturesUnorderedChunked` does not contain any futures. In this state, `FuturesUnordered
     /// Chunked::poll_next` will return `Poll::Ready(None)`.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if `chunk_size` is zero.
     pub fn new(chunk_size: usize) -> Self {
         assert!(chunk_size > 0);
 
@@ -102,7 +106,7 @@ impl<F: Future> Stream for FuturesUnorderedChunked<F> {
                     let last = if this.items.is_empty() {
                         None
                     } else {
-                        let full_buf = mem::replace(this.items, Vec::new());
+                        let full_buf = mem::take(this.items);
                         Some(full_buf)
                     };
 

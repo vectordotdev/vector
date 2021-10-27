@@ -13,22 +13,23 @@ use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
 
-#[derive(Eq)]
 struct PendingAcknowledgement {
-    seq_num: u64,
+    seq_num: SequenceNumber,
     ack_size: usize,
 }
 
 impl PartialEq for PendingAcknowledgement {
     fn eq(&self, other: &Self) -> bool {
-        self.seq_num == other.seq_num
+        self.seq_num.0 == other.seq_num.0
     }
 }
+
+impl Eq for PendingAcknowledgement {}
 
 impl PartialOrd for PendingAcknowledgement {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         // Reverse ordering so that in a `BinaryHeap`, the lowest sequence number is the highest priority.
-        Some(other.seq_num.cmp(&self.seq_num))
+        Some(other.seq_num.0.cmp(&self.seq_num.0))
     }
 }
 
@@ -37,6 +38,20 @@ impl Ord for PendingAcknowledgement {
         other
             .partial_cmp(self)
             .expect("PendingAcknowledgement should always return a valid comparison")
+    }
+}
+
+/// Newtype wrapper around sequence numbers to enforce misuse resistance.
+#[derive(Debug)]
+struct SequenceNumber(u64);
+
+impl SequenceNumber {
+    /// Gets the actual integer value of this sequence number.
+    ///
+    /// This can be used trivially for correlating a given `SequenceNumber` in logs/metrics/tracing
+    /// without consuming the `SequenceNumber` itself.
+    pub fn id(&self) -> u64 {
+        self.0
     }
 }
 
@@ -50,17 +65,16 @@ struct AcknowledgementTracker {
 
 impl AcknowledgementTracker {
     /// Acquires the next available sequence number.
-    pub fn get_next_seq_num(&mut self) -> u64 {
+    pub fn get_next_seq_num(&mut self) -> SequenceNumber {
         let seq_num = self.seq_head;
         self.seq_head += 1;
-        seq_num
+        SequenceNumber(seq_num)
     }
 
     /// Marks the given sequence number as complete.
-    pub fn mark_seq_num_complete(&mut self, seq_num: u64, ack_size: usize) {
-        assert!(seq_num <= self.seq_head);
-        assert!(seq_num >= self.seq_tail);
-        if seq_num == self.seq_tail {
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn mark_seq_num_complete(&mut self, seq_num: SequenceNumber, ack_size: usize) {
+        if seq_num.0 == self.seq_tail {
             self.ack_depth += ack_size;
             self.seq_tail += 1;
         } else {
@@ -69,16 +83,30 @@ impl AcknowledgementTracker {
         }
     }
 
-    /// Gets the acknowledgement "depth" based on previously marked sequence numbers.
+    /// Consumes the current acknowledgement "depth".
     ///
-    /// When a sequence number is marked as complete, we track its acknowledgement size.  The
-    /// acknowledgement size is accumulated internally for all in-order completions.  If we've
-    /// accumulated a non-zero acknowledgement depth, it is returned here and the depth is reset.
-    /// Otherwise, `None` is returned.
-    pub fn get_latest_ack_depth(&mut self) -> Option<NonZeroUsize> {
+    /// When a sequence number is marked as complete, we either update our tail pointer if the
+    /// acknowledgement is "in order" -- essentially, it was the very next sequence number we
+    /// expected to see -- or store it for later if it's out-of-order.
+    ///
+    /// In this method, we see if any of the out-of-order sequence numbers can now be applied: maybe
+    /// 9 sequence numbers were marked complete, but one number that came before all of them was
+    /// still pending, so they had to be stored in the out-of-order list to be checked later.  This is
+    /// where we check them.
+    ///
+    /// For any sequence number -- whether it completed in order or had to be applied from the
+    /// out-of-order list -- there is an associated acknowledge "depth", which can be though of the
+    /// amount of items the sequence is acknowledging as complete.
+    ///
+    /// We accumulate that amount for every sequence number between calls to `consume_ack_depth`.
+    /// Thus, a fresh instance of `AcknowledgementTracker` has an acknowledgement depth of 0.  If we
+    /// create five sequence numbers, and mark them all complete with an acknowledge ment of 10, our
+    /// depth would then be 50.  Calling this method would return `Some(50)`, and if this method was
+    /// called again immediately after, it would return `None`.
+    pub fn consume_ack_depth(&mut self) -> Option<NonZeroUsize> {
         // Drain any out-of-order acknowledgements that can now be ordered correctly.
         while let Some(ack) = self.out_of_order.peek() {
-            if ack.seq_num == self.seq_tail {
+            if ack.seq_num.0 == self.seq_tail {
                 let PendingAcknowledgement { ack_size, .. } = self
                     .out_of_order
                     .pop()
@@ -172,7 +200,7 @@ where
             //
             // Essentially, we bounce back and forth between "grab the new batch from the input
             // stream" and "send all requests in the batch to our service" which _could be trivially
-            // modeled with a normal imperative loop.  However, we wantr to be able to interleave the
+            // modeled with a normal imperative loop.  However, we want to be able to interleave the
             // acknowledgement of responses to allow buffers and sources to continue making forward
             // progress, which necessitates a more complex weaving of logic.  Using `select!` is
             // more code, and requires a more careful eye than blindly doing
@@ -188,11 +216,11 @@ where
                 // One or more of our service calls have completed.
                 Some(acks) = in_flight.next(), if !in_flight.is_empty() => {
                     for (seq_num, ack_size) in acks {
-                        trace!(message = "Sending request.", seq_num, ack_size);
+                        trace!(message = "Sending request.", ?seq_num, ack_size);
                         ack_tracker.mark_seq_num_complete(seq_num, ack_size);
                     }
 
-                    if let Some(ack_depth) = ack_tracker.get_latest_ack_depth() {
+                    if let Some(ack_depth) = ack_tracker.consume_ack_depth() {
                         trace!(message = "Acking events.", ack_size = ack_depth);
                         acker.ack(ack_depth.get());
                     }
@@ -225,6 +253,7 @@ where
 
                         let mut req = batch.pop_front().expect("batch should not be empty");
                         let seq_num = ack_tracker.get_next_seq_num();
+                        let seq_num_id = seq_num.id();
 
                         trace!(
                             message = "Submitting service request.",
@@ -238,18 +267,18 @@ where
                             .map(move |result: Result<Svc::Response, Svc::Error>| {
                                 let status = match result {
                                     Err(error) => {
-                                        error!(message = "Service call failed.", ?error, seq_num);
+                                        error!(message = "Service call failed.", ?error, seq_num = seq_num_id);
                                         EventStatus::Failed
                                     },
                                     Ok(response) => {
-                                        trace!(message = "Service call succeeded.", seq_num);
+                                        trace!(message = "Service call succeeded.", seq_num = seq_num_id);
                                         *response.as_ref()
                                     }
                                 };
                                 finalizers.update_status(status);
                                 (seq_num, ack_size)
                             })
-                            .instrument(info_span!("request", request_id = %seq_num));
+                            .instrument(info_span!("request", request_id = seq_num_id));
 
                         in_flight.push(fut);
                     }
@@ -272,6 +301,7 @@ where
 #[cfg(test)]
 mod tests {
     use std::{
+        collections::VecDeque,
         future::Future,
         num::NonZeroUsize,
         pin::Pin,
@@ -332,6 +362,10 @@ mod tests {
         upper_bound_us: u64,
     }
 
+    // Clippy is unhappy about all of our f64/u64 shuffling.  We don't actually care about losing
+    // the fractional part of 20,459.13142 or whatever.  It just doesn't matter for this test.
+    #[allow(clippy::cast_possible_truncation)]
+    #[allow(clippy::cast_precision_loss)]
     impl DelayService {
         pub fn new(permits: usize, lower_bound: Duration, upper_bound: Duration) -> Self {
             assert!(upper_bound > lower_bound);
@@ -343,7 +377,7 @@ mod tests {
                     3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3, 2, 3, 8, 4, 6, 2, 6, 4, 3, 3,
                     8, 3, 2, 7, 9, 5,
                 ]),
-                lower_bound_us: lower_bound.as_micros().min(10_000) as u64,
+                lower_bound_us: lower_bound.as_micros().max(10_000) as u64,
                 upper_bound_us: upper_bound.as_micros().max(10_000) as u64,
             }
         }
@@ -358,7 +392,7 @@ mod tests {
                 .map(|n| n * lower as f64)
                 .map(|n| n as u64)
                 .filter(|n| *n > lower && *n < upper)
-                .map(|n| Duration::from_micros(n))
+                .map(Duration::from_micros)
                 .next()
                 .expect("jitter iter should be endless")
         }
@@ -416,27 +450,27 @@ mod tests {
     fn acknowledgement_tracker_simple() {
         let mut ack_tracker = AcknowledgementTracker::default();
 
-        assert_eq!(ack_tracker.get_latest_ack_depth(), None);
+        assert_eq!(ack_tracker.consume_ack_depth(), None);
 
         let seq_num1 = ack_tracker.get_next_seq_num();
         ack_tracker.mark_seq_num_complete(seq_num1, 42);
 
-        assert_eq!(ack_tracker.get_latest_ack_depth(), NonZeroUsize::new(42));
-        assert_eq!(ack_tracker.get_latest_ack_depth(), None);
+        assert_eq!(ack_tracker.consume_ack_depth(), NonZeroUsize::new(42));
+        assert_eq!(ack_tracker.consume_ack_depth(), None);
 
         let seq_num2 = ack_tracker.get_next_seq_num();
         let seq_num3 = ack_tracker.get_next_seq_num();
         ack_tracker.mark_seq_num_complete(seq_num3, 314);
-        assert_eq!(ack_tracker.get_latest_ack_depth(), None);
+        assert_eq!(ack_tracker.consume_ack_depth(), None);
 
         ack_tracker.mark_seq_num_complete(seq_num2, 86);
-        assert_eq!(ack_tracker.get_latest_ack_depth(), NonZeroUsize::new(400));
+        assert_eq!(ack_tracker.consume_ack_depth(), NonZeroUsize::new(400));
     }
 
     proptest! {
         #[test]
         fn acknowledgement_tracker_gauntlet(
-            mut seq_ack_order in arb_shuffled_seq_nums(0..1000usize),
+            seq_ack_order in arb_shuffled_seq_nums(0..1000_usize),
             // TODO: We ensure we have the same number of batch size values as we do sequence
             // numbers to acknowledge, but since the batch size could be 0, we could theoretically
             // have all zeroes and never actually mark any sequence numbers complete.  I tried
@@ -445,37 +479,55 @@ mod tests {
             // be hard(er), maybe not possible at all, to shrink.... which feels important.  Maybe not?
             mut ack_batch_size in vec_deque(0..100, 1000..=1000),
         ) {
-            // We get the sequence numbers that we should acknowledge in randomized order, so we
-            // have to call `get_next_seq_num` as many times as the length of that vector to ensure
-            // `seq_head` is configured correctly.  Additionally, we also get a "batch size" which
-            // is how many items we should ack from `seq_ack_order` before getting the latest ack depth.
+            // `AcknowledgementTracker` uses a newtype wrapper, `SequenceNumber`, to dole out its
+            // sequence numbers in a way that ensures callers can't arbitrarily pass in sequence
+            // numbers that out outside of the valid numbers, or numbers we've already seen.
             //
-            // We also use the sequence number as the acknowledge size, which we check at the very
-            // end to ensure we got the expected total.
+            // This makes it harder to test since we want the order of sequence number
+            // acknowledgments to be driven by `proptest` itself.  Thus, we take a simple but
+            // slightly ugly approach: generate the raw numbers as part of the test inputs, and then
+            // transmute them by generating sequence numbers for each raw input number, and do a
+            // one-by-one replacement
+            //
+            // We know that generated sequence numbers will always start in order, and start from
+            // zero.  We can also grab the internal u64 that represents a sequence number.  With
+            // that, we can find each integer in `seq_ack_order` for each `SequenceNumber` we
+            // generate, and do a simple check at the end to make sure we've successfully mapped
+            // each one.
             let mut ack_tracker = AcknowledgementTracker::default();
             let mut total_ack_depth = 0;
-            let expected_total_ack_depth: usize = seq_ack_order.iter().map(|n| *n as usize).sum();
-            let mut order_drain = seq_ack_order.drain(..);
+            let expected_total_ack_depth: usize = seq_ack_order.iter().sum::<u64>()
+                .try_into()
+                .expect("total ack depth should not exceed usize");
 
-            // Prime our tracker by grabbing as many sequence numbers as we have items in
-            // `seq_ack_order`.  This ensures the internal state is correct.
-            for _ in 0..order_drain.len() {
-                let _ = ack_tracker.get_next_seq_num();
-            }
+            let mut seq_nums = (0..seq_ack_order.len())
+                .map(|_| ack_tracker.get_next_seq_num())
+                .collect::<Vec<_>>();
+
+            let mut reordered_seq_nums = seq_ack_order.iter()
+                .filter_map(|n| seq_nums.iter().position(|n2| n2.id() == *n)
+                    .map(|i| seq_nums.swap_remove(i)))
+                .collect::<VecDeque<_>>();
+
+            assert!(seq_nums.is_empty());
+            assert_eq!(seq_ack_order.len(), reordered_seq_nums.len());
 
             // Now start acknowledging sequence numbers.  We do this in variable-sized chunks, based
             // on `ack_batch_size`, and get the ack depth at the end of the every batch,
-            // accumulating it as part of the totle.
-            while order_drain.len() > 0 {
+            // accumulating it as part of the total.
+            while !reordered_seq_nums.is_empty() {
                 let batch_size = ack_batch_size.pop_front().expect("should always have enough batch size values");
                 for _ in 0..batch_size {
-                    match order_drain.next() {
+                    match reordered_seq_nums.pop_front() {
                         None => break,
-                        Some(seq_num) => ack_tracker.mark_seq_num_complete(seq_num, seq_num as usize),
+                        Some(seq_num) => {
+                            let ack_size = seq_num.id().try_into().expect("seq_num should not exceed usize");
+                            ack_tracker.mark_seq_num_complete(seq_num, ack_size);
+                        },
                     }
                 }
 
-                if let Some(ack_depth) = ack_tracker.get_latest_ack_depth() {
+                if let Some(ack_depth) = ack_tracker.consume_ack_depth() {
                     total_ack_depth += ack_depth.get();
                 }
             }
@@ -504,7 +556,7 @@ mod tests {
         // bursts of messages, similar to real sources.
 
         // Set up our driver input stream, service, etc.
-        let input_requests = (0..2048usize).into_iter().collect::<Vec<_>>();
+        let input_requests = (0..2048).into_iter().collect::<Vec<_>>();
         let input_total: usize = input_requests.iter().sum();
         let input_stream = stream::iter(input_requests.into_iter().map(DelayRequest));
         let service = DelayService::new(10, Duration::from_millis(10), Duration::from_millis(175));
@@ -512,10 +564,9 @@ mod tests {
         let driver = Driver::new(input_stream, service, acker);
 
         // Now actually run the driver, consuming all of the input.
-        if let Err(()) = driver.run().await {
-            panic!("driver unexpectedly returned with error!");
+        match driver.run().await {
+            Ok(()) => assert_eq!(input_total, counter.load(Ordering::SeqCst)),
+            Err(()) => panic!("driver unexpectedly returned with error!"),
         }
-
-        assert_eq!(input_total, counter.load(Ordering::SeqCst));
     }
 }
