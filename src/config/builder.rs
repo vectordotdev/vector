@@ -304,11 +304,11 @@ impl ConfigBuilder {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[cfg(all(feature = "datadog-pipelines", feature = "api"))]
     #[test]
     fn config_hash_json_order() {
+        use super::{ConfigBuilder, ConfigBuilderHash};
         use serde_json::{json, Value};
 
         // Expected key order of serialization. This is important for guaranteeing that a
