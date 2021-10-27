@@ -1,6 +1,6 @@
 resource "kubernetes_config_map" "vector" {
   metadata {
-    name = "vector"
+    name      = "vector"
     namespace = var.namespace
   }
 
@@ -11,14 +11,13 @@ resource "kubernetes_config_map" "vector" {
 
 resource "kubernetes_service" "vector" {
   metadata {
-    name = "vector"
+    name      = "vector"
     namespace = var.namespace
   }
   spec {
     selector = {
-      type = var.type
-      soak_test   = kubernetes_deployment.vector.metadata.0.labels.soak_test
-      sha         = kubernetes_deployment.vector.metadata.0.labels.sha
+      type      = var.type
+      soak_test = kubernetes_deployment.vector.metadata.0.labels.soak_test
     }
     session_affinity = "ClientIP"
     port {
@@ -38,12 +37,11 @@ resource "kubernetes_service" "vector" {
 
 resource "kubernetes_deployment" "vector" {
   metadata {
-    name = "vector"
+    name      = "vector"
     namespace = var.namespace
     labels = {
-        type = var.type
-        soak_test   = var.test_name
-        sha         = var.sha
+      type      = var.type
+      soak_test = var.test_name
     }
   }
 
@@ -52,23 +50,21 @@ resource "kubernetes_deployment" "vector" {
 
     selector {
       match_labels = {
-        type = var.type
-        soak_test   = var.test_name
-        sha         = var.sha
+        type      = var.type
+        soak_test = var.test_name
       }
     }
 
     template {
       metadata {
         labels = {
-        type = var.type
-        soak_test   = var.test_name
-        sha         = var.sha
+          type      = var.type
+          soak_test = var.test_name
         }
         annotations = {
           "prometheus.io/scrape" = true
-          "prometheus.io/port" = 9090
-          "prometheus.io/path" = "/metrics"
+          "prometheus.io/port"   = 9090
+          "prometheus.io/path"   = "/metrics"
         }
       }
 

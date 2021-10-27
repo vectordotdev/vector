@@ -2,7 +2,7 @@
 name = "vrl-parser"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@timber.io>"]
-edition = "2018"
+edition = "2021"
 publish = false
 build = "build.rs" # LALRPOP preprocessing
 
@@ -19,4 +19,4 @@ thiserror = "1"
 test-case = "1"
 
 [build-dependencies]
-lalrpop = "0.19"
+lalrpop = "0.19.6"
