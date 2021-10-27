@@ -11,7 +11,7 @@ pub enum DataType {
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 pub enum ExpandType {
-    Parallel,
+    Parallel { aggregates: bool },
     Serial,
 }
 

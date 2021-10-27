@@ -13,7 +13,7 @@ pub struct ExpanderConfig {
 impl ExpanderConfig {
     pub fn parallel(inner: IndexMap<String, Box<dyn TransformConfig>>) -> Self {
         Self {
-            mode: ExpandType::Parallel,
+            mode: ExpandType::Parallel { aggregates: true },
             inner,
         }
     }
