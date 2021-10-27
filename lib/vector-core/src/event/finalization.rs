@@ -343,6 +343,16 @@ pub trait Finalizable {
     fn take_finalizers(&mut self) -> EventFinalizers;
 }
 
+impl<T: Finalizable> Finalizable for Vec<T> {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.iter_mut()
+            .fold(EventFinalizers::default(), |mut acc, x| {
+                acc.merge(x.take_finalizers());
+                acc
+            })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

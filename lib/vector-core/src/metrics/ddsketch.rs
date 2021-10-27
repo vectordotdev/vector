@@ -1,4 +1,7 @@
-use std::{cmp, mem};
+use std::{
+    cmp::{self, Ordering},
+    mem,
+};
 
 use core_common::byte_size_of::ByteSizeOf;
 use ordered_float::OrderedFloat;
@@ -14,7 +17,7 @@ const UV_INF: i16 = i16::MAX;
 const POS_INF_KEY: i16 = UV_INF;
 
 const INITIAL_BINS: u16 = 128;
-const MAX_BIN_WIDTH: u32 = u16::MAX as u32;
+const MAX_BIN_WIDTH: u16 = u16::MAX;
 
 #[inline]
 fn log_gamma(gamma_ln: f64, v: f64) -> f64 {
@@ -43,7 +46,7 @@ fn lower_bound(gamma_v: f64, bias: i32, k: i16) -> f64 {
     pow_gamma(gamma_v, (k as i32 - bias) as f64)
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 struct Config {
     bin_limit: u16,
     // gamma_ln is the natural log of gamma_v, used to speed up calculating log base gamma.
@@ -72,8 +75,8 @@ impl Config {
         let gamma_v = 1.0 + eps;
         let gamma_ln = eps.ln_1p();
 
-        let norm_emin = log_gamma(gamma_ln, min_value).floor() as i32;
-        let norm_bias = -norm_emin + 1;
+        let norm_eff_min = log_gamma(gamma_ln, min_value).floor() as i32;
+        let norm_bias = -norm_eff_min + 1;
 
         let norm_min = lower_bound(gamma_v, norm_bias, 1);
 
@@ -112,6 +115,7 @@ impl Config {
     ///
     /// The key correponds to the bin where this value would be represented. The value returned here
     /// is such that: γ^k <= v < γ^(k+1).
+    #[allow(clippy::cast_possible_truncation)]
     pub fn key(&self, v: f64) -> i16 {
         if v < 0.0 {
             return -self.key(-v);
@@ -121,10 +125,15 @@ impl Config {
             return 0;
         }
 
+        // SAFETY: `rounded` is intentionally meant to be a whole integer, and additionally, based
+        // on our target gamma ln, we expect `log_gamma` to return a value between -2^16 and 2^16,
+        // so it will always fit in an i32.
         let rounded = round_to_even(self.log_gamma(v)) as i32;
         let key = rounded.wrapping_add(self.norm_bias);
 
-        key.clamp(1, POS_INF_KEY as i32) as i16
+        // SAFETY: Our upper bound of POS_INF_KEY is i16, and our lower bound is simply one, so
+        // there is no risk of truncation via conversion.
+        key.clamp(1, i32::from(POS_INF_KEY)) as i16
     }
 
     pub fn log_gamma(&self, v: f64) -> f64 {
@@ -153,13 +162,16 @@ pub struct Bin {
 }
 
 impl Bin {
+    #[allow(clippy::cast_possible_truncation)]
     fn increment(&mut self, n: u32) -> u32 {
-        let next = n + self.n as u32;
-        if next > MAX_BIN_WIDTH {
-            self.n = MAX_BIN_WIDTH as u16;
-            return next - MAX_BIN_WIDTH;
+        let next = n + u32::from(self.n);
+        if next > u32::from(MAX_BIN_WIDTH) {
+            self.n = MAX_BIN_WIDTH;
+            return next - u32::from(MAX_BIN_WIDTH);
         }
 
+        // SAFETY: We already know `next` is less than or equal to `MAX_BIN_WIDTH` if we got here, and
+        // `MAX_BIN_WIDTH` is u16, so next can't possibly be larger than a u16.
         self.n = next as u16;
         0
     }
@@ -167,11 +179,11 @@ impl Bin {
 
 /// An implementation of [`DDSketch`][ddsketch] that mirrors the implementation from the Datadog agent.
 ///
-/// This implementation is subtly different from the open-source implementations of DDSketch, as
+/// This implementation is subtly different from the open-source implementations of `DDSketch`, as
 /// Datadog made some slight tweaks to configuration values and in-memory layout to optimize it for
 /// insertion performance within the agent.
 ///
-/// We've mimiced the agent version of DDSketch here in order to support a future where we can take
+/// We've mimiced the agent version of `DDSketch` here in order to support a future where we can take
 /// sketches shipped by the agent, handle them internally, merge them, and so on, without any loss
 /// of accuracy, eventually forwarding them to Datadog ourselves.
 ///
@@ -333,20 +345,20 @@ impl AgentDDSketch {
         }
 
         self.count += n;
-        self.sum += v * n as f64;
+        self.sum += v * f64::from(n);
 
         if n == 1 {
-            self.avg += (v - self.avg) / self.count as f64;
+            self.avg += (v - self.avg) / f64::from(self.count);
         } else {
             // TODO: From the Agent source code, this method apparently loses precision when the
             // two averages -- v and self.avg -- are close.  Is there a better approach?
-            self.avg = self.avg + (v - self.avg) * n as f64 / self.count as f64;
+            self.avg = self.avg + (v - self.avg) * f64::from(n) / f64::from(self.count);
         }
     }
 
     fn insert_key_counts(&mut self, mut counts: Vec<(i16, u32)>) {
         // Counts need to be sorted by key.
-        counts.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
+        counts.sort_unstable_by(|(k1, _), (k2, _)| k1.cmp(k2));
 
         let mut temp = Vec::new();
 
@@ -368,16 +380,20 @@ impl AgentDDSketch {
             let vk = counts[key_idx].0;
             let kn = counts[key_idx].1;
 
-            if bin.k < vk {
-                temp.push(bin);
-                bins_idx += 1;
-            } else if bin.k > vk {
-                generate_bins(&mut temp, vk, kn);
-                key_idx += 1;
-            } else {
-                generate_bins(&mut temp, bin.k, bin.n as u32 + kn);
-                bins_idx += 1;
-                key_idx += 1;
+            match bin.k.cmp(&vk) {
+                Ordering::Greater => {
+                    generate_bins(&mut temp, vk, kn);
+                    key_idx += 1;
+                }
+                Ordering::Less => {
+                    temp.push(bin);
+                    bins_idx += 1;
+                }
+                Ordering::Equal => {
+                    generate_bins(&mut temp, bin.k, u32::from(bin.n) + kn);
+                    bins_idx += 1;
+                    key_idx += 1;
+                }
             }
         }
 
@@ -398,7 +414,7 @@ impl AgentDDSketch {
     }
 
     fn insert_keys(&mut self, mut keys: Vec<i16>) {
-        keys.sort();
+        keys.sort_unstable();
 
         let mut temp = Vec::new();
 
@@ -419,18 +435,22 @@ impl AgentDDSketch {
             let bin = self.bins[bins_idx];
             let vk = keys[key_idx];
 
-            if bin.k < vk {
-                temp.push(bin);
-                bins_idx += 1;
-            } else if bin.k > vk {
-                let kn = buf_count_leading_equal(&keys, key_idx);
-                generate_bins(&mut temp, vk, kn);
-                key_idx += kn as usize;
-            } else {
-                let kn = buf_count_leading_equal(&keys, key_idx);
-                generate_bins(&mut temp, bin.k, bin.n as u32 + kn);
-                bins_idx += 1;
-                key_idx += kn as usize;
+            match bin.k.cmp(&vk) {
+                Ordering::Greater => {
+                    let kn = buf_count_leading_equal(&keys, key_idx);
+                    generate_bins(&mut temp, vk, kn);
+                    key_idx += kn as usize;
+                }
+                Ordering::Less => {
+                    temp.push(bin);
+                    bins_idx += 1;
+                }
+                Ordering::Equal => {
+                    let kn = buf_count_leading_equal(&keys, key_idx);
+                    generate_bins(&mut temp, bin.k, u32::from(bin.n) + kn);
+                    bins_idx += 1;
+                    key_idx += kn as usize;
+                }
             }
         }
 
@@ -499,11 +519,14 @@ impl AgentDDSketch {
             // lower/upper bound for the current sketch bin, which tells us how much of the input
             // count to apply to the current sketch bin.
             let upper_bound = self.config.bin_lower_bound(keys[end_idx]);
-            let fkn = ((upper_bound - lower_bound) / distance) * count as f64;
+            let fkn = ((upper_bound - lower_bound) / distance) * f64::from(count);
             if fkn > 1.0 {
                 remainder += fkn - fkn.trunc();
             }
 
+            // SAFETY: This integer cast is intentional: we want to get the non-fractional part, as
+            // we've captured the fractional part in the above conditional.
+            #[allow(clippy::cast_possible_truncation)]
             let mut kn = fkn as u32;
             if remainder > 1.0 {
                 kn += 1;
@@ -528,7 +551,7 @@ impl AgentDDSketch {
 
         if remaining_count > 0 {
             let last_key = keys[start_idx];
-            let lower_bound = self.config.bin_lower_bound(last_key);
+            lower_bound = self.config.bin_lower_bound(last_key);
             self.adjust_basic_stats(lower_bound, remaining_count);
             key_counts.push((last_key, remaining_count));
         }
@@ -577,12 +600,12 @@ impl AgentDDSketch {
         let wanted_rank = rank(self.count, q);
 
         for (i, bin) in self.bins.iter().enumerate() {
-            n += bin.n as f64;
+            n += f64::from(bin.n);
             if n <= wanted_rank {
                 continue;
             }
 
-            let weight = (n - wanted_rank) / bin.n as f64;
+            let weight = (n - wanted_rank) / f64::from(bin.n);
             let mut v_low = self.config.bin_lower_bound(bin.k);
             let mut v_high = v_low * self.config.gamma_v;
 
@@ -621,7 +644,7 @@ impl AgentDDSketch {
                 generate_bins(
                     &mut temp,
                     other_bin.k,
-                    other_bin.n as u32 + self.bins[bins_idx].n as u32,
+                    u32::from(other_bin.n) + u32::from(self.bins[bins_idx].n),
                 );
                 bins_idx += 1;
             }
@@ -654,7 +677,7 @@ impl AgentDDSketch {
                 Some(sketch)
             }
             MetricValue::AggregatedHistogram { buckets, .. } => {
-                let delta_buckets = mem::replace(buckets, Vec::new());
+                let delta_buckets = mem::take(buckets);
                 let mut sketch = AgentDDSketch::with_agent_defaults();
                 sketch.insert_interpolate_buckets(delta_buckets);
                 Some(sketch)
@@ -724,9 +747,7 @@ impl BinMap {
     }
 
     pub fn into_bins(self) -> Option<Vec<Bin>> {
-        if self.keys.len() != self.counts.len() {
-            None
-        } else {
+        if self.keys.len() == self.counts.len() {
             Some(
                 self.keys
                     .into_iter()
@@ -734,6 +755,8 @@ impl BinMap {
                     .map(|(k, n)| Bin { k, n })
                     .collect(),
             )
+        } else {
+            None
         }
     }
 }
@@ -743,7 +766,7 @@ pub(self) mod bin_serialization {
 
     use super::{Bin, BinMap};
 
-    pub fn serialize<S>(bins: &Vec<Bin>, serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(bins: &[Bin], serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -796,17 +819,16 @@ fn trim_left(bins: &mut Vec<Bin>, bin_limit: u16) {
     let mut missing = 0;
     let mut overflow = Vec::new();
 
-    for i in 0..num_to_remove {
-        let bin = bins[i];
-        missing += bin.n as u32;
+    for bin in bins.iter().take(num_to_remove) {
+        missing += u32::from(bin.n);
 
-        if missing > MAX_BIN_WIDTH {
+        if missing > MAX_BIN_WIDTH as u32 {
             overflow.push(Bin {
                 k: bin.k,
-                n: MAX_BIN_WIDTH as u16,
+                n: MAX_BIN_WIDTH,
             });
 
-            missing -= MAX_BIN_WIDTH;
+            missing -= MAX_BIN_WIDTH as u32;
         }
     }
 
@@ -827,32 +849,37 @@ fn trim_left(bins: &mut Vec<Bin>, bin_limit: u16) {
     mem::swap(bins, &mut overflow);
 }
 
+#[allow(clippy::cast_possible_truncation)]
 fn generate_bins(bins: &mut Vec<Bin>, k: i16, n: u32) {
-    if n < MAX_BIN_WIDTH {
+    if n < u32::from(MAX_BIN_WIDTH) {
+        // SAFETY: Cannot truncate `n`, as it's less than a u16 value.
         bins.push(Bin { k, n: n as u16 });
     } else {
-        let overflow = n % MAX_BIN_WIDTH;
+        let overflow = n % u32::from(MAX_BIN_WIDTH);
         if overflow != 0 {
             bins.push(Bin {
                 k,
+                // SAFETY: Cannot truncate `overflow`, as it's modulo'd by a u16 value.
                 n: overflow as u16,
             });
         }
 
-        for _ in 0..(n / MAX_BIN_WIDTH) {
+        for _ in 0..(n / u32::from(MAX_BIN_WIDTH)) {
             bins.push(Bin {
                 k,
-                n: MAX_BIN_WIDTH as u16,
+                n: MAX_BIN_WIDTH,
             });
         }
     }
 }
 
+#[allow(clippy::cast_possible_truncation)]
 #[inline]
 fn capped_u64_shift(shift: u64) -> u32 {
     if shift >= 64 {
         u32::MAX
     } else {
+        // SAFETY: There's no way that we end up truncating `shift`, since we cap it to 64 above.
         shift as u32
     }
 }
@@ -917,6 +944,7 @@ fn round_to_even(v: f64) -> f64 {
     const SHIFT: u64 = 64 - 11 - 1;
     const SIGN_MASK: u64 = 1 << 63;
     const FRAC_MASK: u64 = (1 << SHIFT) - 1;
+    #[allow(clippy::unreadable_literal)]
     const UV_ONE: u64 = 0x3FF0000000000000;
     const HALF_MINUS_ULP: u64 = (1 << (SHIFT - 1)) - 1;
 
@@ -947,16 +975,19 @@ mod tests {
 
     const FLOATING_POINT_ACCEPTABLE_ERROR: f64 = 1.0e-10;
 
-    static HISTO_VALUES: &[u64] = &[
-        104221, 10206, 32436, 121686, 92848, 83685, 23739, 15122, 50491, 88507, 48318, 28004,
-        29576, 8735, 77693, 33965, 88047, 7592, 64138, 59966, 117956, 112525, 41743, 82790, 27084,
-        26967, 75008, 10752, 96636, 97150, 60768, 33411, 24746, 91872, 59057, 48329, 16756, 100459,
-        117640, 59244, 107584, 124303, 32368, 109940, 106353, 90452, 84471, 39086, 91119, 89680,
-        41339, 23329, 25629, 98156, 97002, 9538, 73671, 112586, 101616, 70719, 117291, 90043,
-        10713, 49195, 60656, 60887, 47332, 113675, 8371, 42619, 33489, 108629, 70501, 84355, 24576,
-        34468, 76756, 110706, 42854, 83841, 120751, 66494, 65210, 70244, 118529, 28021, 51603,
-        96315, 92364, 59120, 118968, 5484, 91790, 45171, 102756, 29673, 85303, 108322, 122793,
-        88373,
+    #[allow(clippy::unreadable_literal)]
+    static HISTO_VALUES: &[f64] = &[
+        104221.0, 10206.0, 32436.0, 121686.0, 92848.0, 83685.0, 23739.0, 15122.0, 50491.0, 88507.0,
+        48318.0, 28004.0, 29576.0, 8735.0, 77693.0, 33965.0, 88047.0, 7592.0, 64138.0, 59966.0,
+        117956.0, 112525.0, 41743.0, 82790.0, 27084.0, 26967.0, 75008.0, 10752.0, 96636.0, 97150.0,
+        60768.0, 33411.0, 24746.0, 91872.0, 59057.0, 48329.0, 16756.0, 100459.0, 117640.0, 59244.0,
+        107584.0, 124303.0, 32368.0, 109940.0, 106353.0, 90452.0, 84471.0, 39086.0, 91119.0,
+        89680.0, 41339.0, 23329.0, 25629.0, 98156.0, 97002.0, 9538.0, 73671.0, 112586.0, 101616.0,
+        70719.0, 117291.0, 90043.0, 10713.0, 49195.0, 60656.0, 60887.0, 47332.0, 113675.0, 8371.0,
+        42619.0, 33489.0, 108629.0, 70501.0, 84355.0, 24576.0, 34468.0, 76756.0, 110706.0, 42854.0,
+        83841.0, 120751.0, 66494.0, 65210.0, 70244.0, 118529.0, 28021.0, 51603.0, 96315.0, 92364.0,
+        59120.0, 118968.0, 5484.0, 91790.0, 45171.0, 102756.0, 29673.0, 85303.0, 108322.0,
+        122793.0, 88373.0,
     ];
 
     #[cfg(ddsketch_extended)]
@@ -996,19 +1027,19 @@ mod tests {
         assert_eq!(sketch.sum(), None);
         assert_eq!(sketch.avg(), None);
 
-        sketch.insert(3.14);
+        sketch.insert(3.15);
         assert!(!sketch.is_empty());
         assert_eq!(sketch.count(), 1);
-        assert_eq!(sketch.min(), Some(3.14));
-        assert_eq!(sketch.max(), Some(3.14));
-        assert_eq!(sketch.sum(), Some(3.14));
-        assert_eq!(sketch.avg(), Some(3.14));
+        assert_eq!(sketch.min(), Some(3.15));
+        assert_eq!(sketch.max(), Some(3.15));
+        assert_eq!(sketch.sum(), Some(3.15));
+        assert_eq!(sketch.avg(), Some(3.15));
 
         sketch.insert(2.28);
         assert!(!sketch.is_empty());
         assert_eq!(sketch.count(), 2);
         assert_eq!(sketch.min(), Some(2.28));
-        assert_eq!(sketch.max(), Some(3.14));
+        assert_eq!(sketch.max(), Some(3.15));
         assert_eq!(sketch.sum(), Some(5.42));
         assert_eq!(sketch.avg(), Some(2.71));
     }
@@ -1022,7 +1053,7 @@ mod tests {
         assert!(sketch1.is_empty());
         assert!(sketch2.is_empty());
 
-        sketch2.insert(3.14);
+        sketch2.insert(3.15);
         assert_ne!(sketch1, sketch2);
         assert!(!sketch2.is_empty());
 
@@ -1065,7 +1096,7 @@ mod tests {
 
         let mut values = Vec::new();
         for i in -50..=50 {
-            let v = i as f64;
+            let v = f64::from(i);
 
             all_values.insert(v);
 
@@ -1102,7 +1133,7 @@ mod tests {
             assert_eq!(sketch.quantile(1.0), Some(50.0));
 
             for p in 0..50 {
-                let q = p as f64 / 100.0;
+                let q = f64::from(p) / 100.0;
                 let positive = sketch
                     .quantile(q + 0.5)
                     .expect("should have estimated value");
@@ -1189,9 +1220,11 @@ mod tests {
         // granularity.
         let config = Config::default();
         let min_value = 1.0;
+        // We don't care about precision loss, just consistency.
+        #[allow(clippy::cast_possible_truncation)]
         let max_value = config.gamma_v.powf(5.0) as f32;
 
-        test_relative_accuracy(config, AGENT_DEFAULT_EPS, min_value, max_value)
+        test_relative_accuracy(config, AGENT_DEFAULT_EPS, min_value, max_value);
     }
 
     #[test]
@@ -1222,7 +1255,7 @@ mod tests {
 
         let histo = Histogram::new();
         for num in HISTO_VALUES {
-            histo.record((*num as f64) / 10_000.0);
+            histo.record(num / 10_000.0);
         }
 
         let buckets = histo
@@ -1279,7 +1312,7 @@ mod tests {
         let mut v = min_value;
         let mut max_relative_acc = 0.0;
         while v < max_value {
-            let target = v as f64;
+            let target = f64::from(v);
             let actual = config.bin_lower_bound(config.key(target));
 
             let relative_acc = compute_relative_accuracy(target, actual);
@@ -1291,8 +1324,8 @@ mod tests {
         }
 
         // Final iteration to make sure we hit the highest value.
-        let actual = config.bin_lower_bound(config.key(max_value as f64));
-        let relative_acc = compute_relative_accuracy(max_value as f64, actual);
+        let actual = config.bin_lower_bound(config.key(f64::from(max_value)));
+        let relative_acc = compute_relative_accuracy(f64::from(max_value), actual);
         if relative_acc > max_relative_acc {
             max_relative_acc = relative_acc;
         }
@@ -1312,6 +1345,7 @@ mod tests {
             }
         };
 
+        #[allow(clippy::unreadable_literal)]
         let test_cases = &[
             (f64::NAN, f64::NAN),
             (0.5000000000000001, 1.0), // 0.5+epsilon

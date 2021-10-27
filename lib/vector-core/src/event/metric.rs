@@ -43,16 +43,6 @@ impl Finalizable for Metric {
     }
 }
 
-impl Finalizable for Vec<Metric> {
-    fn take_finalizers(&mut self) -> EventFinalizers {
-        self.iter_mut()
-            .fold(EventFinalizers::default(), |mut acc, x| {
-                acc.merge(x.take_finalizers());
-                acc
-            })
-    }
-}
-
 impl AsRef<MetricData> for Metric {
     fn as_ref(&self) -> &MetricData {
         &self.data
