@@ -104,7 +104,7 @@ impl Encoder<Vec<HecProcessedEvent>> for HecMetricsEncoder {
     ) -> std::io::Result<usize> {
         let encoded_input: Vec<u8> = input
             .into_iter()
-            .filter_map(|e| Self::encode_event(e))
+            .filter_map(Self::encode_event)
             .flatten()
             .collect();
         let encoded_size = encoded_input.len();

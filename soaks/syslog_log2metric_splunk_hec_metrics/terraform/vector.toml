@@ -45,6 +45,5 @@ address = "0.0.0.0:9090"
 type = "splunk_hec_metrics"
 inputs = ["log2metric"]
 endpoint = "http://http-blackhole:8080"
-encoding = "json"
 token = "splunk_token"
 healthcheck.enabled = false

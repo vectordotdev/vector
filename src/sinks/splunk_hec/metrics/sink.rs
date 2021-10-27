@@ -118,7 +118,7 @@ impl ByteSizeOf for HecMetricsProcessedEventMetadata {
 impl HecMetricsProcessedEventMetadata {
     fn extract_metric_name(metric: &Metric, default_namespace: Option<&str>) -> String {
         encode_namespace(
-            metric.namespace().or_else(|| default_namespace),
+            metric.namespace().or(default_namespace),
             '.',
             metric.name(),
         )
