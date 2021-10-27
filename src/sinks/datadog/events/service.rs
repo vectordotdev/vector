@@ -4,8 +4,6 @@ use crate::sinks::util::http::HttpBatchService;
 
 use crate::event::EventStatus;
 
-use crate::emit;
-use crate::internal_events::EventsSent;
 use http::Request;
 use std::sync::Arc;
 
@@ -18,15 +16,25 @@ use futures::future::Ready;
 use hyper::Body;
 use std::task::{Context, Poll};
 use tower::{Service, ServiceExt};
+use vector_core::internal_event::EventsSent;
+use vector_core::stream::DriverResponse;
 
 pub struct DatadogEventsResponse {
     pub event_status: EventStatus,
     pub http_status: http::StatusCode,
+    pub event_byte_size: usize,
 }
 
-impl AsRef<EventStatus> for DatadogEventsResponse {
-    fn as_ref(&self) -> &EventStatus {
-        &self.event_status
+impl DriverResponse for DatadogEventsResponse {
+    fn event_status(&self) -> EventStatus {
+        self.event_status
+    }
+
+    fn events_sent(&self) -> EventsSent {
+        EventsSent {
+            count: 1,
+            byte_size: self.event_byte_size,
+        }
     }
 }
 
@@ -90,15 +98,10 @@ impl Service<DatadogEventsRequest> for DatadogEventsService {
             } else {
                 EventStatus::Failed
             };
-            if event_status == EventStatus::Delivered {
-                emit!(&EventsSent {
-                    count: 1,
-                    byte_size: event_byte_size
-                });
-            }
             Ok(DatadogEventsResponse {
                 event_status,
                 http_status: http_response.status(),
+                event_byte_size,
             })
         })
     }
