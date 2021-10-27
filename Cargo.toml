@@ -654,6 +654,7 @@ sinks-vector = ["sinks-utils-udp", "tonic", "tonic-build", "prost-build"]
 
 # Datadog integration
 datadog-pipelines = [
+  "sources-host_metrics",
   "sources-internal_metrics",
   "sinks-datadog",
   "sha2",
