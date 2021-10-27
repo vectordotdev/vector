@@ -53,7 +53,7 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule) -> Result<Value, Error> {
             // apply filters
             if let Some(filters) = grok_rule.filters.get(&path) {
                 filters.iter().for_each(|filter| {
-                    match apply_filter(&value.as_ref().unwrap(), filter) {
+                    match apply_filter(value.as_ref().unwrap(), filter) {
                         Ok(v) => value = Some(v),
                         Err(error) => {
                             warn!(message = "Error applying filter", path = %path, filter = %filter, %error);

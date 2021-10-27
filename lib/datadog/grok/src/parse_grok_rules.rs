@@ -56,7 +56,7 @@ pub fn parse_grok_rules(
 
     for (name, alias) in &aliases {
         if !alias.is_empty() {
-            let parsed_alias = parse_grok_rule(&alias, &aliases, &mut parsed_aliases)?;
+            let parsed_alias = parse_grok_rule(alias, &aliases, &mut parsed_aliases)?;
             parsed_aliases.insert(name.to_string(), parsed_alias);
         }
     }
@@ -131,7 +131,7 @@ fn parse_grok_rule<'a>(
     let mut filters: HashMap<LookupBuf, Vec<GrokFilter>> = HashMap::new();
     let pure_grok_patterns: Vec<String> = grok_patterns
         .iter()
-        .map(|pattern| purify_grok_pattern(&pattern, &mut filters, aliases, parsed_aliases))
+        .map(|pattern| purify_grok_pattern(pattern, &mut filters, aliases, parsed_aliases))
         .collect::<Result<Vec<String>, Error>>()?;
 
     // replace grok patterns with "purified" ones
@@ -243,14 +243,14 @@ fn purify_grok_pattern(
                 res.push_str(destination.path.to_string().as_str());
             }
             res.push('>');
-            res.push_str(resolves_match_function(&mut filters, &pattern)?.as_str());
+            res.push_str(resolves_match_function(&mut filters, pattern)?.as_str());
             res.push(')');
         }
         None => {
             // these will be converted to "pure" grok patterns %{PATTERN:DESTINATION} but without filters
             res.push_str("%{");
 
-            res.push_str(resolves_match_function(&mut filters, &pattern)?.as_str());
+            res.push_str(resolves_match_function(&mut filters, pattern)?.as_str());
 
             if let Some(destination) = &pattern.destination {
                 if destination.path.is_empty() {
@@ -277,7 +277,7 @@ fn resolves_match_function(
         "regex" => match match_fn.args.as_ref() {
             Some(args) if !args.is_empty() => {
                 if let ast::FunctionArgument::Arg(Value::Bytes(ref b)) = args[0] {
-                    return Ok(String::from_utf8_lossy(&b).to_string());
+                    return Ok(String::from_utf8_lossy(b).to_string());
                 }
                 Err(Error::InvalidFunctionArguments(match_fn.name.clone()))
             }

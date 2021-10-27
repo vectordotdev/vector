@@ -119,14 +119,14 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
             )),
         },
         GrokFilter::Lowercase => match value {
-            Value::Bytes(bytes) => Ok(String::from_utf8_lossy(&bytes).to_lowercase().into()),
+            Value::Bytes(bytes) => Ok(String::from_utf8_lossy(bytes).to_lowercase().into()),
             _ => Err(GrokRuntimeError::FailedToApplyFilter(
                 filter.to_string(),
                 value.to_string(),
             )),
         },
         GrokFilter::Uppercase => match value {
-            Value::Bytes(bytes) => Ok(String::from_utf8_lossy(&bytes).to_uppercase().into()),
+            Value::Bytes(bytes) => Ok(String::from_utf8_lossy(bytes).to_uppercase().into()),
             _ => Err(GrokRuntimeError::FailedToApplyFilter(
                 filter.to_string(),
                 value.to_string(),
