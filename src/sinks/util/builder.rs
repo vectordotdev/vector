@@ -2,9 +2,10 @@ use std::{fmt, future::Future, hash::Hash, num::NonZeroUsize, pin::Pin, sync::Ar
 
 use futures_util::{stream::Map, Stream, StreamExt};
 use tower::Service;
+use vector_core::stream::DriverResponse;
 use vector_core::{
     buffers::{Ackable, Acker},
-    event::{EventStatus, Finalizable, Metric},
+    event::{Finalizable, Metric},
     partition::Partitioner,
     stream::{Batcher, BatcherSettings, ConcurrentMap, Driver, ExpirationQueue},
     ByteSizeOf,
@@ -169,7 +170,7 @@ pub trait SinkBuilderExt: Stream {
         Svc: Service<Self::Item>,
         Svc::Error: fmt::Debug + 'static,
         Svc::Future: Send + 'static,
-        Svc::Response: AsRef<EventStatus>,
+        Svc::Response: DriverResponse,
     {
         Driver::new(self, service, acker)
     }

@@ -1225,7 +1225,9 @@ checksum = "5827cebf4670468b8772dd191856768aedcb1b0278a04f989f7766351917b9dc"
 name = "core_common"
 version = "0.1.0"
 dependencies = [
+ "metrics",
  "serde_json",
+ "tracing 0.1.29",
 ]
 
 [[package]]

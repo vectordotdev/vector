@@ -120,7 +120,9 @@ mod tests {
         assert!(matches!(
             logic.should_retry_response(&ElasticSearchResponse {
                 http_response: response,
-                event_status: EventStatus::Failed
+                event_status: EventStatus::Failed,
+                batch_size: 1,
+                events_byte_size: 1,
             }),
             RetryAction::DontRetry(_)
         ));

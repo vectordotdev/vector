@@ -19,7 +19,6 @@ pub use encoder::ElasticSearchEncoder;
 
 use crate::{
     config::SinkDescription,
-    emit,
     internal_events::TemplateRenderingFailed,
     rusoto::{self, AwsAuthentication},
     template::{Template, TemplateParseError},
