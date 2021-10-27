@@ -1,10 +1,18 @@
-use super::{config::HecMetricsSinkConfig};
-use crate::{config::{SinkConfig, SinkContext}, event::{Metric, MetricKind}, sinks::{splunk_hec::common::integration_test_helpers::get_token, util::{BatchConfig, Compression, TowerRequestConfig}}, test_util::components::{self, HTTP_SINK_TAGS}};
+use super::config::HecMetricsSinkConfig;
+use crate::template::Template;
+use crate::{
+    config::{SinkConfig, SinkContext},
+    event::{Metric, MetricKind},
+    sinks::{
+        splunk_hec::common::integration_test_helpers::get_token,
+        util::{BatchConfig, Compression, TowerRequestConfig},
+    },
+    test_util::components::{self, HTTP_SINK_TAGS},
+};
 use serde_json::Value as JsonValue;
 use shared::btreemap;
 use std::convert::TryFrom;
 use vector_core::event::{BatchNotifier, BatchStatus, MetricValue};
-use crate::template::Template;
 
 const USERNAME: &str = "admin";
 const PASSWORD: &str = "password";
@@ -136,4 +144,3 @@ async fn metric_dimensions(metric_name: &str) -> Vec<JsonValue> {
 
     json["entry"].as_array().unwrap().clone()
 }
-

@@ -10,7 +10,9 @@ use crate::sinks::splunk_hec::common::service::{HecService, HttpRequestBuilder};
 use crate::sinks::splunk_hec::common::{build_healthcheck, create_client, host_key};
 use crate::sinks::splunk_hec::metrics::request_builder::HecMetricsRequestBuilder;
 use crate::sinks::splunk_hec::metrics::sink::HecMetricsSink;
-use crate::sinks::util::{BatchConfig, BatchSettings, Buffer, Compression, ServiceBuilderExt, TowerRequestConfig};
+use crate::sinks::util::{
+    BatchConfig, BatchSettings, Buffer, Compression, ServiceBuilderExt, TowerRequestConfig,
+};
 use crate::sinks::Healthcheck;
 use crate::template::Template;
 use crate::tls::TlsOptions;

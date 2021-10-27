@@ -5,11 +5,11 @@ use crate::sinks::splunk_hec::metrics::encoder::HecMetricsEncoder;
 use crate::template::Template;
 use chrono::{DateTime, Utc};
 use serde_json::json;
+use serde_json::Value as JsonValue;
 use shared::btreemap;
 use std::collections::BTreeSet;
 use std::convert::TryFrom;
 use vector_core::ByteSizeOf;
-use serde_json::Value as JsonValue;
 
 fn get_counter() -> Metric {
     let timestamp = DateTime::parse_from_rfc3339("2005-12-12T14:12:55.123-00:00")
@@ -46,7 +46,13 @@ fn get_gauge(namespace: Option<String>) -> Metric {
     .with_namespace(namespace)
 }
 
-fn get_processed_event(metric: Metric, sourcetype: Option<Template>, source: Option<Template>, index: Option<Template>, default_namespace: Option<&str>) -> HecProcessedEvent {
+fn get_processed_event(
+    metric: Metric,
+    sourcetype: Option<Template>,
+    source: Option<Template>,
+    index: Option<Template>,
+    default_namespace: Option<&str>,
+) -> HecProcessedEvent {
     let event_byte_size = metric.size_of();
 
     process_metric(
@@ -80,10 +86,16 @@ fn test_process_metric() {
     assert_eq!(metadata.source, Some("source_value".to_string()));
     assert_eq!(metadata.index, Some("index_value".to_string()));
     assert_eq!(metadata.host, Some("host_value".to_string()));
-    assert_eq!(metadata.metric_name, "namespace.example-counter".to_string());
+    assert_eq!(
+        metadata.metric_name,
+        "namespace.example-counter".to_string()
+    );
     assert_eq!(metadata.metric_value, 26.8);
     metadata.templated_field_keys.sort();
-    assert_eq!(metadata.templated_field_keys.as_slice(), ["template_index", "template_source", "template_sourcetype"]);
+    assert_eq!(
+        metadata.templated_field_keys.as_slice(),
+        ["template_index", "template_source", "template_sourcetype"]
+    );
 }
 
 #[test]
@@ -102,7 +114,16 @@ fn test_process_metric_unsupported_type_returns_none() {
     let source = None;
     let index = None;
     let default_namespace = None;
-    assert!(process_metric(metric, event_byte_size, sourcetype, source, index, "host_key", default_namespace).is_none());
+    assert!(process_metric(
+        metric,
+        event_byte_size,
+        sourcetype,
+        source,
+        index,
+        "host_key",
+        default_namespace
+    )
+    .is_none());
 }
 
 #[test]
@@ -130,9 +151,10 @@ fn test_encode_event_templated_counter_returns_expected_json() {
         "event": "metric",
     });
 
-    let actual =
-        serde_json::from_slice::<JsonValue>(&HecMetricsEncoder::encode_event(processed_event).unwrap()[..])
-            .unwrap();
+    let actual = serde_json::from_slice::<JsonValue>(
+        &HecMetricsEncoder::encode_event(processed_event).unwrap()[..],
+    )
+    .unwrap();
 
     assert_eq!(expected, actual);
 }
@@ -165,9 +187,10 @@ fn test_encode_event_static_counter_returns_expected_json() {
         "event": "metric",
     });
 
-    let actual =
-        serde_json::from_slice::<JsonValue>(&HecMetricsEncoder::encode_event(processed_event).unwrap()[..])
-            .unwrap();
+    let actual = serde_json::from_slice::<JsonValue>(
+        &HecMetricsEncoder::encode_event(processed_event).unwrap()[..],
+    )
+    .unwrap();
 
     assert_eq!(expected, actual);
 }
@@ -190,9 +213,10 @@ fn test_encode_event_gauge_returns_expected_json() {
         "event": "metric",
     });
 
-    let actual =
-        serde_json::from_slice::<JsonValue>(&HecMetricsEncoder::encode_event(processed_event).unwrap()[..])
-            .unwrap();
+    let actual = serde_json::from_slice::<JsonValue>(
+        &HecMetricsEncoder::encode_event(processed_event).unwrap()[..],
+    )
+    .unwrap();
 
     assert_eq!(expected, actual);
 }
@@ -215,9 +239,10 @@ fn test_encode_event_gauge_with_namespace_returns_expected_json() {
         "event": "metric",
     });
 
-    let actual =
-        serde_json::from_slice::<JsonValue>(&HecMetricsEncoder::encode_event(processed_event).unwrap()[..])
-            .unwrap();
+    let actual = serde_json::from_slice::<JsonValue>(
+        &HecMetricsEncoder::encode_event(processed_event).unwrap()[..],
+    )
+    .unwrap();
 
     assert_eq!(expected, actual);
 }
@@ -240,9 +265,10 @@ fn test_encode_event_gauge_default_namespace_returns_expected_json() {
         "event": "metric",
     });
 
-    let actual =
-        serde_json::from_slice::<JsonValue>(&HecMetricsEncoder::encode_event(processed_event).unwrap()[..])
-            .unwrap();
+    let actual = serde_json::from_slice::<JsonValue>(
+        &HecMetricsEncoder::encode_event(processed_event).unwrap()[..],
+    )
+    .unwrap();
 
     assert_eq!(expected, actual);
 }
@@ -265,9 +291,10 @@ fn test_encode_event_gauge_overridden_namespace_returns_expected_json() {
         "event": "metric",
     });
 
-    let actual =
-        serde_json::from_slice::<JsonValue>(&HecMetricsEncoder::encode_event(processed_event).unwrap()[..])
-            .unwrap();
+    let actual = serde_json::from_slice::<JsonValue>(
+        &HecMetricsEncoder::encode_event(processed_event).unwrap()[..],
+    )
+    .unwrap();
 
     assert_eq!(expected, actual);
 }
