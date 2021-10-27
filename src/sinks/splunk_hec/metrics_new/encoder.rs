@@ -49,7 +49,7 @@ impl<'a> HecData<'a> {
 pub struct HecMetricsEncoder;
 
 impl HecMetricsEncoder {
-    fn encode_event(processed_event: HecProcessedEvent) -> Option<Vec<u8>> {
+    pub fn encode_event(processed_event: HecProcessedEvent) -> Option<Vec<u8>> {
         let metadata = processed_event.metadata;
         let metric = processed_event.event;
 

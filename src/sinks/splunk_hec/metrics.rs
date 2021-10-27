@@ -253,452 +253,452 @@ impl HecSinkMetricsConfig {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::event::{Metric, MetricKind, MetricValue};
-    use crate::sinks::util::{http::HttpSink, test::load_sink};
-    use chrono::{DateTime, Utc};
-    use serde_json::Value as JsonValue;
-    use shared::btreemap;
-    use std::collections::BTreeSet;
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use crate::event::{Metric, MetricKind, MetricValue};
+//     use crate::sinks::util::{http::HttpSink, test::load_sink};
+//     use chrono::{DateTime, Utc};
+//     use serde_json::Value as JsonValue;
+//     use shared::btreemap;
+//     use std::collections::BTreeSet;
 
-    #[test]
-    fn generate_config() {
-        crate::test_util::test_generate_config::<HecSinkMetricsConfig>();
-    }
+//     #[test]
+//     fn generate_config() {
+//         crate::test_util::test_generate_config::<HecSinkMetricsConfig>();
+//     }
 
-    #[test]
-    fn test_encode_event_templated_counter_returns_expected_json() {
-        let timestamp = DateTime::parse_from_rfc3339("2005-12-12T14:12:55.123-00:00")
-            .unwrap()
-            .with_timezone(&Utc);
+//     #[test]
+//     fn test_encode_event_templated_counter_returns_expected_json() {
+//         let timestamp = DateTime::parse_from_rfc3339("2005-12-12T14:12:55.123-00:00")
+//             .unwrap()
+//             .with_timezone(&Utc);
 
-        let metric = Metric::new(
-            "example-counter",
-            MetricKind::Absolute,
-            MetricValue::Counter { value: 26.8 },
-        )
-        .with_timestamp(Some(timestamp))
-        .with_tags(Some(btreemap! {
-            "template_index".to_string() => "index_value".to_string(),
-            "template_source".to_string() => "source_value".to_string(),
-            "template_sourcetype".to_string() => "sourcetype_value".to_string(),
-            "tag_one".to_string() => "tag_one_value".to_string(),
-            "tag_two".to_string() => "tag_two_value".to_string(),
-            "host".to_string() => "host_value".to_string(),
-        }));
+//         let metric = Metric::new(
+//             "example-counter",
+//             MetricKind::Absolute,
+//             MetricValue::Counter { value: 26.8 },
+//         )
+//         .with_timestamp(Some(timestamp))
+//         .with_tags(Some(btreemap! {
+//             "template_index".to_string() => "index_value".to_string(),
+//             "template_source".to_string() => "source_value".to_string(),
+//             "template_sourcetype".to_string() => "sourcetype_value".to_string(),
+//             "tag_one".to_string() => "tag_one_value".to_string(),
+//             "tag_two".to_string() => "tag_two_value".to_string(),
+//             "host".to_string() => "host_value".to_string(),
+//         }));
 
-        let (config, _cx) = load_sink::<HecSinkMetricsConfig>(
-            r#"
-            endpoint = "https://splunk-hec.com/"
-            token = "alksjdfo"
-            host_key = "host"
-            index = "{{ tags.template_index }}"
-            source = "{{ tags.template_source }}"
-            sourcetype = "{{ tags.template_sourcetype }}"
-        "#,
-        )
-        .unwrap();
+//         let (config, _cx) = load_sink::<HecSinkMetricsConfig>(
+//             r#"
+//             endpoint = "https://splunk-hec.com/"
+//             token = "alksjdfo"
+//             host_key = "host"
+//             index = "{{ tags.template_index }}"
+//             source = "{{ tags.template_source }}"
+//             sourcetype = "{{ tags.template_sourcetype }}"
+//         "#,
+//         )
+//         .unwrap();
 
-        let expected = json!({
-            "time": 1134396775.123,
-            "host": "host_value",
-            "index": "index_value",
-            "source": "source_value",
-            "sourcetype": "sourcetype_value",
-            "fields": {
-                "host": "host_value",
-                "tag_one": "tag_one_value",
-                "tag_two": "tag_two_value",
-                "metric_name": "example-counter",
-                "_value": 26.8,
-            },
-            "event": "metric",
-        });
+//         let expected = json!({
+//             "time": 1134396775.123,
+//             "host": "host_value",
+//             "index": "index_value",
+//             "source": "source_value",
+//             "sourcetype": "sourcetype_value",
+//             "fields": {
+//                 "host": "host_value",
+//                 "tag_one": "tag_one_value",
+//                 "tag_two": "tag_two_value",
+//                 "metric_name": "example-counter",
+//                 "_value": 26.8,
+//             },
+//             "event": "metric",
+//         });
 
-        let actual =
-            serde_json::from_slice::<JsonValue>(&config.encode_event(metric.into()).unwrap()[..])
-                .unwrap();
+//         let actual =
+//             serde_json::from_slice::<JsonValue>(&config.encode_event(metric.into()).unwrap()[..])
+//                 .unwrap();
 
-        assert_eq!(expected, actual);
-    }
+//         assert_eq!(expected, actual);
+//     }
 
-    #[test]
-    fn test_encode_event_static_counter_returns_expected_json() {
-        let timestamp = DateTime::parse_from_rfc3339("2005-12-12T14:12:55.123-00:00")
-            .unwrap()
-            .with_timezone(&Utc);
+//     #[test]
+//     fn test_encode_event_static_counter_returns_expected_json() {
+//         let timestamp = DateTime::parse_from_rfc3339("2005-12-12T14:12:55.123-00:00")
+//             .unwrap()
+//             .with_timezone(&Utc);
 
-        let metric = Metric::new(
-            "example-counter",
-            MetricKind::Absolute,
-            MetricValue::Counter { value: 26.8 },
-        )
-        .with_timestamp(Some(timestamp))
-        .with_tags(Some(btreemap! {
-            "template_index".to_string() => "index_value".to_string(),
-            "template_source".to_string() => "source_value".to_string(),
-            "template_sourcetype".to_string() => "sourcetype_value".to_string(),
-            "tag_one".to_string() => "tag_one_value".to_string(),
-            "tag_two".to_string() => "tag_two_value".to_string(),
-            "host".to_string() => "host_value".to_string(),
-        }));
+//         let metric = Metric::new(
+//             "example-counter",
+//             MetricKind::Absolute,
+//             MetricValue::Counter { value: 26.8 },
+//         )
+//         .with_timestamp(Some(timestamp))
+//         .with_tags(Some(btreemap! {
+//             "template_index".to_string() => "index_value".to_string(),
+//             "template_source".to_string() => "source_value".to_string(),
+//             "template_sourcetype".to_string() => "sourcetype_value".to_string(),
+//             "tag_one".to_string() => "tag_one_value".to_string(),
+//             "tag_two".to_string() => "tag_two_value".to_string(),
+//             "host".to_string() => "host_value".to_string(),
+//         }));
 
-        let (config, _cx) = load_sink::<HecSinkMetricsConfig>(
-            r#"
-            endpoint = "https://splunk-hec.com/"
-            token = "alksjdfo"
-            host_key = "host"
-            index = "index_value"
-            source = "source_value"
-            sourcetype = "sourcetype_value"
-        "#,
-        )
-        .unwrap();
+//         let (config, _cx) = load_sink::<HecSinkMetricsConfig>(
+//             r#"
+//             endpoint = "https://splunk-hec.com/"
+//             token = "alksjdfo"
+//             host_key = "host"
+//             index = "index_value"
+//             source = "source_value"
+//             sourcetype = "sourcetype_value"
+//         "#,
+//         )
+//         .unwrap();
 
-        let expected = json!({
-            "time": 1134396775.123,
-            "host": "host_value",
-            "index": "index_value",
-            "source": "source_value",
-            "sourcetype": "sourcetype_value",
-            "fields": {
-                "host": "host_value",
-                "tag_one": "tag_one_value",
-                "tag_two": "tag_two_value",
-                "template_index": "index_value",
-                "template_source": "source_value",
-                "template_sourcetype": "sourcetype_value",
-                "metric_name": "example-counter",
-                "_value": 26.8,
-            },
-            "event": "metric",
-        });
+//         let expected = json!({
+//             "time": 1134396775.123,
+//             "host": "host_value",
+//             "index": "index_value",
+//             "source": "source_value",
+//             "sourcetype": "sourcetype_value",
+//             "fields": {
+//                 "host": "host_value",
+//                 "tag_one": "tag_one_value",
+//                 "tag_two": "tag_two_value",
+//                 "template_index": "index_value",
+//                 "template_source": "source_value",
+//                 "template_sourcetype": "sourcetype_value",
+//                 "metric_name": "example-counter",
+//                 "_value": 26.8,
+//             },
+//             "event": "metric",
+//         });
 
-        let actual =
-            serde_json::from_slice::<JsonValue>(&config.encode_event(metric.into()).unwrap()[..])
-                .unwrap();
+//         let actual =
+//             serde_json::from_slice::<JsonValue>(&config.encode_event(metric.into()).unwrap()[..])
+//                 .unwrap();
 
-        assert_eq!(expected, actual);
-    }
+//         assert_eq!(expected, actual);
+//     }
 
-    #[test]
-    fn test_encode_event_gauge_no_namespace_returns_expected_json() {
-        let timestamp = DateTime::parse_from_rfc3339("2005-12-12T14:12:55.123-00:00")
-            .unwrap()
-            .with_timezone(&Utc);
+//     #[test]
+//     fn test_encode_event_gauge_no_namespace_returns_expected_json() {
+//         let timestamp = DateTime::parse_from_rfc3339("2005-12-12T14:12:55.123-00:00")
+//             .unwrap()
+//             .with_timezone(&Utc);
 
-        let metric = Metric::new(
-            "example-gauge",
-            MetricKind::Absolute,
-            MetricValue::Gauge { value: 26.8 },
-        )
-        .with_timestamp(Some(timestamp));
+//         let metric = Metric::new(
+//             "example-gauge",
+//             MetricKind::Absolute,
+//             MetricValue::Gauge { value: 26.8 },
+//         )
+//         .with_timestamp(Some(timestamp));
 
-        let (config, _cx) = load_sink::<HecSinkMetricsConfig>(
-            r#"
-            endpoint = "https://splunk-hec.com/"
-            token = "alksjdfo"
-        "#,
-        )
-        .unwrap();
+//         let (config, _cx) = load_sink::<HecSinkMetricsConfig>(
+//             r#"
+//             endpoint = "https://splunk-hec.com/"
+//             token = "alksjdfo"
+//         "#,
+//         )
+//         .unwrap();
 
-        let expected = json!({
-            "time": 1134396775.123,
-            "fields": {
-                "metric_name": "example-gauge",
-                "_value": 26.8,
-            },
-            "event": "metric",
-        });
+//         let expected = json!({
+//             "time": 1134396775.123,
+//             "fields": {
+//                 "metric_name": "example-gauge",
+//                 "_value": 26.8,
+//             },
+//             "event": "metric",
+//         });
 
-        let actual =
-            serde_json::from_slice::<JsonValue>(&config.encode_event(metric.into()).unwrap()[..])
-                .unwrap();
+//         let actual =
+//             serde_json::from_slice::<JsonValue>(&config.encode_event(metric.into()).unwrap()[..])
+//                 .unwrap();
 
-        assert_eq!(expected, actual);
-    }
+//         assert_eq!(expected, actual);
+//     }
 
-    #[test]
-    fn test_encode_event_gauge_with_namespace_returns_expected_json() {
-        let timestamp = DateTime::parse_from_rfc3339("2005-12-12T14:12:55.123-00:00")
-            .unwrap()
-            .with_timezone(&Utc);
+//     #[test]
+//     fn test_encode_event_gauge_with_namespace_returns_expected_json() {
+//         let timestamp = DateTime::parse_from_rfc3339("2005-12-12T14:12:55.123-00:00")
+//             .unwrap()
+//             .with_timezone(&Utc);
 
-        let metric = Metric::new(
-            "example-gauge",
-            MetricKind::Absolute,
-            MetricValue::Gauge { value: 26.8 },
-        )
-        .with_timestamp(Some(timestamp))
-        .with_namespace(Some("namespace"));
+//         let metric = Metric::new(
+//             "example-gauge",
+//             MetricKind::Absolute,
+//             MetricValue::Gauge { value: 26.8 },
+//         )
+//         .with_timestamp(Some(timestamp))
+//         .with_namespace(Some("namespace"));
 
-        let (config, _cx) = load_sink::<HecSinkMetricsConfig>(
-            r#"
-            endpoint = "https://splunk-hec.com/"
-            token = "alksjdfo"
-        "#,
-        )
-        .unwrap();
+//         let (config, _cx) = load_sink::<HecSinkMetricsConfig>(
+//             r#"
+//             endpoint = "https://splunk-hec.com/"
+//             token = "alksjdfo"
+//         "#,
+//         )
+//         .unwrap();
 
-        let expected = json!({
-            "time": 1134396775.123,
-            "fields": {
-                "metric_name": "namespace.example-gauge",
-                "_value": 26.8,
-            },
-            "event": "metric",
-        });
+//         let expected = json!({
+//             "time": 1134396775.123,
+//             "fields": {
+//                 "metric_name": "namespace.example-gauge",
+//                 "_value": 26.8,
+//             },
+//             "event": "metric",
+//         });
 
-        let actual =
-            serde_json::from_slice::<JsonValue>(&config.encode_event(metric.into()).unwrap()[..])
-                .unwrap();
+//         let actual =
+//             serde_json::from_slice::<JsonValue>(&config.encode_event(metric.into()).unwrap()[..])
+//                 .unwrap();
 
-        assert_eq!(expected, actual);
-    }
+//         assert_eq!(expected, actual);
+//     }
 
-    #[test]
-    fn test_encode_event_gauge_default_namespace_returns_expected_json() {
-        let timestamp = DateTime::parse_from_rfc3339("2005-12-12T14:12:55.123-00:00")
-            .unwrap()
-            .with_timezone(&Utc);
+//     #[test]
+//     fn test_encode_event_gauge_default_namespace_returns_expected_json() {
+//         let timestamp = DateTime::parse_from_rfc3339("2005-12-12T14:12:55.123-00:00")
+//             .unwrap()
+//             .with_timezone(&Utc);
 
-        let metric = Metric::new(
-            "example-gauge",
-            MetricKind::Absolute,
-            MetricValue::Gauge { value: 26.8 },
-        )
-        .with_timestamp(Some(timestamp));
+//         let metric = Metric::new(
+//             "example-gauge",
+//             MetricKind::Absolute,
+//             MetricValue::Gauge { value: 26.8 },
+//         )
+//         .with_timestamp(Some(timestamp));
 
-        let (config, _cx) = load_sink::<HecSinkMetricsConfig>(
-            r#"
-            default_namespace = "default"
-            endpoint = "https://splunk-hec.com/"
-            token = "alksjdfo"
-        "#,
-        )
-        .unwrap();
+//         let (config, _cx) = load_sink::<HecSinkMetricsConfig>(
+//             r#"
+//             default_namespace = "default"
+//             endpoint = "https://splunk-hec.com/"
+//             token = "alksjdfo"
+//         "#,
+//         )
+//         .unwrap();
 
-        let expected = json!({
-            "time": 1134396775.123,
-            "fields": {
-                "metric_name": "default.example-gauge",
-                "_value": 26.8,
-            },
-            "event": "metric",
-        });
+//         let expected = json!({
+//             "time": 1134396775.123,
+//             "fields": {
+//                 "metric_name": "default.example-gauge",
+//                 "_value": 26.8,
+//             },
+//             "event": "metric",
+//         });
 
-        let actual =
-            serde_json::from_slice::<JsonValue>(&config.encode_event(metric.into()).unwrap()[..])
-                .unwrap();
+//         let actual =
+//             serde_json::from_slice::<JsonValue>(&config.encode_event(metric.into()).unwrap()[..])
+//                 .unwrap();
 
-        assert_eq!(expected, actual);
-    }
+//         assert_eq!(expected, actual);
+//     }
 
-    #[test]
-    fn test_encode_event_gauge_overridden_namespace_returns_expected_json() {
-        let timestamp = DateTime::parse_from_rfc3339("2005-12-12T14:12:55.123-00:00")
-            .unwrap()
-            .with_timezone(&Utc);
+//     #[test]
+//     fn test_encode_event_gauge_overridden_namespace_returns_expected_json() {
+//         let timestamp = DateTime::parse_from_rfc3339("2005-12-12T14:12:55.123-00:00")
+//             .unwrap()
+//             .with_timezone(&Utc);
 
-        let metric = Metric::new(
-            "example-gauge",
-            MetricKind::Absolute,
-            MetricValue::Gauge { value: 26.8 },
-        )
-        .with_timestamp(Some(timestamp))
-        .with_namespace(Some("overridden"));
+//         let metric = Metric::new(
+//             "example-gauge",
+//             MetricKind::Absolute,
+//             MetricValue::Gauge { value: 26.8 },
+//         )
+//         .with_timestamp(Some(timestamp))
+//         .with_namespace(Some("overridden"));
 
-        let (config, _cx) = load_sink::<HecSinkMetricsConfig>(
-            r#"
-            default_namespace = "default"
-            endpoint = "https://splunk-hec.com/"
-            token = "alksjdfo"
-        "#,
-        )
-        .unwrap();
+//         let (config, _cx) = load_sink::<HecSinkMetricsConfig>(
+//             r#"
+//             default_namespace = "default"
+//             endpoint = "https://splunk-hec.com/"
+//             token = "alksjdfo"
+//         "#,
+//         )
+//         .unwrap();
 
-        let expected = json!({
-            "time": 1134396775.123,
-            "fields": {
-                "metric_name": "overridden.example-gauge",
-                "_value": 26.8,
-            },
-            "event": "metric",
-        });
+//         let expected = json!({
+//             "time": 1134396775.123,
+//             "fields": {
+//                 "metric_name": "overridden.example-gauge",
+//                 "_value": 26.8,
+//             },
+//             "event": "metric",
+//         });
 
-        let actual =
-            serde_json::from_slice::<JsonValue>(&config.encode_event(metric.into()).unwrap()[..])
-                .unwrap();
+//         let actual =
+//             serde_json::from_slice::<JsonValue>(&config.encode_event(metric.into()).unwrap()[..])
+//                 .unwrap();
 
-        assert_eq!(expected, actual);
-    }
+//         assert_eq!(expected, actual);
+//     }
 
-    #[test]
-    fn test_encode_event_unsupported_type_returns_none() {
-        let mut values = BTreeSet::new();
-        values.insert(String::from("value1"));
+//     #[test]
+//     fn test_encode_event_unsupported_type_returns_none() {
+//         let mut values = BTreeSet::new();
+//         values.insert(String::from("value1"));
 
-        let metric = Metric::new(
-            "example-gauge",
-            MetricKind::Absolute,
-            MetricValue::Set { values },
-        );
+//         let metric = Metric::new(
+//             "example-gauge",
+//             MetricKind::Absolute,
+//             MetricValue::Set { values },
+//         );
 
-        let (config, _cx) = load_sink::<HecSinkMetricsConfig>(
-            r#"
-            endpoint = "https://splunk-hec.com/"
-            token = "alksjdfo"
-        "#,
-        )
-        .unwrap();
+//         let (config, _cx) = load_sink::<HecSinkMetricsConfig>(
+//             r#"
+//             endpoint = "https://splunk-hec.com/"
+//             token = "alksjdfo"
+//         "#,
+//         )
+//         .unwrap();
 
-        assert!(config.encode_event(metric.into()).is_none());
-    }
-}
+//         assert!(config.encode_event(metric.into()).is_none());
+//     }
+// }
 
-#[cfg(all(test, feature = "splunk-integration-tests"))]
-mod integration_tests {
-    use super::*;
-    use crate::{
-        config::{SinkConfig, SinkContext},
-        event::{Metric, MetricKind},
-        sinks::splunk_hec::common::integration_test_helpers::get_token,
-        test_util::components::{self, HTTP_SINK_TAGS},
-    };
-    use serde_json::Value as JsonValue;
-    use shared::btreemap;
-    use std::convert::TryFrom;
-    use vector_core::event::{BatchNotifier, BatchStatus};
-    const USERNAME: &str = "admin";
-    const PASSWORD: &str = "password";
+// #[cfg(all(test, feature = "splunk-integration-tests"))]
+// mod integration_tests {
+//     use super::*;
+//     use crate::{
+//         config::{SinkConfig, SinkContext},
+//         event::{Metric, MetricKind},
+//         sinks::splunk_hec::common::integration_test_helpers::get_token,
+//         test_util::components::{self, HTTP_SINK_TAGS},
+//     };
+//     use serde_json::Value as JsonValue;
+//     use shared::btreemap;
+//     use std::convert::TryFrom;
+//     use vector_core::event::{BatchNotifier, BatchStatus};
+//     const USERNAME: &str = "admin";
+//     const PASSWORD: &str = "password";
 
-    #[tokio::test]
-    async fn splunk_insert_counter_metric() {
-        let cx = SinkContext::new_test();
+//     #[tokio::test]
+//     async fn splunk_insert_counter_metric() {
+//         let cx = SinkContext::new_test();
 
-        let mut config = config().await;
-        config.index = Template::try_from("testmetrics".to_string()).ok();
-        let (sink, _) = config.build(cx).await.unwrap();
+//         let mut config = config().await;
+//         config.index = Template::try_from("testmetrics".to_string()).ok();
+//         let (sink, _) = config.build(cx).await.unwrap();
 
-        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        let event = Metric::new(
-            "example-counter",
-            MetricKind::Absolute,
-            MetricValue::Counter { value: 26.28 },
-        )
-        .with_tags(Some(
-            btreemap! {"tag_one".to_string() => "tag_one_value".to_string()},
-        ))
-        .with_batch_notifier(&batch)
-        .into();
-        drop(batch);
-        components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+//         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+//         let event = Metric::new(
+//             "example-counter",
+//             MetricKind::Absolute,
+//             MetricValue::Counter { value: 26.28 },
+//         )
+//         .with_tags(Some(
+//             btreemap! {"tag_one".to_string() => "tag_one_value".to_string()},
+//         ))
+//         .with_batch_notifier(&batch)
+//         .into();
+//         drop(batch);
+//         components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+//         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
-        assert!(
-            metric_dimensions_exist(
-                "example-counter",
-                &["host", "source", "sourcetype", "tag_one"],
-            )
-            .await
-        );
-    }
+//         assert!(
+//             metric_dimensions_exist(
+//                 "example-counter",
+//                 &["host", "source", "sourcetype", "tag_one"],
+//             )
+//             .await
+//         );
+//     }
 
-    #[tokio::test]
-    async fn splunk_insert_gauge_metric() {
-        let cx = SinkContext::new_test();
+//     #[tokio::test]
+//     async fn splunk_insert_gauge_metric() {
+//         let cx = SinkContext::new_test();
 
-        let mut config = config().await;
-        config.index = Template::try_from("testmetrics".to_string()).ok();
-        let (sink, _) = config.build(cx).await.unwrap();
+//         let mut config = config().await;
+//         config.index = Template::try_from("testmetrics".to_string()).ok();
+//         let (sink, _) = config.build(cx).await.unwrap();
 
-        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        let event = Metric::new(
-            "example-gauge",
-            MetricKind::Absolute,
-            MetricValue::Gauge { value: 26.28 },
-        )
-        .with_tags(Some(
-            btreemap! {"tag_two".to_string() => "tag_two_value".to_string()},
-        ))
-        .with_batch_notifier(&batch)
-        .into();
-        drop(batch);
-        components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+//         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+//         let event = Metric::new(
+//             "example-gauge",
+//             MetricKind::Absolute,
+//             MetricValue::Gauge { value: 26.28 },
+//         )
+//         .with_tags(Some(
+//             btreemap! {"tag_two".to_string() => "tag_two_value".to_string()},
+//         ))
+//         .with_batch_notifier(&batch)
+//         .into();
+//         drop(batch);
+//         components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+//         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
-        assert!(
-            metric_dimensions_exist(
-                "example-gauge",
-                &["host", "source", "sourcetype", "tag_two"],
-            )
-            .await
-        );
-    }
+//         assert!(
+//             metric_dimensions_exist(
+//                 "example-gauge",
+//                 &["host", "source", "sourcetype", "tag_two"],
+//             )
+//             .await
+//         );
+//     }
 
-    // It usually takes ~1 second for the metric to show up in search with all dimensions, so poll
-    // multiple times.
-    async fn metric_dimensions_exist(metric_name: &str, expected_dimensions: &[&str]) -> bool {
-        for _ in 0..20usize {
-            let resp = metric_dimensions(metric_name).await;
-            let actual_dimensions = resp
-                .iter()
-                .map(|d| d["name"].as_str().unwrap())
-                .collect::<Vec<_>>();
+//     // It usually takes ~1 second for the metric to show up in search with all dimensions, so poll
+//     // multiple times.
+//     async fn metric_dimensions_exist(metric_name: &str, expected_dimensions: &[&str]) -> bool {
+//         for _ in 0..20usize {
+//             let resp = metric_dimensions(metric_name).await;
+//             let actual_dimensions = resp
+//                 .iter()
+//                 .map(|d| d["name"].as_str().unwrap())
+//                 .collect::<Vec<_>>();
 
-            if expected_dimensions
-                .iter()
-                .all(|d| actual_dimensions.contains(d))
-            {
-                return true;
-            }
+//             if expected_dimensions
+//                 .iter()
+//                 .all(|d| actual_dimensions.contains(d))
+//             {
+//                 return true;
+//             }
 
-            // if all dimensions not present, sleep and continue
-            std::thread::sleep(std::time::Duration::from_millis(100));
-        }
+//             // if all dimensions not present, sleep and continue
+//             std::thread::sleep(std::time::Duration::from_millis(100));
+//         }
 
-        false
-    }
+//         false
+//     }
 
-    async fn metric_dimensions(metric_name: &str) -> Vec<JsonValue> {
-        let client = reqwest::Client::builder()
-            .danger_accept_invalid_certs(true)
-            .build()
-            .unwrap();
+//     async fn metric_dimensions(metric_name: &str) -> Vec<JsonValue> {
+//         let client = reqwest::Client::builder()
+//             .danger_accept_invalid_certs(true)
+//             .build()
+//             .unwrap();
 
-        let res = client
-            .get(format!(
-                "https://localhost:8089/services/catalog/metricstore/dimensions?output_mode=json&metric_name={}",
-                metric_name
-            ))
-            .basic_auth(USERNAME, Some(PASSWORD))
-            .send()
-            .await
-            .unwrap();
+//         let res = client
+//             .get(format!(
+//                 "https://localhost:8089/services/catalog/metricstore/dimensions?output_mode=json&metric_name={}",
+//                 metric_name
+//             ))
+//             .basic_auth(USERNAME, Some(PASSWORD))
+//             .send()
+//             .await
+//             .unwrap();
 
-        let json: JsonValue = res.json().await.unwrap();
+//         let json: JsonValue = res.json().await.unwrap();
 
-        json["entry"].as_array().unwrap().clone()
-    }
+//         json["entry"].as_array().unwrap().clone()
+//     }
 
-    async fn config() -> HecSinkMetricsConfig {
-        HecSinkMetricsConfig {
-            default_namespace: None,
-            token: get_token().await,
-            endpoint: "http://localhost:8088/".into(),
-            host_key: "host".into(),
-            index: None,
-            sourcetype: None,
-            source: None,
-            compression: Compression::None,
-            batch: BatchConfig {
-                max_events: Some(1),
-                ..Default::default()
-            },
-            request: TowerRequestConfig::default(),
-            tls: None,
-        }
-    }
-}
+//     async fn config() -> HecSinkMetricsConfig {
+//         HecSinkMetricsConfig {
+//             default_namespace: None,
+//             token: get_token().await,
+//             endpoint: "http://localhost:8088/".into(),
+//             host_key: "host".into(),
+//             index: None,
+//             sourcetype: None,
+//             source: None,
+//             compression: Compression::None,
+//             batch: BatchConfig {
+//                 max_events: Some(1),
+//                 ..Default::default()
+//             },
+//             request: TowerRequestConfig::default(),
+//             tls: None,
+//         }
+//     }
+// }
