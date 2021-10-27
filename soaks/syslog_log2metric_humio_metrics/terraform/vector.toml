@@ -41,9 +41,9 @@ type = "prometheus_exporter"
 inputs = ["internal_metrics"]
 address = "0.0.0.0:9090"
 
-[sinks.humio_logs]
-type = "humio_logs"
-inputs = ["syslog"]
+[sinks.humio_metrics]
+type = "humio_metrics"
+inputs = ["log2metric"]
 endpoint = "http://http-blackhole:8080"
 encoding = "json"
 token = "humio_token"

@@ -1,5 +1,5 @@
 use crate::{
-    codecs, emit,
+    codecs,
     event::Event,
     internal_events::{SocketMode, SocketReceiveError, UnixSocketFileDeleteError},
     shutdown::ShutdownSignal,

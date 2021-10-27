@@ -3,17 +3,16 @@ use std::{
     task::{Context, Poll},
 };
 
-use crate::{
-    internal_events::EventsSent,
-    sinks::{
-        splunk_hec::common::build_request,
-        util::{http::HttpBatchService, ElementCount},
-    },
+use crate::sinks::{
+    splunk_hec::common::build_request,
+    util::{http::HttpBatchService, ElementCount},
 };
 use bytes::Bytes;
 use futures_util::future::BoxFuture;
 use http::{Request, Response};
 use tower::{Service, ServiceExt};
+use vector_core::internal_event::EventsSent;
+use vector_core::stream::DriverResponse;
 use vector_core::{
     buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
@@ -57,13 +56,9 @@ impl Service<HecLogsRequest> for HecLogsService {
         Box::pin(async move {
             http_service.ready().await?;
             let events_count = req.events_count;
-            let byte_size = req.events_byte_size;
+            let events_byte_size = req.events_byte_size;
             let response = http_service.call(req).await?;
             let event_status = if response.status().is_success() {
-                emit!(&EventsSent {
-                    count: events_count,
-                    byte_size,
-                });
                 EventStatus::Delivered
             } else if response.status().is_server_error() {
                 EventStatus::Errored
@@ -74,6 +69,8 @@ impl Service<HecLogsRequest> for HecLogsService {
             Ok(HecLogsResponse {
                 http_response: response,
                 event_status,
+                events_count,
+                events_byte_size,
             })
         })
     }
@@ -114,11 +111,20 @@ impl Finalizable for HecLogsRequest {
 pub struct HecLogsResponse {
     pub http_response: Response<Bytes>,
     event_status: EventStatus,
+    events_count: usize,
+    events_byte_size: usize,
 }
 
-impl AsRef<EventStatus> for HecLogsResponse {
-    fn as_ref(&self) -> &EventStatus {
-        &self.event_status
+impl DriverResponse for HecLogsResponse {
+    fn event_status(&self) -> EventStatus {
+        self.event_status
+    }
+
+    fn events_sent(&self) -> EventsSent {
+        EventsSent {
+            count: self.events_count,
+            byte_size: self.events_byte_size,
+        }
     }
 }
 
