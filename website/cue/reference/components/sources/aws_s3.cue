@@ -197,34 +197,7 @@ components: sources: aws_s3: components._aws & {
 				[transforms.elasticloadbalancing_fields_parsed]
 				type = "regex_parser"
 				inputs = ["s3"]
-				regex = '(?x)^
-						(?P<type>[\\w]+)[ ]
-						(?P<timestamp>[\\w:.-]+)[ ]
-						(?P<elb>[^\\s]+)[ ]
-						(?P<client_host>[\\d.:-]+)[ ]
-						(?P<target_host>[\\d.:-]+)[ ]
-						(?P<request_processing_time>[\\d.-]+)[ ]
-						(?P<target_processing_time>[\\d.-]+)[ ]
-						(?P<response_processing_time>[\\d.-]+)[ ]
-						(?P<elb_status_code>[\\d-]+)[ ]
-						(?P<target_status_code>[\\d-]+)[ ]
-						(?P<received_bytes>[\\d-]+)[ ]
-						(?P<sent_bytes>[\\d-]+)[ ]
-						"(?P<request_method>[\\w-]+)[ ]
-						(?P<request_url>[^\\s]+)[ ]
-						(?P<request_protocol>[^"\\s]+)"[ ]
-						"(?P<user_agent>[^"]+)"[ ]
-						(?P<ssl_cipher>[^\\s]+)[ ]
-						(?P<ssl_protocol>[^\\s]+)[ ]
-						(?P<target_group_arn>[\\w.:/-]+)[ ]
-						"(?P<trace_id>[^\\s"]+)"[ ]
-						"(?P<domain_name>[^\\s"]+)"[ ]
-						"(?P<chosen_cert_arn>[\\w:./-]+)"[ ]
-						(?P<matched_rule_priority>[\\d-]+)[ ]
-						(?P<request_creation_time>[\\w.:-]+)[ ]
-						"(?P<actions_executed>[\\w,-]+)"[ ]
-						"(?P<redirect_url>[^"]+)"[ ]
-						"(?P<error_reason>[^"]+)"'
+				regex = '(?P<type>[\\w]+)[ ](?P<timestamp>[\\w:.-]+)[ ](?P<elb>[^\\s]+)[ ](?P<client_host>[\\d.:-]+)[ ](?P<target_host>[\\d.:-]+)[ ](?P<request_processing_time>[\\d.-]+)[ ](?P<target_processing_time>[\\d.-]+)[ ](?P<response_processing_time>[\\d.-]+)[ ](?P<elb_status_code>[\\d-]+)[ ](?P<target_status_code>[\\d-]+)[ ](?P<received_bytes>[\\d-]+)[ ](?P<sent_bytes>[\\d-]+)[ ]"(?P<request_method>[\\w-]+)[ ](?P<request_url>[^\\s]+)[ ](?P<request_protocol>[^"\\s]+)"[ ]"(?P<user_agent>[^"]+)"[ ](?P<ssl_cipher>[^\\s]+)[ ](?P<ssl_protocol>[^\\s]+)[ ](?P<target_group_arn>[\\w.:/-]+)[ ]"(?P<trace_id>[^\\s"]+)"[ ]"(?P<domain_name>[^\\s"]+)"[ ]"(?P<chosen_cert_arn>[\\w:./-]+)"[ ](?P<matched_rule_priority>[\\d-]+)[ ](?P<request_creation_time>[\\w.:-]+)[ ]"(?P<actions_executed>[\\w,-]+)"[ ]"(?P<redirect_url>[^"]+)"[ ]"(?P<error_reason>[^"]+)"'
 				field = "message"
 				drop_failed = false
 
