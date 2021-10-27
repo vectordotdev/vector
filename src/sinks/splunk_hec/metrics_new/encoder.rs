@@ -120,7 +120,7 @@ where
 {
     fn encode_input(
         &self,
-        mut input: Vec<HecProcessedEvent>,
+        input: Vec<HecProcessedEvent>,
         writer: &mut dyn io::Write,
     ) -> io::Result<usize> {
         self.codec().encode_input(input, writer)

@@ -5,9 +5,7 @@ use crate::event::{Metric, MetricKind, MetricValue};
 // use crate::sinks::util::{http::HttpSink, test::load_sink};
 use crate::template::Template;
 use chrono::{DateTime, Utc};
-use serde_json::{json, Value as JsonValue};
 use shared::btreemap;
-use std::collections::BTreeSet;
 use std::convert::TryFrom;
 use vector_core::ByteSizeOf;
 
@@ -37,10 +35,11 @@ fn get_processed_event(metric: Metric) -> HecProcessedEvent {
     let source = Template::try_from("{{ tags.template_source }}".to_string()).ok();
     let index = Template::try_from("{{ tags.template_index }}".to_string()).ok();
     let default_namespace = Some("namespace");
+    let event_byte_size = metric.size_of();
 
     process_metric(
         metric,
-        metric.size_of(),
+        event_byte_size,
         sourcetype.as_ref(),
         source.as_ref(),
         index.as_ref(),
