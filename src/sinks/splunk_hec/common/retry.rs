@@ -5,14 +5,14 @@ use crate::{
     sinks::util::retries::{RetryAction, RetryLogic},
 };
 
-use super::service::HecLogsResponse;
+use super::response::HecResponse;
 
 #[derive(Debug, Default, Clone)]
-pub struct HecLogsRetry;
+pub struct HecRetryLogic;
 
-impl RetryLogic for HecLogsRetry {
+impl RetryLogic for HecRetryLogic {
     type Error = HttpError;
-    type Response = HecLogsResponse;
+    type Response = HecResponse;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
         true
