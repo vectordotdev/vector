@@ -23,6 +23,7 @@ use vector_core::event::{self, Event, EventFinalizers, Finalizable, Value};
 use vector_core::partition::Partitioner;
 use vector_core::sink::StreamSink;
 use vector_core::stream::BatcherSettings;
+use vector_core::ByteSizeOf;
 
 #[derive(Clone)]
 pub struct KeyPartitioner(Option<Template>);
@@ -94,7 +95,7 @@ impl Default for LokiRequestBuilder {
 }
 
 impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
-    type Metadata = (Option<String>, usize, EventFinalizers);
+    type Metadata = (Option<String>, usize, EventFinalizers, usize);
     type Events = Vec<LokiRecord>;
     type Encoder = LokiBatchEncoder;
     type Payload = Vec<u8>;
@@ -115,6 +116,7 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
     ) -> (Self::Metadata, Self::Events) {
         let (key, mut events) = input;
         let batch_size = events.len();
+        let events_byte_size = events.size_of();
         let finalizers = events
             .iter_mut()
             .fold(EventFinalizers::default(), |mut acc, x| {
@@ -122,11 +124,14 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
                 acc
             });
 
-        ((key.tenant_id, batch_size, finalizers), events)
+        (
+            (key.tenant_id, batch_size, finalizers, events_byte_size),
+            events,
+        )
     }
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        let (tenant_id, batch_size, finalizers) = metadata;
+        let (tenant_id, batch_size, finalizers, events_byte_size) = metadata;
         emit!(&LokiEventsProcessed {
             byte_size: payload.len(),
         });
@@ -136,6 +141,7 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
             finalizers,
             payload,
             tenant_id,
+            events_byte_size,
         }
     }
 }
@@ -303,7 +309,9 @@ impl LokiSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let service = tower::ServiceBuilder::new().service(self.service);
+        let service = tower::ServiceBuilder::new()
+            .concurrency_limit(1)
+            .service(self.service);
 
         let encoder = self.encoder.clone();
         let mut filter = RecordFilter::new(self.out_of_order_action);

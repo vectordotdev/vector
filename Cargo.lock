@@ -1225,7 +1225,9 @@ checksum = "ea221b5284a47e40033bf9b66f35f984ec0ea2931eb03505246cd27a963f981b"
 name = "core_common"
 version = "0.1.0"
 dependencies = [
+ "metrics",
  "serde_json",
+ "tracing 0.1.29",
 ]
 
 [[package]]
@@ -6837,9 +6839,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-macros"
-version = "1.3.0"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54473be61f4ebe4efd09cec9bd5d16fa51d70ea0192213d754d2d500457db110"
+checksum = "b2dd85aeaba7b68df939bd357c6afb36c87951be9e80bf9c859f2fc3e9fca0fd"
 dependencies = [
  "proc-macro2 1.0.29",
  "quote 1.0.9",
@@ -7581,6 +7583,7 @@ dependencies = [
  "hash_hasher",
  "headers",
  "heim",
+ "hex",
  "hostname",
  "http",
  "hyper",
@@ -7654,6 +7657,7 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "serde_yaml",
+ "sha2",
  "shared",
  "smallvec",
  "smpl_jwt",
@@ -7767,6 +7771,8 @@ dependencies = [
  "prost-build",
  "prost-types",
  "quickcheck",
+ "rand 0.8.4",
+ "rand_distr",
  "regex",
  "serde",
  "serde_json",
