@@ -3,13 +3,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use crate::{
-    internal_events::EventsSent,
-    sinks::{
-        splunk_hec::common::build_request,
-        util::{http::HttpBatchService, ElementCount},
-    },
-};
+use crate::{internal_events::EventsSent, sinks::{splunk_hec::common::{build_request, request::HecRequest, response::HecResponse}, util::{http::HttpBatchService, ElementCount}}};
 use bytes::Bytes;
 use futures_util::future::BoxFuture;
 use http::{Request, Response};
@@ -26,7 +20,7 @@ use crate::{http::HttpClient, sinks::util::Compression};
 pub struct HecLogsService {
     pub batch_service: HttpBatchService<
         BoxFuture<'static, Result<Request<Vec<u8>>, crate::Error>>,
-        HecLogsRequest,
+        HecRequest,
     >,
 }
 
@@ -43,8 +37,8 @@ impl HecLogsService {
     }
 }
 
-impl Service<HecLogsRequest> for HecLogsService {
-    type Response = HecLogsResponse;
+impl Service<HecRequest> for HecLogsService {
+    type Response = HecResponse;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -52,7 +46,7 @@ impl Service<HecLogsRequest> for HecLogsService {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: HecLogsRequest) -> Self::Future {
+    fn call(&mut self, req: HecRequest) -> Self::Future {
         let mut http_service = self.batch_service.clone();
         Box::pin(async move {
             http_service.ready().await?;
@@ -71,54 +65,11 @@ impl Service<HecLogsRequest> for HecLogsService {
                 EventStatus::Failed
             };
 
-            Ok(HecLogsResponse {
+            Ok(HecResponse {
                 http_response: response,
                 event_status,
             })
         })
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct HecLogsRequest {
-    pub body: Vec<u8>,
-    pub events_count: usize,
-    pub events_byte_size: usize,
-    pub finalizers: EventFinalizers,
-}
-
-impl ByteSizeOf for HecLogsRequest {
-    fn allocated_bytes(&self) -> usize {
-        self.body.allocated_bytes() + self.finalizers.allocated_bytes()
-    }
-}
-
-impl ElementCount for HecLogsRequest {
-    fn element_count(&self) -> usize {
-        self.events_count
-    }
-}
-
-impl Ackable for HecLogsRequest {
-    fn ack_size(&self) -> usize {
-        self.events_count
-    }
-}
-
-impl Finalizable for HecLogsRequest {
-    fn take_finalizers(&mut self) -> EventFinalizers {
-        std::mem::take(&mut self.finalizers)
-    }
-}
-
-pub struct HecLogsResponse {
-    pub http_response: Response<Bytes>,
-    event_status: EventStatus,
-}
-
-impl AsRef<EventStatus> for HecLogsResponse {
-    fn as_ref(&self) -> &EventStatus {
-        &self.event_status
     }
 }
 
@@ -131,7 +82,7 @@ pub struct HttpRequestBuilder {
 impl HttpRequestBuilder {
     pub async fn build_request(
         &self,
-        req: HecLogsRequest,
+        req: HecRequest,
     ) -> Result<Request<Vec<u8>>, crate::Error> {
         build_request(
             self.endpoint.as_str(),

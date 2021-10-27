@@ -103,8 +103,6 @@ mod tests {
 
     use crate::sinks::{splunk_hec::common::{build_healthcheck, create_client}, util::Compression};
 
-    use super::create_client;
-
     #[tokio::test]
     async fn test_build_healthcheck_200_response_returns_ok() {
         let mock_server = MockServer::start().await;

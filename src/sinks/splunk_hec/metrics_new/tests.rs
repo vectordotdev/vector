@@ -7,6 +7,7 @@ use crate::template::Template;
 use chrono::{DateTime, Utc};
 use serde_json::{Value as JsonValue, json};
 use shared::btreemap;
+use vector_core::ByteSizeOf;
 use std::collections::BTreeSet;
 use std::convert::TryFrom;
 

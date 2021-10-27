@@ -2,27 +2,16 @@ use futures_util::FutureExt;
 use tower::ServiceBuilder;
 use vector_core::{sink::VectorSink, transform::DataType};
 
-use crate::{
-    config::{GenerateConfig, SinkConfig, SinkContext},
-    http::HttpClient,
-    sinks::{
-        splunk_hec::common::{build_healthcheck, create_client, host_key},
-        util::{
+use crate::{config::{GenerateConfig, SinkConfig, SinkContext}, http::HttpClient, sinks::{Healthcheck, splunk_hec::common::{build_healthcheck, create_client, host_key, retry::HecRetryLogic}, util::{
             encoding::EncodingConfig, BatchConfig, BatchSettings, Buffer, Compression,
             ServiceBuilderExt, TowerRequestConfig,
-        },
-        Healthcheck,
-    },
-    template::Template,
-    tls::TlsOptions,
-};
+        }}, template::Template, tls::TlsOptions};
 
 use serde::{Deserialize, Serialize};
 
 use super::{
     encoder::HecLogsEncoder,
     request_builder::HecLogsRequestBuilder,
-    retry::HecLogsRetry,
     service::{HecLogsService, HttpRequestBuilder},
     sink::HecLogsSink,
 };
@@ -110,7 +99,7 @@ impl HecSinkLogsConfig {
             compression: self.compression,
         };
         let service = ServiceBuilder::new()
-            .settings(request_settings, HecLogsRetry)
+            .settings(request_settings, HecRetryLogic)
             .service(HecLogsService::new(client, http_request_builder));
 
         let batch_settings = BatchSettings::<Buffer>::default()
