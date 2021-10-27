@@ -9,6 +9,8 @@ use super::{
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "datadog-pipelines")]
+use std::collections::BTreeMap;
 use vector_core::{config::GlobalOptions, default_data_dir, transform::TransformConfig};
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -35,6 +37,21 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub tests: Vec<TestDefinition>,
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
+}
+
+#[cfg(feature = "datadog-pipelines")]
+#[derive(Serialize)]
+struct ConfigBuilderHash<'a> {
+    #[cfg(feature = "api")]
+    api: &'a api::Options,
+    global: &'a GlobalOptions,
+    healthchecks: &'a HealthcheckOptions,
+    enrichment_tables: BTreeMap<&'a ComponentKey, &'a EnrichmentTableOuter>,
+    sources: BTreeMap<&'a ComponentKey, &'a SourceOuter>,
+    sinks: BTreeMap<&'a ComponentKey, &'a SinkOuter<String>>,
+    transforms: BTreeMap<&'a ComponentKey, &'a TransformOuter<String>>,
+    tests: &'a Vec<TestDefinition>,
+    provider: &'a Option<Box<dyn provider::ProviderConfig>>,
 }
 
 impl Clone for ConfigBuilder {
@@ -252,23 +269,8 @@ impl ConfigBuilder {
     /// an order-stable JSON of the config builder and feeding its bytes into a SHA256 hasher.
     pub fn sha256_hash(&self) -> String {
         use sha2::{Digest, Sha256};
-        use std::collections::BTreeMap;
 
-        #[derive(Serialize)]
-        struct ConfigBuilderHash<'a> {
-            #[cfg(feature = "api")]
-            api: &'a api::Options,
-            global: &'a GlobalOptions,
-            healthchecks: &'a HealthcheckOptions,
-            enrichment_tables: BTreeMap<&'a ComponentKey, &'a EnrichmentTableOuter>,
-            sources: BTreeMap<&'a ComponentKey, &'a SourceOuter>,
-            sinks: BTreeMap<&'a ComponentKey, &'a SinkOuter<String>>,
-            transforms: BTreeMap<&'a ComponentKey, &'a TransformOuter<String>>,
-            tests: &'a Vec<TestDefinition>,
-            provider: &'a Option<Box<dyn provider::ProviderConfig>>,
-        }
-
-        let value = serde_json::json!(ConfigBuilderHash {
+        let value = serde_json::to_string(&ConfigBuilderHash {
             #[cfg(feature = "api")]
             api: &self.api,
             global: &self.global,
@@ -279,9 +281,10 @@ impl ConfigBuilder {
             transforms: self.transforms.iter().collect(),
             tests: &self.tests,
             provider: &self.provider,
-        });
+        })
+        .expect("should serialize to JSON");
 
-        let output = Sha256::digest(value.to_string().as_bytes());
+        let output = Sha256::digest(value.as_bytes());
 
         hex::encode(output)
     }
@@ -296,5 +299,55 @@ impl ConfigBuilder {
     pub fn from_json(input: &str) -> Self {
         crate::config::format::deserialize(input, Some(crate::config::format::Format::Json))
             .unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(all(feature = "datadog-pipelines", feature = "api"))]
+    #[test]
+    fn config_hash_json_order() {
+        use serde_json::{json, Value};
+
+        // Expected key order of serialization. This is important for guaranteeing that a
+        // hash is reproducible across versions.
+        let expected_keys = [
+            "api",
+            "global",
+            "healthchecks",
+            "enrichment_tables",
+            "sources",
+            "sinks",
+            "transforms",
+            "tests",
+            "provider",
+        ];
+
+        let builder = ConfigBuilder::default();
+
+        let value = json!(ConfigBuilderHash {
+            api: &builder.api,
+            global: &builder.global,
+            healthchecks: &builder.healthchecks,
+            enrichment_tables: builder.enrichment_tables.iter().collect(),
+            sources: builder.sources.iter().collect(),
+            sinks: builder.sinks.iter().collect(),
+            transforms: builder.transforms.iter().collect(),
+            tests: &builder.tests,
+            provider: &builder.provider,
+        });
+
+        match value {
+            // Should serialize to a map.
+            Value::Object(map) => {
+                // Check ordering.
+                for (i, (key, _)) in map.iter().enumerate() {
+                    assert_eq!(key, expected_keys[i])
+                }
+            }
+            _ => panic!("should serialize to object"),
+        }
     }
 }
