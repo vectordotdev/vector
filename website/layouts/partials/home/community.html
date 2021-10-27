@@ -1,6 +1,6 @@
 {{ $comm := .Params.community }}
 {{ $social := site.Menus.community }}
-<div class="pt-12 md:pt-16 lg:pt-20">
+<div class="pt-12 pb-16 md:pt-16 lg:pt-20">
   <div class="text-center mx-auto max-w-7xl px-8 md:px-4 lg:px-0">
     {{ partial "home/heading.html" (dict "title" $comm.title) }}
 
@@ -25,13 +25,6 @@
         {{ template "community-button" . }}
         {{ end }}
       </div>
-    </div>
-  </div>
-
-  {{/* Spinning globe (see assets/js/home.tsx) */}}
-  <div class="mt-20 flex justify-center mx-auto max-w-4xl">
-    <div id="globe-wrapper" class="overflow-hidden" style="margin-bottom: -40%; z-index: -1;">
-      <div id="globe"></div>
     </div>
   </div>
 </div>

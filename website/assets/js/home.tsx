@@ -3,20 +3,20 @@
 //import "regenerator-runtime/runtime";
 
 // Imports
-import React, { useEffect, useState } from "react";
-import ReactDOM from "react-dom";
-import classnames from "classnames";
-import { useInterval } from "react-use";
-import { useSpring, animated } from "react-spring";
-import { geoOrthographic, geoPath, geoDistance } from "d3-geo";
-import { feature } from "topojson-client";
-
 // types
 import { Topology } from "@types/topojson-specification";
-
+import classnames from "classnames";
+import { geoDistance, geoOrthographic, geoPath } from "d3-geo";
+import React, { useEffect, useState } from "react";
+import ReactDOM from "react-dom";
+import { animated, useSpring } from "react-spring";
+import { useInterval } from "react-use";
+import { feature } from "topojson-client";
 // countryData
 import countryData from "./countries.json";
 import markerData from "./markers.json";
+
+
 
 interface IGlobeProps {
   size?: number;
@@ -316,5 +316,5 @@ function Diagram({className, height, width}) {
 };
 
 // Place the components in the DOM
-ReactDOM.render(<RotatingGlobe size={750} />, document.getElementById("globe"));
+//ReactDOM.render(<RotatingGlobe size={750} />, document.getElementById("globe"));
 ReactDOM.render(<Diagram className="mx-auto" width="100%" />, document.getElementById("diagram"));
