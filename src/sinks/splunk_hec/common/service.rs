@@ -17,14 +17,14 @@ use vector_core::{
 use crate::{http::HttpClient, sinks::util::Compression};
 
 #[derive(Clone)]
-pub struct HecLogsService {
+pub struct HecService {
     pub batch_service: HttpBatchService<
         BoxFuture<'static, Result<Request<Vec<u8>>, crate::Error>>,
         HecRequest,
     >,
 }
 
-impl HecLogsService {
+impl HecService {
     pub fn new(client: HttpClient, http_request_builder: HttpRequestBuilder) -> Self {
         let http_request_builder = Arc::new(http_request_builder);
         let batch_service = HttpBatchService::new(client, move |req| {
@@ -37,7 +37,7 @@ impl HecLogsService {
     }
 }
 
-impl Service<HecRequest> for HecLogsService {
+impl Service<HecRequest> for HecService {
     type Response = HecResponse;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
