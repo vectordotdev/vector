@@ -1,5 +1,5 @@
 use vector_core::{
-    event::{Metric, MetricKind, MetricValue},
+    event::{Metric, MetricValue},
     metrics::AgentDDSketch,
 };
 

@@ -856,6 +856,10 @@ impl MetricValue {
     #[must_use]
     pub fn subtract(&mut self, other: &Self) -> bool {
         match (self, other) {
+            // Counters are monotonic, they should _never_ go backwards unless reset to 0 due to
+            // process restart, etc.  Thus, being able to generate negative deltas would violate
+            // that.  Whether a counter is reset to 0, or if it incorrectly warps to a previous
+            // value, it doesn't matter: we're going to reinitialize it.
             (Self::Counter { ref mut value }, Self::Counter { value: value2 })
                 if *value >= *value2 =>
             {
@@ -892,6 +896,12 @@ impl MetricValue {
                     .collect();
                 true
             }
+            // Aggregated histograms, at least in Prometheus, are also typically monotonic in terms
+            // of growth.  Subtracting them in reverse -- e.g.. subtracting a newer one with more
+            // values from an older one with fewer values -- would not make sense, since buckets
+            // should never be able to have negative counts... and it's not clear that a saturating
+            // subtraction is technically correct either.  Instead, we avoid having to make that
+            // decision, and simply force the metric to be reinitialized.
             (
                 Self::AggregatedHistogram {
                     ref mut buckets,

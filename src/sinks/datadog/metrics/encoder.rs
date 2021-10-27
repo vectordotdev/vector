@@ -20,9 +20,7 @@ use vector_core::{
 
 use crate::sinks::util::{encode_namespace, Compressor};
 
-use super::config::{
-    DatadogMetricsEndpoint, MAXIMUM_SERIES_PAYLOAD_COMPRESSED_SIZE, MAXIMUM_SERIES_PAYLOAD_SIZE,
-};
+use super::config::{DatadogMetricsEndpoint, MAXIMUM_PAYLOAD_COMPRESSED_SIZ, MAXIMUM_PAYLOAD_SIZE};
 
 const SERIES_PAYLOAD_HEADER: &[u8] = b"{\"series\":[";
 const SERIES_PAYLOAD_FOOTER: &[u8] = b"]}";
@@ -154,8 +152,8 @@ impl DatadogMetricsEncoder {
         Self::with_payload_limits(
             endpoint,
             default_namespace,
-            MAXIMUM_SERIES_PAYLOAD_SIZE,
-            MAXIMUM_SERIES_PAYLOAD_COMPRESSED_SIZE,
+            MAXIMUM_PAYLOAD_SIZE,
+            MAXIMUM_PAYLOAD_COMPRESSED_SIZ,
         )
     }
 

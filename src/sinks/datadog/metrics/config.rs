@@ -36,8 +36,8 @@ const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
 const DEFAULT_BATCH_SETTINGS: BatchSettings<()> =
     BatchSettings::const_default().events(100000).timeout(2);
 
-pub const MAXIMUM_SERIES_PAYLOAD_COMPRESSED_SIZE: usize = 3_200_000;
-pub const MAXIMUM_SERIES_PAYLOAD_SIZE: usize = 62_914_560;
+pub const MAXIMUM_PAYLOAD_COMPRESSED_SIZ: usize = 3_200_000;
+pub const MAXIMUM_PAYLOAD_SIZE: usize = 62_914_560;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -91,10 +91,7 @@ impl DatadogMetricsEndpointConfiguration {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogMetricsConfig {
-    #[serde(alias = "namespace")]
     pub default_namespace: Option<String>,
-    // Deprecated name
-    #[serde(alias = "host")]
     pub endpoint: Option<String>,
     // Deprecated, replaced by the site option
     pub region: Option<Region>,
