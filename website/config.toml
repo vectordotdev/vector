@@ -77,6 +77,7 @@ post_process = true
 [[params.css]]
 input = "sass/unpurged.sass"
 output = "css/unpurged.css"
+postcss = true
 
 [[params.css]]
 input = "sass/home.sass"
