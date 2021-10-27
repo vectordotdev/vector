@@ -1,5 +1,7 @@
 use super::FuturesUnorderedChunked;
 use crate::event::{EventStatus, Finalizable};
+use crate::internal_event::emit;
+use crate::internal_event::EventsSent;
 use buffers::{Ackable, Acker};
 use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
 use futures_util::future::poll_fn;
@@ -128,6 +130,11 @@ impl AcknowledgementTracker {
     }
 }
 
+pub trait DriverResponse {
+    fn event_status(&self) -> EventStatus;
+    fn events_sent(&self) -> EventsSent;
+}
+
 /// Drives the interaction between a stream of items and a service which processes them
 /// asynchronously.
 ///
@@ -163,7 +170,7 @@ where
     Svc: Service<St::Item>,
     Svc::Error: fmt::Debug + 'static,
     Svc::Future: Send + 'static,
-    Svc::Response: AsRef<EventStatus>,
+    Svc::Response: DriverResponse,
 {
     /// Runs the driver until the input stream is exhausted.
     ///
@@ -265,17 +272,17 @@ where
                         let fut = svc.call(req)
                             .err_into()
                             .map(move |result: Result<Svc::Response, Svc::Error>| {
-                                let status = match result {
+                                match result {
                                     Err(error) => {
-                                        error!(message = "Service call failed.", ?error, seq_num = seq_num_id);
-                                        EventStatus::Failed
+                                        error!(message = "Service call failed.", ?error, seqno);
+                                        finalizers.update_status(EventStatus::Failed);
                                     },
                                     Ok(response) => {
-                                        trace!(message = "Service call succeeded.", seq_num = seq_num_id);
-                                        *response.as_ref()
+                                        trace!(message = "Service call succeeded.", seqno);
+                                        finalizers.update_status(response.event_status());
+                                        emit(&response.events_sent());
                                     }
                                 };
-                                finalizers.update_status(status);
                                 (seq_num, ack_size)
                             })
                             .instrument(info_span!("request", request_id = seq_num_id));

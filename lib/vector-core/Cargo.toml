@@ -12,6 +12,7 @@ atomig = { version = "0.3.2", features = ["derive", "serde"] }
 buffers = { path = "buffers", default-features = false }
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
+core_common = { path = "core-common", default-features = false }
 db-key = { version = "0.0.5", default-features = false, optional = true }
 derivative = { version = "2.2.0", default-features = false }
 dyn-clone = { version = "1.0.4", default-features = false }
@@ -22,7 +23,6 @@ getset = { version = "0.1.1", default-features = false }
 http = { version = "0.2.5", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 indexmap = { version = "~1.7.0", default-features = false, features = ["serde"] }
-core_common = { path = "core-common", default-features = false }
 lazy_static = { version = "1.4.0", default-features = false }
 lookup = { path = "../lookup", features = ["arbitrary"] }
 metrics = { version = "0.17.0", default-features = false, features = ["std"]}
@@ -74,6 +74,7 @@ default = []
 disk-buffer = ["buffers/disk-buffer"]
 lua = ["mlua", "tokio-stream"]
 vrl = ["vrl-core", "enrichment"]
+test = ["core_common/test"]
 
 [[bench]]
 name = "lookup"

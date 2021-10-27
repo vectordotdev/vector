@@ -1,5 +1,5 @@
 use super::config::S3Options;
-use crate::internal_events::{AwsBytesSent, S3EventsSent};
+use crate::internal_events::AwsBytesSent;
 use crate::serde::to_string;
 use bytes::Bytes;
 use futures::{future::BoxFuture, stream};
@@ -9,6 +9,8 @@ use rusoto_s3::{PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3}
 use std::task::{Context, Poll};
 use tower::Service;
 use tracing_futures::Instrument;
+use vector_core::internal_event::EventsSent;
+use vector_core::stream::DriverResponse;
 use vector_core::{
     buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
@@ -46,11 +48,20 @@ pub struct S3Metadata {
 #[derive(Debug)]
 pub struct S3Response {
     inner: PutObjectOutput,
+    count: usize,
+    events_byte_size: usize,
 }
 
-impl AsRef<EventStatus> for S3Response {
-    fn as_ref(&self) -> &EventStatus {
-        &EventStatus::Delivered
+impl DriverResponse for S3Response {
+    fn event_status(&self) -> EventStatus {
+        EventStatus::Delivered
+    }
+
+    fn events_sent(&self) -> EventsSent {
+        EventsSent {
+            count: self.count,
+            byte_size: self.events_byte_size,
+        }
     }
 }
 
@@ -106,7 +117,7 @@ impl Service<S3Request> for S3Service {
         }
         let tagging = tagging.finish();
         let count = request.metadata.count;
-        let byte_size = request.metadata.byte_size;
+        let events_byte_size = request.metadata.byte_size;
 
         let request_size = request.body.len();
         let client = self.client.clone();
@@ -136,12 +147,15 @@ impl Service<S3Request> for S3Service {
                 .in_current_span()
                 .await
                 .map(|inner| {
-                    emit!(&S3EventsSent { count, byte_size });
                     emit!(&AwsBytesSent {
                         byte_size: request_size,
                         region,
                     });
-                    S3Response { inner }
+                    S3Response {
+                        inner,
+                        count,
+                        events_byte_size,
+                    }
                 })
         })
     }

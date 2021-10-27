@@ -1,10 +1,12 @@
 use super::{ComponentKey, Config, OutputId, SinkOuter, SourceOuter};
 use crate::{
-    sinks::datadog::metrics::DatadogConfig, sources::internal_metrics::InternalMetricsConfig,
+    sinks::datadog::metrics::DatadogConfig,
+    sources::{host_metrics::HostMetricsConfig, internal_metrics::InternalMetricsConfig},
 };
 use serde::{Deserialize, Serialize};
 use std::env;
 
+static HOST_METRICS_KEY: &str = "#datadog_host_metrics";
 static INTERNAL_METRICS_KEY: &str = "#datadog_internal_metrics";
 static DATADOG_METRICS_KEY: &str = "#datadog_metrics";
 
@@ -56,10 +58,16 @@ pub fn try_attach(config: &mut Config) -> bool {
         _ => return false,
     };
 
-    info!("Datadog API key provided. Internal metrics will be sent to Datadog.");
+    info!("Datadog API key provided. Host and internal metrics will be sent to Datadog.");
 
+    let host_metrics_id = OutputId::from(ComponentKey::from(HOST_METRICS_KEY));
     let internal_metrics_id = OutputId::from(ComponentKey::from(INTERNAL_METRICS_KEY));
     let datadog_metrics_id = ComponentKey::from(DATADOG_METRICS_KEY);
+
+    // Create internal sources for host and internal metrics. We're distinct sources here and not
+    // attempting to reuse existing ones, to configure it according to enterprise requirements.
+    let mut host_metrics =
+        HostMetricsConfig::enterprise(config.hash.as_ref().expect("Config should contain hash"));
 
     // Create an internal metrics source. We're using a distinct source here and not
     // attempting to reuse an existing one, to configure it according to enterprise requirements.
@@ -67,9 +75,14 @@ pub fn try_attach(config: &mut Config) -> bool {
         config.hash.as_ref().expect("Config should contain hash"),
     );
 
-    // Override default scrape interval.
+    // Override default scrape intervals.
+    host_metrics.scrape_interval_secs(config.datadog.reporting_interval_secs);
     internal_metrics.scrape_interval_secs(config.datadog.reporting_interval_secs);
 
+    config.sources.insert(
+        host_metrics_id.component.clone(),
+        SourceOuter::new(host_metrics),
+    );
     config.sources.insert(
         internal_metrics_id.component.clone(),
         SourceOuter::new(internal_metrics),
@@ -80,7 +93,10 @@ pub fn try_attach(config: &mut Config) -> bool {
 
     config.sinks.insert(
         datadog_metrics_id,
-        SinkOuter::new(vec![internal_metrics_id], Box::new(datadog_metrics)),
+        SinkOuter::new(
+            vec![host_metrics_id, internal_metrics_id],
+            Box::new(datadog_metrics),
+        ),
     );
 
     true
@@ -117,6 +133,9 @@ mod tests {
 
         assert!(!config
             .sources
+            .contains_key(&ComponentKey::from(HOST_METRICS_KEY)));
+        assert!(!config
+            .sources
             .contains_key(&ComponentKey::from(INTERNAL_METRICS_KEY)));
         assert!(!config
             .sinks
@@ -133,6 +152,9 @@ mod tests {
 
         assert!(try_attach(&mut config));
 
+        assert!(config
+            .sources
+            .contains_key(&ComponentKey::from(HOST_METRICS_KEY)));
         assert!(config
             .sources
             .contains_key(&ComponentKey::from(INTERNAL_METRICS_KEY)));
