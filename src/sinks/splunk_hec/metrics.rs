@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
     event::{Event, Metric, MetricValue},
     internal_events::SplunkInvalidMetricReceived,
     internal_events::{SplunkEventEncodeError, SplunkEventSent},
@@ -15,6 +15,8 @@ use serde_json::json;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::iter;
+
+use super::common::{build_request, host_key, render_template_string};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -82,14 +84,6 @@ struct HecEvent<'a> {
     fields: FieldMap<'a>,
 
     event: &'a str,
-}
-
-fn host_key() -> String {
-    crate::config::log_schema().host_key().to_string()
-}
-
-inventory::submit! {
-    SinkDescription::new::<HecSinkMetricsConfig>("splunk_hec_metrics")
 }
 
 impl GenerateConfig for HecSinkMetricsConfig {
@@ -172,7 +166,7 @@ impl HttpSink for HecSinkMetricsConfig {
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
-        conn::build_request(&self.endpoint, &self.token, self.compression, events).await
+        build_request(&self.endpoint, &self.token, self.compression, events).await
     }
 }
 
@@ -190,15 +184,15 @@ impl HecSinkMetricsConfig {
     }
 
     fn extract_source(&self, metric: &Metric) -> Option<String> {
-        super::render_template_string(self.source.as_ref()?, metric, "source")
+        render_template_string(self.source.as_ref()?, metric, "source")
     }
 
     fn extract_sourcetype(&self, metric: &Metric) -> Option<String> {
-        super::render_template_string(self.sourcetype.as_ref()?, metric, "sourcetype")
+        render_template_string(self.sourcetype.as_ref()?, metric, "sourcetype")
     }
 
     fn extract_index(&self, metric: &Metric) -> Option<String> {
-        super::render_template_string(self.index.as_ref()?, metric, "index")
+        render_template_string(self.index.as_ref()?, metric, "index")
     }
 
     fn extract_fields<'a>(&'a self, metric: &'a Metric) -> Option<FieldMap> {
@@ -570,7 +564,7 @@ mod integration_tests {
     use crate::{
         config::{SinkConfig, SinkContext},
         event::{Metric, MetricKind},
-        sinks::splunk_hec::conn::integration_test_helpers::get_token,
+        sinks::splunk_hec::common::integration_test_helpers::get_token,
         test_util::components::{self, HTTP_SINK_TAGS},
     };
     use serde_json::Value as JsonValue;
