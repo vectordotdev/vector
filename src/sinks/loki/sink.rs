@@ -303,7 +303,9 @@ impl LokiSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let service = tower::ServiceBuilder::new().service(self.service);
+        let service = tower::ServiceBuilder::new()
+            .concurrency_limit(1)
+            .service(self.service);
 
         let encoder = self.encoder.clone();
         let mut filter = RecordFilter::new(self.out_of_order_action);
