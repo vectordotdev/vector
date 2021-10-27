@@ -1,13 +1,15 @@
 use futures_util::FutureExt;
 use serde::{Deserialize, Serialize};
+use tower::ServiceBuilder;
 use vector_core::transform::DataType;
 
 use crate::config::{GenerateConfig, SinkConfig, SinkContext};
 use crate::http::HttpClient;
+use crate::sinks::splunk_hec::common::retry::HecRetryLogic;
+use crate::sinks::splunk_hec::common::service::{HecService, HttpRequestBuilder};
 use crate::sinks::splunk_hec::common::{build_healthcheck, create_client, host_key};
-use crate::sinks::splunk_hec::metrics_new::encoder::HecMetricsEncoder;
 use crate::sinks::splunk_hec::metrics_new::request_builder::HecMetricsRequestBuilder;
-use crate::sinks::util::{BatchConfig, Compression, TowerRequestConfig};
+use crate::sinks::util::{BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig};
 use crate::sinks::Healthcheck;
 use crate::template::Template;
 use crate::tls::TlsOptions;
@@ -82,8 +84,15 @@ impl HecMetricsSinkConfig {
             compression: self.compression,
         };
 
-        // Create a service for making HTTP requests
-        let service = todo!();
+        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+        let http_request_builder = HttpRequestBuilder {
+            endpoint: self.endpoint.clone(),
+            token: self.token.clone(),
+            compression: self.compression,
+        };
+        let service = ServiceBuilder::new()
+            .settings(request_settings, HecRetryLogic)
+            .service(HecService::new(client, http_request_builder));
 
         // Create a HEC metrics sink
         let sink = todo!();

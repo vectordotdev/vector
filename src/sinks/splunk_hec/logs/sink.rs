@@ -12,9 +12,16 @@ use vector_core::{
     ByteSizeOf,
 };
 
-use crate::{config::SinkContext, sinks::{splunk_hec::common::{render_template_string, request::HecRequest}, util::{processed_event::ProcessedEvent, SinkBuilderExt}}, template::Template};
+use crate::{
+    config::SinkContext,
+    sinks::{
+        splunk_hec::common::{render_template_string, request::HecRequest},
+        util::{processed_event::ProcessedEvent, SinkBuilderExt},
+    },
+    template::Template,
+};
 
-use super::{request_builder::HecLogsRequestBuilder};
+use super::request_builder::HecLogsRequestBuilder;
 
 pub struct HecLogsSink<S> {
     pub context: SinkContext,

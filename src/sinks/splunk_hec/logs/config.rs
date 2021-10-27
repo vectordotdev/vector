@@ -2,10 +2,24 @@ use futures_util::FutureExt;
 use tower::ServiceBuilder;
 use vector_core::{sink::VectorSink, transform::DataType};
 
-use crate::{config::{GenerateConfig, SinkConfig, SinkContext}, http::HttpClient, sinks::{Healthcheck, splunk_hec::common::{build_healthcheck, create_client, host_key, retry::HecRetryLogic, service::{HecService, HttpRequestBuilder}}, util::{
+use crate::{
+    config::{GenerateConfig, SinkConfig, SinkContext},
+    http::HttpClient,
+    sinks::{
+        splunk_hec::common::{
+            build_healthcheck, create_client, host_key,
+            retry::HecRetryLogic,
+            service::{HecService, HttpRequestBuilder},
+        },
+        util::{
             encoding::EncodingConfig, BatchConfig, BatchSettings, Buffer, Compression,
             ServiceBuilderExt, TowerRequestConfig,
-        }}, template::Template, tls::TlsOptions};
+        },
+        Healthcheck,
+    },
+    template::Template,
+    tls::TlsOptions,
+};
 
 use serde::{Deserialize, Serialize};
 

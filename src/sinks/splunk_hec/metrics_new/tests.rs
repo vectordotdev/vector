@@ -1,15 +1,15 @@
 // use super::*;
 use super::config::HecMetricsSinkConfig;
-use super::sink::{HecProcessedEvent, process_metric};
+use super::sink::{process_metric, HecProcessedEvent};
 use crate::event::{Metric, MetricKind, MetricValue};
 // use crate::sinks::util::{http::HttpSink, test::load_sink};
 use crate::template::Template;
 use chrono::{DateTime, Utc};
-use serde_json::{Value as JsonValue, json};
+use serde_json::{json, Value as JsonValue};
 use shared::btreemap;
-use vector_core::ByteSizeOf;
 use std::collections::BTreeSet;
 use std::convert::TryFrom;
+use vector_core::ByteSizeOf;
 
 fn get_counter() -> Metric {
     let timestamp = DateTime::parse_from_rfc3339("2005-12-12T14:12:55.123-00:00")
@@ -39,14 +39,15 @@ fn get_processed_event(metric: Metric) -> HecProcessedEvent {
     let default_namespace = Some("namespace");
 
     process_metric(
-        metric, 
+        metric,
         metric.size_of(),
         sourcetype.as_ref(),
         source.as_ref(),
         index.as_ref(),
         "host",
         default_namespace,
-    ).unwrap()
+    )
+    .unwrap()
 }
 
 #[test]

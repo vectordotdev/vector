@@ -1,7 +1,7 @@
-pub mod util;
+pub mod request;
 pub mod response;
 pub mod retry;
-pub mod request;
 pub mod service;
+pub mod util;
 
 pub use util::*;

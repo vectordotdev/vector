@@ -1,6 +1,9 @@
 use vector_core::event::{EventFinalizers, Finalizable};
 
-use crate::sinks::{splunk_hec::common::request::HecRequest, util::{encoding::EncodingConfig, Compression, RequestBuilder}};
+use crate::sinks::{
+    splunk_hec::common::request::HecRequest,
+    util::{encoding::EncodingConfig, Compression, RequestBuilder},
+};
 
 use super::{encoder::HecLogsEncoder, sink::HecProcessedEvent};
 

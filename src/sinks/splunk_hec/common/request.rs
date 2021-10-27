@@ -1,7 +1,10 @@
-use vector_core::{ByteSizeOf, buffers::Ackable, event::{EventFinalizers, Finalizable}};
+use vector_core::{
+    buffers::Ackable,
+    event::{EventFinalizers, Finalizable},
+    ByteSizeOf,
+};
 
 use crate::sinks::util::ElementCount;
-
 
 #[derive(Clone, Debug)]
 pub struct HecRequest {

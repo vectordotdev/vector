@@ -3,25 +3,24 @@ use std::{
     task::{Context, Poll},
 };
 
-use crate::{internal_events::EventsSent, sinks::{splunk_hec::common::{build_request, request::HecRequest, response::HecResponse}, util::{http::HttpBatchService, ElementCount}}};
-use bytes::Bytes;
-use futures_util::future::BoxFuture;
-use http::{Request, Response};
-use tower::{Service, ServiceExt};
-use vector_core::{
-    buffers::Ackable,
-    event::{EventFinalizers, EventStatus, Finalizable},
-    ByteSizeOf,
+use crate::{
+    internal_events::EventsSent,
+    sinks::{
+        splunk_hec::common::{build_request, request::HecRequest, response::HecResponse},
+        util::http::HttpBatchService,
+    },
 };
+use futures_util::future::BoxFuture;
+use http::Request;
+use tower::{Service, ServiceExt};
+use vector_core::event::EventStatus;
 
 use crate::{http::HttpClient, sinks::util::Compression};
 
 #[derive(Clone)]
 pub struct HecService {
-    pub batch_service: HttpBatchService<
-        BoxFuture<'static, Result<Request<Vec<u8>>, crate::Error>>,
-        HecRequest,
-    >,
+    pub batch_service:
+        HttpBatchService<BoxFuture<'static, Result<Request<Vec<u8>>, crate::Error>>, HecRequest>,
 }
 
 impl HecService {
@@ -80,10 +79,7 @@ pub struct HttpRequestBuilder {
 }
 
 impl HttpRequestBuilder {
-    pub async fn build_request(
-        &self,
-        req: HecRequest,
-    ) -> Result<Request<Vec<u8>>, crate::Error> {
+    pub async fn build_request(&self, req: HecRequest) -> Result<Request<Vec<u8>>, crate::Error> {
         build_request(
             self.endpoint.as_str(),
             self.token.as_str(),

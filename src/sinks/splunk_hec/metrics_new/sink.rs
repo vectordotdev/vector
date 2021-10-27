@@ -4,9 +4,7 @@ use crate::{
     config::SinkContext,
     internal_events::SplunkInvalidMetricReceived,
     sinks::{
-        splunk_hec::{
-            common::render_template_string,
-        },
+        splunk_hec::common::{render_template_string, request::HecRequest},
         util::{encode_namespace, processed_event::ProcessedEvent, SinkBuilderExt},
     },
     template::Template,
@@ -22,7 +20,7 @@ use vector_core::{
     ByteSizeOf,
 };
 
-use super::request_builder::{HecMetricsRequest, HecMetricsRequestBuilder};
+use super::request_builder::HecMetricsRequestBuilder;
 
 pub struct HecMetricsSink<S> {
     context: SinkContext,
@@ -38,7 +36,7 @@ pub struct HecMetricsSink<S> {
 
 impl<S> HecMetricsSink<S>
 where
-    S: Service<HecMetricsRequest> + Send + 'static,
+    S: Service<HecRequest> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: AsRef<EventStatus> + Send + 'static,
     S::Error: fmt::Debug + Into<crate::Error> + Send,
@@ -85,7 +83,7 @@ where
 #[async_trait]
 impl<S> StreamSink for HecMetricsSink<S>
 where
-    S: Service<HecMetricsRequest> + Send + 'static,
+    S: Service<HecRequest> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: AsRef<EventStatus> + Send + 'static,
     S::Error: fmt::Debug + Into<crate::Error> + Send,
