@@ -305,7 +305,7 @@ fn get_type_and_fields(
                 .iter()
                 .map(|quantile| {
                     (
-                        format!("quantile_{}", quantile.q),
+                        format!("quantile_{}", quantile.quantile),
                         Field::Float(quantile.value),
                     )
                 })
@@ -331,7 +331,7 @@ fn get_type_and_fields(
                     .iter()
                     .map(|q| {
                         let quantile = Quantile {
-                            q: *q,
+                            quantile: *q,
                             value: ddsketch.quantile(*q).unwrap_or(0.0),
                         };
                         (quantile.as_percentile(), Field::Float(quantile.value))

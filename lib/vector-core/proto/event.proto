@@ -129,17 +129,21 @@ message AggregatedSummary2 {
 }
 
 message SummaryQuantile {
-  double upper_limit = 1;
+  double quantile = 1;
   double value = 2;
 }
 
 message Sketch {
   message AgentDDSketch {
+    // Summary statistics for the samples in this sketch.
     uint32 count = 1;
     double min = 2;
     double max = 3;
     double sum = 4;
     double avg = 5;
+    // The bins (buckets) of this sketch, where `k` and `n` are unzipped pairs.
+    // `k` is the list of bin indexes that are populated, and `n` is the count of samples
+    // within the given bin.
     repeated sint32 k = 6;
     repeated uint32 n = 7;
   }

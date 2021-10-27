@@ -9,10 +9,10 @@ use futures_util::{
 use tower::Service;
 use vector_core::{
     buffers::Acker,
-    event::{Event, EventStatus, Metric, MetricValue},
+    event::{Event, Metric, MetricValue},
     partition::Partitioner,
     sink::StreamSink,
-    stream::BatcherSettings,
+    stream::{BatcherSettings, DriverResponse},
 };
 
 use crate::{
@@ -60,7 +60,7 @@ where
     S: Service<DatadogMetricsRequest> + Send,
     S::Error: fmt::Debug + 'static,
     S::Future: Send + 'static,
-    S::Response: AsRef<EventStatus>,
+    S::Response: DriverResponse,
 {
     /// Creates a new `DatadogMetricsSink`.
     pub fn new(
@@ -125,7 +125,7 @@ where
     S: Service<DatadogMetricsRequest> + Send,
     S::Error: fmt::Debug + 'static,
     S::Future: Send + 'static,
-    S::Response: AsRef<EventStatus>,
+    S::Response: DriverResponse,
 {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         // Rust has issues with lifetimes and generics, which `async_trait` exacerbates, so we write

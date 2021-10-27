@@ -116,7 +116,7 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
                                     .quantiles
                                     .into_iter()
                                     .map(|q| Quantile {
-                                        q: q.quantile,
+                                        quantile: q.quantile,
                                         value: q.value,
                                     })
                                     .collect(),

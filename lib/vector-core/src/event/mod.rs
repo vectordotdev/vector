@@ -305,7 +305,7 @@ impl From<proto::HistogramBucket> for metric::Bucket {
 impl From<metric::Quantile> for proto::SummaryQuantile {
     fn from(quantile: metric::Quantile) -> Self {
         Self {
-            upper_limit: quantile.q,
+            quantile: quantile.quantile,
             value: quantile.value,
         }
     }
@@ -314,7 +314,7 @@ impl From<metric::Quantile> for proto::SummaryQuantile {
 impl From<proto::SummaryQuantile> for metric::Quantile {
     fn from(quantile: proto::SummaryQuantile) -> Self {
         Self {
-            q: quantile.upper_limit,
+            quantile: quantile.quantile,
             value: quantile.value,
         }
     }

@@ -125,7 +125,7 @@ impl<'a> ToLua<'a> for Metric {
             } => {
                 let aggregated_summary = lua.create_table()?;
                 let values: Vec<_> = quantiles.iter().map(|q| q.value).collect();
-                let quantiles: Vec<_> = quantiles.into_iter().map(|q| q.q).collect();
+                let quantiles: Vec<_> = quantiles.into_iter().map(|q| q.quantile).collect();
                 aggregated_summary.raw_set("quantiles", quantiles)?;
                 aggregated_summary.raw_set("values", values)?;
                 aggregated_summary.raw_set("count", count)?;

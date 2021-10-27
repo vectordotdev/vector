@@ -6,7 +6,7 @@ use bytes::{Buf, Bytes};
 use futures::future::BoxFuture;
 use http::{
     header::{HeaderValue, CONTENT_ENCODING, CONTENT_TYPE},
-    Request, Response, StatusCode, Uri,
+    Request, StatusCode, Uri,
 };
 use hyper::Body;
 use snafu::ResultExt;
@@ -15,6 +15,8 @@ use tower::Service;
 use vector_core::{
     buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
+    internal_event::EventsSent,
+    stream::DriverResponse,
 };
 
 /// Retry logic specific to the Datadog metrics endpoints.
@@ -106,26 +108,25 @@ impl Finalizable for DatadogMetricsRequest {
 pub struct DatadogMetricsResponse {
     status_code: StatusCode,
     body: Bytes,
+    batch_size: usize,
+    byte_size: usize,
 }
 
-impl From<Response<Bytes>> for DatadogMetricsResponse {
-    fn from(response: Response<Bytes>) -> DatadogMetricsResponse {
-        let (parts, body) = response.into_parts();
-        DatadogMetricsResponse {
-            status_code: parts.status,
-            body,
+impl DriverResponse for DatadogMetricsResponse {
+    fn event_status(&self) -> EventStatus {
+        if self.status_code.is_success() {
+            EventStatus::Delivered
+        } else if self.status_code.is_client_error() {
+            EventStatus::Failed
+        } else {
+            EventStatus::Errored
         }
     }
-}
 
-impl AsRef<EventStatus> for DatadogMetricsResponse {
-    fn as_ref(&self) -> &EventStatus {
-        if self.status_code.is_success() {
-            &EventStatus::Delivered
-        } else if self.status_code.is_client_error() {
-            &EventStatus::Failed
-        } else {
-            &EventStatus::Errored
+    fn events_sent(&self) -> EventsSent {
+        EventsSent {
+            count: self.batch_size,
+            byte_size: self.byte_size,
         }
     }
 }
@@ -161,13 +162,21 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
         let api_key = self.api_key.clone();
 
         Box::pin(async move {
+            let byte_size = request.payload.len();
+            let batch_size = request.batch_size;
+
             let request = request.into_http_request(api_key).context(BuildRequest)?;
             let response = client.send(request).await?;
             let (parts, body) = response.into_parts();
             let mut body = hyper::body::aggregate(body).await.context(CallRequest)?;
+            let body = body.copy_to_bytes(body.remaining());
 
-            let response = hyper::Response::from_parts(parts, body.copy_to_bytes(body.remaining()));
-            Ok(response.into())
+            Ok(DatadogMetricsResponse {
+                status_code: parts.status,
+                body,
+                batch_size,
+                byte_size,
+            })
         })
     }
 }

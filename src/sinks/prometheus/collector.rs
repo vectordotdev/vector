@@ -173,7 +173,7 @@ pub(super) trait MetricCollector {
                             "",
                             quantile.value,
                             tags,
-                            Some(("quantile", quantile.q.to_string())),
+                            Some(("quantile", quantile.quantile.to_string())),
                         );
                     }
                     self.emit_value(timestamp, name, "_sum", *sum, tags, None);
@@ -183,7 +183,7 @@ pub(super) trait MetricCollector {
                     MetricSketch::AgentDDSketch(ddsketch) => {
                         for q in [0.5, 0.75, 0.9, 0.99] {
                             let quantile = Quantile {
-                                q,
+                                quantile: q,
                                 value: ddsketch.quantile(q).unwrap_or(0.0),
                             };
                             self.emit_value(
@@ -192,7 +192,7 @@ pub(super) trait MetricCollector {
                                 "",
                                 quantile.value,
                                 tags,
-                                Some(("quantile", quantile.q.to_string())),
+                                Some(("quantile", quantile.quantile.to_string())),
                             );
                         }
                         self.emit_value(

@@ -351,7 +351,7 @@ impl Arbitrary for Sample {
 impl Arbitrary for Quantile {
     fn arbitrary(g: &mut Gen) -> Self {
         Quantile {
-            q: f64::arbitrary(g) % MAX_F64_SIZE,
+            quantile: f64::arbitrary(g) % MAX_F64_SIZE,
             value: f64::arbitrary(g) % MAX_F64_SIZE,
         }
     }
@@ -360,11 +360,11 @@ impl Arbitrary for Quantile {
         let base = *self;
 
         Box::new(
-            base.q
+            base.quantile
                 .shrink()
                 .map(move |upper_limit| {
                     let mut quantile = base;
-                    quantile.q = upper_limit;
+                    quantile.quantile = upper_limit;
                     quantile
                 })
                 .flat_map(|quantile| {

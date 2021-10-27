@@ -275,7 +275,7 @@ impl ByteSizeOf for Bucket {
 /// A single value from a `MetricValue::AggregatedSummary`.
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub struct Quantile {
-    pub q: f64,
+    pub quantile: f64,
     pub value: f64,
 }
 
@@ -287,7 +287,7 @@ impl Quantile {
     /// 0.9999 will be rendered as "9999", but a quantile of 0.99999 would also be rendered as
     /// "9999".
     pub fn as_percentile(&self) -> String {
-        let clamped = self.q.clamp(0.0, 1.0);
+        let clamped = self.quantile.clamp(0.0, 1.0);
         let raw = format!("{}", (clamped * 100.0));
         raw.chars()
             .take(5)
@@ -321,7 +321,7 @@ macro_rules! buckets {
 #[macro_export]
 macro_rules! quantiles {
     ( $( $q:expr => $value:expr ),* ) => {
-        vec![ $( crate::event::metric::Quantile { q: $q, value: $value }, )* ]
+        vec![ $( crate::event::metric::Quantile { quantile: $q, value: $value }, )* ]
     }
 }
 
@@ -356,7 +356,7 @@ pub fn zip_quantiles(
     quantiles
         .into_iter()
         .zip(values.into_iter())
-        .map(|(q, value)| Quantile { q, value })
+        .map(|(quantile, value)| Quantile { quantile, value })
         .collect()
 }
 
@@ -1000,13 +1000,16 @@ impl Display for Metric {
             } => {
                 write!(fmt, "count={} sum={} ", count, sum)?;
                 write_list(fmt, " ", quantiles, |fmt, quantile| {
-                    write!(fmt, "{}@{}", quantile.q, quantile.value)
+                    write!(fmt, "{}@{}", quantile.quantile, quantile.value)
                 })
             }
             MetricValue::Sketch { sketch } => {
                 let quantiles = [0.5, 0.75, 0.9, 0.99]
                     .iter()
-                    .map(|q| Quantile { q: *q, value: 0.0 })
+                    .map(|q| Quantile {
+                        quantile: *q,
+                        value: 0.0,
+                    })
                     .collect::<Vec<_>>();
 
                 match sketch {
@@ -1021,7 +1024,12 @@ impl Display for Metric {
                             ddsketch.avg()
                         )?;
                         write_list(fmt, " ", quantiles, |fmt, q| {
-                            write!(fmt, "{}={:?}", q.as_percentile(), ddsketch.quantile(q.q))
+                            write!(
+                                fmt,
+                                "{}={:?}",
+                                q.as_percentile(),
+                                ddsketch.quantile(q.quantile)
+                            )
                         })
                     }
                 }
@@ -1442,8 +1450,11 @@ mod test {
             (3.0, "100"),
         ];
 
-        for (q, expected) in quantiles {
-            let quantile = Quantile { q, value: 1.0 };
+        for (quantile, expected) in quantiles {
+            let quantile = Quantile {
+                quantile,
+                value: 1.0,
+            };
             let result = quantile.as_percentile();
             assert_eq!(result, expected);
         }
