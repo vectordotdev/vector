@@ -10,7 +10,13 @@ jobs:
     runs-on: [self-hosted, linux, x64, general]
     strategy:
       matrix:
-        target: [datadog_agent_remap_datadog_logs, syslog_loki, syslog_regex_logs2metric_ddmetrics]
+        target:
+          - datadog_agent_remap_datadog_logs
+          - syslog_humio_logs
+          - syslog_log2metric_humio_metrics
+          - syslog_loki
+          - syslog_regex_logs2metric_ddmetrics
+          - syslog_splunk_hec_logs
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
