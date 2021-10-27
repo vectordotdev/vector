@@ -660,17 +660,13 @@ sinks-utils-udp = []
 sinks-vector = ["sinks-utils-udp", "tonic", "protobuf-build"]
 
 # Datadog integration
-<<<<<<< HEAD
 datadog-pipelines = [
   "sources-host_metrics",
   "sources-internal_metrics",
-  "sinks-datadog",
+  "sinks-datadog_metrics",
   "sha2",
   "hex"
 ]
-=======
-datadog-pipelines = ["sources-internal_metrics", "sinks-datadog_metrics"]
->>>>>>> 261f1c0cdf (anotha one)
 
 # Identifies that the build is a nightly build
 nightly = []
