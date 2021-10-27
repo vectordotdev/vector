@@ -3,11 +3,9 @@ use std::{
     task::{Context, Poll},
 };
 
-use crate::{
-    sinks::{
-        splunk_hec::common::{build_request, request::HecRequest, response::HecResponse},
-        util::http::HttpBatchService,
-    },
+use crate::sinks::{
+    splunk_hec::common::{build_request, request::HecRequest, response::HecResponse},
+    util::http::HttpBatchService,
 };
 use futures_util::future::BoxFuture;
 use http::Request;

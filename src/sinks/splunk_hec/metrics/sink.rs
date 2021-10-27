@@ -12,7 +12,13 @@ use crate::{
 use async_trait::async_trait;
 use futures_util::{future, stream::BoxStream, StreamExt};
 use tower::Service;
-use vector_core::{ByteSizeOf, event::{Event, Metric, MetricValue}, partition::NullPartitioner, sink::StreamSink, stream::{BatcherSettings, DriverResponse}};
+use vector_core::{
+    event::{Event, Metric, MetricValue},
+    partition::NullPartitioner,
+    sink::StreamSink,
+    stream::{BatcherSettings, DriverResponse},
+    ByteSizeOf,
+};
 
 use super::request_builder::HecMetricsRequestBuilder;
 
