@@ -15,6 +15,21 @@ use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
 
+/// Newtype wrapper around sequence numbers to enforce misuse resistance.
+#[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct SequenceNumber(u64);
+
+impl SequenceNumber {
+    /// Gets the actual integer value of this sequence number.
+    ///
+    /// This can be used trivially for correlating a given `SequenceNumber` in logs/metrics/tracing
+    /// without consuming the `SequenceNumber` itself.
+    fn id(&self) -> u64 {
+        self.0
+    }
+}
+
+/// An out-of-order acknowledgement waiting to become valid.
 struct PendingAcknowledgement {
     seq_num: SequenceNumber,
     ack_size: usize,
@@ -22,7 +37,7 @@ struct PendingAcknowledgement {
 
 impl PartialEq for PendingAcknowledgement {
     fn eq(&self, other: &Self) -> bool {
-        self.seq_num.0 == other.seq_num.0
+        self.seq_num == other.seq_num
     }
 }
 
@@ -31,7 +46,7 @@ impl Eq for PendingAcknowledgement {}
 impl PartialOrd for PendingAcknowledgement {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         // Reverse ordering so that in a `BinaryHeap`, the lowest sequence number is the highest priority.
-        Some(other.seq_num.0.cmp(&self.seq_num.0))
+        Some(other.seq_num.cmp(&self.seq_num))
     }
 }
 
@@ -40,20 +55,6 @@ impl Ord for PendingAcknowledgement {
         other
             .partial_cmp(self)
             .expect("PendingAcknowledgement should always return a valid comparison")
-    }
-}
-
-/// Newtype wrapper around sequence numbers to enforce misuse resistance.
-#[derive(Debug)]
-struct SequenceNumber(u64);
-
-impl SequenceNumber {
-    /// Gets the actual integer value of this sequence number.
-    ///
-    /// This can be used trivially for correlating a given `SequenceNumber` in logs/metrics/tracing
-    /// without consuming the `SequenceNumber` itself.
-    pub fn id(&self) -> u64 {
-        self.0
     }
 }
 
@@ -67,7 +68,7 @@ struct AcknowledgementTracker {
 
 impl AcknowledgementTracker {
     /// Acquires the next available sequence number.
-    pub fn get_next_seq_num(&mut self) -> SequenceNumber {
+    fn get_next_seq_num(&mut self) -> SequenceNumber {
         let seq_num = self.seq_head;
         self.seq_head += 1;
         SequenceNumber(seq_num)
@@ -75,7 +76,7 @@ impl AcknowledgementTracker {
 
     /// Marks the given sequence number as complete.
     #[allow(clippy::needless_pass_by_value)]
-    pub fn mark_seq_num_complete(&mut self, seq_num: SequenceNumber, ack_size: usize) {
+    fn mark_seq_num_complete(&mut self, seq_num: SequenceNumber, ack_size: usize) {
         if seq_num.0 == self.seq_tail {
             self.ack_depth += ack_size;
             self.seq_tail += 1;
@@ -105,7 +106,7 @@ impl AcknowledgementTracker {
     /// create five sequence numbers, and mark them all complete with an acknowledge ment of 10, our
     /// depth would then be 50.  Calling this method would return `Some(50)`, and if this method was
     /// called again immediately after, it would return `None`.
-    pub fn consume_ack_depth(&mut self) -> Option<NonZeroUsize> {
+    fn consume_ack_depth(&mut self) -> Option<NonZeroUsize> {
         // Drain any out-of-order acknowledgements that can now be ordered correctly.
         while let Some(ack) = self.out_of_order.peek() {
             if ack.seq_num.0 == self.seq_tail {
@@ -222,8 +223,10 @@ where
 
                 // One or more of our service calls have completed.
                 Some(acks) = in_flight.next(), if !in_flight.is_empty() => {
-                    for (seq_num, ack_size) in acks {
-                        trace!(message = "Sending request.", ?seq_num, ack_size);
+                    for ack in acks {
+                        let (seq_num, ack_size): (SequenceNumber, usize) = ack;
+                        let request_id = seq_num.id();
+                        trace!(message = "Acknowledging service request.", request_id, ack_size);
                         ack_tracker.mark_seq_num_complete(seq_num, ack_size);
                     }
 
@@ -260,11 +263,12 @@ where
 
                         let mut req = batch.pop_front().expect("batch should not be empty");
                         let seq_num = ack_tracker.get_next_seq_num();
-                        let seq_num_id = seq_num.id();
+                        let request_id = seq_num.id();
 
                         trace!(
                             message = "Submitting service request.",
-                            in_flight_requests = in_flight.len()
+                            in_flight_requests = in_flight.len(),
+                            request_id,
                         );
                         let ack_size = req.ack_size();
                         let finalizers = req.take_finalizers();
@@ -274,18 +278,18 @@ where
                             .map(move |result: Result<Svc::Response, Svc::Error>| {
                                 match result {
                                     Err(error) => {
-                                        error!(message = "Service call failed.", ?error, seqno);
+                                        error!(message = "Service call failed.", ?error, request_id);
                                         finalizers.update_status(EventStatus::Failed);
                                     },
                                     Ok(response) => {
-                                        trace!(message = "Service call succeeded.", seqno);
+                                        trace!(message = "Service call succeeded.", request_id);
                                         finalizers.update_status(response.event_status());
                                         emit(&response.events_sent());
                                     }
                                 };
                                 (seq_num, ack_size)
                             })
-                            .instrument(info_span!("request", request_id = seq_num_id));
+                            .instrument(info_span!("request", request_id));
 
                         in_flight.push(fut);
                     }
@@ -320,6 +324,7 @@ mod tests {
     };
 
     use buffers::{Ackable, Acker};
+    use core_common::internal_event::EventsSent;
     use futures_util::{ready, stream};
     use proptest::{collection::vec as arb_vec, prop_assert_eq, proptest, strategy::Strategy};
     use rand::{prelude::StdRng, SeedableRng};
@@ -336,7 +341,7 @@ mod tests {
         stream::driver::AcknowledgementTracker,
     };
 
-    use super::Driver;
+    use super::{Driver, DriverResponse};
 
     struct DelayRequest(usize);
 
@@ -353,6 +358,19 @@ mod tests {
     }
 
     struct DelayResponse;
+
+    impl DriverResponse for DelayResponse {
+        fn event_status(&self) -> EventStatus {
+            EventStatus::Delivered
+        }
+
+        fn events_sent(&self) -> EventsSent {
+            EventsSent {
+                count: 1,
+                byte_size: 1,
+            }
+        }
+    }
 
     impl AsRef<EventStatus> for DelayResponse {
         fn as_ref(&self) -> &EventStatus {
