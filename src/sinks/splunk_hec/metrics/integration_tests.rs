@@ -9,10 +9,12 @@ use crate::{
     },
     test_util::components::{self, HTTP_SINK_TAGS},
 };
+use futures_util::stream;
 use serde_json::Value as JsonValue;
 use shared::btreemap;
 use std::convert::TryFrom;
-use vector_core::event::{BatchNotifier, BatchStatus, MetricValue};
+use std::sync::Arc;
+use vector_core::event::{BatchNotifier, BatchStatus, Event, MetricValue};
 
 const USERNAME: &str = "admin";
 const PASSWORD: &str = "password";
@@ -28,12 +30,38 @@ async fn config() -> HecMetricsSinkConfig {
         source: None,
         compression: Compression::None,
         batch: BatchConfig {
-            max_events: Some(1),
+            max_events: Some(10),
             ..Default::default()
         },
         request: TowerRequestConfig::default(),
         tls: None,
     }
+}
+
+fn get_gauge(batch: Arc<BatchNotifier>) -> Event {
+    Metric::new(
+        "example-gauge",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 26.28 },
+    )
+    .with_tags(Some(
+        btreemap! {"tag_gauge_test".to_string() => "tag_gauge_value".to_string()},
+    ))
+    .with_batch_notifier(&batch)
+    .into()
+}
+
+fn get_counter(batch: Arc<BatchNotifier>) -> Event {
+    Metric::new(
+        "example-counter",
+        MetricKind::Absolute,
+        MetricValue::Counter { value: 26.28 },
+    )
+    .with_tags(Some(
+        btreemap! {"tag_counter_test".to_string() => "tag_counter_value".to_string()},
+    ))
+    .with_batch_notifier(&batch)
+    .into()
 }
 
 #[tokio::test]
@@ -45,16 +73,7 @@ async fn splunk_insert_counter_metric() {
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-    let event = Metric::new(
-        "example-counter",
-        MetricKind::Absolute,
-        MetricValue::Counter { value: 26.28 },
-    )
-    .with_tags(Some(
-        btreemap! {"tag_one".to_string() => "tag_one_value".to_string()},
-    ))
-    .with_batch_notifier(&batch)
-    .into();
+    let event = get_counter(Arc::clone(&batch));
     drop(batch);
     components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
@@ -62,7 +81,7 @@ async fn splunk_insert_counter_metric() {
     assert!(
         metric_dimensions_exist(
             "example-counter",
-            &["host", "source", "sourcetype", "tag_one"],
+            &["host", "source", "sourcetype", "tag_counter_test"],
         )
         .await
     );
@@ -77,16 +96,7 @@ async fn splunk_insert_gauge_metric() {
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-    let event = Metric::new(
-        "example-gauge",
-        MetricKind::Absolute,
-        MetricValue::Gauge { value: 26.28 },
-    )
-    .with_tags(Some(
-        btreemap! {"tag_two".to_string() => "tag_two_value".to_string()},
-    ))
-    .with_batch_notifier(&batch)
-    .into();
+    let event = get_gauge(Arc::clone(&batch));
     drop(batch);
     components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
@@ -94,7 +104,59 @@ async fn splunk_insert_gauge_metric() {
     assert!(
         metric_dimensions_exist(
             "example-gauge",
-            &["host", "source", "sourcetype", "tag_two"],
+            &["host", "source", "sourcetype", "tag_gauge_test"],
+        )
+        .await
+    );
+}
+
+#[tokio::test]
+async fn splunk_insert_multiple_counter_metrics() {
+    let cx = SinkContext::new_test();
+
+    let mut config = config().await;
+    config.index = Template::try_from("testmetrics".to_string()).ok();
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let mut events = Vec::new();
+    for _ in [..20] {
+        events.push(get_counter(Arc::clone(&batch)))
+    }
+    drop(batch);
+    components::run_sink(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    assert!(
+        metric_dimensions_exist(
+            "example-counter",
+            &["host", "source", "sourcetype", "tag_counter_test"],
+        )
+        .await
+    );
+}
+
+#[tokio::test]
+async fn splunk_insert_multiple_gauge_metrics() {
+    let cx = SinkContext::new_test();
+
+    let mut config = config().await;
+    config.index = Template::try_from("testmetrics".to_string()).ok();
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let mut events = Vec::new();
+    for _ in [..20] {
+        events.push(get_gauge(Arc::clone(&batch)))
+    }
+    drop(batch);
+    components::run_sink(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    assert!(
+        metric_dimensions_exist(
+            "example-gauge",
+            &["host", "source", "sourcetype", "tag_gauge_test"],
         )
         .await
     );
@@ -102,6 +164,8 @@ async fn splunk_insert_gauge_metric() {
 
 // It usually takes ~1 second for the metric to show up in search with all dimensions, so poll
 // multiple times.
+// Note, Splunk automatically addes [host, source, sourcetype] as default metric dimensions
+// https://docs.splunk.com/Documentation/SplunkCloud/latest/Metrics/Overview
 async fn metric_dimensions_exist(metric_name: &str, expected_dimensions: &[&str]) -> bool {
     for _ in 0..20usize {
         let resp = metric_dimensions(metric_name).await;
