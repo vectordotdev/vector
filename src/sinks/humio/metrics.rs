@@ -10,9 +10,12 @@ use crate::{
     tls::TlsOptions,
     transforms::metric_to_log::MetricToLogConfig,
 };
-use futures::{stream, SinkExt, StreamExt};
+use async_trait::async_trait;
+use futures::{stream, StreamExt};
+use futures_util::stream::BoxStream;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
+use vector_core::{event::Event, sink::StreamSink, transform::Transform};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct HumioMetricsConfig {
@@ -67,11 +70,12 @@ impl GenerateConfig for HumioMetricsConfig {
 #[typetag::serde(name = "humio_metrics")]
 impl SinkConfig for HumioMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut transform = self
+        let transform = self
             .transform
             .clone()
             .build(&TransformContext::new_with_globals(cx.globals.clone()))
             .await?;
+
         let sink = HumioLogsConfig {
             token: self.token.clone(),
             endpoint: self.endpoint.clone(),
@@ -89,13 +93,12 @@ impl SinkConfig for HumioMetricsConfig {
 
         let (sink, healthcheck) = sink.clone().build(cx).await?;
 
-        let sink = Box::new(sink.into_sink().with_flat_map(move |e| {
-            let mut buf = Vec::with_capacity(1);
-            transform.as_function().transform(&mut buf, e);
-            stream::iter(buf.into_iter()).map(Ok)
-        }));
+        let sink = HumioMetricsSink {
+            inner: sink,
+            transform,
+        };
 
-        Ok((VectorSink::Sink(sink), healthcheck))
+        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -104,6 +107,25 @@ impl SinkConfig for HumioMetricsConfig {
 
     fn sink_type(&self) -> &'static str {
         "humio_metrics"
+    }
+}
+
+pub struct HumioMetricsSink {
+    inner: VectorSink,
+    transform: Transform,
+}
+
+#[async_trait]
+impl StreamSink for HumioMetricsSink {
+    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let mut transform = self.transform;
+        self.inner
+            .run(input.flat_map(move |e| {
+                let mut buf = Vec::with_capacity(1);
+                transform.as_function().transform(&mut buf, e);
+                stream::iter(buf.into_iter())
+            }))
+            .await
     }
 }
 

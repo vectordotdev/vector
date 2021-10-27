@@ -793,7 +793,7 @@ mod tests {
         config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
         event::Event,
         sinks::{
-            splunk_hec::logs::{Encoding, HecSinkLogsConfig},
+            splunk_hec::logs::{config::HecSinkLogsConfig, encoder::HecLogsEncoder},
             util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
             Healthcheck, VectorSink,
         },
@@ -849,7 +849,7 @@ mod tests {
 
     async fn sink(
         address: SocketAddr,
-        encoding: impl Into<EncodingConfig<Encoding>>,
+        encoding: impl Into<EncodingConfig<HecLogsEncoder>>,
         compression: Compression,
     ) -> (VectorSink, Healthcheck) {
         HecSinkLogsConfig {
@@ -872,7 +872,7 @@ mod tests {
     }
 
     async fn start(
-        encoding: impl Into<EncodingConfig<Encoding>>,
+        encoding: impl Into<EncodingConfig<HecLogsEncoder>>,
         compression: Compression,
     ) -> (VectorSink, mpsc::Receiver<Event>) {
         let (source, address) = source().await;
@@ -957,7 +957,7 @@ mod tests {
     #[tokio::test]
     async fn no_compression_text_event() {
         let message = "gzip_text_event";
-        let (sink, source) = start(Encoding::Text, Compression::None).await;
+        let (sink, source) = start(HecLogsEncoder::Text, Compression::None).await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
@@ -972,7 +972,7 @@ mod tests {
     #[tokio::test]
     async fn one_simple_text_event() {
         let message = "one_simple_text_event";
-        let (sink, source) = start(Encoding::Text, Compression::gzip_default()).await;
+        let (sink, source) = start(HecLogsEncoder::Text, Compression::gzip_default()).await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
@@ -987,7 +987,7 @@ mod tests {
     #[tokio::test]
     async fn multiple_simple_text_event() {
         let n = 200;
-        let (sink, source) = start(Encoding::Text, Compression::None).await;
+        let (sink, source) = start(HecLogsEncoder::Text, Compression::None).await;
 
         let messages = (0..n)
             .map(|i| format!("multiple_simple_text_event_{}", i))
@@ -1007,7 +1007,7 @@ mod tests {
     #[tokio::test]
     async fn one_simple_json_event() {
         let message = "one_simple_json_event";
-        let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
+        let (sink, source) = start(HecLogsEncoder::Json, Compression::gzip_default()).await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
@@ -1022,7 +1022,7 @@ mod tests {
     #[tokio::test]
     async fn multiple_simple_json_event() {
         let n = 200;
-        let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
+        let (sink, source) = start(HecLogsEncoder::Json, Compression::gzip_default()).await;
 
         let messages = (0..n)
             .map(|i| format!("multiple_simple_json_event{}", i))
@@ -1041,7 +1041,7 @@ mod tests {
 
     #[tokio::test]
     async fn json_event() {
-        let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
+        let (sink, source) = start(HecLogsEncoder::Json, Compression::gzip_default()).await;
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("greeting", "hello");
@@ -1060,7 +1060,7 @@ mod tests {
 
     #[tokio::test]
     async fn line_to_message() {
-        let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
+        let (sink, source) = start(HecLogsEncoder::Json, Compression::gzip_default()).await;
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("line", "hello");
@@ -1238,7 +1238,7 @@ mod tests {
     async fn no_authorization() {
         let message = "no_authorization";
         let (source, address) = source_with(None, None).await;
-        let (sink, health) = sink(address, Encoding::Text, Compression::gzip_default()).await;
+        let (sink, health) = sink(address, HecLogsEncoder::Text, Compression::gzip_default()).await;
         assert!(health.await.is_ok());
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
@@ -1381,7 +1381,7 @@ mod tests {
     #[tokio::test]
     async fn host_test() {
         let message = "for the host";
-        let (sink, source) = start(Encoding::Text, Compression::gzip_default()).await;
+        let (sink, source) = start(HecLogsEncoder::Text, Compression::gzip_default()).await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 

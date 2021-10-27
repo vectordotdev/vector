@@ -72,6 +72,7 @@ pub struct HostMetricsConfig {
     collectors: Option<Vec<Collector>>,
     #[serde(default)]
     namespace: Namespace,
+    config_hash: Option<String>,
 
     #[cfg(target_os = "linux")]
     #[serde(default)]
@@ -116,6 +117,20 @@ impl SourceConfig for HostMetricsConfig {
 }
 
 impl HostMetricsConfig {
+    /// Return a host metrics config with enterprise reporting defaults.
+    pub fn enterprise<T: Into<String>>(config_hash: T) -> Self {
+        Self {
+            namespace: Namespace(Some("pipelines".to_owned())),
+            config_hash: Some(config_hash.into()),
+            ..Self::default()
+        }
+    }
+
+    /// Set the interval to collect internal metrics.
+    pub fn scrape_interval_secs(&mut self, value: u64) {
+        self.scrape_interval_secs = value;
+    }
+
     async fn run(self, out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
         let mut out =
             out.sink_map_err(|error| error!(message = "Error sending host metrics.", %error));
@@ -164,6 +179,8 @@ impl HostMetrics {
 
     async fn capture_metrics(&self) -> impl Iterator<Item = Event> {
         let hostname = crate::get_hostname();
+        let config_hash = self.config.config_hash.clone();
+
         let mut metrics = Vec::new();
         #[cfg(target_os = "linux")]
         if self.config.has_collector(Collector::CGroups) {
@@ -194,6 +211,11 @@ impl HostMetrics {
         if let Ok(hostname) = &hostname {
             for metric in &mut metrics {
                 metric.insert_tag("host".into(), hostname.into());
+            }
+        }
+        if let Some(config_hash) = &config_hash {
+            for metric in &mut metrics {
+                metric.insert_tag("config_hash".to_owned(), config_hash.clone());
             }
         }
         emit!(&HostMetricsEventReceived {
