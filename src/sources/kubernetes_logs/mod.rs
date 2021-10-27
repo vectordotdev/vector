@@ -14,14 +14,15 @@ use crate::kubernetes as k8s;
 use crate::kubernetes::hash_value::HashKey;
 use crate::{
     config::{
-        ComponentId, DataType, GenerateConfig, GlobalOptions, ProxyConfig, SourceConfig,
-        SourceContext, SourceDescription,
+        log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, ProxyConfig,
+        SourceConfig, SourceContext, SourceDescription,
     },
     shutdown::ShutdownSignal,
     sources,
     transforms::{FunctionTransform, TaskTransform},
 };
 use bytes::Bytes;
+use chrono::Utc;
 use file_source::{
     Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, Line,
     ReadFrom,
@@ -166,7 +167,7 @@ const COMPONENT_ID: &str = "kubernetes_logs";
 #[typetag::serde(name = "kubernetes_logs")]
 impl SourceConfig for Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let source = Source::new(self, &cx.globals, &cx.id, &cx.proxy)?;
+        let source = Source::new(self, &cx.globals, &cx.key, &cx.proxy)?;
         Ok(Box::pin(source.run(cx.out, cx.shutdown).map(|result| {
             result.map_err(|error| {
                 error!(message = "Source future failed.", %error);
@@ -205,7 +206,7 @@ impl Source {
     fn new(
         config: &Config,
         globals: &GlobalOptions,
-        id: &ComponentId,
+        key: &ComponentKey,
         proxy: &ProxyConfig,
     ) -> crate::Result<Self> {
         let field_selector = prepare_field_selector(config)?;
@@ -217,8 +218,7 @@ impl Source {
         };
         let client = k8s::client::Client::new(k8s_config, proxy)?;
 
-        let data_dir =
-            globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), id.as_str())?;
+        let data_dir = globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), key.id())?;
         let timezone = config.timezone.unwrap_or(globals.timezone);
 
         let exclude_paths = prepare_exclude_paths(config)?;
@@ -396,14 +396,14 @@ impl Source {
             );
             let file_info = annotator.annotate(&mut event, &line.filename);
 
-            emit!(KubernetesLogsEventReceived {
+            emit!(&KubernetesLogsEventReceived {
                 file: &line.filename,
                 byte_size,
                 pod_name: file_info.as_ref().map(|info| info.pod_name),
             });
 
             if file_info.is_none() {
-                emit!(KubernetesLogsEventAnnotationFailed { event: &event });
+                emit!(&KubernetesLogsEventAnnotationFailed { event: &event });
             } else {
                 let namespace = file_info.as_ref().map(|info| info.pod_namespace);
 
@@ -411,7 +411,7 @@ impl Source {
                     let ns_info = ns_annotator.annotate(&mut event, name);
 
                     if ns_info.is_none() {
-                        emit!(KubernetesLogsEventNamespaceAnnotationFailed { event: &event });
+                        emit!(&KubernetesLogsEventNamespaceAnnotationFailed { event: &event });
                     }
                 }
             }
@@ -495,18 +495,17 @@ fn create_event(line: Bytes, file: &str, ingestion_timestamp_field: Option<&str>
     let mut event = LogEvent::from(line);
 
     // Add source type.
-    event.insert(
-        crate::config::log_schema().source_type_key(),
-        COMPONENT_ID.to_owned(),
-    );
+    event.insert(log_schema().source_type_key(), COMPONENT_ID.to_owned());
 
     // Add file.
     event.insert(FILE_KEY, file.to_owned());
 
     // Add ingestion timestamp if requested.
     if let Some(ingestion_timestamp_field) = ingestion_timestamp_field {
-        event.insert(ingestion_timestamp_field, chrono::Utc::now());
+        event.insert(ingestion_timestamp_field, Utc::now());
     }
+
+    event.try_insert(log_schema().timestamp_key(), Utc::now());
 
     event.into()
 }
@@ -521,11 +520,11 @@ fn default_path_exclusion() -> Vec<PathBuf> {
     vec![PathBuf::from("**/*.gz"), PathBuf::from("**/*.tmp")]
 }
 
-fn default_max_read_bytes() -> usize {
+const fn default_max_read_bytes() -> usize {
     2048
 }
 
-fn default_max_line_bytes() -> usize {
+const fn default_max_line_bytes() -> usize {
     // NOTE: The below comment documents an incorrect assumption, see
     // https://github.com/timberio/vector/issues/6967
     //
@@ -538,11 +537,11 @@ fn default_max_line_bytes() -> usize {
     32 * 1024 // 32 KiB
 }
 
-fn default_glob_minimum_cooldown_ms() -> usize {
-    60000
+const fn default_glob_minimum_cooldown_ms() -> usize {
+    60_000
 }
 
-fn default_fingerprint_lines() -> usize {
+const fn default_fingerprint_lines() -> usize {
     1
 }
 

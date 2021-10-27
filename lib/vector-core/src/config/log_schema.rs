@@ -36,7 +36,7 @@ where
     Ok(())
 }
 
-/// Components should use global `LogShema` returned by this function.  The
+/// Components should use global `LogSchema` returned by this function.  The
 /// returned value can differ from `LogSchema::default()` which is unchanging.
 pub fn log_schema() -> &'static LogSchema {
     LOG_SCHEMA.get().unwrap_or(&LOG_SCHEMA_DEFAULT)

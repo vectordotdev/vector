@@ -1,0 +1,9 @@
+[package]
+name = "core_common"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2021"
+publish = false
+
+[dependencies]
+serde_json = { version = "1.0.68", default-features = false, features = ["raw_value"] }

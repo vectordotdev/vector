@@ -26,7 +26,7 @@ struct EventStoreDbConfig {
     default_namespace: Option<String>,
 }
 
-pub fn default_scrape_interval_secs() -> u64 {
+pub const fn default_scrape_interval_secs() -> u64 {
     15
 }
 
@@ -86,7 +86,7 @@ fn eventstoredb(
 
                 match client.send(req).await {
                     Err(error) => {
-                        emit!(EventStoreDbMetricsHttpError {
+                        emit!(&EventStoreDbMetricsHttpError {
                             error: error.into(),
                         });
                         continue;
@@ -96,7 +96,7 @@ fn eventstoredb(
                         let bytes = match hyper::body::to_bytes(resp.into_body()).await {
                             Ok(b) => b,
                             Err(error) => {
-                                emit!(EventStoreDbMetricsHttpError {
+                                emit!(&EventStoreDbMetricsHttpError {
                                     error: error.into(),
                                 });
                                 continue;
@@ -105,14 +105,14 @@ fn eventstoredb(
 
                         match serde_json::from_slice::<Stats>(bytes.as_ref()) {
                             Err(error) => {
-                                emit!(EventStoreDbStatsParsingError { error });
+                                emit!(&EventStoreDbStatsParsingError { error });
                                 continue;
                             }
 
                             Ok(stats) => {
                                 let metrics = stats.metrics(namespace.clone());
 
-                                emit!(EventStoreDbMetricsReceived {
+                                emit!(&EventStoreDbMetricsReceived {
                                     events: metrics.len(),
                                     byte_size: bytes.len(),
                                 });

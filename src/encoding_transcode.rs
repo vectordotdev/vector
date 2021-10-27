@@ -65,7 +65,7 @@ impl Decoder {
         }
 
         if total_had_errors {
-            emit!(DecoderMalformedReplacement {
+            emit!(&DecoderMalformedReplacement {
                 from_encoding: self.inner.encoding().name()
             });
         }
@@ -86,7 +86,7 @@ impl Decoder {
             .get(..BOM_UTF8_LEN)
             .map_or(false, |start| start == BOM_UTF8)
         {
-            emit!(DecoderBomRemoval {
+            emit!(&DecoderBomRemoval {
                 from_encoding: self.inner.encoding().name()
             });
             output.slice(BOM_UTF8_LEN..)
@@ -173,7 +173,7 @@ impl Encoder {
         }
 
         if total_had_errors {
-            emit!(EncoderUnmappableReplacement {
+            emit!(&EncoderUnmappableReplacement {
                 to_encoding: self.inner.encoding().name()
             });
         }
@@ -194,29 +194,33 @@ mod tests {
     const BOM_UTF16LE: &[u8] = b"\xff\xfe";
 
     // test UTF_16LE data
-    fn test_data_utf16le_123() -> &'static [u8] {
+    const fn test_data_utf16le_123() -> &'static [u8] {
         b"1\02\03\0"
     }
-    fn test_data_utf16le_crlf() -> &'static [u8] {
+
+    const fn test_data_utf16le_crlf() -> &'static [u8] {
         b"\r\0\n\0"
     }
-    fn test_data_utf16le_vector_devanagari() -> &'static [u8] {
+
+    const fn test_data_utf16le_vector_devanagari() -> &'static [u8] {
         b"-\tG\t\x15\tM\t\x1f\t0\t"
     }
 
     // test UTF_16BE data
-    fn test_data_utf16be_123() -> &'static [u8] {
+    const fn test_data_utf16be_123() -> &'static [u8] {
         b"\01\02\03"
     }
-    fn test_data_utf16be_crlf() -> &'static [u8] {
+
+    const fn test_data_utf16be_crlf() -> &'static [u8] {
         b"\0\r\0\n"
     }
-    fn test_data_utf16be_vector_devanagari() -> &'static [u8] {
+
+    const fn test_data_utf16be_vector_devanagari() -> &'static [u8] {
         b"\t-\tG\t\x15\tM\t\x1f\t0"
     }
 
     // test SHIFT_JIS data
-    fn test_data_shiftjis_helloworld_japanese() -> &'static [u8] {
+    const fn test_data_shiftjis_helloworld_japanese() -> &'static [u8] {
         b"\x83n\x83\x8D\x81[\x81E\x83\x8F\x81[\x83\x8B\x83h"
     }
 

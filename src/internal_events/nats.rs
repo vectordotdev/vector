@@ -1,19 +1,27 @@
-use super::InternalEvent;
+// ## skip check-events ##
+
 use metrics::counter;
 use std::io::Error;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct NatsEventReceived {
+pub struct NatsEventsReceived {
     pub byte_size: usize,
+    pub count: usize,
 }
 
-impl InternalEvent for NatsEventReceived {
+impl InternalEvent for NatsEventsReceived {
     fn emit_logs(&self) {
-        trace!(message = "Received one event.", internal_log_rate_secs = 10);
+        trace!(
+            message = "Received events.",
+            self.count,
+            internal_log_rate_secs = 10
+        );
     }
 
     fn emit_metrics(&self) {
-        counter!("events_in_total", 1);
+        counter!("component_received_events_total", self.count as u64);
+        counter!("events_in_total", self.count as u64);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }

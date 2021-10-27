@@ -88,7 +88,7 @@ Maps are associative arrays mapping string fields to values of any type.
 
 Array fields are sequences of values of any type.
 
-[3910]: https://github.com/timberio/vector/issues/3910
+[3910]: https://github.com/vectordotdev/vector/issues/3910
 [components]: /components
 [date_time]: https://docs.rs/chrono/latest/chrono/struct.DateTime.html
 [ieee_754]: https://en.wikipedia.org/wiki/IEEE_754

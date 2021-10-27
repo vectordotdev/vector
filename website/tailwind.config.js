@@ -55,7 +55,6 @@ module.exports = {
                 'background-color': theme('colors.gray.100'),
                 'border-radius': '4px',
                 padding: '0 5px',
-                margin: '0 5px',
                 display: 'inline-flex',
                 'align-items': 'center'
               },
@@ -68,6 +67,17 @@ module.exports = {
             },
             'a code': {
               'color': 'inherit'
+            },
+            'ul > li >, ol > li >': {
+              '*:first-child, *:last-child': {
+                margin: 0
+              }
+            },
+            'ul > li::before': {
+              'background-color': theme('colors.gray.700'),
+            },
+            'ol > li::before': {
+              color: theme('colors.gray.700'),
             },
             // Spacing between certain shortcode combinations
             '.admonition + .tabs, .svg + .admonition, .highlight + p': {
@@ -83,7 +93,7 @@ module.exports = {
               'p + .highlight': {
                 'margin-top': '0.75rem',
               },
-              'p, h1, h2, h3, h4, h5, h6': {
+              'h1, h2, h3, h4, h5, h6': {
                 margin: 0,
                 padding: 0,
               },
@@ -103,15 +113,24 @@ module.exports = {
               'border-bottom-color': theme('colors.gray.700'),
             },
             code: {
-              color: theme('colors.primary', 'currentColor'),
+              color: theme('colors.gray.100', 'currentColor'),
               '&:not([class^="language-"])': {
-                color: theme('colors.gray.100'),
                 'background-color': theme('colors.gray.700'),
               }
             },
             color: theme('colors.gray.200'),
-            'p, h1, h2, h3, h4, h5, h6': {
+            'p, h1, h2, h3, h4, h5, h6, li': {
               color: theme('colors.gray.100')
+            },
+            'ul > li': {
+              '&:before': {
+                'background-color': theme('colors.gray.100')
+              }
+            },
+            'ol > li': {
+              '&:before': {
+                color: theme('colors.gray.100')
+              }
             },
             'a, a code, a code:not([class^="language-"])': {
                 color: theme('colors.primary', 'currentColor'),
@@ -132,6 +151,15 @@ module.exports = {
             strong: {
               color: theme('colors.gray.100'),
             },
+          }
+        },
+        sm: {
+          css: {
+            'ul > li >, ol > li >': {
+              '*:first-child, *:last-child': {
+                margin: 0
+              }
+            }
           }
         }
       }),

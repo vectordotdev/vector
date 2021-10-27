@@ -1,6 +1,6 @@
 use super::BuildError;
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{ConcatSubstringError, ConcatSubstringSourceMissing},
     transforms::{FunctionTransform, Transform},
@@ -36,7 +36,7 @@ impl GenerateConfig for ConcatConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "concat")]
 impl TransformConfig for ConcatConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         let joiner: String = match self.joiner.clone() {
             None => " ".into(),
             Some(var) => var,
@@ -161,7 +161,7 @@ impl FunctionTransform for Concat {
                     }
                 };
                 if start >= end {
-                    emit!(ConcatSubstringError {
+                    emit!(&ConcatSubstringError {
                         condition: "start >= end",
                         source: substring.source.as_ref(),
                         start,
@@ -171,7 +171,7 @@ impl FunctionTransform for Concat {
                     return;
                 }
                 if start > b.len() {
-                    emit!(ConcatSubstringError {
+                    emit!(&ConcatSubstringError {
                         condition: "start > len",
                         source: substring.source.as_ref(),
                         start,
@@ -181,7 +181,7 @@ impl FunctionTransform for Concat {
                     return;
                 }
                 if end > b.len() {
-                    emit!(ConcatSubstringError {
+                    emit!(&ConcatSubstringError {
                         condition: "end > len",
                         source: substring.source.as_ref(),
                         start,
@@ -192,7 +192,7 @@ impl FunctionTransform for Concat {
                 }
                 content_vec.push(b.slice(start..end));
             } else {
-                emit!(ConcatSubstringSourceMissing {
+                emit!(&ConcatSubstringSourceMissing {
                     source: substring.source.as_ref()
                 });
             }

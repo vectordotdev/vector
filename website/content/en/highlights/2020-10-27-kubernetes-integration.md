@@ -47,4 +47,4 @@ To get started, follow the install instructions:
 [announcement_post]: /blog/kubernetes-integration/
 [installation_docs]: /docs/setup/installation/platforms/kubernetes/
 [kubernetes_logs_source]: /docs/reference/configuration/sources/kubernetes_logs/
-[kubernetes_pull_requests]: https://github.com/timberio/vector/pulls?q=is%3Apr+sort%3Aupdated-desc+kubernetes+is%3Aclosed
+[kubernetes_pull_requests]: https://github.com/vectordotdev/vector/pulls?q=is%3Apr+sort%3Aupdated-desc+kubernetes+is%3Aclosed

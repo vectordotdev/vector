@@ -82,6 +82,16 @@ impl Expression for Query {
             .unwrap_or(Value::Null))
     }
 
+    fn as_value(&self) -> Option<Value> {
+        match self.target {
+            Target::Internal(ref variable) => variable
+                .value()
+                .and_then(|v| v.get_by_path(self.path()))
+                .cloned(),
+            _ => None,
+        }
+    }
+
     fn type_def(&self, state: &State) -> TypeDef {
         use Target::*;
 

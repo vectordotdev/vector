@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, TransformConfig, TransformDescription},
+    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{JsonParserFailedParse, JsonParserTargetExists},
     transforms::{FunctionTransform, Transform},
@@ -28,7 +28,7 @@ impl_generate_config_from_default!(JsonParserConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "json_parser")]
 impl TransformConfig for JsonParserConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(JsonParser::from(self.clone())))
     }
 
@@ -80,7 +80,7 @@ impl FunctionTransform for JsonParser {
                 let to_parse = value.as_bytes();
                 serde_json::from_slice::<Value>(to_parse.as_ref())
                     .map_err(|error| {
-                        emit!(JsonParserFailedParse {
+                        emit!(&JsonParserFailedParse {
                             field: &self.field,
                             value: value.to_string_lossy().as_str(),
                             error,
@@ -103,7 +103,7 @@ impl FunctionTransform for JsonParser {
                     let contains_target = log.contains(&target_field);
 
                     if contains_target && !self.overwrite_target {
-                        emit!(JsonParserTargetExists { target_field })
+                        emit!(&JsonParserTargetExists { target_field })
                     } else {
                         if self.drop_field {
                             log.remove(&self.field);

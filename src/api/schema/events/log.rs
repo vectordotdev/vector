@@ -1,4 +1,5 @@
 use super::EventEncodingType;
+use crate::config::OutputId;
 use crate::event::{self, Value};
 
 use async_graphql::Object;
@@ -6,16 +7,13 @@ use chrono::{DateTime, Utc};
 
 #[derive(Debug)]
 pub struct Log {
-    component_id: String,
+    output_id: OutputId,
     event: event::LogEvent,
 }
 
 impl Log {
-    pub fn new(component_id: &str, event: event::LogEvent) -> Self {
-        Self {
-            component_id: component_id.to_string(),
-            event,
-        }
+    pub const fn new(output_id: OutputId, event: event::LogEvent) -> Self {
+        Self { output_id, event }
     }
 
     pub fn get_message(&self) -> Option<String> {
@@ -32,7 +30,7 @@ impl Log {
 impl Log {
     /// Id of the component associated with the log event
     async fn component_id(&self) -> &str {
-        &self.component_id
+        self.output_id.component.id()
     }
 
     /// Log message

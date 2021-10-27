@@ -13,11 +13,14 @@ would logs and metrics from any other source.
 
 ## Logs
 
-Vector provide clear, informative, well-structured logs via the [`internal_logs`][internal_logs] source. This section
+Vector provides clear, informative, well-structured logs via the [`internal_logs`][internal_logs] source. This section
 shows you how to use them in your Vector topology.
 
 *Which* logs Vector pipes through the `internal_logs` source is determined by the [log level](#levels), which defaults
 to `info`.
+
+In addition to the `internal_logs` source, Vector also writes its logs to [`stderr`][stderr], which can be captured by
+Kubernetes, SystemD, or however you are running Vector.
 
 ### Accessing logs
 
@@ -65,7 +68,7 @@ table = "vector-log-data"
 #### Levels
 
 Vector logs at the `info` level by default. You can set a different level when [starting] up your instance using either
-command-line flags or the `LOG` environment variable. The table below details these options:
+command-line flags or the `VECTOR_LOG` environment variable. The table below details these options:
 
 Method | Description
 :------|:-----------
@@ -74,7 +77,7 @@ Method | Description
 `-q` flag | Raises the log level to `warn`
 `-qq` flag | Raises the log level to `error`
 `-qqq` flag | Disables logging
-`LOG=<level>` environment variable | Set the log level. Must be one of `trace`, `debug`, `info`, `warn`, `error`, `off`.
+`VECTOR_LOG=<level>` environment variable | Set the log level. Must be one of `trace`, `debug`, `info`, `warn`, `error`, `off`.
 
 #### Stack traces
 
@@ -119,10 +122,11 @@ IO and disrupting the service. The trade-off is that repetitive logs aren't logg
 [journald_source]: /docs/reference/configuration/sources/journald
 [output]: /docs/reference/configuration/sources/internal_metrics/#output
 [remap]: /docs/reference/configuration/transforms/remap
-[rfc_2064]: https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
+[rfc_2064]: https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 [sinks]: /sinks
 [sources]: /sources
 [starting]: /docs/administration/management
+[stderr]: https://en.wikipedia.org/wiki/Standard_streams#Standard_error_(stderr)
 [topology]: /docs/about/concepts/#topology
 [transform]: /transforms
 [troubleshooting]: /guides/level-up/troubleshooting

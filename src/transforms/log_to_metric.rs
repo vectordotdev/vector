@@ -1,6 +1,7 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription,
+        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::{Event, Value},
@@ -30,6 +31,8 @@ pub struct CounterConfig {
     namespace: Option<String>,
     #[serde(default = "default_increment_by_value")]
     increment_by_value: bool,
+    #[serde(default = "default_kind")]
+    kind: MetricKind,
     tags: Option<IndexMap<String, String>>,
 }
 
@@ -87,8 +90,12 @@ impl MetricConfig {
     }
 }
 
-fn default_increment_by_value() -> bool {
+const fn default_increment_by_value() -> bool {
     false
+}
+
+const fn default_kind() -> MetricKind {
+    MetricKind::Incremental
 }
 
 #[derive(Debug, Clone)]
@@ -108,6 +115,7 @@ impl GenerateConfig for LogToMetricConfig {
                 name: None,
                 namespace: None,
                 increment_by_value: false,
+                kind: MetricKind::Incremental,
                 tags: None,
             })],
         })
@@ -118,7 +126,7 @@ impl GenerateConfig for LogToMetricConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(LogToMetric::new(self.clone())))
     }
 
@@ -136,7 +144,7 @@ impl TransformConfig for LogToMetricConfig {
 }
 
 impl LogToMetric {
-    pub fn new(config: LogToMetricConfig) -> Self {
+    pub const fn new(config: LogToMetricConfig) -> Self {
         LogToMetric { config }
     }
 }
@@ -177,7 +185,7 @@ fn render_tags(
                         map.insert(name.to_string(), tag);
                     }
                     Err(TransformError::TemplateRenderingError(error)) => {
-                        emit!(TemplateRenderingFailed {
+                        emit!(&TemplateRenderingFailed {
                             error,
                             drop_event: false,
                             field: Some(name.as_str()),
@@ -241,7 +249,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             Ok(Metric::new_with_metadata(
                 name,
-                MetricKind::Incremental,
+                counter.kind,
                 MetricValue::Counter { value },
                 metadata,
             )
@@ -374,27 +382,27 @@ impl FunctionTransform for LogToMetric {
                 Ok(metric) => {
                     output.push(Event::Metric(metric));
                 }
-                Err(TransformError::FieldNull { field }) => emit!(LogToMetricFieldNull {
+                Err(TransformError::FieldNull { field }) => emit!(&LogToMetricFieldNull {
                     field: field.as_ref()
                 }),
-                Err(TransformError::FieldNotFound { field }) => emit!(LogToMetricFieldNotFound {
+                Err(TransformError::FieldNotFound { field }) => emit!(&LogToMetricFieldNotFound {
                     field: field.as_ref()
                 }),
                 Err(TransformError::ParseFloatError { field, error }) => {
-                    emit!(LogToMetricParseFloatError {
+                    emit!(&LogToMetricParseFloatError {
                         field: field.as_ref(),
                         error
                     })
                 }
                 Err(TransformError::TemplateRenderingError(error)) => {
-                    emit!(TemplateRenderingFailed {
+                    emit!(&TemplateRenderingFailed {
                         error,
                         drop_event: false,
                         field: None,
                     })
                 }
                 Err(TransformError::TemplateParseError(error)) => {
-                    emit!(LogToMetricTemplateParseError { error })
+                    emit!(&LogToMetricTemplateParseError { error })
                 }
             }
         }
@@ -569,6 +577,36 @@ mod tests {
             Metric::new_with_metadata(
                 "amount_total",
                 MetricKind::Incremental,
+                MetricValue::Counter { value: 33.99 },
+                metadata,
+            )
+            .with_timestamp(Some(ts()))
+        );
+    }
+
+    #[test]
+    fn count_absolute() {
+        let config = parse_config(
+            r#"
+            [[metrics]]
+            type = "counter"
+            field = "amount"
+            name = "amount_total"
+            increment_by_value = true
+            kind = "absolute"
+            "#,
+        );
+
+        let event = create_event("amount", "33.99");
+        let metadata = event.metadata().clone();
+        let mut transform = LogToMetric::new(config);
+        let metric = transform_one(&mut transform, event).unwrap();
+
+        assert_eq!(
+            metric.into_metric(),
+            Metric::new_with_metadata(
+                "amount_total",
+                MetricKind::Absolute,
                 MetricValue::Counter { value: 33.99 },
                 metadata,
             )

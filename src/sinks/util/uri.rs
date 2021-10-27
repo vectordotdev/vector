@@ -40,6 +40,25 @@ impl UriSerde {
             auth: self.auth.clone(),
         }
     }
+
+    /// Creates a new instance of `UriSerde` by appending a path to the existing one.
+    pub fn append_path(&self, path: &str) -> crate::Result<Self> {
+        let uri = self.uri.to_string();
+        let self_path = uri.trim_end_matches('/');
+        let other_path = path.trim_start_matches('/');
+        let path = format!("{}/{}", self_path, other_path);
+        let uri = path.parse::<Uri>()?;
+        Ok(Self {
+            uri,
+            auth: self.auth.clone(),
+        })
+    }
+
+    #[allow(clippy::missing_const_for_fn)] // constant functions cannot evaluate destructors
+    pub fn with_auth(mut self, auth: Option<Auth>) -> Self {
+        self.auth = auth;
+        self
+    }
 }
 
 impl Serialize for UriSerde {

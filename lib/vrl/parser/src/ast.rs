@@ -270,6 +270,14 @@ impl Ident {
     }
 }
 
+impl Deref for Ident {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl AsRef<str> for Ident {
     fn as_ref(&self) -> &str {
         &self.0

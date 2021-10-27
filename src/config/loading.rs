@@ -11,20 +11,26 @@ use std::{
     sync::Mutex,
 };
 
-lazy_static! {
-    pub static ref DEFAULT_UNIX_CONFIG_PATHS: Vec<ConfigPath> = vec![ConfigPath::File(
+#[cfg(not(windows))]
+fn default_config_paths() -> Vec<ConfigPath> {
+    vec![ConfigPath::File(
         "/etc/vector/vector.toml".into(),
-        Some(Format::Toml)
-    )];
-    pub static ref DEFAULT_WINDOWS_CONFIG_PATHS: Vec<ConfigPath> = {
-        let program_files = std::env::var("ProgramFiles")
-            .expect("%ProgramFiles% environment variable must be defined");
-        let config_path = format!("{}\\Vector\\config\\vector.toml", program_files);
-        vec![ConfigPath::File(
-            PathBuf::from(config_path),
-            Some(Format::Toml),
-        )]
-    };
+        Some(Format::Toml),
+    )]
+}
+
+#[cfg(windows)]
+fn default_config_paths() -> Vec<ConfigPath> {
+    let program_files =
+        std::env::var("ProgramFiles").expect("%ProgramFiles% environment variable must be defined");
+    let config_path = format!("{}\\Vector\\config\\vector.toml", program_files);
+    vec![ConfigPath::File(
+        PathBuf::from(config_path),
+        Some(Format::Toml),
+    )]
+}
+
+lazy_static! {
     pub static ref CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::default();
 }
 
@@ -41,13 +47,7 @@ pub fn merge_path_lists(
 /// Expand a list of paths (potentially containing glob patterns) into real
 /// config paths, replacing it with the default paths when empty.
 pub fn process_paths(config_paths: &[ConfigPath]) -> Option<Vec<ConfigPath>> {
-    let default_paths = if cfg!(unix) {
-        DEFAULT_UNIX_CONFIG_PATHS.clone()
-    } else if cfg!(windows) {
-        DEFAULT_WINDOWS_CONFIG_PATHS.clone()
-    } else {
-        DEFAULT_UNIX_CONFIG_PATHS.clone()
-    };
+    let default_paths = default_config_paths();
 
     let starting_paths = if !config_paths.is_empty() {
         config_paths
@@ -152,9 +152,9 @@ pub fn load_builder_from_paths(
                     for res in readdir {
                         match res {
                             Ok(direntry) => {
-                                if let Some(file) = open_config(&direntry.path()) {
-                                    // skip any unknown file formats
-                                    if let Ok(format) = Format::from_path(direntry.path()) {
+                                // skip any unknown file formats
+                                if let Ok(format) = Format::from_path(direntry.path()) {
+                                    if let Some(file) = open_config(&direntry.path()) {
                                         inputs.push((file, Some(format)));
                                     }
                                 }
@@ -222,10 +222,10 @@ fn open_config(path: &Path) -> Option<File> {
         Ok(f) => Some(f),
         Err(error) => {
             if let std::io::ErrorKind::NotFound = error.kind() {
-                error!(message = "Config file not found in path.", path = ?path);
+                error!(message = "Config file not found in path.", ?path);
                 None
             } else {
-                error!(message = "Error opening config file.", %error);
+                error!(message = "Error opening config file.", %error, ?path);
                 None
             }
         }

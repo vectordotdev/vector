@@ -83,9 +83,10 @@ components: sources: host_metrics: {
 			common:      true
 			required:    false
 			type: array: {
-				default: ["cpu", "disk", "filesystem", "load", "host", "memory", "network"]
+				default: ["cgroups", "cpu", "disk", "filesystem", "load", "host", "memory", "network"]
 				items: type: string: {
 					enum: {
+						cgroups:    "Metrics related to Linux control groups."
 						cpu:        "Metrics related to CPU utilization."
 						disk:       "Metrics related to disk I/O utilization."
 						filesystem: "Metrics related to filesystem space utilization."
@@ -116,6 +117,80 @@ components: sources: host_metrics: {
 				unit:    "seconds"
 			}
 		}
+		cgroups: {
+			common: false
+			description: #"""
+				Options for the "cgroups" (controller groups) metrics collector.
+
+				Note: this collector is only available on Linux systems, and only supports either version 2 or hybrid cgroups.
+				"""#
+			required: false
+			type: object: options: {
+				base: {
+					common:      false
+					required:    false
+					description: "The base cgroup name to provide metrics for"
+					type: string: {
+						default: null
+						examples: ["/", "system.slice/snapd.service"]
+						syntax: "literal"
+					}
+				}
+				groups: {
+					common:      false
+					required:    false
+					description: "Lists of group name patterns to include or exclude."
+					type: object: options: {
+						includes: {
+							required: false
+							common:   false
+							description: """
+								The list of cgroup name patterns for which to gather metrics.
+
+								Defaults to including all cgroups.
+
+								The patterns are matched using globbing.
+								"""
+							type: array: {
+								default: ["*"]
+								items: type: string: {
+									examples: ["user.slice/*", "*.service"]
+									syntax: "literal"
+								}
+							}
+						}
+						excludes: {
+							required: false
+							common:   false
+							description: """
+								The list of cgroup name patterns for which to gather metrics.
+
+								Defaults to excluding no cgroups.
+
+								The patterns are matched using globbing.
+								"""
+							type: array: {
+								default: []
+								items: type: string: {
+									examples: ["user.slice/*", "*.service"]
+									syntax: "literal"
+								}
+							}
+						}
+					}
+				}
+				levels: {
+					common:      false
+					required:    false
+					description: "The number of levels of the cgroups hierarchy for which to report metrics. A value of `1` means just the root or named cgroup."
+					type: uint: {
+						unit:    null
+						default: 100
+						examples: [1, 3]
+					}
+				}
+			}
+		}
 		disk: {
 			common:      false
 			description: #"Options for the "disk" metrics collector."#
@@ -131,8 +206,10 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of device name patterns for which to gather I/O utilization metrics.
+
 								Defaults to including all devices.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: ["*"]
@@ -147,8 +224,10 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of device name patterns for which to gather I/O utilization metrics.
+
 								Defaults to excluding no devices.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: []
@@ -177,8 +256,10 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of device name patterns for which to gather usage metrics.
+
 								Defaults to including all devices.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: ["*"]
@@ -193,8 +274,10 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of device name patterns for which to gather usage metrics.
+
 								Defaults to excluding no devices.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: []
@@ -216,8 +299,10 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of filesystem name patterns for which to gather usage metrics.
+
 								Defaults to including all filesystems.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: ["*"]
@@ -232,8 +317,10 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of filesystem name patterns for which to gather usage metrics.
+
 								Defaults to excluding no filesystems.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: []
@@ -255,8 +342,10 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of mount point path patterns for which to gather usage metrics.
+
 								Defaults to including all mount points.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: ["*"]
@@ -271,8 +360,10 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of mount point path patterns for which to gather usage metrics.
+
 								Defaults to excluding no mount points.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: []
@@ -301,8 +392,10 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of device name patterns for which to gather network utilization metrics.
+
 								Defaults to including all devices.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: ["*"]
@@ -317,8 +410,10 @@ components: sources: host_metrics: {
 							common:   false
 							description: """
 								The list of device name patterns for which to gather network utilization metrics.
+
 								Defaults to excluding no devices.
-								The patterns are matched using [globbing](#globbing).
+
+								The patterns are matched using globbing.
 								"""
 							type: array: {
 								default: []
@@ -365,6 +460,14 @@ components: sources: host_metrics: {
 				}
 			}
 		}
+
+		// Host cgroups
+		cgroup_cpu_usage_seconds_total:  _host & _cgroup_cpu & {description:    "The total amount CPU time used by this cgroup and its descendants, in seconds."}
+		cgroup_cpu_user_seconds_total:   _host & _cgroup_cpu & {description:    "The total amount of CPU time spent by this cgroup in user space, in seconds."}
+		cgroup_cpu_system_seconds_total: _host & _cgroup_cpu & {description:    "The total amount of CPU time spent by this cgroup in system tasks, in seconds."}
+		cgroup_memory_current_bytes:     _host & _cgroup_memory & {description: "The total amount of memory currently being used by this cgroup and its descendants, in bytes."}
+		cgroup_memory_anon_bytes:        _host & _cgroup_memory & {description: "The total amount of memory used by this cgroup in anonymous mappings (normal program allocation), in bytes."}
+		cgroup_memory_file_bytes:        _host & _cgroup_memory & {description: "The total amount of memory used by this cgroup to cache filesystem data, including tmpfs and shared memory, in bytes."}
 
 		// Host disk
 		disk_read_bytes_total:       _host & _disk_counter & {description: "The accumulated number of bytes read in."}
@@ -420,6 +523,26 @@ components: sources: host_metrics: {
 		// Helpers
 		_host: {
 			default_namespace: "host"
+		}
+
+		_cgroup_cpu: {
+			type: "counter"
+			tags: _host_metrics_tags & {
+				collector: examples: ["cgroups"]
+				cgroup: _cgroup_name
+			}
+		}
+		_cgroup_memory: {
+			type: "gauge"
+			tags: _host_metrics_tags & {
+				collector: examples: ["cgroups"]
+				cgroup: _cgroup_name
+			}
+		}
+		_cgroup_name: {
+			description: "The control group name."
+			required:    true
+			examples: ["/", "user.slice", "system.slice/snapd.service"]
 		}
 
 		_disk_device: {

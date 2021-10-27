@@ -32,37 +32,12 @@
   {{ template "heading" (dict "here" $here "url" .ctx.RelPermalink "title" (.ctx.Params.short | default .ctx.Title )) }}
 
   <div class="flex flex-col space-y-1 mt-1.5">
-    {{ with .ctx.Sections }}
-    {{ range . }}
-    {{ $open := .IsAncestor $section }}
-    <div x-data="{ open: {{ $open }} }">
-      <span class="flex justify-between items-center">
-        {{ template "link" (dict "here" $here "url" .RelPermalink "title" (.Params.short | default .Title )) }}
-        {{ template "chevron-icon" }}
-      </span>
+    {{ range .ctx.Pages }}
 
-      {{ with .Pages }}
-      <div x-show.transition.duration.300ms="open">
-        <div class="flex flex-col space-y-0.5 pl-3.5 border-l-2 border-gray-200 dark:border-gray-600 py-0.5 my-0.5">
-          {{ range . }}
-          {{ if .IsSection }}
-          {{ template "subsection-group" (dict "ctx" . "here" $here "section" $section) }}
-          {{ end }}
-
-          {{ if .IsPage }}
-          {{ template "link" (dict "here" $here "url" .RelPermalink "title" (.Params.short | default .Title)) }}
-          {{ end }}
-          {{ end }}
-        </div>
-      </div>
-      {{ end }}
-    </div>
-    {{ end }}
-    {{ end }}
-
-    {{ with .ctx.RegularPages }}
-    {{ range . }}
-    {{ template "link" (dict "here" $here "url" .RelPermalink "title" (.Params.short | default .Title )) }}
+    {{ if .IsPage }}
+    {{ template "link" (dict "here" $here "url" .RelPermalink "title" (.Params.short | default .Title)) }}
+    {{ else if .IsSection }}
+    {{ template "subsection-group" (dict "ctx" . "here" $here "section" $section) }}
     {{ end }}
     {{ end }}
   </div>
@@ -127,7 +102,7 @@
 {{ define "meta-menu" }}
 {{ range .  }}
 <p class="flex items-start">
-  <a class="block font-semibold dark:text-gray-400 dark:hover:text-purple-v hover:text-purple-v" href="{{ .URL }}" target="_blank">
+  <a class="block font-semibold dark:text-gray-400 dark:hover:text-purple-v hover:text-purple-v" href="{{ .URL }}" rel="noopener" target="_blank">
     <span class="flex justify-between items-start">
       <span class="pr-0.5">
         {{ .Name }}

@@ -35,15 +35,15 @@ impl LuaConfig {
         Lua::new(self.source.clone(), self.search_dirs.clone()).map(Transform::task)
     }
 
-    pub fn input_type(&self) -> DataType {
+    pub const fn input_type(&self) -> DataType {
         DataType::Log
     }
 
-    pub fn output_type(&self) -> DataType {
+    pub const fn output_type(&self) -> DataType {
         DataType::Log
     }
 
-    pub fn transform_type(&self) -> &'static str {
+    pub const fn transform_type(&self) -> &'static str {
         "lua"
     }
 }
@@ -136,7 +136,7 @@ impl Lua {
 
         self.invocations_after_gc += 1;
         if self.invocations_after_gc % GC_INTERVAL == 0 {
-            emit!(LuaGcTriggered {
+            emit!(&LuaGcTriggered {
                 used_memory: self.lua.used_memory()
             });
             self.lua.gc_collect()?;
@@ -150,7 +150,7 @@ impl Lua {
         match self.process(event) {
             Ok(event) => event,
             Err(error) => {
-                emit!(LuaScriptError { error });
+                emit!(&LuaScriptError { error });
                 None
             }
         }
@@ -175,7 +175,7 @@ impl TaskTransform for Lua {
                         Some(stream::iter(output))
                     }
                     Err(error) => {
-                        emit!(LuaScriptError { error });
+                        emit!(&LuaScriptError { error });
                         None
                     }
                 })

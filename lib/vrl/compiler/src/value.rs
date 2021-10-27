@@ -18,7 +18,7 @@ pub use self::regex::Regex;
 pub use error::Error;
 pub use kind::Kind;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Hash, PartialEq)]
 pub enum Value {
     Bytes(Bytes),
     Integer(i64),
@@ -31,7 +31,7 @@ pub enum Value {
     Null,
 }
 
-// -----------------------------------------------------------------------------
+impl Eq for Value {}
 
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

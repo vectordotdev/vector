@@ -19,12 +19,12 @@ administration: interfaces: kubectl: {
 	role_implementations: [Name=string]: {
 		commands: {
 			_deployment_variant:       string
-			_vector_version:           "0.15"
+			_vector_version:           "0.17"
 			_namespace:                string | *"vector"
 			_controller_resource_type: string
 			_controller_resource_name: string | *_deployment_variant
 			_kustomization_ref:        "v\(_vector_version)"
-			_kustomization_base:       string | *"github.com/timberio/vector/distribution/kubernetes/\(_deployment_variant)?ref=\(_kustomization_ref)"
+			_kustomization_base:       string | *"github.com/vectordotdev/vector/distribution/kubernetes/\(_deployment_variant)?ref=\(_kustomization_ref)"
 			_configmap_name:           string | *"\(_controller_resource_name)-config"
 			_configmap_file_name:      string | *"\(_controller_resource_name).toml"
 			_config_header:            string | *""

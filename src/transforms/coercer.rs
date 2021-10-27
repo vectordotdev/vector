@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, LogEvent, Value},
     internal_events::CoercerConversionFailed,
     transforms::{FunctionTransform, Transform},
@@ -27,8 +27,8 @@ impl_generate_config_from_default!(CoercerConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "coercer")]
 impl TransformConfig for CoercerConfig {
-    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
-        let timezone = self.timezone.unwrap_or(globals.timezone);
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        let timezone = self.timezone.unwrap_or(context.globals.timezone);
         let types = parse_conversion_map(&self.types, timezone)?;
         Ok(Transform::function(Coercer {
             types,
@@ -71,7 +71,7 @@ impl FunctionTransform for Coercer {
                         Ok(converted) => {
                             new_log.insert(field, converted);
                         }
-                        Err(error) => emit!(CoercerConversionFailed { field, error }),
+                        Err(error) => emit!(&CoercerConversionFailed { field, error }),
                     }
                 }
             }
@@ -84,7 +84,7 @@ impl FunctionTransform for Coercer {
                         Ok(converted) => {
                             log.insert(field, converted);
                         }
-                        Err(error) => emit!(CoercerConversionFailed { field, error }),
+                        Err(error) => emit!(&CoercerConversionFailed { field, error }),
                     }
                 }
             }
@@ -97,7 +97,7 @@ impl FunctionTransform for Coercer {
 mod tests {
     use super::CoercerConfig;
     use crate::{
-        config::{GlobalOptions, TransformConfig},
+        config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
     };
     use pretty_assertions::assert_eq;
@@ -129,7 +129,7 @@ mod tests {
             extra
         ))
         .unwrap()
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
         let coercer = coercer.as_function();

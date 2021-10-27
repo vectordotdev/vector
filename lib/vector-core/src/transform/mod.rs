@@ -3,7 +3,7 @@ use futures::Stream;
 use std::pin::Pin;
 #[cfg(any(feature = "lua"))]
 pub mod runtime_transform;
-pub use config::{DataType, ExpandType, TransformConfig};
+pub use config::{DataType, ExpandType, TransformConfig, TransformContext};
 
 mod config;
 
@@ -13,6 +13,7 @@ mod config;
 /// transforms act as a coordination or barrier point.
 pub enum Transform {
     Function(Box<dyn FunctionTransform>),
+    FallibleFunction(Box<dyn FallibleFunctionTransform>),
     Task(Box<dyn TaskTransform>),
 }
 
@@ -32,11 +33,11 @@ impl Transform {
     ///
     /// # Panics
     ///
-    /// If the transform is a [`TaskTransform`] this will panic.
+    /// If the transform is not a [`FunctionTransform`] this will panic.
     pub fn as_function(&mut self) -> &mut Box<dyn FunctionTransform> {
         match self {
             Transform::Function(t) => t,
-            Transform::Task(_) => panic!(
+            _ => panic!(
                 "Called `Transform::as_function` on something that was not a function variant."
             ),
         }
@@ -46,12 +47,48 @@ impl Transform {
     ///
     /// # Panics
     ///
-    /// If the transform is a [`TaskTransform`] this will panic.
+    /// If the transform is not a [`FunctionTransform`] this will panic.
     pub fn into_function(self) -> Box<dyn FunctionTransform> {
         match self {
             Transform::Function(t) => t,
-            Transform::Task(_) => panic!(
+            _ => panic!(
                 "Called `Transform::into_function` on something that was not a function variant."
+            ),
+        }
+    }
+
+    /// Create a new fallible function transform.
+    ///
+    /// There are similar to `FunctionTransform`, but with a second output for events that
+    /// encountered an error during processing.
+    pub fn fallible_function(v: impl FallibleFunctionTransform + 'static) -> Self {
+        Transform::FallibleFunction(Box::new(v))
+    }
+
+    /// Mutably borrow the inner transform as a fallible function transform.
+    ///
+    /// # Panics
+    ///
+    /// If the transform is not a [`FallibleFunctionTransform`] this will panic.
+    pub fn as_fallible_function(&mut self) -> &mut Box<dyn FallibleFunctionTransform> {
+        match self {
+            Transform::FallibleFunction(t) => t,
+            _ => panic!(
+                "Called `Transform::as_fallible_function` on something that was not a fallible function variant."
+            ),
+        }
+    }
+
+    /// Transmute the inner transform into a fallible function transform.
+    ///
+    /// # Panics
+    ///
+    /// If the transform is not a [`FallibleFunctionTransform`] this will panic.
+    pub fn into_fallible_function(self) -> Box<dyn FallibleFunctionTransform> {
+        match self {
+            Transform::FallibleFunction(t) => t,
+            _ => panic!(
+                "Called `Transform::into_fallible_function` on something that was not a fallible function variant."
             ),
         }
     }
@@ -74,10 +111,10 @@ impl Transform {
     /// If the transform is a [`FunctionTransform`] this will panic.
     pub fn as_task(&mut self) -> &mut Box<dyn TaskTransform> {
         match self {
-            Transform::Function(_) => {
+            Transform::Task(t) => t,
+            _ => {
                 panic!("Called `Transform::as_task` on something that was not a task variant.")
             }
-            Transform::Task(t) => t,
         }
     }
 
@@ -88,10 +125,10 @@ impl Transform {
     /// If the transform is a [`FunctionTransform`] this will panic.
     pub fn into_task(self) -> Box<dyn TaskTransform> {
         match self {
-            Transform::Function(_) => {
+            Transform::Task(t) => t,
+            _ => {
                 panic!("Called `Transform::into_task` on something that was not a task variant.")
             }
-            Transform::Task(t) => t,
         }
     }
 }
@@ -108,6 +145,14 @@ pub trait FunctionTransform: Send + dyn_clone::DynClone + Sync {
 }
 
 dyn_clone::clone_trait_object!(FunctionTransform);
+
+/// Similar to `FunctionTransform`, but with a second output for events that encountered an error
+/// during processing.
+pub trait FallibleFunctionTransform: Send + dyn_clone::DynClone + Sync {
+    fn transform(&mut self, output: &mut Vec<Event>, errors: &mut Vec<Event>, event: Event);
+}
+
+dyn_clone::clone_trait_object!(FallibleFunctionTransform);
 
 /// Transforms that tend to be more complicated runtime style components.
 ///

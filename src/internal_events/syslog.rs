@@ -1,5 +1,7 @@
-use super::InternalEvent;
+// ## skip check-events ##
+
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct SyslogEventReceived {
@@ -12,16 +14,19 @@ impl InternalEvent for SyslogEventReceived {
     }
 
     fn emit_metrics(&self) {
+        counter!("component_received_events_total", 1);
         counter!("events_in_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
+#[cfg(feature = "codecs")]
 #[derive(Debug)]
 pub struct SyslogUdpReadError {
-    pub error: std::io::Error,
+    pub error: crate::codecs::Error,
 }
 
+#[cfg(feature = "codecs")]
 impl InternalEvent for SyslogUdpReadError {
     fn emit_logs(&self) {
         error!(message = "Error reading datagram.", error = ?self.error, internal_log_rate_secs = 10);
@@ -31,18 +36,17 @@ impl InternalEvent for SyslogUdpReadError {
         counter!("connection_read_errors_total", 1, "mode" => "udp");
     }
 }
-
 #[derive(Debug)]
-pub struct SyslogUdpUtf8Error {
+pub(crate) struct SyslogConvertUtf8Error {
     pub error: std::str::Utf8Error,
 }
 
-impl InternalEvent for SyslogUdpUtf8Error {
+impl InternalEvent for SyslogConvertUtf8Error {
     fn emit_logs(&self) {
-        error!(message = "Error converting bytes to UTF8 string in UDP mode.", error = ?self.error, internal_log_rate_secs = 10);
+        error!(message = "Error converting bytes to UTF-8 string.", error = %self.error, internal_log_rate_secs = 10);
     }
 
     fn emit_metrics(&self) {
-        counter!("utf8_convert_errors_total", 1, "mode" => "udp");
+        counter!("utf8_convert_errors_total", 1);
     }
 }

@@ -154,7 +154,8 @@ components: sinks: [Name=string]: {
 			if features.send.encoding.enabled {
 				encoding: {
 					description: "Configures the encoding specific sink behavior."
-					required:    true
+					required:    false
+					common:      true
 					type: object: options: {
 						if features.send.encoding.codec.enabled {
 							codec: {
@@ -162,7 +163,39 @@ components: sinks: [Name=string]: {
 								required:    true
 								type: string: {
 									examples: features.send.encoding.codec.enum
-									syntax:   "literal"
+									let batched = features.send.encoding.codec.batched
+									enum: {
+										for codec in features.send.encoding.codec.enum {
+											if codec == "text" {
+												if batched {
+													text: "Newline delimited list of messages generated from the message key from each event."
+												}
+												if !batched {
+													text: "The message field from the event."
+												}
+											}
+											if codec == "logfmt" {
+												if batched {
+													logfmt: "Newline delimited list of events encoded by [logfmt]\(urls.logfmt)."
+												}
+												if !batched {
+													logfmt: "[logfmt]\(urls.logfmt) encoded event."
+												}
+											}
+											if codec == "json" {
+												if batched {
+													json: "Array of JSON encoded events, each element representing one event."
+												}
+												if !batched {
+													json: "JSON encoded event."
+												}
+											}
+											if codec == "ndjson" {
+												ndjson: "Newline delimited list of JSON encoded events."
+											}
+										}
+									}
+									syntax: "literal"
 								}
 							}
 						}
@@ -244,6 +277,9 @@ components: sinks: [Name=string]: {
 					common:      false
 					description: "Configures the sink request behavior."
 					required:    false
+					if features.send.request.relevant_when != _|_ {
+						relevant_when: features.send.request.relevant_when
+					}
 					type: object: {
 						examples: []
 						options: {
@@ -266,11 +302,13 @@ components: sinks: [Name=string]: {
 											required:    false
 											type: float: default: 0.7
 										}
-										rtt_threshold_ratio: {
-											common:      false
-											description: "When comparing the past RTT average to the current measurements, we ignore changes that are less than this ratio higher than the past RTT. Valid values are greater than or equal to 0. Larger values cause the algorithm to ignore larger increases in the RTT."
-											required:    false
-											type: float: default: 0.05
+										rtt_deviation_scale: {
+											common: false
+											description: """
+											When calculating the past RTT average, we also compute a secondary "deviation" value that indicates how variable those values are. We use that deviation when comparing the past RTT average to the current measurements, so we can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to an appropriate range. Valid values are greater than or equal to 0, and we expect reasonable values to range from 1.0 to 3.0. Larger values cause the algorithm to ignore larger increases in the RTT.
+											"""
+											required: false
+											type: float: default: 2.0
 										}
 									}
 								}
@@ -368,15 +406,19 @@ components: sinks: [Name=string]: {
 		}
 
 		if features.send != _|_ {
-			if features.send.send_buffer_size != _|_ {
+			if features.send.send_buffer_bytes != _|_ {
 				send_buffer_bytes: {
 					common:      false
 					description: "Configures the send buffer size using the `SO_SNDBUF` option on the socket."
 					required:    false
 					type: uint: {
+						default: null
 						examples: [65536]
+						unit: "bytes"
 					}
-					relevant_when: features.send.send_buffer_bytes.relevant_when
+					if features.send.send_buffer_bytes.relevant_when != _|_ {
+						relevant_when: features.send.send_buffer_bytes.relevant_when
+					}
 				}
 			}
 
@@ -430,7 +472,7 @@ components: sinks: [Name=string]: {
 								*Batches* are flushed when 1 of 2 conditions are met:
 
 								1. The batch age meets or exceeds the configured `timeout_secs`.
-								2. The batch size meets or exceeds the configured `max_size` or `max_events`.
+								2. The batch size meets or exceeds the configured `max_bytes` or `max_events`.
 
 								*Buffers* are controlled via the [`buffer.*`](#buffer) options.
 								"""#
@@ -516,37 +558,44 @@ components: sinks: [Name=string]: {
 						{
 							title: "Adaptive Request Concurrency (ARC)"
 							body:  """
-								Adaptive Requst Concurrency is a feature of Vector that does away
-								with static rate limits and automatically optimizes HTTP
-								concurrency limits based on downstream service responses. The
-								underlying mechanism is a feedback loop inspired by TCP congestion
-								control algorithms. Checkout the [announcement blog post](\(urls.adaptive_request_concurrency_post)),
+								Adaptive Request Concurrency is a feature of Vector that does away with static
+								concurrency limits and automatically optimizes HTTP concurrency based on downstream
+								service responses. The underlying mechanism is a feedback loop inspired by TCP
+								congestion control algorithms. Checkout the [announcement blog
+								post](\(urls.adaptive_request_concurrency_post)),
 
 								We highly recommend enabling this feature as it improves
 								performance and reliability of Vector and the systems it
-								communicates with.
-
-								To enable, set the `request.concurrency` option to `adaptive`:
+								communicates with. As such, we have made it the default,
+								and no further configuration is required.
+								"""
+						},
+						{
+							title: "Static concurrency"
+							body: """
+								If Adaptive Request Concurrency is not for you, you can manually set static concurrency
+								limits by specifying an integer for `request.concurrency`:
 
 								```toml title="vector.toml"
 								[sinks.my-sink]
-								  request.concurrency = "adaptive"
+								  request.concurrency = 10
 								```
 								"""
 						},
 						{
-							title: "Static rate limits"
+							title: "Rate limits"
 							body: """
-								If Adaptive Request Concurrency is not for you, you can manually
-								set static rate limits with the `request.rate_limit_duration_secs`,
-								`request.rate_limit_num`, and `request.concurrency` options:
+								In addition to limiting request concurrency, you can also limit the overall request
+								throughput via the `request.rate_limit_duration_secs` and `request.rate_limit_num`
+								options.
 
 								```toml title="vector.toml"
 								[sinks.my-sink]
 								  request.rate_limit_duration_secs = 1
 								  request.rate_limit_num = 10
-								  request.concurrency = 10
 								```
+
+								These will apply to both `adaptive` and fixed `request.concurrency` values.
 								"""
 						},
 					]
@@ -578,7 +627,16 @@ components: sinks: [Name=string]: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:  components.sources.internal_metrics.output.metrics.events_in_total
-		events_out_total: components.sources.internal_metrics.output.metrics.events_out_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
+		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
+		utilization:                          components.sources.internal_metrics.output.metrics.utilization
+		buffer_byte_size:                     components.sources.internal_metrics.output.metrics.buffer_byte_size
+		buffer_events:                        components.sources.internal_metrics.output.metrics.buffer_events
+		buffer_received_events_total:         components.sources.internal_metrics.output.metrics.buffer_received_events_total
+		buffer_received_event_bytes_total:    components.sources.internal_metrics.output.metrics.buffer_received_event_bytes_total
+		buffer_sent_events_total:             components.sources.internal_metrics.output.metrics.buffer_sent_events_total
+		buffer_sent_event_bytes_total:        components.sources.internal_metrics.output.metrics.buffer_sent_event_bytes_total
+		buffer_discarded_events_total:        components.sources.internal_metrics.output.metrics.buffer_discarded_events_total
 	}
 }

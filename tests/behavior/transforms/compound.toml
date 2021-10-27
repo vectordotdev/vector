@@ -7,16 +7,15 @@ inputs = []
 [transforms.simple_compound]
 type = "compound"
 inputs = ["start"]
-    [transforms.simple_compound.nested.step1]
+    [[transforms.simple_compound.steps]]
     type = "add_fields"
-    [transforms.simple_compound.nested.step1.fields]
-        foo = "bar"
-        foobar = "baz"
-    [transforms.simple_compound.nested.step2]
+    fields.foo = "bar"
+    fields.foobar = "baz"
+    [[transforms.simple_compound.steps]]
+    id = "final"
     type = "add_fields"
-    [transforms.simple_compound.nested.step2.fields]
-        foo = "barbaz"
-        foobarbaz = "qux"
+    fields.foo = "barbaz"
+    fields.foobarbaz = "qux"
 
 [[tests]]
     name = "successful test"
@@ -26,7 +25,7 @@ inputs = ["start"]
     value = "message"
 
     [[tests.outputs]]
-    extract_from = "simple_compound.step2"
+    extract_from = "simple_compound.final"
     [[tests.outputs.conditions]]
         type = "check_fields"
         "foo.equals" = "barbaz"

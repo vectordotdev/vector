@@ -9,8 +9,10 @@ criterion_group!(
     // encapsulates CI noise we saw in
     // https://github.com/timberio/vector/pull/6408
     config = Criterion::default().noise_threshold(0.05);
-    targets = assert,
+    targets = array,
+              assert,
               assert_eq,
+              r#bool,
               ceil,
               compact,
               contains,
@@ -27,14 +29,18 @@ criterion_group!(
               ends_with,
               // TODO: Cannot pass a Path to bench_function
               //exists
+              find,
               flatten,
               floor,
+              float,
               format_int,
               format_number,
               format_timestamp,
+              get,
               get_env_var,
               get_hostname,
               includes,
+              int,
               ip_aton,
               ip_cidr_contains,
               ip_ntoa,
@@ -62,6 +68,7 @@ criterion_group!(
               merge,
               // TODO: value is dynamic so we cannot assert equality
               //now,
+              object,
               parse_apache_log,
               parse_aws_alb_log,
               parse_aws_cloudwatch_log_subscription_message,
@@ -88,16 +95,22 @@ criterion_group!(
               parse_xml,
               push,
               redact,
+              remove,
               replace,
+              reverse_dns,
               round,
+              set,
               sha1,
               sha2,
               sha3,
               slice,
               split,
               starts_with,
+              string,
               strip_ansi_escape_codes,
               strip_whitespace,
+              tally,
+              timestamp,
               to_bool,
               to_float,
               to_int,
@@ -109,6 +122,7 @@ criterion_group!(
               to_timestamp,
               to_unix_timestamp,
               truncate,
+              unique,
               // TODO: Cannot pass a Path to bench_function
               //unnest
               // TODO: value is dynamic so we cannot assert equality
@@ -127,6 +141,15 @@ bench_function! {
 }
 
 bench_function! {
+    array => vrl_stdlib::Array;
+
+    array {
+        args: func_args![value: value!([1,2,3])],
+        want: Ok(value!([1,2,3])),
+    }
+}
+
+bench_function! {
     assert => vrl_stdlib::Assert;
 
     literal {
@@ -140,6 +163,15 @@ bench_function! {
 
     literal {
         args: func_args![left: value!(true), right: value!(true), message: "must be true"],
+        want: Ok(value!(true)),
+    }
+}
+
+bench_function! {
+    r#bool => vrl_stdlib::Boolean;
+
+    r#bool {
+        args: func_args![value: value!(true)],
         want: Ok(value!(true)),
     }
 }
@@ -337,6 +369,25 @@ bench_function! {
 }
 
 bench_function! {
+    find => vrl_stdlib::Find;
+
+    str_matching {
+        args: func_args![value: "foobarfoo", pattern: "bar"],
+        want: Ok(value!(3)),
+    }
+
+    str_too_long {
+        args: func_args![value: "foo", pattern: "foobar"],
+        want: Ok(value!(-1)),
+    }
+
+    regex_matching_start {
+        args: func_args![value: "foobar", pattern: Value::Regex(Regex::new("fo+z?").unwrap().into())],
+        want: Ok(value!(0)),
+    }
+}
+
+bench_function! {
     flatten => vrl_stdlib::Flatten;
 
     nested_map {
@@ -363,6 +414,15 @@ bench_function! {
             "parent.child2.grandchild2": [1, [2, 3], 4],
             "key": "val",
         })),
+    }
+}
+
+bench_function! {
+    float => vrl_stdlib::Float;
+
+    float {
+        args: func_args![value: value!(1.2)],
+        want: Ok(value!(1.2)),
     }
 }
 
@@ -441,11 +501,39 @@ bench_function! {
 }
 
 bench_function! {
+    set => vrl_stdlib::Set;
+
+    single {
+        args: func_args![value: value!({ "foo": "bar" }), path: vec!["baz"], data: true],
+        want: Ok(value!({ "foo": "bar", "baz": true })),
+    }
+
+    nested {
+        args: func_args![value: value!({ "foo": { "bar": "baz" } }), path: vec!["foo", "bar", "qux"], data: 42],
+        want: Ok(value!({ "foo": { "bar": { "qux": 42 } } })),
+    }
+
+    indexing {
+        args: func_args![value: value!([0, 42, 91]), path: vec![3], data: 1],
+        want: Ok(value!([0, 42, 91, 1])),
+    }
+}
+
+bench_function! {
+    int => vrl_stdlib::Integer;
+
+    int {
+        args: func_args![value: value!(1)],
+        want: Ok(value!(1)),
+    }
+}
+
+bench_function! {
     ip_aton => vrl_stdlib::IpAton;
 
     valid {
         args: func_args![value: "1.2.3.4"],
-        want: Ok(value!(67305985)),
+        want: Ok(value!(16909060)),
     }
 }
 
@@ -467,7 +555,7 @@ bench_function! {
     ip_ntoa => vrl_stdlib::IpNtoa;
 
     valid {
-        args: func_args![value: 67305985],
+        args: func_args![value: 16909060],
         want: Ok(value!("1.2.3.4")),
     }
 }
@@ -713,6 +801,25 @@ bench_function! {
 }
 
 bench_function! {
+    get => vrl_stdlib::Get;
+
+    single {
+        args: func_args![value: value!({ "foo": "bar" }), path: vec!["foo"]],
+        want: Ok("bar"),
+    }
+
+    nested {
+        args: func_args![value: value!({ "foo": { "bar": "baz" } }), path: vec!["foo", "bar"]],
+        want: Ok("baz"),
+    }
+
+    indexing {
+        args: func_args![value: value!([0, 42, 91]), path: vec![-2]],
+        want: Ok(42),
+    }
+}
+
+bench_function! {
     r#match => vrl_stdlib::Match;
 
     simple {
@@ -916,6 +1023,15 @@ bench_function! {
                 "grandchild2": "val2",
             },
         }))
+    }
+}
+
+bench_function! {
+    object => vrl_stdlib::Object;
+
+    object {
+        args: func_args![value: value!({"foo": "bar"})],
+        want: Ok(value!({"foo": "bar"})),
     }
 }
 
@@ -1692,6 +1808,25 @@ bench_function! {
 }
 
 bench_function! {
+    remove => vrl_stdlib::Remove;
+
+    single {
+        args: func_args![value: value!({ "foo": "bar", "baz": true }), path: vec!["foo"]],
+        want: Ok(value!({ "baz": true })),
+    }
+
+    nested {
+        args: func_args![value: value!({ "foo": { "bar": "baz" } }), path: vec!["foo", "bar"]],
+        want: Ok(value!({ "foo": {} })),
+    }
+
+    indexing {
+        args: func_args![value: value!([0, 42, 91]), path: vec![-2]],
+        want: Ok(vec![0, 91]),
+    }
+}
+
+bench_function! {
     replace => vrl_stdlib::Replace;
 
     string {
@@ -1710,6 +1845,15 @@ bench_function! {
             with: "o",
         ],
         want: Ok("I like opples ond bononos")
+    }
+}
+
+bench_function! {
+    reverse_dns => vrl_stdlib::ReverseDns;
+
+    google {
+        args: func_args![value: value!("8.8.8.8")],
+        want: Ok(value!("dns.google")),
     }
 }
 
@@ -1792,6 +1936,15 @@ bench_function! {
     case_insensitive {
         args: func_args![value: "abcdefg", substring: "ABC", case_sensitive: false],
         want: Ok(value!(true)),
+    }
+}
+
+bench_function! {
+    string => vrl_stdlib::String;
+
+    string {
+        args: func_args![value: "2"],
+        want: Ok("2")
     }
 }
 
@@ -1881,6 +2034,26 @@ bench_function! {
     tag_null {
         args: func_args![value: Value::Null],
         want: Ok(Value::Null),
+    }
+}
+
+bench_function! {
+    tally => vrl_stdlib::Tally;
+
+    default {
+        args: func_args![
+            value: value!(["bar", "foo", "baz", "foo"]),
+        ],
+        want: Ok(value!({"bar": 1, "foo": 2, "baz": 1})),
+    }
+}
+
+bench_function! {
+    timestamp => vrl_stdlib::Timestamp;
+
+    timestamp {
+        args: func_args![value: Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)],
+        want: Ok(value!(Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0))),
     }
 }
 
@@ -2063,6 +2236,24 @@ bench_function! {
             ellipsis: false,
         ],
         want: Ok("Super"),
+    }
+}
+
+bench_function! {
+    unique => vrl_stdlib::Unique;
+
+    default {
+        args: func_args![
+            value: value!(["bar", "foo", "baz", "foo"]),
+        ],
+        want: Ok(value!(["bar", "foo", "baz"])),
+    }
+
+    mixed_values {
+        args: func_args![
+            value: value!(["foo", [1,2,3], "123abc", 1, true, [1,2,3], "foo", true, 1]),
+        ],
+        want: Ok(value!(["foo", [1,2,3], "123abc", 1, true])),
     }
 }
 

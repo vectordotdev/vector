@@ -10,7 +10,7 @@ use crate::{
             batch::{BatchConfig, BatchSettings},
             encoding::{EncodingConfig, EncodingConfiguration},
             retries::{RetryAction, RetryLogic},
-            Buffer, Compression, Concurrency, EncodedEvent, PartitionBatchSink, PartitionBuffer,
+            Buffer, Compression, EncodedEvent, PartitionBatchSink, PartitionBuffer,
             PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -32,6 +32,7 @@ use snafu::{ResultExt, Snafu};
 use std::{collections::HashMap, convert::TryFrom, task::Poll};
 use tower::{Service, ServiceBuilder};
 use uuid::Uuid;
+use vector_core::ByteSizeOf;
 
 const NAME: &str = "gcp_cloud_storage";
 const BASE_URL: &str = "https://storage.googleapis.com/";
@@ -126,7 +127,7 @@ enum Encoding {
 }
 
 impl Encoding {
-    fn content_type(self) -> &'static str {
+    const fn content_type(self) -> &'static str {
         match self {
             Self::Text => "text/plain",
             Self::Ndjson => "application/x-ndjson",
@@ -201,14 +202,13 @@ impl GcsSink {
 
     fn service(self, config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<VectorSink> {
         let request = config.request.unwrap_with(&TowerRequestConfig {
-            concurrency: Concurrency::Fixed(25),
             rate_limit_num: Some(1000),
             ..Default::default()
         });
         let encoding = config.encoding.clone();
 
         let batch = BatchSettings::default()
-            .bytes(bytesize::mib(10u64))
+            .bytes(10_000_000)
             .timeout(300)
             .parse_config(config.batch)?;
 
@@ -404,13 +404,14 @@ fn encode_event(
     let key = key_prefix
         .render_string(&event)
         .map_err(|error| {
-            emit!(TemplateRenderingFailed {
+            emit!(&TemplateRenderingFailed {
                 error,
                 field: Some("key_prefix"),
                 drop_event: true,
             });
         })
         .ok()?;
+    let byte_size = event.size_of();
     encoding.apply_rules(&mut event);
     let log = event.into_log();
     let bytes = match encoding.codec() {
@@ -430,10 +431,10 @@ fn encode_event(
         }
     };
 
-    Some(EncodedEvent::new(PartitionInnerBuffer::new(
-        bytes,
-        key.into(),
-    )))
+    Some(EncodedEvent::new(
+        PartitionInnerBuffer::new(bytes, key.into()),
+        byte_size,
+    ))
 }
 
 #[derive(Clone)]

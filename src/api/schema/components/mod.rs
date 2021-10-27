@@ -5,11 +5,11 @@ pub mod transform;
 
 use crate::{
     api::schema::{
-        components::state::component_by_component_id,
+        components::state::component_by_component_key,
         filter::{self, filter_items},
         relay, sort,
     },
-    config::ComponentId,
+    config::ComponentKey,
     config::Config,
     filter_check,
 };
@@ -40,15 +40,15 @@ pub enum ComponentKind {
 }
 
 impl Component {
-    fn get_component_id(&self) -> &ComponentId {
+    const fn get_component_key(&self) -> &ComponentKey {
         match self {
-            Component::Source(c) => &c.0.component_id,
-            Component::Transform(c) => &c.0.component_id,
-            Component::Sink(c) => &c.0.component_id,
+            Component::Source(c) => &c.0.component_key,
+            Component::Transform(c) => &c.0.component_key,
+            Component::Sink(c) => &c.0.component_key,
         }
     }
 
-    fn get_component_kind(&self) -> ComponentKind {
+    const fn get_component_kind(&self) -> ComponentKind {
         match self {
             Component::Source(_) => ComponentKind::Source,
             Component::Transform(_) => ComponentKind::Transform,
@@ -69,7 +69,7 @@ impl filter::CustomFilter<Component> for ComponentsFilter {
         filter_check!(
             self.component_id.as_ref().map(|f| f
                 .iter()
-                .all(|f| f.filter_value(component.get_component_id().as_str()))),
+                .all(|f| f.filter_value(&component.get_component_key().to_string()))),
             self.component_kind.as_ref().map(|f| f
                 .iter()
                 .all(|f| f.filter_value(component.get_component_kind())))
@@ -84,15 +84,15 @@ impl filter::CustomFilter<Component> for ComponentsFilter {
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 pub enum ComponentsSortFieldName {
-    ComponentId,
+    ComponentKey,
     ComponentKind,
 }
 
 impl sort::SortableByField<ComponentsSortFieldName> for Component {
     fn sort(&self, rhs: &Self, field: &ComponentsSortFieldName) -> cmp::Ordering {
         match field {
-            ComponentsSortFieldName::ComponentId => {
-                Ord::cmp(&self.get_component_id(), &rhs.get_component_id())
+            ComponentsSortFieldName::ComponentKey => {
+                Ord::cmp(&self.get_component_key(), &rhs.get_component_key())
             }
             ComponentsSortFieldName::ComponentKind => {
                 Ord::cmp(&self.get_component_kind(), &rhs.get_component_kind())
@@ -116,7 +116,7 @@ impl ComponentsQuery {
         filter: Option<ComponentsFilter>,
         sort: Option<Vec<sort::SortField<ComponentsSortFieldName>>>,
     ) -> relay::ConnectionResult<Component> {
-        let filter = filter.unwrap_or_else(ComponentsFilter::default);
+        let filter = filter.unwrap_or_default();
         let mut components = filter_items(state::get_components().into_iter(), &filter);
 
         if let Some(sort_fields) = sort {
@@ -141,7 +141,7 @@ impl ComponentsQuery {
         filter: Option<source::SourcesFilter>,
         sort: Option<Vec<sort::SortField<source::SourcesSortFieldName>>>,
     ) -> relay::ConnectionResult<source::Source> {
-        let filter = filter.unwrap_or_else(source::SourcesFilter::default);
+        let filter = filter.unwrap_or_default();
         let mut sources = filter_items(state::get_sources().into_iter(), &filter);
 
         if let Some(sort_fields) = sort {
@@ -166,7 +166,7 @@ impl ComponentsQuery {
         filter: Option<transform::TransformsFilter>,
         sort: Option<Vec<sort::SortField<transform::TransformsSortFieldName>>>,
     ) -> relay::ConnectionResult<transform::Transform> {
-        let filter = filter.unwrap_or_else(transform::TransformsFilter::default);
+        let filter = filter.unwrap_or_default();
         let mut transforms = filter_items(state::get_transforms().into_iter(), &filter);
 
         if let Some(sort_fields) = sort {
@@ -191,7 +191,7 @@ impl ComponentsQuery {
         filter: Option<sink::SinksFilter>,
         sort: Option<Vec<sort::SortField<sink::SinksSortFieldName>>>,
     ) -> relay::ConnectionResult<sink::Sink> {
-        let filter = filter.unwrap_or_else(sink::SinksFilter::default);
+        let filter = filter.unwrap_or_default();
         let mut sinks = filter_items(state::get_sinks().into_iter(), &filter);
 
         if let Some(sort_fields) = sort {
@@ -206,10 +206,10 @@ impl ComponentsQuery {
         .await
     }
 
-    /// Gets a configured component by component_id
-    async fn component_by_component_id(&self, component_id: String) -> Option<Component> {
-        let id = ComponentId::from(component_id);
-        component_by_component_id(&id)
+    /// Gets a configured component by component_key
+    async fn component_by_component_key(&self, component_id: String) -> Option<Component> {
+        let key = ComponentKey::global(&component_id);
+        component_by_component_key(&key)
     }
 }
 
@@ -253,11 +253,11 @@ pub fn update_config(config: &Config) {
     let mut new_components = HashMap::new();
 
     // Sources
-    for (component_id, source) in config.sources.iter() {
+    for (component_key, source) in config.sources.iter() {
         new_components.insert(
-            component_id.clone(),
+            component_key.clone(),
             Component::Source(source::Source(source::Data {
-                component_id: component_id.clone(),
+                component_key: component_key.clone(),
                 component_type: source.inner.source_type().to_string(),
                 output_type: source.inner.output_type(),
             })),
@@ -265,11 +265,11 @@ pub fn update_config(config: &Config) {
     }
 
     // Transforms
-    for (component_id, transform) in config.transforms.iter() {
+    for (component_key, transform) in config.transforms.iter() {
         new_components.insert(
-            component_id.clone(),
+            component_key.clone(),
             Component::Transform(transform::Transform(transform::Data {
-                component_id: component_id.clone(),
+                component_key: component_key.clone(),
                 component_type: transform.inner.transform_type().to_string(),
                 inputs: transform.inputs.clone(),
             })),
@@ -277,11 +277,11 @@ pub fn update_config(config: &Config) {
     }
 
     // Sinks
-    for (component_id, sink) in config.sinks.iter() {
+    for (component_key, sink) in config.sinks.iter() {
         new_components.insert(
-            component_id.clone(),
+            component_key.clone(),
             Component::Sink(sink::Sink(sink::Data {
-                component_id: component_id.clone(),
+                component_key: component_key.clone(),
                 component_type: sink.inner.sink_type().to_string(),
                 inputs: sink.inputs.clone(),
             })),
@@ -289,28 +289,28 @@ pub fn update_config(config: &Config) {
     }
 
     // Get the component_ids of existing components
-    let existing_component_ids = state::get_component_ids();
-    let new_component_ids = new_components
+    let existing_component_keys = state::get_component_keys();
+    let new_component_keys = new_components
         .iter()
-        .map(|(component_id, _)| component_id.clone())
-        .collect::<HashSet<ComponentId>>();
+        .map(|(component_key, _)| component_key.clone())
+        .collect::<HashSet<ComponentKey>>();
 
     // Publish all components that have been removed
-    existing_component_ids
-        .difference(&new_component_ids)
-        .for_each(|component_id| {
+    existing_component_keys
+        .difference(&new_component_keys)
+        .for_each(|component_key| {
             let _ = COMPONENT_CHANGED.send(ComponentChanged::Removed(
-                state::component_by_component_id(component_id)
-                    .expect("Couldn't get component by id"),
+                state::component_by_component_key(component_key)
+                    .expect("Couldn't get component by key"),
             ));
         });
 
     // Publish all components that have been added
-    new_component_ids
-        .difference(&existing_component_ids)
-        .for_each(|component_id| {
+    new_component_keys
+        .difference(&existing_component_keys)
+        .for_each(|component_key| {
             let _ = COMPONENT_CHANGED.send(ComponentChanged::Added(
-                new_components.get(component_id).unwrap().clone(),
+                new_components.get(component_key).unwrap().clone(),
             ));
         });
 
@@ -323,36 +323,36 @@ mod tests {
     use super::*;
     use crate::{
         api::schema::sort,
-        config::{ComponentId, DataType},
+        config::{ComponentKey, DataType, OutputId},
     };
 
     /// Generate component fixes for use with tests
     fn component_fixtures() -> Vec<Component> {
         vec![
             Component::Source(source::Source(source::Data {
-                component_id: ComponentId::from("gen1"),
+                component_key: ComponentKey::from("gen1"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
-                component_id: ComponentId::from("gen2"),
+                component_key: ComponentKey::from("gen2"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
-                component_id: ComponentId::from("gen3"),
+                component_key: ComponentKey::from("gen3"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Transform(transform::Transform(transform::Data {
-                component_id: ComponentId::from("parse_json"),
+                component_key: ComponentKey::from("parse_json"),
                 component_type: "json".to_string(),
-                inputs: vec![ComponentId::from("gen1"), ComponentId::from("gen2")],
+                inputs: vec![OutputId::from("gen1"), OutputId::from("gen2")],
             })),
             Component::Sink(sink::Sink(sink::Data {
-                component_id: ComponentId::from("devnull"),
+                component_key: ComponentKey::from("devnull"),
                 component_type: "blackhole".to_string(),
-                inputs: vec![ComponentId::from("gen3"), ComponentId::from("parse_json")],
+                inputs: vec![OutputId::from("gen3"), OutputId::from("parse_json")],
             })),
         ]
     }
@@ -442,7 +442,7 @@ mod tests {
     fn components_sort_asc() {
         let mut components = component_fixtures();
         let fields = vec![sort::SortField::<ComponentsSortFieldName> {
-            field: ComponentsSortFieldName::ComponentId,
+            field: ComponentsSortFieldName::ComponentKey,
             direction: sort::Direction::Asc,
         }];
         sort::by_fields(&mut components, &fields);
@@ -450,7 +450,7 @@ mod tests {
         let expectations = ["devnull", "gen1", "gen2", "gen3", "parse_json"];
 
         for (i, component_id) in expectations.iter().enumerate() {
-            assert_eq!(components[i].get_component_id().as_str(), *component_id);
+            assert_eq!(components[i].get_component_key().id(), *component_id);
         }
     }
 
@@ -458,7 +458,7 @@ mod tests {
     fn components_sort_desc() {
         let mut components = component_fixtures();
         let fields = vec![sort::SortField::<ComponentsSortFieldName> {
-            field: ComponentsSortFieldName::ComponentId,
+            field: ComponentsSortFieldName::ComponentKey,
             direction: sort::Direction::Desc,
         }];
         sort::by_fields(&mut components, &fields);
@@ -466,7 +466,7 @@ mod tests {
         let expectations = ["parse_json", "gen3", "gen2", "gen1", "devnull"];
 
         for (i, component_id) in expectations.iter().enumerate() {
-            assert_eq!(components[i].get_component_id().as_str(), *component_id);
+            assert_eq!(components[i].get_component_key().id(), *component_id);
         }
     }
 
@@ -474,37 +474,37 @@ mod tests {
     fn components_sort_multi() {
         let mut components = vec![
             Component::Sink(sink::Sink(sink::Data {
-                component_id: ComponentId::from("a"),
+                component_key: ComponentKey::from("a"),
                 component_type: "blackhole".to_string(),
-                inputs: vec![ComponentId::from("gen3"), ComponentId::from("parse_json")],
+                inputs: vec![OutputId::from("gen3"), OutputId::from("parse_json")],
             })),
             Component::Sink(sink::Sink(sink::Data {
-                component_id: ComponentId::from("b"),
+                component_key: ComponentKey::from("b"),
                 component_type: "blackhole".to_string(),
-                inputs: vec![ComponentId::from("gen3"), ComponentId::from("parse_json")],
+                inputs: vec![OutputId::from("gen3"), OutputId::from("parse_json")],
             })),
             Component::Transform(transform::Transform(transform::Data {
-                component_id: ComponentId::from("c"),
+                component_key: ComponentKey::from("c"),
                 component_type: "json".to_string(),
-                inputs: vec![ComponentId::from("gen1"), ComponentId::from("gen2")],
+                inputs: vec![OutputId::from("gen1"), OutputId::from("gen2")],
             })),
             Component::Source(source::Source(source::Data {
-                component_id: ComponentId::from("e"),
+                component_key: ComponentKey::from("e"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
-                component_id: ComponentId::from("d"),
+                component_key: ComponentKey::from("d"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
-                component_id: ComponentId::from("g"),
+                component_key: ComponentKey::from("g"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
-                component_id: ComponentId::from("f"),
+                component_key: ComponentKey::from("f"),
                 component_type: "generator".to_string(),
                 output_type: DataType::Metric,
             })),
@@ -516,7 +516,7 @@ mod tests {
                 direction: sort::Direction::Asc,
             },
             sort::SortField::<ComponentsSortFieldName> {
-                field: ComponentsSortFieldName::ComponentId,
+                field: ComponentsSortFieldName::ComponentKey,
                 direction: sort::Direction::Asc,
             },
         ];
@@ -524,7 +524,7 @@ mod tests {
 
         let expectations = ["d", "e", "f", "g", "c", "a", "b"];
         for (i, component_id) in expectations.iter().enumerate() {
-            assert_eq!(components[i].get_component_id().as_str(), *component_id);
+            assert_eq!(components[i].get_component_key().id(), *component_id);
         }
     }
 }

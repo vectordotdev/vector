@@ -1,10 +1,10 @@
-use super::util::{SocketListenAddr, TcpIsErrorFatal, TcpSource};
+use super::util::{SocketListenAddr, TcpError, TcpSource};
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
-    event::{Event, LogEvent, Value},
+    event::{Event, Value},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
     types,
@@ -12,6 +12,7 @@ use crate::{
 use bytes::{Buf, Bytes, BytesMut};
 use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
 use snafu::{ResultExt, Snafu};
 use std::{
     collections::{BTreeMap, VecDeque},
@@ -84,6 +85,7 @@ struct LogstashSource {
 
 impl TcpSource for LogstashSource {
     type Error = DecodeError;
+    type Item = LogstashEventFrame;
     type Decoder = LogstashDecoder;
 
     fn decoder(&self) -> Self::Decoder {
@@ -99,30 +101,25 @@ impl TcpSource for LogstashSource {
         Bytes::from(bytes)
     }
 
-    fn build_event(&self, frame: LogstashEventFrame, host: Bytes) -> Option<Event> {
-        let mut log = LogEvent::from(
-            frame
-                .fields
-                .into_iter()
-                .map(|(key, value)| (key, Value::from(value)))
-                .collect::<BTreeMap<_, _>>(),
-        );
-        if log.get(log_schema().host_key()).is_none() {
-            log.insert(log_schema().host_key(), host);
+    fn handle_events(&self, events: &mut [Event], host: Bytes, _byte_size: usize) {
+        let now = Value::from(chrono::Utc::now());
+        for event in events {
+            let log = event.as_mut_log();
+            log.try_insert(log_schema().source_type_key(), "logstash");
+            if log.get(log_schema().timestamp_key()).is_none() {
+                // Attempt to parse @timestamp if it exists; otherwise set to receipt time.
+                let timestamp = log
+                    .get_flat("@timestamp")
+                    .and_then(|timestamp| {
+                        self.timestamp_converter
+                            .convert::<Value>(timestamp.as_bytes())
+                            .ok()
+                    })
+                    .unwrap_or_else(|| now.clone());
+                log.insert(log_schema().timestamp_key(), timestamp);
+            }
+            log.try_insert(log_schema().host_key(), host.clone());
         }
-        if log.get(log_schema().timestamp_key()).is_none() {
-            // attempt to parse @timestamp if it exists; otherwise set to receipt time
-            let timestamp = log
-                .get("@timestamp")
-                .and_then(|timestamp| {
-                    self.timestamp_converter
-                        .convert::<Value>(timestamp.as_bytes())
-                        .ok()
-                })
-                .unwrap_or_else(|| Value::from(chrono::Utc::now()));
-            log.insert(log_schema().timestamp_key(), timestamp);
-        }
-        Some(Event::from(log))
     }
 }
 
@@ -131,7 +128,7 @@ enum LogstashDecoderReadState {
     ReadProtocol,
     ReadType(LogstashProtocolVersion),
     ReadFrame(LogstashProtocolVersion, LogstashFrameType),
-    PendingFrames(VecDeque<LogstashEventFrame>),
+    PendingFrames(VecDeque<(LogstashEventFrame, usize)>),
 }
 
 #[derive(Debug)]
@@ -140,7 +137,7 @@ struct LogstashDecoder {
 }
 
 impl LogstashDecoder {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             state: LogstashDecoderReadState::ReadProtocol,
         }
@@ -161,16 +158,16 @@ pub enum DecodeError {
     DecompressionFailed { source: io::Error },
 }
 
-impl TcpIsErrorFatal for DecodeError {
-    fn is_error_fatal(&self) -> bool {
+impl TcpError for DecodeError {
+    fn can_continue(&self) -> bool {
         use DecodeError::*;
 
         match self {
-            IO { .. } => true,
-            UnknownProtocolVersion { .. } => true,
-            UnknownFrameType { .. } => true,
-            JsonFrameFailedDecode { .. } => false,
-            DecompressionFailed { .. } => false,
+            IO { .. } => false,
+            UnknownProtocolVersion { .. } => false,
+            UnknownFrameType { .. } => false,
+            JsonFrameFailedDecode { .. } => true,
+            DecompressionFailed { .. } => true,
         }
     }
 }
@@ -267,7 +264,7 @@ struct LogstashEventFrame {
 // Based on spec at: https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md
 // And implementation from logstash: https://github.com/logstash-plugins/logstash-input-beats/blob/27bad62a26a81fc000a9d21495b8dc7174ab63e9/src/main/java/org/logstash/beats/BeatsParser.java
 impl Decoder for LogstashDecoder {
-    type Item = LogstashEventFrame;
+    type Item = (LogstashEventFrame, usize);
     type Error = DecodeError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
@@ -391,14 +388,18 @@ impl Decoder for LogstashDecoder {
                     }
 
                     let remaining = rest.remaining();
+                    let byte_size = src.remaining() - remaining;
 
-                    src.advance(src.remaining() - remaining);
+                    src.advance(byte_size);
 
-                    let frames = vec![LogstashEventFrame {
-                        protocol,
-                        sequence_number,
-                        fields,
-                    }]
+                    let frames = vec![(
+                        LogstashEventFrame {
+                            protocol,
+                            sequence_number,
+                            fields,
+                        },
+                        byte_size,
+                    )]
                     .into();
 
                     LogstashDecoderReadState::PendingFrames(frames)
@@ -424,16 +425,20 @@ impl Decoder for LogstashDecoder {
                         serde_json::from_slice(slice).context(JsonFrameFailedDecode {});
 
                     let remaining = rest.remaining();
+                    let byte_size = src.remaining() - remaining;
 
-                    src.advance(src.remaining() - remaining);
+                    src.advance(byte_size);
 
                     match fields_result {
                         Ok(fields) => {
-                            let frames = vec![LogstashEventFrame {
-                                protocol,
-                                sequence_number,
-                                fields,
-                            }]
+                            let frames = vec![(
+                                LogstashEventFrame {
+                                    protocol,
+                                    sequence_number,
+                                    fields,
+                                },
+                                byte_size,
+                            )]
                             .into();
 
                             LogstashDecoderReadState::PendingFrames(frames)
@@ -467,8 +472,9 @@ impl Decoder for LogstashDecoder {
                             .map(|_| BytesMut::from(&buf[..]));
 
                         let remaining = rest.remaining();
+                        let byte_size = src.remaining() - remaining;
 
-                        src.advance(src.remaining() - remaining);
+                        src.advance(byte_size);
 
                         res
                     }?;
@@ -485,6 +491,23 @@ impl Decoder for LogstashDecoder {
                 }
             };
         }
+    }
+}
+
+impl From<LogstashEventFrame> for Event {
+    fn from(frame: LogstashEventFrame) -> Self {
+        frame
+            .fields
+            .into_iter()
+            .map(|(key, value)| (key, Value::from(value)))
+            .collect::<BTreeMap<_, _>>()
+            .into()
+    }
+}
+
+impl From<LogstashEventFrame> for SmallVec<[Event; 1]> {
+    fn from(frame: LogstashEventFrame) -> Self {
+        smallvec![frame.into()]
     }
 }
 

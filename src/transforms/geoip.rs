@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{GeoipFieldDoesNotExist, GeoipIpAddressParseError},
     transforms::{FunctionTransform, Transform},
@@ -61,7 +61,7 @@ impl GenerateConfig for GeoipConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "geoip")]
 impl TransformConfig for GeoipConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> Result<Transform> {
         Ok(Transform::function(Geoip::new(
             self.database.clone(),
             self.source.clone(),
@@ -181,10 +181,10 @@ impl FunctionTransform for Geoip {
                     }
                 }
             } else {
-                emit!(GeoipIpAddressParseError { address: ipaddress });
+                emit!(&GeoipIpAddressParseError { address: ipaddress });
             }
         } else {
-            emit!(GeoipFieldDoesNotExist {
+            emit!(&GeoipFieldDoesNotExist {
                 field: &self.source
             });
         };

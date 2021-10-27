@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{LogfmtParserConversionFailed, LogfmtParserMissingField},
     transforms::{FunctionTransform, Transform},
@@ -28,12 +28,12 @@ impl_generate_config_from_default!(LogfmtConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "logfmt_parser")]
 impl TransformConfig for LogfmtConfig {
-    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
             .unwrap_or_else(|| crate::config::log_schema().message_key().into());
-        let timezone = self.timezone.unwrap_or(globals.timezone);
+        let timezone = self.timezone.unwrap_or(context.globals.timezone);
         let conversions = parse_conversion_map(&self.types, timezone)?;
 
         Ok(Transform::function(Logfmt {
@@ -85,7 +85,7 @@ impl FunctionTransform for Logfmt {
                             event.as_mut_log().insert(key, value);
                         }
                         Err(error) => {
-                            emit!(LogfmtParserConversionFailed {
+                            emit!(&LogfmtParserConversionFailed {
                                 name: key.as_ref(),
                                 error
                             });
@@ -100,7 +100,7 @@ impl FunctionTransform for Logfmt {
                 event.as_mut_log().remove(&self.field);
             }
         } else {
-            emit!(LogfmtParserMissingField { field: &self.field });
+            emit!(&LogfmtParserMissingField { field: &self.field });
         };
 
         output.push(event);
@@ -111,7 +111,7 @@ impl FunctionTransform for Logfmt {
 mod tests {
     use super::LogfmtConfig;
     use crate::{
-        config::{GlobalOptions, TransformConfig},
+        config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
     };
 
@@ -130,7 +130,7 @@ mod tests {
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
             timezone: Default::default(),
         }
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
         let parser = parser.as_function();

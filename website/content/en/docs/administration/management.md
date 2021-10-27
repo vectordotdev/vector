@@ -21,16 +21,20 @@ To manage the Vector executable directly, without a process manager:
 
 {{< tabs default="Start" >}}
 {{< tab title="Start" >}}
+
 ```bash
 vector --config /etc/vector/vector.toml
 
 # Or supply a JSON or YAML config file
 ```
+
 {{< /tab >}}
 {{< tab title="Reload" >}}
+
 ```bash
 killall -s SIGHUP vector
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 
@@ -42,24 +46,32 @@ If you've installed Vector using [APT], [dpkg], [RPM], or [YUM], you can manage 
 
 {{< tabs default="Start" >}}
 {{< tab title="Start" >}}
+
 ```bash
 sudo systemctl start vector
 ```
+
 {{< /tab >}}
 {{< tab title="Stop" >}}
+
 ```bash
 sudo systemctl stop vector
 ```
+
 {{< /tab >}}
 {{< tab title="Reload" >}}
+
 ```bash
 systemctl kill -s HUP --kill-who=main vector.service
 ```
+
 {{< /tab >}}
 {{< tab title="Restart" >}}
+
 ```bash
 sudo systemctl restart vector
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 
@@ -79,24 +91,32 @@ If you've installed Vector using [Homebrew], you can manage it using Homebrew's 
 
 {{< tabs default="Start" >}}
 {{< tab title="Start" >}}
+
 ```bash
 brew services start vector
 ```
+
 {{< /tab >}}
 {{< tab title="Stop" >}}
+
 ```bash
 brew services stop vector
 ```
+
 {{< /tab >}}
 {{< tab title="Reload" >}}
+
 ```bash
 killall -S SIGHUP vector
 ```
+
 {{< /tab >}}
 {{< tab title="Restart" >}}
+
 ```bash
 brew services restart vector
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 
@@ -106,12 +126,14 @@ If you're running Vector on Windows (perhaps you installed it using [MSI]), you 
 
 {{< tabs default="Start" >}}
 {{< tab title="Start" >}}
+
 ```powershell
 C:\Program Files\Vector\bin\vector \
   --config C:\Program Files\Vector\config\vector.toml
 
 # Or supply a JSON or YAML config file
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 
@@ -121,28 +143,36 @@ If you're running Vector using [Docker], the command interface is the same acros
 
 {{< tabs default="Start" >}}
 {{< tab title="Start" >}}
+
 ```bash
 docker run \
   -d \
   -v ~/vector.toml:/etc/vector/vector.toml:ro \
   -p 8686:8686 \
-  timberio/vector:0.13.1-alpine
+  timberio/vector:{{< version >}}-alpine
 ```
+
 {{< /tab >}}
 {{< tab title="Stop" >}}
+
 ```bash
 docker stop timberio/vector
 ```
+
 {{< /tab >}}
 {{< tab title="Reload" >}}
+
 ```bash
 docker kill --signal=HUP timberio/vector
 ```
+
 {{< /tab >}}
 {{< tab title="Restart" >}}
+
 ```bash
 docker restart -f $(docker ps -aqf "name=vector")
 ```
+
 {{< /tab >}}
 {{< /tabs >}}
 
@@ -163,11 +193,20 @@ To get Vector running on [Kubernetes] using the [Helm] package manager:
 
 Once Vector is running in Kubernetes, you can manage it using [kubectl]:
 
-{{< tabs default="Restart" >}}
-{{< tab title="Restart" >}}
+{{< tabs default="Restart Agent" >}}
+{{< tab title="Restart Agent" >}}
+
 ```shell
 kubectl rollout restart --namespace vector daemonset/vector-agent
 ```
+
+{{< /tab >}}
+{{< tab title="Restart Aggregator" >}}
+
+```shell
+kubectl rollout restart --namespace vector statefulset/vector-aggregator
+```
+
 {{< /tab >}}
 {{< /tabs >}}
 

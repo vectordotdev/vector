@@ -1,10 +1,16 @@
 use buffers::bytes::{DecodeBytes, EncodeBytes};
 use buffers::{self, Variant};
 use bytes::{Buf, BufMut};
+use core_common::byte_size_of::ByteSizeOf;
 use futures::task::{noop_waker, Context, Poll};
 use futures::{Sink, Stream};
+use metrics_tracing_context::{MetricsLayer, TracingContextLayer};
+use metrics_util::layers::Layer;
+use metrics_util::DebuggingRecorder;
 use std::fmt;
 use std::pin::Pin;
+use tracing::Span;
+use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 
 #[derive(Clone, Copy)]
 pub struct Message<const N: usize> {
@@ -18,6 +24,12 @@ impl<const N: usize> Message<N> {
             id,
             _padding: [0; N],
         }
+    }
+}
+
+impl<const N: usize> ByteSizeOf for Message<N> {
+    fn allocated_bytes(&self) -> usize {
+        0
     }
 }
 
@@ -81,7 +93,7 @@ pub fn setup<const N: usize>(
         messages.push(Message::new(i as u64));
     }
 
-    let (tx, rx, _) = buffers::build::<Message<N>>(variant).unwrap();
+    let (tx, rx, _) = buffers::build::<Message<N>>(variant, Span::none()).unwrap();
     (Pin::new(tx.get()), Box::pin(rx), messages)
 }
 
@@ -107,6 +119,16 @@ fn consume<T>(mut stream: Pin<&mut (dyn Stream<Item = T> + Unpin + Send)>, conte
     while let Poll::Ready(Some(_)) = stream.as_mut().poll_next(context) {}
 }
 
+pub fn init_instrumentation() {
+    if metrics::try_recorder().is_none() {
+        let subscriber = tracing_subscriber::Registry::default().with(MetricsLayer::new());
+        tracing::subscriber::set_global_default(subscriber).unwrap();
+
+        let recorder = TracingContextLayer::all().layer(DebuggingRecorder::new());
+        metrics::set_boxed_recorder(Box::new(recorder)).unwrap();
+    }
+}
+
 //
 // Measurements
 //
@@ -114,9 +136,7 @@ fn consume<T>(mut stream: Pin<&mut (dyn Stream<Item = T> + Unpin + Send)>, conte
 // behind an abstract interface. As a happy consequence of this our benchmark
 // measurements are common. "Write Then Read" writes all messages into the
 // buffer and then reads them out. "Write And Read" writes a message and then
-// reads it from the buffer. Measurement is done without a runtime avoiding
-// conflating the overhead of the runtime with our buffer code. This,
-// admittedly, is tough to read.
+// reads it from the buffer.
 //
 
 #[allow(clippy::type_complexity)]

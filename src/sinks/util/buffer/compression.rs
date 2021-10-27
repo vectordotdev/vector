@@ -2,32 +2,35 @@ use serde::{de, ser};
 use serde_json::Value;
 use std::fmt;
 
-pub const GZIP_NONE: usize = 0;
-pub const GZIP_FAST: usize = 1;
-pub const GZIP_DEFAULT: usize = 6;
-pub const GZIP_BEST: usize = 9;
+pub const GZIP_NONE: u32 = 0;
+pub const GZIP_FAST: u32 = 1;
+pub const GZIP_DEFAULT: u32 = 6;
+pub const GZIP_BEST: u32 = 9;
 
 #[derive(Debug, Derivative, Copy, Clone, Eq, PartialEq)]
 #[derivative(Default)]
 pub enum Compression {
     #[derivative(Default)]
     None,
-    Gzip(Option<usize>),
+    Gzip(flate2::Compression),
 }
 
 impl Compression {
     pub const fn gzip_default() -> Compression {
-        Compression::Gzip(None)
+        // flate2 doesn't have a const `default` fn, since it actually implements the `Default`
+        // trait, and it doesn't have a constant for what the "default" level should be, so we
+        // hard-code it here.
+        Compression::Gzip(flate2::Compression::new(6))
     }
 
-    pub fn content_encoding(&self) -> Option<&'static str> {
+    pub const fn content_encoding(&self) -> Option<&'static str> {
         match self {
             Self::None => None,
             Self::Gzip(_) => Some("gzip"),
         }
     }
 
-    pub fn extension(&self) -> &'static str {
+    pub const fn extension(&self) -> &'static str {
         match self {
             Self::None => "log",
             Self::Gzip(_) => "log.gz",
@@ -38,7 +41,7 @@ impl fmt::Display for Compression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Compression::None => write!(f, "none"),
-            Compression::Gzip(ref level) => write!(f, "gzip({})", level.unwrap_or(GZIP_DEFAULT)),
+            Compression::Gzip(ref level) => write!(f, "gzip({})", level.level()),
         }
     }
 }
@@ -49,8 +52,7 @@ impl From<Compression> for rusoto_core::encoding::ContentEncoding {
         match compression {
             Compression::None => rusoto_core::encoding::ContentEncoding::Identity,
             Compression::Gzip(level) => {
-                let level = level.unwrap_or(GZIP_DEFAULT);
-                rusoto_core::encoding::ContentEncoding::Gzip(None, level as u32)
+                rusoto_core::encoding::ContentEncoding::Gzip(None, level.level())
             }
         }
     }
@@ -105,7 +107,9 @@ impl<'de> de::Deserialize<'de> for Compression {
                             }
                             level = Some(match map.next_value::<Value>()? {
                                 Value::Number(level) => match level.as_u64() {
-                                    Some(value) if value <= 9 => value as usize,
+                                    Some(value) if value <= 9 => {
+                                        flate2::Compression::new(value as u32)
+                                    }
                                     Some(_) | None => {
                                         return Err(de::Error::invalid_value(
                                             de::Unexpected::Other(&level.to_string()),
@@ -114,10 +118,10 @@ impl<'de> de::Deserialize<'de> for Compression {
                                     }
                                 },
                                 Value::String(level) => match level.as_str() {
-                                    "none" => GZIP_NONE,
-                                    "fast" => GZIP_FAST,
-                                    "default" => GZIP_DEFAULT,
-                                    "best" => GZIP_BEST,
+                                    "none" => flate2::Compression::none(),
+                                    "fast" => flate2::Compression::fast(),
+                                    "default" => flate2::Compression::default(),
+                                    "best" => flate2::Compression::best(),
                                     level => {
                                         return Err(de::Error::invalid_value(
                                             de::Unexpected::Str(level),
@@ -142,7 +146,7 @@ impl<'de> de::Deserialize<'de> for Compression {
                         Some(_) => Err(de::Error::unknown_field("level", &[])),
                         None => Ok(Compression::None),
                     },
-                    "gzip" => Ok(Compression::Gzip(level)),
+                    "gzip" => Ok(Compression::Gzip(level.unwrap_or_default())),
                     algorithm => Err(de::Error::unknown_variant(algorithm, &["none", "gzip"])),
                 }
             }
@@ -164,10 +168,12 @@ impl ser::Serialize for Compression {
             Compression::None => map.serialize_entry("algorithm", "none")?,
             Compression::Gzip(level) => {
                 map.serialize_entry("algorithm", "gzip")?;
-                match level.unwrap_or(GZIP_DEFAULT) {
+                match level.level() {
                     GZIP_NONE => map.serialize_entry("level", "none")?,
                     GZIP_FAST => map.serialize_entry("level", "fast")?,
-                    GZIP_DEFAULT => map.serialize_entry("level", "default")?,
+                    // Don't serialize if at default level, we already utilize that when
+                    // deserializing and it just clutters the resulting JSON.
+                    GZIP_DEFAULT => {}
                     GZIP_BEST => map.serialize_entry("level", "best")?,
                     level => map.serialize_entry("level", &level)?,
                 };
@@ -186,14 +192,17 @@ mod test {
         let fixtures_valid = [
             (r#""none""#, Compression::None),
             (r#"{"algorithm": "none"}"#, Compression::None),
-            (r#"{"algorithm": "gzip"}"#, Compression::Gzip(None)),
+            (
+                r#"{"algorithm": "gzip"}"#,
+                Compression::Gzip(flate2::Compression::default()),
+            ),
             (
                 r#"{"algorithm": "gzip", "level": "best"}"#,
-                Compression::Gzip(Some(9)),
+                Compression::Gzip(flate2::Compression::best()),
             ),
             (
                 r#"{"algorithm": "gzip", "level": 8}"#,
-                Compression::Gzip(Some(8)),
+                Compression::Gzip(flate2::Compression::new(8)),
             ),
         ];
         for (sources, result) in fixtures_valid.iter() {

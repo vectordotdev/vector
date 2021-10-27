@@ -4,7 +4,7 @@ use super::controller::ControllerStatistics;
 use crate::{
     config::{self, DataType, SinkConfig, SinkContext},
     event::{metric::MetricValue, Event},
-    metrics::{self, capture_metrics, get_controller},
+    metrics::{self},
     sinks::{
         util::{
             retries::RetryLogic, sink, BatchSettings, Concurrency, EncodedEvent, EncodedLength,
@@ -28,6 +28,7 @@ use rand::{thread_rng, Rng};
 use rand_distr::Exp1;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use std::pin::Pin;
 use std::{
     collections::{HashMap, VecDeque},
     fmt,
@@ -82,16 +83,17 @@ impl LimitParams {
     }
 
     fn scale(&self, level: usize) -> f64 {
-        (level - 1) as f64 * self.scale
-            + self
-                .knee_start
+        ((level - 1) as f64).mul_add(
+            self.scale,
+            self.knee_start
                 .map(|knee| {
                     self.knee_exp
                         .unwrap_or_else(|| self.scale + 1.0)
                         .powf(level.saturating_sub(knee) as f64)
                         - 1.0
                 })
-                .unwrap_or(0.0)
+                .unwrap_or(0.0),
+        )
     }
 }
 
@@ -101,7 +103,8 @@ struct TestParams {
     requests: usize,
 
     // The time interval between requests.
-    interval: Option<f64>,
+    #[serde(default = "default_interval")]
+    interval: f64,
 
     // The delay is the base time every request takes return.
     delay: f64,
@@ -123,7 +126,11 @@ struct TestParams {
     concurrency: Concurrency,
 }
 
-fn default_concurrency() -> Concurrency {
+const fn default_interval() -> f64 {
+    0.0
+}
+
+const fn default_concurrency() -> Concurrency {
     Concurrency::Adaptive
 }
 
@@ -157,17 +164,13 @@ impl SinkConfig for TestConfig {
                 cx.acker(),
                 sink::StdServiceLogic::default(),
             )
-            .with_flat_map(|event| stream::iter(Some(Ok(EncodedEvent::new(event)))))
+            .with_flat_map(|event| stream::iter(Some(Ok(EncodedEvent::new(event, 0)))))
             .sink_map_err(|error| panic!("Fatal test sink error: {}", error));
         let healthcheck = future::ok(()).boxed();
 
         // Dig deep to get at the internal controller statistics
         let stats = Arc::clone(
-            &sink
-                .get_ref()
-                .get_ref()
-                .get_ref()
-                .get_ref()
+            &Pin::new(&sink.get_ref().get_ref().get_ref().get_ref())
                 .get_ref()
                 .controller
                 .stats,
@@ -206,10 +209,11 @@ impl TestSink {
 
     fn delay_at(&self, in_flight: usize, rate: usize) -> f64 {
         self.params.delay
-            * (1.0
-                + self.params.concurrency_limit_params.scale(in_flight)
-                + self.params.rate.scale(rate)
-                + thread_rng().sample::<f64, _>(Exp1) * self.params.jitter)
+            * thread_rng().sample::<f64, _>(Exp1).mul_add(
+                self.params.jitter,
+                1.0 + self.params.concurrency_limit_params.scale(in_flight)
+                    + self.params.rate.scale(rate),
+            )
     }
 }
 
@@ -384,7 +388,7 @@ struct TestResults {
 }
 
 async fn run_test(params: TestParams) -> TestResults {
-    let _ = metrics::init();
+    let _ = metrics::init_test();
     let (send_done, is_done) = oneshot::channel();
 
     let test_config = TestConfig {
@@ -410,7 +414,7 @@ async fn run_test(params: TestParams) -> TestResults {
 
     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
-    let controller = get_controller().unwrap();
+    let controller = metrics::Controller::get().unwrap();
 
     is_done.await.expect("Test failed to complete");
     topology.stop().await;
@@ -430,7 +434,8 @@ async fn run_test(params: TestParams) -> TestResults {
         .into_inner()
         .expect("Failed to unwrap controller_stats Mutex");
 
-    let metrics = capture_metrics(controller)
+    let metrics = controller
+        .capture_metrics()
         .map(|metric| (metric.name().to_string(), metric))
         .collect::<HashMap<_, _>>();
     // Ensure basic statistics are captured, don't actually examine them

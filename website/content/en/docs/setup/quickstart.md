@@ -15,7 +15,7 @@ In this quickstart guide, we walk you through using Vector for the first time. W
 We can install Vector using this installation script:
 
 ```shell
-curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash
 ```
 
 Or you can [choose your preferred installation method][install].
@@ -50,7 +50,7 @@ Each component has a unique id and is prefixed with the type of the component, f
 
 Our second component, `sinks.out`, uses [`console` sink][console], which tells Vector to print the data to stdout, while the `encoding.codec` option tells Vector to print data as plain text (unencoded).
 
-The `inputs` option the `sinks.out` component tells Vector where this sink's events are coming from. In our case, events are received from our other component, the source with ID `in`.
+The `inputs` option of the `sinks.out` component tells Vector where this sink's events are coming from. In our case, events are received from our other component, the source with ID `in`.
 
 ## Hello world!
 
@@ -64,7 +64,7 @@ The `echo` statement sends a single log to Vector via stdin. The `vector...` com
 
 The event we've just sent is received by our `sources.in` component, then sent onto the `sinks.out` component, which in turn echoes it back to the console:
 
-```
+```shell
 ... some logs ...
 Hello World!
 ```
@@ -120,6 +120,7 @@ Lastly, we've updated the ID of our sink component to `emit_syslog`, updated the
 
 Let's re-run Vector. This time we don't need to echo any data to it; just run in on the command line. It'll process
 100 lines of generated Syslog data, emit the processed data as JSON, and exit:
+
 ```shell
 vector --config ./vector.toml
 ```

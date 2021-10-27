@@ -30,6 +30,7 @@ use std::{
 };
 use tower::Service;
 use tracing_futures::Instrument;
+use vector_core::ByteSizeOf;
 
 #[derive(Clone)]
 pub struct KinesisService {
@@ -198,7 +199,7 @@ impl Service<Vec<PutRecordsRequestEntry>> for KinesisService {
                 .put_records(request)
                 .inspect_ok(|_| {
                     for byte_size in sizes {
-                        emit!(AwsKinesisStreamsEventSent { byte_size });
+                        emit!(&AwsKinesisStreamsEventSent { byte_size });
                     }
                 })
                 .instrument(info_span!("request"))
@@ -287,6 +288,7 @@ fn encode_event(
         partition_key
     };
 
+    let byte_size = event.size_of();
     encoding.apply_rules(&mut event);
 
     let log = event.into_log();
@@ -298,11 +300,14 @@ fn encode_event(
             .unwrap_or_default(),
     };
 
-    Some(EncodedEvent::new(PutRecordsRequestEntry {
-        data: Bytes::from(data),
-        partition_key,
-        ..Default::default()
-    }))
+    Some(EncodedEvent::new(
+        PutRecordsRequestEntry {
+            data: Bytes::from(data),
+            partition_key,
+            ..Default::default()
+        },
+        byte_size,
+    ))
 }
 
 fn gen_partition_key() -> String {

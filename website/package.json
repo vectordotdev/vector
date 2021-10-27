@@ -4,7 +4,8 @@
     "algolia-config": "algolia setsettings -a $ALGOLIA_APP_ID -k $ALGOLIA_ADMIN_KEY -n $ALGOLIA_INDEX_NAME -s algolia.json",
     "algolia-index": "ts-node scripts/algolia-index.ts",
     "algolia-upload": "atomic-algolia",
-    "config-examples": "node scripts/create-config-examples.js"
+    "config-examples": "node scripts/create-config-examples.js",
+    "lighthouse": "lighthouse --output html --output-path ./reports/lighthouse.html --view https://vector.dev"
   },
   "dependencies": {
     "@algolia/autocomplete-js": "^1.2.1",
@@ -14,6 +15,8 @@
     "@babel/core": "^7.14.6",
     "@babel/preset-env": "^7.14.5",
     "@babel/preset-typescript": "^7.14.5",
+    "@datadog/browser-logs": "^3.1.3",
+    "@datadog/browser-rum": "^3.1.2",
     "@emotion/babel-preset-css-prop": "^11.2.0",
     "@fullhuman/postcss-purgecss": "^4.0.3",
     "@iarna/toml": "^2.2.5",
@@ -60,5 +63,8 @@
   },
   "browserslist": [
     "since 2017-06"
-  ]
+  ],
+  "devDependencies": {
+    "@netlify/plugin-lighthouse": "^2.1.2"
+  }
 }

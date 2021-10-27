@@ -8,7 +8,7 @@
 {{ $styles := dict "red" $red "blue" $blue "yellow" $yellow "gray" $gray "green" $green "indigo" $indigo "violet" $violet }}
 {{ $color := index $styles .color }}
 {{ with .href }}<a href="{{ . }}">{{ end }}
-<span{{ with .show }} x-show="{{ . }}"{{ end }} class="{{ if .inline }}inline-{{ end }}flex items-center py-0.5 font-medium{{ if .large }} text-sm px-3{{ else }} text-xs px-2{{ end }} {{ if .rounded }} rounded-full{{ else }} rounded{{ end }} {{ $color }}">
+<span{{ with .show }} x-show="{{ . }}"{{ end }} class="{{ if .inline }}inline-{{ end }}flex items-center py-1 font-medium{{ if .large }} text-sm px-3{{ else }} text-xs px-2{{ end }} {{ if .rounded }} rounded-full{{ else }} rounded{{ end }} {{ $color }}">
   {{ if .prefix }}
   {{ .prefix }}:&nbsp;<span class="font-bold">{{- .word -}}</span>
   {{ else }}

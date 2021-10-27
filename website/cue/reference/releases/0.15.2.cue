@@ -12,7 +12,7 @@ releases: "0.15.2": {
 
 		In v0.15.0, we released a change the SystemD unit file to run `vector validate` before start-up as part of
 		`ExecStartPre`. If users were using, for example, `VECTOR_CONFIG` in `/etc/default/vector` to pass the
-		configuartion location, this would result in Vector failing to boot.
+		configuration location, this would result in Vector failing to boot.
 
 		See the release notes for 0.15.0 for additional changes if upgrading from 0.14.X.
 		"""

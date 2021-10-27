@@ -21,22 +21,34 @@ pub(self) fn instant_now() -> std::time::Instant {
 // The defaults for these values were chosen after running several
 // simulations on a test service that had various responses to load. The
 // values are the best balances found between competing outcomes.
-#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
-#[derivative(Default)]
-#[serde(default)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct AdaptiveConcurrencySettings {
     // This value maintained high concurrency without holding it too
     // high under adverse conditions.
-    #[derivative(Default(value = "0.9"))]
     pub(super) decrease_ratio: f64,
 
     // This value achieved the best balance between quick response and
     // stability.
-    #[derivative(Default(value = "0.7"))]
     pub(super) ewma_alpha: f64,
 
     // This value avoided changing concurrency too aggressively when
     // there is fluctuation in the RTT measurements.
-    #[derivative(Default(value = "0.05"))]
-    pub(super) rtt_threshold_ratio: f64,
+    pub(super) rtt_deviation_scale: f64,
+}
+
+impl AdaptiveConcurrencySettings {
+    pub const fn const_default() -> Self {
+        Self {
+            decrease_ratio: 0.9,
+            ewma_alpha: 0.4,
+            rtt_deviation_scale: 2.5,
+        }
+    }
+}
+
+impl Default for AdaptiveConcurrencySettings {
+    fn default() -> Self {
+        AdaptiveConcurrencySettings::const_default()
+    }
 }

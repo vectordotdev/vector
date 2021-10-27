@@ -152,8 +152,8 @@ impl From<&NatsSinkConfig> for NatsOptions {
 
 #[async_trait]
 impl StreamSink for NatsSink {
-    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let nats_options: async_nats::Options = self.options.clone().into();
+    async fn run(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let nats_options: async_nats::Options = self.options.into();
 
         let nc = nats_options.connect(&self.url).await.map_err(|_| ())?;
 
@@ -161,7 +161,7 @@ impl StreamSink for NatsSink {
             let subject = match self.subject.render_string(&event) {
                 Ok(subject) => subject,
                 Err(error) => {
-                    emit!(TemplateRenderingFailed {
+                    emit!(&TemplateRenderingFailed {
                         error,
                         field: Some("subject"),
                         drop_event: true,
@@ -176,12 +176,12 @@ impl StreamSink for NatsSink {
 
             match nc.publish(&subject, log).await {
                 Ok(_) => {
-                    emit!(NatsEventSendSuccess {
+                    emit!(&NatsEventSendSuccess {
                         byte_size: message_len,
                     });
                 }
                 Err(error) => {
-                    emit!(NatsEventSendFail { error });
+                    emit!(&NatsEventSendFail { error });
                 }
             }
 
@@ -270,7 +270,7 @@ mod integration_tests {
 
         // Publish events.
         let (acker, ack_counter) = Acker::new_for_testing();
-        let mut sink = NatsSink::new(cnf.clone(), acker).unwrap();
+        let sink = Box::new(NatsSink::new(cnf.clone(), acker).unwrap());
         let num_events = 1_000;
         let (input, events) = random_lines_with_stream(100, num_events, None);
 

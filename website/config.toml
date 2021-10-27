@@ -35,6 +35,7 @@ alpine_js_version = "2.8.2"
 ionicons_version = "5.4.0"
 site_logo = "img/vector-open-graph.png"
 favicon = "favicon.ico"
+display_banner = false # Whether to display the top banner in layouts/partials/banner.html
 
 # Update this every time there's a new "generation" of the site. Incrementing this forces the browser to refresh any
 # state persisted in localStorage. You should do that whenever there's some change in the front-end logic that requires
@@ -52,6 +53,8 @@ algolia_index_prod = "vector_docs_prod"
 algolia_index_staging = "vector_docs_staging"
 algolia_autocomplete_theme = "classic"
 
+# VRL JSON server
+
 # Generated _redirects file for Netlify
 [mediaTypes."text/netlify"]
 delimiter = ""
@@ -62,7 +65,7 @@ baseName = "_redirects"
 
 # Outputs (including search.json and _redirects files)
 [outputs]
-home = ["HTML", "RSS", "REDIRECTS"]
+home = ["HTML", "JSON", "RSS", "REDIRECTS"]
 
 # CSS generation
 [[params.css]]
@@ -82,8 +85,14 @@ home_page_only = true
 
 [params.social]
 twitter_handle = "vectordotdev"
-github_repo = "timberio/vector"
+github_repo = "vectordotdev/vector"
 discord = "https://chat.vector.dev"
+
+# Datadog configuration
+[params.datadog_config]
+application_id = "0b95923b-b06d-445b-893f-a861e93d6ea3"
+client_token = "puba5f23a97d613091ae2ca8c0f4a135af4"
+service_name = "vector"
 
 ## Menus
 
@@ -110,7 +119,6 @@ weight = 3
 [[languages.en.menus.navbar]]
 name = "Docs"
 url = "/docs"
-params = { flyout = true }
 weight = 1
 
 [[languages.en.menus.navbar]]
@@ -213,7 +221,7 @@ weight = 4
 
 [[languages.en.menus.footer]]
 name = "GitHub"
-url = "https://github.com/timberio/vector"
+url = "https://github.com/vectordotdev/vector"
 parent = "community"
 weight = 1
 
@@ -232,24 +240,29 @@ weight = 3
 # Extra links under the "Meta" section in the docs
 [[languages.en.menus.meta]]
 name = "Privacy"
-url = "https://github.com/timberio/vector/blob/master/PRIVACY.md"
+url = "https://github.com/vectordotdev/vector/blob/master/PRIVACY.md"
 weight = 1
 
 [[languages.en.menus.meta]]
-name = "Release"
-url = "https://github.com/timberio/vector/blob/master/RELEASING.md"
+name = "Security"
+url = "https://github.com/vectordotdev/vector/security/policy"
 weight = 2
 
 [[languages.en.menus.meta]]
-name = "Security"
-url = "https://github.com/timberio/vector/security/policy"
+name = "Releases"
+url = "https://github.com/vectordotdev/vector/blob/master/RELEASES.md"
 weight = 3
+
+[[languages.en.menus.meta]]
+name = "Versioning"
+url = "https://github.com/vectordotdev/vector/blob/master/VERSIONING.md"
+weight = 4
 
 # Buttons in "community" section on main page
 [[languages.en.menus.community]]
 name = "View GitHub repo"
 params = { color = "black", dark = "white", icon = "github" }
-url = "https://github.com/timberio/vector"
+url = "https://github.com/vectordotdev/vector"
 weight = 1
 
 [[languages.en.menus.community]]
@@ -269,7 +282,7 @@ weight = 1
 [[languages.en.menus.comms]]
 name = "GitHub"
 params = { color = "black", dark = "white", icon = "github" }
-url = "https://github.com/timberio/vector"
+url = "https://github.com/vectordotdev/vector"
 weight = 2
 
 [[languages.en.menus.comms]]
@@ -287,99 +300,10 @@ weight = 4
 # Links in subfooter
 [[languages.en.menus.subfooter]]
 name = "Security policy"
-url = "https://github.com/timberio/vector/blob/master/PRIVACY.md"
+url = "https://github.com/vectordotdev/vector/blob/master/PRIVACY.md"
 weight = 1
 
 [[languages.en.menus.subfooter]]
 name = "Privacy policy"
-url = "https://github.com/timberio/vector/blob/master/PRIVACY.md"
+url = "https://github.com/vectordotdev/vector/blob/master/PRIVACY.md"
 weight = 2
-
-[[languages.en.menus.flyout]]
-name = "Documentation"
-identifier = "docs"
-url = "/docs"
-weight = 1
-
-[[languages.en.menus.flyout]]
-name = "Quickstart"
-parent = "docs"
-url = "/docs/setup/quickstart"
-weight = 1
-
-[[languages.en.menus.flyout]]
-name = "Components"
-identifier = "components"
-url = "/components"
-weight = 2
-
-[[languages.en.menus.flyout]]
-name = "Sources"
-parent = "components"
-url = "/docs/reference/configuration/sources"
-weight = 1
-
-[[languages.en.menus.flyout]]
-name = "Transforms"
-parent = "components"
-url = "/docs/reference/configuration/transforms"
-weight = 2
-
-[[languages.en.menus.flyout]]
-name = "Sinks"
-parent = "components"
-url = "/docs/reference/configuration/sinks"
-weight = 3
-
-[[languages.en.menus.flyout]]
-name = "Vector Remap Language"
-identifier = "vrl"
-url = "/docs/reference/vrl"
-weight = 3
-
-[[languages.en.menus.flyout]]
-name = "Functions"
-parent = "vrl"
-url = "/docs/reference/vrl/functions"
-weight = 1
-
-[[languages.en.menus.flyout]]
-name = "Errors"
-parent = "vrl"
-url = "/docs/reference/vrl/errors"
-weight = 2
-
-[[languages.en.menus.flyout]]
-name = "Examples"
-parent = "vrl"
-url = "/docs/reference/vrl/examples"
-weight = 3
-
-[[languages.en.menus.flyout]]
-name = "Expressions"
-parent = "vrl"
-url = "/docs/reference/vrl/expressions"
-weight = 4
-
-[[languages.en.enus.flyout]]
-name = "Pages"
-identifier = "pages"
-weight = 4
-
-[[languages.en.menus.flyout]]
-name = "Download"
-parent = "pages"
-url = "/download"
-weight = 1
-
-[[languages.en.menus.flyout]]
-name = "Releases"
-parent = "pages"
-url = "/releases"
-weight = 2
-
-[[languages.en.menus.flyout]]
-name = "Highlights"
-parent = "pages"
-url = "/highlights"
-weight = 3

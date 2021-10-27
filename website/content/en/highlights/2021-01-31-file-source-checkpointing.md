@@ -28,8 +28,8 @@ quite confusing. To resolve this, [PR 6178][pr_6178] deprecated the `start_at_be
 
 Adjust as necessary. The above values are the defaults and are not required to be specified.
 
-[conditions]: https://github.com/timberio/vector/issues/1020
+[conditions]: https://github.com/vectordotdev/vector/issues/1020
 [file_source]: /docs/reference/configuration/sources/file/
 [ignore_checkpoints]: /docs/reference/configuration/sources/file/#ignore_checkpoints
-[pr_6178]: https://github.com/timberio/vector/pull/6178
+[pr_6178]: https://github.com/vectordotdev/vector/pull/6178
 [read_from]: /docs/reference/configuration/sources/file/#read_from

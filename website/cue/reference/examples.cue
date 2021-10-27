@@ -22,7 +22,7 @@ config_examples: [#ConfigExample, ...#ConfigExample] & [
 
 			[sinks.datadog_backend]
 			type = "datadog_logs"
-			inputs = ["remove_sensitive_info"]
+			inputs = ["remove_sensitive_user_info"]
 			default_api_key = "${DATADOG_API_KEY}"
 			"""#
 	},
@@ -38,12 +38,13 @@ config_examples: [#ConfigExample, ...#ConfigExample] & [
 
 			[transforms.json_parse]
 			type = "remap"
+			inputs = ["kafka_in"]
 			source = '''
 			  parsed, err = parse_json(.message)
 			  if err != null {
-			    log(err, level: "error")
+				log(err, level: "error")
 			  }
-			  . |= parsed ?? {}
+			  . |= object(parsed) ?? {}
 			'''
 
 			[sinks.elasticsearch_out]
@@ -65,7 +66,7 @@ config_examples: [#ConfigExample, ...#ConfigExample] & [
 			bucket = "k8s-logs"
 			region = "us-east-1"
 			compression = "gzip"
-			encoding.codec = "json"
+			encoding.codec = "ndjson"
 			"""#
 	},
 	{

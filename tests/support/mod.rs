@@ -30,8 +30,8 @@ use tracing::{error, info};
 use vector::{
     buffers::Acker,
     config::{
-        DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, SourceContext,
-        TransformConfig,
+        DataType, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
+        TransformContext,
     },
     event::{
         metric::{self, MetricData, MetricValue},
@@ -50,6 +50,15 @@ pub fn sink(channel_size: usize) -> (mpsc::Receiver<Event>, MockSinkConfig<Pipel
     (rx, sink)
 }
 
+pub fn sink_with_data(
+    channel_size: usize,
+    data: &str,
+) -> (mpsc::Receiver<Event>, MockSinkConfig<Pipeline>) {
+    let (tx, rx) = Pipeline::new_with_buffer(channel_size, vec![]);
+    let sink = MockSinkConfig::new_with_data(tx, true, data);
+    (rx, sink)
+}
+
 pub fn sink_failing_healthcheck(
     channel_size: usize,
 ) -> (mpsc::Receiver<Event>, MockSinkConfig<Pipeline>) {
@@ -65,6 +74,12 @@ pub fn sink_dead() -> MockSinkConfig<DeadSink<Event>> {
 pub fn source() -> (Pipeline, MockSourceConfig) {
     let (tx, rx) = Pipeline::new_with_buffer(1, vec![]);
     let source = MockSourceConfig::new(rx);
+    (tx, source)
+}
+
+pub fn source_with_data(data: &str) -> (Pipeline, MockSourceConfig) {
+    let (tx, rx) = Pipeline::new_with_buffer(1, vec![]);
+    let source = MockSourceConfig::new_with_data(rx, data);
     (tx, source)
 }
 
@@ -114,6 +129,8 @@ pub struct MockSourceConfig {
     event_counter: Option<Arc<AtomicUsize>>,
     #[serde(skip)]
     data_type: Option<DataType>,
+    // something for serde to use, so we can trigger rebuilds
+    data: Option<String>,
 }
 
 impl MockSourceConfig {
@@ -122,6 +139,16 @@ impl MockSourceConfig {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,
             data_type: Some(DataType::Any),
+            data: None,
+        }
+    }
+
+    pub fn new_with_data(receiver: mpsc::Receiver<Event>, data: &str) -> Self {
+        Self {
+            receiver: Arc::new(Mutex::new(Some(receiver))),
+            event_counter: None,
+            data_type: Some(DataType::Any),
+            data: Some(data.into()),
         }
     }
 
@@ -133,6 +160,7 @@ impl MockSourceConfig {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: Some(event_counter),
             data_type: Some(DataType::Any),
+            data: None,
         }
     }
 
@@ -257,7 +285,7 @@ impl MockTransformConfig {
 #[async_trait]
 #[typetag::serde(name = "mock")]
 impl TransformConfig for MockTransformConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> Result<Transform, vector::Error> {
+    async fn build(&self, _globals: &TransformContext) -> Result<Transform, vector::Error> {
         Ok(Transform::function(MockTransform {
             suffix: self.suffix.clone(),
             increase: self.increase,
@@ -287,6 +315,8 @@ where
     sink: Option<T>,
     #[serde(skip)]
     healthy: bool,
+    // something for serde to use, so we can trigger rebuilds
+    data: Option<String>,
 }
 
 impl<T> MockSinkConfig<T>
@@ -298,6 +328,15 @@ where
         Self {
             sink: Some(sink),
             healthy,
+            data: None,
+        }
+    }
+
+    pub fn new_with_data(sink: T, healthy: bool, data: &str) -> Self {
+        Self {
+            sink: Some(sink),
+            healthy,
+            data: Some(data.into()),
         }
     }
 }
@@ -354,7 +393,7 @@ where
     S: Sink<Event> + Send + std::marker::Unpin,
     <S as Sink<Event>>::Error: std::fmt::Display,
 {
-    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         while let Some(event) = input.next().await {
             if let Err(error) = self.sink.send(event).await {
                 error!(message = "Ingesting an event failed at mock sink.", %error);

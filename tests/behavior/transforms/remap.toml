@@ -2183,3 +2183,75 @@
 #         .none == "foobarbaz" &&
 #         .from_split == "big__bad__booper"
 #       '''
+
+[transforms.remap_function_reverse_dns]
+  inputs = []
+  type = "remap"
+  source = """
+    .host = reverse_dns!(.ip)
+  """
+[[tests]]
+  name = "remap_function_reverse_dns"
+  [tests.input]
+    insert_at = "remap_function_reverse_dns"
+    type = "log"
+    [tests.input.log_fields]
+      ip = "127.0.0.1"
+  [[tests.outputs]]
+    extract_from = "remap_function_reverse_dns"
+    [[tests.outputs.conditions]]
+      "type" = "vrl"
+      source = '''
+        .host == "localhost"
+      '''
+
+[enrichment_tables.test]
+type = "file"
+file.path = "./tests/data/enrichment.csv"
+file.encoding.type = "csv"
+schema.id = "integer"
+
+[transforms.remap_function_get_enrichment_table_row]
+  inputs = []
+  type = "remap"
+  source = '''
+    . = get_enrichment_table_record!("test", { "id": .id })
+  '''
+[[tests]]
+  name = "remap_function_get_enrichment_table_row"
+  [tests.input]
+    insert_at = "remap_function_get_enrichment_table_row"
+    type = "log"
+    [tests.input.log_fields]
+      id = 3
+  [[tests.outputs]]
+    extract_from = "remap_function_get_enrichment_table_row"
+    [[tests.outputs.conditions]]
+      "type" = "vrl"
+      source = '''
+        .tree == "yew"
+      '''
+
+[transforms.remap_function_find_enrichment_table_rows]
+  inputs = []
+  type = "remap"
+  source = '''
+    .trees = find_enrichment_table_records!("test", { "tree": .tree })
+  '''
+[[tests]]
+  name = "remap_function_find_enrichment_table_rows"
+  [tests.input]
+    insert_at = "remap_function_find_enrichment_table_rows"
+    type = "log"
+    [tests.input.log_fields]
+      tree = "yew"
+  [[tests.outputs]]
+    extract_from = "remap_function_find_enrichment_table_rows"
+    [[tests.outputs.conditions]]
+      "type" = "vrl"
+      source = '''
+        .trees == [{"id": 3, "tree": "yew"},
+                   {"id": 5, "tree": "yew"},
+                   {"id": 7, "tree": "yew"}]
+      '''
+

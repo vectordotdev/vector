@@ -145,6 +145,62 @@ configuration: {
 				syntax: "literal"
 			}
 		}
+
+		proxy: {
+			common:      false
+			description: "Configures an HTTP(S) proxy for Vector to use."
+			required:    false
+			type: object: options: {
+				enabled: {
+					common:      false
+					description: "If false the proxy will be disabled."
+					required:    false
+					type: bool: default: true
+				}
+				http: {
+					common:      false
+					description: "The URL to proxy HTTP requests through."
+					required:    false
+					type: string: {
+						default: null
+						examples: ["http://foo.bar:3128"]
+						syntax: "literal"
+					}
+				}
+				https: {
+					common:      false
+					description: "The URL to proxy HTTPS requests through."
+					required:    false
+					type: string: {
+						default: null
+						examples: ["http://foo.bar:3128"]
+						syntax: "literal"
+					}
+				}
+				no_proxy: {
+					common:      false
+					description: """
+							A list of hosts to avoid proxying. Allowed patterns here include:
+
+							Pattern | Example match
+							:-------|:-------------
+							Domain names | `example.com` matches requests to `example.com`
+							Wildcard domains | `.example.com` matches requests to `example.com` and its subdomains
+							IP addresses | `127.0.0.1` matches requests to 127.0.0.1
+							[CIDR](\(urls.cidr)) blocks | `192.168.0.0./16` matches requests to any IP addresses in this range
+							Splat | `*` matches all hosts
+							"""
+					required:    false
+					type: array: {
+						default: null
+						items: type: string: {
+							examples: ["localhost", ".foo.bar", "*"]
+							syntax: "literal"
+						}
+					}
+				}
+			}
+		}
 	}
 
 	how_it_works: {

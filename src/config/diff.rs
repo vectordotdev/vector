@@ -1,4 +1,4 @@
-use super::{ComponentId, Config};
+use super::{ComponentKey, Config};
 use indexmap::IndexMap;
 use std::collections::HashSet;
 
@@ -6,6 +6,7 @@ pub struct ConfigDiff {
     pub sources: Difference,
     pub transforms: Difference,
     pub sinks: Difference,
+    pub enrichment_tables: Difference,
 }
 
 impl ConfigDiff {
@@ -18,6 +19,7 @@ impl ConfigDiff {
             sources: Difference::new(&old.sources, &new.sources),
             transforms: Difference::new(&old.transforms, &new.transforms),
             sinks: Difference::new(&old.sinks, &new.sinks),
+            enrichment_tables: Difference::new(&old.enrichment_tables, &new.enrichment_tables),
         }
     }
 
@@ -31,13 +33,13 @@ impl ConfigDiff {
 }
 
 pub struct Difference {
-    pub to_remove: HashSet<ComponentId>,
-    pub to_change: HashSet<ComponentId>,
-    pub to_add: HashSet<ComponentId>,
+    pub to_remove: HashSet<ComponentKey>,
+    pub to_change: HashSet<ComponentKey>,
+    pub to_add: HashSet<ComponentKey>,
 }
 
 impl Difference {
-    fn new<C>(old: &IndexMap<ComponentId, C>, new: &IndexMap<ComponentId, C>) -> Self
+    fn new<C>(old: &IndexMap<ComponentKey, C>, new: &IndexMap<ComponentKey, C>) -> Self
     where
         C: serde::Serialize + serde::Deserialize<'static>,
     {
@@ -68,7 +70,7 @@ impl Difference {
     }
 
     /// True if name is present in new config and either not in the old one or is different.
-    pub fn contains_new(&self, id: &ComponentId) -> bool {
+    pub fn contains_new(&self, id: &ComponentKey) -> bool {
         self.to_add.contains(id) || self.to_change.contains(id)
     }
 
@@ -76,11 +78,11 @@ impl Difference {
         std::mem::swap(&mut self.to_remove, &mut self.to_add);
     }
 
-    pub fn changed_and_added(&self) -> impl Iterator<Item = &ComponentId> {
+    pub fn changed_and_added(&self) -> impl Iterator<Item = &ComponentKey> {
         self.to_change.iter().chain(self.to_add.iter())
     }
 
-    pub fn removed_and_changed(&self) -> impl Iterator<Item = &ComponentId> {
+    pub fn removed_and_changed(&self) -> impl Iterator<Item = &ComponentKey> {
         self.to_change.iter().chain(self.to_remove.iter())
     }
 }

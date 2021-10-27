@@ -48,9 +48,9 @@ macro_rules! bench_function {
             group.throughput(criterion::Throughput::Elements(1));
             $(
                 group.bench_function(&format!("{}", stringify!($case)), |b| {
-                    let (expression, want) = $crate::__prep_bench_or_test!($func, $args, $(Ok($crate::Value::from($ok)))? $(Err($err.to_owned()))?);
-                    let expression = expression.unwrap();
                     let mut compiler_state = $crate::state::Compiler::default();
+                    let (expression, want) = $crate::__prep_bench_or_test!($func, compiler_state, $args, $(Ok($crate::Value::from($ok)))? $(Err($err.to_owned()))?);
+                    let expression = expression.unwrap();
                     let mut runtime_state = $crate::state::Runtime::default();
                     let mut target: $crate::Value = ::std::collections::BTreeMap::default().into();
                     let tz = shared::TimeZone::Named(chrono_tz::Tz::UTC);
@@ -87,10 +87,10 @@ macro_rules! test_function {
             #[test]
             fn [<$name _ $case:snake:lower>]() {
                 $before
-                let (expression, want) = $crate::__prep_bench_or_test!($func, $args, $(Ok($crate::Value::from($ok)))? $(Err($err.to_owned()))?);
+                let mut compiler_state = $crate::state::Compiler::default();
+                let (expression, want) = $crate::__prep_bench_or_test!($func, compiler_state, $args, $(Ok($crate::Value::from($ok)))? $(Err($err.to_owned()))?);
                 match expression {
                     Ok(expression) => {
-                        let mut compiler_state = $crate::state::Compiler::default();
                         let mut runtime_state = $crate::state::Runtime::default();
                         let mut target: $crate::Value = ::std::collections::BTreeMap::default().into();
                         let tz = $tz;
@@ -121,8 +121,17 @@ macro_rules! test_function {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __prep_bench_or_test {
-    ($func:path, $args:expr, $want:expr) => {{
-        ($func.compile($args.into()), $want)
+    ($func:path, $state:expr, $args:expr, $want:expr) => {{
+        (
+            $func.compile(
+                &$state,
+                &$crate::function::FunctionCompileContext {
+                    span: vrl::diagnostic::Span::new(0, 0),
+                },
+                $args.into(),
+            ),
+            $want,
+        )
     }};
 }
 

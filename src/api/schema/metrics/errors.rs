@@ -1,3 +1,4 @@
+use crate::config::ComponentKey;
 use crate::event::{Metric, MetricValue};
 use async_graphql::Object;
 use chrono::{DateTime, Utc};
@@ -5,7 +6,7 @@ use chrono::{DateTime, Utc};
 pub struct ErrorsTotal(Metric);
 
 impl ErrorsTotal {
-    pub fn new(m: Metric) -> Self {
+    pub const fn new(m: Metric) -> Self {
         Self(m)
     }
 }
@@ -33,7 +34,7 @@ impl From<Metric> for ErrorsTotal {
 }
 
 pub struct ComponentErrorsTotal {
-    component_id: String,
+    component_key: ComponentKey,
     metric: Metric,
 }
 
@@ -41,12 +42,13 @@ impl ComponentErrorsTotal {
     /// Returns a new `ComponentErrorsTotal` struct, which is a GraphQL type. The
     /// component id is hoisted for clear field resolution in the resulting payload
     pub fn new(metric: Metric) -> Self {
-        let component_id = metric.tag_value("component_id").expect(
+        let component_key = metric.tag_value("component_id").expect(
             "Returned a metric without a `component_id`, which shouldn't happen. Please report.",
         );
+        let component_key = ComponentKey::from(component_key);
 
         Self {
-            component_id,
+            component_key,
             metric,
         }
     }
@@ -56,7 +58,7 @@ impl ComponentErrorsTotal {
 impl ComponentErrorsTotal {
     /// Component id
     async fn component_id(&self) -> &str {
-        &self.component_id
+        self.component_key.id()
     }
 
     /// Errors processed metric

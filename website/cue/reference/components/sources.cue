@@ -71,6 +71,116 @@ components: sources: [Name=string]: {
 			}
 		}
 
+		if features.codecs != _|_ {
+			if features.codecs.enabled {
+				framing: {
+					common:      false
+					description: "Configures in which way incoming byte sequences are split up into byte frames."
+					required:    false
+					type: object: options: {
+						method: {
+							description: "The framing method."
+							required:    false
+							common:      true
+							type: string: {
+								default: features.codecs.default_framing
+								enum: {
+									bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
+									character_delimited: "Byte frames which are delimited by a chosen character."
+									length_delimited:    "Byte frames whose length is encoded in a header."
+									newline_delimited:   "Byte frames which are delimited by a newline character."
+									octet_counting:      "Byte frames according to the [octet counting](\(urls.rfc_6587_3_4_1)) format."
+								}
+								syntax: "literal"
+							}
+						}
+						character_delimited: {
+							description:   "Options for `character_delimited` framing."
+							required:      true
+							relevant_when: "method = `character_delimited`"
+							type: object: options: {
+								delimiter: {
+									description: "The character used to separate frames."
+									required:    true
+									type: string: {
+										examples: ["\n", "\t"]
+										syntax: "literal"
+									}
+								}
+								max_length: {
+									description: "The maximum frame length limit. Any frames longer than `max_length` bytes will be discarded entirely."
+									required:    false
+									common:      false
+									type: uint: {
+										default: null
+										examples: [65535, 102400]
+										unit: "bytes"
+									}
+								}
+							}
+						}
+						newline_delimited: {
+							description:   "Options for `newline_delimited` framing."
+							required:      false
+							common:        false
+							relevant_when: "method = `newline_delimited`"
+							type: object: options: {
+								max_length: {
+									description: "The maximum frame length limit. Any frames longer than `max_length` bytes will be discarded entirely."
+									required:    false
+									common:      false
+									type: uint: {
+										default: null
+										examples: [65535, 102400]
+										unit: "bytes"
+									}
+								}
+							}
+						}
+						octet_counting: {
+							description:   "Options for `octet_counting` framing."
+							required:      false
+							common:        false
+							relevant_when: "method = `octet_counting`"
+							type: object: options: {
+								max_length: {
+									description: "The maximum frame length limit. Any frames longer than `max_length` bytes will be discarded entirely."
+									required:    false
+									common:      false
+									type: uint: {
+										default: null
+										examples: [65535, 102400]
+										unit: "bytes"
+									}
+								}
+							}
+						}
+					}
+				}
+				decoding: {
+					common:      false
+					description: "Configures in which way frames are decoded into events."
+					required:    false
+					type: object: options: {
+						codec: {
+							description: "The decoding method."
+							required:    false
+							common:      true
+							type: string: {
+								default: "bytes"
+								enum: {
+									bytes:  "Events containing the byte frame as-is."
+									json:   "Events being parsed from a JSON string."
+									syslog: "Events being parsed from a Syslog message."
+								}
+								syntax: "literal"
+							}
+						}
+					}
+				}
+			}
+		}
+
 		if features.encoding != _|_ {
 			if features.encoding.enabled {
 				encoding: {
@@ -113,15 +223,19 @@ components: sources: [Name=string]: {
 		}
 
 		if features.receive != _|_ {
-			if features.receive.receive_buffer_size != _|_ {
-				send_buffer_bytes: {
+			if features.receive.receive_buffer_bytes != _|_ {
+				receive_buffer_bytes: {
 					common:      false
 					description: "Configures the receive buffer size using the `SO_RCVBUF` option on the socket."
 					required:    false
 					type: uint: {
+						default: null
 						examples: [65536]
+						unit: "bytes"
 					}
-					relevant_when: features.receive.receive_buffer_bytes.relevant_when
+					if features.receive.receive_buffer_bytes.relevant_when != _|_ {
+						relevant_when: features.receive.receive_buffer_bytes.relevant_when
+					}
 				}
 			}
 
@@ -236,6 +350,8 @@ components: sources: [Name=string]: {
 	}
 
 	telemetry: metrics: {
-		events_out_total: components.sources.internal_metrics.output.metrics.events_out_total
+		events_out_total:                 components.sources.internal_metrics.output.metrics.events_out_total
+		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
 	}
 }

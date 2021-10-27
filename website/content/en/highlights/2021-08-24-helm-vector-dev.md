@@ -1,6 +1,6 @@
 ---
 date: "2021-08-24"
-title: "Introducing https://helm.vector.dev"
+title: "Introducing helm.vector.dev"
 description: "A new home for Vector's Helm charts"
 authors: ["spencergilbert"]
 pr_numbers: []
@@ -14,7 +14,7 @@ badges:
 Vector's new home for helm charts is at https://helm.vector.dev!
 
 We made this change as part of migrating the helm charts from our old AWS S3 bucket hosting to
-Github Pages via [timberio/helm-charts](https://github.com/timberio/helm-charts). This new domain
+Github Pages via [vectordotdev/helm-charts](https://github.com/vectordotdev/helm-charts). This new domain
 will also allow us to swap hosting in the future without any user impact.
 
 Vector’s 0.16.x release will be the last version that publishes charts to both
@@ -24,7 +24,7 @@ The new repository contains all released charts from the previous `latest` repos
 Moving forward we will be releasing charts at their own pace as we work towards the stable
 releases for the _vector-agent_ and _vector-aggregator_ charts.
 
-Development and issue tracking will be migrated to https://github.com/timberio/helm-charts
+Development and issue tracking will be migrated to https://github.com/vectordotdev/helm-charts
 in the coming days.
 
 ## Upgrade Guide

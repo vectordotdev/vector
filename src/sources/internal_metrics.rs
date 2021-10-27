@@ -1,7 +1,6 @@
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     metrics::Controller,
-    metrics::{capture_metrics, get_controller},
     shutdown::ShutdownSignal,
     Pipeline,
 };
@@ -18,17 +17,22 @@ pub struct InternalMetricsConfig {
     scrape_interval_secs: u64,
     tags: TagsConfig,
     namespace: Option<String>,
+    config_hash: Option<String>,
 }
 
 impl InternalMetricsConfig {
-    // TODO: Remove this annotation once it's actually being used.
-    #[allow(dead_code)]
-    /// Override the default namespace.
-    fn namespace<T: Into<String>>(namespace: T) -> Self {
+    /// Return an internal metrics config with enterprise reporting defaults.
+    pub fn enterprise<T: Into<String>>(config_hash: T) -> Self {
         Self {
-            namespace: Some(namespace.into()),
+            namespace: Some("pipelines".to_owned()),
+            config_hash: Some(config_hash.into()),
             ..Self::default()
         }
+    }
+
+    /// Set the interval to collect internal metrics.
+    pub fn scrape_interval_secs(&mut self, value: u64) {
+        self.scrape_interval_secs = value;
     }
 }
 
@@ -57,6 +61,7 @@ impl SourceConfig for InternalMetricsConfig {
         }
         let interval = time::Duration::from_secs(self.scrape_interval_secs);
         let namespace = self.namespace.clone();
+        let config_hash = self.config_hash.clone();
         let host_key = self.tags.host_key.as_deref().and_then(|tag| {
             if tag.is_empty() {
                 None
@@ -71,9 +76,10 @@ impl SourceConfig for InternalMetricsConfig {
                 .and_then(|tag| if tag.is_empty() { None } else { Some("pid") });
         Ok(Box::pin(run(
             namespace,
+            config_hash,
             host_key,
             pid_key,
-            get_controller()?,
+            Controller::get()?,
             interval,
             cx.out,
             cx.shutdown,
@@ -91,6 +97,7 @@ impl SourceConfig for InternalMetricsConfig {
 
 async fn run(
     namespace: Option<String>,
+    config_hash: Option<String>,
     host_key: Option<&str>,
     pid_key: Option<&str>,
     controller: &Controller,
@@ -106,13 +113,18 @@ async fn run(
         let hostname = crate::get_hostname();
         let pid = std::process::id().to_string();
 
-        let metrics = capture_metrics(controller);
+        let metrics = controller.capture_metrics();
 
         out.send_all(&mut stream::iter(metrics).map(|mut metric| {
             // A metric starts out with a default "vector" namespace, but will be overridden
             // if an explicit namespace is provided to this source.
             if namespace.is_some() {
                 metric = metric.with_namespace(namespace.as_ref());
+            }
+
+            // If a configuration hash is provided, report it. Used in enterprise.
+            if let Some(config_hash) = &config_hash {
+                metric.insert_tag("config_hash".to_owned(), config_hash.clone());
             }
 
             if let Some(host_key) = host_key {
@@ -139,7 +151,7 @@ mod tests {
             metric::{Metric, MetricValue},
             Event,
         },
-        metrics::{capture_metrics, get_controller},
+        metrics::Controller,
         Pipeline,
     };
     use metrics::{counter, gauge, histogram};
@@ -152,7 +164,7 @@ mod tests {
 
     #[test]
     fn captures_internal_metrics() {
-        let _ = crate::metrics::init();
+        let _ = crate::metrics::init_test();
 
         // There *seems* to be a race condition here (CI was flaky), so add a slight delay.
         std::thread::sleep(std::time::Duration::from_millis(300));
@@ -166,12 +178,13 @@ mod tests {
         histogram!("quux", 8.0, "host" => "foo");
         histogram!("quux", 8.1, "host" => "foo");
 
-        let controller = get_controller().expect("no controller");
+        let controller = Controller::get().expect("no controller");
 
         // There *seems* to be a race condition here (CI was flaky), so add a slight delay.
         std::thread::sleep(std::time::Duration::from_millis(300));
 
-        let output = capture_metrics(controller)
+        let output = controller
+            .capture_metrics()
             .map(|metric| (metric.name().to_string(), metric))
             .collect::<BTreeMap<String, Metric>>();
 
@@ -219,7 +232,7 @@ mod tests {
     }
 
     async fn event_from_config(config: InternalMetricsConfig) -> Event {
-        let _ = crate::metrics::init();
+        let _ = crate::metrics::init_test();
 
         let (sender, mut recv) = Pipeline::new_test();
 

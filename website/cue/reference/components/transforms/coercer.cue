@@ -34,7 +34,7 @@ components: transforms: coercer: {
 			"""
 			\(coercer._remap_deprecation_notice)
 
-			```vrl
+			```coffee
 			.bool = to_bool("false")
 			.float = to_float("1.0")
 			.int = to_int("1")
@@ -54,7 +54,7 @@ components: transforms: coercer: {
 	configuration: {
 		drop_unspecified: {
 			common:      false
-			description: "Set to `true` to drop all fields that are not specified in the `types` table. Make sure both `message` and `timestamp` are specified in the `types` table as their absense will cause the original message data to be dropped along with other extraneous fields."
+			description: "Set to `true` to drop all fields that are not specified in the `types` table. Make sure both `message` and `timestamp` are specified in the `types` table as their absence will cause the original message data to be dropped along with other extraneous fields."
 			required:    false
 			warnings: []
 			type: bool: default: false

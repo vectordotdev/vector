@@ -27,6 +27,7 @@ use std::{
     future::ready,
     sync::atomic::{AtomicI64, Ordering::SeqCst},
 };
+use vector_core::ByteSizeOf;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -70,6 +71,14 @@ struct DatadogRequest<T> {
 }
 
 impl DatadogConfig {
+    /// Returns a new Datadog config from API key.
+    pub fn from_api_key<T: Into<String>>(api_key: T) -> Self {
+        Self {
+            api_key: api_key.into(),
+            ..Self::default()
+        }
+    }
+
     fn get_endpoint(&self) -> String {
         self.endpoint.clone().unwrap_or_else(|| {
             // Follow the official Datadog agent convention:
@@ -232,9 +241,14 @@ fn encode_metric(
     mut metric: Metric,
 ) -> Result<EncodedEvent<PartitionInnerBuffer<Metric, DatadogEndpoint>>, ()> {
     let endpoint = DatadogEndpoint::from_metric(&metric);
+    let byte_size = metric.size_of();
     let finalizers = metric.metadata_mut().take_finalizers();
     let item = PartitionInnerBuffer::new(metric, endpoint);
-    Ok(EncodedEvent { item, finalizers })
+    Ok(EncodedEvent {
+        item,
+        finalizers,
+        byte_size,
+    })
 }
 
 impl DatadogSink {

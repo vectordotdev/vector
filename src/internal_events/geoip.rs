@@ -1,8 +1,10 @@
-use super::InternalEvent;
+// ## skip check-events ##
+
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub(crate) struct GeoipIpAddressParseError<'a> {
+pub struct GeoipIpAddressParseError<'a> {
     pub address: &'a str,
 }
 
@@ -21,7 +23,7 @@ impl<'a> InternalEvent for GeoipIpAddressParseError<'a> {
 }
 
 #[derive(Debug)]
-pub(crate) struct GeoipFieldDoesNotExist<'a> {
+pub struct GeoipFieldDoesNotExist<'a> {
     pub field: &'a str,
 }
 

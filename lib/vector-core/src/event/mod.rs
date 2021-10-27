@@ -4,6 +4,7 @@ use bytes::{Buf, BufMut, Bytes};
 use chrono::{DateTime, SecondsFormat, Utc};
 pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
+    Finalizable,
 };
 pub use legacy_lookup::Lookup;
 pub use log_event::LogEvent;
@@ -53,6 +54,25 @@ impl ByteSizeOf for Event {
             Event::Log(log_event) => log_event.allocated_bytes(),
             Event::Metric(metric_event) => metric_event.allocated_bytes(),
         }
+    }
+}
+
+impl Finalizable for Event {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        match self {
+            Event::Log(log) => log.metadata_mut().take_finalizers(),
+            Event::Metric(metric) => metric.metadata_mut().take_finalizers(),
+        }
+    }
+}
+
+impl<T: Finalizable> Finalizable for Vec<T> {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.iter_mut()
+            .fold(EventFinalizers::default(), |mut acc, x| {
+                acc.merge(x.take_finalizers());
+                acc
+            })
     }
 }
 
@@ -317,6 +337,19 @@ impl From<LogEvent> for Event {
 impl From<Metric> for Event {
     fn from(metric: Metric) -> Self {
         Event::Metric(metric)
+    }
+}
+
+pub trait MaybeAsLogMut {
+    fn maybe_as_log_mut(&mut self) -> Option<&mut LogEvent>;
+}
+
+impl MaybeAsLogMut for Event {
+    fn maybe_as_log_mut(&mut self) -> Option<&mut LogEvent> {
+        match self {
+            Event::Log(log) => Some(log),
+            Event::Metric(_) => None,
+        }
     }
 }
 

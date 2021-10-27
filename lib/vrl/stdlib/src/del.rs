@@ -49,7 +49,12 @@ impl Function for Del {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _ctx: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let query = arguments.required_query("target")?;
 
         Ok(Box::new(DelFn { query }))
@@ -126,8 +131,12 @@ impl Expression for DelFn {
         TypeDef::new().unknown()
     }
 
-    fn update_state(&self, state: &mut state::Compiler) {
+    fn update_state(
+        &mut self,
+        state: &mut state::Compiler,
+    ) -> std::result::Result<(), ExpressionError> {
         self.query.delete_type_def(state);
+        Ok(())
     }
 }
 

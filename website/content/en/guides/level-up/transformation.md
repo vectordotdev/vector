@@ -176,25 +176,20 @@ recommend checking out the following documentation:
 ## Runtime transforms
 
 If VRL doesn't cover your use case—and that should happen rarely—Vector also
-offers two **runtime transforms** that you can use instead of VRL:
+offers a [`lua`][docs.lua] **runtime transform** that you can use instead of
+VRL. It enables you to run [Lua][urls.lua] code that you can include directly in
+your Vector configuration
 
-* The [`wasm`][docs.transforms.wasm] transform enables you to run compiled
-  [WebAssembly][urls.wasm] code using a Wasm runtime inside of Vector.
-* The [`lua`][docs.lua] transform enables you to run [Lua][urls.lua] code
-  that you can include directly in your Vector configuration
+The `lua` transform provides maximal flexibility because they enable you to use
+a full-fledged programming language right inside of Vector. But we recommend
+using it only when truly necessary, for several reasons:
 
-Both of the runtime transforms provide maximal flexibility because they enable
-you to use full-fledged programming languages right inside of Vector. But we
-recommend using these transforms only when truly necessary, for several reasons:
-
-1. The runtime transforms make it all too easy to write scripts that are slow,
+1. The `lua` transform makes it all too easy to write scripts that are slow,
    error prone, and hard to read.
-2. Both require you to add a coding/testing/debugging workflow to using Vector,
+2. It requires you to add a coding/testing/debugging workflow to using Vector,
    which is worth the effort if there's no other way to satisfy your use case
    but best avoided if possible.
-3. Both impose a performance penalty vis-à-vis VRL. Wasm *does* tend to be faster
-   than Lua, but Wasm is more difficult to use because you need to add a
-   Wasm compilation step to your Vector workflow.
+3. It imposes a performance penalty vis-à-vis VRL.
 
 [docs.architecture.pipeline-model]: /docs/about/under-the-hood/architecture/pipeline-model/
 [docs.lua]: /docs/reference/configuration/transforms/lua/
@@ -202,7 +197,6 @@ recommend using these transforms only when truly necessary, for several reasons:
 [docs.sinks.console]: /docs/reference/configuration/sinks/console/
 [docs.sources.generator]: /docs/reference/configuration/sources/generator/
 [docs.transforms.remap]: /docs/reference/configuration/transforms/remap/
-[docs.transforms.wasm]: /docs/reference/configuration/transforms/wasm/
 [docs.transforms]: /docs/reference/configuration/transforms/
 [docs.vrl.examples]: /docs/reference/vrl/examples/
 [docs.vrl.expressions]: /docs/reference/vrl/expressions/
@@ -210,7 +204,6 @@ recommend using these transforms only when truly necessary, for several reasons:
 [docs.vrl]: /docs/reference/vrl
 [paths]: /docs/reference/vrl/expressions/#path
 [urls.lua]: https://www.lua.org
-[urls.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature
+[urls.new_feature_request]: https://github.com/vectordotdev/vector/issues/new?labels=type%3A+new+feature
 [urls.rust]: https://www.rust-lang.org/
 [urls.syslog]: https://en.wikipedia.org/wiki/Syslog
-[urls.wasm]: https://webassembly.org/

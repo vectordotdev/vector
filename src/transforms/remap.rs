@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, VrlTarget},
     internal_events::{RemapMappingAbort, RemapMappingError},
     transforms::{FunctionTransform, Transform},
@@ -37,8 +37,8 @@ impl_generate_config_from_default!(RemapConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> Result<Transform> {
-        Remap::new(self.clone()).map(Transform::function)
+    async fn build(&self, context: &TransformContext) -> Result<Transform> {
+        Remap::new(self.clone(), &context.enrichment_tables).map(Transform::function)
     }
 
     fn input_type(&self) -> DataType {
@@ -54,16 +54,20 @@ impl TransformConfig for RemapConfig {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Remap {
     program: Program,
+    runtime: Runtime,
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
 }
 
 impl Remap {
-    pub fn new(config: RemapConfig) -> crate::Result<Self> {
+    pub fn new(
+        config: RemapConfig,
+        enrichment_tables: &enrichment::TableRegistry,
+    ) -> crate::Result<Self> {
         let source = match (&config.source, &config.file) {
             (Some(source), None) => source.to_owned(),
             (None, Some(path)) => {
@@ -79,15 +83,40 @@ impl Remap {
             _ => return Err(Box::new(BuildError::SourceAndOrFile)),
         };
 
-        let program = vrl::compile(&source, &vrl_stdlib::all())
-            .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
+        let mut functions = vrl_stdlib::all();
+        functions.append(&mut enrichment::vrl_functions());
+
+        let program = vrl::compile(
+            &source,
+            &functions,
+            Some(Box::new(enrichment_tables.clone())),
+        )
+        .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
 
         Ok(Remap {
             program,
+            runtime: Runtime::default(),
             timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
         })
+    }
+
+    #[cfg(test)]
+    const fn runtime(&self) -> &Runtime {
+        &self.runtime
+    }
+}
+
+impl Clone for Remap {
+    fn clone(&self) -> Self {
+        Self {
+            program: self.program.clone(),
+            runtime: Runtime::default(),
+            timezone: self.timezone,
+            drop_on_error: self.drop_on_error,
+            drop_on_abort: self.drop_on_abort,
+        }
     }
 }
 
@@ -112,9 +141,10 @@ impl FunctionTransform for Remap {
 
         let mut target: VrlTarget = event.into();
 
-        let mut runtime = Runtime::default();
-
-        let result = runtime.resolve(&mut target, &self.program, &self.timezone);
+        let result = self
+            .runtime
+            .resolve(&mut target, &self.program, &self.timezone);
+        self.runtime.clear();
 
         match result {
             Ok(_) => {
@@ -123,7 +153,7 @@ impl FunctionTransform for Remap {
                 }
             }
             Err(Terminate::Abort(_)) => {
-                emit!(RemapMappingAbort {
+                emit!(&RemapMappingAbort {
                     event_dropped: self.drop_on_abort,
                 });
 
@@ -132,7 +162,7 @@ impl FunctionTransform for Remap {
                 }
             }
             Err(Terminate::Error(error)) => {
-                emit!(RemapMappingError {
+                emit!(&RemapMappingError {
                     error: error.to_string(),
                     event_dropped: self.drop_on_error,
                 });
@@ -183,7 +213,9 @@ mod tests {
             ..Default::default()
         };
 
-        let err = Remap::new(config).unwrap_err().to_string();
+        let err = Remap::new(config, &Default::default())
+            .unwrap_err()
+            .to_string();
         assert_eq!(
             &err,
             "must provide exactly one of `source` or `file` configuration"
@@ -198,7 +230,9 @@ mod tests {
             ..Default::default()
         };
 
-        let err = Remap::new(config).unwrap_err().to_string();
+        let err = Remap::new(config, &Default::default())
+            .unwrap_err()
+            .to_string();
         assert_eq!(
             &err,
             "must provide exactly one of `source` or `file` configuration"
@@ -207,6 +241,42 @@ mod tests {
 
     fn get_field_string(event: &Event, field: &str) -> String {
         event.as_log().get(field).unwrap().to_string_lossy()
+    }
+
+    #[test]
+    fn check_remap_doesnt_share_state_between_events() {
+        let conf = RemapConfig {
+            source: Some(".foo = .sentinel".to_string()),
+            file: None,
+            timezone: TimeZone::default(),
+            drop_on_error: true,
+            drop_on_abort: false,
+        };
+        let mut tform = Remap::new(conf, &Default::default()).unwrap();
+        assert!(tform.runtime().is_empty());
+
+        let event1 = {
+            let mut event1 = LogEvent::from("event1");
+            event1.insert("sentinel", "bar");
+            Event::from(event1)
+        };
+        let metadata1 = event1.metadata().clone();
+        let result1 = transform_one(&mut tform, event1).unwrap();
+        assert_eq!(get_field_string(&result1, "message"), "event1");
+        assert_eq!(get_field_string(&result1, "foo"), "bar");
+        assert_eq!(result1.metadata(), &metadata1);
+        assert!(tform.runtime().is_empty());
+
+        let event2 = {
+            let event2 = LogEvent::from("event2");
+            Event::from(event2)
+        };
+        let metadata2 = event2.metadata().clone();
+        let result2 = transform_one(&mut tform, event2).unwrap();
+        assert_eq!(get_field_string(&result2, "message"), "event2");
+        assert_eq!(result2.as_log().get("foo"), Some(&Value::Null));
+        assert_eq!(result2.metadata(), &metadata2);
+        assert!(tform.runtime().is_empty());
     }
 
     #[test]
@@ -231,7 +301,7 @@ mod tests {
             drop_on_error: true,
             drop_on_abort: false,
         };
-        let mut tform = Remap::new(conf).unwrap();
+        let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
         let result = transform_one(&mut tform, event).unwrap();
         assert_eq!(get_field_string(&result, "message"), "augment me");
@@ -266,7 +336,7 @@ mod tests {
             drop_on_error: true,
             drop_on_abort: false,
         };
-        let mut tform = Remap::new(conf).unwrap();
+        let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
         let mut result = vec![];
         tform.transform(&mut result, event);
@@ -296,7 +366,7 @@ mod tests {
             drop_on_error: false,
             drop_on_abort: false,
         };
-        let mut tform = Remap::new(conf).unwrap();
+        let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
         let event = transform_one(&mut tform, event).unwrap();
 
@@ -324,7 +394,7 @@ mod tests {
             drop_on_error: true,
             drop_on_abort: false,
         };
-        let mut tform = Remap::new(conf).unwrap();
+        let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
         assert!(transform_one(&mut tform, event).is_none())
     }
@@ -347,7 +417,7 @@ mod tests {
             drop_on_error: false,
             drop_on_abort: false,
         };
-        let mut tform = Remap::new(conf).unwrap();
+        let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
         let event = transform_one(&mut tform, event).unwrap();
 
@@ -375,7 +445,7 @@ mod tests {
             drop_on_error: false,
             drop_on_abort: false,
         };
-        let mut tform = Remap::new(conf).unwrap();
+        let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
         let event = transform_one(&mut tform, event).unwrap();
 
@@ -403,7 +473,7 @@ mod tests {
             drop_on_error: false,
             drop_on_abort: true,
         };
-        let mut tform = Remap::new(conf).unwrap();
+        let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
         assert!(transform_one(&mut tform, event).is_none())
     }
@@ -430,7 +500,7 @@ mod tests {
             drop_on_error: true,
             drop_on_abort: false,
         };
-        let mut tform = Remap::new(conf).unwrap();
+        let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
         let result = transform_one(&mut tform, metric).unwrap();
         assert_eq!(

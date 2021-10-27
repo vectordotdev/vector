@@ -10,6 +10,9 @@
 #![allow(clippy::unit_arg)]
 #![deny(clippy::clone_on_ref_ptr)]
 #![deny(clippy::trivially_copy_pass_by_ref)]
+#![deny(clippy::disallowed_method)] // [nursery] mark some functions as verboten
+#![deny(clippy::missing_const_for_fn)] // [nursery] valuable to the optimizer,
+                                       // but may produce false positives
 
 #[macro_use]
 extern crate tracing;
@@ -27,8 +30,6 @@ pub mod dns;
 pub mod docker;
 pub mod expiring_hash_map;
 pub mod generate;
-#[cfg(feature = "wasm")]
-pub mod wasm;
 #[macro_use]
 pub mod internal_events;
 #[cfg(feature = "api")]
@@ -36,12 +37,15 @@ pub mod api;
 pub mod app;
 pub mod async_read;
 pub mod buffers;
+#[cfg(feature = "codecs")]
+pub mod codecs;
 pub mod encoding_transcode;
+pub mod enrichment_tables;
 pub mod graph;
 pub mod heartbeat;
 pub mod http;
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
-pub mod kafka;
+pub(crate) mod kafka;
 pub mod kubernetes;
 pub mod line_agg;
 pub mod list;

@@ -50,10 +50,6 @@ export ENVIRONMENT_UPSTREAM ?= timberio/ci_image
 export ENVIRONMENT_AUTOBUILD ?= true
 # Override this when appropriate to disable a TTY being available in commands with `ENVIRONMENT=true`
 export ENVIRONMENT_TTY ?= true
-# A list of WASM modules by name
-export WASM_MODULES = $(patsubst tests/data/wasm/%/,%,$(wildcard tests/data/wasm/*/))
-# The same WASM modules, by output path.
-export WASM_MODULE_OUTPUTS = $(patsubst %,/target/wasm32-wasi/%,$(WASM_MODULES))
 
 # Set dummy AWS credentials if not present - used for AWS and ES integration tests
 export AWS_ACCESS_KEY_ID ?= "dummy"
@@ -170,6 +166,7 @@ environment-push: environment-prepare ## Publish a new version of the container 
 
 ##@ Building
 .PHONY: build
+build: check-build-tools
 build: export CFLAGS += -g0 -O3
 build: ## Build the project in release mode (Supports `ENVIRONMENT=true`)
 	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features ${DEFAULT_FEATURES}
@@ -206,6 +203,12 @@ build-armv7-unknown-linux-musleabihf: target/armv7-unknown-linux-musleabihf/rele
 .PHONY: build-graphql-schema
 build-graphql-schema: ## Generate the `schema.json` for Vector's GraphQL API
 	${MAYBE_ENVIRONMENT_EXEC} cargo run --bin graphql-schema --no-default-features --features=default-no-api-client
+
+.PHONY: check-build-tools
+check-build-tools:
+ifeq (, $(shell which cargo))
+	$(error "Please install Rust: https://www.rust-lang.org/tools/install")
+endif
 
 ##@ Cross Compiling
 .PHONY: cross-enable
@@ -395,7 +398,7 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh humio start
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features humio-integration-tests --lib "::humio::.*::integration_tests::"
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features humio-integration-tests --lib ::humio::
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh humio stop
 endif
@@ -530,7 +533,6 @@ test-integration-splunk: ## Runs Splunk integration tests
 ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh splunk stop
 	@scripts/setup_integration_env.sh splunk start
-	sleep 10 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features splunk-integration-tests --lib ::splunk_hec::
 ifeq ($(AUTODESPAWN), true)
@@ -568,25 +570,6 @@ endif
 test-cli: ## Runs cli tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features cli-tests --test cli -- --test-threads 4
 
-.PHONY: test-wasm-build-modules
-test-wasm-build-modules: $(WASM_MODULE_OUTPUTS) ### Build all WASM test modules
-
-$(WASM_MODULE_OUTPUTS): MODULE = $(notdir $@)
-$(WASM_MODULE_OUTPUTS): export CFLAGS += -g0 -O3
-$(WASM_MODULE_OUTPUTS): ### Build a specific WASM module
-	@echo "# Building WASM module ${MODULE}, requires Rustc for wasm32-wasi."
-	${MAYBE_ENVIRONMENT_EXEC} cargo build \
-		--manifest-path tests/data/wasm/${MODULE}/Cargo.toml \
-		--target wasm32-wasi \
-		--release \
-		--package ${MODULE}
-
-.PHONY: test-wasm
-test-wasm: export TEST_THREADS=1
-test-wasm: export TEST_LOG=vector=trace
-test-wasm: $(WASM_MODULE_OUTPUTS)  ### Run engine tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test wasm --no-fail-fast --no-default-features --features "transforms-field_filter transforms-wasm transforms-lua transforms-add_fields"
-
 ##@ Benching (Supports `ENVIRONMENT=true`)
 
 .PHONY: bench
@@ -619,13 +602,8 @@ bench-transform: ## Run transform benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "transform-benches" --bench transform ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
-.PHONY: bench-wasm
-bench-wasm: $(WASM_MODULE_OUTPUTS)  ### Run WASM benches
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "wasm-benches" --bench wasm ${CARGO_BENCH_FLAGS}
-	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
-
 .PHONY: bench-languages
-bench-languages: $(WASM_MODULE_OUTPUTS)  ### Run language comparison benches
+bench-languages:  ### Run language comparison benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "language-benches" --bench languages ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
@@ -636,8 +614,8 @@ bench-metrics: ## Run metrics benches
 
 .PHONY: bench-all
 bench-all: ### Run all benches
-bench-all: $(WASM_MODULE_OUTPUTS) bench-remap-functions
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches remap-benches wasm-benches metrics-benches language-benches ${DNSTAP_BENCHES}" ${CARGO_BENCH_FLAGS}
+bench-all: bench-remap-functions
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches remap-benches  metrics-benches language-benches ${DNSTAP_BENCHES}" ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 ##@ Checking
@@ -656,7 +634,7 @@ check-all: check-kubernetes-yaml
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
-	${MAYBE_ENVIRONMENT_EXEC} cargo hack check --each-feature --exclude-features "sources-utils-http sources-utils-tcp-keepalive sources-utils-tcp-socket sources-utils-tls sources-utils-udp sources-utils-unix sinks-utils-udp"
+	${MAYBE_ENVIRONMENT_EXEC} cargo hack check --each-feature --exclude-features "sources-utils-http sources-utils-http-encoding sources-utils-http-prelude sources-utils-http-query sources-utils-tcp-keepalive sources-utils-tcp-socket sources-utils-tls sources-utils-udp sources-utils-unix sinks-utils-udp"
 
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy
@@ -707,7 +685,7 @@ check-kubernetes-yaml: ## Check that the generated Kubernetes YAML configs are u
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/kubernetes-yaml.sh check
 
 check-events: ## Check that events satisfy patterns set in https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events.sh
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events
 
 ##@ Rustdoc
 build-rustdoc: ## Build Vector's Rustdocs
@@ -920,12 +898,3 @@ update-kubernetes-yaml: ## Regenerate the Kubernetes YAML configs
 cargo-install-%: override TOOL = $(@:cargo-install-%=%)
 cargo-install-%:
 	$(if $(findstring true,$(AUTOINSTALL)),cargo install ${TOOL} --quiet; cargo clean,)
-
-.PHONY: ensure-has-wasm-toolchain ### Configures a wasm toolchain for test artifact building, if required
-ensure-has-wasm-toolchain: target/wasm32-wasi/.obtained
-target/wasm32-wasi/.obtained:
-	@echo "# You should also install WABT for WASM module development!"
-	@echo "# You can use your package manager or check https://github.com/WebAssembly/wabt"
-	${MAYBE_ENVIRONMENT_EXEC} rustup target add wasm32-wasi
-	@mkdir -p target/wasm32-wasi
-	@touch target/wasm32-wasi/.obtained

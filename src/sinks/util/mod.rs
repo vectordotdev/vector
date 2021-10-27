@@ -1,8 +1,12 @@
 pub mod adaptive_concurrency;
 pub mod batch;
 pub mod buffer;
+pub mod builder;
+pub mod compressor;
 pub mod encoding;
 pub mod http;
+pub mod processed_event;
+pub mod request_builder;
 pub mod retries;
 pub mod service;
 pub mod sink;
@@ -28,6 +32,9 @@ pub use buffer::json::{BoxedRawValue, JsonArrayBuffer};
 pub use buffer::partition::Partition;
 pub use buffer::vec::{EncodedLength, VecBuffer};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
+pub use builder::SinkBuilderExt;
+pub use compressor::Compressor;
+pub use request_builder::RequestBuilder;
 pub use service::{
     Concurrency, ServiceBuilderExt, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
     TowerRequestLayer, TowerRequestSettings,
@@ -47,14 +54,18 @@ enum SinkBuildError {
 pub struct EncodedEvent<I> {
     pub item: I,
     pub finalizers: EventFinalizers,
+    pub byte_size: usize,
 }
 
 impl<I> EncodedEvent<I> {
     /// Create a trivial input with no metadata. This method will be
     /// removed when all sinks are converted.
-    pub fn new(item: I) -> Self {
-        let finalizers = Default::default();
-        Self { item, finalizers }
+    pub fn new(item: I, byte_size: usize) -> Self {
+        Self {
+            item,
+            finalizers: Default::default(),
+            byte_size,
+        }
     }
 
     // This should be:
@@ -69,6 +80,16 @@ impl<I> EncodedEvent<I> {
         Self {
             item: I::from(that.item),
             finalizers: that.finalizers,
+            byte_size: that.byte_size,
+        }
+    }
+
+    /// Remap the item using an adapter
+    pub fn map<T>(self, doit: impl Fn(I) -> T) -> EncodedEvent<T> {
+        EncodedEvent {
+            item: doit(self.item),
+            finalizers: self.finalizers,
+            byte_size: self.byte_size,
         }
     }
 }
@@ -121,4 +142,21 @@ pub fn encode_namespace<'a>(
     namespace
         .map(|namespace| format!("{}{}{}", namespace, delimiter, name))
         .unwrap_or_else(|| name.into_owned())
+}
+
+/// Marker trait for types that can hold a batch of events
+pub trait ElementCount {
+    fn element_count(&self) -> usize;
+}
+
+impl<T> ElementCount for Vec<T> {
+    fn element_count(&self) -> usize {
+        self.len()
+    }
+}
+
+impl ElementCount for serde_json::Value {
+    fn element_count(&self) -> usize {
+        1
+    }
 }

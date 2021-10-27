@@ -156,7 +156,7 @@ impl SourceConfig for PostgresqlMetricsConfig {
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter_mut().map(|source| source.collect())).await;
-                emit!(PostgresqlMetricsCollectCompleted {
+                emit!(&PostgresqlMetricsCollectCompleted {
                     start,
                     end: Instant::now()
                 });
@@ -186,7 +186,7 @@ struct PostgresqlClient {
 }
 
 impl PostgresqlClient {
-    fn new(config: Config, tls_config: Option<PostgresqlMetricsTlsConfig>) -> Self {
+    const fn new(config: Config, tls_config: Option<PostgresqlMetricsTlsConfig>) -> Self {
         Self {
             config,
             tls_config,
@@ -462,7 +462,7 @@ impl PostgresqlMetrics {
         let (up_value, metrics) = match self.collect_metrics().await {
             Ok(metrics) => (1.0, stream::iter(metrics).boxed()),
             Err(error) => {
-                emit!(PostgresqlMetricsCollectFailed {
+                emit!(&PostgresqlMetricsCollectFailed {
                     error,
                     endpoint: self.tags.get("endpoint"),
                 });
