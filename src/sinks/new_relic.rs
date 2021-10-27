@@ -72,7 +72,7 @@ where
                 None
             }
         }
-    } 
+    }
 }
 
 type KeyValData = HashMap<String, Value>;
@@ -198,11 +198,11 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
                             event_model.remove("message");
                         }
                     }
-                    
+
                     if let None = event_model.get("eventType") {
                         event_model.insert("eventType".to_owned(), Value::from("VectorSink".to_owned()));
                     }
-                    
+
                     events_array.push(event_model);
                 },
                 _ => {
@@ -509,7 +509,7 @@ mod tests {
         map.insert("user_id".to_owned(), Value::from(123456));
         let event = Event::Log(LogEvent::from(map));
         let model = EventsApiModel::try_from(vec!(event)).expect("Failed mapping events into API model");
-        
+
         assert_eq!(model.0.len(), 1);
         assert_eq!(model.0[0].get("eventType").is_some(), true);
         assert_eq!(model.0[0].get("eventType").unwrap().to_string_lossy(), "TestEvent".to_owned());
@@ -565,7 +565,7 @@ mod tests {
         let event = Event::Log(LogEvent::from(map));
         let model = LogsApiModel::try_from(vec!(event)).expect("Failed mapping logs into API model");
         let logs = model.0[0].get("logs").expect("Logs data store not present");
-        
+
         assert_eq!(logs.len(), 1);
         assert_eq!(logs[0].get("tag_key").is_some(), true);
         assert_eq!(logs[0].get("tag_key").unwrap().to_string_lossy(), "tag_value".to_owned());
@@ -578,7 +578,7 @@ mod tests {
         let event = Event::Log(LogEvent::from(map));
         let model = LogsApiModel::try_from(vec!(event)).expect("Failed mapping logs into API model");
         let logs = model.0[0].get("logs").expect("Logs data store not present");
-        
+
         assert_eq!(logs.len(), 1);
         assert_eq!(logs[0].get("tag_key").is_some(), true);
         assert_eq!(logs[0].get("tag_key").unwrap().to_string_lossy(), "tag_value".to_owned());
