@@ -59,12 +59,15 @@ vrl-core = { package = "vrl", path = "../vrl/core", optional = true }
 prost-build = "0.8"
 
 [dev-dependencies]
+core_common = { path = "core-common", default-features = false, features = ["test"] }
 criterion = { version = "0.3.5", features = ["html_reports"] }
 env-test-util = "1.0.1"
 quickcheck = "1.0.3"
 proptest = "1.0"
 pretty_assertions = "1.0.0"
 tokio-test = "0.4.2"
+rand = "0.8"
+rand_distr = "0.4"
 
 [features]
 api = ["async-graphql"]
