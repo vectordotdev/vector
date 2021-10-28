@@ -10,5 +10,5 @@ use crate::config::SinkDescription;
 use config::KinesisSinkConfig;
 
 inventory::submit! {
-    SinkDescription::new::<KinesisSinkConfig>("sinks.aws_kinesis_streams")
+    SinkDescription::new::<KinesisSinkConfig>("aws_kinesis_streams")
 }
