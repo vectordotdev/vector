@@ -1,5 +1,7 @@
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        log_schema, ComponentKey, DataType, TransformConfig, TransformContext, TransformDescription,
+    },
     event::{Event, VrlTarget},
     internal_events::{RemapMappingAbort, RemapMappingError},
     transforms::{FallibleFunctionTransform, Transform},
@@ -38,7 +40,7 @@ impl_generate_config_from_default!(RemapConfig);
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
     async fn build(&self, context: &TransformContext) -> Result<Transform> {
-        Remap::new(self.clone(), &context.enrichment_tables).map(Transform::fallible_function)
+        Remap::new(self.clone(), context).map(Transform::fallible_function)
     }
 
     fn named_outputs(&self) -> Vec<String> {
@@ -60,6 +62,7 @@ impl TransformConfig for RemapConfig {
 
 #[derive(Debug)]
 pub struct Remap {
+    component_key: Option<ComponentKey>,
     program: Program,
     runtime: Runtime,
     timezone: TimeZone,
@@ -68,10 +71,7 @@ pub struct Remap {
 }
 
 impl Remap {
-    pub fn new(
-        config: RemapConfig,
-        enrichment_tables: &enrichment::TableRegistry,
-    ) -> crate::Result<Self> {
+    pub fn new(config: RemapConfig, context: &TransformContext) -> crate::Result<Self> {
         let source = match (&config.source, &config.file) {
             (Some(source), None) => source.to_owned(),
             (None, Some(path)) => {
@@ -93,11 +93,12 @@ impl Remap {
         let program = vrl::compile(
             &source,
             &functions,
-            Some(Box::new(enrichment_tables.clone())),
+            Some(Box::new(context.enrichment_tables.clone())),
         )
         .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
 
         Ok(Remap {
+            component_key: context.key.clone(),
             program,
             runtime: Runtime::default(),
             timezone: config.timezone,
@@ -115,6 +116,7 @@ impl Remap {
 impl Clone for Remap {
     fn clone(&self) -> Self {
         Self {
+            component_key: self.component_key.clone(),
             program: self.program.clone(),
             runtime: Runtime::default(),
             timezone: self.timezone,
@@ -174,7 +176,17 @@ impl FallibleFunctionTransform for Remap {
                 if !self.drop_on_error {
                     output.push(original_event.expect("event will be set"))
                 } else {
-                    err_output.push(original_event.expect("event will be set"))
+                    let mut erred_event = original_event.expect("event will be set");
+                    if let Event::Log(ref mut log) = &mut erred_event {
+                        log.insert(
+                            log_schema().metadata_key(),
+                            serde_json::json!({
+                                "error": error.to_string(),
+                                "component": self.component_key,
+                            }),
+                        );
+                    }
+                    err_output.push(erred_event)
                 }
             }
         }

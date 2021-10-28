@@ -1,4 +1,4 @@
-use crate::config::GlobalOptions;
+use crate::config::{ComponentKey, GlobalOptions};
 use async_trait::async_trait;
 use indexmap::IndexMap;
 
@@ -15,17 +15,15 @@ pub enum ExpandType {
     Serial,
 }
 
-#[cfg(feature = "vrl")]
 #[derive(Debug, Default)]
 pub struct TransformContext {
+    // This is optional because currently there are a lot of places we use `TransformContext` that
+    // may not have the relevant data available (e.g. tests). In the future it'd be nice to make it
+    // required somehow.
+    pub key: Option<ComponentKey>,
     pub globals: GlobalOptions,
+    #[cfg(feature = "vrl")]
     pub enrichment_tables: enrichment::TableRegistry,
-}
-
-#[cfg(not(feature = "vrl"))]
-#[derive(Debug, Default)]
-pub struct TransformContext {
-    pub globals: GlobalOptions,
 }
 
 impl TransformContext {
