@@ -183,6 +183,7 @@ urls: {
 	fluentd:                                                  "https://www.fluentd.org/"
 	fluentbit:                                                "https://fluentbit.io/"
 	freebsd:                                                  "https://www.freebsd.org/"
+	gcra:                                                     "\(wikipedia)/wiki/Generic_cell_rate_algorithm"
 	gcp:                                                      "https://cloud.google.com"
 	gcp_authentication:                                       "\(gcp)/docs/authentication/"
 	gcp_authentication_api_key:                               "\(gcp)/docs/authentication/api-keys"
