@@ -50,7 +50,7 @@ pub struct KinesisSinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     // Deprecated name. Moved to auth.
-    assume_role: Option<String>,
+    pub assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
 }
@@ -78,7 +78,7 @@ impl KinesisSinkConfig {
         }
     }
 
-    fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisClient> {
+    pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisClient> {
         let region = (&self.region).try_into()?;
 
         let client = rusoto::client(proxy)?;

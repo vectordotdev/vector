@@ -11,6 +11,11 @@ use rusoto_core::Region;
 use rusoto_kinesis::{Kinesis, KinesisClient};
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
+use futures::StreamExt;
+use crate::config::SinkConfig;
+use crate::sinks::util::{BatchConfig, Compression};
+use crate::sinks::util::encoding::StandardEncodings;
+use super::service::KinesisService;
 
 #[tokio::test]
 async fn kinesis_put_records() {
@@ -27,7 +32,7 @@ async fn kinesis_put_records() {
         stream_name: stream.clone(),
         partition_key_field: None,
         region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
-        encoding: Encoding::Text.into(),
+        encoding: StandardEncodings::Text.into(),
         compression: Compression::None,
         batch: BatchConfig {
             max_events: Some(2),
@@ -41,14 +46,14 @@ async fn kinesis_put_records() {
     let cx = SinkContext::new_test();
 
     let client = config.create_client(cx.proxy()).unwrap();
-    let mut sink = KinesisService::new(config, client, cx).unwrap();
+    let mut sink = config.build(cx).await.unwrap().0;
 
     let timestamp = chrono::Utc::now().timestamp_millis();
 
     let (mut input_lines, events) = random_lines_with_stream(100, 11, None);
-    let mut events = events.map(Ok);
+    // let mut events = events.map(Ok);
 
-    let _ = sink.send_all(&mut events).await.unwrap();
+    let _ = sink.run(events).await.unwrap();
 
     sleep(Duration::from_secs(1)).await;
 

@@ -1,5 +1,5 @@
 use std::num::NonZeroUsize;
-use async_graphql::futures_util::stream::BoxStream;
+use futures::stream::BoxStream;
 use futures::StreamExt;
 use rand::random;
 use tower::util::BoxService;
