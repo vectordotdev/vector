@@ -53,7 +53,7 @@ impl Clone for PipelineConfig {
 }
 
 impl PipelineConfig {
-    fn into_serial(&self) -> Box<dyn TransformConfig> {
+    fn serial(&self) -> Box<dyn TransformConfig> {
         let pipelines: IndexMap<String, Box<dyn TransformConfig>> = self
             .transforms
             .iter()
@@ -88,14 +88,14 @@ impl EventTypeConfig {
         }
     }
 
-    fn into_serial(&self) -> Box<dyn TransformConfig> {
+    fn serial(&self) -> Box<dyn TransformConfig> {
         let pipelines: IndexMap<String, Box<dyn TransformConfig>> = self
             .names()
             .into_iter()
             .filter_map(|name| {
                 self.pipelines
                     .get(&name)
-                    .map(|config| (name, config.into_serial()))
+                    .map(|config| (name, config.serial()))
             })
             .collect();
 
@@ -113,22 +113,20 @@ pub struct PipelinesConfig {
 }
 
 impl PipelinesConfig {
-    fn into_parallel(&self) -> IndexMap<String, Box<dyn TransformConfig>> {
+    fn parallel(&self) -> IndexMap<String, Box<dyn TransformConfig>> {
         let mut map: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
 
         if !self.logs.is_empty() {
             map.insert(
                 "logs".to_string(),
-                Box::new(router::EventRouterConfig::log(self.logs.into_serial())),
+                Box::new(router::EventRouterConfig::log(self.logs.serial())),
             );
         }
 
         if !self.metrics.is_empty() {
             map.insert(
                 "metrics".to_string(),
-                Box::new(router::EventRouterConfig::metric(
-                    self.metrics.into_serial(),
-                )),
+                Box::new(router::EventRouterConfig::metric(self.metrics.serial())),
             );
         }
 
@@ -147,7 +145,7 @@ impl TransformConfig for PipelinesConfig {
         &mut self,
     ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
         Ok(Some((
-            self.into_parallel(),
+            self.parallel(),
             ExpandType::Parallel { aggregates: true },
         )))
     }

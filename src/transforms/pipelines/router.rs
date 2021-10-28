@@ -17,14 +17,14 @@ impl Default for EventType {
 }
 
 impl EventType {
-    fn validate(&self, event: &Event) -> bool {
+    const fn validate(&self, event: &Event) -> bool {
         match self {
             Self::Log => matches!(event, Event::Log(_)),
             Self::Metric => matches!(event, Event::Metric(_)),
         }
     }
 
-    fn into_data_type(&self) -> DataType {
+    const fn data_type(&self) -> DataType {
         match self {
             Self::Log => DataType::Log,
             Self::Metric => DataType::Metric,
@@ -85,7 +85,7 @@ impl TransformConfig for EventRouterConfig {
     }
 
     fn output_type(&self) -> DataType {
-        self.filter.into_data_type()
+        self.filter.data_type()
     }
 
     fn transform_type(&self) -> &'static str {
@@ -111,7 +111,7 @@ impl TransformConfig for EventFilterConfig {
     }
 
     fn output_type(&self) -> DataType {
-        self.inner.into_data_type()
+        self.inner.data_type()
     }
 
     fn transform_type(&self) -> &'static str {
