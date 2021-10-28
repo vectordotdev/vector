@@ -6,6 +6,7 @@ potential avenues for us to explore in order to optimise VRL.
 ## Context
 
 https://github.com/vectordotdev/vector/issues/6680
+
 https://github.com/vectordotdev/vector/issues/6770
 
 ## Scope
