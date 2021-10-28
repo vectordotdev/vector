@@ -134,6 +134,8 @@ mod syslog;
 mod tag_cardinality_limit;
 mod tcp;
 mod template;
+#[cfg(feature = "transforms-throttle")]
+mod throttle;
 #[cfg(feature = "transforms-tokenizer")]
 mod tokenizer;
 mod udp;
@@ -290,6 +292,8 @@ pub use self::syslog::*;
 pub(crate) use self::tag_cardinality_limit::*;
 pub use self::tcp::*;
 pub use self::template::*;
+#[cfg(feature = "transforms-throttle")]
+pub use self::throttle::*;
 #[cfg(feature = "transforms-tokenizer")]
 pub(crate) use self::tokenizer::*;
 pub use self::udp::*;
