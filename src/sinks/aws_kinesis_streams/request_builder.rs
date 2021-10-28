@@ -73,10 +73,6 @@ impl ByteSizeOf for KinesisRequest {
     }
 }
 
-pub struct KinesisPreEncodedEvent {
-
-}
-
 impl RequestBuilder<KinesisProcessedEvent> for KinesisRequestBuilder {
     type Metadata = Metadata;
     type Events = Event;
