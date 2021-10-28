@@ -25,18 +25,18 @@ more generic.
 
 ### Out of scope
 
-This proposal may unlock future optimizations because of the new data
-structures, such as parallelizing transforms with `rayon`. This is an
-important consideration, but not a driving feature of this proposal.
-
 - Future optimizations that may be unlocked by the proposed array data
   structures, such as parallelizing transforms with `rayon`.
 
-- The addition of new variants to the base `Event` type to support plans
-  for new data types such as traces.
+- The addition of new variants to the `Event` type to support plans for
+  new data types such as traces.
 
 - The addition of traits or other support to allow components to be more
   generic over different types of events.
+
+- Replacing the core `enum Event` type with the contained `LogEvent` and
+  `Metric` to be able to encode which variant a component accepts in the
+  type system.
 
 ## Proposal
 
@@ -53,7 +53,7 @@ performance changes.
 
 ### Implementation
 
-#### Introducing a new type for arrays of events
+#### Introducing a new types for arrays of events
 
 The simplest way to represent an arbitrary sized array of events is the
 built-in `Vec` type. However, in the short-term, most producing
@@ -68,14 +68,20 @@ metrics, and consuming components need to detect what type of data is
 contained in the array, this type is required to provide that
 information up-front in a similar manner the base `Event` type does.
 
+The internal types will are explicitly named to allow components to use
+the internal types without needing to know the implementation details.
+
 ```rust
+pub type LogVec = SmallVec<[LogEvent; 1]>;
+pub type MetricVec = SmallVec<[LogEvent; 1]>;
+
 pub enum EventVec {
-    Logs(SmallVec<[LogEvent; 1]>),
-    Metrics(SmallVec<[Metric; 1]>),
+    Logs(LogVec),
+    Metrics(MetricVec),
 }
 ```
 
-#### Generic event container trait
+#### Generic container traits
 
 Several of the components will need to be generic over what type of data
 they are handling, either a single `Event` or an array. This can be
@@ -83,18 +89,38 @@ simply modelled as an iterator using existing traits. We can add
 additional methods to this trait later as needed to support needs beyond
 simple iteration (ie batching in sinks).
 
+As above, this is broken down into separate container traits for each
+internal variant and the containing event enum. All implementations are
+expected to be trivial wrappers around existing iterators.
+
 ```rust
 trait EventContainer: ByteSizeOf {
-    type EventIter;
-    type LogIter;
-    type MetricIter;
+    type Iter;
     fn into_events(self) -> Self::EventIter;
-    fn into_logs(self) -> Self::LogIter;
-    fn into_metrics(self) -> Self::MetricIter;
 }
 
-impl IntoIterator for EventVec { … }
-impl IntoIterator for Event { … }
+impl EventContainer for Event { … }
+impl EventContainer for EventVec { … }
+impl EventContainer for LogEvent { … }
+impl EventContainer for LogVec { … }
+impl EventContainer for Metric { … }
+impl EventContainer for MetricVec { … }
+
+trait LogContainer: ByteSizeOf {
+    type Iter;
+    fn into_logs(self) -> Self::Iter;
+}
+
+impl LogContainer for LogEvent { … }
+impl LogContainer for LogVec { … }
+
+trait MetricContainer: ByteSizeOf {
+    type Iter;
+    fn into_metrics(self) -> Self::Iter;
+}
+
+impl MetricContainer for Metric { … }
+impl MetricContainer for MetricVec { … }
 ```
 
 #### Enhancing the `Pipeline`
@@ -260,3 +286,10 @@ both of which have challenges for actually manipulating the data:
    an event would be composed of many arrays.
 2. Flatten out the structure into an array of keys and replace the leaf
    values with an indexed array of arrays.
+
+As referenced at various points above, the core `Event` and `EventVec`
+types are enums over log and metric variants. This creates pain for
+components that can accept only one or the other, requiring them to
+detect the variant at run time. Some thought should go into moving
+towards a design that eliminates, or at least reduces, the need for this
+wrapper type and instead encodes the capabilities in the type system.
