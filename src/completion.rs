@@ -1,5 +1,5 @@
 use crate::cli::Opts as RootOpts;
-use structopt::{StructOpt, clap::Shell};
+use structopt::{clap::Shell, StructOpt};
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
