@@ -206,7 +206,7 @@ pub enum SubCommand {
     #[cfg(feature = "vrl-cli")]
     Vrl(vrl_cli::Opts),
 
-    /// Generate autocompletion scripts.
+    /// Output autocompletion scripts for the Vector CLI.
     Completion(completion::Opts),
 }
 

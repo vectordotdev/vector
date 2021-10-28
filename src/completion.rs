@@ -1,4 +1,4 @@
-use crate::cli::RootOpts;
+use crate::cli::Opts as RootOpts;
 use structopt::{StructOpt, clap::Shell};
 
 #[derive(StructOpt, Debug)]
@@ -13,7 +13,7 @@ fn possible_shell_values() -> [&'static str; 5] {
 }
 
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
-    RootOpts::clap().gen_completions(env!("CARGO_PKG_NAME"), opts.shell, "target");
+    RootOpts::clap().gen_completions_to("vector", opts.shell, &mut std::io::stdout());
 
     exitcode::OK
 }
