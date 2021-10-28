@@ -58,7 +58,7 @@ pub struct DatadogMetricsSink<S> {
 impl<S> DatadogMetricsSink<S>
 where
     S: Service<DatadogMetricsRequest> + Send,
-    S::Error: fmt::Debug + 'static,
+    S::Error: fmt::Debug + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse,
 {
@@ -123,7 +123,7 @@ where
 impl<S> StreamSink for DatadogMetricsSink<S>
 where
     S: Service<DatadogMetricsRequest> + Send,
-    S::Error: fmt::Debug + 'static,
+    S::Error: fmt::Debug + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse,
 {

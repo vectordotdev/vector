@@ -1,4 +1,4 @@
-use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable};
+use crate::event::{BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable};
 use crate::metrics::{AgentDDSketch, Handle};
 use crate::ByteSizeOf;
 use chrono::{DateTime, Utc};

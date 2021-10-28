@@ -16,13 +16,13 @@ use vector_core::{
 use crate::{
     config::SinkContext,
     sinks::{
-        splunk_hec::common::render_template_string,
+        splunk_hec::common::{render_template_string, request::HecRequest},
         util::{processed_event::ProcessedEvent, SinkBuilderExt},
     },
     template::Template,
 };
 
-use super::{request_builder::HecLogsRequestBuilder, service::HecLogsRequest};
+use super::request_builder::HecLogsRequestBuilder;
 
 pub struct HecLogsSink<S> {
     pub context: SinkContext,
@@ -38,7 +38,7 @@ pub struct HecLogsSink<S> {
 
 impl<S> HecLogsSink<S>
 where
-    S: Service<HecLogsRequest> + Send + 'static,
+    S: Service<HecRequest> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse + Send + 'static,
     S::Error: fmt::Debug + Into<crate::Error> + Send,
@@ -85,7 +85,7 @@ where
 #[async_trait]
 impl<S> StreamSink for HecLogsSink<S>
 where
-    S: Service<HecLogsRequest> + Send + 'static,
+    S: Service<HecRequest> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: DriverResponse + Send + 'static,
     S::Error: fmt::Debug + Into<crate::Error> + Send,

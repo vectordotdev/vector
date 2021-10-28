@@ -13,12 +13,14 @@ use futures::{future::BoxFuture, stream, SinkExt, StreamExt, TryFutureExt};
 use http::uri::Uri;
 use hyper::client::HttpConnector;
 use hyper_openssl::HttpsConnector;
+use hyper_proxy::ProxyConnector;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::task::{Context, Poll};
 use tonic::{body::BoxBody, IntoRequest};
 use tower::ServiceBuilder;
+use vector_core::config::proxy::ProxyConfig;
 use vector_core::ByteSizeOf;
 
 type Client = proto::Client<HyperSvc>;
@@ -86,7 +88,8 @@ fn with_default_scheme(address: &str, tls: bool) -> crate::Result<Uri> {
 
 fn new_client(
     tls_settings: &MaybeTlsSettings,
-) -> crate::Result<hyper::Client<HttpsConnector<HttpConnector>, BoxBody>> {
+    proxy_config: &ProxyConfig,
+) -> crate::Result<hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>> {
     let mut http = HttpConnector::new();
     http.enforce_http(false);
 
@@ -102,13 +105,16 @@ fn new_client(
         Ok(())
     });
 
-    Ok(hyper::Client::builder().http2_only(true).build(https))
+    let mut proxy = ProxyConnector::new(https).unwrap();
+    proxy_config.configure(&mut proxy)?;
+
+    Ok(hyper::Client::builder().http2_only(true).build(proxy))
 }
 
 #[derive(Clone)]
 struct HyperSvc {
     uri: Uri,
-    client: hyper::Client<HttpsConnector<HttpConnector>, BoxBody>,
+    client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
 }
 
 impl tower::Service<hyper::Request<BoxBody>> for HyperSvc {
@@ -139,7 +145,7 @@ impl VectorConfig {
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
         let uri = with_default_scheme(&self.address, tls.is_tls())?;
 
-        let client = new_client(&tls)?;
+        let client = new_client(&tls, cx.proxy())?;
 
         let healthcheck_uri = cx
             .healthcheck
