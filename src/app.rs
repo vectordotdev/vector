@@ -1,6 +1,6 @@
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
-    config, generate, graph, heartbeat, list, metrics,
+    completion, config, generate, graph, heartbeat, list, metrics,
     signal::{self, SignalTo},
     topology::{self, RunningTopology},
     trace, unit_test, validate,
@@ -143,6 +143,8 @@ impl Application {
                         SubCommand::Validate(v) => validate::validate(&v, color).await,
                         #[cfg(feature = "vrl-cli")]
                         SubCommand::Vrl(s) => vrl_cli::cmd::cmd(&s),
+
+                        SubCommand::Completion(c) => completion::cmd(&c),
                     };
 
                     return Err(code);

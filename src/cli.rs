@@ -1,4 +1,4 @@
-use crate::{config, generate, get_version, graph, list, unit_test, validate};
+use crate::{completion, config, generate, get_version, graph, list, unit_test, validate};
 use std::path::PathBuf;
 use structopt::{clap::AppSettings, StructOpt};
 
@@ -205,6 +205,9 @@ pub enum SubCommand {
     /// Vector Remap Language CLI
     #[cfg(feature = "vrl-cli")]
     Vrl(vrl_cli::Opts),
+
+    /// Generate autocompletion scripts.
+    Completion(completion::Opts),
 }
 
 #[derive(Debug, Clone, PartialEq)]

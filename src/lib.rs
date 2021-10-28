@@ -25,6 +25,7 @@ extern crate vrl_cli;
 #[macro_use]
 pub mod config;
 pub mod cli;
+pub mod completion;
 pub mod conditions;
 pub mod dns;
 #[cfg(feature = "docker")]
