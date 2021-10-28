@@ -90,7 +90,7 @@ impl KinesisSinkConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "sinks.aws_kinesis_streams")]
+#[typetag::serde(name = "aws_kinesis_streams")]
 impl SinkConfig for KinesisSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy)?;
@@ -132,7 +132,7 @@ impl SinkConfig for KinesisSinkConfig {
     }
 
     fn sink_type(&self) -> &'static str {
-        "sinks.aws_kinesis_streams"
+        "aws_kinesis_streams"
     }
 }
 
