@@ -146,13 +146,10 @@ impl TransformConfig for PipelinesConfig {
     fn expand(
         &mut self,
     ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
-        let mut map: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
-        map.insert(
-            "inner".to_string(),
-            Box::new(expander::ExpanderConfig::parallel(self.into_parallel())),
-        );
-
-        Ok(Some((map, ExpandType::Serial { alias: true })))
+        Ok(Some((
+            self.into_parallel(),
+            ExpandType::Parallel { aggregates: true },
+        )))
     }
 
     fn input_type(&self) -> DataType {

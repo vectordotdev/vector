@@ -11,13 +11,6 @@ pub struct ExpanderConfig {
 }
 
 impl ExpanderConfig {
-    pub fn parallel(inner: IndexMap<String, Box<dyn TransformConfig>>) -> Self {
-        Self {
-            mode: ExpandType::Parallel { aggregates: true },
-            inner,
-        }
-    }
-
     pub fn serial(inner: IndexMap<String, Box<dyn TransformConfig>>) -> Self {
         Self {
             mode: ExpandType::Serial { alias: true },
