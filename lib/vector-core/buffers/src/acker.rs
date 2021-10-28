@@ -59,9 +59,11 @@ impl Acker {
     }
 }
 
-impl <T> Ackable for Vec<T>
-where T: Ackable {
+impl<T> Ackable for Vec<T>
+where
+    T: Ackable,
+{
     fn ack_size(&self) -> usize {
-        self.iter().map(|x|x.ack_size()).sum()
+        self.iter().map(|x| x.ack_size()).sum()
     }
 }

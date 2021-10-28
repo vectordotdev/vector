@@ -1,24 +1,24 @@
 use std::convert::TryInto;
 
-use rusoto_core::RusotoError;
-use rusoto_kinesis::{DescribeStreamInput, Kinesis, KinesisClient, PutRecordsError};
 use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext};
 use crate::rusoto::{AwsAuthentication, RegionOrEndpoint};
 use crate::sinks::aws_kinesis_streams::service::KinesisService;
-use crate::sinks::util::{BatchConfig, BatchSettings, Compression, TowerRequestConfig};
 use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
+use crate::sinks::util::{BatchConfig, BatchSettings, Compression, TowerRequestConfig};
 use futures::FutureExt;
-use serde::{Serialize, Deserialize};
+use rusoto_core::RusotoError;
+use rusoto_kinesis::{DescribeStreamInput, Kinesis, KinesisClient, PutRecordsError};
+use serde::{Deserialize, Serialize};
 
+use super::service::KinesisResponse;
+use crate::rusoto;
 use crate::sinks::aws_kinesis_streams::request_builder::KinesisRequestBuilder;
 use crate::sinks::aws_kinesis_streams::sink::KinesisSink;
-use crate::sinks::{Healthcheck, VectorSink};
-use snafu::Snafu;
-use crate::rusoto;
 use crate::sinks::util::retries::RetryLogic;
 use crate::sinks::util::ServiceBuilderExt;
+use crate::sinks::{Healthcheck, VectorSink};
+use snafu::Snafu;
 use tower::ServiceBuilder;
-use super::service::KinesisResponse;
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -29,8 +29,8 @@ enum HealthcheckError {
     #[snafu(display("Stream names do not match, got {}, expected {}", name, stream_name))]
     StreamNamesMismatch { name: String, stream_name: String },
     #[snafu(display(
-    "Stream returned does not contain any streams that match {}",
-    stream_name
+        "Stream returned does not contain any streams that match {}",
+        stream_name
     ))]
     NoMatchingStreamName { stream_name: String },
 }
@@ -92,10 +92,7 @@ impl KinesisSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "sinks.aws_kinesis_streams")]
 impl SinkConfig for KinesisSinkConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy)?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
 
@@ -106,9 +103,7 @@ impl SinkConfig for KinesisSinkConfig {
             .parse_config(self.batch)?
             .into_batcher_settings()?;
 
-        let request_limits = self
-            .request
-            .unwrap_with(&TowerRequestConfig::default());
+        let request_limits = self.request.unwrap_with(&TowerRequestConfig::default());
 
         let service = ServiceBuilder::new()
             .settings(request_limits, KinesisRetryLogic)
@@ -148,7 +143,7 @@ impl GenerateConfig for KinesisSinkConfig {
             stream_name = "my-stream"
             encoding.codec = "json""#,
         )
-            .unwrap()
+        .unwrap()
     }
 }
 

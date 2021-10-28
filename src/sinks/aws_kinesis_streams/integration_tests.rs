@@ -1,21 +1,21 @@
 #![cfg(feature = "aws-kinesis-streams-integration-tests")]
 #![cfg(test)]
 
+use super::service::KinesisService;
 use super::*;
+use crate::config::SinkConfig;
+use crate::sinks::util::encoding::StandardEncodings;
+use crate::sinks::util::{BatchConfig, Compression};
 use crate::{
     config::SinkContext,
     rusoto::RegionOrEndpoint,
     test_util::{random_lines_with_stream, random_string},
 };
+use futures::StreamExt;
 use rusoto_core::Region;
 use rusoto_kinesis::{Kinesis, KinesisClient};
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
-use futures::StreamExt;
-use crate::config::SinkConfig;
-use crate::sinks::util::{BatchConfig, Compression};
-use crate::sinks::util::encoding::StandardEncodings;
-use super::service::KinesisService;
 
 #[tokio::test]
 async fn kinesis_put_records() {
@@ -132,4 +132,3 @@ async fn ensure_stream(region: Region, stream_name: String) {
 fn gen_stream() -> String {
     format!("test-{}", random_string(10).to_lowercase())
 }
-

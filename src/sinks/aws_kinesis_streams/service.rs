@@ -1,19 +1,17 @@
-use std::task::{Context, Poll};
 use futures::future::BoxFuture;
 use futures::TryFutureExt;
 use rusoto_core::RusotoError;
 use rusoto_kinesis::{Kinesis, KinesisClient, PutRecordsError, PutRecordsInput, PutRecordsOutput};
+use std::task::{Context, Poll};
 use tower::Service;
 use tracing::Instrument;
 
 use crate::sinks::aws_kinesis_streams::request_builder::KinesisRequest;
 
-
-use vector_core::internal_event::EventsSent;
-use vector_core::stream::DriverResponse;
 use crate::event::EventStatus;
 use crate::internal_events::AwsKinesisStreamsEventSent;
-
+use vector_core::internal_event::EventsSent;
+use vector_core::stream::DriverResponse;
 
 #[derive(Clone)]
 pub struct KinesisService {
@@ -23,7 +21,7 @@ pub struct KinesisService {
 
 pub struct KinesisResponse {
     count: usize,
-    events_byte_size: usize
+    events_byte_size: usize,
 }
 
 impl DriverResponse for KinesisResponse {
@@ -34,7 +32,7 @@ impl DriverResponse for KinesisResponse {
     fn events_sent(&self) -> EventsSent {
         EventsSent {
             count: self.count,
-            byte_size: self.events_byte_size
+            byte_size: self.events_byte_size,
         }
     }
 }
@@ -54,12 +52,17 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
             events = %requests.len(),
         );
 
-        let processed_bytes_total = requests.iter().map(|req|req.put_records_request.data.len()).sum();
-        let events_byte_size = requests.iter().map(|req|req.event_byte_size).sum();
+        let processed_bytes_total = requests
+            .iter()
+            .map(|req| req.put_records_request.data.len())
+            .sum();
+        let events_byte_size = requests.iter().map(|req| req.event_byte_size).sum();
         let count = requests.len();
 
-        let records = requests.into_iter().map(|req|req.put_records_request).collect();
-
+        let records = requests
+            .into_iter()
+            .map(|req| req.put_records_request)
+            .collect();
 
         let client = self.client.clone();
         let request = PutRecordsInput {
@@ -68,17 +71,19 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
         };
 
         Box::pin(async move {
-            let _response:PutRecordsOutput = client
+            let _response: PutRecordsOutput = client
                 .put_records(request)
                 .inspect_ok(|_| {
-                    emit!(&AwsKinesisStreamsEventSent { byte_size: processed_bytes_total });
+                    emit!(&AwsKinesisStreamsEventSent {
+                        byte_size: processed_bytes_total
+                    });
                 })
                 .instrument(info_span!("request"))
                 .await?;
 
             Ok(KinesisResponse {
                 count,
-                events_byte_size
+                events_byte_size,
             })
         })
     }

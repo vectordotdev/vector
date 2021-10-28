@@ -1,18 +1,18 @@
-use std::num::NonZeroUsize;
-use futures::stream::BoxStream;
-use futures::StreamExt;
-use rand::random;
-use tower::util::BoxService;
-use vector_core::partition::NullPartitioner;
-use vector_core::stream::BatcherSettings;
 use crate::buffers::Acker;
-use crate::Error;
 use crate::event::{Event, LogEvent};
 use crate::sinks::aws_kinesis_streams::request_builder::{KinesisRequest, KinesisRequestBuilder};
 use crate::sinks::aws_kinesis_streams::service::KinesisResponse;
+use crate::Error;
+use futures::stream::BoxStream;
+use futures::StreamExt;
+use rand::random;
+use std::num::NonZeroUsize;
+use tower::util::BoxService;
+use vector_core::partition::NullPartitioner;
+use vector_core::stream::BatcherSettings;
 
-use crate::sinks::util::{SinkBuilderExt, StreamSink};
 use crate::sinks::util::processed_event::ProcessedEvent;
+use crate::sinks::util::{SinkBuilderExt, StreamSink};
 use async_trait::async_trait;
 use futures::future;
 
@@ -27,7 +27,7 @@ pub struct KinesisSink {
     pub acker: Acker,
     pub service: BoxService<Vec<KinesisRequest>, KinesisResponse, Error>,
     pub request_builder: KinesisRequestBuilder,
-    pub partition_key_field: Option<String>
+    pub partition_key_field: Option<String>,
 }
 
 impl KinesisSink {
@@ -36,7 +36,7 @@ impl KinesisSink {
 
         let partition_key_field = self.partition_key_field.clone();
         let sink = input
-            .map(|event|{
+            .map(|event| {
                 // Panic: This sink only accepts Logs, so this should never panic
                 event.into_log()
             })
@@ -70,7 +70,6 @@ pub fn process_log(
     log: LogEvent,
     partition_key_field: &Option<String>,
 ) -> Option<KinesisProcessedEvent> {
-
     let partition_key = if let Some(partition_key_field) = partition_key_field {
         if let Some(v) = log.get(&partition_key_field) {
             v.to_string_lossy()
@@ -93,7 +92,7 @@ pub fn process_log(
 
     Some(KinesisProcessedEvent {
         event: log,
-        metadata: KinesisMetadata{ partition_key }
+        metadata: KinesisMetadata { partition_key },
     })
 }
 
