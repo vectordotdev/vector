@@ -25,10 +25,7 @@ impl Compression {
     /// Some callers can benefit from knowing whether or not compression is actually taking place,
     /// as different size limitations may come into play.
     pub const fn is_compressed(&self) -> bool {
-        match self {
-            Compression::None => false,
-            _ => true,
-        }
+        !matches!(self, Compression::None)
     }
 
     pub const fn gzip_default() -> Compression {

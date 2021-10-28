@@ -56,7 +56,7 @@ pub enum DatadogMetricsEndpoint {
 
 impl DatadogMetricsEndpoint {
     /// Gets the content type associated with the specific encoder for a given metric endpoint.
-    pub fn content_type(&self) -> &'static str {
+    pub const fn content_type(self) -> &'static str {
         match self {
             DatadogMetricsEndpoint::Series => "application/json",
             DatadogMetricsEndpoint::Sketches => "application/x-protobuf",
@@ -72,7 +72,7 @@ pub struct DatadogMetricsEndpointConfiguration {
 
 impl DatadogMetricsEndpointConfiguration {
     /// Creates a new `DatadogMEtricsEndpointConfiguration`.
-    pub fn new(series_endpoint: Uri, sketches_endpoint: Uri) -> Self {
+    pub const fn new(series_endpoint: Uri, sketches_endpoint: Uri) -> Self {
         Self {
             series_endpoint,
             sketches_endpoint,

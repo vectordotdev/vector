@@ -77,7 +77,7 @@ impl FinishError {
     /// Gets the telemetry-friendly string version of this error.
     ///
     /// The value will be a short string with only lowercase letters and underscores.
-    pub fn as_error_type(&self) -> &'static str {
+    pub const fn as_error_type(&self) -> &'static str {
         match self {
             Self::CompressionFailed { .. } => "compression_failed",
             Self::PendingEncodeFailed { .. } => "pendiong_encode_failed",
@@ -212,11 +212,10 @@ impl DatadogMetricsEncoder {
                 let has_processed = !self.state.processed.is_empty();
                 for (i, series) in all_series.iter().enumerate() {
                     // Add a array delimiter if we already have other metrics encoded.
-                    if has_processed || i > 0 {
-                        if let Err(_) = write_payload_delimiter(self.endpoint, &mut self.state.buf)
-                        {
-                            return Ok(Some(metric));
-                        }
+                    if (has_processed || i > 0)
+                        && write_payload_delimiter(self.endpoint, &mut self.state.buf).is_err()
+                    {
+                        return Ok(Some(metric));
                     }
                     let _ = serde_json::to_writer(&mut self.state.buf, series)
                         .context(JsonEncodingFailed)?;
@@ -336,7 +335,7 @@ impl DatadogMetricsEncoder {
         }
 
         // Consume of all of the "pending" metrics and try to write them out as sketches.
-        let pending = mem::replace(&mut self.state.pending, Vec::new());
+        let pending = mem::take(&mut self.state.pending);
         let _ = write_sketches(
             &pending,
             &self.default_namespace,
@@ -403,7 +402,7 @@ fn get_namespaced_name(metric: &Metric, default_namespace: &Option<Arc<str>>) ->
     encode_namespace(
         metric
             .namespace()
-            .or(default_namespace.as_ref().map(|s| s.as_ref())),
+            .or_else(|| default_namespace.as_ref().map(|s| s.as_ref())),
         '.',
         metric.name(),
     )
@@ -590,7 +589,7 @@ fn get_compressor() -> Compressor {
     Compressor::zlib_default()
 }
 
-fn max_uncompressed_header_len() -> usize {
+const fn max_uncompressed_header_len() -> usize {
     SERIES_PAYLOAD_HEADER.len() + SERIES_PAYLOAD_FOOTER.len()
 }
 
@@ -615,7 +614,7 @@ const fn max_compression_overhead_len(compressed_limit: usize) -> usize {
     HEADER_TRAILER + (1 + compressed_limit.saturating_sub(HEADER_TRAILER) / STORED_BLOCK_SIZE) * 5
 }
 
-fn validate_payload_size_limits(
+const fn validate_payload_size_limits(
     uncompressed_limit: usize,
     compressed_limit: usize,
 ) -> Option<(usize, usize)> {
@@ -959,24 +958,18 @@ mod tests {
                 uncompressed_limit,
                 compressed_limit,
             );
-            match result {
-                Ok(mut encoder) => {
-                    let _ = encoder.try_encode(metric);
+            if let Ok(mut encoder) = result {
+                let _ = encoder.try_encode(metric);
 
-                    match encoder.finish() {
-                        Ok((payload, _processed)) => {
-                            prop_assert!(payload.len() <= compressed_limit);
+                if let Ok((payload, _processed)) = encoder.finish() {
+                    prop_assert!(payload.len() <= compressed_limit);
 
-                            let result = decompress_payload(payload);
-                            prop_assert!(result.is_ok());
+                    let result = decompress_payload(payload);
+                    prop_assert!(result.is_ok());
 
-                            let decompressed = result.unwrap();
-                            prop_assert!(decompressed.len() <= uncompressed_limit);
-                        },
-                        _ => {},
-                    }
-                },
-                _ => {},
+                    let decompressed = result.unwrap();
+                    prop_assert!(decompressed.len() <= uncompressed_limit);
+                }
             }
         }
     }

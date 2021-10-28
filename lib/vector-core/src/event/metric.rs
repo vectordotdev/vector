@@ -199,8 +199,8 @@ impl MetricValue {
             MetricValue::Counter { .. } | MetricValue::Gauge { .. } => false,
             MetricValue::Set { values } => values.is_empty(),
             MetricValue::Distribution { samples, .. } => samples.is_empty(),
-            MetricValue::AggregatedSummary { count, .. } => *count == 0,
-            MetricValue::AggregatedHistogram { count, .. } => *count == 0,
+            MetricValue::AggregatedSummary { count, .. }
+            | MetricValue::AggregatedHistogram { count, .. } => *count == 0,
             MetricValue::Sketch { sketch } => sketch.is_empty(),
         }
     }
@@ -889,6 +889,15 @@ impl MetricValue {
                 // This is an ugly algorithm, but the use of a HashSet
                 // or equivalent is complicated by neither Hash nor Eq
                 // being implemented for the f64 part of Sample.
+                //
+                // TODO: This logic does not work if a value is repeated within a distribution. For
+                // example, if the current distribution is [1, 2, 3, 1, 2, 3] and the previous
+                // distribution is [1, 2, 3], this would yield a result of [].
+                //
+                // The only reasonable way we could provide subtraction, I believe, is if we
+                // required the ordering to stay the same, such that we would just take the samples
+                // from the non-overlapping region as the delta.  In the above example: length of
+                // samples from `other` would be 3, so delta would be `self.samples[3..]`.
                 *samples = samples
                     .iter()
                     .copied()

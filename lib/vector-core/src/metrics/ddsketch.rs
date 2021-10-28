@@ -35,7 +35,7 @@ fn lower_bound(gamma_v: f64, bias: i32, k: i16) -> f64 {
         return -lower_bound(gamma_v, bias, -k);
     }
 
-    if k == i16::max_value() {
+    if k == i16::MAX {
         return f64::INFINITY;
     }
 
@@ -43,7 +43,7 @@ fn lower_bound(gamma_v: f64, bias: i32, k: i16) -> f64 {
         return 0.0;
     }
 
-    pow_gamma(gamma_v, (k as i32 - bias) as f64)
+    pow_gamma(gamma_v, f64::from(i32::from(k) - bias))
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -66,6 +66,7 @@ struct Config {
 }
 
 impl Config {
+    #[allow(clippy::cast_possible_truncation)]
     pub(self) fn new(mut eps: f64, min_value: f64, bin_limit: u16) -> Self {
         assert!(eps > 0.0 && eps < 1.0, "eps must be between 0.0 and 1.0");
         assert!(min_value > 0.0, "min value must be greater than 0.0");
@@ -75,6 +76,8 @@ impl Config {
         let gamma_v = 1.0 + eps;
         let gamma_ln = eps.ln_1p();
 
+        // SAFETY: We expect `log_gamma` to return a value between -2^16 and 2^16, so it will always
+        // fit in an i32.
         let norm_eff_min = log_gamma(gamma_ln, min_value).floor() as i32;
         let norm_bias = -norm_eff_min + 1;
 
@@ -89,8 +92,8 @@ impl Config {
             bin_limit,
             gamma_v,
             gamma_ln,
-            norm_bias,
             norm_min,
+            norm_bias,
         }
     }
 
@@ -108,7 +111,7 @@ impl Config {
             return 0.0;
         }
 
-        self.pow_gamma((k as i32 - self.norm_bias) as f64)
+        self.pow_gamma(f64::from(i32::from(k) - self.norm_bias))
     }
 
     /// Gets the key for the given value.
@@ -414,6 +417,15 @@ impl AgentDDSketch {
     }
 
     fn insert_keys(&mut self, mut keys: Vec<i16>) {
+        // Updating more than 4 billion keys would be very very weird and likely indicative of
+        // something horribly broken.
+        assert!(
+            keys.len()
+                <= u32::MAX
+                    .try_into()
+                    .expect("we don't support 16-bit systems")
+        );
+
         keys.sort_unstable();
 
         let mut temp = Vec::new();
@@ -569,7 +581,8 @@ impl AgentDDSketch {
             oa.cmp(&ob)
         });
 
-        let mut lower = 0.0;
+        let mut lower = f64::NEG_INFINITY;
+        let mut total = 0;
 
         for bucket in buckets {
             let mut upper = bucket.upper_limit;
@@ -577,8 +590,17 @@ impl AgentDDSketch {
                 upper = lower;
             }
 
-            self.insert_interpolate_bucket(lower, upper, bucket.count);
+            // Each bucket should have a higher count than the last, since the logic of "contains
+            // this many samples under this upper limit" implies that once a value fits into a
+            // particular bucket, it fits into all subsequent buckets.
+            //
+            // Thus, we track the last bucket count and subtract it from the current bucket count to
+            // get the correct value for "how many items are in this bucket if we exclude the
+            // samples we've already accounted for?".
+            let bucket_count = bucket.count - total;
+            self.insert_interpolate_bucket(lower, upper, bucket_count);
             lower = bucket.upper_limit;
+            total = bucket.count;
         }
     }
 
@@ -791,9 +813,10 @@ pub(self) mod bin_serialization {
 }
 
 fn rank(count: u32, q: f64) -> f64 {
-    round_to_even(q * (count - 1) as f64)
+    round_to_even(q * f64::from(count - 1))
 }
 
+#[allow(clippy::cast_possible_truncation)]
 fn buf_count_leading_equal(keys: &[i16], start_idx: usize) -> u32 {
     if start_idx == keys.len() - 1 {
         return 1;
@@ -804,6 +827,8 @@ fn buf_count_leading_equal(keys: &[i16], start_idx: usize) -> u32 {
         idx += 1;
     }
 
+    // SAFETY: We limit the size of the vector (used to provide the slice given to us here) to be no
+    // larger than 2^32, so we can't exceed u32 here.
     (idx - start_idx) as u32
 }
 
@@ -822,13 +847,13 @@ fn trim_left(bins: &mut Vec<Bin>, bin_limit: u16) {
     for bin in bins.iter().take(num_to_remove) {
         missing += u32::from(bin.n);
 
-        if missing > MAX_BIN_WIDTH as u32 {
+        if missing > u32::from(MAX_BIN_WIDTH) {
             overflow.push(Bin {
                 k: bin.k,
                 n: MAX_BIN_WIDTH,
             });
 
-            missing -= MAX_BIN_WIDTH as u32;
+            missing -= u32::from(MAX_BIN_WIDTH);
         }
     }
 

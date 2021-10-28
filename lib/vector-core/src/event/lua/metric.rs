@@ -159,6 +159,7 @@ impl<'a> ToLua<'a> for Metric {
 }
 
 impl<'a> FromLua<'a> for Metric {
+    #[allow(clippy::too_many_lines)]
     fn from_lua(value: LuaValue<'a>, _: &'a Lua) -> LuaResult<Self> {
         let table = match &value {
             LuaValue::Table(table) => table,

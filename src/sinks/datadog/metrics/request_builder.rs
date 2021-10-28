@@ -34,7 +34,7 @@ pub enum RequestBuilderError {
 impl RequestBuilderError {
     /// Converts this error into its constituent parts: the error reason, and how many events were
     /// dropped as a result.
-    pub fn into_parts(self) -> (&'static str, u64) {
+    pub const fn into_parts(self) -> (&'static str, u64) {
         match self {
             Self::FailedToBuild { error_type } => (error_type, 0),
             Self::FailedToEncode {
