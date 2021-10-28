@@ -8,6 +8,8 @@ use tower::Service;
 use tracing_futures::Instrument;
 use vector_core::buffers::Ackable;
 use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
+use vector_core::internal_event::EventsSent;
+use vector_core::stream::DriverResponse;
 
 #[derive(Debug, Snafu)]
 pub enum LokiError {
@@ -18,13 +20,21 @@ pub enum LokiError {
 }
 
 #[derive(Debug, Snafu)]
-pub enum LokiResponse {
-    Success,
+pub struct LokiResponse {
+    batch_size: usize,
+    events_byte_size: usize,
 }
 
-impl AsRef<EventStatus> for LokiResponse {
-    fn as_ref(&self) -> &EventStatus {
-        &EventStatus::Delivered
+impl DriverResponse for LokiResponse {
+    fn event_status(&self) -> EventStatus {
+        EventStatus::Delivered
+    }
+
+    fn events_sent(&self) -> EventsSent {
+        EventsSent {
+            count: self.batch_size,
+            byte_size: self.events_byte_size,
+        }
     }
 }
 
@@ -33,6 +43,7 @@ pub struct LokiRequest {
     pub finalizers: EventFinalizers,
     pub payload: Vec<u8>,
     pub tenant_id: Option<String>,
+    pub events_byte_size: usize,
 }
 
 impl Ackable for LokiRequest {
@@ -87,13 +98,18 @@ impl Service<LokiRequest> for LokiService {
 
         let mut client = self.client.clone();
 
+        let batch_size = request.batch_size;
+        let events_byte_size = request.events_byte_size;
         Box::pin(async move {
             match client.call(req).in_current_span().await {
                 Ok(response) => {
                     let status = response.status();
 
                     match status {
-                        StatusCode::NO_CONTENT => Ok(LokiResponse::Success),
+                        StatusCode::NO_CONTENT => Ok(LokiResponse {
+                            batch_size,
+                            events_byte_size,
+                        }),
                         code => Err(LokiError::ServerError { code }),
                     }
                 }

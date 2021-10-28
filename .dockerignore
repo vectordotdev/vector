@@ -1,5 +1,4 @@
 *
-!.cargo
 !benches
 !lib
 !proto

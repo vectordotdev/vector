@@ -102,11 +102,9 @@ mod tests {
     };
 
     use crate::sinks::{
-        splunk_hec::common::{build_healthcheck, build_request},
+        splunk_hec::common::{build_healthcheck, build_request, create_client},
         util::Compression,
     };
-
-    use super::create_client;
 
     #[tokio::test]
     async fn test_build_healthcheck_200_response_returns_ok() {

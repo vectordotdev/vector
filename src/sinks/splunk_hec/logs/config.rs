@@ -6,7 +6,11 @@ use crate::{
     config::{GenerateConfig, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
-        splunk_hec::common::{build_healthcheck, create_client, host_key},
+        splunk_hec::common::{
+            build_healthcheck, create_client, host_key,
+            retry::HecRetryLogic,
+            service::{HecService, HttpRequestBuilder},
+        },
         util::{
             encoding::EncodingConfig, BatchConfig, BatchSettings, Buffer, Compression,
             ServiceBuilderExt, TowerRequestConfig,
@@ -19,13 +23,7 @@ use crate::{
 
 use serde::{Deserialize, Serialize};
 
-use super::{
-    encoder::HecLogsEncoder,
-    request_builder::HecLogsRequestBuilder,
-    retry::HecLogsRetry,
-    service::{HecLogsService, HttpRequestBuilder},
-    sink::HecLogsSink,
-};
+use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -110,8 +108,8 @@ impl HecSinkLogsConfig {
             compression: self.compression,
         };
         let service = ServiceBuilder::new()
-            .settings(request_settings, HecLogsRetry)
-            .service(HecLogsService::new(client, http_request_builder));
+            .settings(request_settings, HecRetryLogic)
+            .service(HecService::new(client, http_request_builder));
 
         let batch_settings = BatchSettings::<Buffer>::default()
             .bytes(1_000_000)
