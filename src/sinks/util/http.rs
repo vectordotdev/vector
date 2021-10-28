@@ -17,6 +17,7 @@ use hyper::{body, Body};
 use indexmap::IndexMap;
 use pin_project::pin_project;
 use serde::{Deserialize, Serialize};
+use std::marker::PhantomData;
 use std::{
     fmt,
     future::Future,
@@ -479,6 +480,66 @@ impl RetryLogic for HttpRetryLogic {
             )),
             _ if status.is_success() => RetryAction::Successful,
             _ => RetryAction::DontRetry(format!("response status: {}", status)),
+        }
+    }
+}
+
+/// A more generic version of `HttpRetryLogic` that accepts anything that can be converted
+/// to a status code
+#[derive(Debug)]
+pub struct HttpStatusRetryLogic<F, T> {
+    func: F,
+    request: PhantomData<T>,
+}
+
+impl<F, T> HttpStatusRetryLogic<F, T>
+where
+    F: Fn(&T) -> StatusCode + Clone + Send + Sync + 'static,
+    T: Send + Sync + 'static,
+{
+    pub fn new(func: F) -> HttpStatusRetryLogic<F, T> {
+        HttpStatusRetryLogic {
+            func,
+            request: PhantomData,
+        }
+    }
+}
+
+impl<F, T> RetryLogic for HttpStatusRetryLogic<F, T>
+where
+    F: Fn(&T) -> StatusCode + Clone + Send + Sync + 'static,
+    T: Send + Sync + 'static,
+{
+    type Error = HttpError;
+    type Response = T;
+
+    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
+        true
+    }
+
+    fn should_retry_response(&self, response: &T) -> RetryAction {
+        let status = (self.func)(response);
+
+        match status {
+            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
+            StatusCode::NOT_IMPLEMENTED => {
+                RetryAction::DontRetry("endpoint not implemented".into())
+            }
+            _ if status.is_server_error() => RetryAction::Retry(format!("Http Status: {}", status)),
+            _ if status.is_success() => RetryAction::Successful,
+            _ => RetryAction::DontRetry(format!("Http status: {}", status)),
+        }
+    }
+}
+
+impl<F, T> Clone for HttpStatusRetryLogic<F, T>
+where
+    F: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            func: self.func.clone(),
+            request: PhantomData,
         }
     }
 }
