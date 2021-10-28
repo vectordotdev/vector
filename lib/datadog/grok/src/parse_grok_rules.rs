@@ -50,7 +50,7 @@ pub enum Error {
 /// For further documentation and the full list of available matcher and filters check out https://docs.datadoghq.com/logs/processing/parsing
 pub fn parse_grok_rules(
     patterns: &[String],
-    aliases: BTreeMap<&str, String>,
+    aliases: BTreeMap<String, String>,
 ) -> Result<Vec<GrokRule>, Error> {
     let mut parsed_aliases: HashMap<String, ParsedGrokRule> = HashMap::new();
 
@@ -80,7 +80,7 @@ struct ParsedGrokRule {
 
 fn parse_pattern(
     pattern: &str,
-    aliases: &BTreeMap<&str, String>,
+    aliases: &BTreeMap<String, String>,
     parsed_aliases: &mut HashMap<String, ParsedGrokRule>,
     grok: &mut Grok,
 ) -> Result<GrokRule, Error> {
@@ -103,9 +103,9 @@ fn parse_pattern(
 }
 
 /// Parses a given rule to a pure grok pattern with a set of post-processing filters.
-fn parse_grok_rule<'a>(
-    rule: &'a str,
-    aliases: &BTreeMap<&'a str, String>,
+fn parse_grok_rule(
+    rule: &str,
+    aliases: &BTreeMap<String, String>,
     parsed_aliases: &mut HashMap<String, ParsedGrokRule>,
 ) -> Result<ParsedGrokRule, Error> {
     lazy_static! {
@@ -206,7 +206,7 @@ fn index_repeated_fields(grok_patterns: Vec<GrokPattern>) -> Vec<GrokPattern> {
 fn purify_grok_pattern(
     pattern: &GrokPattern,
     mut filters: &mut HashMap<LookupBuf, Vec<GrokFilter>>,
-    aliases: &BTreeMap<&str, String>,
+    aliases: &BTreeMap<String, String>,
     parsed_aliases: &mut HashMap<String, ParsedGrokRule>,
 ) -> Result<String, Error> {
     let mut res = String::new();

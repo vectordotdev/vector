@@ -10,6 +10,7 @@ license = "MPL-2.0"
 vrl = { path = "../core" }
 lookup_lib = {package = "lookup", path = "../../lookup" }
 datadog-search-syntax = { path = "../../datadog/search-syntax", optional = true }
+datadog-grok = { path = "../../datadog/grok", optional = true }
 
 base64 = { version = "0.13", optional = true }
 bytes = { version = "1.1.0", optional = true }
@@ -116,6 +117,7 @@ default = [
     "parse_duration",
     "parse_glog",
     "parse_grok",
+    "parse_groks",
     "parse_int",
     "parse_json",
     "parse_key_value",
@@ -237,6 +239,7 @@ parse_csv = ["csv"]
 parse_duration = ["rust_decimal", "lazy_static", "regex"]
 parse_glog = ["chrono", "lazy_static", "regex"]
 parse_grok = ["grok"]
+parse_groks = ["grok", "datadog-grok"]
 parse_int = []
 parse_json = ["serde_json"]
 parse_key_value = ["nom"]

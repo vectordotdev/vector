@@ -142,6 +142,8 @@ mod parse_duration;
 mod parse_glog;
 #[cfg(feature = "parse_grok")]
 mod parse_grok;
+#[cfg(feature = "parse_groks")]
+mod parse_groks;
 #[cfg(feature = "parse_int")]
 mod parse_int;
 #[cfg(feature = "parse_json")]
