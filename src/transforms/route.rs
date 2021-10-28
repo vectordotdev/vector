@@ -215,7 +215,7 @@ mod test {
 
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
-            r#"[{"first":{"type":"lane","condition":{"type":"check_fields","message.eq":"foo"}}},"Parallel"]"#
+            r#"[{"first":{"type":"lane","condition":{"type":"check_fields","message.eq":"foo"}}},{"Parallel":{"aggregates":false}}]"#
         );
     }
 }
