@@ -123,7 +123,7 @@ components: transforms: throttle: {
 
 			configuration: {
 				threshold: 1
-				window: 60
+				window:    60
 			}
 
 			output: [
@@ -149,14 +149,14 @@ components: transforms: throttle: {
 			sub_sections: [
 				{
 					title: "Buckets"
-					body:  """
+					body: """
 						The `throttle` transform buckets events into rate limiters based on the provided `key_field`, or a
 						single bucket if not provided. Each bucket is rate limited separately.
 						"""
 				},
 				{
 					title: "Quotas"
-					body:  """
+					body: """
 						Rate limiters use "cells" to determine if there is sufficient capacity for an event to successfully
 						pass through a rate limiter. Each event passing through the transform consumes an available cell,
 						if there is no available cell the event will be rate limited.
@@ -168,7 +168,7 @@ components: transforms: throttle: {
 				},
 				{
 					title: "Rate Limited Events"
-					body:  """
+					body: """
 						The rate limiter will allow up to `threshold` number of events through and drop any further events
 						for that particular bucket when the rate limiter is at capacity. Any event passed when the rate
 						limiter is at capacity will be discarded and tracked by an `events_discarded_total` metric tagged

@@ -397,9 +397,7 @@ jobs:
           command: check licenses
       - name: Check Cue docs
         if: needs.changes.outputs.cue == 'true'
-        run: |
-          cue version
-          make check-docs
+        run: make check-docs
       - name: Check Markdown
         if: needs.changes.outputs.markdown == 'true'
         run: make check-markdown
