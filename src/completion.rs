@@ -4,7 +4,7 @@ use structopt::{StructOpt, clap::Shell};
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
 pub struct Opts {
-    #[structopt(name = "SHELL")]
+    #[structopt(name = "SHELL", possible_values = &Shell::variants())]
     shell: Shell,
 }
 
