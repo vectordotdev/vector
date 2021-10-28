@@ -68,7 +68,7 @@ pub fn wrap(inner: Pin<EventStream>) -> Pin<EventStream> {
     Box::pin(utilization)
 }
 
-struct Timer {
+pub struct Timer {
     overall_start: Instant,
     span_start: Instant,
     waiting: bool,
@@ -85,7 +85,7 @@ struct Timer {
 /// to be of uniform length and used to aggregate span data into time-weighted
 /// averages.
 impl Timer {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             overall_start: Instant::now(),
             span_start: Instant::now(),
@@ -96,7 +96,7 @@ impl Timer {
     }
 
     /// Begin a new span representing time spent waiting
-    fn start_wait(&mut self) {
+    pub fn start_wait(&mut self) {
         if !self.waiting {
             self.end_span();
             self.waiting = true;
@@ -104,17 +104,17 @@ impl Timer {
     }
 
     /// Complete the current waiting span and begin a non-waiting span
-    fn stop_wait(&mut self) {
-        assert!(self.waiting);
-
-        self.end_span();
-        self.waiting = false;
+    pub fn stop_wait(&mut self) {
+        if self.waiting {
+            self.end_span();
+            self.waiting = false;
+        }
     }
 
     /// Meant to be called on a regular interval, this method calculates wait
     /// ratio since the last time it was called and reports the resulting
     /// utilization average.
-    fn report(&mut self) {
+    pub fn report(&mut self) {
         // End the current span so it can be accounted for, but do not change
         // whether or not we're in the waiting state. This way the next span
         // inherits the correct status.
