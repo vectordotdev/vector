@@ -459,7 +459,7 @@ impl TransformOuter<String> {
 
                 inputs = match expand_type {
                     ExpandType::Parallel { .. } => self.inputs.clone(),
-                    ExpandType::Serial => vec![full_name.to_string()],
+                    ExpandType::Serial { .. } => vec![full_name.to_string()],
                 }
             }
 
@@ -468,6 +468,15 @@ impl TransformOuter<String> {
                     key.clone(),
                     TransformOuter {
                         inputs: children.iter().map(ToString::to_string).collect(),
+                        inner: Box::new(Noop),
+                    },
+                );
+                children.push(key.clone());
+            } else if matches!(expand_type, ExpandType::Serial { alias: true }) {
+                transforms.insert(
+                    key.clone(),
+                    TransformOuter {
+                        inputs,
                         inner: Box::new(Noop),
                     },
                 );

@@ -4,7 +4,7 @@ mod router;
 use crate::config::{
     DataType, ExpandType, GenerateConfig, TransformConfig, TransformContext, TransformDescription,
 };
-use crate::transforms::{noop::Noop, Transform};
+use crate::transforms::Transform;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
@@ -54,14 +54,12 @@ impl Clone for PipelineConfig {
 
 impl PipelineConfig {
     fn into_serial(&self) -> Box<dyn TransformConfig> {
-        let mut pipelines: IndexMap<String, Box<dyn TransformConfig>> = self
+        let pipelines: IndexMap<String, Box<dyn TransformConfig>> = self
             .transforms
             .iter()
             .enumerate()
             .map(|(index, config)| (index.to_string(), config.clone()))
             .collect();
-
-        pipelines.insert("".to_string(), Box::new(Noop));
 
         Box::new(expander::ExpanderConfig::serial(pipelines))
     }
@@ -91,7 +89,7 @@ impl EventTypeConfig {
     }
 
     fn into_serial(&self) -> Box<dyn TransformConfig> {
-        let mut pipelines: IndexMap<String, Box<dyn TransformConfig>> = self
+        let pipelines: IndexMap<String, Box<dyn TransformConfig>> = self
             .names()
             .into_iter()
             .filter_map(|name| {
@@ -100,8 +98,6 @@ impl EventTypeConfig {
                     .map(|config| (name, config.into_serial()))
             })
             .collect();
-
-        pipelines.insert("".to_string(), Box::new(Noop));
 
         Box::new(expander::ExpanderConfig::serial(pipelines))
     }
@@ -155,9 +151,8 @@ impl TransformConfig for PipelinesConfig {
             "inner".to_string(),
             Box::new(expander::ExpanderConfig::parallel(self.into_parallel())),
         );
-        map.insert(String::new(), Box::new(Noop));
 
-        Ok(Some((map, ExpandType::Serial)))
+        Ok(Some((map, ExpandType::Serial { alias: true })))
     }
 
     fn input_type(&self) -> DataType {

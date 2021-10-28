@@ -55,7 +55,7 @@ impl TransformConfig for CompoundConfig {
         }
 
         if !map.is_empty() {
-            Ok(Some((map, ExpandType::Serial)))
+            Ok(Some((map, ExpandType::Serial { alias: false })))
         } else {
             Err("must specify at least one transform".into())
         }
