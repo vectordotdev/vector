@@ -103,17 +103,37 @@ components: transforms: throttle: {
 
 	how_it_works: {
 		rate_limiting: {
-			title: "Rate Limited Events"
-			body: #"""
-				The `throttle` transform buckets events into rate limiters based on the provided `key_field`, or a
-				single bucket if not provided. The rate limiter will allow up to `threshold` number of events through and
-				drop any further events for that particular bucket. Any event above the configured rate limit will be
-				discarded and exposed by an `events_discarded_total` metric.
-				
-				This limit will replenish based on the configured `window` option, such that when the `threshold` has
-				been reached it will be fully replenished after the the entire `window` duration has passed. This is
-				replenished incrementally throughout the `window` period.
+			title: "Rate Limiting"
+			body:  #"""
+        The `throttle` transform will spread load across the configured `window`, ensuring that each bucket's
+        throughput averages out to the `threshold` per `window`. It utilizes a Generic Cell Rate Algorithm to
+        rate limit the event stream.
 				"""#
+			sub_sections: [
+				{
+					title: "Buckets"
+					body:  """
+            The `throttle` transform buckets events into rate limiters based on the provided `key_field`, or a
+            single bucket if not provided. Each bucket is rate limited separately.
+						"""
+				},
+				{
+					title: "Quotas"
+					body:  """
+						Rate limiters are configured with a `Quota` to determine if there is sufficient capacity for an
+            event to successfully pass through a rate limiter.
+						"""
+				},
+				{
+					title: "Rate Limited Events"
+					body:  """
+            The rate limiter will allow up to `threshold` number of events through and drop any further events
+            for that particular bucket when the rate limiter is at capacity. Any event passed when the rate
+            limiter is at capacity will be discarded and tracked by an `events_discarded_total` metric tagged
+            by the bucket's `key`.
+						"""
+				},
+			]
 		}
 	}
 }
