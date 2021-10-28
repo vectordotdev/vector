@@ -161,3 +161,14 @@ impl RetryLogic for KinesisRetryLogic {
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use crate::sinks::aws_kinesis_streams::config::KinesisSinkConfig;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<KinesisSinkConfig>();
+    }
+}
