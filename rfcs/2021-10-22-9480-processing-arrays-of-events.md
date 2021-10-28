@@ -143,6 +143,27 @@ existing sources.
 impl Sink<EventVec> for Pipeline { … }
 ```
 
+`Pipeline` internally stores a dequeue of `Event`. In order for it to
+handle arrays of events, the simplest conversion would be to have a
+similar deque of `EventVec`. In this form, each send into the pipeline
+will simply push a new array onto the dequeue.
+
+With this form in place, a useful optimization is possible. Since most
+sources only send a single event type into the pipeline, we can extend
+the last item on the current queue with new items if the variants
+match. This allows us to collect events from sources that emit a single
+event at a time into arrays that can be forwarded to consumers.
+
+```rust
+pub struct Pipeline {
+    inner: mpsc::Sender<Event>,
+    // We really just keep this around in case we need to rebuild.
+    #[derivative(Debug = "ignore")]
+    inlines: Vec<Box<dyn FunctionTransform>>,
+    enqueued: VecDeque<EventVec>,
+}
+```
+
 #### Arrays of events in transforms
 
 There currently exist three types of transforms, expressed as traits:
@@ -251,10 +272,16 @@ individual events, at least initially. The `SmallVec` type allows for
 sending those single events as efficiently as we did previously, while
 switching to a `Vec` when more than one is in the array.
 
-Additionally, having an array of the `Event` type means that consuming
-components are required to switch on each event emitted from the
-iteration, thus preventing any real optimizations in transforms and
+Additionally, having an array of the `Event` type directly means that
+consuming components are required to switch on each event emitted from
+the iteration, thus preventing any real optimizations in transforms and
 sinks.
+
+Given the event container traits, the pipeline could be made generic
+over the container trait and then work for any kind of input sent to
+it. However, sources sending a single event will require the pipeline to
+create an event array, while those sending arrays can avoid that process
+of reallocation and moving data.
 
 ## Outstanding Questions
 
