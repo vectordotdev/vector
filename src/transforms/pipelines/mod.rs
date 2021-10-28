@@ -8,7 +8,7 @@ use crate::transforms::Transform;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
-const SAMPLE_CONFIG: &'static str = r#"[logs]
+const SAMPLE_CONFIG: &str = r#"[logs]
 order = ["foo", "bar"]
 
 [logs.pipelines.foo]
