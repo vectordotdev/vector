@@ -184,6 +184,11 @@ mod tests {
     use super::{PipelinesConfig, SAMPLE_CONFIG};
 
     #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<PipelinesConfig>();
+    }
+
+    #[test]
     fn parsing() {
         let config = PipelinesConfig::from_toml(SAMPLE_CONFIG);
         assert_eq!(config.logs.pipelines.len(), 2);
