@@ -20,7 +20,7 @@ impl ExpanderConfig {
 
     pub fn serial(inner: IndexMap<String, Box<dyn TransformConfig>>) -> Self {
         Self {
-            mode: ExpandType::Serial,
+            mode: ExpandType::Serial { alias: true },
             inner,
         }
     }

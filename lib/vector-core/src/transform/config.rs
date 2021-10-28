@@ -12,7 +12,7 @@ pub enum DataType {
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 pub enum ExpandType {
     Parallel { aggregates: bool },
-    Serial,
+    Serial { alias: bool },
 }
 
 #[cfg(feature = "vrl")]

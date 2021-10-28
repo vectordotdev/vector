@@ -1,6 +1,6 @@
 use crate::config::{DataType, ExpandType, TransformConfig, TransformContext};
 use crate::event::Event;
-use crate::transforms::{noop::Noop, FunctionTransform, Transform};
+use crate::transforms::{FunctionTransform, Transform};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
@@ -74,8 +74,7 @@ impl TransformConfig for EventRouterConfig {
                 }),
             );
             res.insert("inner".to_string(), inner.clone());
-            res.insert(String::new(), Box::new(Noop));
-            Ok(Some((res, ExpandType::Serial)))
+            Ok(Some((res, ExpandType::Serial { alias: true })))
         } else {
             Err("must specify at least one pipeline".into())
         }
