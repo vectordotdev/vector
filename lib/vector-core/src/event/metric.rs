@@ -1,4 +1,4 @@
-use crate::event::{EventFinalizers, Finalizable, BatchNotifier, EventMetadata, EventFinalizer};
+use crate::event::{BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable};
 use crate::metrics::Handle;
 use crate::ByteSizeOf;
 use chrono::{DateTime, Utc};
