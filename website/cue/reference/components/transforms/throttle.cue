@@ -141,11 +141,11 @@ components: transforms: throttle: {
 	how_it_works: {
 		rate_limiting: {
 			title: "Rate Limiting"
-			body:  #"""
+			body:  """
 				The `throttle` transform will spread load across the configured `window`, ensuring that each bucket's
-				throughput averages out to the `threshold` per `window`. It utilizes a [Generic Cell Rate Algorithm](\(url.gcra) to
+				throughput averages out to the `threshold` per `window`. It utilizes a [Generic Cell Rate Algorithm](\(urls.gcra)) to
 				rate limit the event stream.
-				"""#
+				"""
 			sub_sections: [
 				{
 					title: "Buckets"
