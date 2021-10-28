@@ -165,6 +165,37 @@ fn get_basic_auth(authority: &Authority) -> (Authority, Option<Auth>) {
     }
 }
 
+/// Simplify the URI into a protocol and endpoint by removing the
+/// "query" portion of the `path_and_query`.
+pub fn protocol_endpoint(uri: Uri) -> (String, String) {
+    let mut parts = uri.into_parts();
+
+    // Drop any username and password
+    parts.authority = parts.authority.map(|auth| {
+        let host = auth.host();
+        match auth.port() {
+            None => host.to_string(),
+            Some(port) => format!("{}:{}", host, port),
+        }
+        .parse()
+        .unwrap_or_else(|_| unreachable!())
+    });
+
+    // Drop the query and fragment
+    parts.path_and_query = parts.path_and_query.map(|pq| {
+        pq.path()
+            .parse::<PathAndQuery>()
+            .unwrap_or_else(|_| unreachable!())
+    });
+
+    (
+        parts.scheme.clone().unwrap_or(Scheme::HTTP).as_str().into(),
+        Uri::from_parts(parts)
+            .unwrap_or_else(|_| unreachable!())
+            .to_string(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -211,5 +242,23 @@ mod tests {
         );
 
         test_parse("user@example.com", "example.com", Some(("user", "")));
+    }
+
+    #[test]
+    fn protocol_endpoint_parses_urls() {
+        let parse = |uri: &str| protocol_endpoint(uri.parse().unwrap());
+
+        assert_eq!(
+            parse("http://example.com/"),
+            ("http".into(), "http://example.com/".into())
+        );
+        assert_eq!(
+            parse("https://user:pass@example.org:123/path?query"),
+            ("https".into(), "https://example.org:123/path".into())
+        );
+        assert_eq!(
+            parse("gopher://example.net:123/path?query#frag,emt"),
+            ("gopher".into(), "gopher://example.net:123/path".into())
+        );
     }
 }

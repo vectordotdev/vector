@@ -1,7 +1,7 @@
 use super::{
     retries::{RetryAction, RetryLogic},
     sink::{self, ServiceLogic},
-    Batch, ElementCount, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink,
+    uri, Batch, ElementCount, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink,
     TowerRequestConfig, TowerRequestSettings,
 };
 use crate::{
@@ -12,7 +12,7 @@ use crate::{
 };
 use bytes::{Buf, Bytes};
 use futures::{future::BoxFuture, ready, Sink};
-use http::{uri::PathAndQuery, uri::Scheme, StatusCode, Uri};
+use http::StatusCode;
 use hyper::{body, Body};
 use indexmap::IndexMap;
 use pin_project::pin_project;
@@ -402,25 +402,14 @@ where
             let request = request_builder(body).await?;
             let byte_size = request.body().len();
             let request = request.map(Body::from);
-
-            // Simplify the URI in the request to remove the "query" portion.
-            let mut parts = request.uri().clone().into_parts();
-            parts.path_and_query = parts.path_and_query.map(|pq| {
-                pq.path()
-                    .parse::<PathAndQuery>()
-                    .unwrap_or_else(|_| unreachable!())
-            });
-            let scheme = parts.scheme.clone();
-            let endpoint = Uri::from_parts(parts)
-                .unwrap_or_else(|_| unreachable!())
-                .to_string();
+            let (protocol, endpoint) = uri::protocol_endpoint(request.uri().clone());
 
             let response = http_client.call(request).await?;
 
             if response.status().is_success() {
                 emit!(&EndpointBytesSent {
                     byte_size,
-                    protocol: scheme.unwrap_or(Scheme::HTTP).as_str(),
+                    protocol: &protocol,
                     endpoint: &endpoint
                 });
             }
