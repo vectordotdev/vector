@@ -10,7 +10,7 @@ use crate::Error;
 use crate::event::{Event, LogEvent};
 use crate::sinks::aws_kinesis_streams::request_builder::{KinesisRequest, KinesisRequestBuilder};
 use crate::sinks::aws_kinesis_streams::service::KinesisResponse;
-use crate::sinks::elasticsearch::ElasticSearchCommonMode;
+
 use crate::sinks::util::{SinkBuilderExt, StreamSink};
 use crate::sinks::util::processed_event::ProcessedEvent;
 use async_trait::async_trait;
@@ -67,7 +67,7 @@ impl StreamSink for KinesisSink {
 }
 
 pub fn process_log(
-    mut log: LogEvent,
+    log: LogEvent,
     partition_key_field: &Option<String>,
 ) -> Option<KinesisProcessedEvent> {
 

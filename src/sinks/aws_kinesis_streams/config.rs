@@ -1,7 +1,7 @@
 use std::convert::TryInto;
-use std::num::NonZeroUsize;
+
 use rusoto_core::RusotoError;
-use rusoto_kinesis::{DescribeStreamInput, Kinesis, KinesisClient, PutRecordsError, PutRecordsOutput};
+use rusoto_kinesis::{DescribeStreamInput, Kinesis, KinesisClient, PutRecordsError};
 use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext};
 use crate::rusoto::{AwsAuthentication, RegionOrEndpoint};
 use crate::sinks::aws_kinesis_streams::service::KinesisService;
@@ -9,7 +9,7 @@ use crate::sinks::util::{BatchConfig, BatchSettings, Compression, TowerRequestCo
 use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
 use futures::FutureExt;
 use serde::{Serialize, Deserialize};
-use vector_core::stream::BatcherSettings;
+
 use crate::sinks::aws_kinesis_streams::request_builder::KinesisRequestBuilder;
 use crate::sinks::aws_kinesis_streams::sink::KinesisSink;
 use crate::sinks::{Healthcheck, VectorSink};

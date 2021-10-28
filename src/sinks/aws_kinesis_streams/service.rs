@@ -5,10 +5,10 @@ use rusoto_core::RusotoError;
 use rusoto_kinesis::{Kinesis, KinesisClient, PutRecordsError, PutRecordsInput, PutRecordsOutput};
 use tower::Service;
 use tracing::Instrument;
-use crate::sinks::aws_kinesis_streams::config::KinesisSinkConfig;
+
 use crate::sinks::aws_kinesis_streams::request_builder::KinesisRequest;
-use crate::sinks::util::sink;
-use std::fmt;
+
+
 use vector_core::internal_event::EventsSent;
 use vector_core::stream::DriverResponse;
 use crate::event::EventStatus;
@@ -68,7 +68,7 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
         };
 
         Box::pin(async move {
-            let response:PutRecordsOutput = client
+            let _response:PutRecordsOutput = client
                 .put_records(request)
                 .inspect_ok(|_| {
                     emit!(&AwsKinesisStreamsEventSent { byte_size: processed_bytes_total });

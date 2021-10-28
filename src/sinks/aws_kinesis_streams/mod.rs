@@ -7,37 +7,20 @@ mod request_builder;
 
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
-    },
-    event::Event,
-    internal_events::AwsKinesisStreamsEventSent,
-    rusoto::{self, AwsAuthentication, RegionOrEndpoint},
-    sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration},
-        retries::RetryLogic,
-        sink::Response,
-        BatchConfig, BatchSettings, Compression, EncodedEvent, EncodedLength, TowerRequestConfig,
-        VecBuffer,
+        SinkDescription,
     },
 };
-use bytes::Bytes;
-use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
-use rand::random;
-use rusoto_core::RusotoError;
-use rusoto_kinesis::{
-    DescribeStreamInput, Kinesis, KinesisClient, PutRecordsError, PutRecordsInput,
-    PutRecordsOutput, PutRecordsRequestEntry,
-};
-use serde::{Deserialize, Serialize};
-use snafu::Snafu;
-use std::{
-    convert::TryInto,
-    fmt,
-    task::{Context, Poll},
-};
-use tower::Service;
-use tracing_futures::Instrument;
-use vector_core::ByteSizeOf;
+
+
+
+
+
+
+
+
+
+
+
 use config::KinesisSinkConfig;
 
 
