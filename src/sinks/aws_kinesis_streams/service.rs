@@ -58,7 +58,7 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
         let events_byte_size = requests.iter().map(|req|req.event_byte_size).sum();
         let count = requests.len();
 
-        let records = requests.iter().map(|req|req.put_records_request).collect();
+        let records = requests.into_iter().map(|req|req.put_records_request).collect();
 
 
         let client = self.client.clone();

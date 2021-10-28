@@ -66,7 +66,6 @@ impl ByteSizeOf for KinesisRequest {
         // the batching consistent with the pre-sink rewrite behavior
         self.encoded_length()
 
-        self.put_records_request.
     }
 
     fn allocated_bytes(&self) -> usize {

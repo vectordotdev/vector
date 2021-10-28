@@ -18,7 +18,7 @@ use crate::rusoto;
 use crate::sinks::util::retries::RetryLogic;
 use crate::sinks::util::ServiceBuilderExt;
 use tower::ServiceBuilder;
-
+use super::service::KinesisResponse;
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -99,7 +99,7 @@ impl SinkConfig for KinesisSinkConfig {
         let client = self.create_client(&cx.proxy)?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
 
-        let batch_settings = BatchSettings::default()
+        let batch_settings = BatchSettings::<()>::default()
             .bytes(5_000_000)
             .events(500)
             .timeout(1)
@@ -119,7 +119,7 @@ impl SinkConfig for KinesisSinkConfig {
 
         let request_builder = KinesisRequestBuilder {
             compression: self.compression,
-            encoder: self.encoding,
+            encoder: self.encoding.clone(),
         };
 
         let sink = KinesisSink {

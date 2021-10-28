@@ -34,12 +34,13 @@ impl KinesisSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let request_builder_concurrency_limit = NonZeroUsize::new(50);
 
+        let partition_key_field = self.partition_key_field.clone();
         let sink = input
             .map(|event|{
                 // Panic: This sink only accepts Logs, so this should never panic
                 event.into_log()
             })
-            .filter_map(move |log| future::ready(process_log(log, &self.partition_key_field)))
+            .filter_map(move |log| future::ready(process_log(log, &partition_key_field)))
             .request_builder(request_builder_concurrency_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
