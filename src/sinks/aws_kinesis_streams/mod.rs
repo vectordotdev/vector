@@ -38,7 +38,6 @@ use std::{
 use tower::Service;
 use tracing_futures::Instrument;
 use vector_core::ByteSizeOf;
-use crate::sinks::aws_kinesis_streams::config::Encoding;
 use config::KinesisSinkConfig;
 
 
@@ -46,36 +45,10 @@ inventory::submit! {
     SinkDescription::new::<KinesisSinkConfig>("sinks.aws_kinesis_streams")
 }
 
-impl EncodedLength for PutRecordsRequestEntry {
-    fn encoded_length(&self) -> usize {
-        // data is base64 encoded
-        (self.data.len() + 2) / 3 * 4
-            + self
-            .explicit_hash_key
-            .as_ref()
-            .map(|s| s.len())
-            .unwrap_or_default()
-            + self.partition_key.len()
-            + 10
-    }
-}
 
-impl Response for PutRecordsOutput {}
+// impl Response for PutRecordsOutput {}
 
-#[derive(Debug, Clone)]
-struct KinesisRetryLogic;
 
-impl RetryLogic for KinesisRetryLogic {
-    type Error = RusotoError<PutRecordsError>;
-    type Response = PutRecordsOutput;
-
-    fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        match error {
-            RusotoError::Service(PutRecordsError::ProvisionedThroughputExceeded(_)) => true,
-            error => rusoto::is_retriable_error(error),
-        }
-    }
-}
 
 
 

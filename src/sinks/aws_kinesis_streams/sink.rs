@@ -2,25 +2,35 @@ use std::num::NonZeroUsize;
 use async_graphql::futures_util::stream::BoxStream;
 use futures::StreamExt;
 use rand::random;
+use tower::util::BoxService;
 use vector_core::partition::NullPartitioner;
 use vector_core::stream::BatcherSettings;
+use crate::buffers::Acker;
+use crate::Error;
 use crate::event::{Event, LogEvent};
+use crate::sinks::aws_kinesis_streams::request_builder::{KinesisRequest, KinesisRequestBuilder};
+use crate::sinks::aws_kinesis_streams::service::KinesisResponse;
 use crate::sinks::elasticsearch::ElasticSearchCommonMode;
 use crate::sinks::util::{SinkBuilderExt, StreamSink};
 use crate::sinks::util::processed_event::ProcessedEvent;
+use async_trait::async_trait;
+use futures::future;
 
 pub type KinesisProcessedEvent = ProcessedEvent<LogEvent, KinesisMetadata>;
 
 pub struct KinesisMetadata {
-    partition_key: String,
+    pub partition_key: String,
 }
 
 pub struct KinesisSink {
     pub batch_settings: BatcherSettings,
+    pub acker: Acker,
+    pub service: BoxService<Vec<KinesisRequest>, KinesisResponse, Error>,
+    pub request_builder: KinesisRequestBuilder,
+    pub partition_key_field: Option<String>
 }
 
-
-impl StreamSink for KinesisSink {
+impl KinesisSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let request_builder_concurrency_limit = NonZeroUsize::new(50);
 
@@ -29,7 +39,7 @@ impl StreamSink for KinesisSink {
                 // Panic: This sink only accepts Logs, so this should never panic
                 event.into_log()
             })
-            .filter_map(move |log| future::ready(process_log(log)))
+            .filter_map(move |log| future::ready(process_log(log, &self.partition_key_field)))
             .request_builder(request_builder_concurrency_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
@@ -45,6 +55,13 @@ impl StreamSink for KinesisSink {
             .into_driver(self.service, self.acker);
 
         sink.run().await
+    }
+}
+
+#[async_trait]
+impl StreamSink for KinesisSink {
+    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        self.run(input).await
     }
 }
 

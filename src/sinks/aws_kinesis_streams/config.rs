@@ -1,12 +1,24 @@
 use std::convert::TryInto;
+use std::num::NonZeroUsize;
 use rusoto_core::RusotoError;
-use rusoto_kinesis::{DescribeStreamInput, Kinesis, KinesisClient};
+use rusoto_kinesis::{DescribeStreamInput, Kinesis, KinesisClient, PutRecordsError, PutRecordsOutput};
 use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext};
 use crate::rusoto::{AwsAuthentication, RegionOrEndpoint};
 use crate::sinks::aws_kinesis_streams::service::KinesisService;
-use crate::sinks::util::{BatchConfig, Compression, TowerRequestConfig};
+use crate::sinks::util::{BatchConfig, BatchSettings, Compression, TowerRequestConfig};
 use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
 use futures::FutureExt;
+use serde::{Serialize, Deserialize};
+use vector_core::stream::BatcherSettings;
+use crate::sinks::aws_kinesis_streams::request_builder::KinesisRequestBuilder;
+use crate::sinks::aws_kinesis_streams::sink::KinesisSink;
+use crate::sinks::{Healthcheck, VectorSink};
+use snafu::Snafu;
+use crate::rusoto;
+use crate::sinks::util::retries::RetryLogic;
+use crate::sinks::util::ServiceBuilderExt;
+use tower::ServiceBuilder;
+
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -83,14 +95,41 @@ impl SinkConfig for KinesisSinkConfig {
     async fn build(
         &self,
         cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy)?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
-        // let sink = KinesisService::new(self.clone(), client, cx)?;
-        let sink = KinesisSink {
 
+        let batch_settings = BatchSettings::default()
+            .bytes(5_000_000)
+            .events(500)
+            .timeout(1)
+            .parse_config(self.batch)?
+            .into_batcher_settings()?;
+
+        let request_limits = self
+            .request
+            .unwrap_with(&TowerRequestConfig::default());
+
+        let service = ServiceBuilder::new()
+            .settings(request_limits, KinesisRetryLogic)
+            .service(KinesisService {
+                client,
+                stream_name: self.stream_name.clone(),
+            });
+
+        let request_builder = KinesisRequestBuilder {
+            compression: self.compression,
+            encoder: self.encoding,
         };
-        Ok((super::VectorSink::Stream(Box::new(sink)), healthcheck))
+
+        let sink = KinesisSink {
+            batch_settings,
+            acker: cx.acker(),
+            service,
+            request_builder,
+            partition_key_field: self.partition_key_field.clone(),
+        };
+        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -110,5 +149,20 @@ impl GenerateConfig for KinesisSinkConfig {
             encoding.codec = "json""#,
         )
             .unwrap()
+    }
+}
+
+#[derive(Debug, Clone)]
+struct KinesisRetryLogic;
+
+impl RetryLogic for KinesisRetryLogic {
+    type Error = RusotoError<PutRecordsError>;
+    type Response = KinesisResponse;
+
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        match error {
+            RusotoError::Service(PutRecordsError::ProvisionedThroughputExceeded(_)) => true,
+            error => rusoto::is_retriable_error(error),
+        }
     }
 }

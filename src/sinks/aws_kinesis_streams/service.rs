@@ -6,7 +6,6 @@ use rusoto_kinesis::{Kinesis, KinesisClient, PutRecordsError, PutRecordsInput, P
 use tower::Service;
 use tracing::Instrument;
 use crate::sinks::aws_kinesis_streams::config::KinesisSinkConfig;
-use crate::sinks::aws_kinesis_streams::encode_event;
 use crate::sinks::aws_kinesis_streams::request_builder::KinesisRequest;
 use crate::sinks::util::sink;
 use std::fmt;
@@ -18,47 +17,13 @@ use crate::internal_events::AwsKinesisStreamsEventSent;
 
 #[derive(Clone)]
 pub struct KinesisService {
-    client: KinesisClient,
-    config: KinesisSinkConfig,
+    pub client: KinesisClient,
+    pub stream_name: String,
 }
 
-// impl KinesisService {
-//     pub fn new(
-//         config: KinesisSinkConfig,
-//         client: KinesisClient,
-//         cx: SinkContext,
-//     ) -> crate::Result<impl Sink<Event, Error = ()>> {
-//         let batch = BatchSettings::default()
-//             .bytes(5_000_000)
-//             .events(500)
-//             .timeout(1)
-//             .parse_config(config.batch)?;
-//         let request = config.request.unwrap_with(&TowerRequestConfig::default());
-//         let encoding = config.encoding.clone();
-//         let partition_key_field = config.partition_key_field.clone();
-//
-//         let kinesis = KinesisService { client, config };
-//
-//         let sink = request
-//             .batch_sink(
-//                 KinesisRetryLogic,
-//                 kinesis,
-//                 VecBuffer::new(batch.size),
-//                 batch.timeout,
-//                 cx.acker(),
-//                 sink::StdServiceLogic::default(),
-//             )
-//             .sink_map_err(|error| error!(message = "Fatal kinesis streams sink error.", %error))
-//             .with_flat_map(move |e| {
-//                 stream::iter(encode_event(e, &partition_key_field, &encoding)).map(Ok)
-//             });
-//
-//         Ok(sink)
-//     }
-// }
-
 pub struct KinesisResponse {
-    count:
+    count: usize,
+    events_byte_size: usize
 }
 
 impl DriverResponse for KinesisResponse {
@@ -67,7 +32,10 @@ impl DriverResponse for KinesisResponse {
     }
 
     fn events_sent(&self) -> EventsSent {
-        todo!()
+        EventsSent {
+            count: self.count,
+            byte_size: self.events_byte_size
+        }
     }
 }
 
@@ -87,34 +55,31 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
         );
 
         let processed_bytes_total = requests.iter().map(|req|req.put_records_request.data.len()).sum();
+        let events_byte_size = requests.iter().map(|req|req.event_byte_size).sum();
+        let count = requests.len();
 
         let records = requests.iter().map(|req|req.put_records_request).collect();
+
 
         let client = self.client.clone();
         let request = PutRecordsInput {
             records,
-            stream_name: self.config.stream_name.clone(),
+            stream_name: self.stream_name.clone(),
         };
 
         Box::pin(async move {
-            let response:() = client
+            let response:PutRecordsOutput = client
                 .put_records(request)
                 .inspect_ok(|_| {
-                    emit!(&AwsKinesisStreamsEventSent { processed_bytes_total });
+                    emit!(&AwsKinesisStreamsEventSent { byte_size: processed_bytes_total });
                 })
                 .instrument(info_span!("request"))
                 .await?;
-            Ok(KinesisResponse {
 
+            Ok(KinesisResponse {
+                count,
+                events_byte_size
             })
         })
-    }
-}
-
-impl fmt::Debug for KinesisService {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("KinesisService")
-            .field("config", &self.config)
-            .finish()
     }
 }

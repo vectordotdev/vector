@@ -1,9 +1,13 @@
 use bytes::Bytes;
 use rusoto_kinesis::PutRecordsRequestEntry;
+use vector_core::ByteSizeOf;
 use crate::event::{EventFinalizers, Finalizable};
 use crate::sinks::aws_kinesis_streams::sink::KinesisProcessedEvent;
 use crate::sinks::util::{Compression, RequestBuilder};
 use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
+use std::io;
+use crate::buffers::Ackable;
+use crate::event::Event;
 
 pub struct KinesisRequestBuilder {
     pub compression: Compression,
@@ -17,20 +21,70 @@ pub struct KinesisRequestBuilder {
 pub struct Metadata {
     pub finalizers: EventFinalizers,
     pub partition_key: String,
+    pub event_byte_size: usize,
 }
 
+#[derive(Clone)]
 pub struct KinesisRequest {
     pub put_records_request: PutRecordsRequestEntry,
-    pub metadata: Metadata
+    pub finalizers: EventFinalizers,
+    pub event_byte_size: usize,
+}
+
+impl Ackable for KinesisRequest {
+    fn ack_size(&self) -> usize {
+        1
+    }
+}
+
+impl Finalizable for KinesisRequest {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
+    }
+}
+
+
+impl KinesisRequest {
+    fn encoded_length(&self) -> usize {
+        let hash_key_size = self.put_records_request.explicit_hash_key
+            .as_ref()
+            .map(|s| s.len())
+            .unwrap_or_default();
+
+        // data is base64 encoded
+        (self.put_records_request.data.len() + 2) / 3 * 4
+            + hash_key_size
+            + self.put_records_request.partition_key.len()
+            + 10
+    }
+}
+
+impl ByteSizeOf for KinesisRequest {
+    fn size_of(&self) -> usize {
+        // `ByteSizeOf` is being somewhat abused here. This is only
+        // used by the batcher. `encoded_length` is used to keep
+        // the batching consistent with the pre-sink rewrite behavior
+        self.encoded_length()
+
+        self.put_records_request.
+    }
+
+    fn allocated_bytes(&self) -> usize {
+        0
+    }
+}
+
+pub struct KinesisPreEncodedEvent {
+
 }
 
 impl RequestBuilder<KinesisProcessedEvent> for KinesisRequestBuilder {
     type Metadata = Metadata;
-    type Events = [KinesisProcessedEvent; 1];
+    type Events = Event;
     type Encoder = EncodingConfig<StandardEncodings>;
     type Payload = Bytes;
     type Request = KinesisRequest;
-    type Error = ();
+    type Error = io::Error;
 
     fn compression(&self) -> Compression {
         self.compression
@@ -43,10 +97,10 @@ impl RequestBuilder<KinesisProcessedEvent> for KinesisRequestBuilder {
     fn split_input(&self, mut event: KinesisProcessedEvent) -> (Self::Metadata, Self::Events) {
         let metadata = Metadata {
             finalizers: event.event.take_finalizers(),
-            partition_key: event.partition_key
+            partition_key: event.metadata.partition_key,
+            event_byte_size: event.event.size_of()
         };
-        let events = [event];
-        (metadata, events)
+        (metadata, Event::from(event.event))
     }
 
     fn build_request(&self, metadata: Self::Metadata, data: Bytes) -> Self::Request {
@@ -56,7 +110,8 @@ impl RequestBuilder<KinesisProcessedEvent> for KinesisRequestBuilder {
                 partition_key: metadata.partition_key,
                 ..Default::default()
             },
-            metadata
+            finalizers: metadata.finalizers,
+            event_byte_size: metadata.event_byte_size
         }
     }
 }
