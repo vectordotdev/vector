@@ -4,7 +4,6 @@ use crate::{http::HttpClient, sinks::HealthcheckError};
 use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use std::sync::Arc;
 
 #[cfg(feature = "sinks-datadog_events")]
 pub mod events;
@@ -12,8 +11,6 @@ pub mod events;
 pub mod logs;
 #[cfg(feature = "sinks-datadog_metrics")]
 pub mod metrics;
-
-type ApiKey = Arc<str>;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

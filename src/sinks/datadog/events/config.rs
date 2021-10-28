@@ -65,8 +65,11 @@ impl SinkConfig for DatadogEventsConfig {
 
         let http_client = HttpClient::new(tls_settings, cx.proxy())?;
 
-        let service =
-            DatadogEventsService::new(&self.get_uri(), &self.default_api_key, http_client.clone());
+        let service = DatadogEventsService::new(
+            &self.get_uri(),
+            self.default_api_key.clone(),
+            http_client.clone(),
+        );
 
         let request_opts = self.request;
         let request_settings = request_opts.unwrap_with(&TowerRequestConfig::default());
