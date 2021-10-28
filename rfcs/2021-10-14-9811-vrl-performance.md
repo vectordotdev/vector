@@ -5,11 +5,8 @@ in order to optimise VRL.
 
 ## Context
 
-- Link to any previous issues, RFCs, or briefs (do not repeat that context in this RFC).
-
-## Cross cutting concerns
-
-- Link to any ongoing or future work relevant to this change.
+https://github.com/vectordotdev/vector/issues/6680
+https://github.com/vectordotdev/vector/issues/6770
 
 ## Scope
 
@@ -19,7 +16,10 @@ This RFC discussing a number of changes that can be made to the Vrl runtime to e
 
 ### Out of scope
 
-Out of scope are changes to improve the functionality of Vrl.
+Out of scope are:
+
+- improvements to the build time of Vrl (mainly caused by lalrpop).
+- changes to improve the functionality of Vrl.
 
 ## Pain
 
@@ -65,11 +65,6 @@ Also, each node in the AST is boxed which causes extra pointer indirection.
 
 ## Proposal
 
-### User Experience
-
-- Explain your change as if you were describing it to a Vector user. We should be able to share this section with a Vector user to solicit feedback.
-- Does this change break backward compatibility? If so, what should users do to upgrade?
-
 ### Implementation
 
 ### Reducing allocations
@@ -80,7 +75,7 @@ One of the data types that is cloned the most is `vrl::Value`. A lot of these cl
 a single value. In the Rust model, this can get highly awkward handling the lifetimes.
 
 If VRL used reference counting instead, the allocations can be avoided. Each clone would just increase a count into the underlying data store
-which is significantly cheaper.
+which is significantly cheaper. When the value goes out of scope the count is reduced. If the count reaches 0, the memory is freed.
 
 VRL needs to wrap the data in an `Rc`. This does mean pulling the data out of the original event, which is not wrapped in `Rc`. Since we already
 clone the data at the start of the transform this is not going to create any additional cost to what we already have.
@@ -92,12 +87,12 @@ is aborted, we don't do anything since the original event is still unmodified.
 
 Currently, the only point at which data is mutated is when updating the event. With this change mutation would occur when updating the VRL data store.
 
-
 Some changes will need to be made:
 
-1. Change `vrl::Value::Object` to wrap the Value in `Rc<RefCell<>`:  `Object(BTreeMap<String, Rc<RefCell<Value>>>)`
-2. Change `vrl::Value::Array`  to wrap the Value in `Rc<RefCell<>`: a`Array(Vec<Rc<RefCell<Value>>>)`
-3. Change the methods of the `Target` trait to use `Rc<RefCell<>`:
+1. Change `vrl::Value::Object` to wrap the Value in `Rc<RefCell<>>`:  `Object(BTreeMap<String, Rc<RefCell<Value>>>)`
+2. Change `vrl::Value::Array`  to wrap the Value in `Rc<RefCell<>>`: a`Array(Vec<Rc<RefCell<Value>>>)`
+3. Change the methods of the `Target` trait to use `Rc<RefCell<>>`:
+
 ```rust
     fn insert(&mut self, path: &LookupBuf, value: Rc<RefCell<Value>>) -> Result<(), String>;
     fn get(&self, path: &LookupBuf) -> Result<Option<Rc<RefCell<Value>>>, String>;
@@ -119,23 +114,7 @@ Some changes will need to be made:
    stores a `Value`.  We need to identify if this `Value` is actually necessary (it's not clear to me). If it isn't we can remove it.
    If it is we need to create a thread safe variable of `Value` that can be stored here and then converted into a `Value` at runtime.
 
-
 Initial experiments roughly showed a reduction from 1m20s to 1m02s to push 100000 records through Vector using reference counting.
-
-
-#### Use a Bump Allocator?
-
-We could use a library such as [bumpalo](https://crates.io/crates/bumpalo).
-
-A bump allocator will allocated a significant amount of memory up front. This memory will then be used
-
-
-Use a persistent data structure to avoid the initial clone.
-Create an mutated pool
-
-This is probably not ready yet until this PR for `BTreeMap` lands.
-https://github.com/rust-lang/rust/pull/77438
-
 
 ### Bytecode VM
 
@@ -252,6 +231,20 @@ Functions like `parse_json` would need access to this array and hints as to what
 
 A lot more thought needs to go into this before we can consider implementing it.
 
+#### Use a Bump Allocator?
+
+We could use a library such as [bumpalo](https://crates.io/crates/bumpalo).
+
+A bump allocator will allocated a significant amount of memory up front. This memory will then be used
+
+
+Use a persistent data structure to avoid the initial clone.
+Create an mutated pool
+
+This is probably not ready yet until this PR for `BTreeMap` lands.
+https://github.com/rust-lang/rust/pull/77438
+
+
 ### Optimization
 
 With the code as a single dimension array of Bytecode, it could be possible to scan the code for patterns and reorganise
@@ -269,14 +262,11 @@ slight reduction in code ergonomics.
 
 The functions that could possibly be optimised are:
 
-contains
-ends_with
-starts_with
-join
-truncate
-
-
-### Flow
+`contains`
+`ends_with`
+`starts_with`
+`join`
+`truncate`
 
 ## Rationale
 
