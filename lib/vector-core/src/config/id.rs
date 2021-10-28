@@ -143,6 +143,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::similar_names)]
     fn ordering() {
         let global_baz = ComponentKey::from("baz");
         let yolo_bar = ComponentKey::from("yolo.bar");
