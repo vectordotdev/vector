@@ -106,7 +106,7 @@ mod test {
 
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
-            r#"[{"0":{"type":"mock"},"foo":{"type":"mock"}},"Serial"]"#
+            r#"[{"0":{"type":"mock"},"foo":{"type":"mock"}},{"Serial":{"alias":false}}]"#
         );
     }
 }
