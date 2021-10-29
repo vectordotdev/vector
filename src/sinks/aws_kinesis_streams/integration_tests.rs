@@ -1,7 +1,6 @@
 #![cfg(feature = "aws-kinesis-streams-integration-tests")]
 #![cfg(test)]
 
-use super::service::KinesisService;
 use super::*;
 use crate::config::SinkConfig;
 use crate::sinks::util::encoding::StandardEncodings;
@@ -11,7 +10,6 @@ use crate::{
     rusoto::RegionOrEndpoint,
     test_util::{random_lines_with_stream, random_string},
 };
-use futures::StreamExt;
 use rusoto_core::Region;
 use rusoto_kinesis::{Kinesis, KinesisClient};
 use std::sync::Arc;
