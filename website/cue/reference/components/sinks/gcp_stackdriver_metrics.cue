@@ -83,7 +83,6 @@ components: sinks: gcp_stackdriver_metrics: {
 			type: string: {
 				default: null
 				examples: ["/path/to/credentials.json"]
-				syntax: "literal"
 			}
 		}
 		project_id: {
@@ -92,7 +91,6 @@ components: sinks: gcp_stackdriver_metrics: {
 			warnings: []
 			type: string: {
 				examples: ["vector-123456"]
-				syntax: "literal"
 			}
 		}
 		default_namespace: {
@@ -103,7 +101,6 @@ components: sinks: gcp_stackdriver_metrics: {
 			type: string: {
 				examples: ["vector-123456"]
 				default: "namespace"
-				syntax:  "literal"
 			}
 		}
 		resource: {
@@ -126,7 +123,6 @@ components: sinks: gcp_stackdriver_metrics: {
 						warnings: []
 						type: string: {
 							examples: ["global", "gce_instance"]
-							syntax: "literal"
 						}
 					}
 					"*": {
@@ -137,7 +133,6 @@ components: sinks: gcp_stackdriver_metrics: {
 						type: string: {
 							default: null
 							examples: ["vector-123456", "Twilight"]
-							syntax: "literal"
 						}
 					}
 				}

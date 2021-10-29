@@ -88,7 +88,6 @@ components: sinks: splunk_hec_logs: {
 			required:    true
 			type: string: {
 				examples: ["https://http-inputs-hec.splunkcloud.com", "https://hec.splunk.com:8088", "http://example.com"]
-				syntax: "literal"
 			}
 		}
 		host_key: {
@@ -102,7 +101,6 @@ components: sinks: splunk_hec_logs: {
 			type: string: {
 				default: null
 				examples: ["hostname"]
-				syntax: "literal"
 			}
 		}
 		index: {
@@ -157,7 +155,6 @@ components: sinks: splunk_hec_logs: {
 			warnings: []
 			type: string: {
 				examples: ["${SPLUNK_HEC_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
-				syntax: "literal"
 			}
 		}
 	}

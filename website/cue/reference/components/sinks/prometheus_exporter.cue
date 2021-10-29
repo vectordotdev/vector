@@ -75,7 +75,6 @@ components: sinks: prometheus_exporter: {
 			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)"]
-				syntax: "literal"
 			}
 		}
 		buckets: {
@@ -114,7 +113,6 @@ components: sinks: prometheus_exporter: {
 			type: string: {
 				default: null
 				examples: ["service"]
-				syntax: "literal"
 			}
 		}
 		quantiles: {

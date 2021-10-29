@@ -58,7 +58,6 @@ components: sinks: statsd: {
 			type: string: {
 				default: null
 				examples: ["service"]
-				syntax: "literal"
 			}
 		}
 	}

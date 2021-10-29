@@ -75,7 +75,6 @@ components: sources: journald: {
 				default: []
 				items: type: string: {
 					examples: ["badservice", "sysinit.target"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -100,7 +99,6 @@ components: sources: journald: {
 							default: []
 							items: type: string: {
 								examples: ["sshd.service", "ntpd.service"]
-								syntax: "literal"
 							}
 						}
 					}
@@ -116,7 +114,6 @@ components: sources: journald: {
 				default: []
 				items: type: string: {
 					examples: ["ntpd", "sysinit.target"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -141,7 +138,6 @@ components: sources: journald: {
 							default: []
 							items: type: string: {
 								examples: ["sshd.service", "ntpd.service"]
-								syntax: "literal"
 							}
 						}
 					}
@@ -156,7 +152,6 @@ components: sources: journald: {
 			type: string: {
 				default: "journalctl"
 				examples: ["/usr/local/bin/journalctl"]
-				syntax: "literal"
 			}
 		}
 		journal_directory: {
@@ -167,7 +162,6 @@ components: sources: journald: {
 			type: string: {
 				default: null
 				examples: ["/run/log/journal"]
-				syntax: "literal"
 			}
 		}
 	}
@@ -182,7 +176,6 @@ components: sources: journald: {
 					required:    true
 					type: string: {
 						examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
-						syntax: "literal"
 					}
 				}
 				timestamp: fields._current_timestamp
@@ -193,7 +186,6 @@ components: sources: journald: {
 					type: string: {
 						default: null
 						examples: ["/usr/sbin/ntpd", "c36e9ea52800a19d214cb71b53263a28"]
-						syntax: "literal"
 					}
 				}
 			}

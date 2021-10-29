@@ -64,7 +64,6 @@ components: transforms: tokenizer: {
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child"]
-				syntax: "literal"
 			}
 		}
 		field_names: {
@@ -73,7 +72,6 @@ components: transforms: tokenizer: {
 			warnings: []
 			type: array: items: type: string: {
 				examples: ["timestamp", "level", "message", "parent.child"]
-				syntax: "literal"
 			}
 		}
 		timezone: configuration._timezone

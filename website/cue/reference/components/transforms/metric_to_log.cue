@@ -44,7 +44,6 @@ components: transforms: metric_to_log: {
 			type: string: {
 				default: "hostname"
 				examples: ["host", "hostname"]
-				syntax: "literal"
 			}
 		}
 		timezone: configuration._timezone

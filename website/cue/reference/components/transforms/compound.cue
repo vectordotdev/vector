@@ -54,7 +54,6 @@ components: transforms: compound: {
 							type: string: {
 								default: null
 								examples: ["my_filter_transform"]
-								syntax: "literal"
 							}
 						}
 						"*": {

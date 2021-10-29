@@ -48,7 +48,6 @@ components: transforms: log_to_metric: {
 						warnings: []
 						type: string: {
 							examples: ["duration", "parent.child"]
-							syntax: "literal"
 						}
 					}
 					increment_by_value: {
@@ -77,7 +76,6 @@ components: transforms: log_to_metric: {
 								absolute:    "An absolute counter value."
 								incremental: "In incremental counter value."
 							}
-							syntax:  "literal"
 							default: "incremental"
 						}
 					}
@@ -141,7 +139,6 @@ components: transforms: log_to_metric: {
 								set:       "A [set metric type](\(urls.vector_metric)#set)."
 								summary:   "A [distribution metric type](\(urls.vector_metric)#distribution) with summary statistic."
 							}
-							syntax: "literal"
 						}
 					}
 				}

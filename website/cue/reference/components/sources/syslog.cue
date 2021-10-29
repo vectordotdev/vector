@@ -54,7 +54,6 @@ components: sources: syslog: {
 			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
-				syntax: "literal"
 			}
 		}
 		host_key: {
@@ -68,7 +67,6 @@ components: sources: syslog: {
 			warnings: []
 			type: string: {
 				default: "host"
-				syntax:  "literal"
 			}
 		}
 		max_length: {
@@ -91,7 +89,6 @@ components: sources: syslog: {
 					udp:  "UDP socket."
 					unix: "Unix domain stream socket."
 				}
-				syntax: "literal"
 			}
 		}
 		path: {
@@ -101,7 +98,6 @@ components: sources: syslog: {
 			warnings: []
 			type: string: {
 				examples: ["/path/to/socket"]
-				syntax: "literal"
 			}
 		}
 	}
@@ -114,7 +110,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["app-name"]
-					syntax: "literal"
 				}
 			}
 			host: fields._local_host
@@ -123,7 +118,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["my.host.com"]
-					syntax: "literal"
 				}
 			}
 			facility: {
@@ -131,7 +125,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["1"]
-					syntax: "literal"
 				}
 			}
 			message: {
@@ -139,7 +132,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["Hello world"]
-					syntax: "literal"
 				}
 			}
 			msgid: {
@@ -147,7 +139,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["ID47"]
-					syntax: "literal"
 				}
 			}
 			procid: {
@@ -155,7 +146,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["8710"]
-					syntax: "literal"
 				}
 			}
 			severity: {
@@ -163,7 +153,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["notice"]
-					syntax: "literal"
 				}
 			}
 			source_ip: {
@@ -171,7 +160,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["127.0.0.1"]
-					syntax: "literal"
 				}
 			}
 			timestamp: {
@@ -192,7 +180,6 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["hello world"]
-					syntax: "literal"
 				}
 			}
 		}

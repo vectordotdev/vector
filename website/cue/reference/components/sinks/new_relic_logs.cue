@@ -81,7 +81,6 @@ components: sinks: new_relic_logs: {
 			type: string: {
 				default: null
 				examples: ["xxxx", "${NEW_RELIC_INSERT_KEY}"]
-				syntax: "literal"
 			}
 		}
 		license_key: {
@@ -92,7 +91,6 @@ components: sinks: new_relic_logs: {
 			type: string: {
 				default: null
 				examples: ["xxxx", "${NEW_RELIC_LICENSE_KEY}"]
-				syntax: "literal"
 			}
 		}
 		region: {
@@ -106,7 +104,6 @@ components: sinks: new_relic_logs: {
 					us: "United States"
 					eu: "Europe"
 				}
-				syntax: "literal"
 			}
 		}
 

@@ -58,7 +58,6 @@ components: transforms: split: {
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child"]
-				syntax: "literal"
 			}
 		}
 		field_names: {
@@ -67,7 +66,6 @@ components: transforms: split: {
 			warnings: []
 			type: array: items: type: string: {
 				examples: ["timestamp", "level", "message", "parent.child"]
-				syntax: "literal"
 			}
 		}
 		separator: {
@@ -78,7 +76,6 @@ components: transforms: split: {
 			type: string: {
 				default: "[whitespace]"
 				examples: [","]
-				syntax: "literal"
 			}
 		}
 		timezone: configuration._timezone

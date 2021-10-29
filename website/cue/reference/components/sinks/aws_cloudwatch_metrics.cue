@@ -96,7 +96,6 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 			warnings: []
 			type: string: {
 				examples: ["service"]
-				syntax: "literal"
 			}
 		}
 	}

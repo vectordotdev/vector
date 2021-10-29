@@ -81,7 +81,6 @@ components: transforms: "remap": {
 				examples: [
 					"./my/program.vrl",
 				]
-				syntax:  "literal"
 				default: null
 			}
 		}

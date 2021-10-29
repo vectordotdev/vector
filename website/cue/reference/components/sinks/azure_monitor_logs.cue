@@ -79,7 +79,6 @@ components: sinks: azure_monitor_logs: {
 			type: string: {
 				default: null
 				examples: ["/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/otherResourceGroup/providers/Microsoft.Storage/storageAccounts/examplestorage", "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/examplegroup/providers/Microsoft.SQL/servers/serverName/databases/databaseName"]
-				syntax: "literal"
 			}
 		}
 		customer_id: {
@@ -88,7 +87,6 @@ components: sinks: azure_monitor_logs: {
 			warnings: []
 			type: string: {
 				examples: ["5ce893d9-2c32-4b6c-91a9-b0887c2de2d6", "97ce69d9-b4be-4241-8dbd-d265edcf06c4"]
-				syntax: "literal"
 			}
 		}
 		host: {
@@ -99,7 +97,6 @@ components: sinks: azure_monitor_logs: {
 			type: string: {
 				default: "ods.opinsights.azure.com"
 				examples: ["ods.opinsights.azure.us", "ods.opinsights.azure.cn"]
-				syntax: "literal"
 			}
 		}
 		log_type: {
@@ -108,7 +105,6 @@ components: sinks: azure_monitor_logs: {
 			warnings: []
 			type: string: {
 				examples: ["MyTableName", "MyRecordType"]
-				syntax: "literal"
 			}
 		}
 		shared_key: {
@@ -117,7 +113,6 @@ components: sinks: azure_monitor_logs: {
 			warnings: []
 			type: string: {
 				examples: ["${AZURE_MONITOR_SHARED_KEY_ENV_VAR}", "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="]
-				syntax: "literal"
 			}
 		}
 	}

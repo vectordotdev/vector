@@ -92,7 +92,6 @@ components: sinks: prometheus_remote_write: {
 			warnings: []
 			type: string: {
 				examples: ["https://localhost:8087/"]
-				syntax: "literal"
 			}
 		}
 		auth: configuration._http_auth & {_args: {
@@ -111,7 +110,6 @@ components: sinks: prometheus_remote_write: {
 			type: string: {
 				default: null
 				examples: ["service"]
-				syntax: "literal"
 			}
 		}
 		buckets: {

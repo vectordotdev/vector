@@ -76,7 +76,6 @@ components: sinks: aws_sqs: components._aws & {
 			warnings: []
 			type: string: {
 				examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
-				syntax: "literal"
 			}
 		}
 		message_group_id: {

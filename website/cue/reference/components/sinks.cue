@@ -101,7 +101,6 @@ components: sinks: [Name=string]: {
 									For comparison, AWS gp2 volumes are usually too slow for common cases.
 									"""
 								}
-								syntax: "literal"
 							}
 						}
 						when_full: {
@@ -114,7 +113,6 @@ components: sinks: [Name=string]: {
 									block:       "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."
 									drop_newest: "Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."
 								}
-								syntax: "literal"
 							}
 						}
 					}
@@ -138,13 +136,11 @@ components: sinks: [Name=string]: {
 						enum: {
 							if list.Contains(features.send.compression.algorithms, "none") {
 								none:   "No compression."
-								syntax: "literal"
 							}
 							if list.Contains(features.send.compression.algorithms, "gzip") {
 								gzip: "[Gzip](\(urls.gzip)) standard DEFLATE compression."
 							}
 						}
-						syntax: "literal"
 					}
 				}
 			}
@@ -195,7 +191,6 @@ components: sinks: [Name=string]: {
 											}
 										}
 									}
-									syntax: "literal"
 								}
 							}
 						}
@@ -236,7 +231,6 @@ components: sinks: [Name=string]: {
 									rfc3339: "Formats as a RFC3339 string"
 									unix:    "Formats as a unix timestamp"
 								}
-								syntax: "literal"
 							}
 						}
 					}

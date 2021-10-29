@@ -71,7 +71,6 @@ components: transforms: lua: {
 				                """,
 								"init",
 							]
-							syntax: "literal"
 						}
 					}
 					process: {
@@ -91,7 +90,6 @@ components: transforms: lua: {
 				                """,
 								"process",
 							]
-							syntax: "literal"
 						}
 					}
 					shutdown: {
@@ -109,7 +107,6 @@ components: transforms: lua: {
 				                """,
 								"shutdown",
 							]
-							syntax: "literal"
 						}
 					}
 				}
@@ -123,9 +120,7 @@ components: transforms: lua: {
 			type: array: {
 				default: null
 				items: type: string: {
-					examples: ["/etc/vector/lua"]
-					syntax: "literal"
-				}
+					examples: ["/etc/vector/lua"]				}
 			}
 		}
 		source: {
@@ -161,7 +156,6 @@ components: transforms: lua: {
 								timestamp = os.date("!*t"),
 								counter = {
 									value = value
-									syntax: "literal"
 								}
 						 	}
 						end
@@ -171,7 +165,6 @@ components: transforms: lua: {
 						require('custom_module')
 						""",
 				]
-				syntax: "literal"
 			}
 		}
 		timers: {
@@ -189,7 +182,6 @@ components: transforms: lua: {
 							warnings: []
 							type: string: {
 								examples: ["timer_handler"]
-								syntax: "literal"
 							}
 						}
 						interval_seconds: {
@@ -213,9 +205,7 @@ components: transforms: lua: {
 				enum: {
 					"1": "Lua transform API version 1"
 					"2": "Lua transform API version 2"
-				}
-				syntax: "literal"
-			}
+				}			}
 		}
 	}
 

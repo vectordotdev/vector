@@ -57,7 +57,6 @@ components: _nats: {
 			warnings: []
 			type: string: {
 				examples: ["nats://demo.nats.io", "nats://127.0.0.1:4222"]
-				syntax: "literal"
 			}
 		}
 		subject: {
@@ -76,7 +75,6 @@ components: _nats: {
 			type: string: {
 				default: "vector"
 				examples: ["foo", "API Name Option Example"]
-				syntax: "literal"
 			}
 		}
 	}

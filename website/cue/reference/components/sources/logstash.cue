@@ -66,7 +66,6 @@ components: sources: logstash: {
 			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)"]
-				syntax: "literal"
 			}
 		}
 	}
@@ -79,7 +78,6 @@ components: sources: logstash: {
 				required:    true
 				type: string: {
 					examples: ["127.0.0.1"]
-					syntax: "literal"
 				}
 			}
 			timestamp: fields._current_timestamp & {
@@ -99,7 +97,6 @@ components: sources: logstash: {
 				required:    true
 				type: string: {
 					examples: ["hello world"]
-					syntax: "literal"
 				}
 			}
 		}

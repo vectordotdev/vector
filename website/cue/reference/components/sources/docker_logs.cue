@@ -19,7 +19,6 @@ components: sources: docker_logs: {
 			type: string: {
 				default: null
 				examples: ["unix:///var/run/docker.sock"]
-				syntax: "literal"
 			}
 		}
 
@@ -34,7 +33,6 @@ components: sources: docker_logs: {
 			type: string: {
 				default: null
 				examples: ["certs/"]
-				syntax: "literal"
 			}
 		}
 
@@ -43,7 +41,6 @@ components: sources: docker_logs: {
 			type: string: {
 				default: null
 				examples: ["certs/"]
-				syntax: "literal"
 			}
 		}
 	}
@@ -128,7 +125,6 @@ components: sources: docker_logs: {
 					"/var/run/docker.sock",
 					"//./pipe/docker_engine",
 				]
-				syntax: "literal"
 			}
 		}
 		tls: {
@@ -148,7 +144,6 @@ components: sources: docker_logs: {
 						warnings: []
 						type: string: {
 							examples: ["certs/ca.pem"]
-							syntax: "literal"
 						}
 					}
 					crt_file: {
@@ -157,7 +152,6 @@ components: sources: docker_logs: {
 						warnings: []
 						type: string: {
 							examples: ["certs/cert.pem"]
-							syntax: "literal"
 						}
 					}
 					key_file: {
@@ -166,7 +160,6 @@ components: sources: docker_logs: {
 						warnings: []
 						type: string: {
 							examples: ["certs/key.pem"]
-							syntax: "literal"
 						}
 					}
 				}
@@ -196,7 +189,6 @@ components: sources: docker_logs: {
 				default: null
 				items: type: string: {
 					examples: ["exclude_", "exclude_me_0", "ad08cc418cf9"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -215,7 +207,6 @@ components: sources: docker_logs: {
 				default: null
 				items: type: string: {
 					examples: ["include_", "include_me_0", "ad08cc418cf9"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -231,7 +222,6 @@ components: sources: docker_logs: {
 				default: null
 				items: type: string: {
 					examples: ["com.example.vendor=Timber Inc.", "com.example.name=Vector"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -246,7 +236,6 @@ components: sources: docker_logs: {
 				default: null
 				items: type: string: {
 					examples: ["httpd", "redis"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -272,7 +261,6 @@ components: sources: docker_logs: {
 			warnings: []
 			type: string: {
 				default: "host"
-				syntax:  "literal"
 			}
 		}
 	}
@@ -291,7 +279,6 @@ components: sources: docker_logs: {
 					required:    true
 					type: string: {
 						examples: ["9b6247364a03", "715ebfcee040"]
-						syntax: "literal"
 					}
 				}
 				container_name: {
@@ -299,7 +286,6 @@ components: sources: docker_logs: {
 					required:    true
 					type: string: {
 						examples: ["evil_ptolemy", "nostalgic_stallman"]
-						syntax: "literal"
 					}
 				}
 				image: {
@@ -307,7 +293,6 @@ components: sources: docker_logs: {
 					required:    true
 					type: string: {
 						examples: ["ubuntu:latest", "busybox", "timberio/vector:latest-alpine"]
-						syntax: "literal"
 					}
 				}
 				message: {
@@ -315,7 +300,6 @@ components: sources: docker_logs: {
 					required:    true
 					type: string: {
 						examples: ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
-						syntax: "literal"
 					}
 				}
 				stream: {
@@ -326,7 +310,6 @@ components: sources: docker_logs: {
 							stdout: "The STDOUT stream"
 							stderr: "The STDERR stream"
 						}
-						syntax: "literal"
 					}
 				}
 				timestamp: {
@@ -340,7 +323,6 @@ components: sources: docker_logs: {
 					required:    true
 					type: string: {
 						examples: ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
-						syntax: "literal"
 					}
 				}
 			}

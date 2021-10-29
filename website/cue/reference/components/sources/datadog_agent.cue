@@ -85,7 +85,6 @@ components: sources: datadog_agent: {
 				required:    true
 				type: string: {
 					examples: ["Hi from erlang"]
-					syntax: "literal"
 				}
 			}
 			status: {
@@ -93,7 +92,6 @@ components: sources: datadog_agent: {
 				required:    true
 				type: string: {
 					examples: ["info"]
-					syntax: "literal"
 				}
 			}
 			timestamp: fields._current_timestamp
@@ -103,7 +101,6 @@ components: sources: datadog_agent: {
 				required:    true
 				type: string: {
 					examples: ["backend"]
-					syntax: "literal"
 				}
 			}
 			ddsource: {
@@ -111,7 +108,6 @@ components: sources: datadog_agent: {
 				required:    true
 				type: string: {
 					examples: ["java"]
-					syntax: "literal"
 				}
 			}
 			ddtags: {
@@ -119,7 +115,6 @@ components: sources: datadog_agent: {
 				required:    true
 				type: string: {
 					examples: ["env:prod,region:ap-east-1"]
-					syntax: "literal"
 				}
 			}
 		}

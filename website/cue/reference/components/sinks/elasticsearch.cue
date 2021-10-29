@@ -98,7 +98,6 @@ components: sinks: elasticsearch: {
 						warnings: []
 						type: string: {
 							examples: ["${ELASTICSEARCH_PASSWORD}", "password"]
-							syntax: "literal"
 						}
 					}
 					strategy: {
@@ -110,7 +109,6 @@ components: sinks: elasticsearch: {
 								aws:   "Authentication strategy used for [AWS' hosted Elasticsearch service](\(urls.aws_elasticsearch))."
 								basic: "The [basic authentication strategy](\(urls.basic_auth))."
 							}
-							syntax: "literal"
 						}
 					}
 					user: {
@@ -119,7 +117,6 @@ components: sinks: elasticsearch: {
 						warnings: []
 						type: string: {
 							examples: ["${ELASTICSEARCH_USERNAME}", "username"]
-							syntax: "literal"
 						}
 					}
 				}
@@ -141,7 +138,6 @@ components: sinks: elasticsearch: {
 						type: string: {
 							default: null
 							examples: ["us-east-1"]
-							syntax: "literal"
 						}
 					}
 				}
@@ -266,7 +262,6 @@ components: sinks: elasticsearch: {
 			warnings: []
 			type: string: {
 				default: "_doc"
-				syntax:  "literal"
 			}
 		}
 		endpoint: {
@@ -275,7 +270,6 @@ components: sinks: elasticsearch: {
 			warnings: []
 			type: string: {
 				examples: ["http://10.24.32.122:9000", "https://example.com", "https://user:password@example.com"]
-				syntax: "literal"
 			}
 		}
 		id_key: {
@@ -286,7 +280,6 @@ components: sinks: elasticsearch: {
 			type: string: {
 				default: null
 				examples: ["id", "_id"]
-				syntax: "literal"
 			}
 		}
 		index: {
@@ -316,7 +309,6 @@ components: sinks: elasticsearch: {
 						type: string: {
 							default: "hostname"
 							examples: ["host", "hostname"]
-							syntax: "literal"
 						}
 					}
 					timezone: configuration._timezone
@@ -331,7 +323,6 @@ components: sinks: elasticsearch: {
 			type: string: {
 				default: "bulk"
 				examples: ["bulk", "data_stream"]
-				syntax: "literal"
 			}
 		}
 		pipeline: {
@@ -342,7 +333,6 @@ components: sinks: elasticsearch: {
 			type: string: {
 				default: null
 				examples: ["pipeline-name"]
-				syntax: "literal"
 			}
 		}
 		query: {

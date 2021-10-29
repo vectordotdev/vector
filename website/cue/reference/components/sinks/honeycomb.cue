@@ -74,7 +74,6 @@ components: sinks: honeycomb: {
 			warnings: []
 			type: string: {
 				examples: ["${HONEYCOMB_API_KEY}", "some-api-key"]
-				syntax: "literal"
 			}
 		}
 		dataset: {
@@ -83,7 +82,6 @@ components: sinks: honeycomb: {
 			warnings: []
 			type: string: {
 				examples: ["my-honeycomb-dataset"]
-				syntax: "literal"
 			}
 		}
 	}

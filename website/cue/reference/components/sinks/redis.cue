@@ -79,7 +79,6 @@ components: sinks: redis: {
 			warnings: []
 			type: string: {
 				examples: ["redis://127.0.0.1:6379/0"]
-				syntax: "literal"
 			}
 		}
 		key: {
@@ -101,7 +100,6 @@ components: sinks: redis: {
 					list:    "Use the Redis `list` data type."
 					channel: "Use the Redis `channel` data type."
 				}
-				syntax: "literal"
 			}
 		}
 		list: {
@@ -122,7 +120,6 @@ components: sinks: redis: {
 								lpush: "Use the `lpush` method to publish messages."
 								rpush: "Use the `rpush` method to publish messages."
 							}
-							syntax: "literal"
 						}
 					}
 				}

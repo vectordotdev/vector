@@ -69,7 +69,6 @@ components: sources: prometheus_scrape: {
 			type: array: {
 				items: type: string: {
 					examples: ["http://localhost:9090/metrics"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -93,7 +92,6 @@ components: sources: prometheus_scrape: {
 			warnings: []
 			type: string: {
 				default: null
-				syntax:  "literal"
 				examples: ["instance"]
 			}
 		}
@@ -107,7 +105,6 @@ components: sources: prometheus_scrape: {
 			warnings: []
 			type: string: {
 				default: null
-				syntax:  "literal"
 				examples: ["endpoint"]
 			}
 		}

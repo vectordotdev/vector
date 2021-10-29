@@ -60,7 +60,6 @@ components: sources: generator: {
 					"bsd_syslog":    "Randomly generated logs in Syslog format ([RFC 3164](\(urls.syslog_3164)))."
 					"json":          "Randomly generated HTTP server logs in [JSON](\(urls.json)) format."
 				}
-				syntax: "literal"
 			}
 		}
 		interval: {
@@ -97,7 +96,6 @@ components: sources: generator: {
 				default: null
 				items: type: string: {
 					examples: ["Line 1", "Line 2"]
-					syntax: "literal"
 				}
 			}
 		}

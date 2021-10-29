@@ -64,7 +64,6 @@ components: sinks: sematext_metrics: {
 			warnings: []
 			type: string: {
 				examples: ["service"]
-				syntax: "literal"
 			}
 		}
 	}

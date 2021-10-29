@@ -65,7 +65,6 @@ components: sources: nginx_metrics: {
 			type: array: {
 				items: type: string: {
 					examples: ["http://localhost:8000/basic_status"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -84,7 +83,6 @@ components: sources: nginx_metrics: {
 			required:    false
 			type: string: {
 				default: "nginx"
-				syntax:  "literal"
 			}
 		}
 		tls: configuration._tls_connect & {_args: {

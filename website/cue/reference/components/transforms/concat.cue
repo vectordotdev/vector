@@ -49,7 +49,6 @@ components: transforms: concat: {
 			warnings: []
 			type: array: items: type: string: {
 				examples: ["first[..3]", "second[-5..]", "third[3..6]"]
-				syntax: "literal"
 			}
 		}
 		joiner: {
@@ -60,7 +59,6 @@ components: transforms: concat: {
 			type: string: {
 				default: " "
 				examples: [" ", ",", "_", "+"]
-				syntax: "literal"
 			}
 		}
 		target: {
@@ -69,7 +67,6 @@ components: transforms: concat: {
 			warnings: []
 			type: string: {
 				examples: ["root_field_name", "parent.child", "array[0]"]
-				syntax: "literal"
 			}
 		}
 	}

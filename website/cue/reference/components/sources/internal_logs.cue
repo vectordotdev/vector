@@ -60,7 +60,6 @@ components: sources: internal_logs: {
 			warnings: []
 			type: string: {
 				default: "host"
-				syntax:  "literal"
 			}
 		}
 		pid_key: {
@@ -75,7 +74,6 @@ components: sources: internal_logs: {
 			warnings: []
 			type: string: {
 				default: "pid"
-				syntax:  "literal"
 			}
 		}
 	}
@@ -88,7 +86,6 @@ components: sources: internal_logs: {
 				required:    true
 				type: string: {
 					examples: ["Vector has started."]
-					syntax: "literal"
 				}
 			}
 			timestamp: fields._current_timestamp & {
@@ -122,7 +119,6 @@ components: sources: internal_logs: {
 									event: "The call site is an event."
 									span:  "The call site is a span."
 								}
-								syntax: "literal"
 							}
 						}
 						level: {
@@ -136,7 +132,6 @@ components: sources: internal_logs: {
 									WARN:  "Designates hazardous situations."
 									ERROR: "Designates very serious errors."
 								}
-								syntax: "literal"
 							}
 						}
 						module_path: {
@@ -144,7 +139,6 @@ components: sources: internal_logs: {
 							required:    true
 							type: string: {
 								examples: ["vector::internal_events::heartbeat"]
-								syntax: "literal"
 							}
 						}
 						target: {
@@ -152,7 +146,6 @@ components: sources: internal_logs: {
 							required:    true
 							type: string: {
 								examples: ["vector"]
-								syntax: "literal"
 							}
 						}
 					}

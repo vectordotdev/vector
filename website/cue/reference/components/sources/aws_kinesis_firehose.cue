@@ -73,7 +73,6 @@ components: sources: aws_kinesis_firehose: {
 			required:    true
 			type: string: {
 				examples: ["0.0.0.0:443", "localhost:443"]
-				syntax: "literal"
 			}
 		}
 		access_key: {
@@ -88,7 +87,6 @@ components: sources: aws_kinesis_firehose: {
 			type: "string": {
 				default: null
 				examples: ["A94A8FE5CCB19BA61C4C08"]
-				syntax: "literal"
 			}
 		}
 		record_compression: {
@@ -120,7 +118,6 @@ components: sources: aws_kinesis_firehose: {
 					gzip: "GZIP format."
 					none: "Uncompressed."
 				}
-				syntax: "literal"
 			}
 		}
 	}
@@ -135,7 +132,6 @@ components: sources: aws_kinesis_firehose: {
 					required:    true
 					type: string: {
 						examples: ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
-						syntax: "literal"
 					}
 				}
 				request_id: {
@@ -143,7 +139,6 @@ components: sources: aws_kinesis_firehose: {
 					required:    true
 					type: string: {
 						examples: ["ed1d787c-b9e2-4631-92dc-8e7c9d26d804"]
-						syntax: "literal"
 					}
 				}
 				source_arn: {
@@ -151,7 +146,6 @@ components: sources: aws_kinesis_firehose: {
 					required:    true
 					type: string: {
 						examples: ["arn:aws:firehose:us-east-1:111111111111:deliverystream/test"]
-						syntax: "literal"
 					}
 				}
 			}

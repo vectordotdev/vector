@@ -83,7 +83,6 @@ components: sinks: azure_blob: {
 			warnings: []
 			type: string: {
 				examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net"]
-				syntax: "literal"
 			}
 		}
 		container_name: {
@@ -92,7 +91,6 @@ components: sinks: azure_blob: {
 			warnings: []
 			type: string: {
 				examples: ["my-logs"]
-				syntax: "literal"
 			}
 		}
 		blob_prefix: {

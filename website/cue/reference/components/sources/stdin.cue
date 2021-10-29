@@ -60,7 +60,6 @@ components: sources: stdin: {
 			warnings: []
 			type: string: {
 				default: "host"
-				syntax:  "literal"
 			}
 		}
 		max_length: {

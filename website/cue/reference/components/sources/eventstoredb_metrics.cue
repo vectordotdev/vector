@@ -62,7 +62,6 @@ components: sources: eventstoredb_metrics: {
 			type: string: {
 				examples: ["https://localhost:2113/stats"]
 				default: "https://localhost:2113/stats"
-				syntax:  "literal"
 			}
 		}
 		scrape_interval_secs: {
@@ -83,7 +82,6 @@ components: sources: eventstoredb_metrics: {
 			type: string: {
 				examples: ["app-123-eventstoredb"]
 				default: "eventstoredb"
-				syntax:  "literal"
 			}
 		}
 	}

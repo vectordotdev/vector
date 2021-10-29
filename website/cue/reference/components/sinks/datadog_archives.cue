@@ -55,7 +55,7 @@ components: sinks: datadog_archives: {
 			warnings: []
 			type: string: {
 				examples: ["my-bucket"]
-				syntax: "literal"
+
 			}
 		}
 		key_prefix: {
@@ -67,7 +67,6 @@ components: sinks: datadog_archives: {
 			type: string: {
 				default: "/"
 				examples: ["logs/audit"]
-				syntax: "literal"
 			}
 		}
 		service: {
@@ -79,7 +78,6 @@ components: sinks: datadog_archives: {
 				enum: {
 					aws_s3: "[AWS S3](\(urls.aws_s3)) is used as an external storage service."
 				}
-				syntax: "literal"
 			}
 		}
 		aws_s3: {
@@ -123,7 +121,6 @@ components: sinks: datadog_archives: {
 								STANDARD_IA:         "Amazon S3 stores the object data redundantly across multiple geographically separated Availability Zones (similar to the STANDARD storage class)."
 								ONEZONE_IA:          "Amazon S3 stores the object data in only one Availability Zone."
 							}
-							syntax: "literal"
 						}
 					}
 					tags: sinks.aws_s3.configuration.tags
@@ -132,7 +129,6 @@ components: sinks: datadog_archives: {
 						required:    true
 						type: string: {
 							examples: ["us-east-1"]
-							syntax: "literal"
 						}
 					}
 				}

@@ -70,7 +70,6 @@ components: transforms: dedupe: {
 							default: null
 							items: type: string: {
 								examples: ["field1", "parent.child_field"]
-								syntax: "literal"
 							}
 						}
 					}
@@ -83,7 +82,6 @@ components: transforms: dedupe: {
 							default: ["timestamp", "host", "message"]
 							items: type: string: {
 								examples: ["field1", "parent.child_field", "host", "message"]
-								syntax: "literal"
 							}
 						}
 					}

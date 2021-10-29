@@ -49,7 +49,6 @@ components: transforms: reduce: {
 				examples: [
 					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
 				]
-				syntax: "literal"
 			}
 		}
 		expire_after_ms: {
@@ -81,7 +80,6 @@ components: transforms: reduce: {
 				default: []
 				items: type: string: {
 					examples: ["request_id", "user_id", "transaction_id"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -131,7 +129,6 @@ components: transforms: reduce: {
 								min:            "The minimum of all numeric values."
 								flat_unique:    "Create a flattened array of all the unique values."
 							}
-							syntax: "literal"
 						}
 					}
 				}
@@ -150,7 +147,6 @@ components: transforms: reduce: {
 				examples: [
 					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
 				]
-				syntax: "literal"
 			}
 		}
 	}

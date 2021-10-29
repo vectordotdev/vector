@@ -92,7 +92,6 @@ components: sinks: vector: {
 			warnings: []
 			type: string: {
 				examples: ["92.12.333.224:\(_port)"]
-				syntax: "literal"
 			}
 		}
 		version: {
@@ -106,7 +105,6 @@ components: sinks: vector: {
 					"2": "Vector sink API version 2"
 				}
 				default: "1"
-				syntax:  "literal"
 			}
 		}
 	}

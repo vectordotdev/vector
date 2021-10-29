@@ -481,7 +481,6 @@ cli: {
 					TRACE: "Most verbose log level. Can be used for troubleshooting Vector. The same as `-vv`"
 				}
 				examples: ["DEBUG", "INFO"]
-				syntax: "literal"
 			}
 		}
 	}

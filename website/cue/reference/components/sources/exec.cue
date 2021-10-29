@@ -56,7 +56,6 @@ components: sources: exec: {
 					scheduled: "Scheduled exec mechanism."
 					streaming: "Streaming exec mechanism."
 				}
-				syntax: "literal"
 			}
 		}
 		command: {
@@ -64,9 +63,7 @@ components: sources: exec: {
 			description: "The command to be run, plus any arguments required."
 			type: array: {
 				examples: [["echo", "Hello World!"], ["ls", "-la"]]
-				items: type: string: {
-					syntax: "literal"
-				}
+				items: type: string: {}
 			}
 		}
 		working_directory: {
@@ -76,7 +73,6 @@ components: sources: exec: {
 			warnings: []
 			type: string: {
 				default: null
-				syntax:  "literal"
 			}
 		}
 		include_stderr: {
@@ -165,7 +161,6 @@ components: sources: exec: {
 				type: string: {
 					examples: ["stdout", "stderr"]
 					default: null
-					syntax:  "literal"
 				}
 			}
 			pid: {
@@ -182,7 +177,6 @@ components: sources: exec: {
 				type: array: {
 					items: type: string: {
 						examples: ["echo", "Hello World!", "ls", "-la"]
-						syntax: "literal"
 					}
 				}
 			}

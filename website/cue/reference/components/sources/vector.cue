@@ -72,7 +72,6 @@ components: sources: vector: {
 			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)"]
-				syntax: "literal"
 			}
 		}
 		shutdown_timeout_secs: {
@@ -96,7 +95,6 @@ components: sources: vector: {
 					"2": "Vector source API version 2"
 				}
 				default: "1"
-				syntax:  "literal"
 			}
 		}
 	}

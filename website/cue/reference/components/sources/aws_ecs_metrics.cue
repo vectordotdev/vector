@@ -72,7 +72,6 @@ components: sources: aws_ecs_metrics: {
 			required: false
 			type: string: {
 				default: "${ECS_CONTAINER_METADATA_URI_V4}"
-				syntax:  "literal"
 			}
 		}
 		namespace: {
@@ -81,7 +80,6 @@ components: sources: aws_ecs_metrics: {
 			required:    false
 			type: string: {
 				default: "awsecs"
-				syntax:  "literal"
 			}
 		}
 		scrape_interval_secs: {
@@ -107,7 +105,6 @@ components: sources: aws_ecs_metrics: {
 					v3: "When the v4 check fails but the environment variable `ECS_CONTAINER_METADATA_URI` is defined."
 					v2: "When the v4 and v3 checks fail."
 				}
-				syntax: "literal"
 			}
 		}
 	}

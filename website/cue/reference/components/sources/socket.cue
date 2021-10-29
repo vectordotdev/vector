@@ -72,7 +72,6 @@ components: sources: socket: {
 			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
-				syntax: "literal"
 			}
 		}
 		host_key: {
@@ -86,7 +85,6 @@ components: sources: socket: {
 			warnings: []
 			type: string: {
 				default: "host"
-				syntax:  "literal"
 			}
 		}
 		max_length: {
@@ -110,7 +108,6 @@ components: sources: socket: {
 					unix_datagram: "Unix domain datagram socket."
 					unix_stream:   "Unix domain stream socket."
 				}
-				syntax: "literal"
 			}
 		}
 		path: {
@@ -120,7 +117,6 @@ components: sources: socket: {
 			warnings: []
 			type: string: {
 				examples: ["/path/to/socket"]
-				syntax: "literal"
 			}
 		}
 		shutdown_timeout_secs: {

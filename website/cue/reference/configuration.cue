@@ -19,7 +19,6 @@ configuration: {
 			type: string: {
 				default: "/var/lib/vector/"
 				examples: ["/var/lib/vector", "/var/local/lib/vector/", "/home/user/vector/"]
-				syntax: "literal"
 			}
 		}
 
@@ -44,7 +43,6 @@ configuration: {
 						type: string: {
 							default: "message"
 							examples: ["message", "@message"]
-							syntax: "literal"
 						}
 					}
 
@@ -57,7 +55,6 @@ configuration: {
 						type: string: {
 							default: "timestamp"
 							examples: ["timestamp", "@timestamp"]
-							syntax: "literal"
 						}
 					}
 
@@ -70,7 +67,6 @@ configuration: {
 						type: string: {
 							default: "host"
 							examples: ["host", "@host"]
-							syntax: "literal"
 						}
 					}
 
@@ -84,7 +80,6 @@ configuration: {
 						type: string: {
 							default: "source_type"
 							examples: ["source_type", "@source_type"]
-							syntax: "literal"
 						}
 					}
 				}
@@ -142,7 +137,6 @@ configuration: {
 			type: string: {
 				default: "local"
 				examples: ["local", "America/NewYork", "EST5EDT"]
-				syntax: "literal"
 			}
 		}
 
@@ -164,7 +158,6 @@ configuration: {
 					type: string: {
 						default: null
 						examples: ["http://foo.bar:3128"]
-						syntax: "literal"
 					}
 				}
 				https: {
@@ -174,7 +167,6 @@ configuration: {
 					type: string: {
 						default: null
 						examples: ["http://foo.bar:3128"]
-						syntax: "literal"
 					}
 				}
 				no_proxy: {
@@ -195,7 +187,6 @@ configuration: {
 						default: null
 						items: type: string: {
 							examples: ["localhost", ".foo.bar", "*"]
-							syntax: "literal"
 						}
 					}
 				}

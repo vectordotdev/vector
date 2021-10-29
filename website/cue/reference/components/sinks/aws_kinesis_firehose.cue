@@ -83,7 +83,6 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 			warnings: []
 			type: string: {
 				examples: ["my-stream"]
-				syntax: "literal"
 			}
 		}
 	}

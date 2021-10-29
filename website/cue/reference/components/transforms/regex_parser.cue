@@ -71,7 +71,6 @@ components: transforms: regex_parser: {
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child"]
-				syntax: "literal"
 			}
 		}
 		overwrite_target: {
@@ -87,7 +86,6 @@ components: transforms: regex_parser: {
 			warnings: []
 			type: array: items: type: string: {
 				examples: ["^(?P<timestamp>[\\\\w\\\\-:\\\\+]+) (?P<level>\\\\w+) (?P<message>.*)$"]
-				syntax: "literal"
 			}
 		}
 		target_field: {
@@ -98,7 +96,6 @@ components: transforms: regex_parser: {
 			type: string: {
 				default: null
 				examples: ["root_field", "parent.child"]
-				syntax: "literal"
 			}
 		}
 		timezone: configuration._timezone

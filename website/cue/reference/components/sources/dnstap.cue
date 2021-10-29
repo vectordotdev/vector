@@ -149,7 +149,6 @@ components: sources: dnstap: {
 						Message: "Payload is a dnstap message."
 					}
 					default: null
-					syntax:  "literal"
 				}
 			}
 			dataTypeId: {
@@ -243,7 +242,6 @@ components: sources: dnstap: {
 							"""
 					}
 					default: null
-					syntax:  "literal"
 				}
 			}
 			messageTypeId: {
@@ -281,7 +279,6 @@ components: sources: dnstap: {
 						us: "microsecond"
 						ns: "nanosecond"
 					}
-					syntax: "literal"
 				}
 			}
 			timestamp: {
@@ -292,7 +289,6 @@ components: sources: dnstap: {
 				required: true
 				type: string: {
 					examples: ["2021-04-09T15:08:32.767098Z"]
-					syntax: "literal"
 				}
 			}
 			serverId: {
@@ -302,7 +298,6 @@ components: sources: dnstap: {
 				type: string: {
 					examples: ["ns1.example.com"]
 					default: null
-					syntax:  "literal"
 				}
 			}
 			serverVersion: {
@@ -312,7 +307,6 @@ components: sources: dnstap: {
 				type: string: {
 					examples: ["BIND 9.16.8"]
 					default: null
-					syntax:  "literal"
 				}
 			}
 			extraInfo: {
@@ -322,7 +316,6 @@ components: sources: dnstap: {
 				type: string: {
 					examples: ["an arbitrary byte-string annotation"]
 					default: null
-					syntax:  "literal"
 				}
 			}
 			socketFamily: {
@@ -337,7 +330,6 @@ components: sources: dnstap: {
 						INET:  "IPv4 ([RFC 791](\(urls.rfc_791)))."
 						INET6: "IPv6 ([RFC 2460](\(urls.rfc_2460)))."
 					}
-					syntax: "literal"
 				}
 			}
 			socketProtocol: {
@@ -352,7 +344,6 @@ components: sources: dnstap: {
 						UDP: "User Datagram Protocol ([RFC 768](\(urls.rfc_768)))."
 						TCP: "Transmission Control Protocol ([RFC 793](\(urls.rfc_793)))."
 					}
-					syntax: "literal"
 				}
 			}
 			sourceAddress: {
@@ -361,7 +352,6 @@ components: sources: dnstap: {
 				required:      true
 				type: string: {
 					examples: ["192.0.2.8", "fc00::100"]
-					syntax: "literal"
 				}
 			}
 			sourcePort: {
@@ -381,7 +371,6 @@ components: sources: dnstap: {
 				required:      true
 				type: string: {
 					examples: ["192.0.2.18", "fc00::200"]
-					syntax: "literal"
 				}
 			}
 			responsePort: {
@@ -402,7 +391,6 @@ components: sources: dnstap: {
 				type: string: {
 					examples: ["Encountered error : Unexpected number of records in update section: 0"]
 					default: null
-					syntax:  "literal"
 				}
 			}
 			rawData: {
@@ -415,7 +403,6 @@ components: sources: dnstap: {
 				type: string: {
 					examples: ["ChBqYW1lcy11YnVudHUtZGV2EgtCSU5EIDkuMTYuNXKdAQgCEAEYASIEfwAAASoEfwAAATDRyAM4AFoNB2V4YW1wbGUDY29tAGCTvf76BW3evGImcmlihYQAAAEAAAABAAACaDIHZXhhbXBsZQNjb20AAAYAAcAPAAYAAQAADhAAPQtiZGRzLWRuc3RhcAAKcG9zdG1hc3RlcgJubwVlbWFpbAZwbGVhc2UAJADGPgAADhAAAAJYACeNAAAADhB4AQ=="]
 					default: null
-					syntax:  "literal"
 				}
 			}
 			requestData: {
@@ -447,7 +434,6 @@ components: sources: dnstap: {
 									us: "microsecond"
 									ns: "nanosecond"
 								}
-								syntax: "literal"
 							}
 						}
 						fullRcode: {
@@ -494,7 +480,6 @@ components: sources: dnstap: {
 									BADCOOKIE: "Bad/missing server cookie"
 								}
 								default: null
-								syntax:  "literal"
 							}
 						}
 						rawData: {
@@ -507,7 +492,6 @@ components: sources: dnstap: {
 							type: string: {
 								examples: ["YoWEAAABAAAAAQAAAmgyB2V4YW1wbGUDY29tAAAGAAHADwAGAAEAAA4QAD0LYmRkcy1kbnN0YXAACnBvc3RtYXN0ZXICbm8FZW1haWwGcGxlYXNlACQAxj4AAA4QAAACWAAnjQAAAA4Q"]
 								default: null
-								syntax:  "literal"
 							}
 						}
 						header: {
@@ -705,7 +689,6 @@ components: sources: dnstap: {
 									us: "microsecond"
 									ns: "nanosecond"
 								}
-								syntax: "literal"
 							}
 						}
 						fullRcode: {
@@ -748,7 +731,6 @@ components: sources: dnstap: {
 									BADCOOKIE: "Bad/missing server cookie"
 								}
 								default: null
-								syntax:  "literal"
 							}
 						}
 						rawData: {
@@ -761,7 +743,6 @@ components: sources: dnstap: {
 							type: string: {
 								examples: ["YoWEAAABAAAAAQAAAmgyB2V4YW1wbGUDY29tAAAGAAHADwAGAAEAAA4QAD0LYmRkcy1kbnN0YXAACnBvc3RtYXN0ZXICbm8FZW1haWwGcGxlYXNlACQAxj4AAA4QAAACWAAnjQAAAA4Q"]
 								default: null
-								syntax:  "literal"
 							}
 						}
 						header: {

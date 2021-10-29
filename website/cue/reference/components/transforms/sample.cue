@@ -49,7 +49,6 @@ components: transforms: sample: {
 			type: string: {
 				default: null
 				examples: ["message"]
-				syntax: "literal"
 			}
 		}
 		exclude: {

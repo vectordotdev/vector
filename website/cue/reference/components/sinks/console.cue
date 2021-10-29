@@ -61,7 +61,6 @@ components: sinks: console: {
 					stdout: "Output will be written to [STDOUT](\(urls.stdout))"
 					stderr: "Output will be written to [STDERR](\(urls.stderr))"
 				}
-				syntax: "literal"
 			}
 		}
 	}

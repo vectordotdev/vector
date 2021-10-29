@@ -56,7 +56,6 @@ components: transforms: remove_fields: {
 			warnings: []
 			type: array: items: type: string: {
 				examples: ["field1", "field2", "parent.child"]
-				syntax: "literal"
 			}
 		}
 	}
