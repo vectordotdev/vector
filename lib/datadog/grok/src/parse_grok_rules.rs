@@ -212,13 +212,13 @@ fn purify_grok_pattern(
     let mut res = String::new();
 
     match aliases.get(pattern.match_fn.name.as_str()) {
-        Some(_) => {
+        Some(alias_def) => {
             // this is a reference to an alias - replace it and copy all filters from the alias
             let definition = match parsed_aliases.get(pattern.match_fn.name.as_str()) {
                 Some(alias) => alias.definition.clone(),
                 None => {
                     // this alias is not parsed yet - let's parse it first
-                    let alias = parse_grok_rule(&pattern.match_fn.name, aliases, parsed_aliases)?;
+                    let alias = parse_grok_rule(alias_def, aliases, parsed_aliases)?;
                     parsed_aliases.insert(pattern.match_fn.name.to_string(), alias.clone());
                     alias.definition
                 }
