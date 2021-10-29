@@ -5,6 +5,7 @@ use crate::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
         SplunkHecRequestReceived,
     },
+    sources::splunk_hec::splunk_response::HecResponseMetadata,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
@@ -25,6 +26,8 @@ use std::{
 use vector_core::ByteSizeOf;
 
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
+
+use self::splunk_response::{HecCode, HecResponse};
 
 // Event fields unique to splunk_hec source
 pub const CHANNEL: &str = "splunk_channel";
@@ -684,32 +687,87 @@ impl warp::reject::Reject for ApiError {}
 mod splunk_response {
     use bytes::Bytes;
     use lazy_static::lazy_static;
+    use serde::Serialize;
     use serde_json::{json, Value};
+    pub enum HecCode {
+        Success = 0,
+        MissingCredentials = 2,
+        InvalidAuthorization = 3,
+        NoData = 5,
+        InvalidDataFormat = 6,
+        InternalServerError = 8,
+        ServerIsShuttingDown = 9,
+        DataChannelIsMissing = 10,
+        EventFieldIsRequired = 12,
+        EventFieldCannotBeBlank = 13,
+    }
+
+    #[derive(Serialize)]
+    pub enum HecResponseMetadata {
+        #[serde(rename = "ackId")]
+        AckId(u64),
+        #[serde(rename = "invalid-event-number")]
+        InvalidEventNumber(usize),
+    }
+
+    #[derive(Serialize)]
+    pub struct HecResponse {
+        text: &'static str,
+        code: u8,
+        #[serde(skip_serializing_if = "Option::is_none", flatten)]
+        pub metadata: Option<HecResponseMetadata>,
+    }
+
+    impl HecResponse {
+        pub fn new(code: HecCode) -> Self {
+            let text = match code {
+                HecCode::Success => "Success",
+                HecCode::MissingCredentials => "Token is required",
+                HecCode::InvalidAuthorization => "Invalid authorization",
+                HecCode::NoData => "No data",
+                HecCode::InvalidDataFormat => "Invalid data format",
+                HecCode::InternalServerError => "Internal server error",
+                HecCode::ServerIsShuttingDown => "Server is shutting down",
+                HecCode::DataChannelIsMissing => "Data channel is missing",
+                HecCode::EventFieldIsRequired => "Event field is required",
+                HecCode::EventFieldCannotBeBlank => "Event field cannot be blank",
+            };
+
+            Self {
+                text,
+                code: code as u8,
+                metadata: None,
+            }
+        }
+
+        pub fn with_metadata(mut self, metadata: HecResponseMetadata) -> Self {
+            self.metadata = Some(metadata);
+            self
+        }
+    }
 
     fn json_to_bytes(value: Value) -> Bytes {
         serde_json::to_string(&value).unwrap().into()
     }
 
     lazy_static! {
-        pub static ref INVALID_AUTHORIZATION: Bytes =
-            json_to_bytes(json!({"text":"Invalid authorization","code":3}));
-        pub static ref MISSING_CREDENTIALS: Bytes =
-            json_to_bytes(json!({"text":"Token is required","code":2}));
-        pub static ref NO_DATA: Bytes = json_to_bytes(json!({"text":"No data","code":5}));
-        pub static ref SUCCESS: Bytes = json_to_bytes(json!({"text":"Success","code":0}));
-        pub static ref SERVER_ERROR: Bytes =
-            json_to_bytes(json!({"text":"Internal server error","code":8}));
-        pub static ref SERVER_SHUTDOWN: Bytes =
-            json_to_bytes(json!({"text":"Server is shutting down","code":9}));
+        pub static ref INVALID_AUTHORIZATION: HecResponse =
+            HecResponse::new(HecCode::InvalidAuthorization);
+        pub static ref MISSING_CREDENTIALS: HecResponse =
+            HecResponse::new(HecCode::MissingCredentials);
+        pub static ref NO_DATA: HecResponse = HecResponse::new(HecCode::NoData);
+        pub static ref SUCCESS: HecResponse = HecResponse::new(HecCode::Success);
+        pub static ref SERVER_ERROR: HecResponse = HecResponse::new(HecCode::InternalServerError);
+        pub static ref SERVER_SHUTDOWN: HecResponse =
+            HecResponse::new(HecCode::ServerIsShuttingDown);
+        pub static ref NO_CHANNEL: HecResponse = HecResponse::new(HecCode::DataChannelIsMissing);
         pub static ref UNSUPPORTED_MEDIA_TYPE: Bytes =
             json_to_bytes(json!({"text":"unsupported content encoding"}));
-        pub static ref NO_CHANNEL: Bytes =
-            json_to_bytes(json!({"text":"Data channel is missing","code":10}));
     }
 }
 
 fn finish_ok(_: ()) -> Response {
-    response_json(StatusCode::OK, splunk_response::SUCCESS.as_ref())
+    response_json(StatusCode::OK, &*splunk_response::SUCCESS)
 }
 
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
@@ -718,34 +776,39 @@ async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
         Ok((match error {
             ApiError::MissingAuthorization => response_json(
                 StatusCode::UNAUTHORIZED,
-                splunk_response::MISSING_CREDENTIALS.as_ref(),
+                &*splunk_response::MISSING_CREDENTIALS,
             ),
             ApiError::InvalidAuthorization => response_json(
                 StatusCode::UNAUTHORIZED,
-                splunk_response::INVALID_AUTHORIZATION.as_ref(),
+                &*splunk_response::INVALID_AUTHORIZATION,
             ),
             ApiError::UnsupportedEncoding => response_json(
                 StatusCode::UNSUPPORTED_MEDIA_TYPE,
                 splunk_response::UNSUPPORTED_MEDIA_TYPE.as_ref(),
             ),
-            ApiError::MissingChannel => response_json(
-                StatusCode::BAD_REQUEST,
-                splunk_response::NO_CHANNEL.as_ref(),
-            ),
-            ApiError::NoData => {
-                response_json(StatusCode::BAD_REQUEST, splunk_response::NO_DATA.as_ref())
+            ApiError::MissingChannel => {
+                response_json(StatusCode::BAD_REQUEST, &*splunk_response::NO_CHANNEL)
             }
+            ApiError::NoData => response_json(StatusCode::BAD_REQUEST, &*splunk_response::NO_DATA),
             ApiError::ServerShutdown => response_json(
                 StatusCode::SERVICE_UNAVAILABLE,
-                splunk_response::SERVER_SHUTDOWN.as_ref(),
+                &*splunk_response::SERVER_SHUTDOWN,
             ),
-            ApiError::InvalidDataFormat { event } => event_error("Invalid data format", 6, event),
-            ApiError::EmptyEventField { event } => {
-                event_error("Event field cannot be blank", 13, event)
-            }
-            ApiError::MissingEventField { event } => {
-                event_error("Event field is required", 12, event)
-            }
+            ApiError::InvalidDataFormat { event } => response_json(
+                StatusCode::BAD_REQUEST,
+                HecResponse::new(HecCode::InvalidDataFormat)
+                    .with_metadata(HecResponseMetadata::InvalidEventNumber(event)),
+            ),
+            ApiError::EmptyEventField { event } => response_json(
+                StatusCode::BAD_REQUEST,
+                HecResponse::new(HecCode::EventFieldCannotBeBlank)
+                    .with_metadata(HecResponseMetadata::InvalidEventNumber(event)),
+            ),
+            ApiError::MissingEventField { event } => response_json(
+                StatusCode::BAD_REQUEST,
+                HecResponse::new(HecCode::EventFieldIsRequired)
+                    .with_metadata(HecResponseMetadata::InvalidEventNumber(event)),
+            ),
             ApiError::BadRequest => empty_response(StatusCode::BAD_REQUEST),
         },))
     } else {
@@ -763,26 +826,6 @@ fn empty_response(code: StatusCode) -> Response {
 /// Response with body
 fn response_json(code: StatusCode, body: impl Serialize) -> Response {
     warp::reply::with_status(warp::reply::json(&body), code).into_response()
-}
-
-/// Error happened during parsing of events
-fn event_error(text: &str, code: u16, event: usize) -> Response {
-    let body = json!({
-        "text":text,
-        "code":code,
-        "invalid-event-number":event
-    });
-    match serde_json::to_string(&body) {
-        Ok(string) => response_json(StatusCode::BAD_REQUEST, string),
-        Err(error) => {
-            // This should never happen.
-            error!(message = "Error encoding json body.", %error);
-            response_json(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                splunk_response::SERVER_ERROR.clone(),
-            )
-        }
-    }
 }
 
 #[cfg(feature = "sinks-splunk_hec")]
