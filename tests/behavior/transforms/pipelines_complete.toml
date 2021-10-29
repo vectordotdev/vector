@@ -27,7 +27,7 @@ filter.condition = "source:s3"
 [[transforms.processing.logs.pipelines.aws_s3_access_logs.transforms]]
 type = "remap"
 source = '''
-. |= parse_groks(
+. |= parse_grok(
     .message,
     patterns: [
         # Access
