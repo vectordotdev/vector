@@ -43,13 +43,11 @@ async fn kinesis_put_records() {
 
     let cx = SinkContext::new_test();
 
-    let client = config.create_client(cx.proxy()).unwrap();
-    let mut sink = config.build(cx).await.unwrap().0;
+    let sink = config.build(cx).await.unwrap().0;
 
     let timestamp = chrono::Utc::now().timestamp_millis();
 
     let (mut input_lines, events) = random_lines_with_stream(100, 11, None);
-    // let mut events = events.map(Ok);
 
     let _ = sink.run(events).await.unwrap();
 
