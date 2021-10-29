@@ -117,7 +117,7 @@ components: transforms: lua: {
 			warnings: []
 			type: array: {
 				items: type: string: {
-					examples: ["/etc/vector/lua"]				}
+					examples: ["/etc/vector/lua"]}
 			}
 		}
 		source: {

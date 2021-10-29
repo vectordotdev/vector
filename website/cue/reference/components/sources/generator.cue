@@ -82,7 +82,7 @@ components: sources: generator: {
 			required:    false
 			warnings: []
 			type: uint: {
-				unit:    null
+				unit: null
 			}
 		}
 		lines: {

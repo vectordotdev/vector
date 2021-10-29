@@ -83,7 +83,7 @@ components: sources: dnstap: {
 				"""
 			required: false
 			type: uint: {
-				unit:    null
+				unit: null
 				examples: [0o777, 0o754, 508]
 			}
 		}
@@ -95,7 +95,7 @@ components: sources: dnstap: {
 				"""
 			required: false
 			type: uint: {
-				unit:    "bytes"
+				unit: "bytes"
 			}
 			warnings: [
 				"""
@@ -113,7 +113,7 @@ components: sources: dnstap: {
 				"""
 			required: false
 			type: uint: {
-				unit:    "bytes"
+				unit: "bytes"
 			}
 			warnings: [
 				"""

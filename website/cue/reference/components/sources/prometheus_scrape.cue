@@ -91,7 +91,6 @@ components: sources: prometheus_scrape: {
 			required: false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["instance"]
 			}
 		}
@@ -104,7 +103,6 @@ components: sources: prometheus_scrape: {
 			required: false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["endpoint"]
 			}
 		}

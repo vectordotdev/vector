@@ -63,7 +63,7 @@ components: transforms: "remap": {
 						.new_name = del(.old_name)
 						""",
 				]
-				syntax:  "remap_program"
+				syntax: "remap_program"
 			}
 		}
 		file: {

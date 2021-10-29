@@ -135,7 +135,7 @@ components: sinks: [Name=string]: {
 						default: features.send.compression.default
 						enum: {
 							if list.Contains(features.send.compression.algorithms, "none") {
-								none:   "No compression."
+								none: "No compression."
 							}
 							if list.Contains(features.send.compression.algorithms, "gzip") {
 								gzip: "[Gzip](\(urls.gzip)) standard DEFLATE compression."
@@ -426,7 +426,7 @@ components: sinks: [Name=string]: {
 								description: "The time a connection needs to be idle before sending TCP keepalive probes."
 								required:    false
 								type: uint: {
-									unit:    "seconds"
+									unit: "seconds"
 								}
 							}
 						}

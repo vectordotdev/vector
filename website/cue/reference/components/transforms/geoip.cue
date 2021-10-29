@@ -128,7 +128,7 @@ components: transforms: geoip: {
 							required:    false
 							common:      false
 							type: uint: {
-								unit:    null
+								unit: null
 								examples: [701, 721]
 							}
 							groups: ["ASN", "ISP"]

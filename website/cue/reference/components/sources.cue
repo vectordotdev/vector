@@ -241,7 +241,7 @@ components: sources: [Name=string]: {
 								description: "The time a connection needs to be idle before sending TCP keepalive probes."
 								required:    false
 								type: uint: {
-									unit:    "seconds"
+									unit: "seconds"
 								}
 							}
 						}
