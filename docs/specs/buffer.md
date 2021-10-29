@@ -12,61 +12,61 @@ interpreted as described in [RFC 2119].
 
 <!-- /MarkdownTOC -->
 
+## Scope
+
+This specification addresses direct buffer development and does not cover aspects that buffers inherit "for free". For example, this specification does not cover global context, such as component_id, that all buffers receive in their telemetry by nature of being attached to a Vector component.
+
 ## Instrumentation
 
 Vector buffers MUST be instrumented for optimal observability and monitoring. This is required to drive various interfaces that Vector users depend on to manage Vector installations in mission critical production environments. This section extends the [Instrumentation Specification].
 
-### Terms and Definitions
+### Terms And Definitions
 
-`component_metadata` - Refers to the metadata (component id, component scope, component kind, and component type) of the component associated with the buffer. Buffer metrics MUST be tagged with all or partial `component_metadata` unless specified otherwise. In most cases, these tags are automatically added from tracing span context and do not need to be included as event properties.
+* `byte_size` - Refers to the byte size of events from a buffer's perspective. For memory buffers, `byte_size` represents the in-memory byte size of events. For disk buffers, `byte_size` represents the serialized byte size of events.
+* `buffer_type` - One of `memory`, `disk`. Buffer metrics MUST be tagged with `buffer_type` unless otherwise specified.
 
 ### Events
 
 #### `BufferCreated`
 
-*All buffers* MUST emit a `BufferCreated` event immediately upon creation. To avoid stale metrics, this event MUST be regularly emitted at an interval.
+*All buffers* MUST emit a `BufferCreated` event upon creation. To avoid stale metrics, this event MUST be regularly emitted at an interval.
 
 * Properties
-  * `max_size_bytes` - the max size of the buffer in bytes
-  * `max_size_events` - the max size of the buffer in number of events
-  * `initial_events_size` - the number of events in the buffer at creation
-  * `initial_bytes_size` - the byte size of the buffer at creation
-  * `component_metadata` - as defined in [Terms and Definitions](#terms-and-definitions)
+  * `max_size_bytes` - the max size of the buffer in bytes if relevant
+  * `max_size_events` - the max size of the buffer in number of events if relevant
 * Metric
   * MUST emit the `buffer_max_event_size` gauge (in-memory buffers) if the defined `max_size_events` value is present
   * MUST emit the `buffer_max_byte_size` gauge (disk buffers) if the defined `max_size_bytes` value is present
-  * MUST emit the `buffer_received_events_total` counter with the defined `initial_events_size` value
-  * MUST emit the `buffer_received_event_bytes_total` counter with the defined `initial_bytes_size` value
 
 #### `BufferEventsReceived`
 
-*All buffers* MUST emit an `BufferEventsReceived` event immediately after receiving one or more Vector events.
+*All buffers* MUST emit a `BufferEventsReceived` event after receiving one or more Vector events. *All buffers* MUST emit a `BufferEventsReceived` event upon startup if there are existing events in the buffer.
 
 * Properties
   * `count` - the number of received events
-  * `byte_size` - the byte size of received events
+  * `byte_size` - as defined in [Terms and Definitions](#terms-and-definitions)
 * Metric
   * MUST increment the `buffer_received_events_total` counter by the defined `count`
-  * MUST increment the `buffer_received_event_bytes_total` counter by the defined `byte_size`
+  * MUST increment the `buffer_received_bytes_total` counter by the defined `byte_size`
   * MUST increment the `buffer_events` gauge by the defined `count`
   * MUST increment the `buffer_byte_size` gauge by the defined `byte_size`
 
 #### `BufferEventsSent`
 
-*All buffers* MUST emit an `BufferEventsSent` event immediately after sending one or more Vector events.
+*All buffers* MUST emit a `BufferEventsSent` event after sending one or more Vector events.
 
 * Properties
   * `count` - the number of sent events
-  * `byte_size` - the byte size of sent events
+  * `byte_size` - as defined in [Terms and Definitions](#terms-and-definitions)
 * Metric
   * MUST increment the `buffer_sent_events_total` counter by the defined `count`
-  * MUST increment the `buffer_sent_event_bytes_total` counter by the defined `byte_size`
+  * MUST increment the `buffer_sent_bytes_total` counter by the defined `byte_size`
   * MUST decrement the `buffer_events` gauge by the defined `count`
   * MUST decrement the `buffer_byte_size` gauge by the defined `byte_size`
 
 #### `EventsDropped`
 
-*All buffers* MUST emit an `EventsDropped` event immediately after dropping one or more Vector events.
+*All buffers* MUST emit an `EventsDropped` event after dropping one or more Vector events.
 
 * Properties
   * `count` - the number of dropped events

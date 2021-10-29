@@ -9,7 +9,10 @@ components: sources: nats: {
 			from: components._nats.features.collect.from
 		}
 		multiline: enabled: false
-		codecs: enabled:    true
+		codecs: {
+			enabled:         true
+			default_framing: "bytes"
+		}
 	}
 
 	classes: {

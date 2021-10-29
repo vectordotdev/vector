@@ -34,7 +34,7 @@ components: transforms: concat: {
 			"""
 			\(concat._remap_deprecation_notice)
 
-			```vrl
+			```coffee
 			.message = "The severity level is " + .level
 			```
 			""",
