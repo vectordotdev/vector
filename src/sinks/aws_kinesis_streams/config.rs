@@ -105,11 +105,13 @@ impl SinkConfig for KinesisSinkConfig {
 
         let request_limits = self.request.unwrap_with(&TowerRequestConfig::default());
 
+        let region = self.region.clone().try_into()?;
         let service = ServiceBuilder::new()
             .settings(request_limits, KinesisRetryLogic)
             .service(KinesisService {
                 client,
                 stream_name: self.stream_name.clone(),
+                region,
             });
 
         let request_builder = KinesisRequestBuilder {
