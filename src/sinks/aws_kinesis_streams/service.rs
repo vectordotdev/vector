@@ -73,7 +73,14 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
         Box::pin(async move {
             let _response: PutRecordsOutput = client
                 .put_records(request)
+                .inspect(|_| {
+                    emit!(&AwsBytesSent {
+                        byte_size: processed_bytes_total,
+                        region,
+                    });
+                })
                 .inspect_ok(|_| {
+                    // Deprecated
                     emit!(&AwsKinesisStreamsEventSent {
                         byte_size: processed_bytes_total
                     });
