@@ -83,7 +83,6 @@ components: sources: dnstap: {
 				"""
 			required: false
 			type: uint: {
-				default: null
 				unit:    null
 				examples: [0o777, 0o754, 508]
 			}
@@ -96,7 +95,6 @@ components: sources: dnstap: {
 				"""
 			required: false
 			type: uint: {
-				default: null
 				unit:    "bytes"
 			}
 			warnings: [
@@ -115,7 +113,6 @@ components: sources: dnstap: {
 				"""
 			required: false
 			type: uint: {
-				default: null
 				unit:    "bytes"
 			}
 			warnings: [
@@ -148,7 +145,6 @@ components: sources: dnstap: {
 					enum: {
 						Message: "Payload is a dnstap message."
 					}
-					default: null
 				}
 			}
 			dataTypeId: {
@@ -241,7 +237,6 @@ components: sources: dnstap: {
 							authoritative name server.
 							"""
 					}
-					default: null
 				}
 			}
 			messageTypeId: {
@@ -297,7 +292,6 @@ components: sources: dnstap: {
 				required:    false
 				type: string: {
 					examples: ["ns1.example.com"]
-					default: null
 				}
 			}
 			serverVersion: {
@@ -306,7 +300,6 @@ components: sources: dnstap: {
 				required:    false
 				type: string: {
 					examples: ["BIND 9.16.8"]
-					default: null
 				}
 			}
 			extraInfo: {
@@ -315,7 +308,6 @@ components: sources: dnstap: {
 				required:    false
 				type: string: {
 					examples: ["an arbitrary byte-string annotation"]
-					default: null
 				}
 			}
 			socketFamily: {
@@ -390,7 +382,6 @@ components: sources: dnstap: {
 				required:    false
 				type: string: {
 					examples: ["Encountered error : Unexpected number of records in update section: 0"]
-					default: null
 				}
 			}
 			rawData: {
@@ -402,7 +393,6 @@ components: sources: dnstap: {
 				required: false
 				type: string: {
 					examples: ["ChBqYW1lcy11YnVudHUtZGV2EgtCSU5EIDkuMTYuNXKdAQgCEAEYASIEfwAAASoEfwAAATDRyAM4AFoNB2V4YW1wbGUDY29tAGCTvf76BW3evGImcmlihYQAAAEAAAABAAACaDIHZXhhbXBsZQNjb20AAAYAAcAPAAYAAQAADhAAPQtiZGRzLWRuc3RhcAAKcG9zdG1hc3RlcgJubwVlbWFpbAZwbGVhc2UAJADGPgAADhAAAAJYACeNAAAADhB4AQ=="]
-					default: null
 				}
 			}
 			requestData: {
@@ -447,7 +437,6 @@ components: sources: dnstap: {
 							type: uint: {
 								unit: null
 								examples: [0]
-								default: null
 							}
 						}
 						rcodeName: {
@@ -479,7 +468,6 @@ components: sources: dnstap: {
 									BADTRUNC:  "Bad Truncation"
 									BADCOOKIE: "Bad/missing server cookie"
 								}
-								default: null
 							}
 						}
 						rawData: {
@@ -491,7 +479,6 @@ components: sources: dnstap: {
 							required: false
 							type: string: {
 								examples: ["YoWEAAABAAAAAQAAAmgyB2V4YW1wbGUDY29tAAAGAAHADwAGAAEAAA4QAD0LYmRkcy1kbnN0YXAACnBvc3RtYXN0ZXICbm8FZW1haWwGcGxlYXNlACQAxj4AAA4QAAACWAAnjQAAAA4Q"]
-								default: null
 							}
 						}
 						header: {
@@ -701,7 +688,6 @@ components: sources: dnstap: {
 							type: uint: {
 								unit: null
 								examples: [0, 5]
-								default: null
 							}
 						}
 						rcodeName: {
@@ -730,7 +716,6 @@ components: sources: dnstap: {
 									BADTRUNC:  "Bad Truncation"
 									BADCOOKIE: "Bad/missing server cookie"
 								}
-								default: null
 							}
 						}
 						rawData: {
@@ -742,7 +727,6 @@ components: sources: dnstap: {
 							required: false
 							type: string: {
 								examples: ["YoWEAAABAAAAAQAAAmgyB2V4YW1wbGUDY29tAAAGAAHADwAGAAEAAA4QAD0LYmRkcy1kbnN0YXAACnBvc3RtYXN0ZXICbm8FZW1haWwGcGxlYXNlACQAxj4AAA4QAAACWAAnjQAAAA4Q"]
-								default: null
 							}
 						}
 						header: {

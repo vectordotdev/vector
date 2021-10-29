@@ -86,7 +86,6 @@ components: sinks: gcp_stackdriver_logs: {
 			required: false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["012345-6789AB-CDEF01"]
 			}
 		}
@@ -104,7 +103,6 @@ components: sinks: gcp_stackdriver_logs: {
 			required: false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["/path/to/credentials.json"]
 			}
 		}
@@ -120,7 +118,6 @@ components: sinks: gcp_stackdriver_logs: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["My Folder"]
 			}
 		}
@@ -144,7 +141,6 @@ components: sinks: gcp_stackdriver_logs: {
 			required: false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["622418129737"]
 			}
 		}
@@ -198,7 +194,6 @@ components: sinks: gcp_stackdriver_logs: {
 						required: false
 						warnings: []
 						type: string: {
-							default: null
 							examples: ["Twilight", "{{ zone }}"]
 							syntax: "template"
 						}
@@ -222,7 +217,6 @@ components: sinks: gcp_stackdriver_logs: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["severity"]
 			}
 		}

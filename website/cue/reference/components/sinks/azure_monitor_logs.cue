@@ -77,7 +77,6 @@ components: sinks: azure_monitor_logs: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/otherResourceGroup/providers/Microsoft.Storage/storageAccounts/examplestorage", "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/examplegroup/providers/Microsoft.SQL/servers/serverName/databases/databaseName"]
 			}
 		}

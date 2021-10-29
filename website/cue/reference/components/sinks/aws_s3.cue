@@ -84,7 +84,6 @@ components: sinks: aws_s3: components._aws & {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				enum: {
 					"private":                   "Owner gets `FULL_CONTROL`. No one else has access rights (default)."
 					"public-read":               "Owner gets `FULL_CONTROL`. The AllUsers group gets `READ` access."
@@ -112,7 +111,6 @@ components: sinks: aws_s3: components._aws & {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["gzip"]
 			}
 		}
@@ -162,7 +160,6 @@ components: sinks: aws_s3: components._aws & {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
 			}
 		}
@@ -173,7 +170,6 @@ components: sinks: aws_s3: components._aws & {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
 			}
 		}
@@ -184,7 +180,6 @@ components: sinks: aws_s3: components._aws & {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
 			}
 		}
@@ -195,7 +190,6 @@ components: sinks: aws_s3: components._aws & {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
 			}
 		}
@@ -218,7 +212,6 @@ components: sinks: aws_s3: components._aws & {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				enum: {
 					"AES256":  "256-bit Advanced Encryption Standard"
 					"aws:kms": "AWS managed key encryption"
@@ -232,7 +225,6 @@ components: sinks: aws_s3: components._aws & {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["abcd1234"]
 			}
 		}
@@ -243,7 +235,6 @@ components: sinks: aws_s3: components._aws & {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				enum: {
 					STANDARD:            "The default storage class. If you don't specify the storage class when you upload an object, Amazon S3 assigns the STANDARD storage class."
 					REDUCED_REDUNDANCY:  "Designed for noncritical, reproducible data that can be stored with less redundancy than the STANDARD storage class. AWS recommends that you not use this storage class. The STANDARD storage class is more cost effective. "

@@ -91,7 +91,6 @@ components: sinks: gcp_cloud_storage: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				enum: {
 					"authenticated-read":        "Gives the bucket or object owner OWNER permission, and gives all authenticated Google account holders READER permission."
 					"bucket-owner-full-control": "Gives the object and bucket owners OWNER permission."
@@ -117,7 +116,6 @@ components: sinks: gcp_cloud_storage: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["/path/to/credentials.json"]
 			}
 		}
@@ -167,7 +165,6 @@ components: sinks: gcp_cloud_storage: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: []
 			}
 		}
@@ -178,7 +175,6 @@ components: sinks: gcp_cloud_storage: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				enum: {
 					STANDARD: "Standard Storage is best for data that is frequently accessed and/or stored for only brief periods of time. This is the default."
 					NEARLINE: "Nearline Storage is a low-cost, highly durable storage service for storing infrequently accessed data."

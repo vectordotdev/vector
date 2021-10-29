@@ -17,7 +17,6 @@ components: sources: docker_logs: {
 		DOCKER_HOST: {
 			description: "The Docker host to connect to when `docker_host` configuration is absent."
 			type: string: {
-				default: null
 				examples: ["unix:///var/run/docker.sock"]
 			}
 		}
@@ -31,7 +30,6 @@ components: sources: docker_logs: {
 				- `$DOCKER_CERT_PATH/key.pem`: TLS key.
 				"""
 			type: string: {
-				default: null
 				examples: ["certs/"]
 			}
 		}
@@ -39,7 +37,6 @@ components: sources: docker_logs: {
 		DOCKER_CONFIG: {
 			description: "Path to look for TLS certificates when both `tls` configuration and `DOCKER_CERT_PATH` are absent."
 			type: string: {
-				default: null
 				examples: ["certs/"]
 			}
 		}
@@ -116,7 +113,6 @@ components: sources: docker_logs: {
 				"""
 			required: false
 			type: string: {
-				default: null
 				examples: [
 					"http://localhost:2375",
 					"https://localhost:2376",
@@ -186,7 +182,6 @@ components: sources: docker_logs: {
 				"""
 			required: false
 			type: array: {
-				default: null
 				items: type: string: {
 					examples: ["exclude_", "exclude_me_0", "ad08cc418cf9"]
 				}
@@ -204,7 +199,6 @@ components: sources: docker_logs: {
 				"""
 			required: false
 			type: array: {
-				default: null
 				items: type: string: {
 					examples: ["include_", "include_me_0", "ad08cc418cf9"]
 				}
@@ -219,7 +213,6 @@ components: sources: docker_logs: {
 				"""
 			required:    false
 			type: array: {
-				default: null
 				items: type: string: {
 					examples: ["com.example.vendor=Timber Inc.", "com.example.name=Vector"]
 				}
@@ -233,7 +226,6 @@ components: sources: docker_logs: {
 				"""
 			required: false
 			type: array: {
-				default: null
 				items: type: string: {
 					examples: ["httpd", "redis"]
 				}

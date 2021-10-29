@@ -91,7 +91,6 @@ components: sources: http: {
 			description: "A list of HTTP headers to include in the log event. These will override any values included in the JSON payload with conflicting names."
 			required:    false
 			type: array: {
-				default: null
 				items: type: string: {
 					examples: ["User-Agent", "X-My-Custom-Header"]
 				}
@@ -103,7 +102,6 @@ components: sources: http: {
 			description: "A list of URL query parameters to include in the log event. These will override any values included in the body with conflicting names."
 			required:    false
 			type: array: {
-				default: null
 				items: type: string: {
 					examples: ["application", "source"]
 				}

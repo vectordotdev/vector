@@ -81,7 +81,6 @@ components: sinks: gcp_pubsub: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["${GCP_API_KEY}", "ef8d5de700e7989468166c40fc8a0ccd"]
 			}
 		}
@@ -91,7 +90,6 @@ components: sinks: gcp_pubsub: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["/path/to/credentials.json"]
 			}
 		}

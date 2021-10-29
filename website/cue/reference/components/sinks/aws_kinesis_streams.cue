@@ -83,7 +83,6 @@ components: sinks: aws_kinesis_streams: components._aws & {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["user_id"]
 			}
 		}

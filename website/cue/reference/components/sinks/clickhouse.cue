@@ -94,7 +94,6 @@ components: sinks: clickhouse: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["mydatabase"]
 			}
 		}

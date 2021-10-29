@@ -71,9 +71,7 @@ components: sources: exec: {
 			required:    false
 			description: "The directory in which to run the command."
 			warnings: []
-			type: string: {
-				default: null
-			}
+			type: string: {}
 		}
 		include_stderr: {
 			common:      false
@@ -160,7 +158,6 @@ components: sources: exec: {
 				required:    false
 				type: string: {
 					examples: ["stdout", "stderr"]
-					default: null
 				}
 			}
 			pid: {

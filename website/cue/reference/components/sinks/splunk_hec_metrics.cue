@@ -84,7 +84,6 @@ components: sinks: splunk_hec_metrics: {
 				"""
 			required: false
 			type: string: {
-				default: null
 				examples: ["service"]
 			}
 		}
@@ -104,7 +103,6 @@ components: sinks: splunk_hec_metrics: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["hostname"]
 			}
 		}
@@ -114,7 +112,6 @@ components: sinks: splunk_hec_metrics: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["{{ host }}", "custom_index"]
 				syntax: "template"
 			}
@@ -125,7 +122,6 @@ components: sinks: splunk_hec_metrics: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["{{ file }}", "/var/log/syslog", "UDP:514"]
 				syntax: "template"
 			}
@@ -136,7 +132,6 @@ components: sinks: splunk_hec_metrics: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["{{ sourcetype }}", "_json", "httpevent"]
 				syntax: "template"
 			}

@@ -156,7 +156,6 @@ configuration: {
 					description: "The URL to proxy HTTP requests through."
 					required:    false
 					type: string: {
-						default: null
 						examples: ["http://foo.bar:3128"]
 					}
 				}
@@ -165,7 +164,6 @@ configuration: {
 					description: "The URL to proxy HTTPS requests through."
 					required:    false
 					type: string: {
-						default: null
 						examples: ["http://foo.bar:3128"]
 					}
 				}
@@ -184,7 +182,6 @@ configuration: {
 							"""
 					required:    false
 					type: array: {
-						default: null
 						items: type: string: {
 							examples: ["localhost", ".foo.bar", "*"]
 						}

@@ -160,7 +160,6 @@ components: sources: journald: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["/run/log/journal"]
 			}
 		}
@@ -184,7 +183,6 @@ components: sources: journald: {
 					description: "Any Journald field"
 					required:    false
 					type: string: {
-						default: null
 						examples: ["/usr/sbin/ntpd", "c36e9ea52800a19d214cb71b53263a28"]
 					}
 				}

@@ -64,7 +64,6 @@ components: transforms: "remap": {
 						""",
 				]
 				syntax:  "remap_program"
-				default: null
 			}
 		}
 		file: {
@@ -81,7 +80,6 @@ components: transforms: "remap": {
 				examples: [
 					"./my/program.vrl",
 				]
-				default: null
 			}
 		}
 		drop_on_error: {

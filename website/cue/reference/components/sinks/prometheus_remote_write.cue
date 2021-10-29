@@ -108,7 +108,6 @@ components: sinks: prometheus_remote_write: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["service"]
 			}
 		}
@@ -138,7 +137,6 @@ components: sinks: prometheus_remote_write: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["my-domain"]
 				syntax: "template"
 			}

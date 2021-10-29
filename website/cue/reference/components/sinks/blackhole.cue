@@ -57,7 +57,6 @@ components: sinks: blackhole: {
 			required:    false
 			warnings: []
 			type: uint: {
-				default: null
 				examples: [1000]
 				unit: null
 			}

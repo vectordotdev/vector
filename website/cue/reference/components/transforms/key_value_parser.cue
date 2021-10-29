@@ -113,7 +113,6 @@ components: transforms: key_value_parser: {
 				"""
 			required: false
 			type: string: {
-				default: null
 				examples: ["root_field", "parent.child"]
 			}
 		}
@@ -126,7 +125,6 @@ components: transforms: key_value_parser: {
 				"""
 			required: false
 			type: string: {
-				default: null
 				examples: ["<>", "{}"]
 			}
 		}
@@ -139,7 +137,6 @@ components: transforms: key_value_parser: {
 				"""
 			required: false
 			type: string: {
-				default: null
 				examples: ["<>", "{}"]
 			}
 		}

@@ -108,7 +108,6 @@ components: sinks: http: {
 			required: false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["https://10.22.212.22:9000/health"]
 			}
 		}

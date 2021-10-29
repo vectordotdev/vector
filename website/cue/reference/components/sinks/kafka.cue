@@ -58,7 +58,6 @@ components: sinks: kafka: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["user_id"]
 			}
 		}
@@ -87,7 +86,7 @@ components: sinks: kafka: {
 						description: "Enable SASL/SCRAM authentication to the remote. (Not supported on Windows at this time.)"
 						required:    false
 						warnings: []
-						type: bool: default: null
+						type: bool: {}
 					}
 					mechanism: {
 						common:      true
@@ -95,7 +94,6 @@ components: sinks: kafka: {
 						required:    false
 						warnings: []
 						type: string: {
-							default: null
 							examples: ["SCRAM-SHA-256", "SCRAM-SHA-512"]
 						}
 					}
@@ -105,7 +103,6 @@ components: sinks: kafka: {
 						required:    false
 						warnings: []
 						type: string: {
-							default: null
 							examples: ["password"]
 						}
 					}
@@ -115,7 +112,6 @@ components: sinks: kafka: {
 						required:    false
 						warnings: []
 						type: string: {
-							default: null
 							examples: ["username"]
 						}
 					}
@@ -137,7 +133,6 @@ components: sinks: kafka: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["headers"]
 			}
 		}

@@ -79,7 +79,6 @@ components: sinks: new_relic_logs: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["xxxx", "${NEW_RELIC_INSERT_KEY}"]
 			}
 		}
@@ -89,7 +88,6 @@ components: sinks: new_relic_logs: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["xxxx", "${NEW_RELIC_LICENSE_KEY}"]
 			}
 		}

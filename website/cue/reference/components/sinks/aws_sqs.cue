@@ -84,7 +84,6 @@ components: sinks: aws_sqs: components._aws & {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["vector", "vector-%Y-%m-%d"]
 				syntax: "template"
 			}
@@ -101,7 +100,6 @@ components: sinks: aws_sqs: components._aws & {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["{{ transaction_id }}"]
 				syntax: "template"
 			}

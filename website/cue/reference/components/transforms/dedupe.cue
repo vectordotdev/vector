@@ -67,7 +67,6 @@ components: transforms: dedupe: {
 						required:    false
 						warnings: []
 						type: array: {
-							default: null
 							items: type: string: {
 								examples: ["field1", "parent.child_field"]
 							}

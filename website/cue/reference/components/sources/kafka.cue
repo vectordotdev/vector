@@ -148,7 +148,7 @@ components: sources: kafka: {
 						description: "Enable SASL/SCRAM authentication to the remote (not supported on Windows at this time)."
 						required:    false
 						warnings: []
-						type: bool: default: null
+						type: bool: {}
 					}
 					mechanism: {
 						common:      true
@@ -156,7 +156,6 @@ components: sources: kafka: {
 						required:    false
 						warnings: []
 						type: string: {
-							default: null
 							examples: ["SCRAM-SHA-256", "SCRAM-SHA-512"]
 						}
 					}
@@ -166,7 +165,6 @@ components: sources: kafka: {
 						required:    false
 						warnings: []
 						type: string: {
-							default: null
 							examples: ["password"]
 						}
 					}
@@ -176,7 +174,6 @@ components: sources: kafka: {
 						required:    false
 						warnings: []
 						type: string: {
-							default: null
 							examples: ["username"]
 						}
 					}

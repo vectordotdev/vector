@@ -85,7 +85,6 @@ components: sources: aws_kinesis_firehose: {
 				"""
 			required: false
 			type: "string": {
-				default: null
 				examples: ["A94A8FE5CCB19BA61C4C08"]
 			}
 		}

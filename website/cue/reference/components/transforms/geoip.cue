@@ -129,7 +129,6 @@ components: transforms: geoip: {
 							common:      false
 							type: uint: {
 								unit:    null
-								default: null
 								examples: [701, 721]
 							}
 							groups: ["ASN", "ISP"]
@@ -144,7 +143,6 @@ components: transforms: geoip: {
 							required:    false
 							common:      false
 							type: string: {
-								default: null
 								examples: [
 									"MCI Communications Services, Inc. d/b/a Verizon Business",
 									"DoD Network Information Center",
@@ -201,7 +199,6 @@ components: transforms: geoip: {
 							required:    false
 							common:      false
 							type: string: {
-								default: null
 								examples: ["Verizon Business"]
 							}
 							groups: ["ISP"]
@@ -231,7 +228,6 @@ components: transforms: geoip: {
 							required:    false
 							common:      false
 							type: string: {
-								default: null
 								examples: ["Verizon Business"]
 							}
 							groups: ["ISP"]

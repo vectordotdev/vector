@@ -75,7 +75,6 @@ components: sinks: pulsar: {
 						required:    false
 						warnings: []
 						type: string: {
-							default: null
 							examples: ["${PULSAR_NAME}", "name123"]
 						}
 					}
@@ -85,7 +84,6 @@ components: sinks: pulsar: {
 						required:    false
 						warnings: []
 						type: string: {
-							default: null
 							examples: ["${PULSAR_TOKEN}", "123456789"]
 						}
 					}

@@ -16,7 +16,6 @@ components: _aws: {
 						description: "The AWS access key id. Used for AWS authentication when communicating with AWS services."
 						required:    false
 						type: string: {
-							default: null
 							examples: ["AKIAIOSFODNN7EXAMPLE"]
 						}
 					}
@@ -26,7 +25,6 @@ components: _aws: {
 						description: "The AWS secret access key. Used for AWS authentication when communicating with AWS services."
 						required:    false
 						type: string: {
-							default: null
 							examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
 						}
 					}
@@ -36,7 +34,6 @@ components: _aws: {
 						description: "The ARN of an [IAM role](\(urls.aws_iam_role)) to assume at startup."
 						required:    false
 						type: string: {
-							default: null
 							examples: ["arn:aws:iam::123456789098:role/my_role"]
 						}
 					}
@@ -46,7 +43,6 @@ components: _aws: {
 						description: "The path to AWS credentials file. Used for AWS authentication when communicating with AWS services."
 						required:    false
 						type: string: {
-							default: null
 							examples: ["/path/to/aws/credentials"]
 						}
 					}
@@ -70,7 +66,6 @@ components: _aws: {
 			relevant_when: "region = null"
 			required:      false
 			type: string: {
-				default: null
 				examples: ["127.0.0.0:5000/path/to/service"]
 			}
 		}
@@ -89,7 +84,6 @@ components: _aws: {
 		AWS_ACCESS_KEY_ID: {
 			description: "The AWS access key id. Used for AWS authentication when communicating with AWS services."
 			type: string: {
-				default: null
 				examples: ["AKIAIOSFODNN7EXAMPLE"]
 			}
 		}
@@ -104,7 +98,6 @@ components: _aws: {
 		AWS_CREDENTIAL_EXPIRATION: {
 			description: "Expiration time in RFC 3339 format. If unset, credentials won't expire."
 			type: string: {
-				default: null
 				examples: ["1996-12-19T16:39:57-08:00"]
 			}
 		}
@@ -113,7 +106,6 @@ components: _aws: {
 			description:   "The default [AWS region](\(urls.aws_regions))."
 			relevant_when: "endpoint = null"
 			type: string: {
-				default: null
 				examples: ["/path/to/credentials.json"]
 			}
 		}
@@ -129,7 +121,6 @@ components: _aws: {
 		AWS_ROLE_SESSION_NAME: {
 			description: "Specifies a name to associate with the role session. This value appears in CloudTrail logs for commands performed by the user of this profile."
 			type: string: {
-				default: null
 				examples: ["vector-session"]
 			}
 		}
@@ -137,7 +128,6 @@ components: _aws: {
 		AWS_SECRET_ACCESS_KEY: {
 			description: "The AWS secret access key. Used for AWS authentication when communicating with AWS services."
 			type: string: {
-				default: null
 				examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
 			}
 		}
@@ -145,7 +135,6 @@ components: _aws: {
 		AWS_SESSION_TOKEN: {
 			description: "The AWS session token. Used for AWS authentication when communicating with AWS services."
 			type: string: {
-				default: null
 				examples: ["AQoEXAMPLEH4aoAH0gNCAPy...truncated...zrkuWJOgQs8IZZaIv2BXIa2R4Olgk"]
 			}
 		}

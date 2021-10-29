@@ -111,7 +111,6 @@ components: sinks: prometheus_exporter: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["service"]
 			}
 		}

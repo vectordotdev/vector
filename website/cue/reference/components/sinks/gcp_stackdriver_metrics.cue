@@ -81,7 +81,6 @@ components: sinks: gcp_stackdriver_metrics: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["/path/to/credentials.json"]
 			}
 		}
@@ -131,7 +130,6 @@ components: sinks: gcp_stackdriver_metrics: {
 						required:    false
 						warnings: []
 						type: string: {
-							default: null
 							examples: ["vector-123456", "Twilight"]
 						}
 					}

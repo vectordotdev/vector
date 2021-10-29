@@ -136,7 +136,6 @@ components: sinks: elasticsearch: {
 						required:    false
 						warnings: []
 						type: string: {
-							default: null
 							examples: ["us-east-1"]
 						}
 					}
@@ -278,7 +277,6 @@ components: sinks: elasticsearch: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["id", "_id"]
 			}
 		}
@@ -331,7 +329,6 @@ components: sinks: elasticsearch: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["pipeline-name"]
 			}
 		}

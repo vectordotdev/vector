@@ -105,7 +105,6 @@ components: sinks: _humio: {
 			required: false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["json", "none"]
 				syntax: "template"
 			}
@@ -119,7 +118,6 @@ components: sinks: _humio: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["hostname"]
 			}
 		}
@@ -129,7 +127,6 @@ components: sinks: _humio: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["{{ host }}", "custom_index"]
 				syntax: "template"
 			}
@@ -140,7 +137,6 @@ components: sinks: _humio: {
 			required:    false
 			warnings: []
 			type: array: {
-				default: null
 				items: type: string: {
 					examples: ["#env", "#datacenter"]
 				}
@@ -155,7 +151,6 @@ components: sinks: _humio: {
 			required: false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["{{file}}", "/var/log/syslog", "UDP:514"]
 				syntax: "template"
 			}

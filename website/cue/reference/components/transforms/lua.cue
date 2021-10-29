@@ -62,7 +62,6 @@ components: transforms: lua: {
 						required:    false
 						warnings: []
 						type: string: {
-							default: null
 							examples: [
 								"""
 				                function (emit)
@@ -98,7 +97,6 @@ components: transforms: lua: {
 						required:    false
 						warnings: []
 						type: string: {
-							default: null
 							examples: [
 								"""
 				                function (emit)
@@ -118,7 +116,6 @@ components: transforms: lua: {
 			required:    false
 			warnings: []
 			type: array: {
-				default: null
 				items: type: string: {
 					examples: ["/etc/vector/lua"]				}
 			}
@@ -129,7 +126,6 @@ components: transforms: lua: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: [
 					"""
 						function init()
@@ -172,26 +168,23 @@ components: transforms: lua: {
 			description: "Configures timers which are executed periodically at given interval."
 			required:    false
 			warnings: []
-			type: array: {
-				default: null
-				items: type: object: {
-					options: {
-						handler: {
-							description: "Defines a handler function which is executed periodically at `interval_seconds`. It can produce new events using `emit` function."
-							required:    true
-							warnings: []
-							type: string: {
-								examples: ["timer_handler"]
-							}
+			type: array: items: type: object: {
+				options: {
+					handler: {
+						description: "Defines a handler function which is executed periodically at `interval_seconds`. It can produce new events using `emit` function."
+						required:    true
+						warnings: []
+						type: string: {
+							examples: ["timer_handler"]
 						}
-						interval_seconds: {
-							description: "Defines the interval at which the timer handler would be executed."
-							required:    true
-							warnings: []
-							type: uint: {
-								examples: [1, 10, 30]
-								unit: "seconds"
-							}
+					}
+					interval_seconds: {
+						description: "Defines the interval at which the timer handler would be executed."
+						required:    true
+						warnings: []
+						type: uint: {
+							examples: [1, 10, 30]
+							unit: "seconds"
 						}
 					}
 				}
@@ -201,11 +194,10 @@ components: transforms: lua: {
 			description: "Transform API version. Specifying this version ensures that Vector does not break backward compatibility."
 			required:    true
 			warnings: []
-			type: string: {
-				enum: {
-					"1": "Lua transform API version 1"
-					"2": "Lua transform API version 2"
-				}			}
+			type: string: enum: {
+				"1": "Lua transform API version 1"
+				"2": "Lua transform API version 2"
+			}
 		}
 	}
 

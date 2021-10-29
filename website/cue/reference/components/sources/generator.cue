@@ -82,7 +82,6 @@ components: sources: generator: {
 			required:    false
 			warnings: []
 			type: uint: {
-				default: null
 				unit:    null
 			}
 		}
@@ -93,7 +92,6 @@ components: sources: generator: {
 			required:      false
 			warnings: []
 			type: array: {
-				default: null
 				items: type: string: {
 					examples: ["Line 1", "Line 2"]
 				}

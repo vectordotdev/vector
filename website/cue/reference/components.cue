@@ -570,7 +570,6 @@ components: {
 						description: "Absolute path to an additional CA certificate file, in DER or PEM format (X.509), or an in-line CA certificate in PEM format."
 						required:    false
 						type: string: {
-							default: null
 							examples: ["/path/to/certificate_authority.crt"]
 						}
 					}
@@ -579,7 +578,6 @@ components: {
 						description: "Absolute path to a certificate file used to identify this server, in DER or PEM format (X.509) or PKCS#12, or an in-line certificate in PEM format. If this is set, and is not a PKCS#12 archive, `key_file` must also be set. This is required if `enabled` is set to `true`."
 						required:    false
 						type: string: {
-							default: null
 							examples: ["/path/to/host_certificate.crt"]
 						}
 					}
@@ -588,7 +586,6 @@ components: {
 						description: "Absolute path to a private key file used to identify this server, in DER or PEM format (PKCS#8), or an in-line private key in PEM format."
 						required:    false
 						type: string: {
-							default: null
 							examples: ["/path/to/host_certificate.key"]
 						}
 					}
@@ -597,7 +594,6 @@ components: {
 						description: "Pass phrase used to unlock the encrypted key file. This has no effect unless `key_file` is set."
 						required:    false
 						type: string: {
-							default: null
 							examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 						}
 					}
@@ -640,7 +636,6 @@ components: {
 						description: "Absolute path to an additional CA certificate file, in DER or PEM format (X.509), or an inline CA certificate in PEM format."
 						required:    false
 						type: string: {
-							default: null
 							examples: ["/path/to/certificate_authority.crt"]
 						}
 					}
@@ -649,7 +644,6 @@ components: {
 						description: "Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If this is set and is not a PKCS#12 archive, `key_file` must also be set."
 						required:    false
 						type: string: {
-							default: null
 							examples: ["/path/to/host_certificate.crt"]
 						}
 					}
@@ -658,7 +652,6 @@ components: {
 						description: "Absolute path to a private key file used to identify this connection, in DER or PEM format (PKCS#8), or an inline private key in PEM format. If this is set, `crt_file` must also be set."
 						required:    false
 						type: string: {
-							default: null
 							examples: ["/path/to/host_certificate.key"]
 						}
 					}
@@ -667,7 +660,6 @@ components: {
 						description: "Pass phrase used to unlock the encrypted key file. This has no effect unless `key_file` is set."
 						required:    false
 						type: string: {
-							default: null
 							examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
 						}
 					}
@@ -708,7 +700,6 @@ components: {
 						description: "The URL to proxy HTTP requests through."
 						required:    false
 						type: string: {
-							default: null
 							examples: ["http://foo.bar:3128"]
 						}
 					}
@@ -717,7 +708,6 @@ components: {
 						description: "The URL to proxy HTTPS requests through."
 						required:    false
 						type: string: {
-							default: null
 							examples: ["http://foo.bar:3128"]
 						}
 					}
@@ -736,7 +726,6 @@ components: {
 							"""
 						required:    false
 						type: array: {
-							default: null
 							items: type: string: {
 								examples: ["localhost", ".foo.bar", "*"]
 							}
@@ -943,7 +932,6 @@ components: {
 					The lowercase variant has priority over the uppercase one.
 					"""
 				type: string: {
-					default: null
 					examples: ["http://foo.bar:3128"]
 				}
 			}
@@ -957,7 +945,6 @@ components: {
 					The lowercase variant has priority over the uppercase one.
 					"""
 				type: string: {
-					default: null
 					examples: ["http://foo.bar:3128"]
 				}
 			}
@@ -981,7 +968,6 @@ components: {
 					The lowercase variant has priority over the uppercase one.
 					"""
 				type: string: {
-					default: null
 					examples: ["localhost,.example.com,192.168.0.0./16", "*"]
 				}
 			}

@@ -186,17 +186,13 @@ components: sources: kubernetes_logs: {
 			common:      false
 			description: "The exact time the event was ingested into Vector."
 			required:    false
-			type: string: {
-				default: null
-			}
+			type: string: {}
 		}
 		kube_config_file: {
 			common:      false
 			description: "Optional path to a kubeconfig file readable by Vector. If not set, Vector will try to connect to Kubernetes using in-cluster configuration."
 			required:    false
-			type: string: {
-				default: null
-			}
+			type: string: {}
 		}
 		self_node_name: {
 			common:      false
@@ -296,7 +292,6 @@ components: sources: kubernetes_logs: {
 				common:      true
 				type: string: {
 					examples: ["busybox:1.30"]
-					default: null
 				}
 			}
 			"kubernetes.container_name": {
@@ -305,7 +300,6 @@ components: sources: kubernetes_logs: {
 				common:      true
 				type: string: {
 					examples: ["coredns"]
-					default: null
 				}
 			}
 			"kubernetes.namespace_labels": {
@@ -323,7 +317,6 @@ components: sources: kubernetes_logs: {
 				common:      true
 				type: string: {
 					examples: ["192.168.1.1"]
-					default: null
 				}
 			}
 			"kubernetes.pod_ips": {
@@ -332,7 +325,6 @@ components: sources: kubernetes_logs: {
 				common:      true
 				type: string: {
 					examples: ["192.168.1.1", "::1"]
-					default: null
 				}
 			}
 			"kubernetes.pod_labels": {
@@ -359,7 +351,6 @@ components: sources: kubernetes_logs: {
 				common:      true
 				type: string: {
 					examples: ["coredns-qwertyuiop-qwert"]
-					default: null
 				}
 			}
 			"kubernetes.pod_namespace": {
@@ -368,7 +359,6 @@ components: sources: kubernetes_logs: {
 				common:      true
 				type: string: {
 					examples: ["kube-system"]
-					default: null
 				}
 			}
 			"kubernetes.pod_node_name": {
@@ -377,7 +367,6 @@ components: sources: kubernetes_logs: {
 				common:      true
 				type: string: {
 					examples: ["minikube"]
-					default: null
 				}
 			}
 			"kubernetes.pod_uid": {
@@ -386,7 +375,6 @@ components: sources: kubernetes_logs: {
 				common:      true
 				type: string: {
 					examples: ["ba46d8c9-9541-4f6b-bbf9-d23b36f2f136"]
-					default: null
 				}
 			}
 			message: {

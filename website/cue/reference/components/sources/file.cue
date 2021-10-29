@@ -63,7 +63,6 @@ components: sources: file: {
 			description: "Array of file patterns to exclude. [Globbing](#globbing) is supported.*Takes precedence over the [`include` option](#include).*"
 			required:    false
 			type: array: {
-				default: null
 				items: type: string: {
 					examples: ["\(_directory)/binary-file.log"]
 				}
@@ -158,7 +157,6 @@ components: sources: file: {
 			description: "Ignore files with a data modification date older than the specified number of seconds."
 			required:    false
 			type: uint: {
-				default: null
 				examples: [60 * 10]
 				unit: "seconds"
 			}
@@ -194,7 +192,6 @@ components: sources: file: {
 			description: "An approximate limit on the amount of data read from a single file at a given time."
 			required:    false
 			type: uint: {
-				default: null
 				examples: [2048]
 				unit: "bytes"
 			}
@@ -212,7 +209,6 @@ components: sources: file: {
 			required:    false
 			warnings: ["Vector's process must have permission to delete files."]
 			type: uint: {
-				default: null
 				examples: [0, 5, 60]
 				unit: "seconds"
 			}

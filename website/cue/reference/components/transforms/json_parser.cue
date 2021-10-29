@@ -85,7 +85,6 @@ components: transforms: json_parser: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["root_field", "parent.child"]
 			}
 		}

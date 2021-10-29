@@ -98,7 +98,6 @@ components: sources: postgresql_metrics: {
 			common:      false
 			required:    false
 			type: array: {
-				default: null
 				items: type: string: {
 					examples: ["^postgres$", "^vector$", "^foo"]
 				}
@@ -114,7 +113,6 @@ components: sources: postgresql_metrics: {
 			common:      false
 			required:    false
 			type: array: {
-				default: null
 				items: type: string: {
 					examples: ["^postgres$", "^template.*", ""]
 				}

@@ -52,7 +52,6 @@ components: transforms: compound: {
 							required:    false
 							warnings: []
 							type: string: {
-								default: null
 								examples: ["my_filter_transform"]
 							}
 						}

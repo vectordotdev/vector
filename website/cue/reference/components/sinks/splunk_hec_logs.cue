@@ -99,7 +99,6 @@ components: sinks: splunk_hec_logs: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["hostname"]
 			}
 		}
@@ -109,7 +108,6 @@ components: sinks: splunk_hec_logs: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["{{ host }}", "custom_index"]
 				syntax: "template"
 			}
@@ -120,7 +118,6 @@ components: sinks: splunk_hec_logs: {
 			required:    false
 			warnings: []
 			type: array: {
-				default: null
 				items: type: string: {
 					examples: ["field1", "field2"]
 					syntax: "field_path"
@@ -133,7 +130,6 @@ components: sinks: splunk_hec_logs: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["{{ file }}", "/var/log/syslog", "UDP:514"]
 				syntax: "template"
 			}
@@ -144,7 +140,6 @@ components: sinks: splunk_hec_logs: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["{{ sourcetype }}", "_json", "httpevent"]
 				syntax: "template"
 			}

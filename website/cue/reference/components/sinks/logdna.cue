@@ -115,7 +115,6 @@ components: sinks: logdna: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["0.0.0.0"]
 			}
 		}
@@ -125,7 +124,6 @@ components: sinks: logdna: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["my-mac-address"]
 			}
 		}
@@ -135,7 +133,6 @@ components: sinks: logdna: {
 			required:    false
 			warnings: []
 			type: array: {
-				default: null
 				items: type: string: {
 					examples: ["tag1", "tag2"]
 				}

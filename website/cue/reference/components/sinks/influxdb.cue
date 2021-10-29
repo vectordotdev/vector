@@ -41,7 +41,6 @@ components: sinks: _influxdb: {
 			required: false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["any", "one", "quorum", "all"]
 			}
 		}
@@ -80,7 +79,6 @@ components: sinks: _influxdb: {
 			required: false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["${INFLUXDB_PASSWORD}", "influxdb4ever"]
 			}
 		}
@@ -92,7 +90,6 @@ components: sinks: _influxdb: {
 			required: false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["autogen", "one_day_only"]
 			}
 		}
@@ -103,7 +100,6 @@ components: sinks: _influxdb: {
 			required: false
 			warnings: []
 			type: array: {
-				default: null
 				items: type: string: {
 					examples: ["field1", "parent.child_field"]
 					syntax: "field_path"
@@ -128,7 +124,6 @@ components: sinks: _influxdb: {
 			required: false
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["todd", "vector-source"]
 			}
 		}

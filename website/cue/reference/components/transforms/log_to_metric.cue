@@ -86,7 +86,6 @@ components: transforms: log_to_metric: {
 						warnings: []
 						type: string: {
 							examples: ["duration_total"]
-							default: null
 							syntax:  "template"
 						}
 					}
@@ -97,7 +96,6 @@ components: transforms: log_to_metric: {
 						warnings: []
 						type: string: {
 							examples: ["service"]
-							default: null
 							syntax:  "template"
 						}
 					}

@@ -200,7 +200,6 @@ components: sinks: [Name=string]: {
 							description: "Prevent the sink from encoding the specified fields."
 							required:    false
 							type: array: {
-								default: null
 								items: type: string: {
 									examples: ["message", "parent.child"]
 									syntax: "field_path"
@@ -213,7 +212,6 @@ components: sinks: [Name=string]: {
 							description: "Makes the sink encode only the specified fields."
 							required:    false
 							type: array: {
-								default: null
 								items: type: string: {
 									examples: ["message", "parent.child"]
 									syntax: "field_path"
@@ -406,7 +404,6 @@ components: sinks: [Name=string]: {
 					description: "Configures the send buffer size using the `SO_SNDBUF` option on the socket."
 					required:    false
 					type: uint: {
-						default: null
 						examples: [65536]
 						unit: "bytes"
 					}
@@ -429,7 +426,6 @@ components: sinks: [Name=string]: {
 								description: "The time a connection needs to be idle before sending TCP keepalive probes."
 								required:    false
 								type: uint: {
-									default: null
 									unit:    "seconds"
 								}
 							}
