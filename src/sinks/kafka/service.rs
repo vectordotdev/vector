@@ -9,7 +9,7 @@ use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::util::Timeout;
 use std::task::{Context, Poll};
 use tower::Service;
-use vector_core::internal_event::EventsSent;
+use vector_core::internal_event::{BytesSent, EventsSent};
 use vector_core::stream::DriverResponse;
 
 pub struct KafkaRequest {
@@ -79,7 +79,7 @@ impl Service<KafkaRequest> for KafkaService {
         let kafka_producer = self.kafka_producer.clone();
 
         Box::pin(async move {
-            let _ = &request;
+            // let _ = &request;
             let mut record = FutureRecord::to(&request.metadata.topic).payload(&request.body);
             if let Some(key) = &request.metadata.key {
                 record = record.key(&key[..]);
@@ -93,9 +93,16 @@ impl Service<KafkaRequest> for KafkaService {
 
             //rdkafka will internally retry forever if the queue is full
             let result = match kafka_producer.send(record, Timeout::Never).await {
-                Ok((_partition, _offset)) => Ok(KafkaResponse {
-                    event_byte_size: request.event_byte_size,
-                }),
+                Ok((_partition, _offset)) => {
+                    emit!(&BytesSent {
+                        byte_size: request.body.len()
+                            + request.metadata.key.map(|x| x.len()).unwrap_or(0),
+                        protocol: "kafka"
+                    });
+                    Ok(KafkaResponse {
+                        event_byte_size: request.event_byte_size,
+                    })
+                }
                 Err((kafka_err, _original_record)) => Err(kafka_err),
             };
             result
