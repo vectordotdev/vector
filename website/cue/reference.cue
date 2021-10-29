@@ -442,7 +442,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: string | null
+		default: string | *null
 	}
 
 	// `enum` restricts the value to a set of values.
