@@ -17,6 +17,7 @@ Vector's 0.17.0 release includes five **breaking changes**:
 1. [Vector now logs to stderr](#logging)
 1. [The `generator` source now has a default `interval` setting](#interval)
 1. [The deprecated `wasm` transform was removed](#wasm)
+1. [The `exec` source now has a `decoding` setting](#exec_source)
 
 We cover them below to help you upgrade quickly:
 
@@ -73,3 +74,15 @@ it to the [Github issue][9466].
 
 [deprecation]: /highlights/2021-08-23-removing-wasm
 [9466]: https://github.com/vectordotdev/vector/issues/9466
+
+### The `exec` source now has a `decoding` setting {#exec_source}
+
+Previously, the [`exec` source][exec] had an `event_per_line` setting
+that controlled how events were parsed out of the input data from the
+executed program. This has been removed and replaced by separate
+[`framing`][exec_framing] and [`decoding`][exec_decoding] options that
+provide more control over the formats that this source accepts.
+
+[exec]: /docs/reference/configuration/sources/exec
+[exec_decoding]: /docs/reference/configuration/sources/exec/#decoding
+[exec_framing]: /docs/reference/configuration/sources/exec/#framing
