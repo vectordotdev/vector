@@ -149,7 +149,9 @@ Datadog API key management would be the same as it is for Datadog logs & metrics
 Regarding APM stats, if we envision the `datadog_trace` sink as a universal sender for any kind of traces ingested by
 Vector, it shall ultimately support computing APM stats, even if the stats payload is a bit [complex][apm-stats-proto]
 (it includes ddsketches) as this provides valuable stats on ingested traces. The Datadog OTLP traces exporter also
-[computes][otlp-exp-apm-stats] those stats.
+[computes][otlp-exp-apm-stats] those stats. How Vector will hanlde APM stats will be discussed in a subsequent RFC.
+
+
 
 [schema-rfc]: https://github.com/vectordotdev/vector/pull/9388
 [gzip'ed protobuf over http]: https://github.com/DataDog/datadog-agent/blob/8b63d85/pkg/trace/writer/trace.go#L230-L269
@@ -192,15 +194,14 @@ https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/pr
 
 ## Outstanding Questions
 
-* Confirm that this RFC only addresses traces.
-* Confirm wether we rely on `LogEvent` or if we introduce a new type to represent traces inside Vector.
-* Confirm what to do with APM stats (seems we should ingest those no to loose accuracy), to be further investigated.
+None.
 
 ## Plan Of Attack
 
+* [ ] Write a subsequent RFC discussing how APM stats will fit in Vector.
 * [ ] Submit a PR introducing traces support in the `datadog_agent` source emitting a `LogEvent` for each trace and each APM event.
-* [ ] Submit a PR introducing the `datadog_trace` sink that would
-* [ ] Compute APM stats in the `datadog_trace` sink
+* [ ] Submit a PR introducing the `datadog_trace` that turns relevant `LogEvent` back into Datadog protobuf-encoded traces.
+* [ ] Do the APM stats work.
 
 ## Future Improvements
 
