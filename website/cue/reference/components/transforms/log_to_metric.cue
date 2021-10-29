@@ -53,8 +53,8 @@ components: transforms: log_to_metric: {
 							If `true` the metric will be incremented by the `field` value.
 							If `false` the metric will be incremented by 1 regardless of the `field` value.
 							"""
-						required: false
-						common:   false
+						required:      false
+						common:        false
 						relevant_when: #"type = "counter""#
 						type: bool: {
 							default: false
@@ -64,8 +64,8 @@ components: transforms: log_to_metric: {
 						description: """
 							The kind of the metric.
 							"""
-						required: false
-						common:   false
+						required:      false
+						common:        false
 						relevant_when: #"type = "counter""#
 						type: string: {
 							enum: {
