@@ -37,14 +37,12 @@ impl DriverResponse for DatadogEventsResponse {
 
 #[derive(Clone)]
 pub struct DatadogEventsService {
-    uri: String,
     batch_http_service:
         HttpBatchService<Ready<Result<http::Request<Vec<u8>>, crate::Error>>, DatadogEventsRequest>,
 }
 
 impl DatadogEventsService {
-    pub fn new(uri: &str, default_api_key: String, http_client: HttpClient<Body>) -> Self {
-        let owned_uri = uri.to_owned();
+    pub fn new(endpoint: String, default_api_key: String, http_client: HttpClient<Body>) -> Self {
         let batch_http_service = HttpBatchService::new(http_client, move |req| {
             let req: DatadogEventsRequest = req;
 
@@ -53,7 +51,7 @@ impl DatadogEventsService {
                 None => default_api_key.as_str(),
             };
 
-            let request = Request::post(owned_uri.as_str())
+            let request = Request::post(endpoint.as_str())
                 .header("Content-Type", "application/json")
                 .header("DD-API-KEY", api_key)
                 .header("Content-Length", req.body.len())
@@ -61,10 +59,7 @@ impl DatadogEventsService {
                 .map_err(|x| x.into());
             future::ready(request)
         });
-        Self {
-            uri: uri.to_owned(),
-            batch_http_service,
-        }
+        Self { batch_http_service }
     }
 }
 

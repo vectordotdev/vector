@@ -2,7 +2,7 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
-        datadog::{healthcheck, Region},
+        datadog::{get_api_validate_endpoint, get_base_domain, healthcheck, Region},
         util::{
             batch::{BatchConfig, BatchSettings},
             Concurrency, ServiceBuilderExt, TowerRequestConfig,
@@ -96,7 +96,9 @@ pub struct DatadogMetricsConfig {
     // Deprecated, replaced by the site option
     pub region: Option<Region>,
     pub site: Option<String>,
-    pub api_key: String,
+    // Deprecated name
+    #[serde(alias = "api_key")]
+    default_api_key: String,
     #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
@@ -110,7 +112,7 @@ impl_generate_config_from_default!(DatadogMetricsConfig);
 impl SinkConfig for DatadogMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.build_client(&cx.proxy)?;
-        let healthcheck = self.build_healthcheck(client.clone());
+        let healthcheck = self.build_healthcheck(client.clone())?;
         let sink = self.build_sink(client, cx)?;
 
         Ok((sink, healthcheck))
@@ -129,7 +131,7 @@ impl DatadogMetricsConfig {
     /// Creates a default [`DatadogMetricsConfig`] with the given API key.
     pub fn from_api_key<T: Into<String>>(api_key: T) -> Self {
         Self {
-            api_key: api_key.into(),
+            default_api_key: api_key.into(),
             ..Self::default()
         }
     }
@@ -145,7 +147,11 @@ impl DatadogMetricsConfig {
     fn get_base_agent_endpoint(&self) -> String {
         self.endpoint.clone().unwrap_or_else(|| {
             let version = str::replace(crate::built_info::PKG_VERSION, ".", "-");
-            format!("https://{}-vector.agent.{}", version, self.get_site())
+            format!(
+                "https://{}-vector.agent.{}",
+                version,
+                get_base_domain(self.site.as_ref(), self.region)
+            )
         })
     }
 
@@ -163,33 +169,15 @@ impl DatadogMetricsConfig {
         ))
     }
 
-    /// Gets the base URI of the Datadog API.
-    ///
-    /// The `endpoint` configuration field will be used here if it is present.
-    fn get_api_endpoint(&self) -> String {
-        self.endpoint
-            .clone()
-            .unwrap_or_else(|| format!("https://api.{}", self.get_site()))
-    }
-
-    /// Gets the base domain to use for any calls to Datadog.
-    ///
-    /// If `site` is not specified, we fallback to `region`, and if that is not specified, we
-    /// fallback to the Datadog US domain.
-    fn get_site(&self) -> &str {
-        self.site.as_deref().unwrap_or_else(|| match self.region {
-            Some(Region::Eu) => "datadoghq.eu",
-            None | Some(Region::Us) => "datadoghq.com",
-        })
-    }
-
     fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
         let client = HttpClient::new(None, proxy)?;
         Ok(client)
     }
 
-    fn build_healthcheck(&self, client: HttpClient) -> Healthcheck {
-        healthcheck(self.get_api_endpoint(), self.api_key.clone(), client).boxed()
+    fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
+        let validate_endpoint =
+            get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_ref(), self.region)?;
+        Ok(healthcheck(client, validate_endpoint, self.default_api_key.clone()).boxed())
     }
 
     fn build_sink(&self, client: HttpClient, cx: SinkContext) -> crate::Result<VectorSink> {
@@ -201,7 +189,10 @@ impl DatadogMetricsConfig {
         let endpoint_configuration = self.generate_metrics_endpoint_configuration()?;
         let service = ServiceBuilder::new()
             .settings(request_limits, DatadogMetricsRetryLogic)
-            .service(DatadogMetricsService::new(client, self.api_key.as_str()));
+            .service(DatadogMetricsService::new(
+                client,
+                self.default_api_key.as_str(),
+            ));
 
         let request_builder = DatadogMetricsRequestBuilder::new(
             endpoint_configuration,

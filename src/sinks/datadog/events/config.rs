@@ -4,33 +4,33 @@ use crate::sinks::{Healthcheck, VectorSink};
 use crate::http::HttpClient;
 use crate::sinks::datadog::events::service::{DatadogEventsResponse, DatadogEventsService};
 use crate::sinks::datadog::events::sink::DatadogEventsSink;
-use crate::sinks::datadog::healthcheck;
+use crate::sinks::datadog::{
+    get_api_base_endpoint, get_api_validate_endpoint, healthcheck, Region,
+};
 use crate::sinks::util::http::HttpStatusRetryLogic;
 use crate::sinks::util::ServiceBuilderExt;
 use crate::sinks::util::TowerRequestConfig;
-use crate::tls::{MaybeTlsSettings, TlsConfig};
+use crate::tls::TlsConfig;
 use futures::FutureExt;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
+use vector_core::config::proxy::ProxyConfig;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogEventsConfig {
     pub endpoint: Option<String>,
-
-    #[serde(default = "default_site")]
-    pub site: String,
+    // Deprecated, replaced by the site option
+    pub region: Option<Region>,
+    pub site: Option<String>,
     pub default_api_key: String,
 
+    // Deprecated, not sure it actually makes sense to allow messing with TLS configuration?
     pub tls: Option<TlsConfig>,
 
     #[serde(default)]
     pub request: TowerRequestConfig,
-}
-
-fn default_site() -> String {
-    "datadoghq.com".to_owned()
 }
 
 impl GenerateConfig for DatadogEventsConfig {
@@ -43,44 +43,32 @@ impl GenerateConfig for DatadogEventsConfig {
 }
 
 impl DatadogEventsConfig {
-    pub fn get_uri(&self) -> String {
-        format!("{}/api/v1/events", self.get_api_endpoint())
+    fn get_api_events_endpoint(&self) -> String {
+        let api_base_endpoint =
+            get_api_base_endpoint(self.endpoint.as_ref(), self.site.as_ref(), self.region);
+        format!("{}/api/v1/events", api_base_endpoint)
     }
 
-    pub fn get_api_endpoint(&self) -> String {
-        self.endpoint
-            .clone()
-            .unwrap_or_else(|| format!("https://api.{}", &self.site))
+    fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
+        let client = HttpClient::new(None, proxy)?;
+        Ok(client)
     }
-}
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "datadog_events")]
-impl SinkConfig for DatadogEventsConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let tls_settings = MaybeTlsSettings::from_config(
-            &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
-            false,
-        )?;
+    fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
+        let validate_endpoint =
+            get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_ref(), self.region)?;
+        Ok(healthcheck(client, validate_endpoint, self.default_api_key.clone()).boxed())
+    }
 
-        let http_client = HttpClient::new(tls_settings, cx.proxy())?;
-
+    fn build_sink(&self, client: HttpClient, cx: SinkContext) -> crate::Result<VectorSink> {
         let service = DatadogEventsService::new(
-            &self.get_uri(),
+            self.get_api_events_endpoint(),
             self.default_api_key.clone(),
-            http_client.clone(),
+            client,
         );
 
         let request_opts = self.request;
         let request_settings = request_opts.unwrap_with(&TowerRequestConfig::default());
-
-        let healthcheck = healthcheck(
-            self.get_api_endpoint(),
-            self.default_api_key.clone(),
-            http_client,
-        )
-        .boxed();
-
         let retry_logic = HttpStatusRetryLogic::new(|req: &DatadogEventsResponse| req.http_status);
 
         let service = ServiceBuilder::new()
@@ -92,7 +80,19 @@ impl SinkConfig for DatadogEventsConfig {
             acker: cx.acker(),
         };
 
-        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
+        Ok(VectorSink::Stream(Box::new(sink)))
+    }
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "datadog_events")]
+impl SinkConfig for DatadogEventsConfig {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let client = self.build_client(cx.proxy())?;
+        let healthcheck = self.build_healthcheck(client.clone())?;
+        let sink = self.build_sink(client, cx)?;
+
+        Ok((sink, healthcheck))
     }
 
     fn input_type(&self) -> DataType {

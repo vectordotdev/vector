@@ -125,13 +125,10 @@ impl Histogram {
     }
 
     pub(crate) fn record(&self, value: f64) {
-        let mut prev_bound = f64::NEG_INFINITY;
         for (bound, bucket) in self.buckets.iter() {
-            if value > prev_bound && value <= *bound {
+            if value <= *bound {
                 bucket.fetch_add(1, Ordering::Relaxed);
-                break;
             }
-            prev_bound = *bound;
         }
 
         self.count.fetch_add(1, Ordering::Relaxed);

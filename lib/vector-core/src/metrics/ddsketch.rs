@@ -1065,8 +1065,8 @@ mod tests {
         assert_eq!(sketch.count(), 2);
         assert_eq!(sketch.min(), Some(2.28));
         assert_eq!(sketch.max(), Some(3.15));
-        assert_eq!(sketch.sum(), Some(5.42));
-        assert_eq!(sketch.avg(), Some(2.71));
+        assert_eq!(sketch.sum(), Some(5.43));
+        assert_eq!(sketch.avg(), Some(2.715));
     }
 
     #[test]
