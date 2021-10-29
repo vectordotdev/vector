@@ -11,7 +11,6 @@ use crate::sinks::aws_kinesis_streams::request_builder::KinesisRequest;
 
 use crate::event::EventStatus;
 use crate::internal_events::AwsKinesisStreamsEventSent;
-use futures::FutureExt;
 use vector_core::internal_event::EventsSent;
 use vector_core::stream::DriverResponse;
 
@@ -77,13 +76,12 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
         Box::pin(async move {
             let _response: PutRecordsOutput = client
                 .put_records(request)
-                .inspect(|_| {
+                .inspect_ok(|_| {
                     emit!(&AwsBytesSent {
                         byte_size: processed_bytes_total,
                         region,
                     });
-                })
-                .inspect_ok(|_| {
+
                     // Deprecated
                     emit!(&AwsKinesisStreamsEventSent {
                         byte_size: processed_bytes_total
