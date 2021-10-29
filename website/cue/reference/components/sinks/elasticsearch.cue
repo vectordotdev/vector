@@ -88,14 +88,12 @@ components: sinks: elasticsearch: {
 			common:      false
 			description: "Options for the authentication strategy."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: []
 				options: components._aws.configuration.auth.type.object.options & {
 					password: {
 						description: "The basic authentication password."
 						required:    true
-						warnings: []
 						type: string: {
 							examples: ["${ELASTICSEARCH_PASSWORD}", "password"]
 						}
@@ -103,7 +101,6 @@ components: sinks: elasticsearch: {
 					strategy: {
 						description: "The authentication strategy to use."
 						required:    true
-						warnings: []
 						type: string: {
 							enum: {
 								aws:   "Authentication strategy used for [AWS' hosted Elasticsearch service](\(urls.aws_elasticsearch))."
@@ -114,7 +111,6 @@ components: sinks: elasticsearch: {
 					user: {
 						description: "The basic authentication user name."
 						required:    true
-						warnings: []
 						type: string: {
 							examples: ["${ELASTICSEARCH_USERNAME}", "username"]
 						}
@@ -126,7 +122,6 @@ components: sinks: elasticsearch: {
 			common:      false
 			description: "Options for the AWS connections."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -134,7 +129,6 @@ components: sinks: elasticsearch: {
 						common:      true
 						description: "The [AWS region](\(urls.aws_regions)) of the target service. This defaults to the region named in the endpoint parameter, or the value of the `$AWS_REGION` or `$AWS_DEFAULT_REGION` environment variables if that cannot be determined, or \"us-east-1\"."
 						required:    false
-						warnings: []
 						type: string: {
 							examples: ["us-east-1"]
 						}
@@ -160,7 +154,6 @@ components: sinks: elasticsearch: {
 			common:      true
 			description: "Options for the bulk mode."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -171,7 +164,6 @@ components: sinks: elasticsearch: {
 							Currently, Vector only supports `index` and `create`. `update` and `delete` actions are not supported.
 							"""
 						required:    false
-						warnings: []
 						type: string: {
 							default: "index"
 							examples: ["index", "create", "{{ action }}"]
@@ -182,7 +174,6 @@ components: sinks: elasticsearch: {
 						common:      true
 						description: "Index name to write events to."
 						required:    false
-						warnings: []
 						type: string: {
 							default: "vector-%F"
 							examples: ["application-{{ application_id }}-%Y-%m-%d", "vector-%Y-%m-%d"]
@@ -196,7 +187,6 @@ components: sinks: elasticsearch: {
 			common:      false
 			description: "Options for the data stream mode."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -208,14 +198,12 @@ components: sinks: elasticsearch: {
 							If enabled, the data_stream.* event fields will take precedence over the data_stream.type, data_stream.dataset, and data_stream.namespace settings, but will fall back to them if any of the fields are missing from the event.
 							"""
 						required: false
-						warnings: []
 						type: bool: default: true
 					}
 					dataset: {
 						common:      false
 						description: "The data stream dataset used to construct the data stream at index time."
 						required:    false
-						warnings: []
 						type: string: {
 							default: "generic"
 							examples: ["generic", "nginx", "{{ service }}"]
@@ -226,7 +214,6 @@ components: sinks: elasticsearch: {
 						common:      false
 						description: "The data stream namespace used to construct the data stream at index time."
 						required:    false
-						warnings: []
 						type: string: {
 							default: "default"
 							examples: ["default", "{{ environment }}"]
@@ -237,14 +224,12 @@ components: sinks: elasticsearch: {
 						common:      false
 						description: "Automatically adds and syncs the data_stream.* event fields if they are missing from the event. This ensures that fields match the name of the data stream that is receiving events."
 						required:    false
-						warnings: []
 						type: bool: default: true
 					}
 					type: {
 						common:      false
 						description: "The data stream type used to construct the data stream at index time."
 						required:    false
-						warnings: []
 						type: string: {
 							default: "logs"
 							examples: ["logs", "metrics", "synthetics", "{{ type }}"]
@@ -258,7 +243,6 @@ components: sinks: elasticsearch: {
 			common:      false
 			description: "The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "_doc"
 			}
@@ -266,7 +250,6 @@ components: sinks: elasticsearch: {
 		endpoint: {
 			description: "The Elasticsearch endpoint to send logs to. This should be the full URL as shown in the example."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["http://10.24.32.122:9000", "https://example.com", "https://user:password@example.com"]
 			}
@@ -275,7 +258,6 @@ components: sinks: elasticsearch: {
 			common:      false
 			description: "The name of the event key that should map to Elasticsearch's [`_id` field](\(urls.elasticsearch_id_field)). By default, Vector does not set the `_id` field, which allows Elasticsearch to set this automatically. You should think carefully about setting your own Elasticsearch IDs, since this can [hinder performance](\(urls.elasticsearch_id_performance))."
 			required:    false
-			warnings: []
 			type: string: {
 				examples: ["id", "_id"]
 			}
@@ -295,7 +277,6 @@ components: sinks: elasticsearch: {
 			common:      false
 			description: "Options for metrics."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -303,7 +284,6 @@ components: sinks: elasticsearch: {
 						common:      false
 						description: "Tag key that identifies the source host."
 						required:    false
-						warnings: []
 						type: string: {
 							default: "hostname"
 							examples: ["host", "hostname"]
@@ -317,7 +297,6 @@ components: sinks: elasticsearch: {
 			common:      true
 			description: "The type of index mechanism. If `data_stream` mode is enabled, the `bulk.action` is set to `create`."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "bulk"
 				examples: ["bulk", "data_stream"]
@@ -327,7 +306,6 @@ components: sinks: elasticsearch: {
 			common:      true
 			description: "Name of the pipeline to apply."
 			required:    false
-			warnings: []
 			type: string: {
 				examples: ["pipeline-name"]
 			}
@@ -336,7 +314,6 @@ components: sinks: elasticsearch: {
 			common:      false
 			description: "Custom parameters to Elasticsearch query string."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: [{"X-Powered-By": "Vector"}]
 				options: {}

@@ -137,7 +137,6 @@ components: sources: docker_logs: {
 					ca_file: {
 						description: "Path to CA certificate file."
 						required:    true
-						warnings: []
 						type: string: {
 							examples: ["certs/ca.pem"]
 						}
@@ -145,7 +144,6 @@ components: sources: docker_logs: {
 					crt_file: {
 						description: "Path to TLS certificate file."
 						required:    true
-						warnings: []
 						type: string: {
 							examples: ["certs/cert.pem"]
 						}
@@ -153,7 +151,6 @@ components: sources: docker_logs: {
 					key_file: {
 						description: "Path to TLS key file."
 						required:    true
-						warnings: []
 						type: string: {
 							examples: ["certs/key.pem"]
 						}

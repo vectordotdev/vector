@@ -47,7 +47,6 @@ components: sources: kafka: {
 				clarification.
 				"""
 			required:    false
-			warnings: []
 			type: string: {
 				default: "largest"
 				examples: ["smallest", "earliest", "beginning", "largest", "latest", "end", "error"]
@@ -58,7 +57,6 @@ components: sources: kafka: {
 			common:      false
 			description: "The frequency that the consumer offsets are committed (written) to offset storage."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 5000
 				examples: [5000, 10000]
@@ -69,7 +67,6 @@ components: sources: kafka: {
 			common:      false
 			description: "Maximum time the broker may wait to fill the response."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 100
 				examples: [50, 100]
@@ -79,7 +76,6 @@ components: sources: kafka: {
 		group_id: {
 			description: "The consumer group name to be used to consume events from Kafka."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["consumer-group-name"]
 			}
@@ -88,7 +84,6 @@ components: sources: kafka: {
 			common:      true
 			description: "The log field name to use for the Kafka message key."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "message_key"
 				examples: ["message_key"]
@@ -98,7 +93,6 @@ components: sources: kafka: {
 			common:      false
 			description: "The log field name to use for the Kafka topic."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "topic"
 				examples: ["topic"]
@@ -108,7 +102,6 @@ components: sources: kafka: {
 			common:      false
 			description: "The log field name to use for the Kafka partition name."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "partition"
 				examples: ["partition"]
@@ -118,7 +111,6 @@ components: sources: kafka: {
 			common:      false
 			description: "The log field name to use for the Kafka offset."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "offset"
 				examples: ["offset"]
@@ -128,7 +120,6 @@ components: sources: kafka: {
 			common:      false
 			description: "The log field name to use for the Kafka headers."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "headers"
 				examples: ["headers"]
@@ -139,7 +130,6 @@ components: sources: kafka: {
 			common:      false
 			description: "Options for SASL/SCRAM authentication support."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -147,14 +137,12 @@ components: sources: kafka: {
 						common:      true
 						description: "Enable SASL/SCRAM authentication to the remote (not supported on Windows at this time)."
 						required:    false
-						warnings: []
 						type: bool: {}
 					}
 					mechanism: {
 						common:      true
 						description: "The Kafka SASL/SCRAM mechanisms."
 						required:    false
-						warnings: []
 						type: string: {
 							examples: ["SCRAM-SHA-256", "SCRAM-SHA-512"]
 						}
@@ -163,7 +151,6 @@ components: sources: kafka: {
 						common:      true
 						description: "The Kafka SASL/SCRAM authentication password."
 						required:    false
-						warnings: []
 						type: string: {
 							examples: ["password"]
 						}
@@ -172,7 +159,6 @@ components: sources: kafka: {
 						common:      true
 						description: "The Kafka SASL/SCRAM authentication username."
 						required:    false
-						warnings: []
 						type: string: {
 							examples: ["username"]
 						}
@@ -184,7 +170,6 @@ components: sources: kafka: {
 			common:      false
 			description: "The Kafka session timeout in milliseconds."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 10000
 				examples: [5000, 10000]
@@ -195,7 +180,6 @@ components: sources: kafka: {
 		topics: {
 			description: "The Kafka topics names to read events from. Regex is supported if the topic begins with `^`."
 			required:    true
-			warnings: []
 			type: array: items: type: string: {
 				examples: ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"]
 			}

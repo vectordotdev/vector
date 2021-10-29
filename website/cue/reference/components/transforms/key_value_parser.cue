@@ -58,7 +58,6 @@ components: transforms: key_value_parser: {
 			common:      true
 			description: "If `true` will drop the specified `field` after parsing."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 
@@ -66,7 +65,6 @@ components: transforms: key_value_parser: {
 			common:      true
 			description: "The log field containing key/value pairs to parse. Must be a `string` value."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child", "array[0]"]

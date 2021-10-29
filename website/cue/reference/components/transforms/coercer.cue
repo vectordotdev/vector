@@ -56,7 +56,6 @@ components: transforms: coercer: {
 			common:      false
 			description: "Set to `true` to drop all fields that are not specified in the `types` table. Make sure both `message` and `timestamp` are specified in the `types` table as their absence will cause the original message data to be dropped along with other extraneous fields."
 			required:    false
-			warnings: []
 			type: bool: default: false
 		}
 		timezone: configuration._timezone

@@ -14,7 +14,6 @@ data_model: schema: {
 			will document the fields it provides.
 			"""
 		required: false
-		warnings: []
 		type: object: {
 			examples: [
 				{
@@ -52,7 +51,6 @@ data_model: schema: {
 			interoperable between systems.
 			"""
 		required: false
-		warnings: []
 		type: object: {
 			examples: []
 			options: {
@@ -62,14 +60,12 @@ data_model: schema: {
 						A single value that can be incremented or reset to a zero value but *not* decremented.
 						"""
 					required: false
-					warnings: []
 					type: object: {
 						examples: []
 						options: {
 							value: {
 								description: "The value to increment the counter by. Can only be positive."
 								required:    true
-								warnings: []
 								type: float: {
 									examples: [1.0, 10.0, 500.0]
 								}
@@ -86,21 +82,18 @@ data_model: schema: {
 						that support global histograms and summaries.
 						"""
 					required: false
-					warnings: []
 					type: object: {
 						examples: []
 						options: {
 							samples: {
 								description: "The set of sampled values."
 								required:    true
-								warnings: []
 								type: array: items: type: object: {
 									examples: []
 									options: {
 										rate: {
 											description: "The rate at which this value was sampled."
 											required:    true
-											warnings: []
 											type: uint: {
 												examples: [12, 43, 25]
 												unit: null
@@ -109,7 +102,6 @@ data_model: schema: {
 										value: {
 											description: "The value being sampled."
 											required:    true
-											warnings: []
 											// FIXME: making this float, as it should be, makes cue blow up
 											type: uint: {
 												// FIXME: Adding even empty examples makes cue blow up
@@ -123,7 +115,6 @@ data_model: schema: {
 							statistic: {
 								description: "The statistic to be calculated from the values."
 								required:    true
-								warnings: []
 								type: string: {
 									enum: {
 										histogram: "Counts values in buckets."
@@ -146,14 +137,12 @@ data_model: schema: {
 						or CPU usage.
 						"""
 					required: false
-					warnings: []
 					type: object: {
 						examples: []
 						options: {
 							value: {
 								description: "A specific point-in-time value for the gauge."
 								required:    true
-								warnings: []
 								type: float: {
 									examples: [1.0, 10.0, 500.0]
 								}
@@ -172,21 +161,18 @@ data_model: schema: {
 						sum of all observed values.
 						"""
 					required: false
-					warnings: []
 					type: object: {
 						examples: []
 						options: {
 							buckets: {
 								description: "The set of buckets containing the histogram values."
 								required:    true
-								warnings: []
 								type: array: items: type: object: {
 									examples: []
 									options: {
 										count: {
 											description: "The number of values contained within this bucket."
 											required:    true
-											warnings: []
 											type: uint: {
 												examples: [1, 10, 25, 100]
 												unit: null
@@ -195,7 +181,6 @@ data_model: schema: {
 										upper_limit: {
 											description: "The upper limit of the samples within the bucket."
 											required:    true
-											warnings: []
 											// FIXME: making this float, as it should be, makes cue blow up
 											type: uint: {
 												// FIXME: Adding even empty examples makes cue blow up
@@ -209,7 +194,6 @@ data_model: schema: {
 							count: {
 								description: "The total number of values contained within the histogram."
 								required:    true
-								warnings: []
 								type: uint: {
 									examples: [1, 10, 25, 100]
 									unit: null
@@ -218,7 +202,6 @@ data_model: schema: {
 							sum: {
 								description: "The sum of all values contained within the histogram."
 								required:    true
-								warnings: []
 								type: float: {
 									examples: [1.0, 10.0, 25.0, 100.0]
 								}
@@ -230,7 +213,6 @@ data_model: schema: {
 				"kind": {
 					description: "The metric value kind."
 					required:    true
-					warnings: []
 					type: string: {
 						enum: {
 							absolute:    "The metric value is absolute and replaces values as it is received downstream."
@@ -242,7 +224,6 @@ data_model: schema: {
 				"name": {
 					description: "The metric name."
 					required:    true
-					warnings: []
 					type: string: {
 						examples: ["memory_available_bytes"]
 					}
@@ -251,7 +232,6 @@ data_model: schema: {
 				"namespace": {
 					description: "The metric namespace. Depending on the service, this will prepend the name or use native namespacing facilities."
 					required:    true
-					warnings: []
 					type: string: {
 						examples: ["host", "apache", "nginx"]
 					}
@@ -263,14 +243,12 @@ data_model: schema: {
 						A set represents an array of unique values.
 						"""
 					required: false
-					warnings: []
 					type: object: {
 						examples: []
 						options: {
 							values: {
 								description: "The list of unique values."
 								required:    true
-								warnings: []
 								type: array: items: type: string: {
 									examples: ["value1", "value2"]
 								}
@@ -291,14 +269,12 @@ data_model: schema: {
 						window.
 						"""
 					required: false
-					warnings: []
 					type: object: {
 						examples: []
 						options: {
 							count: {
 								description: "The total number of values contained within the summary."
 								required:    true
-								warnings: []
 								type: uint: {
 									examples: [54]
 									unit: null
@@ -307,14 +283,12 @@ data_model: schema: {
 							quantiles: {
 								description: "The set of observations."
 								required:    true
-								warnings: []
 								type: array: items: type: object: {
 									examples: []
 									options: {
 										value: {
 											description: "The value of this quantile range."
 											required:    true
-											warnings: []
 											// FIXME: making this float, as it should be, makes cue blow up
 											type: uint: {
 												// FIXME: Adding even empty examples makes cue blow up
@@ -325,7 +299,6 @@ data_model: schema: {
 										upper_limit: {
 											description: "The upper limit for this quantile range, where 0 ≤ upper_limit ≤ 1."
 											required:    true
-											warnings: []
 											// FIXME: making this float, as it should be, makes cue blow up
 											type: uint: {
 												// FIXME: Adding even empty examples makes cue blow up
@@ -339,7 +312,6 @@ data_model: schema: {
 							sum: {
 								description: "The sum of all values contained within the histogram."
 								required:    true
-								warnings: []
 								type: float: {
 									examples: [1.0, 10.0, 25.0, 100.0]
 								}
@@ -351,7 +323,6 @@ data_model: schema: {
 				tags: {
 					description: "The metric tags. Key/value pairs, nesting is not allowed."
 					required:    true
-					warnings: []
 					type: object: {
 						examples: [
 							{
@@ -373,7 +344,6 @@ data_model: schema: {
 				"timestamp": {
 					description: "The metric timestamp; when the metric was created."
 					required:    true
-					warnings: []
 					type: timestamp: {}
 				}
 			}

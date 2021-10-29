@@ -93,7 +93,6 @@ components: sinks: loki: {
 				unique label keys and values.
 				"""
 			required: true
-			warnings: []
 			type: object: {
 				examples: [
 					{
@@ -125,7 +124,6 @@ components: sinks: loki: {
 				with those events.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				default: "drop"
 				enum: {
@@ -138,14 +136,12 @@ components: sinks: loki: {
 			common:      false
 			description: "If this is set to `true` then when labels are collected from events those fields will also get removed from the event."
 			required:    false
-			warnings: []
 			type: bool: default: false
 		}
 		remove_timestamp: {
 			common:      false
 			description: "If this is set to `true` then the timestamp will be removed from the event payload. Note the event timestamp will still be sent as metadata to Loki for indexing."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 		tenant_id: {
@@ -157,7 +153,6 @@ components: sinks: loki: {
 				You can read more about tenant id's [here](\(urls.loki_multi_tenancy)).
 				"""
 			required:    false
-			warnings: []
 			type: string: {
 				examples: ["some_tenant_id", "{{ event_field }}"]
 				syntax: "template"

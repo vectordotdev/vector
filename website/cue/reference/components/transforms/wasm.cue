@@ -69,7 +69,6 @@ components: transforms: wasm: {
 		artifact_cache: {
 			description: "The directory where Vector should store the artifact it builds of this WASM module. Typically, all WASM modules share this."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: [
 					"/etc/vector/artifacts",
@@ -83,7 +82,6 @@ components: transforms: wasm: {
 			common:      false
 			description: "The maximum size of the heap of this module, in bytes. (This includes the module itself, default is 10 MB.)"
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 10485760
 				unit:    "bytes"
@@ -92,7 +90,6 @@ components: transforms: wasm: {
 		module: {
 			description: "The file path of the `.wasm` or `.wat` module."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: [
 					"./modules/example.wasm",

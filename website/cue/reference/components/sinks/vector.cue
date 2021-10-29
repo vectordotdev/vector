@@ -89,7 +89,6 @@ components: sinks: vector: {
 		address: {
 			description: "The downstream Vector address to connect to. The address _must_ include a port."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["92.12.333.224:\(_port)"]
 			}

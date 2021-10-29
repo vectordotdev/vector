@@ -94,7 +94,6 @@ components: sinks: http: {
 				but can also include the port, path, and any other valid part of a URI.
 				"""
 			required: true
-			warnings: []
 			type: string: {
 				examples: ["https://10.22.212.22:9000/endpoint"]
 			}
@@ -106,7 +105,6 @@ components: sinks: http: {
 				but can also include the port, path, and any other valid part of a URI.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				examples: ["https://10.22.212.22:9000/health"]
 			}

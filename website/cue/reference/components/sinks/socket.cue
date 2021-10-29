@@ -72,7 +72,6 @@ components: sinks: socket: {
 			description:   "The address to connect to. The address _must_ include a port."
 			relevant_when: "mode = `tcp` or `udp`"
 			required:      true
-			warnings: []
 			type: string: {
 				examples: ["92.12.333.224:5000"]
 			}
@@ -80,7 +79,6 @@ components: sinks: socket: {
 		mode: {
 			description: "The type of socket to use."
 			required:    true
-			warnings: []
 			type: string: {
 				enum: {
 					tcp:  "TCP socket"
@@ -93,7 +91,6 @@ components: sinks: socket: {
 			description:   "The unix socket path. This should be the absolute path."
 			relevant_when: "mode = `unix`"
 			required:      true
-			warnings: []
 			type: string: {
 				examples: ["/path/to/socket"]
 			}

@@ -30,7 +30,6 @@ components: sinks: _datadog: {
 		api_key: {
 			description: "Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)"
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
 			}
@@ -62,7 +61,6 @@ components: sinks: _datadog: {
 			description:   "The [Datadog site](https://docs.datadoghq.com/getting_started/site) to send data to. "
 			required:      false
 			relevant_when: "endpoint is not set"
-			warnings: []
 			type: string: {
 				default: "datadoghq.com"
 				examples: ["us3.datadoghq.com", "datadoghq.com", "datadoghq.eu"]

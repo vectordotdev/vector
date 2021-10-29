@@ -52,7 +52,6 @@ components: sinks: datadog_archives: {
 		bucket: {
 			description: "The S3 bucket name. Do not include a leading `s3://` or a trailing `/`."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["my-bucket"]
 
@@ -63,7 +62,6 @@ components: sinks: datadog_archives: {
 			category:    "File Naming"
 			description: "A prefix to apply to all object key names. This should be used to partition your objects in \"folders\"."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "/"
 				examples: ["logs/audit"]
@@ -73,7 +71,6 @@ components: sinks: datadog_archives: {
 			category:    "Storage"
 			description: "An external storage service where archived logs are sent to."
 			required:    true
-			warnings: []
 			type: string: {
 				enum: {
 					aws_s3: "[AWS S3](\(urls.aws_s3)) is used as an external storage service."
@@ -85,7 +82,6 @@ components: sinks: datadog_archives: {
 			common:        false
 			required:      false
 			relevant_when: "service = \"aws_s3\""
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -93,7 +89,6 @@ components: sinks: datadog_archives: {
 						common:      false
 						description: "Options for the authentication strategy. Check the [`auth`](\(urls.vector_aws_s3_sink_auth)) section of the AWS S3 sink for more details."
 						required:    false
-						warnings: []
 						type: object: {}
 					}
 					acl:                    sinks.aws_s3.configuration.acl
@@ -111,7 +106,6 @@ components: sinks: datadog_archives: {
           			Log Rehydration supports all storage classes except for Glacier and Glacier Deep Archive.
           			"""
 						required: false
-						warnings: []
 						type: string: {
 							enum: {
 								STANDARD:            "The default storage class. If you don't specify the storage class when you upload an object, Amazon S3 assigns the STANDARD storage class."

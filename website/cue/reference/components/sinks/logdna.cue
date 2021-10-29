@@ -67,7 +67,6 @@ components: sinks: logdna: {
 		api_key: {
 			description: "The Ingestion API key."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["${LOGDNA_API_KEY}", "ef8d5de700e7989468166c40fc8a0ccd"]
 			}
@@ -76,7 +75,6 @@ components: sinks: logdna: {
 			common:      false
 			description: "The default app that will be set for events that do not contain a `file` or `app` field."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "vector"
 				examples: ["vector", "myapp"]
@@ -86,7 +84,6 @@ components: sinks: logdna: {
 			common:      false
 			description: "The default environment that will be set for events that do not contain an `env` field."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "production"
 				examples: ["staging", "production"]
@@ -104,7 +101,6 @@ components: sinks: logdna: {
 		hostname: {
 			description: "The hostname that will be attached to each batch of events."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["${HOSTNAME}", "my-local-machine"]
 			}
@@ -113,7 +109,6 @@ components: sinks: logdna: {
 			common:      false
 			description: "The IP address that will be attached to each batch of events."
 			required:    false
-			warnings: []
 			type: string: {
 				examples: ["0.0.0.0"]
 			}
@@ -122,7 +117,6 @@ components: sinks: logdna: {
 			common:      false
 			description: "The mac address that will be attached to each batch of events."
 			required:    false
-			warnings: []
 			type: string: {
 				examples: ["my-mac-address"]
 			}
@@ -131,7 +125,6 @@ components: sinks: logdna: {
 			common:      false
 			description: "The tags that will be attached to each batch of events."
 			required:    false
-			warnings: []
 			type: array: {
 				items: type: string: {
 					examples: ["tag1", "tag2"]

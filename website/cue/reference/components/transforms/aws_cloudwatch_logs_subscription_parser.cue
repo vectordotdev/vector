@@ -54,7 +54,6 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 			common:      true
 			description: "The log field to decode as an AWS CloudWatch Logs Subscription JSON event. The field must hold a string value."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "message"
 			}

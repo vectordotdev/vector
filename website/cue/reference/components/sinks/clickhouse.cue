@@ -92,7 +92,6 @@ components: sinks: clickhouse: {
 			common:      true
 			description: "The database that contains the table that data will be inserted into."
 			required:    false
-			warnings: []
 			type: string: {
 				examples: ["mydatabase"]
 			}
@@ -107,7 +106,6 @@ components: sinks: clickhouse: {
 		table: {
 			description: "The table that data will be inserted into."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["mytable"]
 			}

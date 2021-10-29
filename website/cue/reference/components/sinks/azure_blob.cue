@@ -80,7 +80,6 @@ components: sinks: azure_blob: {
 		connection_string: {
 			description: "The Azure Blob Storage Account connection string. Only authentication with access key supported."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net"]
 			}
@@ -88,7 +87,6 @@ components: sinks: azure_blob: {
 		container_name: {
 			description: "The Azure Blob Storage Account container name."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["my-logs"]
 			}
@@ -98,7 +96,6 @@ components: sinks: azure_blob: {
 			common:      true
 			description: "A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root azure storage \"folder\"."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "blob/%F/"
 				examples: ["date/%F/", "date/%F/hour/%H/", "year=%Y/month=%m/day=%d/", "kubernetes/{{ metadata.cluster }}/{{ metadata.application_name }}/"]
@@ -110,7 +107,6 @@ components: sinks: azure_blob: {
 			common:      false
 			description: "Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 		blob_time_format: {
@@ -118,7 +114,6 @@ components: sinks: azure_blob: {
 			common:      false
 			description: "The format of the resulting object file name. [`strftime` specifiers](\(urls.strptime_specifiers)) are supported."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "%s"
 				syntax:  "strftime"

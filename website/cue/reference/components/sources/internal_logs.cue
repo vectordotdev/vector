@@ -57,7 +57,6 @@ components: sources: internal_logs: {
 				Set to "" to suppress this key.
 				"""
 			required:    false
-			warnings: []
 			type: string: {
 				default: "host"
 			}
@@ -71,7 +70,6 @@ components: sources: internal_logs: {
 				Set to "" to suppress this key.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				default: "pid"
 			}

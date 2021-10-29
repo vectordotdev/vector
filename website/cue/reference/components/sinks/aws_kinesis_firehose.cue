@@ -72,15 +72,14 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: []
 		notices: []
+		warnings: []
 	}
 
 	configuration: {
 		stream_name: {
 			description: "The [stream name](\(urls.aws_cloudwatch_logs_stream_name)) of the target Kinesis Firehose delivery stream."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["my-stream"]
 			}

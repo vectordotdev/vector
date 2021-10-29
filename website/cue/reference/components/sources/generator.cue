@@ -50,7 +50,6 @@ components: sources: generator: {
 		format: {
 			description: "The format of the randomly generated output."
 			required:    true
-			warnings: []
 			type: string: {
 				enum: {
 					"shuffle":       "Lines are chosen at random from the list specified using `lines`."
@@ -70,7 +69,6 @@ components: sources: generator: {
 				quickly as possible, set `interval` to `0.0`.
 				"""
 			required: false
-			warnings: []
 			type: float: {
 				default: 1.0
 				examples: [1.0, 0.1, 0.01]
@@ -80,7 +78,6 @@ components: sources: generator: {
 			common:      false
 			description: "The total number of lines to output. By default the source continuously prints logs (infinitely)."
 			required:    false
-			warnings: []
 			type: uint: {
 				unit: null
 			}
@@ -90,7 +87,6 @@ components: sources: generator: {
 			description:   "The list of lines to output."
 			relevant_when: "`format` = `shuffle`"
 			required:      false
-			warnings: []
 			type: array: {
 				items: type: string: {
 					examples: ["Line 1", "Line 2"]
@@ -102,7 +98,6 @@ components: sources: generator: {
 			relevant_when: "`format` = `shuffle`"
 			description:   "If `true`, each output line starts with an increasing sequence number, beginning with 0."
 			required:      false
-			warnings: []
 			type: bool: default: false
 		}
 	}

@@ -93,7 +93,6 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 				Used as a namespace for metrics that don't have it.
 				"""
 			required: true
-			warnings: []
 			type: string: {
 				examples: ["service"]
 			}

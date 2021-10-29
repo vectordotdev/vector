@@ -68,7 +68,6 @@ components: sources: internal_metrics: {
 			description: "Metric tag options."
 			required:    false
 
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -82,7 +81,6 @@ components: sources: internal_metrics: {
 				Set to "" to suppress this key.
 				"""
 						required:    false
-						warnings: []
 						type: string: {
 							default: "host"
 						}
@@ -96,7 +94,6 @@ components: sources: internal_metrics: {
 					Set to "" to suppress this key.
 					"""
 						required: false
-						warnings: []
 						type: string: {
 							default: "pid"
 						}

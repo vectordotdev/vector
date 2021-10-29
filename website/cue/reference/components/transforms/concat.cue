@@ -46,7 +46,6 @@ components: transforms: concat: {
 		items: {
 			description: "A list of substring definitons in the format of source_field[start..end]. For both start and end negative values are counted from the end of the string."
 			required:    true
-			warnings: []
 			type: array: items: type: string: {
 				examples: ["first[..3]", "second[-5..]", "third[3..6]"]
 			}
@@ -55,7 +54,6 @@ components: transforms: concat: {
 			common:      false
 			description: "The string that is used to join all items."
 			required:    false
-			warnings: []
 			type: string: {
 				default: " "
 				examples: [" ", ",", "_", "+"]
@@ -64,7 +62,6 @@ components: transforms: concat: {
 		target: {
 			description: "The name for the new label."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["root_field_name", "parent.child", "array[0]"]
 			}

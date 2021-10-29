@@ -128,7 +128,6 @@ components: sources: postgresql_metrics: {
 					ca_file: {
 						description: "Path to CA certificate file."
 						required:    true
-						warnings: []
 						type: string: {
 							examples: ["certs/ca.pem"]
 						}

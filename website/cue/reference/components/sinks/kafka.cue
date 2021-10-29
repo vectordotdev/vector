@@ -56,7 +56,6 @@ components: sinks: kafka: {
 			common:      true
 			description: "The log field name or tags key to use for the topic key. If the field does not exist in the log or in tags, a blank value will be used. If unspecified, the key is not sent. Kafka uses a hash of the key to choose the partition or uses round-robin if the record has no key."
 			required:    false
-			warnings: []
 			type: string: {
 				examples: ["user_id"]
 			}
@@ -66,7 +65,6 @@ components: sinks: kafka: {
 			common:      false
 			description: "Local message timeout."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 300000
 				examples: [150000, 450000]
@@ -77,7 +75,6 @@ components: sinks: kafka: {
 			common:      false
 			description: "Options for SASL/SCRAM authentication support."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -85,14 +82,12 @@ components: sinks: kafka: {
 						common:      true
 						description: "Enable SASL/SCRAM authentication to the remote. (Not supported on Windows at this time.)"
 						required:    false
-						warnings: []
 						type: bool: {}
 					}
 					mechanism: {
 						common:      true
 						description: "The Kafka SASL/SCRAM mechanisms."
 						required:    false
-						warnings: []
 						type: string: {
 							examples: ["SCRAM-SHA-256", "SCRAM-SHA-512"]
 						}
@@ -101,7 +96,6 @@ components: sinks: kafka: {
 						common:      true
 						description: "The Kafka SASL/SCRAM authentication password."
 						required:    false
-						warnings: []
 						type: string: {
 							examples: ["password"]
 						}
@@ -110,7 +104,6 @@ components: sinks: kafka: {
 						common:      true
 						description: "The Kafka SASL/SCRAM authentication username."
 						required:    false
-						warnings: []
 						type: string: {
 							examples: ["username"]
 						}
@@ -122,7 +115,6 @@ components: sinks: kafka: {
 		topic: {
 			description: "The Kafka topic name to write events to."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["topic-1234", "logs-{{unit}}-%Y-%m-%d"]
 			}
@@ -131,7 +123,6 @@ components: sinks: kafka: {
 			common:      false
 			description: "The log field name to use for the Kafka headers. If ommited, no headers will be written."
 			required:    false
-			warnings: []
 			type: string: {
 				examples: ["headers"]
 			}

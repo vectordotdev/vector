@@ -103,7 +103,6 @@ components: sinks: _humio: {
 				If unset, Humio will default it to none.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				examples: ["json", "none"]
 				syntax: "template"
@@ -116,7 +115,6 @@ components: sinks: _humio: {
 				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
 				"""
 			required:    false
-			warnings: []
 			type: string: {
 				examples: ["hostname"]
 			}
@@ -125,7 +123,6 @@ components: sinks: _humio: {
 			common:      false
 			description: "Optional name of the repository to ingest into. In public-facing APIs this must - if present - be equal to the repository used to create the ingest token used for authentication. In private cluster setups, humio can be configured to allow these to be different. For more information, see [Humio's Format of Data](\(urls.humio_hec_format_of_data))."
 			required:    false
-			warnings: []
 			type: string: {
 				examples: ["{{ host }}", "custom_index"]
 				syntax: "template"
@@ -135,7 +132,6 @@ components: sinks: _humio: {
 			common:      true
 			description: "Event fields to be added to Humio's extra fields. Can be used to tag events by specifying fields starting with `#`. For more information, see [Humio's Format of Data](\(urls.humio_hec_format_of_data))."
 			required:    false
-			warnings: []
 			type: array: {
 				items: type: string: {
 					examples: ["#env", "#datacenter"]
@@ -149,7 +145,6 @@ components: sinks: _humio: {
 				`@source` in Humio.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				examples: ["{{file}}", "/var/log/syslog", "UDP:514"]
 				syntax: "template"
@@ -158,7 +153,6 @@ components: sinks: _humio: {
 		token: {
 			description: "Your Humio ingestion token."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["${HUMIO_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
 			}

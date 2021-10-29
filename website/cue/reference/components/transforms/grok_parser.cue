@@ -60,14 +60,12 @@ components: transforms: grok_parser: {
 			common:      true
 			description: "If `true` will drop the specified `field` after parsing."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 		field: {
 			common:      true
 			description: "The log field to execute the `pattern` against. Must be a `string` value."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child", "array[0]"]
@@ -76,7 +74,6 @@ components: transforms: grok_parser: {
 		pattern: {
 			description: "The [Grok pattern](\(urls.grok_patterns))"
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"]
 			}

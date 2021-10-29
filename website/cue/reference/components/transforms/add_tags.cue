@@ -44,14 +44,12 @@ components: transforms: add_tags: {
 			common:      true
 			description: "By default, fields will be overridden. Set this to `false` to avoid overwriting values."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 		tags: {
 			common:      true
 			description: "A table of key/value pairs representing the tags to be added to the metric."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: [
 					{

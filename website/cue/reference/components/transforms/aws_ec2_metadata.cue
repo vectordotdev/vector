@@ -44,8 +44,8 @@ components: transforms: aws_ec2_metadata: {
 				```
 				""",
 		]
-		warnings: []
 		notices: []
+		warnings: []
 	}
 
 	configuration: {
@@ -61,7 +61,6 @@ components: transforms: aws_ec2_metadata: {
 			common:      true
 			description: "A list of fields to include in each event."
 			required:    false
-			warnings: []
 			type: array: {
 				default: ["instance-id", "local-hostname", "local-ipv4", "public-hostname", "public-ipv4", "ami-id", "availability-zone", "vpc-id", "subnet-id", "region"]
 				items: type: string: {
@@ -73,7 +72,6 @@ components: transforms: aws_ec2_metadata: {
 			common:      true
 			description: "Prepend a namespace to each field's key."
 			required:    false
-			warnings: []
 			type: string: {
 				default: ""
 				examples: ["", "ec2", "aws.ec2"]
@@ -84,7 +82,6 @@ components: transforms: aws_ec2_metadata: {
 			common:      true
 			description: "The interval in seconds at which the EC2 Metadata api will be called."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 10
 				unit:    null

@@ -30,7 +30,6 @@ configuration: {
 				events.
 				"""
 			required: false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -92,7 +91,6 @@ configuration: {
 				Configures health checks for all sinks.
 				"""
 			required: false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -103,7 +101,6 @@ configuration: {
 							option overrides it.
 							"""
 						required: false
-						warnings: []
 						type: bool: {
 							default: true
 						}
@@ -116,7 +113,6 @@ configuration: {
 							`--require-healthy` command line flag.
 							"""
 						required: false
-						warnings: []
 						type: bool: {
 							default: false
 						}
@@ -133,7 +129,6 @@ configuration: {
 				[TZ database](\(urls.tz_time_zones)), or `local` to indicate system local time.
 				"""
 			required:    false
-			warnings: []
 			type: string: {
 				default: "local"
 				examples: ["local", "America/NewYork", "EST5EDT"]

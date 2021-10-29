@@ -6,7 +6,6 @@ components: _aws: {
 			common:      false
 			description: "Options for the authentication strategy."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {

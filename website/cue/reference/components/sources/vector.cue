@@ -69,7 +69,6 @@ components: sources: vector: {
 				The HTTP address to listen for connections on. It _must_ include a port.
 				"""
 			required: true
-			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)"]
 			}
@@ -78,7 +77,6 @@ components: sources: vector: {
 			common:      false
 			description: "The timeout before a connection is forcefully closed during shutdown."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 30
 				unit:    "seconds"

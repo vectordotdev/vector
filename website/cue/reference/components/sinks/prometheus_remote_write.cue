@@ -106,7 +106,6 @@ components: sinks: prometheus_remote_write: {
 				It should follow Prometheus [naming conventions](\(urls.prometheus_metric_naming)).
 				"""
 			required:    false
-			warnings: []
 			type: string: {
 				examples: ["service"]
 			}
@@ -115,7 +114,6 @@ components: sinks: prometheus_remote_write: {
 			common:      false
 			description: "Default buckets to use for aggregating [distribution](\(urls.vector_metric)/#distribution) metrics into histograms."
 			required:    false
-			warnings: []
 			type: array: {
 				default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
 				items: type: float: examples: [0.005, 0.01]
@@ -125,7 +123,6 @@ components: sinks: prometheus_remote_write: {
 			common:      false
 			description: "Quantiles to use for aggregating [distribution](\(urls.vector_metric)/#distribution) metrics into a summary."
 			required:    false
-			warnings: []
 			type: array: {
 				default: [0.5, 0.75, 0.9, 0.95, 0.99]
 				items: type: float: examples: [0.5, 0.75, 0.9, 0.95, 0.99]
@@ -135,7 +132,6 @@ components: sinks: prometheus_remote_write: {
 			common:      false
 			description: "If set, a header named `X-Scope-OrgID` will be added to outgoing requests with the text of this setting. This may be used by Cortex or other remote services to identify the tenant making the request."
 			required:    false
-			warnings: []
 			type: string: {
 				examples: ["my-domain"]
 				syntax: "template"

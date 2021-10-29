@@ -53,21 +53,18 @@ components: transforms: regex_parser: {
 			common:      true
 			description: "If the event should be dropped if parsing fails."
 			required:    false
-			warnings: []
 			type: bool: default: false
 		}
 		drop_field: {
 			common:      true
 			description: "If the specified `field` should be dropped (removed) after parsing."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 		field: {
 			common:      true
 			description: "The log field to parse."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child"]
@@ -77,13 +74,11 @@ components: transforms: regex_parser: {
 			common:      false
 			description: "If `target_field` is set and the log contains a field of the same name as the target, it will only be overwritten if this is set to `true`."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 		patterns: {
 			description: "The Regular Expressions to apply. Do not include the leading or trailing `/` in any of the expressions."
 			required:    true
-			warnings: []
 			type: array: items: type: string: {
 				examples: ["^(?P<timestamp>[\\\\w\\\\-:\\\\+]+) (?P<level>\\\\w+) (?P<message>.*)$"]
 			}
@@ -92,7 +87,6 @@ components: transforms: regex_parser: {
 			common:      false
 			description: "If this setting is present, the parsed fields will be inserted into the log as a sub-object with this name. If a field with the same name already exists, the parser will fail and produce an error."
 			required:    false
-			warnings: []
 			type: string: {
 				examples: ["root_field", "parent.child"]
 			}

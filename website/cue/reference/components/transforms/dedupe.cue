@@ -39,14 +39,12 @@ components: transforms: dedupe: {
 			common:      false
 			description: "Options controlling how we cache recent Events for future duplicate checking."
 			required:    false
-			warnings: []
 			type: object: {
 				options: {
 					num_events: {
 						common:      true
 						description: "The number of recent Events to cache and compare new incoming Events against."
 						required:    false
-						warnings: []
 						type: uint: {
 							default: 5000
 							unit:    null
@@ -58,14 +56,12 @@ components: transforms: dedupe: {
 		fields: {
 			description: "Options controlling what fields to match against."
 			required:    true
-			warnings: []
 			type: object: {
 				options: {
 					ignore: {
 						common:      false
 						description: "The field names to ignore when deciding if an Event is a duplicate. Incompatible with the `fields.match` option."
 						required:    false
-						warnings: []
 						type: array: {
 							items: type: string: {
 								examples: ["field1", "parent.child_field"]
@@ -76,7 +72,6 @@ components: transforms: dedupe: {
 						common:      true
 						description: "The field names considered when deciding if an Event is a duplicate. This can also be globally set via the [global `log_schema` options](\(urls.vector_configuration_global)/#log_schema). Incompatible with the `fields.ignore` option."
 						required:    false
-						warnings: []
 						type: array: {
 							default: ["timestamp", "host", "message"]
 							items: type: string: {

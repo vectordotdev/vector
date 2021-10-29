@@ -52,7 +52,6 @@ components: transforms: lua: {
 		hooks: {
 			description: "Configures hooks handlers."
 			required:    true
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -60,7 +59,6 @@ components: transforms: lua: {
 						common:      false
 						description: "A function which is called when the first event comes, before calling `hooks.process`"
 						required:    false
-						warnings: []
 						type: string: {
 							examples: [
 								"""
@@ -75,7 +73,6 @@ components: transforms: lua: {
 					process: {
 						description: "A function which is called for each incoming event. It can produce new events using `emit` function."
 						required:    true
-						warnings: []
 						type: string: {
 							examples: [
 								"""
@@ -95,7 +92,6 @@ components: transforms: lua: {
 						common:      false
 						description: "A function which is called when Vector is stopped. It can produce new events using `emit` function."
 						required:    false
-						warnings: []
 						type: string: {
 							examples: [
 								"""
@@ -114,7 +110,6 @@ components: transforms: lua: {
 			common:      false
 			description: "A list of directories to search when loading a Lua file via the `require` function. If not specified, the modules are looked up in the directories of Vector's configs."
 			required:    false
-			warnings: []
 			type: array: {
 				items: type: string: {
 					examples: ["/etc/vector/lua"]}
@@ -124,7 +119,6 @@ components: transforms: lua: {
 			common:      false
 			description: "The source which is evaluated when the transform is created."
 			required:    false
-			warnings: []
 			type: string: {
 				examples: [
 					"""
@@ -167,13 +161,11 @@ components: transforms: lua: {
 			common:      false
 			description: "Configures timers which are executed periodically at given interval."
 			required:    false
-			warnings: []
 			type: array: items: type: object: {
 				options: {
 					handler: {
 						description: "Defines a handler function which is executed periodically at `interval_seconds`. It can produce new events using `emit` function."
 						required:    true
-						warnings: []
 						type: string: {
 							examples: ["timer_handler"]
 						}
@@ -181,7 +173,6 @@ components: transforms: lua: {
 					interval_seconds: {
 						description: "Defines the interval at which the timer handler would be executed."
 						required:    true
-						warnings: []
 						type: uint: {
 							examples: [1, 10, 30]
 							unit: "seconds"
@@ -193,7 +184,6 @@ components: transforms: lua: {
 		version: {
 			description: "Transform API version. Specifying this version ensures that Vector does not break backward compatibility."
 			required:    true
-			warnings: []
 			type: string: enum: {
 				"1": "Lua transform API version 1"
 				"2": "Lua transform API version 2"

@@ -54,7 +54,6 @@ components: sinks: console: {
 			common:      true
 			description: "The [standard stream](\(urls.standard_streams)) to write to."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "stdout"
 				enum: {

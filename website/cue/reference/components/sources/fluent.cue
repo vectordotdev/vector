@@ -63,7 +63,6 @@ components: sources: fluent: {
 		address: {
 			description: "The address to listen for TCP connections on."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)"]
 			}

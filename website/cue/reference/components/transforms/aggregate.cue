@@ -32,8 +32,8 @@ components: transforms: aggregate: {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: []
 		notices: []
+		warnings: []
 	}
 
 	configuration: {
@@ -44,7 +44,6 @@ components: transforms: aggregate: {
 				same series data (name, namespace, tags, ...) will be aggregated.
 				"""
 			required: false
-			warnings: []
 			type: uint: {
 				default: 10000
 				unit:    "milliseconds"

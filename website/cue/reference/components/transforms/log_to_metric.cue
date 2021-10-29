@@ -38,14 +38,12 @@ components: transforms: log_to_metric: {
 		metrics: {
 			description: "A table of key/value pairs representing the keys to be added to the event."
 			required:    true
-			warnings: []
 			type: array: items: type: object: {
 				examples: []
 				options: {
 					field: {
 						description: "The log field to use as the metric."
 						required:    true
-						warnings: []
 						type: string: {
 							examples: ["duration", "parent.child"]
 						}
@@ -57,7 +55,6 @@ components: transforms: log_to_metric: {
 							"""
 						required: false
 						common:   false
-						warnings: []
 						relevant_when: #"type = "counter""#
 						type: bool: {
 							default: false
@@ -69,7 +66,6 @@ components: transforms: log_to_metric: {
 							"""
 						required: false
 						common:   false
-						warnings: []
 						relevant_when: #"type = "counter""#
 						type: string: {
 							enum: {
@@ -83,7 +79,6 @@ components: transforms: log_to_metric: {
 						description: "The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`."
 						required:    false
 						common:      true
-						warnings: []
 						type: string: {
 							examples: ["duration_total"]
 							syntax: "template"
@@ -93,7 +88,6 @@ components: transforms: log_to_metric: {
 						description: "The namespace of the metric."
 						required:    false
 						common:      true
-						warnings: []
 						type: string: {
 							examples: ["service"]
 							syntax: "template"
@@ -103,7 +97,6 @@ components: transforms: log_to_metric: {
 						description: "Key/value pairs representing [metric tags](\(urls.vector_metric)#tags)."
 						required:    false
 						common:      true
-						warnings: []
 						type: object: {
 							examples: [
 								{
@@ -119,7 +112,6 @@ components: transforms: log_to_metric: {
 	                      Environment variables and field interpolation is allowed.
 	                      """
 									required:    true
-									warnings: []
 									type: "*": {}
 								}
 							}
@@ -128,7 +120,6 @@ components: transforms: log_to_metric: {
 					type: {
 						description: "The metric type."
 						required:    true
-						warnings: []
 						type: string: {
 							enum: {
 								counter:   "A [counter metric type](\(urls.vector_metric)#counter)."

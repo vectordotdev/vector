@@ -47,7 +47,6 @@ components: transforms: ansi_stripper: {
 			common:      true
 			description: "The target field to strip ANSI escape sequences from."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child", "array[0]"]

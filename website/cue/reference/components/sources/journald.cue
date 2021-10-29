@@ -53,7 +53,6 @@ components: sources: journald: {
 			common:      false
 			description: "The systemd journal is read in batches, and a checkpoint is set at the end of each batch. This option limits the size of the batch."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 16
 				unit:    null
@@ -63,14 +62,12 @@ components: sources: journald: {
 			common:      true
 			description: "Include only entries from the current boot."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 		exclude_units: {
 			common:      true
 			description: "The list of unit names to exclude from monitoring. Unit names lacking a `\".\"` will have `\".service\"` appended to make them a valid service unit name."
 			required:    false
-			warnings: []
 			type: array: {
 				default: []
 				items: type: string: {
@@ -82,7 +79,6 @@ components: sources: journald: {
 			common:      true
 			description: "This list contains sets of field/value pairs that, if any are present in a journal entry, will cause the entry to be excluded from this source. If `exclude_units` is specified, it will be merged into this list."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: [
 					{
@@ -109,7 +105,6 @@ components: sources: journald: {
 			common:      true
 			description: "The list of unit names to monitor. If empty or not present, all units are accepted. Unit names lacking a `\".\"` will have `\".service\"` appended to make them a valid service unit name."
 			required:    false
-			warnings: []
 			type: array: {
 				default: []
 				items: type: string: {
@@ -121,7 +116,6 @@ components: sources: journald: {
 			common:      true
 			description: "This list contains sets of field/value pairs to monitor. If empty or not present, all journal fields are accepted. If `include_units` is specified, it will be merged into this list."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: [
 					{
@@ -148,7 +142,6 @@ components: sources: journald: {
 			common:      false
 			description: "The full path of the `journalctl` executable. If not set, Vector will search the path for `journalctl`."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "journalctl"
 				examples: ["/usr/local/bin/journalctl"]
@@ -158,7 +151,6 @@ components: sources: journald: {
 			common:      false
 			description: "The full path of the journal directory. If not set, `journalctl` will use the default system journal paths"
 			required:    false
-			warnings: []
 			type: string: {
 				examples: ["/run/log/journal"]
 			}

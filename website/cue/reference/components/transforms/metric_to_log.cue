@@ -40,7 +40,6 @@ components: transforms: metric_to_log: {
 			common:      true
 			description: "Tag key that identifies the source host."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "hostname"
 				examples: ["host", "hostname"]

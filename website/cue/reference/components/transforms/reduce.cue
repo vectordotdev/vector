@@ -43,7 +43,6 @@ components: transforms: reduce: {
 				for an event, the current transaction is immediately flushed with this event.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				examples: [
 					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
@@ -54,7 +53,6 @@ components: transforms: reduce: {
 			common:      false
 			description: "A maximum period of time to wait after the last event is received before a combined event should be considered complete."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 30000
 				unit:    "milliseconds"
@@ -64,7 +62,6 @@ components: transforms: reduce: {
 			common:      false
 			description: "Controls the frequency that Vector checks for (and flushes) expired events."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 1000
 				unit:    "milliseconds"
@@ -74,7 +71,6 @@ components: transforms: reduce: {
 			common:      true
 			description: "An ordered list of fields by which to group events. Each group is combined independently, allowing you to keep independent events separate. When no fields are specified, all events will be combined in a single group. Events missing a specified field will be combined in their own group."
 			required:    false
-			warnings: []
 			type: array: {
 				default: []
 				items: type: string: {
@@ -99,7 +95,6 @@ components: transforms: reduce: {
 				3. Numeric values are summed.
 				"""
 			required: false
-			warnings: []
 			type: object: {
 				examples: [
 					{
@@ -113,7 +108,6 @@ components: transforms: reduce: {
 					"*": {
 						description: "The custom merge strategy to use for a field."
 						required:    true
-						warnings: []
 						type: string: {
 							enum: {
 								array:          "Each value is appended to an array."
@@ -140,7 +134,6 @@ components: transforms: reduce: {
 				for an event, the previous transaction is flushed (without this event) and a new transaction is started.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				examples: [
 					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,

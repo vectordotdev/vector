@@ -89,7 +89,6 @@ components: sinks: gcp_cloud_storage: {
 			common:      false
 			description: "Predefined ACL to apply to the created objects. For more information, see [Predefined ACLs](\(urls.gcs_predefined_acl)). If this is not set, GCS will apply a default ACL when the object is created."
 			required:    false
-			warnings: []
 			type: string: {
 				enum: {
 					"authenticated-read":        "Gives the bucket or object owner OWNER permission, and gives all authenticated Google account holders READER permission."
@@ -104,7 +103,6 @@ components: sinks: gcp_cloud_storage: {
 		bucket: {
 			description: "The GCS bucket name."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["my-bucket"]
 			}
@@ -114,7 +112,6 @@ components: sinks: gcp_cloud_storage: {
 			common:      true
 			description: "The filename for a Google Cloud service account credentials JSON file used to authenticate access to the Cloud Storage API. If this is unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.\n\nIf no filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is running on. If Vector is not running on a GCE instance, you must define a credentials file as above."
 			required:    false
-			warnings: []
 			type: string: {
 				examples: ["/path/to/credentials.json"]
 			}
@@ -124,7 +121,6 @@ components: sinks: gcp_cloud_storage: {
 			common:      false
 			description: "Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 		filename_extension: {
@@ -132,7 +128,6 @@ components: sinks: gcp_cloud_storage: {
 			common:      false
 			description: "The filename extension to use in the object name."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "log"
 			}
@@ -142,7 +137,6 @@ components: sinks: gcp_cloud_storage: {
 			common:      false
 			description: "The format of the resulting object file name. [`strftime` specifiers](\(urls.strptime_specifiers)) are supported."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "%s"
 			}
@@ -152,7 +146,6 @@ components: sinks: gcp_cloud_storage: {
 			common:      true
 			description: "A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root GCS \"folder\"."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "date=%F/"
 				examples: ["date=%F/", "date=%F/hour=%H/", "year=%Y/month=%m/day=%d/", "application_id={{ application_id }}/date=%F/"]
@@ -163,7 +156,6 @@ components: sinks: gcp_cloud_storage: {
 			common:      false
 			description: "The set of metadata `key:value` pairs for the created objects. See the [GCS custom metadata](\(urls.gcs_custom_metadata)) documentation for more details."
 			required:    false
-			warnings: []
 			type: string: {
 				examples: []
 			}
@@ -173,7 +165,6 @@ components: sinks: gcp_cloud_storage: {
 			common:      false
 			description: "The storage class for the created objects. See [the GCP storage classes](\(urls.gcs_storage_classes)) for more details."
 			required:    false
-			warnings: []
 			type: string: {
 				enum: {
 					STANDARD: "Standard Storage is best for data that is frequently accessed and/or stored for only brief periods of time. This is the default."

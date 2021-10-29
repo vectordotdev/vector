@@ -77,7 +77,6 @@ components: sources: aws_s3: components._aws & {
 			common:      true
 			description: "SQS strategy options. Required if strategy=`sqs`."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -85,7 +84,6 @@ components: sources: aws_s3: components._aws & {
 						common:      true
 						description: "How long to wait when polling SQS for new messages."
 						required:    false
-						warnings: []
 						type: uint: {
 							default: 15
 							unit:    "seconds"
@@ -105,13 +103,11 @@ components: sources: aws_s3: components._aws & {
 						common:      true
 						description: "Whether to delete the message once Vector processes it. It can be useful to set this to `false` to debug or during initial Vector setup."
 						required:    false
-						warnings: []
 						type: bool: default: true
 					}
 					queue_url: {
 						description: "The URL of the SQS queue to receive bucket notifications from."
 						required:    true
-						warnings: []
 						type: string: {
 							examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
 						}

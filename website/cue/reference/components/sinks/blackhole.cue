@@ -44,7 +44,6 @@ components: sinks: blackhole: {
 			common:      false
 			description: "The number of seconds between reporting a summary of activity."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 1
 				examples: [10]
@@ -55,7 +54,6 @@ components: sinks: blackhole: {
 			common:      false
 			description: "Rates the amount of events that the sink can consume per second."
 			required:    false
-			warnings: []
 			type: uint: {
 				examples: [1000]
 				unit: null

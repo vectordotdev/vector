@@ -51,7 +51,6 @@ components: sources: syslog: {
 			description:   "The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port."
 			relevant_when: "mode = `tcp` or `udp`"
 			required:      true
-			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
 			}
@@ -64,7 +63,6 @@ components: sources: syslog: {
 				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
 				"""
 			required:    false
-			warnings: []
 			type: string: {
 				default: "host"
 			}
@@ -73,7 +71,6 @@ components: sources: syslog: {
 			common:      true
 			description: "The maximum buffer size of incoming messages. Messages larger than this are truncated."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 102400
 				unit:    "bytes"
@@ -82,7 +79,6 @@ components: sources: syslog: {
 		mode: {
 			description: "The type of socket to use."
 			required:    true
-			warnings: []
 			type: string: {
 				enum: {
 					tcp:  "TCP socket."
@@ -95,7 +91,6 @@ components: sources: syslog: {
 			description:   "The unix socket path. *This should be an absolute path*."
 			relevant_when: "mode = `unix`"
 			required:      true
-			warnings: []
 			type: string: {
 				examples: ["/path/to/socket"]
 			}

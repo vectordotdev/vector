@@ -69,7 +69,6 @@ components: sources: socket: {
 			description:   "The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port."
 			relevant_when: "mode = `tcp` or `udp`"
 			required:      true
-			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
 			}
@@ -82,7 +81,6 @@ components: sources: socket: {
 				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
 				"""
 			required:    false
-			warnings: []
 			type: string: {
 				default: "host"
 			}
@@ -91,7 +89,6 @@ components: sources: socket: {
 			common:      true
 			description: "The maximum buffer size of incoming messages. Messages larger than this are truncated."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 102400
 				unit:    "bytes"
@@ -100,7 +97,6 @@ components: sources: socket: {
 		mode: {
 			description: "The type of socket to use."
 			required:    true
-			warnings: []
 			type: string: {
 				enum: {
 					tcp:           "TCP socket."
@@ -114,7 +110,6 @@ components: sources: socket: {
 			description:   "The unix socket path. *This should be an absolute path*."
 			relevant_when: "mode = `unix_datagram` or `unix_stream`"
 			required:      true
-			warnings: []
 			type: string: {
 				examples: ["/path/to/socket"]
 			}
@@ -124,7 +119,6 @@ components: sources: socket: {
 			description:   "The timeout before a connection is forcefully closed during shutdown."
 			relevant_when: "mode = `tcp`"
 			required:      false
-			warnings: []
 			type: uint: {
 				default: 30
 				unit:    "seconds"

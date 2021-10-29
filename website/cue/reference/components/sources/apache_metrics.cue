@@ -82,7 +82,6 @@ components: sources: apache_metrics: {
 			description: "The namespace of the metric. Disabled if empty."
 			required:    false
 			common:      false
-			warnings: []
 			type: string: {
 				default: "apache"
 			}

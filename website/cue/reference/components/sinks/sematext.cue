@@ -30,7 +30,6 @@ components: sinks: _sematext: {
 			description:   "The region to send data to."
 			required:      true
 			relevant_when: "endpoint is not set"
-			warnings: []
 			type: string: {
 				enum: {
 					us: "United States"
@@ -41,7 +40,6 @@ components: sinks: _sematext: {
 		token: {
 			description: "The token that will be used to write to Sematext."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["${SEMATEXT_TOKEN}", "some-sematext-token"]
 			}

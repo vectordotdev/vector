@@ -39,7 +39,6 @@ components: sinks: _influxdb: {
 			description: "Sets the write consistency for the point for InfluxDB 1."
 			groups: ["v1"]
 			required: false
-			warnings: []
 			type: string: {
 				examples: ["any", "one", "quorum", "all"]
 			}
@@ -48,7 +47,6 @@ components: sinks: _influxdb: {
 			description: "Sets the target database for the write into InfluxDB 1."
 			groups: ["v1"]
 			required: true
-			warnings: []
 			type: string: {
 				examples: ["vector-database", "iot-store"]
 			}
@@ -66,7 +64,6 @@ components: sinks: _influxdb: {
 			description: "Specifies the destination organization for writes into InfluxDB 2."
 			groups: ["v2"]
 			required: true
-			warnings: []
 			type: string: {
 				examples: ["my-org", "33f2cff0a28e5b63"]
 			}
@@ -77,7 +74,6 @@ components: sinks: _influxdb: {
 			description: "Sets the password for authentication if you’ve enabled authentication for the write into InfluxDB 1."
 			groups: ["v1"]
 			required: false
-			warnings: []
 			type: string: {
 				examples: ["${INFLUXDB_PASSWORD}", "influxdb4ever"]
 			}
@@ -88,7 +84,6 @@ components: sinks: _influxdb: {
 			description: "Sets the target retention policy for the write into InfluxDB 1."
 			groups: ["v1"]
 			required: false
-			warnings: []
 			type: string: {
 				examples: ["autogen", "one_day_only"]
 			}
@@ -98,7 +93,6 @@ components: sinks: _influxdb: {
 			description: "A set of additional fields that will be attached to each LineProtocol as a tag. Note: If the set of tag values has high cardinality this also increase cardinality in InfluxDB."
 			groups: ["v1", "v2"]
 			required: false
-			warnings: []
 			type: array: {
 				items: type: string: {
 					examples: ["field1", "parent.child_field"]
@@ -111,7 +105,6 @@ components: sinks: _influxdb: {
 			description: "[Authentication token](\(urls.influxdb_authentication_token)) for InfluxDB 2."
 			groups: ["v2"]
 			required: true
-			warnings: []
 			type: string: {
 				examples: ["${INFLUXDB_TOKEN}", "ef8d5de700e7989468166c40fc8a0ccd"]
 			}
@@ -122,7 +115,6 @@ components: sinks: _influxdb: {
 			description: "Sets the username for authentication if you’ve enabled authentication for the write into InfluxDB 1."
 			groups: ["v1"]
 			required: false
-			warnings: []
 			type: string: {
 				examples: ["todd", "vector-source"]
 			}

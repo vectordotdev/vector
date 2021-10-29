@@ -46,15 +46,14 @@ components: _nats: {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: []
 		notices: []
+		warnings: []
 	}
 
 	configuration: {
 		url: {
 			description: "The NATS URL to connect to. The url _must_ take the form of `nats://server:port`."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["nats://demo.nats.io", "nats://127.0.0.1:4222"]
 			}
@@ -62,7 +61,6 @@ components: _nats: {
 		subject: {
 			description: "The NATS subject to publish messages to."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["{{ host }}", "foo", "time.us.east", "time.*.east", "time.>", ">"]
 				syntax: "template"

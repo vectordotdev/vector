@@ -42,7 +42,6 @@ components: transforms: tag_cardinality_limit: {
 			description:   "The size of the cache in bytes to use to detect duplicate tags. The bigger the cache the less likely it is to have a 'false positive' or a case where we allow a new value for tag even after we have reached the configured limits."
 			relevant_when: "mode = \"probabilistic\""
 			required:      false
-			warnings: []
 			type: uint: {
 				default: 5120000
 				unit:    "bytes"
@@ -52,7 +51,6 @@ components: transforms: tag_cardinality_limit: {
 			common:      true
 			description: "Controls what should happen when a metric comes in with a tag that would exceed the configured limit on cardinality."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "drop_tag"
 				enum: {
@@ -64,7 +62,6 @@ components: transforms: tag_cardinality_limit: {
 		mode: {
 			description: "Controls what approach is used internally to keep track of previously seen tags and determine when a tag on an incoming metric exceeds the limit."
 			required:    true
-			warnings: []
 			type: string: {
 				enum: {
 					exact:         "Has higher memory requirements than `probabilistic`, but never falsely outputs metrics with new tags after the limit has been hit."
@@ -76,7 +73,6 @@ components: transforms: tag_cardinality_limit: {
 			common:      true
 			description: "How many distinct values to accept for any given key."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 500
 				unit:    null

@@ -84,7 +84,6 @@ components: sinks: gcp_stackdriver_logs: {
 				or `project_id`.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				examples: ["012345-6789AB-CDEF01"]
 			}
@@ -101,7 +100,6 @@ components: sinks: gcp_stackdriver_logs: {
 				file as above.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				examples: ["/path/to/credentials.json"]
 			}
@@ -116,7 +114,6 @@ components: sinks: gcp_stackdriver_logs: {
 				Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
 				"""
 			required:    false
-			warnings: []
 			type: string: {
 				examples: ["My Folder"]
 			}
@@ -124,7 +121,6 @@ components: sinks: gcp_stackdriver_logs: {
 		log_id: {
 			description: "The log ID to which to publish logs. This is a name you create to identify this log stream."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["vector-logs", "{{ component_id }}"]
 				syntax: "template"
@@ -139,7 +135,6 @@ components: sinks: gcp_stackdriver_logs: {
 				Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				examples: ["622418129737"]
 			}
@@ -152,7 +147,6 @@ components: sinks: gcp_stackdriver_logs: {
 				Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
 				"""
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["vector-123456"]
 			}
@@ -160,7 +154,6 @@ components: sinks: gcp_stackdriver_logs: {
 		resource: {
 			description: "Options for describing the logging resource."
 			required:    true
-			warnings: []
 			type: object: {
 				examples: [
 					{
@@ -179,7 +172,6 @@ components: sinks: gcp_stackdriver_logs: {
 							more details.
 							"""
 						required:    true
-						warnings: []
 						type: string: {
 							examples: ["global", "gce_instance"]
 						}
@@ -192,7 +184,6 @@ components: sinks: gcp_stackdriver_logs: {
 							For example, Compute Engine VM instances use the labels `instance_id` and `zone`.
 							"""
 						required: false
-						warnings: []
 						type: string: {
 							examples: ["Twilight", "{{ zone }}"]
 							syntax: "template"
@@ -215,7 +206,6 @@ components: sinks: gcp_stackdriver_logs: {
 				details on the value of the `severity` field.
 				"""
 			required:    false
-			warnings: []
 			type: string: {
 				examples: ["severity"]
 			}

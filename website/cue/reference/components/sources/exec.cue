@@ -70,7 +70,6 @@ components: sources: exec: {
 			common:      false
 			required:    false
 			description: "The directory in which to run the command."
-			warnings: []
 			type: string: {}
 		}
 		include_stderr: {
@@ -98,7 +97,6 @@ components: sources: exec: {
 			common:      true
 			description: "The scheduled options."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -119,7 +117,6 @@ components: sources: exec: {
 			common:      true
 			description: "The streaming options."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -135,7 +132,6 @@ components: sources: exec: {
 						description:   "The interval in seconds between restarting streaming commands if needed."
 						relevant_when: "mode = `streaming`"
 						required:      false
-						warnings: []
 						type: uint: {
 							default: 5
 							unit:    "seconds"

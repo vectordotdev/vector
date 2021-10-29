@@ -76,7 +76,6 @@ components: sources: prometheus_scrape: {
 			common:      true
 			description: "The interval between scrapes, in seconds."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 15
 				unit:    "seconds"
@@ -89,7 +88,6 @@ components: sources: prometheus_scrape: {
 				The tag name added to each event representing the scraped instance's host:port.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				examples: ["instance"]
 			}
@@ -101,7 +99,6 @@ components: sources: prometheus_scrape: {
 				The tag name added to each event representing the scraped instance's endpoint.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				examples: ["endpoint"]
 			}
@@ -116,7 +113,6 @@ components: sources: prometheus_scrape: {
 				configuration.
 				"""
 			required: false
-			warnings: []
 			type: bool: {
 				default: false
 			}

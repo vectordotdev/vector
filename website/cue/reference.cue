@@ -318,7 +318,7 @@ _values: {
 	//
 	// For example, the `tls.verify_hostname` option has a warning about
 	// reduced security if the option is disabled.
-	warnings: [...string]
+	warnings: [...string] | *[]
 
 	if !required {
 		// `common` specifes that the option is commonly used. It will bring the

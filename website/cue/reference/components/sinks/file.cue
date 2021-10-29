@@ -56,7 +56,6 @@ components: sinks: file: {
 			common:      false
 			description: "The amount of time a file can be idle  and stay open. After not receiving any events for this timeout, the file will be flushed and closed.\n"
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 30
 				unit:    null
@@ -65,7 +64,6 @@ components: sinks: file: {
 		path: {
 			description: "File name to write events to."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["/tmp/vector-%Y-%m-%d.log", "/tmp/application-{{ application_id }}-%Y-%m-%d.log"]
 				syntax: "template"

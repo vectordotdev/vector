@@ -76,7 +76,6 @@ components: sinks: redis: {
 			description: "The Redis URL to connect to. The url _must_ take the form of `protocol://server:port/db` where the protocol can either be `redis` or `rediss` for connections secured via TLS."
 			groups: ["tcp"]
 			required: true
-			warnings: []
 			type: string: {
 				examples: ["redis://127.0.0.1:6379/0"]
 			}
@@ -84,7 +83,6 @@ components: sinks: redis: {
 		key: {
 			description: "The Redis key to publish messages to."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["syslog:{{ app }}", "vector"]
 				syntax: "template"
@@ -106,7 +104,6 @@ components: sinks: redis: {
 			common:      false
 			description: "Options for the Redis `list` data type."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {

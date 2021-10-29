@@ -748,7 +748,6 @@ components: {
 					password: {
 						description: "The basic authentication password."
 						required:    true
-						warnings: []
 						type: string: {
 							examples: [Args.password_example, "password"]
 						}
@@ -756,7 +755,6 @@ components: {
 					strategy: {
 						description: "The authentication strategy to use."
 						required:    true
-						warnings: []
 						type: string: {
 							enum: {
 								basic:  "The [basic authentication strategy](\(urls.basic_auth))."
@@ -767,7 +765,6 @@ components: {
 					token: {
 						description: "The token to use for bearer authentication"
 						required:    true
-						warnings: []
 						type: string: {
 							examples: ["${API_TOKEN}", "xyz123"]
 						}
@@ -775,7 +772,6 @@ components: {
 					user: {
 						description: "The basic authentication user name."
 						required:    true
-						warnings: []
 						type: string: {
 							examples: [Args.username_example, "username"]
 						}
@@ -787,14 +783,12 @@ components: {
 				common:      false
 				description: "Options for HTTP Basic Authentication."
 				required:    false
-				warnings: []
 				type: object: {
 					examples: []
 					options: {
 						username: {
 							description: "The basic authentication user name."
 							required:    true
-							warnings: []
 							type: string: {
 								examples: ["${HTTP_USERNAME}", "username"]
 							}
@@ -802,7 +796,6 @@ components: {
 						password: {
 							description: "The basic authentication password."
 							required:    true
-							warnings: []
 							type: string: {
 								examples: ["${HTTP_PASSWORD}", "password"]
 							}
@@ -820,7 +813,6 @@ components: {
 					indicate system local time.
 					"""
 				required:    false
-				warnings: []
 				type: string: {
 					default: "local"
 					examples: ["local", "America/NewYork", "EST5EDT"]
@@ -872,7 +864,6 @@ components: {
 					**Note**: the examples in this table are for 54 seconds after 2:37 am on December 1st, 2020 in Pacific Standard Time.
 					"""
 				required:    false
-				warnings: []
 
 				type: object: {
 					examples: [

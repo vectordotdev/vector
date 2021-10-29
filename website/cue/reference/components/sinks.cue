@@ -379,7 +379,6 @@ components: sinks: [Name=string]: {
 									common:      false
 									description: "Options for custom headers."
 									required:    false
-									warnings: []
 									type: object: {
 										examples: [
 											{

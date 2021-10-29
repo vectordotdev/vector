@@ -72,8 +72,8 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: []
 		notices: []
+		warnings: []
 	}
 
 	configuration: {
