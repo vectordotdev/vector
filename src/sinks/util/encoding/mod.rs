@@ -84,6 +84,10 @@ use std::{fmt::Debug, io, sync::Arc};
 
 pub trait Encoder<T> {
     /// Encodes the input into the provided writer.
+    ///
+    /// # Errors
+    ///
+    /// If an I/O error is encountered while encoding the input, an error variant will be returned.
     fn encode_input(&self, input: T, writer: &mut dyn io::Write) -> io::Result<usize>;
 }
 

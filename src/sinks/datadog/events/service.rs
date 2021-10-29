@@ -1,11 +1,8 @@
-use crate::sinks::datadog::ApiKey;
-
 use crate::sinks::util::http::HttpBatchService;
 
 use crate::event::EventStatus;
 
 use http::Request;
-use std::sync::Arc;
 
 use crate::http::HttpClient;
 use crate::sinks::datadog::events::request_builder::DatadogEventsRequest;
@@ -40,26 +37,21 @@ impl DriverResponse for DatadogEventsResponse {
 
 #[derive(Clone)]
 pub struct DatadogEventsService {
-    uri: String,
-    default_api_key: ApiKey,
     batch_http_service:
         HttpBatchService<Ready<Result<http::Request<Vec<u8>>, crate::Error>>, DatadogEventsRequest>,
 }
 
 impl DatadogEventsService {
-    pub fn new(uri: &str, default_api_key: &str, http_client: HttpClient<Body>) -> Self {
-        let owned_uri = uri.to_owned();
-        let default_api_key = default_api_key.to_owned();
-        let default_api_key_clone = default_api_key.clone();
+    pub fn new(endpoint: String, default_api_key: String, http_client: HttpClient<Body>) -> Self {
         let batch_http_service = HttpBatchService::new(http_client, move |req| {
             let req: DatadogEventsRequest = req;
 
             let api_key = match req.metadata.api_key.as_ref() {
                 Some(x) => x.as_ref(),
-                None => &default_api_key_clone,
+                None => default_api_key.as_str(),
             };
 
-            let request = Request::post(owned_uri.as_str())
+            let request = Request::post(endpoint.as_str())
                 .header("Content-Type", "application/json")
                 .header("DD-API-KEY", api_key)
                 .header("Content-Length", req.body.len())
@@ -67,11 +59,7 @@ impl DatadogEventsService {
                 .map_err(|x| x.into());
             future::ready(request)
         });
-        Self {
-            default_api_key: Arc::from(default_api_key),
-            uri: uri.to_owned(),
-            batch_http_service,
-        }
+        Self { batch_http_service }
     }
 }
 

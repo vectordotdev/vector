@@ -110,6 +110,12 @@ impl EventFinalizers {
     }
 }
 
+impl Finalizable for EventFinalizers {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        mem::take(self)
+    }
+}
+
 /// An event finalizer is the shared data required to handle tracking
 /// the status of an event, and updating the status of a batch with that
 /// when the event is dropped.
@@ -335,6 +341,16 @@ pub trait Finalizable {
     /// when batching finalizable objects where all finalizations will be
     /// processed when the batch itself is processed.
     fn take_finalizers(&mut self) -> EventFinalizers;
+}
+
+impl<T: Finalizable> Finalizable for Vec<T> {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.iter_mut()
+            .fold(EventFinalizers::default(), |mut acc, x| {
+                acc.merge(x.take_finalizers());
+                acc
+            })
+    }
 }
 
 #[cfg(test)]

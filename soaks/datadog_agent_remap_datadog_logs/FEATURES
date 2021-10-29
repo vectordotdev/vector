@@ -1,1 +1,1 @@
-FEATURES="sources-internal_metrics,sinks-prometheus,sources-datadog,sinks-datadog,transforms-remap"
+FEATURES="sources-internal_metrics,sinks-prometheus,sources-datadog_agent,sinks-datadog_logs,transforms-remap"

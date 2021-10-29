@@ -309,6 +309,7 @@ libz-sys = "1.1.3"
 matches = "0.1.9"
 pretty_assertions = "1.0.0"
 reqwest = { version = "0.11.6", features = ["json"] }
+proptest = "1.0"
 tempfile = "3.2.0"
 tokio = { version = "1.12.0", features = ["test-util"] }
 tokio-test = "0.4.2"
@@ -400,6 +401,9 @@ api-client = [
   "vector-api-client",
 ]
 
+# Anything that requires Protocol Buffers.
+protobuf-build = ["tonic-build", "prost-build"]
+
 # Enrichment Tables
 enrichment-tables = ["enrichment-tables-file"]
 enrichment-tables-file = [ "csv", "seahash", "hash_hasher" ]
@@ -412,7 +416,7 @@ sources = ["sources-logs", "sources-metrics"]
 sources-logs = [
   "sources-aws_kinesis_firehose",
   "sources-aws_s3",
-  "sources-datadog",
+  "sources-datadog_agent",
   "sources-docker_logs",
   "sources-exec",
   "sources-file",
@@ -450,8 +454,8 @@ sources-apache_metrics = []
 sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "infer", "sources-utils-tls", "warp", "codecs"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid", "codecs", "zstd"]
-sources-datadog = ["snap", "sources-utils-tls", "warp", "sources-utils-http-error", "codecs"]
-sources-dnstap = ["base64", "data-encoding", "trust-dns-proto", "dnsmsg-parser", "tonic-build", "prost-build"]
+sources-datadog_agent = ["snap", "sources-utils-tls", "warp", "sources-utils-http-error", "protobuf-build", "codecs"]
+sources-dnstap = ["base64", "data-encoding", "trust-dns-proto", "dnsmsg-parser", "protobuf-build"]
 sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = ["codecs"]
@@ -488,7 +492,7 @@ sources-utils-tcp-socket = []
 sources-utils-tls = []
 sources-utils-udp = []
 sources-utils-unix = []
-sources-vector = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "tonic", "tonic-build", "prost-build", "codecs"]
+sources-vector = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "tonic", "protobuf-build", "codecs"]
 
 # Transforms
 transforms = ["transforms-logs", "transforms-metrics"]
@@ -584,8 +588,9 @@ sinks-logs = [
   "sinks-blackhole",
   "sinks-clickhouse",
   "sinks-console",
-  "sinks-datadog",
   "sinks-datadog_archives",
+  "sinks-datadog_events",
+  "sinks-datadog_logs",
   "sinks-elasticsearch",
   "sinks-file",
   "sinks-gcp",
@@ -610,7 +615,7 @@ sinks-metrics = [
   "sinks-aws_cloudwatch_metrics",
   "sinks-blackhole",
   "sinks-console",
-  "sinks-datadog",
+  "sinks-datadog_metrics",
   "sinks-humio",
   "sinks-influxdb",
   "sinks-kafka",
@@ -632,8 +637,10 @@ sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-clickhouse = []
 sinks-console = []
-sinks-datadog = []
 sinks-datadog_archives = ["sinks-aws_s3"]
+sinks-datadog_events = []
+sinks-datadog_logs = []
+sinks-datadog_metrics = ["protobuf-build"]
 sinks-elasticsearch = ["rusoto", "transforms-metric_to_log"]
 sinks-file = []
 sinks-gcp = ["base64", "goauth", "gouth", "smpl_jwt", "uuid"]
@@ -655,13 +662,13 @@ sinks-socket = ["sinks-utils-udp"]
 sinks-splunk_hec = []
 sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
-sinks-vector = ["sinks-utils-udp", "tonic", "tonic-build", "prost-build"]
+sinks-vector = ["sinks-utils-udp", "tonic", "protobuf-build"]
 
 # Datadog integration
 datadog-pipelines = [
   "sources-host_metrics",
   "sources-internal_metrics",
-  "sinks-datadog",
+  "sinks-datadog_metrics",
   "sha2",
   "hex"
 ]
