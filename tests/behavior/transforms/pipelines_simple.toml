@@ -2,9 +2,14 @@
 type = "generator"
 format = "syslog"
 
+[transforms.pipelines_gate]
+type = "remap"
+inputs = ["pipelines_syslog"]
+source = ""
+
 [transforms.pipelines_processing]
 type = "pipelines"
-inputs = ["pipelines_syslog"]
+inputs = ["pipelines_gate"]
 
 [transforms.pipelines_processing.logs]
 order = [
@@ -40,7 +45,7 @@ target = "stdout"
 name = "through logs"
 
 [tests.input]
-insert_at = "pipelines_processing"
+insert_at = "pipelines_gate"
 value = "hello world"
 
 [[tests.outputs]]
