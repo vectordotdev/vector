@@ -178,6 +178,8 @@ mod parse_user_agent;
 mod parse_xml;
 #[cfg(feature = "push")]
 mod push;
+#[cfg(feature = "read_to_string")]
+mod read_to_string;
 #[cfg(feature = "redact")]
 mod redact;
 #[cfg(feature = "remove")]

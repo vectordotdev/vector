@@ -134,6 +134,7 @@ default = [
     "parse_user_agent",
     "parse_xml",
     "push",
+    "read_to_string",
     "redact",
     "remove",
     "replace",
@@ -255,6 +256,7 @@ parse_url = ["url"]
 parse_user_agent = ["woothee","uaparser","lazy_static"]
 parse_xml = ["roxmltree", "lazy_static", "regex"]
 push = []
+read_to_string = []
 redact = ["lazy_static", "regex"]
 remove = ["shared/btreemap"]
 replace = []
