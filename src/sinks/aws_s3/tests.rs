@@ -24,14 +24,15 @@ mod integration_tests {
     use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
 
     #[tokio::test]
-    async fn s3_insert_message_into() {
+    async fn s3_insert_message_into_with_flat_key_prefix() {
         let cx = SinkContext::new_test();
 
         let bucket = uuid::Uuid::new_v4().to_string();
 
         create_bucket(&bucket, false).await;
 
-        let config = config(&bucket, 1000000);
+        let mut config = config(&bucket, 1000000);
+        config.key_prefix = Some("test-prefix".to_string());
         let prefix = config.key_prefix.clone();
         let service = config.create_service(&cx.globals.proxy).unwrap();
         let sink = config.build_processor(service, cx).unwrap();
@@ -44,6 +45,44 @@ mod integration_tests {
         assert_eq!(keys.len(), 1);
 
         let key = keys[0].clone();
+        let key_parts = key.split("/").collect::<Vec<_>>();
+        assert!(key_parts.len() == 1);
+        assert!(key.starts_with("test-prefix"));
+        assert!(key.ends_with(".log"));
+
+
+        let obj = get_object(&bucket, key).await;
+        assert_eq!(obj.content_encoding, Some("identity".to_string()));
+
+        let response_lines = get_lines(obj).await;
+        assert_eq!(lines, response_lines);
+    }
+
+    #[tokio::test]
+    async fn s3_insert_message_into_with_folder_key_prefix() {
+        let cx = SinkContext::new_test();
+
+        let bucket = uuid::Uuid::new_v4().to_string();
+
+        create_bucket(&bucket, false).await;
+
+        let mut config = config(&bucket, 1000000);
+        config.key_prefix = Some("test-prefix/".to_string());
+        let prefix = config.key_prefix.clone();
+        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let sink = config.build_processor(service, cx).unwrap();
+
+        let (lines, events, receiver) = make_events_batch(100, 10);
+        sink.run(events).await.unwrap();
+        assert_eq!(receiver.await, BatchStatus::Delivered);
+
+        let keys = get_keys(&bucket, prefix.unwrap()).await;
+        assert_eq!(keys.len(), 1);
+
+        let key = keys[0].clone();
+        let key_parts = key.split("/").collect::<Vec<_>>();
+        assert!(key_parts.len() == 2);
+        assert!(key_parts.get(0).unwrap().to_string() == "test-prefix");
         assert!(key.ends_with(".log"));
 
         let obj = get_object(&bucket, key).await;
