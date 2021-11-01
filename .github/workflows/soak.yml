@@ -1,3 +1,16 @@
+# Soak test vector
+#
+# This workflow runs our 'soak' tests, which are relative evaluations of
+# vector's master branch HEAD to whatever SHA was just pushed into the project
+# (unless that SHA happens to be master branch HEAD). The goal is to give
+# quick-ish feedback on all-up vector for a variety of configs as to whether
+# throughput performance has gone down, gotten more variable in the pushed SHA.
+#
+# Soaks are always done relative to the pushed SHA, meaning any changes you
+# introduce to the soak tests will be picked up both for the master HEAD soak
+# and your current SHA. Tags are SHA-SHA. The first SHA is the one that
+# triggered this workflow, the second is the one of the vector being tested. For
+# comparison images the two SHAs are identical.
 name: Soak
 
 on:
@@ -20,6 +33,7 @@ jobs:
     name: Build baseline 'soak-vector' container
     runs-on: [self-hosted, linux, x64, general]
     steps:
+      #
       - uses: actions/checkout@v2.3.5
 
       - uses: actions/checkout@v2.3.5
@@ -27,7 +41,7 @@ jobs:
           ref: master
           path: baseline-vector
 
-      - name: Set baseline SHA, store in file
+      - name: Set baseline TAG, store in file
         id: baseline
         run: |
           pushd baseline-vector
@@ -35,13 +49,13 @@ jobs:
           popd
 
           echo ::set-output name=SHA::${SHA}
-          echo -n ${SHA} > sha
+          echo -n "${{ github.sha }}-${SHA}" > tag
 
-      - name: Upload SHA for baseline
+      - name: Upload TAG for baseline
         uses: actions/upload-artifact@v1
         with:
           name: baseline-soak
-          path: sha
+          path: tag
 
       - name: Set up Docker Buildx
         id: buildx
@@ -63,7 +77,7 @@ jobs:
             prefix=
             suffix=
           images: ghcr.io/${{ github.repository }}/soak-vector
-          tags: type=raw, value=${{ steps.baseline.outputs.SHA }}
+          tags: type=raw, value=${{ steps.baseline.outputs.TAG }}
 
       - name: Build and push 'soak-vector' image
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
@@ -102,7 +116,7 @@ jobs:
             prefix=
             suffix=
           images: ghcr.io/${{ github.repository }}/soak-vector
-          tags: type=raw, value=${{ github.sha }}
+          tags: type=raw, value=${{ github.sha }}-${{ github.sha }}
 
       - name: Build and push 'soak-vector' image
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
@@ -142,7 +156,7 @@ jobs:
         run: |
           rm -rf /tmp/${{ matrix.target }}/
           mkdir -p /tmp/${{ matrix.target }}/
-          ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "baseline" `cat baseline-soak/sha` /tmp/${{ matrix.target }}
+          ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "baseline" `cat baseline-soak/tag` /tmp/${{ matrix.target }}
 
       - name: Upload timing captures
         uses: actions/upload-artifact@v1
@@ -177,7 +191,7 @@ jobs:
         run: |
           rm -rf /tmp/${{ matrix.target }}/
           mkdir -p /tmp/${{ matrix.target }}/
-          ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "comparison" ${{ github.sha }} /tmp/${{ matrix.target }}
+          ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "comparison" "${{ github.sha }}-${{ github.sha }}" /tmp/${{ matrix.target }}
 
       - name: Upload timing captures
         uses: actions/upload-artifact@v1
