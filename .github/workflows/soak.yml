@@ -27,8 +27,12 @@ jobs:
       - name: Set baseline SHA, store in file
         id: baseline
         run: |
-          echo ::set-output name=SHA::$(git rev-parse HEAD)
-          git rev-parse HEAD > sha
+          pushd baseline-vector
+          export SHA=$(git rev-parse HEAD)
+          popd
+
+          echo ::set-output name=SHA::${SHA}
+          echo -n ${SHA} > sha
 
       - name: Upload SHA for baseline
         uses: actions/upload-artifact@v1
