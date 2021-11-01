@@ -133,6 +133,9 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+
       - uses: actions/github-script@v5
         id: set-matrix
         with:
