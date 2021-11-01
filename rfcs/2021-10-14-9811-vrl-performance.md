@@ -88,9 +88,10 @@ significantly cheaper. When the value goes out of scope the count is reduced.
 If the count reaches 0, the memory is freed.
 
 VRL needs to wrap the data in an `Rc`. This does mean pulling the data out of
-the original event, which is not wrapped in `Rc`.  Since we already clone the
-data at the start of the transform this is not going to create any additional
-cost to what we already have.
+the original event, which is not wrapped in `Rc`. Currently the data is cloned
+at the start of the transform. Since this replaces the need for that clone the
+additional cost required will be minimal - just an additional allocation
+required for each part of the value to cater for the reference count.
 
 Each field in the event can be pulled out lazily as it is used.
 
@@ -271,11 +272,13 @@ it.
 
 We could use a library such as [bumpalo](https://crates.io/crates/bumpalo).
 
-A bump allocator will allocated a significant amount of memory up front. This
-memory will then be used
+A bump allocator will allocate memory up front. This memory will then be used
+during the runtime. At the end of each transform the bump pointer is reset to
+the start - effectively deallocating all the memory used during the transform
+with very little cost.
 
-Use a persistent data structure to avoid the initial clone.
-Create an mutated pool
+The downside to a bump allocator is we need to make sure sufficient memory is
+allocated up front.
 
 This is probably not ready yet until this PR for `BTreeMap` lands.
 https://github.com/rust-lang/rust/pull/77438
@@ -339,6 +342,8 @@ Downsides to using a Vm:
 
 - Goscript - An implementation of Go using a bytecode Vm,
   https://github.com/oxfeeefeee/goscript
+
+- CPython - https://github.com/python/cpython
 
 ## Alternatives
 
