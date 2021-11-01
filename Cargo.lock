@@ -865,7 +865,9 @@ dependencies = [
  "snafu",
  "tempdir",
  "tokio",
+ "tokio-stream",
  "tokio-test",
+ "tokio-util",
  "tracing 0.1.29",
  "tracing-subscriber",
 ]
