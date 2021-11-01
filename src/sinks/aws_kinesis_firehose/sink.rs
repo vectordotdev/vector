@@ -56,6 +56,7 @@ impl KinesisSink {
     }
 }
 
+#[async_trait]
 impl StreamSink for KinesisSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await

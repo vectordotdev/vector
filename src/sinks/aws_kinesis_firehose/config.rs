@@ -5,7 +5,7 @@ use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkConte
 use crate::rusoto;
 use crate::rusoto::{AwsAuthentication, RegionOrEndpoint};
 use crate::sinks::aws_kinesis_firehose::request_builder::KinesisRequestBuilder;
-use crate::sinks::aws_kinesis_firehose::service::{KinesisFirehoseService, KinesisResponse, KinesisService};
+use crate::sinks::aws_kinesis_firehose::service::{KinesisService, KinesisResponse};
 use crate::sinks::aws_kinesis_firehose::sink::KinesisSink;
 use crate::sinks::util::{BatchConfig, BatchSettings, Compression, ServiceBuilderExt, TowerRequestConfig};
 use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
@@ -13,7 +13,7 @@ use crate::sinks::util::retries::RetryLogic;
 use serde::{Serialize, Deserialize};
 use snafu::Error;
 use snafu::Snafu;
-use crate::sinks::VectorSink;
+use crate::sinks::{Healthcheck, VectorSink};
 use tower::ServiceBuilder;
 
 // AWS Kinesis Firehose API accepts payloads up to 4MB or 500 events
@@ -80,7 +80,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
     async fn build(
         &self,
         cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy)?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
 
