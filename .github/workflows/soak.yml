@@ -1,6 +1,9 @@
 name: Soak
 
-on: push
+on:
+  push:
+    branches-ignore:
+      - master
 
 jobs:
   cancel-previous:
