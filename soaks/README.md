@@ -8,9 +8,9 @@ improved as laid out in [Issue
 
 ## Index of Soaks
 
-* [Datadog Agent -> Remap -> Datadog Logs](./datadog_agent_remap_datadog_logs/README.md)
-* [Syslog -> Loki](./syslog_loki/README.md)
-* [Syslog -> Regex (VRL) -> Log2Metric ->  Datadog Metrics](./syslog_regex_logs2metric_ddmetrics/README.md)
+* [Datadog Agent -> Remap -> Datadog Logs](./tests/datadog_agent_remap_datadog_logs/README.md)
+* [Syslog -> Loki](./tests/syslog_loki/README.md)
+* [Syslog -> Regex (VRL) -> Log2Metric ->  Datadog Metrics](./tests/syslog_regex_logs2metric_ddmetrics/README.md)
 
 ## Requirements
 
@@ -84,8 +84,8 @@ the "Datadog Agent -> Remap -> Datadog Logs" soak in
 `tree` that directory you'll see:
 
 ```shell
-> tree datadog_agent_remap_datadog_logs
-datadog_agent_remap_datadog_logs
+> tree tests/datadog_agent_remap_datadog_logs
+tests/datadog_agent_remap_datadog_logs
 ├── README.md
 └── terraform
     ├── http_blackhole.toml
@@ -163,44 +163,4 @@ with the `toml` files referenced above. There are a handful of modules available
 for use in soak testing; please add more as your infrastructure needs
 dictate. If at all possible do not require services external to the minikube.
 
-In the near future we'll run soaks automatically in CI. Today this is limited to
-building soak containers. To get container builds going please add your soak
-name to the [`soak_lib.yml`](../.github/workflows/soak_lib.yml) matrix. Say you
-add a soak called `datadog_agent_throttle_blackhole` then you want this:
-
-```toml
-jobs:
-  vector-soak:
-    name: Build 'soak-vector' container (${{ matrix.target }})
-    runs-on: [self-hosted, linux, x64, general]
-    strategy:
-      matrix:
-        target:
-          - datadog_agent_remap_datadog_logs
-          - syslog_humio_logs
-          - syslog_log2metric_humio_metrics
-          - syslog_loki
-          - syslog_regex_logs2metric_ddmetrics
-          - syslog_splunk_hec_logs
-```
-
-to include your soak
-
-```toml
-jobs:
-  vector-soak:
-    name: Build 'soak-vector' container (${{ matrix.target }})
-    runs-on: [self-hosted, linux, x64, general]
-    strategy:
-      matrix:
-        target:
-          - datadog_agent_remap_datadog_logs
-          - datadog_agent_throttle_blackhole
-          - syslog_humio_logs
-          - syslog_log2metric_humio_metrics
-          - syslog_loki
-          - syslog_regex_logs2metric_ddmetrics
-          - syslog_splunk_hec_logs
-```
-
-Note the additional list member.
+Newly added soaks in `tests/` will be ran automatically by CI.
