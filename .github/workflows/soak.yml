@@ -215,14 +215,7 @@ jobs:
     runs-on: [self-hosted, linux, x64, soak] # could be general if we move away from miller
     needs: [soak-baseline, soak-comparison]
     strategy:
-      matrix:
-        target:
-          - datadog_agent_remap_datadog_logs
-          - syslog_humio_logs
-          - syslog_log2metric_humio_metrics
-          - syslog_loki
-          - syslog_regex_logs2metric_ddmetrics
-          - syslog_splunk_hec_logs
+      matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
