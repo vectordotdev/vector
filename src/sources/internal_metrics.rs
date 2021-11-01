@@ -123,7 +123,7 @@ async fn run(
                 metric = metric.with_namespace(namespace.as_ref());
             }
 
-            // If a configuration hash is provided, report it. Used in enterprise.
+            // If a configuration version is provided, report it. Used in enterprise.
             if let Some(version) = &version {
                 metric.insert_tag("version".to_owned(), version.clone());
             }
