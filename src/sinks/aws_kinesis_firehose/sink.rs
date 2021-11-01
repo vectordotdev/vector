@@ -1,32 +1,28 @@
-use std::num::NonZeroUsize;
-use async_graphql::futures_util::stream::BoxStream;
 use futures::StreamExt;
-use rusoto_core::RusotoError;
-use rusoto_firehose::{PutRecordBatchError, PutRecordBatchOutput};
+use std::num::NonZeroUsize;
+
+use crate::buffers::Acker;
+use crate::event::Event;
+use crate::sinks::aws_kinesis_firehose::request_builder::{KinesisRequest, KinesisRequestBuilder};
+use crate::sinks::aws_kinesis_firehose::service::KinesisResponse;
+use crate::Error;
+use futures::stream::BoxStream;
 use tower::util::BoxService;
 use vector_core::partition::NullPartitioner;
 use vector_core::sink::StreamSink;
 use vector_core::stream::BatcherSettings;
-use crate::buffers::Acker;
-use crate::event::Event;
-use crate::{Error, rusoto};
-use crate::sinks::aws_kinesis_firehose::request_builder::{KinesisRequest, KinesisRequestBuilder};
-use crate::sinks::aws_kinesis_firehose::service::{KinesisResponse, KinesisService};
-use crate::sinks::util::retries::RetryLogic;
+
 use crate::sinks::util::SinkBuilderExt;
 use async_trait::async_trait;
 
 #[derive(Debug, Clone)]
 struct KinesisFirehoseRetryLogic;
 
-
-
-
 pub struct KinesisSink {
     pub batch_settings: BatcherSettings,
     pub service: BoxService<Vec<KinesisRequest>, KinesisResponse, Error>,
     pub acker: Acker,
-    pub request_builder: KinesisRequestBuilder
+    pub request_builder: KinesisRequestBuilder,
 }
 
 impl KinesisSink {
@@ -62,4 +58,3 @@ impl StreamSink for KinesisSink {
         self.run_inner(input).await
     }
 }
-

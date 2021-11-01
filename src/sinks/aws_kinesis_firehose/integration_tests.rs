@@ -2,14 +2,24 @@
 #![cfg(test)]
 
 use super::*;
+use crate::config::{SinkConfig, SinkContext};
+use crate::rusoto::{AwsAuthentication, RegionOrEndpoint};
+use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
+use crate::sinks::util::{BatchConfig, Compression, TowerRequestConfig};
+use crate::test_util::components;
+use crate::test_util::components::AWS_SINK_TAGS;
 use crate::{
     sinks::elasticsearch::{ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig},
     test_util::{random_events_with_stream, random_string, wait_for_duration},
 };
+use futures::StreamExt;
 use futures::TryFutureExt;
 use rusoto_core::Region;
 use rusoto_es::{CreateElasticsearchDomainRequest, Es, EsClient};
-use rusoto_firehose::{CreateDeliveryStreamInput, ElasticsearchDestinationConfiguration};
+use rusoto_firehose::{
+    CreateDeliveryStreamInput, ElasticsearchDestinationConfiguration, KinesisFirehose,
+    KinesisFirehoseClient,
+};
 use serde_json::{json, Value};
 use tokio::time::{sleep, Duration};
 
@@ -24,13 +34,12 @@ async fn firehose_put_records() {
 
     let elasticseacrh_arn = ensure_elasticsearch_domain(region.clone(), stream.clone()).await;
 
-    ensure_elasticesarch_delivery_stream(region, stream.clone(), elasticseacrh_arn.clone())
-        .await;
+    ensure_elasticesarch_delivery_stream(region, stream.clone(), elasticseacrh_arn.clone()).await;
 
     let config = KinesisFirehoseSinkConfig {
         stream_name: stream.clone(),
         region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
-        encoding: EncodingConfig::from(Encoding::Json), // required for ES destination w/ localstack
+        encoding: EncodingConfig::from(StandardEncodings::Json), // required for ES destination w/ localstack
         compression: Compression::None,
         batch: BatchConfig {
             max_events: Some(2),
@@ -47,15 +56,15 @@ async fn firehose_put_records() {
 
     let cx = SinkContext::new_test();
 
-    let client = config.create_client(&cx.proxy).unwrap();
-    let mut sink = KinesisFirehoseService::new(config, client, cx).unwrap();
+    let mut sink = config.build(cx).await.unwrap();
 
     let (input, events) = random_events_with_stream(100, 100, None);
-    let mut events = events.map(Ok);
 
-    let _ = sink.send_all(&mut events).await.unwrap();
+    components::init_test();
+    sink.0.run(events).await.unwrap();
 
     sleep(Duration::from_secs(1)).await;
+    components::SINK_TESTS.assert(&AWS_SINK_TAGS);
 
     let config = ElasticSearchConfig {
         auth: Some(ElasticSearchAuth::Aws(AwsAuthentication::Default {})),
@@ -72,8 +81,8 @@ async fn firehose_put_records() {
     let response = client
         .get(&format!("{}/{}/_search", common.base_url, stream))
         .json(&json!({
-                "query": { "query_string": { "query": "*" } }
-            }))
+            "query": { "query_string": { "query": "*" } }
+        }))
         .send()
         .await
         .unwrap()
@@ -90,7 +99,7 @@ async fn firehose_put_records() {
         .as_array()
         .expect("Elasticsearch response does not include hits->hits");
     #[allow(clippy::needless_collect)] // https://github.com/rust-lang/rust-clippy/issues/6909
-        let input = input
+    let input = input
         .into_iter()
         .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
         .collect::<Vec<_>>();
@@ -133,7 +142,7 @@ async fn ensure_elasticsearch_domain(region: Region, domain_name: String) -> Str
         },
         Duration::from_secs(30),
     )
-        .await;
+    .await;
 
     arn
 }
@@ -169,4 +178,3 @@ async fn ensure_elasticesarch_delivery_stream(
 fn gen_stream() -> String {
     format!("test-{}", random_string(10).to_lowercase())
 }
-

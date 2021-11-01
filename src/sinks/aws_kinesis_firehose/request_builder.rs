@@ -1,13 +1,12 @@
-
 use crate::buffers::Ackable;
 use crate::event::{Event, LogEvent};
 use crate::event::{EventFinalizers, Finalizable};
 use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
 use crate::sinks::util::{Compression, RequestBuilder};
 use bytes::Bytes;
-use rusoto_kinesis::PutRecordsRequestEntry;
-use std::io;
+
 use rusoto_firehose::Record;
+use std::io;
 use vector_core::ByteSizeOf;
 
 pub struct KinesisRequestBuilder {
@@ -87,7 +86,7 @@ impl RequestBuilder<LogEvent> for KinesisRequestBuilder {
         KinesisRequest {
             record: Record { data },
             finalizers: metadata.finalizers,
-            event_byte_size: metadata.event_byte_size
+            event_byte_size: metadata.event_byte_size,
         }
     }
 }

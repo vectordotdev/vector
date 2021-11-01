@@ -1,25 +1,30 @@
-use futures::FutureExt;
-use rusoto_core::RusotoError;
-use rusoto_firehose::{DescribeDeliveryStreamError, DescribeDeliveryStreamInput, KinesisFirehose, KinesisFirehoseClient, PutRecordBatchError, PutRecordBatchOutput};
 use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext};
 use crate::rusoto;
 use crate::rusoto::{AwsAuthentication, RegionOrEndpoint};
 use crate::sinks::aws_kinesis_firehose::request_builder::KinesisRequestBuilder;
-use crate::sinks::aws_kinesis_firehose::service::{KinesisService, KinesisResponse};
+use crate::sinks::aws_kinesis_firehose::service::{KinesisResponse, KinesisService};
 use crate::sinks::aws_kinesis_firehose::sink::KinesisSink;
-use crate::sinks::util::{BatchConfig, BatchSettings, Compression, ServiceBuilderExt, TowerRequestConfig};
 use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
 use crate::sinks::util::retries::RetryLogic;
-use serde::{Serialize, Deserialize};
-use snafu::Error;
-use snafu::Snafu;
+use crate::sinks::util::{
+    BatchConfig, BatchSettings, Compression, ServiceBuilderExt, TowerRequestConfig,
+};
+use futures::FutureExt;
+use rusoto_core::RusotoError;
+use rusoto_firehose::{
+    DescribeDeliveryStreamError, DescribeDeliveryStreamInput, KinesisFirehose,
+    KinesisFirehoseClient, PutRecordBatchError,
+};
+use serde::{Deserialize, Serialize};
+
 use crate::sinks::{Healthcheck, VectorSink};
+use snafu::Snafu;
 use tower::ServiceBuilder;
 
 // AWS Kinesis Firehose API accepts payloads up to 4MB or 500 events
 // https://docs.aws.amazon.com/firehose/latest/dev/limits.html
-const MAX_PAYLOAD_SIZE: usize = 1024 * 1024 * 4;
-const MAX_PAYLOAD_EVENTS: usize = 500;
+pub const MAX_PAYLOAD_SIZE: usize = 1024 * 1024 * 4;
+pub const MAX_PAYLOAD_EVENTS: usize = 500;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -35,21 +40,21 @@ pub struct KinesisFirehoseSinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     // Deprecated name. Moved to auth.
-    assume_role: Option<String>,
+    pub assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
 }
 
 #[derive(Debug, PartialEq, Snafu)]
-enum BuildError {
+pub enum BuildError {
     #[snafu(display(
-    "Batch max size is too high. The value must be {} bytes or less",
-    MAX_PAYLOAD_SIZE
+        "Batch max size is too high. The value must be {} bytes or less",
+        MAX_PAYLOAD_SIZE
     ))]
     BatchMaxSize,
     #[snafu(display(
-    "Batch max events is too high. The value must be {} or less",
-    MAX_PAYLOAD_EVENTS
+        "Batch max events is too high. The value must be {} or less",
+        MAX_PAYLOAD_EVENTS
     ))]
     BatchMaxEvents,
 }
@@ -70,17 +75,15 @@ impl GenerateConfig for KinesisFirehoseSinkConfig {
             r#"region = "us-east-1"
             stream_name = "my-stream"
             encoding.codec = "json""#,
-        ).unwrap()
+        )
+        .unwrap()
     }
 }
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_kinesis_firehose")]
 impl SinkConfig for KinesisFirehoseSinkConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = self.create_client(&cx.proxy)?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
 
@@ -107,7 +110,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
             .service(KinesisService {
                 client,
                 region,
-                stream_name: self.stream_name.clone()
+                stream_name: self.stream_name.clone(),
             });
 
         let request_builder = KinesisRequestBuilder {
@@ -156,7 +159,7 @@ impl KinesisFirehoseSinkConfig {
         }
     }
 
-    fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisFirehoseClient> {
+    pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisFirehoseClient> {
         let region = (&self.region).try_into()?;
 
         let client = rusoto::client(proxy)?;

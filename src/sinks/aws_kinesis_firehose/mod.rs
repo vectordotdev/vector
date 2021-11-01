@@ -1,10 +1,9 @@
-mod integration_tests;
-mod tests;
 mod config;
+mod integration_tests;
+mod request_builder;
 mod service;
 mod sink;
-mod request_builder;
-
+mod tests;
 
 use crate::config::SinkDescription;
 use config::KinesisFirehoseSinkConfig;

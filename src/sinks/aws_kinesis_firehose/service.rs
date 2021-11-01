@@ -1,15 +1,17 @@
-use std::task::{Context, Poll};
 use futures::future::BoxFuture;
 use hyper::service::Service;
 use rusoto_core::{Region, RusotoError};
-use rusoto_firehose::{KinesisFirehose, KinesisFirehoseClient, PutRecordBatchError, PutRecordBatchInput, Record};
+use rusoto_firehose::{
+    KinesisFirehose, KinesisFirehoseClient, PutRecordBatchError, PutRecordBatchInput,
+};
+use std::task::{Context, Poll};
 use tracing::Instrument;
 use vector_core::internal_event::EventsSent;
 use vector_core::stream::DriverResponse;
-use crate::buffers::Ackable;
-use crate::config::SinkContext;
+
 use crate::event::EventStatus;
-use crate::sinks::aws_kinesis_firehose::config::KinesisFirehoseSinkConfig;
+use crate::internal_events::AwsBytesSent;
+
 use crate::sinks::aws_kinesis_firehose::request_builder::KinesisRequest;
 
 #[derive(Clone)]
@@ -60,18 +62,21 @@ pub struct KinesisService {
 //     }
 // }
 
-
 pub struct KinesisResponse {
-
+    events_byte_size: usize,
+    count: usize,
 }
 
-impl DriverResponse for KinesisResponse{
+impl DriverResponse for KinesisResponse {
     fn event_status(&self) -> EventStatus {
-        todo!()
+        EventStatus::Delivered
     }
 
     fn events_sent(&self) -> EventsSent {
-        todo!()
+        EventsSent {
+            count: self.count,
+            byte_size: self.events_byte_size,
+        }
     }
 }
 
@@ -90,17 +95,12 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
             events = %requests.len(),
         );
 
-        // let processed_bytes_total = requests
-        //     .iter()
-        //     .map(|req| req.record.data.len())
-        //     .sum();
-        // let events_byte_size = requests.iter().map(|req| req.event_byte_size).sum();
+        let processed_bytes_total = requests.iter().map(|req| req.record.data.len()).sum();
+        let events_byte_size = requests.iter().map(|req| req.event_byte_size).sum();
         let count = requests.len();
+        let region = self.region.clone();
 
-        let records = requests
-            .into_iter()
-            .map(|req| req.record)
-            .collect();
+        let records = requests.into_iter().map(|req| req.record).collect();
 
         let client = self.client.clone();
         let request = PutRecordBatchInput {
@@ -112,10 +112,16 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
             client
                 .put_record_batch(request)
                 .instrument(info_span!("request"))
-                .await;
+                .await?;
+
+            emit!(&AwsBytesSent {
+                byte_size: processed_bytes_total,
+                region
+            });
 
             Ok(KinesisResponse {
-
+                events_byte_size,
+                count,
             })
         })
     }
