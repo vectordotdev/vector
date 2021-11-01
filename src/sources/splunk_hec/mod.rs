@@ -90,6 +90,7 @@ impl SourceConfig for SplunkConfig {
         let event_service = source.event_service(cx.out.clone());
         let raw_service = source.raw_service(cx.out);
         let health_service = source.health_service();
+        let ack_service = source.ack_service();
         let options = SplunkSource::options();
 
         let services = path!("services" / "collector" / ..)
@@ -107,6 +108,8 @@ impl SourceConfig for SplunkConfig {
                     .or(raw_service)
                     .unify()
                     .or(health_service)
+                    .unify()
+                    .or(ack_service)
                     .unify()
                     .or(options)
                     .unify(),
@@ -300,6 +303,18 @@ impl SplunkSource {
             .and(path!("health" / "1.0").or(path!("health")))
             .and(authorize)
             .map(move |_, _| warp::reply().into_response())
+            .boxed()
+    }
+
+    fn ack_service(&self) -> BoxedFilter<(Response,)> {
+        warp::post()
+            .and(path!("ack"))
+            .and(self.authorization())
+            .and(warp::body::json())
+            .map(|_, body: JsonValue| {
+                println!("{:?}", body);
+                warp::reply().into_response()
+            })
             .boxed()
     }
 
