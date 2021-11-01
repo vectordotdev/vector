@@ -18,6 +18,7 @@ Vector's 0.17.0 release includes five **breaking changes**:
 1. [The `generator` source now has a default `interval` setting](#interval)
 1. [The deprecated `wasm` transform was removed](#wasm)
 1. [The `exec` source now has a `decoding` setting](#exec_source)
+1. [The algorithm underlying ARC has been optimized](#arc)
 
 We cover them below to help you upgrade quickly:
 
@@ -86,3 +87,17 @@ provide more control over the formats that this source accepts.
 [exec]: /docs/reference/configuration/sources/exec
 [exec_decoding]: /docs/reference/configuration/sources/exec/#decoding
 [exec_framing]: /docs/reference/configuration/sources/exec/#framing
+
+### The algorithm underlying ARC has been optimized {#arc}
+
+The algorithm underlying the [adaptive request concurrency][arc]
+mechanism has been optimized in this release to take into account the
+variance between request response times. This has come with changes to
+the configuration as well. The option to control the RTT threshold
+value, `rtt_threshold_ratio`, has been replaced by the RTT variance
+calcuation. It has been replaced by
+[`rtt_deviation_scale`][rtt_deviation_scale] which can be used to adjust
+the scale factor applied to this value.
+
+[arc]: /docs/about/under-the-hood/networking/arc/
+[rtt_deviation_scale]: /docs/reference/configuration/sinks/http/#request.adaptive_concurrency.rtt_deviation_scale
