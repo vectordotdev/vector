@@ -48,7 +48,7 @@ jobs:
           export SHA=$(git rev-parse HEAD)
           popd
 
-          echo ::set-output name=SHA::${SHA}
+          echo "::set-output name=TAG::${{ github.sha }}-${SHA}"
           echo -n "${{ github.sha }}-${SHA}" > tag
 
       - name: Upload TAG for baseline
