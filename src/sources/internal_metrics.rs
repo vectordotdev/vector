@@ -19,14 +19,17 @@ pub struct InternalMetricsConfig {
     namespace: Option<String>,
     #[serde(skip)]
     version: Option<String>,
+    #[serde(skip)]
+    configuration: Option<String>,
 }
 
 impl InternalMetricsConfig {
     /// Return an internal metrics config with enterprise reporting defaults.
-    pub fn enterprise<T: Into<String>>(version: T) -> Self {
+    pub fn enterprise(version: impl Into<String>, configuration: impl Into<String>) -> Self {
         Self {
             namespace: Some("pipelines".to_owned()),
             version: Some(version.into()),
+            configuration: Some(configuration.into()),
             ..Self::default()
         }
     }
@@ -63,6 +66,8 @@ impl SourceConfig for InternalMetricsConfig {
         let interval = time::Duration::from_secs(self.scrape_interval_secs);
         let namespace = self.namespace.clone();
         let version = self.version.clone();
+        let configuration = self.configuration.clone();
+
         let host_key = self.tags.host_key.as_deref().and_then(|tag| {
             if tag.is_empty() {
                 None
@@ -78,6 +83,7 @@ impl SourceConfig for InternalMetricsConfig {
         Ok(Box::pin(run(
             namespace,
             version,
+            configuration,
             host_key,
             pid_key,
             Controller::get()?,
@@ -99,6 +105,7 @@ impl SourceConfig for InternalMetricsConfig {
 async fn run(
     namespace: Option<String>,
     version: Option<String>,
+    configuration: Option<String>,
     host_key: Option<&str>,
     pid_key: Option<&str>,
     controller: &Controller,
@@ -123,9 +130,12 @@ async fn run(
                 metric = metric.with_namespace(namespace.as_ref());
             }
 
-            // If a configuration version is provided, report it. Used in enterprise.
+            // Version and configuration are reported in enterprise.
             if let Some(version) = &version {
                 metric.insert_tag("version".to_owned(), version.clone());
+            }
+            if let Some(configuration) = &configuration {
+                metric.insert_tag("configuration".to_owned(), configuration.clone());
             }
 
             if let Some(host_key) = host_key {

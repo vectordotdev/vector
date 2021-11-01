@@ -19,6 +19,8 @@ pub struct Options {
     #[serde(default)]
     pub api_key: Option<String>,
 
+    pub configuration: String,
+
     #[serde(default = "default_reporting_interval_secs")]
     pub reporting_interval_secs: u64,
 }
@@ -28,6 +30,7 @@ impl Default for Options {
         Self {
             enabled: default_enabled(),
             api_key: None,
+            configuration: "".to_owned(),
             reporting_interval_secs: default_reporting_interval_secs(),
         }
     }
@@ -60,20 +63,20 @@ pub fn try_attach(config: &mut Config) -> bool {
 
     info!("Datadog API key provided. Host and internal metrics will be sent to Datadog.");
 
+    let version = config.version.as_ref().expect("Config should be versioned");
+    let configuration = &config.datadog.configuration;
+
     let host_metrics_id = OutputId::from(ComponentKey::from(HOST_METRICS_KEY));
     let internal_metrics_id = OutputId::from(ComponentKey::from(INTERNAL_METRICS_KEY));
     let datadog_metrics_id = ComponentKey::from(DATADOG_METRICS_KEY);
 
     // Create internal sources for host and internal metrics. We're distinct sources here and not
     // attempting to reuse existing ones, to configure it according to enterprise requirements.
-    let mut host_metrics =
-        HostMetricsConfig::enterprise(config.version.as_ref().expect("Config should be versioned"));
+    let mut host_metrics = HostMetricsConfig::enterprise(version, configuration);
 
     // Create an internal metrics source. We're using a distinct source here and not
     // attempting to reuse an existing one, to configure it according to enterprise requirements.
-    let mut internal_metrics = InternalMetricsConfig::enterprise(
-        config.version.as_ref().expect("Config should be versioned"),
-    );
+    let mut internal_metrics = InternalMetricsConfig::enterprise(version, configuration);
 
     // Override default scrape intervals.
     host_metrics.scrape_interval_secs(config.datadog.reporting_interval_secs);
@@ -149,6 +152,7 @@ mod tests {
         // Explicitly set to enabled and provide an API key to activate.
         config.datadog.enabled = true;
         config.datadog.api_key = Some("xxx".to_string());
+        config.datadog.configuration = Some("zzz".to_string());
 
         assert!(try_attach(&mut config));
 
