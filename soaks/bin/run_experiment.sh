@@ -26,10 +26,12 @@ then
     exit 1
 fi
 
-. "${SOAK_ROOT}/bin/boot_minikube.sh"
+pushd "${__dir}"
+./boot_minikube.sh
 minikube mount "${CAPTURE_DIR}:/captures" &
 minikube cache add "${IMAGE}"
 MOUNT_PID=$!
+popd
 
 pushd "${SOAK_ROOT}/${SOAK_NAME}/terraform"
 terraform init
@@ -42,4 +44,6 @@ sleep "${TOTAL_SAMPLES}"
 kill "${MOUNT_PID}"
 popd
 
-. "${SOAK_ROOT}/bin/shutdown_minikube.sh"
+pushd "${__dir}"
+./shutdown_minikube.sh
+popd

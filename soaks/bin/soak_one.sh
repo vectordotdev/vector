@@ -6,7 +6,6 @@ set -o nounset
 #set -o xtrace
 
 __dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SOAK_ROOT="${__dir}/.."
 
 display_usage() {
     echo ""
@@ -28,7 +27,7 @@ if [ "${USE_LOCAL_IMAGE}" = "true" ]; then
     ./build_container.sh "${SHA}" "${IMAGE}"
 else
     REMOTE_IMAGE="ghcr.io/vectordotdev/vector/soak-vector:${SHA}"
-    docker pull ${REMOTE_IMAGE}
+    docker pull "${REMOTE_IMAGE}"
     docker image tag "${REMOTE_IMAGE}" "${IMAGE}"
 fi
 

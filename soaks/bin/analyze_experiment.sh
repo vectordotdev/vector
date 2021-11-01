@@ -5,9 +5,6 @@ set -o pipefail
 set -o nounset
 #set -o xtrace
 
-__dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SOAK_ROOT="${__dir}/.."
-
 display_usage() {
     echo ""
     echo "Usage: $0 CAPTURE_DIR"

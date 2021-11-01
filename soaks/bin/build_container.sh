@@ -7,7 +7,6 @@ set -o nounset
 
 __dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOAK_ROOT="${__dir}/.."
-PATCH_DIR="${SOAK_ROOT}/patches"
 
 display_usage() {
     echo ""

@@ -22,7 +22,6 @@ display_usage() {
 
 USE_LOCAL_IMAGE="true"
 
-POSITIONAL=()
 while [[ $# -gt 0 ]]; do
   key="$1"
 
