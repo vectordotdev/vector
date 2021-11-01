@@ -5,6 +5,7 @@ use super::*;
 use crate::config::SinkConfig;
 use crate::sinks::util::encoding::StandardEncodings;
 use crate::sinks::util::{BatchConfig, Compression};
+use crate::test_util::components;
 use crate::{
     config::SinkContext,
     rusoto::RegionOrEndpoint,
@@ -49,9 +50,10 @@ async fn kinesis_put_records() {
 
     let (mut input_lines, events) = random_lines_with_stream(100, 11, None);
 
+    components::init_test();
     let _ = sink.run(events).await.unwrap();
-
     sleep(Duration::from_secs(1)).await;
+    components::SINK_TESTS.assert(&["region"]);
 
     let timestamp = timestamp as f64 / 1000.0;
     let records = fetch_records(stream, timestamp, region).await.unwrap();

@@ -31,7 +31,7 @@ pub struct KinesisSink {
 }
 
 impl KinesisSink {
-    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let request_builder_concurrency_limit = NonZeroUsize::new(50);
 
         let partition_key_field = self.partition_key_field.clone();
@@ -62,7 +62,7 @@ impl KinesisSink {
 #[async_trait]
 impl StreamSink for KinesisSink {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        self.run(input).await
+        self.run_inner(input).await
     }
 }
 
