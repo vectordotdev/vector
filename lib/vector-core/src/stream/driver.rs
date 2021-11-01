@@ -494,7 +494,9 @@ mod tests {
     }
 
     proptest! {
+        // This test occasionally hangs. Ignoring until it can be looked at more.
         #[test]
+        #[ignore]
         fn acknowledgement_tracker_gauntlet(
             seq_ack_order in arb_shuffled_seq_nums(0..1000_usize),
             batch_size_seed in arb_vec(0..100_usize, 5..=10),
