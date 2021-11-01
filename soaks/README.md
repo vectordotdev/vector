@@ -107,7 +107,7 @@ The `FEATURES` file defines which feature flags will be lit when vector is
 built. As of this writing that file contains:
 
 ```shell
-FEATURES="sources-internal_metrics,sinks-prometheus,sources-datadog,sinks-datadog,transforms-remap"
+FEATURES="sources-internal_metrics,sinks-prometheus,sources-datadog_agent,sinks-datadog_logs,transforms-remap"
 ```
 
 This is a shell include file. You must set the features you need for vector to

@@ -103,13 +103,33 @@ impl TowerRequestConfig {
         }
     }
 
-    pub const fn rate_limit_num(mut self, rate_limit_num: u64) -> Self {
-        self.rate_limit_num = Some(rate_limit_num);
+    pub const fn timeout_secs(mut self, timeout_secs: u64) -> Self {
+        self.timeout_secs = Some(timeout_secs);
         self
     }
 
     pub const fn rate_limit_duration_secs(mut self, rate_limit_duration_secs: u64) -> Self {
         self.rate_limit_duration_secs = Some(rate_limit_duration_secs);
+        self
+    }
+
+    pub const fn rate_limit_num(mut self, rate_limit_num: u64) -> Self {
+        self.rate_limit_num = Some(rate_limit_num);
+        self
+    }
+
+    pub const fn retry_attempts(mut self, retry_attempts: usize) -> Self {
+        self.retry_attempts = Some(retry_attempts);
+        self
+    }
+
+    pub const fn retry_max_duration_secs(mut self, retry_max_duration_secs: u64) -> Self {
+        self.retry_max_duration_secs = Some(retry_max_duration_secs);
+        self
+    }
+
+    pub const fn retry_initial_backoff_secs(mut self, retry_initial_backoff_secs: u64) -> Self {
+        self.retry_initial_backoff_secs = Some(retry_initial_backoff_secs);
         self
     }
 

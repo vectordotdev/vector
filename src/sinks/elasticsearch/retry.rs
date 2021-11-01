@@ -62,25 +62,28 @@ impl RetryLogic for ElasticSearchRetryLogic {
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
-            _ if status.is_server_error() => RetryAction::Retry(format!(
-                "{}: {}",
-                status,
-                String::from_utf8_lossy(response.http_response.body())
-            )),
+            _ if status.is_server_error() => RetryAction::Retry(
+                format!(
+                    "{}: {}",
+                    status,
+                    String::from_utf8_lossy(response.http_response.body())
+                )
+                .into(),
+            ),
             _ if status.is_client_error() => {
                 let body = String::from_utf8_lossy(response.http_response.body());
-                RetryAction::DontRetry(format!("client-side error, {}: {}", status, body))
+                RetryAction::DontRetry(format!("client-side error, {}: {}", status, body).into())
             }
             _ if status.is_success() => {
                 let body = String::from_utf8_lossy(response.http_response.body());
 
                 if body.contains("\"errors\":true") {
-                    RetryAction::DontRetry(get_error_reason(&body))
+                    RetryAction::DontRetry(get_error_reason(&body).into())
                 } else {
                     RetryAction::Successful
                 }
             }
-            _ => RetryAction::DontRetry(format!("response status: {}", status)),
+            _ => RetryAction::DontRetry(format!("response status: {}", status).into()),
         }
     }
 }

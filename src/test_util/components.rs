@@ -8,7 +8,7 @@
 use crate::event::{Event, Metric, MetricValue};
 use crate::metrics::{self, Controller};
 use crate::sinks::VectorSink;
-use futures::{stream, SinkExt, Stream};
+use futures::{stream, SinkExt, Stream, StreamExt};
 use lazy_static::lazy_static;
 use std::env;
 use vector_core::event_test_util;
@@ -180,9 +180,19 @@ where
     S: Stream<Item = Result<Event, ()>> + Send + Unpin,
 {
     init_test();
-    sink.into_sink()
-        .send_all(&mut events)
-        .await
-        .expect("Sending event stream to sink failed");
+    match sink {
+        VectorSink::Sink(mut sink) => {
+            sink.send_all(&mut events)
+                .await
+                .expect("Sending event stream to sink failed");
+        }
+        VectorSink::Stream(stream) => {
+            let events = events.filter_map(|x| async move { x.ok() }).boxed();
+            stream
+                .run(events)
+                .await
+                .expect("Sending event stream to sink failed");
+        }
+    }
     SINK_TESTS.assert(tags);
 }
