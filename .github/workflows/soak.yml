@@ -137,8 +137,6 @@ jobs:
         id: set-matrix
         with:
           script: |
-            import { readdir } from 'fs/promises'
-
             const fs = require('fs')
             target = fs.readdirSync('soaks/tests')
 
