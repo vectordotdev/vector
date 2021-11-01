@@ -69,8 +69,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha, scope=${{ github.workflow }}
           cache-to: type=gha, scope=${{ github.workflow }}
-          build-args: |
-            VECTOR_FEATURES=api,api-client,disk-buffer,enrichment-tables,rdkafka-plain,sinks,sources,sources-dnstap,transforms,unix,vendor-all,vrl-cli,datadog-pipelines
 
   build-comparison-image:
     name: Build comparison 'soak-vector' container
@@ -109,8 +107,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha, scope=${{ github.workflow }}
           cache-to: type=gha, scope=${{ github.workflow }}
-          build-args: |
-            VECTOR_FEATURES=api,api-client,disk-buffer,enrichment-tables,rdkafka-plain,sinks,sources,sources-dnstap,transforms,unix,vendor-all,vrl-cli,datadog-pipelines
 
   soak-baseline:
     name: Soak (${{ matrix.target }}) - baseline
@@ -137,6 +133,7 @@ jobs:
 
       - name: Run baseline experiment
         run: |
+          rm -rf /tmp/${{ matrix.target }}/
           mkdir -p /tmp/${{ matrix.target }}/
           ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "baseline" `cat baseline-soak/sha` /tmp/${{ matrix.target }}
 
@@ -171,6 +168,7 @@ jobs:
 
       - name: Run comparison experiment
         run: |
+          rm -rf /tmp/${{ matrix.target }}/
           mkdir -p /tmp/${{ matrix.target }}/
           ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "comparison" ${{ github.sha }} /tmp/${{ matrix.target }}
 
