@@ -11,7 +11,7 @@ static INTERNAL_METRICS_KEY: &str = "#datadog_internal_metrics";
 static DATADOG_METRICS_KEY: &str = "#datadog_metrics";
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-#[serde(default, deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub struct Options {
     #[serde(default = "default_enabled")]
     pub enabled: bool,
@@ -49,8 +49,13 @@ const fn default_reporting_interval_secs() -> u64 {
 /// Augment configuration with observability via Datadog if the feature is enabled and
 /// an API key is provided.
 pub fn try_attach(config: &mut Config) -> bool {
+    let datadog = match config.datadog.as_ref() {
+        Some(datadog) => datadog,
+        _ => return false,
+    };
+
     // Return early if an API key is missing, or the feature isn't enabled.
-    let api_key = match (&config.datadog.api_key, config.datadog.enabled) {
+    let api_key = match (&datadog.api_key, datadog.enabled) {
         // API key provided explicitly.
         (Some(api_key), true) => api_key.clone(),
         // No API key; attempt to get it from the environment.
@@ -64,7 +69,6 @@ pub fn try_attach(config: &mut Config) -> bool {
     info!("Datadog API key provided. Host and internal metrics will be sent to Datadog.");
 
     let version = config.version.as_ref().expect("Config should be versioned");
-    let configuration = &config.datadog.configuration;
 
     let host_metrics_id = OutputId::from(ComponentKey::from(HOST_METRICS_KEY));
     let internal_metrics_id = OutputId::from(ComponentKey::from(INTERNAL_METRICS_KEY));
@@ -72,15 +76,15 @@ pub fn try_attach(config: &mut Config) -> bool {
 
     // Create internal sources for host and internal metrics. We're distinct sources here and not
     // attempting to reuse existing ones, to configure it according to enterprise requirements.
-    let mut host_metrics = HostMetricsConfig::enterprise(version, configuration);
+    let mut host_metrics = HostMetricsConfig::enterprise(version, &datadog.configuration);
 
     // Create an internal metrics source. We're using a distinct source here and not
     // attempting to reuse an existing one, to configure it according to enterprise requirements.
-    let mut internal_metrics = InternalMetricsConfig::enterprise(version, configuration);
+    let mut internal_metrics = InternalMetricsConfig::enterprise(version, &datadog.configuration);
 
     // Override default scrape intervals.
-    host_metrics.scrape_interval_secs(config.datadog.reporting_interval_secs);
-    internal_metrics.scrape_interval_secs(config.datadog.reporting_interval_secs);
+    host_metrics.scrape_interval_secs(datadog.reporting_interval_secs);
+    internal_metrics.scrape_interval_secs(datadog.reporting_interval_secs);
 
     config.sources.insert(
         host_metrics_id.component.clone(),
