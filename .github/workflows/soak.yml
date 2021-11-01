@@ -19,16 +19,6 @@ on:
       - master
 
 jobs:
-  cancel-previous:
-    runs-on: ubuntu-20.04
-    timeout-minutes: 3
-    if: github.ref != 'refs/heads/master'
-    steps:
-      - uses: styfle/cancel-workflow-action@0.9.1
-        with:
-          access_token: ${{ secrets.GITHUB_TOKEN }}
-          all_but_latest: true # can cancel workflows scheduled later
-
   build-baseline-image:
     name: Build baseline 'soak-vector' container
     runs-on: [self-hosted, linux, x64, general]
