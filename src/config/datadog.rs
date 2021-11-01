@@ -38,7 +38,7 @@ impl Default for Options {
 
 /// By default, the Datadog feature is enabled.
 const fn default_enabled() -> bool {
-    false
+    true
 }
 
 /// By default, report to Datadog every 5 seconds.
