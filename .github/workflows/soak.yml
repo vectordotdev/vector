@@ -148,7 +148,7 @@ jobs:
       - name: Dump matrix context
         env:
           MATRIX_CONTEXT: ${{ toJson(steps.set-matrix.outputs.matrix) }}
-          run: echo "$MATRIX_CONTEXT"
+        run: echo "$MATRIX_CONTEXT"
 
   soak-baseline:
     name: Soak (${{ matrix.target }}) - baseline
