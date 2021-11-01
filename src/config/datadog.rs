@@ -67,12 +67,12 @@ pub fn try_attach(config: &mut Config) -> bool {
     // Create internal sources for host and internal metrics. We're distinct sources here and not
     // attempting to reuse existing ones, to configure it according to enterprise requirements.
     let mut host_metrics =
-        HostMetricsConfig::enterprise(config.hash.as_ref().expect("Config should contain hash"));
+        HostMetricsConfig::enterprise(config.version.as_ref().expect("Config should contain hash"));
 
     // Create an internal metrics source. We're using a distinct source here and not
     // attempting to reuse an existing one, to configure it according to enterprise requirements.
     let mut internal_metrics = InternalMetricsConfig::enterprise(
-        config.hash.as_ref().expect("Config should contain hash"),
+        config.version.as_ref().expect("Config should contain hash"),
     );
 
     // Override default scrape intervals.
@@ -108,7 +108,7 @@ mod tests {
 
     fn default_with_hash() -> Config {
         Config {
-            hash: Some("".to_owned()),
+            version: Some("".to_owned()),
             ..Config::default()
         }
     }

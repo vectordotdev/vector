@@ -310,7 +310,7 @@ mod tests {
     /// We are relying on `serde_json` to serialize keys in the ordered provided. If this test
     /// fails, it likely means an implementation detail of serialization has changed, which is
     /// likely to impact the final hash.
-    fn config_hash_json_order() {
+    fn version_json_order() {
         use super::{ConfigBuilder, ConfigBuilderHash};
         use serde_json::{json, Value};
 
@@ -356,7 +356,7 @@ mod tests {
     /// If this hash changes, it means either the `ConfigBuilder` has changed what it
     /// serializes, or the implementation of `serde_json` has changed. If this test fails, we
     /// should ideally be able to fix so that the original hash passes!
-    fn hash_match() {
+    fn version_hash_match() {
         assert_eq!(
             "14def8ff43fe0255b3234a7c3d7488379a119b7dbcf311c77ad308a83173d92c",
             ConfigBuilder::default().sha256_hash()

@@ -89,7 +89,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             api,
             #[cfg(feature = "datadog-pipelines")]
             datadog,
-            hash,
+            version: hash,
             healthchecks,
             enrichment_tables,
             sources,
