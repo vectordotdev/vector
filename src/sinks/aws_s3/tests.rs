@@ -50,7 +50,6 @@ mod integration_tests {
         assert!(key.starts_with("test-prefix"));
         assert!(key.ends_with(".log"));
 
-
         let obj = get_object(&bucket, key).await;
         assert_eq!(obj.content_encoding, Some("identity".to_string()));
 
