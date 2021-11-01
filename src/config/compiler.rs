@@ -33,10 +33,10 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
     }
 
     #[cfg(feature = "datadog-pipelines")]
-    let hash = Some(builder.sha256_hash());
+    let version = Some(builder.sha256_hash());
 
     #[cfg(not(feature = "datadog-pipelines"))]
-    let hash = None;
+    let version = None;
 
     let ConfigBuilder {
         global,
@@ -89,7 +89,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             api,
             #[cfg(feature = "datadog-pipelines")]
             datadog,
-            version: hash,
+            version,
             healthchecks,
             enrichment_tables,
             sources,
