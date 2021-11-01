@@ -49,6 +49,7 @@ const fn default_reporting_interval_secs() -> u64 {
 /// Augment configuration with observability via Datadog if the feature is enabled and
 /// an API key is provided.
 pub fn try_attach(config: &mut Config) -> bool {
+    // Only valid if a [datadog] section is present in config.
     let datadog = match config.datadog.as_ref() {
         Some(datadog) => datadog,
         _ => return false,
@@ -74,12 +75,9 @@ pub fn try_attach(config: &mut Config) -> bool {
     let internal_metrics_id = OutputId::from(ComponentKey::from(INTERNAL_METRICS_KEY));
     let datadog_metrics_id = ComponentKey::from(DATADOG_METRICS_KEY);
 
-    // Create internal sources for host and internal metrics. We're distinct sources here and not
-    // attempting to reuse existing ones, to configure it according to enterprise requirements.
+    // Create internal sources for host and internal metrics. We're using distinct sources here and
+    // not attempting to reuse existing ones, to configure according to enterprise requirements.
     let mut host_metrics = HostMetricsConfig::enterprise(version, &datadog.configuration);
-
-    // Create an internal metrics source. We're using a distinct source here and not
-    // attempting to reuse an existing one, to configure it according to enterprise requirements.
     let mut internal_metrics = InternalMetricsConfig::enterprise(version, &datadog.configuration);
 
     // Override default scrape intervals.
