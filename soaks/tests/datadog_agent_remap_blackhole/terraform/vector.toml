@@ -32,7 +32,6 @@ if .status == "warning" {
 
 .matches = { "name": .message, "num": "2" }
 .origin, .err = .hostname + "/" + .matches.name + "/" + .matches.num
-del(.hostname)
 '''
 
 ##
