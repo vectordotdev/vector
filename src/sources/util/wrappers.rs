@@ -4,27 +4,27 @@ use std::{io, pin::Pin};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 pub trait AfterReadExt {
-    fn after_read<F>(self, after_read: F) -> StreamWrapper<Self, F>
+    fn after_read<F>(self, after_read: F) -> AfterRead<Self, F>
     where
         Self: Sized;
 }
 
 impl<T: AsyncRead + AsyncWrite> AfterReadExt for T {
-    fn after_read<F>(self, after_read: F) -> StreamWrapper<Self, F> {
-        StreamWrapper::new(self, after_read)
+    fn after_read<F>(self, after_read: F) -> AfterRead<Self, F> {
+        AfterRead::new(self, after_read)
     }
 }
 
 /// This wraps the inner socket and emits `BytesReceived` with the
 /// actual number of bytes read before handling framing.
 #[pin_project]
-pub struct StreamWrapper<T, F> {
+pub struct AfterRead<T, F> {
     #[pin]
     inner: T,
     after_read: F,
 }
 
-impl<T, F> StreamWrapper<T, F> {
+impl<T, F> AfterRead<T, F> {
     pub const fn new(inner: T, after_read: F) -> Self {
         Self { inner, after_read }
     }
@@ -35,7 +35,7 @@ impl<T, F> StreamWrapper<T, F> {
     }
 }
 
-impl<T: AsyncRead, F> AsyncRead for StreamWrapper<T, F>
+impl<T: AsyncRead, F> AsyncRead for AfterRead<T, F>
 where
     F: Fn(usize),
 {
@@ -54,7 +54,7 @@ where
     }
 }
 
-impl<T: AsyncWrite, F> AsyncWrite for StreamWrapper<T, F> {
+impl<T: AsyncWrite, F> AsyncWrite for AfterRead<T, F> {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -76,7 +76,7 @@ impl<T: AsyncWrite, F> AsyncWrite for StreamWrapper<T, F> {
 mod tonic {
     use tonic::transport::server::Connected;
 
-    impl<T: Connected, F> Connected for super::StreamWrapper<T, F> {
+    impl<T: Connected, F> Connected for super::AfterRead<T, F> {
         type ConnectInfo = T::ConnectInfo;
         fn connect_info(&self) -> Self::ConnectInfo {
             self.inner.connect_info()
