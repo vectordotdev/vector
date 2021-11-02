@@ -69,7 +69,7 @@ impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
             .as_ref()
             .cloned()
             .unwrap_or_else(|| self.compression.extension().into());
-        metadata.partition_key = format!("{}/{}.{}", metadata.partition_key, filename, extension);
+        metadata.partition_key = format!("{}{}.{}", metadata.partition_key, filename, extension);
 
         // TODO: move this into `.request_builder(...)` closure?
         trace!(
