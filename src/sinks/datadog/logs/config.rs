@@ -2,9 +2,8 @@ use super::service::LogApiRetry;
 use super::sink::{DatadogLogsJsonEncoding, LogSinkBuilder};
 use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
 use crate::http::HttpClient;
-use crate::sinks::datadog::logs::healthcheck::healthcheck;
 use crate::sinks::datadog::logs::service::LogApiService;
-use crate::sinks::datadog::Region;
+use crate::sinks::datadog::{get_api_validate_endpoint, healthcheck, Region};
 use crate::sinks::util::encoding::EncodingConfigFixed;
 use crate::sinks::util::service::ServiceBuilderExt;
 use crate::sinks::util::BatchSettings;
@@ -73,6 +72,8 @@ impl GenerateConfig for DatadogLogsConfig {
 }
 
 impl DatadogLogsConfig {
+    // TODO: We should probably hoist this type of base URI generation so that all DD sinks can
+    // utilize it, since it all follows the same pattern.
     fn get_uri(&self) -> http::Uri {
         let endpoint = self
             .endpoint
@@ -127,8 +128,9 @@ impl DatadogLogsConfig {
     }
 
     pub fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
-        let healthcheck = healthcheck(client, self.get_uri(), self.default_api_key.clone()).boxed();
-        Ok(healthcheck)
+        let validate_endpoint =
+            get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_ref(), self.region)?;
+        Ok(healthcheck(client, validate_endpoint, self.default_api_key.clone()).boxed())
     }
 
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {

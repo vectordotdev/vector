@@ -201,6 +201,7 @@ urls: {
 	gcp_stackdriver_metrics_rest:                             "https://monitoring.googleapis.com/"
 	gcp_stackdriver_severity:                                 "\(gcp)/logging/docs/reference/v2/rest/v2/LogEntry#logseverity"
 	gcp_xml_interface:                                        "\(gcp)/storage/docs/xml-api/overview"
+	gcra:                                                     "\(wikipedia)/wiki/Generic_cell_rate_algorithm"
 	gcs_predefined_acl:                                       "\(gcp)/storage/docs/access-control/lists#predefined-acl"
 	gcs_storage_classes:                                      "\(gcp)/storage/docs/storage-classes"
 	gcs_custom_metadata:                                      "\(gcp)/storage/docs/metadata#custom-metadata"

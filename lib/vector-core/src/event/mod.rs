@@ -60,19 +60,9 @@ impl ByteSizeOf for Event {
 impl Finalizable for Event {
     fn take_finalizers(&mut self) -> EventFinalizers {
         match self {
-            Event::Log(log) => log.metadata_mut().take_finalizers(),
-            Event::Metric(metric) => metric.metadata_mut().take_finalizers(),
+            Event::Log(log) => log.take_finalizers(),
+            Event::Metric(metric) => metric.take_finalizers(),
         }
-    }
-}
-
-impl<T: Finalizable> Finalizable for Vec<T> {
-    fn take_finalizers(&mut self) -> EventFinalizers {
-        self.iter_mut()
-            .fold(EventFinalizers::default(), |mut acc, x| {
-                acc.merge(x.take_finalizers());
-                acc
-            })
     }
 }
 
@@ -118,6 +108,16 @@ impl Event {
         }
     }
 
+    /// Fallibly coerces self into a `LogEvent`
+    ///
+    /// If the event is a `LogEvent`, then `Some(log_event)` is returned, otherwise `None`.
+    pub fn try_into_log(self) -> Option<LogEvent> {
+        match self {
+            Event::Log(log) => Some(log),
+            _ => None,
+        }
+    }
+
     /// Return self as a `Metric`
     ///
     /// # Panics
@@ -151,6 +151,16 @@ impl Event {
         match self {
             Event::Metric(metric) => metric,
             _ => panic!("Failed type coercion, {:?} is not a metric", self),
+        }
+    }
+
+    /// Fallibly coerces self into a `Metric`
+    ///
+    /// If the event is a `Metric`, then `Some(metric)` is returned, otherwise `None`.
+    pub fn try_into_metric(self) -> Option<Metric> {
+        match self {
+            Event::Metric(metric) => Some(metric),
+            _ => None,
         }
     }
 
@@ -295,7 +305,7 @@ impl From<proto::HistogramBucket> for metric::Bucket {
 impl From<metric::Quantile> for proto::SummaryQuantile {
     fn from(quantile: metric::Quantile) -> Self {
         Self {
-            upper_limit: quantile.upper_limit,
+            quantile: quantile.quantile,
             value: quantile.value,
         }
     }
@@ -304,7 +314,7 @@ impl From<metric::Quantile> for proto::SummaryQuantile {
 impl From<proto::SummaryQuantile> for metric::Quantile {
     fn from(quantile: proto::SummaryQuantile) -> Self {
         Self {
-            upper_limit: quantile.upper_limit,
+            quantile: quantile.quantile,
             value: quantile.value,
         }
     }

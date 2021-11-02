@@ -377,7 +377,7 @@ impl Hash for MetricEntry {
             }
             MetricValue::AggregatedSummary { quantiles, .. } => {
                 for quantile in quantiles {
-                    quantile.upper_limit.to_bits().hash(state);
+                    quantile.quantile.to_bits().hash(state);
                 }
             }
             _ => {}
@@ -422,7 +422,7 @@ impl PartialEq for MetricEntry {
                         && quantiles1
                             .iter()
                             .zip(quantiles2.iter())
-                            .all(|(q1, q2)| q1.upper_limit == q2.upper_limit)
+                            .all(|(q1, q2)| q1.quantile == q2.quantile)
                 }
                 _ => true,
             }
