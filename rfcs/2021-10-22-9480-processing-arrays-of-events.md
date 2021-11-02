@@ -175,21 +175,23 @@ There currently exist three types of transforms, expressed as traits:
 3. `TaskTransform` runs as an asynchronous task, accepting a stream of
    events and outputting a stream of events.
 
-These will need to be rewritten to accept an event container as their
-input, and as the output for the task. While most transforms can be
-easily rewritten to handle the iterator provided by the container,
-they will initially simply be handled by a wrapper that will convert the
-container, iterate over the events individually, and collect the result.
+The two function transforms are turned into tasks within the topology
+builder code. This task uses the `ready_chunks` stream adapter to pulls
+arrays out of the input component(s) and then processes them in a loop
+before forwarding them to the consumer components. This process can
+easily be adapted to pull in and loop over the arrays of events
+described above. In the same manner as `ready_chunks`, this process can
+be further optimized to merge arrays of the same type of event when
+multiples are ready at the same time.
+
+The task transform, however, will need to be rewritten to accept an
+event container as its input, and as the output for the task. While most
+such transforms can be easily rewritten to handle the iterator provided
+by the container, they will initially simply be handled by a wrapper
+task that will iterate over the events in the container individually,
+and collect the result before forwarding it into the output stream.
 
 ```rust
-trait FunctionTransform<T: EventContainer>: Send + dyn_clone::DynClone + Sync {
-    fn transform(&mut self, output: &mut Vec<T>, event: T);
-}
-
-trait FallibleFunctionTransform<T: EventContainer>: Send + dyn_clone::DynClone + Sync {
-    fn transform(&mut self, output: &mut Vec<T>, errors: &mut Vec<T>, event: T);
-}
-
 trait TaskTransform<T: EventContainer>: Send {
     fn transform(
         self: Box<Self>,
@@ -199,12 +201,7 @@ trait TaskTransform<T: EventContainer>: Send {
         Self: 'static;
 }
 
-// Allow existing transforms to be converted with `.into()`
-
-impl<T: FunctionTransform<Event>> From<T> for Transform { … }
-
-impl<T: FallibleFunctionTransform<Event>> From<T> for Transform { … }
-
+// Allow existing task transforms to be converted with `.into()`
 impl<T: TaskTransform<Event>> From<T> for Transform { … }
 ```
 
@@ -283,25 +280,27 @@ it. However, sources sending a single event will require the pipeline to
 create an event array, while those sending arrays can avoid that process
 of reallocation and moving data.
 
-## Outstanding Questions
-
-- List any remaining questions.
-- Use this to resolve ambiguity and collaborate with your team during the RFC process.
-- *These must be resolved before the RFC can be merged.*
-
 ## Plan Of Attack
 
 Incremental steps to execute this change. These will be converted to issues after the RFC is approved:
 
 - [ ] Implement `Sink<EventVec> for Pipeline`.
 - [ ] Rewrite sink types to accept `EventVec` through wrapper functions.
-- [ ] Rewrite transform types to accept `EventVec` through wrapper functions.
+- [ ] Rewrite task transform type to accept `EventVec` through wrapper functions.
 - [ ] Modify `Pipeline` to send `EventVec` to its receiver.
 - [ ] Convert sources that can send arrays of events to send `EventVec`.
-- [ ] Convert transforms that can easily process arrays of events to consume `EventContainer`.
+- [ ] Convert task transforms that can easily process arrays of events to consume `EventContainer`.
 - [ ] Convert sinks that can process arrays of events to consume `EventContainer`.
 
 ## Future Improvements
+
+It is conceivable that some function transforms could benefit from
+processing the array of events internally instead of being implicitly
+wrapped by a loop. In such a case, it may be worth adding additional
+function transform types that accept either `EventVec` or
+`EventContainer` as their inputs instead of a single `Event`. If so,
+consideration should be given to replacing the default types with this
+and wrapping existing single-event transforms with a loop.
 
 Since producing components will tend to produce events with a similar
 structure in each output, a potential optimization to the internal
