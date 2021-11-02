@@ -68,7 +68,7 @@ components: transforms: route: {
 
 	example_config: {
 		common: {
-			routes: {
+			route: {
 				success: #".status >= 200 && .status < 400"#
 				failure: #".status >= 400"#
 			}
