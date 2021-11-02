@@ -106,6 +106,9 @@ components: transforms: "remap": {
 	example_config: {
 		common: {
 			source: _example_vrl_program
+			advanced: {
+				drop_on_abort: true
+			}
 		}
 	}
 
