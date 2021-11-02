@@ -277,8 +277,9 @@ configuration: {
 			title: "Automatic namespacing of component files"
 			body: """
 				You can split your configuration files in component-type related folders.
-				That way, you can create the sink `foo` in the folder `/path/to/vector/config/sinks/foo.toml` and
-				configure it as follow.
+				
+				For example, you can create the sink `foo` in the folder `/path/to/vector/config/sinks/foo.toml` and
+				configure it as follows:
 
 				```toml
 				type = "sink_type"
