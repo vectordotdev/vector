@@ -7,10 +7,12 @@ use lookup::LookupBuf;
 
 use crate::{
     ast::{self, Destination, GrokPattern},
+    date,
     grok_filter::GrokFilter,
     parse_grok_pattern::parse_grok_pattern,
 };
 use itertools::{Itertools, Position};
+use regex::Regex;
 use std::collections::BTreeMap;
 use vrl_compiler::Value;
 
@@ -386,6 +388,47 @@ fn resolves_match_function(
                 filters.insert(destination.path.clone(), vec![GrokFilter::NumberExt]);
             }
             Ok("numberExtStr".to_string())
+        }
+        "date" => {
+            return match match_fn.args.as_ref() {
+                Some(args) if !args.is_empty() && args.len() <= 2 => {
+                    if let ast::FunctionArgument::Arg(Value::Bytes(b)) = &args[0] {
+                        let format = String::from_utf8_lossy(b);
+                        let result = date::time_format_to_regex(&format, true)
+                            .map_err(|_e| Error::InvalidFunctionArguments(match_fn.name.clone()))?;
+                        let mut tz_regex_opt = None;
+                        if result.tz_captured {
+                            tz_regex_opt = Some(Regex::new(&result.regex).map_err(|error| {
+                                    error!(message = "Error compiling regex", regex = %result.regex, %error);
+                                    Error::InvalidFunctionArguments(match_fn.name.clone())
+                                })?);
+                        }
+                        let strp_format = date::convert_time_format(&format).map_err(|error| {
+                                error!(message = "Error compiling regex", regex = %result.regex, %error);
+                                Error::InvalidFunctionArguments(match_fn.name.clone())
+                            })?;
+                        let mut tz = None;
+                        if args.len() > 1 {
+                            if let ast::FunctionArgument::Arg(Value::Bytes(b)) = &args[1] {
+                                tz = Some(String::from_utf8_lossy(b).to_string());
+                            }
+                        }
+                        let filter =
+                            GrokFilter::Date(strp_format, tz_regex_opt, tz, result.with_tz);
+                        let result =
+                            date::time_format_to_regex(&format, false).map_err(|error| {
+                                error!(message = "Invalid time format", format = %format, %error);
+                                Error::InvalidFunctionArguments(match_fn.name.clone())
+                            })?;
+                        if let Some(destination) = &pattern.destination {
+                            filters.insert(destination.path.clone(), vec![filter]);
+                        }
+                        return Ok(result.regex);
+                    }
+                    Err(Error::InvalidFunctionArguments(match_fn.name.clone()))
+                }
+                _ => Err(Error::InvalidFunctionArguments(match_fn.name.clone())),
+            };
         }
         // otherwise just add it as is, it should be a known grok pattern
         grok_pattern_name => Ok(grok_pattern_name.to_string()),

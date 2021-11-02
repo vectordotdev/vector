@@ -1,4 +1,5 @@
 mod ast;
+mod date;
 mod grok_filter;
 mod lexer;
 pub mod parse_grok;
