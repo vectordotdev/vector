@@ -87,6 +87,15 @@ struct ParsedGrokRule {
     pub filters: HashMap<LookupBuf, Vec<GrokFilter>>,
 }
 
+///
+/// Parses alias definitions.
+///
+/// # Arguments
+///
+/// - `name` - the name of the alias
+/// - `definition` - the definition of the alias
+/// - `parsed_aliases` - aliases that have already been parsed
+/// - `inflight_parsed_aliases` - names of the aliases that are being currently parsed(aliases can refer to other aliases) to catch circular dependencies
 fn parse_alias<'a>(
     name: &'a str,
     definition: &'a str,
@@ -110,6 +119,14 @@ fn parse_alias<'a>(
     Ok(parsed)
 }
 
+///
+/// Parses pattern definitions.
+///
+/// # Arguments
+///
+/// - `pattern` - the definition of the pattern
+/// - `parsed_aliases` - aliases that have already been parsed
+/// - `grok` - an instance of Grok parser
 fn parse_pattern(
     pattern: &str,
     aliases: &BTreeMap<&str, String>,
@@ -135,6 +152,13 @@ fn parse_pattern(
 }
 
 /// Parses a given rule to a pure grok pattern with a set of post-processing filters.
+///
+/// # Arguments
+///
+/// - `rule` - the definition of a grok rule(can be a pattern or an alias)
+/// - `aliases` - all aliases and their definitions
+/// - `parsed_aliases` - aliases that have already been parsed
+/// - `inflight_parsed_aliases` - names of the aliases that are being currently parsed(aliases can refer to other aliases) to catch circular dependencies
 fn parse_grok_rule<'a>(
     rule: &'a str,
     aliases: &BTreeMap<&'a str, String>,
@@ -244,6 +268,14 @@ fn index_repeated_fields(grok_patterns: Vec<GrokPattern>) -> Vec<GrokPattern> {
 ///  - strips filters and collects them to apply later
 ///  - replaces references to aliases with their definitions
 ///  - replaces match functions with corresponding regex groups.
+///
+/// # Arguments
+///
+/// - `pattern` - a parsed grok pattern
+/// - `filters` - post-processing filters that need to be applied after grok parsing
+/// - `aliases` - all aliases and their definitions
+/// - `parsed_aliases` - aliases that have already been parsed
+/// - `inflight_parsed_aliases` - names of the aliases that are being currently parsed(aliases can refer to other aliases) to catch circular dependencies
 fn purify_grok_pattern(
     pattern: &GrokPattern,
     mut filters: &mut HashMap<LookupBuf, Vec<GrokFilter>>,
