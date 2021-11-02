@@ -3,5 +3,3 @@ inputs       = ["apache_sample"]            # only take sampled data
 type         = "elasticsearch"
 host         = "http://79.12.221.222:9200"   # local or external host
 index        = "vector-%Y-%m-%d"             # daily indices
-
-
