@@ -35,16 +35,6 @@ components: transforms: pipelines: {
 	}
 
 	configuration: {
-		_pipeline_configuration: {
-			description: """
-				Any valid transform configuration. See [transforms documentation](\(urls.vector_transforms))
-				for the list of available transforms and their configuration.
-				"""
-			required:    true
-			warnings: []
-			type: array: items: type: object: {}
-		}
-
 		_pipeline_group: {
 			description: """
 				A list of pipeline's configurations. It's also possible to define this order in which the pipelines are
@@ -72,6 +62,16 @@ components: transforms: pipelines: {
 					}
 				}
 			}
+		}
+
+		_pipeline_configuration: {
+			description: """
+				Any valid transform configuration. See [transforms documentation](\(urls.vector_transforms))
+				for the list of available transforms and their configuration.
+				"""
+			required:    true
+			warnings: []
+			type: array: items: type: object: {}
 		}
 
 		logs:    _pipeline_group
