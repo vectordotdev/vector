@@ -44,6 +44,14 @@ components: transforms: "remap": {
 		notices: []
 	}
 
+	_example_vrl_program: #"""
+		. = parse_json!(.message)
+		.new_field = "new value"
+		.status = to_int!(.status)
+		.duration = parse_duration!(.duration, "s")
+		.new_name = del(.old_name)
+		"""#
+
 	configuration: {
 		source: {
 			description: """
@@ -54,15 +62,7 @@ components: transforms: "remap": {
 			common:      true
 			required:    false
 			type: string: {
-				examples: [
-					"""
-						. = parse_json!(.message)
-						.new_field = "new value"
-						.status = to_int!(.status)
-						.duration = parse_duration!(.duration, "s")
-						.new_name = del(.old_name)
-						""",
-				]
+				examples: [_example_vrl_program]
 				syntax:  "remap_program"
 				default: null
 			}
@@ -100,6 +100,12 @@ components: transforms: "remap": {
 				Drop the event if the VRL program is manually aborted through the `abort` statement.
 				"""
 			type: bool: default: true
+		}
+	}
+
+	example_config: {
+		common: {
+			source: _example_vrl_program
 		}
 	}
 

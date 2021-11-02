@@ -49,6 +49,10 @@ components: {
 
 		configuration: #Schema
 
+		// This field should be used in cases where auto-generating example configs using fields
+		// like `common` and `required` breaks down. If no `example_config` is set on a component,
+		// the example config is auto-generated; if `example_config` is set, then this map will be
+		// used to generate the example directly.
 		example_config?: {
 			common:    #Fields
 			advanced?: #Fields
