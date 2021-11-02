@@ -76,10 +76,10 @@ components: transforms: pipelines: {
 					description: "Name of the pipeline"
 					warnings: []
 					required: false
-					common: true
+					common:   true
 					type: string: {
 						default: null
-						syntax: "literal"
+						syntax:  "literal"
 					}
 				}
 				transforms: {
