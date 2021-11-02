@@ -14,9 +14,7 @@
 name: Soak
 
 on:
-  push:
-    branches-ignore:
-      - master
+  pull_request:
 
 jobs:
   cancel-previous:
