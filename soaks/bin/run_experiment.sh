@@ -33,7 +33,7 @@ minikube cache add "${IMAGE}"
 MOUNT_PID=$!
 popd
 
-pushd "${SOAK_ROOT}/${SOAK_NAME}/terraform"
+pushd "${SOAK_ROOT}/tests/${SOAK_NAME}/terraform"
 terraform init
 terraform apply -var "type=${VARIANT}" -var "vector_image=${IMAGE}" -auto-approve -compact-warnings -input=false -no-color -parallelism=20
 echo "[${VARIANT}] Captures will be recorded into ${CAPTURE_DIR}"
