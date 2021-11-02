@@ -12,7 +12,6 @@ use crate::{
     sinks::elasticsearch::{ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig},
     test_util::{random_events_with_stream, random_string, wait_for_duration},
 };
-use futures::StreamExt;
 use futures::TryFutureExt;
 use rusoto_core::Region;
 use rusoto_es::{CreateElasticsearchDomainRequest, Es, EsClient};
