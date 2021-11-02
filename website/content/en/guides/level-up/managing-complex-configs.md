@@ -185,7 +185,8 @@ If your components start to by used in multiple configuration files, having a
 dedicated place to define them can become interesting.
 
 With Vector you can define a component configuration inside a component type folder.
-Let's take an example with the following configuration file.
+
+Let's take an example with the following configuration file:
 
 ```toml title="vector.toml"
 [sources.syslog]
