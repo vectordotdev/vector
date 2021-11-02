@@ -422,4 +422,16 @@ mod tests {
             .contains_key(&ComponentKey::from("es_cluster")));
         assert_eq!(builder.tests.len(), 2);
     }
+
+    #[test]
+    fn load_namespacing_failing() {
+        let path = PathBuf::from("./tests/namespacing-fail");
+        let configs = vec![ConfigPath::Dir(path)];
+        let errors = load_builder_from_paths(&configs).unwrap_err();
+        assert_eq!(errors.len(), 1);
+        assert_eq!(
+            errors[0],
+            "Couldn't identify component type for folder \"./tests/namespacing-fail/foo\""
+        );
+    }
 }
