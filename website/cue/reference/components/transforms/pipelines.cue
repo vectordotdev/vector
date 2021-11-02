@@ -40,7 +40,7 @@ components: transforms: pipelines: {
 				Any valid transform configuration. See [transforms documentation](\(urls.vector_transforms))
 				for the list of available transforms and their configuration.
 				"""
-			required: true
+			required:    true
 			warnings: []
 			type: array: items: type: object: {}
 		}
@@ -54,9 +54,9 @@ components: transforms: pipelines: {
 			warnings: []
 			type: object: options: {
 				order: {
-					common: true
+					common:      true
 					description: "A complete ordered list of how the pipelines will be chained."
-					required: false
+					required:    false
 					type: array: {
 						default: null
 						items: type: string: {
@@ -66,7 +66,7 @@ components: transforms: pipelines: {
 				}
 				pipelines: {
 					description: "TODO"
-					required: true
+					required:    true
 					type: object: options: {
 						"*": _pipeline_configuration
 					}
@@ -74,7 +74,7 @@ components: transforms: pipelines: {
 			}
 		}
 
-		logs: _pipeline_group
+		logs:    _pipeline_group
 		metrics: _pipeline_group
 	}
 
