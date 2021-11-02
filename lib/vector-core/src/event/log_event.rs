@@ -2,8 +2,9 @@ use super::{
     finalization::{BatchNotifier, EventFinalizer},
     legacy_lookup::Segment,
     metadata::EventMetadata,
-    util, Lookup, PathComponent, Value,
+    util, EventFinalizers, Finalizable, Lookup, PathComponent, Value,
 };
+use crate::event::MaybeAsLogMut;
 use crate::{config::log_schema, ByteSizeOf};
 use bytes::Bytes;
 use chrono::Utc;
@@ -43,6 +44,12 @@ impl Default for LogEvent {
 impl ByteSizeOf for LogEvent {
     fn allocated_bytes(&self) -> usize {
         self.fields.allocated_bytes() + self.metadata.allocated_bytes()
+    }
+}
+
+impl Finalizable for LogEvent {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.metadata.take_finalizers()
     }
 }
 
@@ -270,6 +277,12 @@ impl LogEvent {
             }
         }
         self.metadata.merge(incoming.metadata);
+    }
+}
+
+impl MaybeAsLogMut for LogEvent {
+    fn maybe_as_log_mut(&mut self) -> Option<&mut LogEvent> {
+        Some(self)
     }
 }
 

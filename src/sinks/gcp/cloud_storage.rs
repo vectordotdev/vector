@@ -10,7 +10,7 @@ use crate::{
             batch::{BatchConfig, BatchSettings},
             encoding::{EncodingConfig, EncodingConfiguration},
             retries::{RetryAction, RetryLogic},
-            Buffer, Compression, Concurrency, EncodedEvent, PartitionBatchSink, PartitionBuffer,
+            Buffer, Compression, EncodedEvent, PartitionBatchSink, PartitionBuffer,
             PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -202,7 +202,6 @@ impl GcsSink {
 
     fn service(self, config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<VectorSink> {
         let request = config.request.unwrap_with(&TowerRequestConfig {
-            concurrency: Concurrency::Fixed(25),
             rate_limit_num: Some(1000),
             ..Default::default()
         });
@@ -458,9 +457,9 @@ impl RetryLogic for GcsRetryLogic {
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
-            _ if status.is_server_error() => RetryAction::Retry(format!("{}", status)),
+            _ if status.is_server_error() => RetryAction::Retry(format!("{}", status).into()),
             _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("response status: {}", status)),
+            _ => RetryAction::DontRetry(format!("response status: {}", status).into()),
         }
     }
 }

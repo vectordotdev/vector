@@ -20,9 +20,8 @@ components: sinks: datadog_events: {
 			encoding: enabled:    false
 			proxy: enabled:       true
 			request: {
-				enabled:              true
-				adaptive_concurrency: true
-				headers:              false
+				enabled: true
+				headers: false
 			}
 			tls: {
 				enabled:                true

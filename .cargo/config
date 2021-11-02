@@ -5,11 +5,6 @@ rustflags = ["-C", "link-args=-rdynamic"]
 rustflags = ["-C", "link-args=-rdynamic"]
 
 
-[target.'cfg(target_env = "musl")']
-# Turn off self-contained linking mode. This makes rustc rely on the installed musl toolchain to
-# find and link against C and C++ runtime objects, instead of linking against the bundled C ones.
-rustflags = "-Clink-self-contained=no"
-
 # for these musl targets libstdc++ will be linked statically (that's configured in e.g. leveldb-sys)
 # we provide the location of that library here
 [target.x86_64-unknown-linux-musl]

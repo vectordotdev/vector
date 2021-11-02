@@ -64,7 +64,7 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
 pub struct TowerRequestConfig {
     #[serde(default)]
     #[serde(skip_serializing_if = "concurrency_is_none")]
-    pub concurrency: Concurrency, // 1024
+    pub concurrency: Concurrency, // adaptive
     pub timeout_secs: Option<u64>,             // 1 minute
     pub rate_limit_duration_secs: Option<u64>, // 1 second
     pub rate_limit_num: Option<u64>,           // i64::MAX
@@ -103,13 +103,33 @@ impl TowerRequestConfig {
         }
     }
 
-    pub const fn rate_limit_num(mut self, rate_limit_num: u64) -> Self {
-        self.rate_limit_num = Some(rate_limit_num);
+    pub const fn timeout_secs(mut self, timeout_secs: u64) -> Self {
+        self.timeout_secs = Some(timeout_secs);
         self
     }
 
     pub const fn rate_limit_duration_secs(mut self, rate_limit_duration_secs: u64) -> Self {
         self.rate_limit_duration_secs = Some(rate_limit_duration_secs);
+        self
+    }
+
+    pub const fn rate_limit_num(mut self, rate_limit_num: u64) -> Self {
+        self.rate_limit_num = Some(rate_limit_num);
+        self
+    }
+
+    pub const fn retry_attempts(mut self, retry_attempts: usize) -> Self {
+        self.retry_attempts = Some(retry_attempts);
+        self
+    }
+
+    pub const fn retry_max_duration_secs(mut self, retry_max_duration_secs: u64) -> Self {
+        self.retry_max_duration_secs = Some(retry_max_duration_secs);
+        self
+    }
+
+    pub const fn retry_initial_backoff_secs(mut self, retry_initial_backoff_secs: u64) -> Self {
+        self.retry_initial_backoff_secs = Some(retry_initial_backoff_secs);
         self
     }
 
@@ -332,6 +352,13 @@ mod tests {
 
         toml::from_str::<TowerRequestConfig>(r#"concurrency = -9"#)
             .expect_err("Invalid concurrency setting didn't fail on negative number");
+    }
+
+    #[test]
+    fn config_merging_defaults_concurrency_to_none_if_unset() {
+        let cfg = TowerRequestConfig::default().unwrap_with(&TowerRequestConfig::default());
+
+        assert_eq!(cfg.concurrency, None);
     }
 
     #[tokio::test]
