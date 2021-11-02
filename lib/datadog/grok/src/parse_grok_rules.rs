@@ -28,6 +28,8 @@ pub enum Error {
     InvalidFunctionArguments(String),
     #[error("unknown filter '{}'", .0)]
     UnknownFilter(String),
+    #[error("Circular dependency found in the alias '{}'", .0)]
+    CircularDependencyInAliasDefinition(String),
 }
 
 ///
@@ -53,10 +55,17 @@ pub fn parse_grok_rules(
     aliases: BTreeMap<&str, String>,
 ) -> Result<Vec<GrokRule>, Error> {
     let mut parsed_aliases: HashMap<String, ParsedGrokRule> = HashMap::new();
+    let mut inflight_parsed_aliases = vec![];
 
-    for (name, alias) in &aliases {
-        if !alias.is_empty() {
-            let parsed_alias = parse_grok_rule(alias, &aliases, &mut parsed_aliases)?;
+    for (name, definition) in &aliases {
+        if !definition.is_empty() {
+            let parsed_alias = parse_alias(
+                name,
+                definition,
+                &aliases,
+                &mut parsed_aliases,
+                &mut inflight_parsed_aliases,
+            )?;
             parsed_aliases.insert(name.to_string(), parsed_alias);
         }
     }
@@ -78,13 +87,36 @@ struct ParsedGrokRule {
     pub filters: HashMap<LookupBuf, Vec<GrokFilter>>,
 }
 
+fn parse_alias<'a>(
+    name: &'a str,
+    definition: &'a str,
+    aliases: &BTreeMap<&'a str, String>,
+    parsed_aliases: &mut HashMap<String, ParsedGrokRule>,
+    inflight_parsed_aliases: &mut Vec<String>,
+) -> Result<ParsedGrokRule, Error> {
+    // track circular dependencies
+    if inflight_parsed_aliases.iter().any(|a| a == name) {
+        return Err(Error::CircularDependencyInAliasDefinition(
+            inflight_parsed_aliases.first().unwrap().to_string(),
+        ));
+    } else {
+        inflight_parsed_aliases.push(name.to_string());
+    }
+
+    let parsed = parse_grok_rule(definition, aliases, parsed_aliases, inflight_parsed_aliases)?;
+
+    inflight_parsed_aliases.pop();
+
+    Ok(parsed)
+}
+
 fn parse_pattern(
     pattern: &str,
     aliases: &BTreeMap<&str, String>,
     parsed_aliases: &mut HashMap<String, ParsedGrokRule>,
     grok: &mut Grok,
 ) -> Result<GrokRule, Error> {
-    let parsed_pattern = parse_grok_rule(pattern, aliases, parsed_aliases)?;
+    let parsed_pattern = parse_grok_rule(pattern, aliases, parsed_aliases, &mut Vec::new())?;
     let mut pattern = String::new();
     pattern.push('^');
     pattern.push_str(parsed_pattern.definition.as_str());
@@ -107,6 +139,7 @@ fn parse_grok_rule<'a>(
     rule: &'a str,
     aliases: &BTreeMap<&'a str, String>,
     parsed_aliases: &mut HashMap<String, ParsedGrokRule>,
+    inflight_parsed_aliases: &mut Vec<String>,
 ) -> Result<ParsedGrokRule, Error> {
     lazy_static! {
         static ref GROK_PATTERN_RE: onig::Regex =
@@ -131,7 +164,15 @@ fn parse_grok_rule<'a>(
     let mut filters: HashMap<LookupBuf, Vec<GrokFilter>> = HashMap::new();
     let pure_grok_patterns: Vec<String> = grok_patterns
         .iter()
-        .map(|pattern| purify_grok_pattern(pattern, &mut filters, aliases, parsed_aliases))
+        .map(|pattern| {
+            purify_grok_pattern(
+                pattern,
+                &mut filters,
+                aliases,
+                parsed_aliases,
+                inflight_parsed_aliases,
+            )
+        })
         .collect::<Result<Vec<String>, Error>>()?;
 
     // replace grok patterns with "purified" ones
@@ -208,6 +249,7 @@ fn purify_grok_pattern(
     mut filters: &mut HashMap<LookupBuf, Vec<GrokFilter>>,
     aliases: &BTreeMap<&str, String>,
     parsed_aliases: &mut HashMap<String, ParsedGrokRule>,
+    inflight_parsed_aliases: &mut Vec<String>,
 ) -> Result<String, Error> {
     let mut res = String::new();
 
@@ -218,7 +260,13 @@ fn purify_grok_pattern(
                 Some(alias) => alias.definition.clone(),
                 None => {
                     // this alias is not parsed yet - let's parse it first
-                    let alias = parse_grok_rule(alias_def, aliases, parsed_aliases)?;
+                    let alias = parse_alias(
+                        pattern.match_fn.name.as_str(),
+                        alias_def,
+                        aliases,
+                        parsed_aliases,
+                        inflight_parsed_aliases,
+                    )?;
                     parsed_aliases.insert(pattern.match_fn.name.to_string(), alias.clone());
                     alias.definition
                 }

@@ -375,4 +375,21 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn error_on_circular_dependency() {
+        let err = parse_grok_rules(
+            // patterns
+            &[r#"%{pattern1}"#.to_string()],
+            // aliases with a circular dependency
+            btreemap! {
+            "pattern1" => r#"%{pattern2}"#.to_string(),
+            "pattern2" => r#"%{pattern1}"#.to_string()},
+        )
+        .unwrap_err();
+        assert_eq!(
+            format!("{}", err),
+            "Circular dependency found in the alias 'pattern1'"
+        );
+    }
 }
