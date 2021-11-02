@@ -122,11 +122,8 @@ mod tests {
     fn default() {
         let config = default_with_hash();
 
-        // The Datadog config should be disabled by default.
-        assert!(!config.datadog.enabled);
-
-        // There should be no API key.
-        assert_eq!(config.datadog.api_key, None);
+        // The Datadog config shouldn't exist by default.
+        assert!(config.datadog.is_none());
     }
 
     #[test]
@@ -151,11 +148,13 @@ mod tests {
     fn enabled() {
         let mut config = default_with_hash();
 
-        // Explicitly set to enabled and provide an API key to activate.
-        config.datadog.enabled = true;
-        config.datadog.api_key = Some("xxx".to_string());
-        config.datadog.configuration = Some("zzz".to_string());
+        config.datadog = Some(Options {
+            api_key: Some("xxx".to_owned()),
+            configuration: "zzz".to_owned(),
+            ..Options::default()
+        });
 
+        // Explicitly set to enabled and provide an API key to activate.
         assert!(try_attach(&mut config));
 
         assert!(config
@@ -167,13 +166,5 @@ mod tests {
         assert!(config
             .sinks
             .contains_key(&ComponentKey::from(DATADOG_METRICS_KEY)));
-    }
-
-    #[test]
-    fn default_reporting_interval_secs() {
-        let config = default_with_hash();
-
-        // Reporting interval should default to 5 seconds.
-        assert_eq!(config.datadog.reporting_interval_secs, 5);
     }
 }
