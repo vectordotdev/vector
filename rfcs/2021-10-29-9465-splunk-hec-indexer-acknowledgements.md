@@ -54,9 +54,9 @@ processed.
 With indexer acknowledgement enabled, the `200 OK` response contains an
 additional JSON body field specifying an `ackId` where `ackId` is an integer
 identifier corresponding to the request. Note that a single HEC request can
-include multiple Splunk events, so the `ackId` is per-request.
+include multiple Splunk events, so the `ackId` covers the entire request.
 
-```json
+```jsonc
 // Example response from local Splunk 7.3.2
 {
    "text": "Success",
@@ -74,7 +74,7 @@ the desired replication factor”). Upon returning `true`, Splunk drops the
 `false` (based on Splunk channel-related expiration settings, `ackId`'s can be
 reset/reused).
 
-```json
+```jsonc
 // Example request body
 {
     "acks": [0, 1, 2]
@@ -124,8 +124,8 @@ Users can configure the `splunk_hec` source with additional indexer acknowledgem
 
 ```toml
 [sources.splunk_hec]
-type = “splunk_hec”
-...
+type = "splunk_hec"
+# ...
 acknowledgements.enabled = true
 acknowledgements.max_pending_acks = 1_000_000
 ```
