@@ -190,6 +190,25 @@ impl MetricSet {
     /// Convert the absolute metric into an incremental by calculating
     /// the increment from the last saved absolute state.
     fn absolute_to_incremental(&mut self, mut metric: Metric) -> Option<Metric> {
+        // NOTE: Crucially, like I did, you may wonder: why do we not always return a metric? Could
+        // this lead to issues where a metric isn't seen again and we, in effect, never emit it?
+        //
+        // You're not wrong, and that does happen based on the logic below.  However, the main
+        // problem this logic solves is avoiding massive counter updates when Vector restarts.
+        //
+        // If we emitted a metric for a newly-seen absolute metric in this method, we would
+        // naturally have to emit an incremental version where the value was the absolute value,
+        // with subsequent updates being only delta updates.  If we restarted Vector, however, we
+        // would be back to not having yet seen the metric before, so the first emission of the
+        // metric after converting it here would be... its absolute value.  Even if the value only
+        // changed by 1 between Vector stopping and restarting, we could be incrementing the counter
+        // by some outrageous amount.
+        //
+        // Thus, we only emit a metric when we've calculated an actual delta for it, which means
+        // that, yes, we're risking never seeing a metric if it's not re-emitted, and we're
+        // introducing a small amount of lag before a metric is emitted by having to wait to see it
+        // again, but this is a behavior we have to observe for sinks that can only handle
+        // incremental updates.
         match self.0.get_mut(metric.series()) {
             Some(reference) => {
                 let new_value = metric.value().clone();
