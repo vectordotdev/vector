@@ -50,7 +50,7 @@ components: {
 		configuration: #Schema
 
 		example_config?: {
-			common: #Fields
+			common:    #Fields
 			advanced?: #Fields
 		}
 
