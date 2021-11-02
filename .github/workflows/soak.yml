@@ -1,0 +1,261 @@
+# Soak test vector
+#
+# This workflow runs our 'soak' tests, which are relative evaluations of
+# vector's master branch HEAD to whatever SHA was just pushed into the project
+# (unless that SHA happens to be master branch HEAD). The goal is to give
+# quick-ish feedback on all-up vector for a variety of configs as to whether
+# throughput performance has gone down, gotten more variable in the pushed SHA.
+#
+# Soaks are always done relative to the pushed SHA, meaning any changes you
+# introduce to the soak tests will be picked up both for the master HEAD soak
+# and your current SHA. Tags are SHA-SHA. The first SHA is the one that
+# triggered this workflow, the second is the one of the vector being tested. For
+# comparison images the two SHAs are identical.
+name: Soak
+
+on:
+  pull_request:
+
+jobs:
+  cancel-previous:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 3
+    if: github.ref != 'refs/heads/master'
+    steps:
+      - uses: styfle/cancel-workflow-action@0.9.1
+        with:
+          access_token: ${{ secrets.GITHUB_TOKEN }}
+          all_but_latest: true # can cancel workflows scheduled later
+
+  build-baseline-image:
+    name: Build baseline 'soak-vector' container
+    runs-on: [self-hosted, linux, x64, general]
+    steps:
+      #
+      - uses: actions/checkout@v2.3.5
+
+      - uses: actions/checkout@v2.3.5
+        with:
+          ref: master
+          path: baseline-vector
+
+      - name: Set baseline TAG, store in file
+        id: baseline
+        run: |
+          pushd baseline-vector
+          export SHA=$(git rev-parse HEAD)
+          popd
+
+          echo "::set-output name=TAG::${{ github.sha }}-${SHA}"
+          echo -n "${{ github.sha }}-${SHA}" > tag
+
+      - name: Upload TAG for baseline
+        uses: actions/upload-artifact@v1
+        with:
+          name: baseline-soak
+          path: tag
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        with:
+          flavor: |
+            latest=false
+            prefix=
+            suffix=
+          images: ghcr.io/${{ github.repository }}/soak-vector
+          tags: type=raw, value=${{ steps.baseline.outputs.TAG }}
+
+      - name: Build and push 'soak-vector' image
+        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
+        with:
+          context: baseline-vector/
+          file: soaks/Dockerfile
+          builder: ${{ steps.buildx.outputs.name }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha, scope=${{ github.workflow }}
+          cache-to: type=gha, scope=${{ github.workflow }}
+
+  build-comparison-image:
+    name: Build comparison 'soak-vector' container
+    runs-on: [self-hosted, linux, x64, general]
+    steps:
+      - uses: actions/checkout@v2.3.5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        with:
+          flavor: |
+            latest=false
+            prefix=
+            suffix=
+          images: ghcr.io/${{ github.repository }}/soak-vector
+          tags: type=raw, value=${{ github.sha }}-${{ github.sha }}
+
+      - name: Build and push 'soak-vector' image
+        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
+        with:
+          context: .
+          file: soaks/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha, scope=${{ github.workflow }}
+          cache-to: type=gha, scope=${{ github.workflow }}
+
+  soak-baseline:
+    name: Soak (${{ matrix.target }}) - baseline
+    if: ${{ github.actor != 'dependabot[bot]' }}
+    runs-on: [self-hosted, linux, x64, soak]
+    needs: [build-baseline-image]
+    strategy:
+      matrix:
+        target:
+          - datadog_agent_remap_datadog_logs
+          - syslog_humio_logs
+          - syslog_log2metric_humio_metrics
+          - syslog_loki
+          - syslog_regex_logs2metric_ddmetrics
+          - syslog_splunk_hec_logs
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+
+      - name: Download baseline-soak artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: baseline-soak
+
+      - name: Run baseline experiment
+        run: |
+          rm -rf /tmp/${{ matrix.target }}/
+          mkdir -p /tmp/${{ matrix.target }}/
+          ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "baseline" `cat baseline-soak/tag` /tmp/${{ matrix.target }}
+
+      - name: Upload timing captures
+        uses: actions/upload-artifact@v1
+        with:
+          name: ${{ matrix.target}}-captures
+          path: /tmp/${{ matrix.target }}
+
+  soak-comparison:
+    name: Soak (${{ matrix.target }}) - comparison
+    if: ${{ github.actor != 'dependabot[bot]' }}
+    runs-on: [self-hosted, linux, x64, soak]
+    needs: [build-comparison-image]
+    strategy:
+      matrix:
+        target:
+          - datadog_agent_remap_datadog_logs
+          - syslog_humio_logs
+          - syslog_log2metric_humio_metrics
+          - syslog_loki
+          - syslog_regex_logs2metric_ddmetrics
+          - syslog_splunk_hec_logs
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+
+      - name: Download baseline-soak artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: baseline-soak
+
+      - name: Run comparison experiment
+        run: |
+          rm -rf /tmp/${{ matrix.target }}/
+          mkdir -p /tmp/${{ matrix.target }}/
+          ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "comparison" "${{ github.sha }}-${{ github.sha }}" /tmp/${{ matrix.target }}
+
+      - name: Upload timing captures
+        uses: actions/upload-artifact@v1
+        with:
+          name: ${{ matrix.target}}-captures
+          path: /tmp/${{ matrix.target }}
+
+  analyze-results:
+    name: Soak analysis (${{ matrix.target }})
+    if: ${{ github.actor != 'dependabot[bot]' }}
+    runs-on: [self-hosted, linux, x64, soak] # could be general if we move away from miller
+    needs: [soak-baseline, soak-comparison]
+    strategy:
+      matrix:
+        target:
+          - datadog_agent_remap_datadog_logs
+          - syslog_humio_logs
+          - syslog_log2metric_humio_metrics
+          - syslog_loki
+          - syslog_regex_logs2metric_ddmetrics
+          - syslog_splunk_hec_logs
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+
+      - name: Download captures artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: ${{ matrix.target }}-captures
+
+      - name: Analyze captures
+        run: |
+          ./soaks/bin/analyze_experiment.sh ${{ matrix.target }}-captures
+
+  observer:
+    name: Build and push 'observer' to Github CR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        with:
+          images: ghcr.io/${{ github.repository }}/soak-observer
+          tags: type=sha, format=long
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
+        with:
+          context: .
+          file: lib/soak/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha, scope=${{ github.workflow }}
+          cache-to: type=gha, scope=${{ github.workflow }}
