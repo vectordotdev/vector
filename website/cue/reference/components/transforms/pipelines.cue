@@ -71,7 +71,27 @@ components: transforms: pipelines: {
 				"""
 			required:    true
 			warnings: []
-			type: array: items: type: object: {}
+			type: array: items: type: object: options: {
+				name: {
+					description: "Name of the pipeline"
+					warnings: []
+					required: false
+					common: true
+					type: string: {
+						default: null
+						syntax: "literal"
+					}
+				}
+				transforms: {
+					description: """
+						Any list of valid transform configurations. See [transforms documentation](\(urls.vector_transforms))
+						for the list of available transforms and their configuration.
+						"""
+					required:    true
+					warnings: []
+					type: array: items: type: object: {}
+				}
+			}
 		}
 
 		logs:    _pipeline_group
