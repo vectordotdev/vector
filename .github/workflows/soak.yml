@@ -215,7 +215,7 @@ jobs:
     name: Soak analysis (${{ matrix.target }})
     if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak] # could be general if we move away from miller
-    needs: [soak-baseline, soak-comparison]
+    needs: [compute-test-plan, soak-baseline, soak-comparison]
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
