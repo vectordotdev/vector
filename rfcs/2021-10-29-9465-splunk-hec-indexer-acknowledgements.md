@@ -56,7 +56,7 @@ additional JSON body field specifying an `ackId` where `ackId` is an integer
 identifier corresponding to the request. Note that a single HEC request can
 include multiple Splunk events, so the `ackId` is per-request.
 
-```{}
+```json
 // Example response from local Splunk 7.3.2
 {
    "text": "Success",
@@ -74,7 +74,7 @@ the desired replication factor”). Upon returning `true`, Splunk drops the
 `false` (based on Splunk channel-related expiration settings, `ackId`'s can be
 reset/reused).
 
-```{}
+```json
 // Example request body
 {
     "acks": [0, 1, 2]
@@ -122,7 +122,7 @@ In addition to the overall protocol, there are a few details worth highlighting:
 
 Users can configure the `splunk_hec` source with additional indexer acknowledgement related settings.
 
-```{toml}
+```toml
 [sources.splunk_hec]
 type = “splunk_hec”
 ...
@@ -205,7 +205,7 @@ efficiency.
     the data, we will use the existing `BatchNotifier`/`BatchReceiver` system
     from vector’s overall end-to-end-acknowledgement infrastructure.
 
-    ```{rust}
+    ```rust
     async fn handle_request(acknowledgements: bool, events: Vec<Events>, out: Pipeline, ack_id: usize...) {
         let receiver = acknowledgements.then(|| {
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
@@ -267,7 +267,7 @@ results. Meanwhile, back in the HEC response handler, we’ll check the shared
 structure for `true` at 10 second intervals up to a maximum time limit (5
 minutes as recommended by Splunk).
 
-```{rust}
+```rust
 fn call(&mut self, req: HecRequest) -> Self::Future {
         let mut http_service = self.batch_service.clone();
         Box::pin(async move {
