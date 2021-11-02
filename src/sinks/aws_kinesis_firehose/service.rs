@@ -21,47 +21,6 @@ pub struct KinesisService {
     pub stream_name: String,
 }
 
-// impl KinesisFirehoseService {
-//     pub fn new(
-//         config: KinesisFirehoseSinkConfig,
-//         client: KinesisFirehoseClient,
-//         cx: SinkContext,
-//     ) -> crate::Result<impl Sink<Event, Error = ()>> {
-//         let batch_config = config.batch;
-//
-//         if batch_config.max_bytes.unwrap_or_default() > MAX_PAYLOAD_SIZE {
-//             return Err(Box::new(BuildError::BatchMaxSize));
-//         }
-//
-//         if batch_config.max_events.unwrap_or_default() > MAX_PAYLOAD_EVENTS {
-//             return Err(Box::new(BuildError::BatchMaxEvents));
-//         }
-//
-//         let batch = BatchSettings::default()
-//             .bytes(4_000_000)
-//             .events(500)
-//             .timeout(1)
-//             .parse_config(batch_config)?;
-//
-//         let request = config.request.unwrap_with(&TowerRequestConfig::default());
-//         let encoding = config.encoding.clone();
-//         let kinesis = KinesisFirehoseService { client, config };
-//         let sink = request
-//             .batch_sink(
-//                 KinesisFirehoseRetryLogic,
-//                 kinesis,
-//                 VecBuffer::new(batch.size),
-//                 batch.timeout,
-//                 cx.acker(),
-//                 sink::StdServiceLogic::default(),
-//             )
-//             .sink_map_err(|error| error!(message = "Fatal kinesis firehose sink error.", %error))
-//             .with_flat_map(move |e| stream::iter(Some(encode_event(e, &encoding))).map(Ok));
-//
-//         Ok(sink)
-//     }
-// }
-
 pub struct KinesisResponse {
     events_byte_size: usize,
     count: usize,
