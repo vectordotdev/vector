@@ -277,12 +277,12 @@ const main = () => {
         const component = componentsOfKind[componentType];
         const configuration = component.configuration;
 
-        const commonParams = Object.makeExampleParams(
+        const commonParams = (component['example_config'] && component['example_config']['common']) || Object.makeExampleParams(
           configuration,
           p => p.required || p.common,
           p => p.required || p.common,
         );
-        const advancedParams = Object.makeExampleParams(
+        const advancedParams = (component['example_config'] && component['example_config']['advanced']) || Object.makeExampleParams(
           configuration,
           _ => true,
           p => p.required || p.common || p.relevant_when,
@@ -290,8 +290,6 @@ const main = () => {
         const useCaseExamples = makeUseCaseExamples(component);
 
         const keyName = `my_${kind.substring(0, kind.length - 1)}_id`;
-
-        let commonExampleConfig, advancedExampleConfig;
 
         // Sinks and transforms are treated differently because they need an `inputs` field
         if (['sinks', 'transforms'].includes(kind)) {

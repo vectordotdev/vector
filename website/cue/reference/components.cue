@@ -49,6 +49,11 @@ components: {
 
 		configuration: #Schema
 
+		example_config?: {
+			common: #Fields
+			advanced?: #Fields
+		}
+
 		// `description` describes the components with a single paragraph. It
 		// should be 1-3 sentences.  It is used for SEO purposes and should be
 		// full of relevant keywords.
