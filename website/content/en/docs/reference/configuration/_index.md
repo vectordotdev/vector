@@ -268,8 +268,7 @@ vector --config /etc/vector/*.toml
 
 #### Automatic namespacing
 
-You can also split your configuration by grouping the components by their type.
-The example can then be split as follow.
+You can also split your configuration by grouping the components by their type, one directory per component type, where the file name is used as the component id. For example:
 
 {{< tabs default="vector.toml" >}}
 {{< tab title="vector.toml" >}}
