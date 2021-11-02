@@ -127,20 +127,39 @@ jobs:
           cache-from: type=gha, scope=${{ github.workflow }}
           cache-to: type=gha, scope=${{ github.workflow }}
 
+  compute-test-plan:
+    name: Compute soak test plan
+    runs-on: ubuntu-20.04
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+
+      - uses: actions/github-script@v5
+        id: set-matrix
+        with:
+          script: |
+            const fs = require('fs')
+            target = fs.readdirSync('soaks/tests')
+
+            const matrix = {
+              target
+            }
+
+            core.setOutput('matrix', matrix)
+      - name: Dump matrix context
+        env:
+          MATRIX_CONTEXT: ${{ toJson(steps.set-matrix.outputs.matrix) }}
+        run: echo "$MATRIX_CONTEXT"
+
   soak-baseline:
     name: Soak (${{ matrix.target }}) - baseline
     if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak]
-    needs: [build-baseline-image]
+    needs: [compute-test-plan, build-baseline-image]
     strategy:
-      matrix:
-        target:
-          - datadog_agent_remap_datadog_logs
-          - syslog_humio_logs
-          - syslog_log2metric_humio_metrics
-          - syslog_loki
-          - syslog_regex_logs2metric_ddmetrics
-          - syslog_splunk_hec_logs
+      matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
@@ -166,16 +185,9 @@ jobs:
     name: Soak (${{ matrix.target }}) - comparison
     if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak]
-    needs: [build-comparison-image]
+    needs: [compute-test-plan, build-comparison-image]
     strategy:
-      matrix:
-        target:
-          - datadog_agent_remap_datadog_logs
-          - syslog_humio_logs
-          - syslog_log2metric_humio_metrics
-          - syslog_loki
-          - syslog_regex_logs2metric_ddmetrics
-          - syslog_splunk_hec_logs
+      matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
