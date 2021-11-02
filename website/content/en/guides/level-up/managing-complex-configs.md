@@ -238,7 +238,7 @@ target = "stdout"
 ```
 
 And for Vector to look for the configuration in the component type related folders,
-you need to start is using the `--config-dir` argument as follow.
+you need to start it using the `--config-dir` argument as follows.
 
 ```bash
 vector --config-dir /etc/vector
