@@ -45,8 +45,8 @@ mod integration_tests {
         assert_eq!(keys.len(), 1);
 
         let key = keys[0].clone();
-        let key_parts = key.split("/").collect::<Vec<_>>();
-        assert!(key_parts.len() == 1);
+        let key_parts = key.split('/');
+        assert!(key_parts.count() == 1);
         assert!(key.starts_with("test-prefix"));
         assert!(key.ends_with(".log"));
 
@@ -79,9 +79,9 @@ mod integration_tests {
         assert_eq!(keys.len(), 1);
 
         let key = keys[0].clone();
-        let key_parts = key.split("/").collect::<Vec<_>>();
+        let key_parts = key.split('/').collect::<Vec<_>>();
         assert!(key_parts.len() == 2);
-        assert!(key_parts.get(0).unwrap().to_string() == "test-prefix");
+        assert!(*key_parts.get(0).unwrap() == "test-prefix");
         assert!(key.ends_with(".log"));
 
         let obj = get_object(&bucket, key).await;
