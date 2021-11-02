@@ -35,59 +35,47 @@ components: transforms: pipelines: {
 	}
 
 	configuration: {
-		#PipelineGroup: {
+		_pipeline_configuration: {
+			description: """
+				Any valid transform configuration. See [transforms documentation](\(urls.vector_transforms))
+				for the list of available transforms and their configuration.
+				"""
+			required: true
+			warnings: []
+			type: array: items: type: object: {}
+		}
+
+		_pipeline_group: {
 			description: """
 				A list of pipeline's configurations. It's also possible to define this order in which the pipelines are
 				chained using the `order` options. If no order is specified, they will be chained by alphabetical order.
 				"""
 			required: true
 			warnings: []
-			type: object: {
-				options: {
-					order: {
-						description: "A complete ordered list of how the pipelines will be chained."
-						required:    false
-						type: array: items: string
-					}
-					pipelines: type: object: {
-						options: {
-							"*": #PipelineConfiguration
+			type: object: options: {
+				order: {
+					common: true
+					description: "A complete ordered list of how the pipelines will be chained."
+					required: false
+					type: array: {
+						default: null
+						items: type: string: {
+							syntax: "literal"
 						}
 					}
 				}
-			}
-		}
-
-		#PipelineConfiguration: {
-			description: """
-				Any valid transform configuration. See [transforms documentation](\(urls.vector_transforms))
-				for the list of available transforms and their configuration.
-				"""
-			required:    true
-			warnings: []
-			type: object: {
-				options: {
-					name: {
-						description: "Name of the pipeline"
-						type:        string
-						warnings: []
-						required: false
-					}
-					transforms: {
-						description: """
-							Any list of valid transform configurations. See [transforms documentation](\(urls.vector_transforms))
-							for the list of available transforms and their configuration.
-							"""
-						required:    true
-						warnings: []
-						type: array: items: type: object: {}
+				pipelines: {
+					description: "TODO"
+					required: true
+					type: object: options: {
+						"*": _pipeline_configuration
 					}
 				}
 			}
 		}
 
-		logs:    #PipelineGroup
-		metrics: #PipelineGroup
+		logs: _pipeline_group
+		metrics: _pipeline_group
 	}
 
 	input: {
