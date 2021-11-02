@@ -82,13 +82,13 @@ reset/reused).
 
 // Example response body
 {
-    "acks": 
+    "acks":
         {
-            "0": true, 
-            "1": false, 
+            "0": true,
+            "1": false,
             "2": true
         }
-} 
+}
 ```
 
 In addition to the overall protocol, there are a few details worth highlighting:
@@ -114,7 +114,7 @@ In addition to the overall protocol, there are a few details worth highlighting:
   * Splunk does not explicitly indicate whether event data is dropped or still
     pending processing. Either of these states will result in `{ack_id}: false`
     status. Splunk only advises that after a certain amount of time (e.g. 5
-    minutes), the data can be considered dropped.  
+    minutes), the data can be considered dropped.
 
 ## Proposal: `splunk_hec` Source Indexer Acknowledgement
 
@@ -180,7 +180,7 @@ efficiency.
   yet been delivered. A value of `1` indicates that the data has been delivered.
   These two bitvecs will be wrapped in a struct with useful methods. A single
   bitvec is not necessarily sufficient as we care about 3 states: `ackId` is
-  available, `ackId` is pending/dropped, and `ackId` is delivered.  
+  available, `ackId` is pending/dropped, and `ackId` is delivered.
 * An index pointer `currently_available_ack_id` initialized with `0`.
 
 #### Process
@@ -231,7 +231,7 @@ efficiency.
     ```
 
   * When the data in the request is successfully delivered, we mark
-    `ack_ids_ack_status[currently_available_ack_id] = 1`.  
+    `ack_ids_ack_status[currently_available_ack_id] = 1`.
 * Querying ackId status
   * We add a new `/services/collector/ack` route
   * `ackId`’s from incoming requests are used to index into
@@ -286,7 +286,7 @@ fn call(&mut self, req: HecRequest) -> Self::Future {
                 }
                 retries += 1;
             }
-            
+
             // if ack_id is not found, fall back on current behavior
             let event_status = if response.status().is_success() {
                 EventStatus::Delivered
