@@ -75,7 +75,7 @@ components: transforms: "remap": {
 
 				Required if `source` is missing.
 				"""
-			common:      true
+			common:      false
 			required:    false
 			type: string: {
 				examples: [
