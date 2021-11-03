@@ -8,7 +8,8 @@ use crate::transforms::Transform;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
-const SAMPLE_CONFIG: &str = r#"[logs]
+const SAMPLE_CONFIG: &str = indoc::indoc! { r#"
+[logs]
 order = ["foo", "bar"]
 
 [logs.pipelines.foo]
@@ -27,7 +28,8 @@ name = "bar pipeline"
 
 [[logs.pipelines.bar.transforms]]
 type = "filter"
-condition = """#;
+condition = ""
+"# };
 
 inventory::submit! {
     TransformDescription::new::<PipelinesConfig>("pipelines")
@@ -179,7 +181,7 @@ impl PipelinesConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::{PipelinesConfig, SAMPLE_CONFIG};
+    use super::{GenerateConfig, PipelinesConfig};
 
     #[test]
     fn generate_config() {
@@ -188,7 +190,8 @@ mod tests {
 
     #[test]
     fn parsing() {
-        let config = PipelinesConfig::from_toml(SAMPLE_CONFIG);
+        let config = PipelinesConfig::generate_config();
+        let config: PipelinesConfig = config.try_into().unwrap();
         assert_eq!(config.logs.pipelines.len(), 2);
         let foo = config.logs.pipelines.get("foo").unwrap();
         assert_eq!(foo.transforms.len(), 2);
