@@ -34,9 +34,9 @@ jobs:
     runs-on: [self-hosted, linux, x64, general]
     steps:
       #
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
 
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
         with:
           ref: master
           path: baseline-vector
@@ -95,7 +95,7 @@ jobs:
     name: Build comparison 'soak-vector' container
     runs-on: [self-hosted, linux, x64, general]
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
@@ -136,7 +136,7 @@ jobs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2.4.0
 
       - uses: actions/github-script@v5
         id: set-matrix
@@ -164,7 +164,7 @@ jobs:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2.4.0
 
       - name: Download baseline-soak artifact
         uses: actions/download-artifact@v1
@@ -192,7 +192,7 @@ jobs:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2.4.0
 
       - name: Download baseline-soak artifact
         uses: actions/download-artifact@v1
@@ -220,7 +220,7 @@ jobs:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2.4.0
 
       - name: Download captures artifact
         uses: actions/download-artifact@v1
@@ -236,7 +236,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2.4.0
 
       - name: Set up Docker Buildx
         id: buildx
