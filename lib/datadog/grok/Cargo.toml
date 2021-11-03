@@ -2,7 +2,7 @@
 name = "datadog-grok"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@timber.io>"]
-edition = "2018"
+edition = "2021"
 build = "build.rs" # LALRPOP preprocessing
 
 [dependencies]
@@ -28,4 +28,4 @@ shared = { path = "../../shared" }
 vrl-compiler = { path = "../../vrl/compiler" }
 
 [build-dependencies]
-lalrpop = { version = "0.19", default-features = false }
+lalrpop = { version = "0.19.6", default-features = false }

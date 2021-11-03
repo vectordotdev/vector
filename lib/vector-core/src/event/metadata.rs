@@ -70,6 +70,11 @@ impl EventMetadata {
     pub fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
     }
+
+    /// Merges the given finalizers into the existing set of finalizers.
+    pub fn merge_finalizers(&mut self, finalizers: EventFinalizers) {
+        self.finalizers.merge(finalizers);
+    }
 }
 
 impl EventDataEq for EventMetadata {

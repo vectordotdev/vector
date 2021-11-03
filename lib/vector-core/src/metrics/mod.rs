@@ -1,3 +1,4 @@
+mod ddsketch;
 mod handle;
 mod label_filter;
 mod recorder;
@@ -5,6 +6,7 @@ mod recorder;
 use std::sync::Arc;
 
 use crate::event::Metric;
+pub use crate::metrics::ddsketch::{AgentDDSketch, BinMap};
 pub use crate::metrics::handle::{Counter, Handle};
 use crate::metrics::label_filter::VectorLabelFilter;
 use crate::metrics::recorder::VectorRecorder;

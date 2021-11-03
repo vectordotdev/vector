@@ -7,6 +7,7 @@ use indexmap::map::IndexMap;
 use prometheus_parser::{proto, METRIC_NAME_LABEL};
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
+use vector_core::event::metric::{MetricSketch, Quantile};
 
 pub(super) trait MetricCollector {
     type Output;
@@ -172,12 +173,46 @@ pub(super) trait MetricCollector {
                             "",
                             quantile.value,
                             tags,
-                            Some(("quantile", quantile.upper_limit.to_string())),
+                            Some(("quantile", quantile.quantile.to_string())),
                         );
                     }
                     self.emit_value(timestamp, name, "_sum", *sum, tags, None);
                     self.emit_value(timestamp, name, "_count", *count as f64, tags, None);
                 }
+                MetricValue::Sketch { sketch } => match sketch {
+                    MetricSketch::AgentDDSketch(ddsketch) => {
+                        for q in [0.5, 0.75, 0.9, 0.99] {
+                            let quantile = Quantile {
+                                quantile: q,
+                                value: ddsketch.quantile(q).unwrap_or(0.0),
+                            };
+                            self.emit_value(
+                                timestamp,
+                                name,
+                                "",
+                                quantile.value,
+                                tags,
+                                Some(("quantile", quantile.quantile.to_string())),
+                            );
+                        }
+                        self.emit_value(
+                            timestamp,
+                            name,
+                            "_sum",
+                            ddsketch.sum().unwrap_or(0.0),
+                            tags,
+                            None,
+                        );
+                        self.emit_value(
+                            timestamp,
+                            name,
+                            "_count",
+                            ddsketch.count() as f64,
+                            tags,
+                            None,
+                        );
+                    }
+                },
             }
         }
     }
@@ -381,6 +416,7 @@ const fn prometheus_metric_type(metric_value: &MetricValue) -> proto::MetricType
         } => MetricType::Summary,
         MetricValue::AggregatedHistogram { .. } => MetricType::Histogram,
         MetricValue::AggregatedSummary { .. } => MetricType::Summary,
+        MetricValue::Sketch { .. } => MetricType::Summary,
     }
 }
 

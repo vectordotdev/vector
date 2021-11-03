@@ -1,10 +1,12 @@
 use super::{ComponentKey, Config, OutputId, SinkOuter, SourceOuter};
 use crate::{
-    sinks::datadog::metrics::DatadogConfig, sources::internal_metrics::InternalMetricsConfig,
+    sinks::datadog::metrics::DatadogMetricsConfig,
+    sources::{host_metrics::HostMetricsConfig, internal_metrics::InternalMetricsConfig},
 };
 use serde::{Deserialize, Serialize};
 use std::env;
 
+static HOST_METRICS_KEY: &str = "#datadog_host_metrics";
 static INTERNAL_METRICS_KEY: &str = "#datadog_internal_metrics";
 static DATADOG_METRICS_KEY: &str = "#datadog_metrics";
 
@@ -56,30 +58,45 @@ pub fn try_attach(config: &mut Config) -> bool {
         _ => return false,
     };
 
-    info!("Datadog API key provided. Internal metrics will be sent to Datadog.");
+    info!("Datadog API key provided. Host and internal metrics will be sent to Datadog.");
 
+    let host_metrics_id = OutputId::from(ComponentKey::from(HOST_METRICS_KEY));
     let internal_metrics_id = OutputId::from(ComponentKey::from(INTERNAL_METRICS_KEY));
     let datadog_metrics_id = ComponentKey::from(DATADOG_METRICS_KEY);
 
-    // Create an internal metrics source. We're using a distinct source here and not
-    // attempting to reuse an existing one, due to the use of a custom namespace to
-    // satisfy reporting to Datadog.
-    let mut internal_metrics = InternalMetricsConfig::namespace("pipelines");
+    // Create internal sources for host and internal metrics. We're distinct sources here and not
+    // attempting to reuse existing ones, to configure it according to enterprise requirements.
+    let mut host_metrics =
+        HostMetricsConfig::enterprise(config.hash.as_ref().expect("Config should contain hash"));
 
-    // Override default scrape interval.
+    // Create an internal metrics source. We're using a distinct source here and not
+    // attempting to reuse an existing one, to configure it according to enterprise requirements.
+    let mut internal_metrics = InternalMetricsConfig::enterprise(
+        config.hash.as_ref().expect("Config should contain hash"),
+    );
+
+    // Override default scrape intervals.
+    host_metrics.scrape_interval_secs(config.datadog.reporting_interval_secs);
     internal_metrics.scrape_interval_secs(config.datadog.reporting_interval_secs);
 
+    config.sources.insert(
+        host_metrics_id.component.clone(),
+        SourceOuter::new(host_metrics),
+    );
     config.sources.insert(
         internal_metrics_id.component.clone(),
         SourceOuter::new(internal_metrics),
     );
 
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
-    let datadog_metrics = DatadogConfig::from_api_key(api_key);
+    let datadog_metrics = DatadogMetricsConfig::from_api_key(api_key);
 
     config.sinks.insert(
         datadog_metrics_id,
-        SinkOuter::new(vec![internal_metrics_id], Box::new(datadog_metrics)),
+        SinkOuter::new(
+            vec![host_metrics_id, internal_metrics_id],
+            Box::new(datadog_metrics),
+        ),
     );
 
     true
@@ -89,9 +106,16 @@ pub fn try_attach(config: &mut Config) -> bool {
 mod tests {
     use super::*;
 
+    fn default_with_hash() -> Config {
+        Config {
+            hash: Some("".to_owned()),
+            ..Config::default()
+        }
+    }
+
     #[test]
     fn default() {
-        let config = Config::default();
+        let config = default_with_hash();
 
         // The Datadog config should be disabled by default.
         assert!(!config.datadog.enabled);
@@ -102,11 +126,14 @@ mod tests {
 
     #[test]
     fn disabled() {
-        let mut config = Config::default();
+        let mut config = default_with_hash();
 
         // Attaching config without an API enabled should avoid wiring up components.
         assert!(!try_attach(&mut config));
 
+        assert!(!config
+            .sources
+            .contains_key(&ComponentKey::from(HOST_METRICS_KEY)));
         assert!(!config
             .sources
             .contains_key(&ComponentKey::from(INTERNAL_METRICS_KEY)));
@@ -117,7 +144,7 @@ mod tests {
 
     #[test]
     fn enabled() {
-        let mut config = Config::default();
+        let mut config = default_with_hash();
 
         // Explicitly set to enabled and provide an API key to activate.
         config.datadog.enabled = true;
@@ -125,6 +152,9 @@ mod tests {
 
         assert!(try_attach(&mut config));
 
+        assert!(config
+            .sources
+            .contains_key(&ComponentKey::from(HOST_METRICS_KEY)));
         assert!(config
             .sources
             .contains_key(&ComponentKey::from(INTERNAL_METRICS_KEY)));
@@ -135,7 +165,7 @@ mod tests {
 
     #[test]
     fn default_reporting_interval_secs() {
-        let config = Config::default();
+        let config = default_with_hash();
 
         // Reporting interval should default to 5 seconds.
         assert_eq!(config.datadog.reporting_interval_secs, 5);

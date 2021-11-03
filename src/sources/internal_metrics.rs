@@ -17,13 +17,15 @@ pub struct InternalMetricsConfig {
     scrape_interval_secs: u64,
     tags: TagsConfig,
     namespace: Option<String>,
+    config_hash: Option<String>,
 }
 
 impl InternalMetricsConfig {
-    /// Override the default namespace.
-    pub fn namespace<T: Into<String>>(namespace: T) -> Self {
+    /// Return an internal metrics config with enterprise reporting defaults.
+    pub fn enterprise<T: Into<String>>(config_hash: T) -> Self {
         Self {
-            namespace: Some(namespace.into()),
+            namespace: Some("pipelines".to_owned()),
+            config_hash: Some(config_hash.into()),
             ..Self::default()
         }
     }
@@ -59,6 +61,7 @@ impl SourceConfig for InternalMetricsConfig {
         }
         let interval = time::Duration::from_secs(self.scrape_interval_secs);
         let namespace = self.namespace.clone();
+        let config_hash = self.config_hash.clone();
         let host_key = self.tags.host_key.as_deref().and_then(|tag| {
             if tag.is_empty() {
                 None
@@ -73,6 +76,7 @@ impl SourceConfig for InternalMetricsConfig {
                 .and_then(|tag| if tag.is_empty() { None } else { Some("pid") });
         Ok(Box::pin(run(
             namespace,
+            config_hash,
             host_key,
             pid_key,
             Controller::get()?,
@@ -93,6 +97,7 @@ impl SourceConfig for InternalMetricsConfig {
 
 async fn run(
     namespace: Option<String>,
+    config_hash: Option<String>,
     host_key: Option<&str>,
     pid_key: Option<&str>,
     controller: &Controller,
@@ -115,6 +120,11 @@ async fn run(
             // if an explicit namespace is provided to this source.
             if namespace.is_some() {
                 metric = metric.with_namespace(namespace.as_ref());
+            }
+
+            // If a configuration hash is provided, report it. Used in enterprise.
+            if let Some(config_hash) = &config_hash {
+                metric.insert_tag("config_hash".to_owned(), config_hash.clone());
             }
 
             if let Some(host_key) = host_key {
@@ -191,7 +201,7 @@ mod tests {
                 // [`metrics::handle::Histogram::new`] are hard-coded. If this
                 // check fails you might look there and see if we've allowed
                 // users to set their own bucket widths.
-                assert_eq!(buckets[11].count, 2);
+                assert_eq!(buckets[9].count, 2);
                 assert_eq!(*count, 2);
                 assert_eq!(*sum, 11.0);
             }
@@ -208,8 +218,8 @@ mod tests {
                 // [`metrics::handle::Histogram::new`] are hard-coded. If this
                 // check fails you might look there and see if we've allowed
                 // users to set their own bucket widths.
-                assert_eq!(buckets[11].count, 1);
-                assert_eq!(buckets[12].count, 1);
+                assert_eq!(buckets[9].count, 1);
+                assert_eq!(buckets[10].count, 2);
                 assert_eq!(*count, 2);
                 assert_eq!(*sum, 16.1);
             }

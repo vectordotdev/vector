@@ -16,6 +16,18 @@ pub enum Compression {
 }
 
 impl Compression {
+    /// Gets whether or not this compression will actually compressing the input.
+    ///
+    /// While it may be counterintuitive for "compression" to not compress, this is simply a
+    /// consequence of designing a single type that may or may not compress so that we can avoid
+    /// having to box writers at a higher-level.
+    ///
+    /// Some callers can benefit from knowing whether or not compression is actually taking place,
+    /// as different size limitations may come into play.
+    pub const fn is_compressed(&self) -> bool {
+        !matches!(self, Compression::None)
+    }
+
     pub const fn gzip_default() -> Compression {
         // flate2 doesn't have a const `default` fn, since it actually implements the `Default`
         // trait, and it doesn't have a constant for what the "default" level should be, so we
@@ -146,9 +158,7 @@ impl<'de> de::Deserialize<'de> for Compression {
                         Some(_) => Err(de::Error::unknown_field("level", &[])),
                         None => Ok(Compression::None),
                     },
-                    "gzip" => Ok(Compression::Gzip(
-                        level.unwrap_or_else(flate2::Compression::default),
-                    )),
+                    "gzip" => Ok(Compression::Gzip(level.unwrap_or_default())),
                     algorithm => Err(de::Error::unknown_variant(algorithm, &["none", "gzip"])),
                 }
             }
