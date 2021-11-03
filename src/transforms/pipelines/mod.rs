@@ -8,35 +8,11 @@ use crate::transforms::Transform;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
-const SAMPLE_CONFIG: &str = indoc::indoc! { r#"
-[logs]
-order = ["foo", "bar"]
-
-[logs.pipelines.foo]
-name = "foo pipeline"
-
-[[logs.pipelines.foo.transforms]]
-type = "filter"
-condition = ""
-
-[[logs.pipelines.foo.transforms]]
-type = "filter"
-condition = ""
-
-[logs.pipelines.bar]
-name = "bar pipeline"
-
-[[logs.pipelines.bar.transforms]]
-type = "filter"
-condition = ""
-"# };
-
 inventory::submit! {
     TransformDescription::new::<PipelinesConfig>("pipelines")
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
-// #[serde(deny_unknown_fields)]
 pub struct PipelineConfig {
     name: String,
     transforms: Vec<Box<dyn TransformConfig>>,
@@ -106,7 +82,6 @@ impl EventTypeConfig {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-// #[serde(deny_unknown_fields)]
 pub struct PipelinesConfig {
     #[serde(default)]
     logs: EventTypeConfig,
@@ -167,7 +142,29 @@ impl TransformConfig for PipelinesConfig {
 
 impl GenerateConfig for PipelinesConfig {
     fn generate_config() -> toml::Value {
-        toml::from_str(SAMPLE_CONFIG).unwrap()
+        toml::from_str(indoc::indoc! {r#"
+            [logs]
+            order = ["foo", "bar"]
+
+            [logs.pipelines.foo]
+            name = "foo pipeline"
+
+            [[logs.pipelines.foo.transforms]]
+            type = "filter"
+            condition = ""
+
+            [[logs.pipelines.foo.transforms]]
+            type = "filter"
+            condition = ""
+
+            [logs.pipelines.bar]
+            name = "bar pipeline"
+
+            [[logs.pipelines.bar.transforms]]
+            type = "filter"
+            condition = ""
+        "#})
+        .unwrap()
     }
 }
 
