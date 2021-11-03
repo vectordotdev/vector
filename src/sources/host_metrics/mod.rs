@@ -75,7 +75,7 @@ pub struct HostMetricsConfig {
     #[serde(skip)]
     version: Option<String>,
     #[serde(skip)]
-    configuration: Option<String>,
+    configuration_key: Option<String>,
 
     #[cfg(target_os = "linux")]
     #[serde(default)]
@@ -121,11 +121,11 @@ impl SourceConfig for HostMetricsConfig {
 
 impl HostMetricsConfig {
     /// Return a host metrics config with enterprise reporting defaults.
-    pub fn enterprise(version: impl Into<String>, configuration: impl Into<String>) -> Self {
+    pub fn enterprise(version: impl Into<String>, configuration_key: impl Into<String>) -> Self {
         Self {
             namespace: Namespace(Some("pipelines".to_owned())),
             version: Some(version.into()),
-            configuration: Some(configuration.into()),
+            configuration_key: Some(configuration_key.into()),
             ..Self::default()
         }
     }
@@ -184,7 +184,7 @@ impl HostMetrics {
     async fn capture_metrics(&self) -> impl Iterator<Item = Event> {
         let hostname = crate::get_hostname();
         let version = self.config.version.clone();
-        let configuration = self.config.configuration.clone();
+        let configuration_key = self.config.configuration_key.clone();
 
         let mut metrics = Vec::new();
         #[cfg(target_os = "linux")]
@@ -223,9 +223,9 @@ impl HostMetrics {
                 metric.insert_tag("version".to_owned(), version.clone());
             }
         }
-        if let Some(configuration) = &configuration {
+        if let Some(configuration_key) = &configuration_key {
             for metric in &mut metrics {
-                metric.insert_tag("configuration".to_owned(), configuration.clone());
+                metric.insert_tag("configuration_key".to_owned(), configuration_key.clone());
             }
         }
         emit!(&HostMetricsEventReceived {

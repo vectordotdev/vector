@@ -20,16 +20,16 @@ pub struct InternalMetricsConfig {
     #[serde(skip)]
     version: Option<String>,
     #[serde(skip)]
-    configuration: Option<String>,
+    configuration_key: Option<String>,
 }
 
 impl InternalMetricsConfig {
     /// Return an internal metrics config with enterprise reporting defaults.
-    pub fn enterprise(version: impl Into<String>, configuration: impl Into<String>) -> Self {
+    pub fn enterprise(version: impl Into<String>, configuration_key: impl Into<String>) -> Self {
         Self {
             namespace: Some("pipelines".to_owned()),
             version: Some(version.into()),
-            configuration: Some(configuration.into()),
+            configuration_key: Some(configuration_key.into()),
             ..Self::default()
         }
     }
@@ -66,7 +66,7 @@ impl SourceConfig for InternalMetricsConfig {
         let interval = time::Duration::from_secs(self.scrape_interval_secs);
         let namespace = self.namespace.clone();
         let version = self.version.clone();
-        let configuration = self.configuration.clone();
+        let configuration_key = self.configuration_key.clone();
 
         let host_key = self.tags.host_key.as_deref().and_then(|tag| {
             if tag.is_empty() {
@@ -83,7 +83,7 @@ impl SourceConfig for InternalMetricsConfig {
         Ok(Box::pin(run(
             namespace,
             version,
-            configuration,
+            configuration_key,
             host_key,
             pid_key,
             Controller::get()?,
@@ -105,7 +105,7 @@ impl SourceConfig for InternalMetricsConfig {
 async fn run(
     namespace: Option<String>,
     version: Option<String>,
-    configuration: Option<String>,
+    configuration_key: Option<String>,
     host_key: Option<&str>,
     pid_key: Option<&str>,
     controller: &Controller,
@@ -130,12 +130,12 @@ async fn run(
                 metric = metric.with_namespace(namespace.as_ref());
             }
 
-            // Version and configuration are reported in enterprise.
+            // Version and configuration key are reported in enterprise.
             if let Some(version) = &version {
                 metric.insert_tag("version".to_owned(), version.clone());
             }
-            if let Some(configuration) = &configuration {
-                metric.insert_tag("configuration".to_owned(), configuration.clone());
+            if let Some(configuration_key) = &configuration_key {
+                metric.insert_tag("configuration_key".to_owned(), configuration_key.clone());
             }
 
             if let Some(host_key) = host_key {

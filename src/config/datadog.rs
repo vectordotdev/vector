@@ -19,7 +19,7 @@ pub struct Options {
     #[serde(default)]
     pub api_key: Option<String>,
 
-    pub configuration: String,
+    pub configuration_key: String,
 
     #[serde(default = "default_reporting_interval_secs")]
     pub reporting_interval_secs: u64,
@@ -30,7 +30,7 @@ impl Default for Options {
         Self {
             enabled: default_enabled(),
             api_key: None,
-            configuration: "".to_owned(),
+            configuration_key: "".to_owned(),
             reporting_interval_secs: default_reporting_interval_secs(),
         }
     }
@@ -77,8 +77,9 @@ pub fn try_attach(config: &mut Config) -> bool {
 
     // Create internal sources for host and internal metrics. We're using distinct sources here and
     // not attempting to reuse existing ones, to configure according to enterprise requirements.
-    let mut host_metrics = HostMetricsConfig::enterprise(version, &datadog.configuration);
-    let mut internal_metrics = InternalMetricsConfig::enterprise(version, &datadog.configuration);
+    let mut host_metrics = HostMetricsConfig::enterprise(version, &datadog.configuration_key);
+    let mut internal_metrics =
+        InternalMetricsConfig::enterprise(version, &datadog.configuration_key);
 
     // Override default scrape intervals.
     host_metrics.scrape_interval_secs(datadog.reporting_interval_secs);
@@ -150,7 +151,7 @@ mod tests {
 
         config.datadog = Some(Options {
             api_key: Some("xxx".to_owned()),
-            configuration: "zzz".to_owned(),
+            configuration_key: "zzz".to_owned(),
             ..Options::default()
         });
 
