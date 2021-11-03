@@ -336,14 +336,14 @@ _values: {
 }
 
 #TargetTriples: {
-	"aarch64-unknown-linux-gnu":      *true | bool
-	"aarch64-unknown-linux-musl":     *true | bool
-	"armv7-unknown-linux-gnueabihf":  *true | bool
-	"armv7-unknown-linux-musleabihf": *true | bool
-	"x86_64-apple-darwin":            *true | bool
-	"x86_64-pc-windows-msv":          *true | bool
-	"x86_64-unknown-linux-gnu":       *true | bool
-	"x86_64-unknown-linux-musl":      *true | bool
+	"aarch64-unknown-linux-gnu":      bool | *true
+	"aarch64-unknown-linux-musl":     bool | *true
+	"armv7-unknown-linux-gnueabihf":  bool | *true
+	"armv7-unknown-linux-musleabihf": bool | *true
+	"x86_64-apple-darwin":            bool | *true
+	"x86_64-pc-windows-msv":          bool | *true
+	"x86_64-unknown-linux-gnu":       bool | *true
+	"x86_64-unknown-linux-musl":      bool | *true
 }
 
 #Timestamp: =~"^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.\\d{6}Z"
