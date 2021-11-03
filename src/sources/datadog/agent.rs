@@ -82,7 +82,7 @@ impl SourceConfig for DatadogAgentConfig {
 
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let listener = tls.bind(&self.address).await?;
-        let service = source.event_service(cx.acknowledgements, cx.out.clone());
+        let service = source.event_service(cx.acknowledgements.enabled, cx.out.clone());
 
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
@@ -434,7 +434,7 @@ mod tests {
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
         let mut context = SourceContext::new_test(sender);
-        context.acknowledgements = acknowledgements;
+        context.acknowledgements.enabled = acknowledgements;
         tokio::spawn(async move {
             DatadogAgentConfig {
                 address,

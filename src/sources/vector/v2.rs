@@ -148,7 +148,7 @@ async fn run(
 
     let service = proto::Server::new(Service {
         pipeline: cx.out,
-        acknowledgements: cx.acknowledgements,
+        acknowledgements: cx.acknowledgements.enabled,
     });
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
 
