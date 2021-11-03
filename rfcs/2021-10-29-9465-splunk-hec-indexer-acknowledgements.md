@@ -152,7 +152,8 @@ acknowledgements.max_idle_time = 300
   before removal. Defaults to `600` seconds (Splunk default).
 
 Since Vector does not share Splunk’s internal constraints, we can relax certain
-protocol requirements to avoid unnecessary complexity. Specifically,
+protocol requirements to avoid unnecessary complexity. For the most part, we
+will take inspiration from Splunk. Specifically,
 
 * Authentication tokens
   * Enabling indexer acknowledgements will be an overall `splunk_hec` source
@@ -170,7 +171,7 @@ protocol requirements to avoid unnecessary complexity. Specifically,
 
 * Pending acks
   * We will support the same configuration settings described in Splunk
-    documentation mostly concerning pending `ackId`'s and channel configuration.
+    documentation concerning pending `ackId`'s and channel configuration.
 
 ### Implementation
 
@@ -182,19 +183,21 @@ Second, we describe implementation details for channel behavior.
 
 #### AckId Data Structures
 
-* A [bitvec](https://docs.rs/bitvec/0.22.3/bitvec/) (or similar structure)
-  `ack_ids_in_use` whose indices represent `ackId`’s, max size is determined by
-  `max_pending_acks_per_channel`, and is initialized with all `0`'s'. A value of `0` at an
-  index indicates that the `ackId` is not in-use. A value of `1` indicates
-  in-use.
+* A [bitvec::BitVec](https://docs.rs/bitvec/0.22.3/bitvec/) (or similar
+  structure) `ack_ids_in_use` whose indices represent `ackId`’s, max size is
+  determined by `max_pending_acks_per_channel`, and is initialized with all
+  `0`'s. A value of `0` at an index indicates that the `ackId` is not in-use. A
+  value of `1` indicates in-use.
 * A bitvec `ack_ids_ack_status` whose indices also correspond to `ackId`’s, max
-  size is determined by `max_pending_acks_per_channel`, and is initialized with all `0`'s. A
-  value of `0` at an index indicates that the associated request data has not
-  yet been delivered. A value of `1` indicates that the data has been delivered.
+  size is determined by `max_pending_acks_per_channel`, and is initialized with
+  all `0`'s. A value of `0` at an index indicates that the associated request
+  data has not yet been delivered. A value of `1` indicates that the data has
+  been delivered. The two bitvecs will be wrapped in a struct with utility
+  methods for setting bits, removing in use ids, etc. Note, a single bitvec is
+  not necessarily sufficient as we care about 3 states: `ackId` is available,
+  `ackId` is pending/dropped, and `ackId` is delivered.
 * An index pointer `currently_available_ack_id` initialized with `0`.
-* The above will be wrapped in a simple struct with utility methods. Note, a
-  single bitvec is not necessarily sufficient as we care about 3 states: `ackId`
-  is available, `ackId` is pending/dropped, and `ackId` is delivered.
+* The above will be wrapped in a `HecAckInfo` struct with utility methods.
 
 #### AckId Process
 
@@ -257,14 +260,14 @@ Second, we describe implementation details for channel behavior.
 The above `ackId` process will occur per-channel. As part of the `splunk_hec`
 source struct, we will store a `Arc<Mutex<Map<channel_id, channel>>>` where
 `channel_id` is a `String` value and `channel` is a struct wrapping a
-`last_used_timestamp` (for expiring channels) and the ackId structure described
-above.
+`last_used_timestamp` (used to expire channels) and the `HecAckInfo` structure
+described above.
 
 Incoming requests will be required to specify a `channelId`. On receiving a new
 `channelId`, we create a new instance of `channel` and insert it into the `Map`.
-We handle all `ackId` processing after drilling in to the appropriate ackId data
+We handle all `ackId` processing after mapping to the appropriate `HecAckInfo`
 based on the client provided `channelId`. Every time a `channelId` and
-corresponding `channel` information is used, we update the respective
+corresponding `channel` information is used/accessed, we update the respective
 `last_used_timestamp` to current.
 
 To expire idle channels, we use a background task that shares the channel `Map`
@@ -286,10 +289,10 @@ Users can configure the `splunk_hec` sinks with the following indexer
 acknowledgement settings
 
 * `acknowledgements.query_interval` The amount of time to wait between requests
-  to `services/collector/ack`. This defaults to 10 seconds as recommended by
+  to `services/collector/ack`. Defaults to 10 seconds as recommended by
   Splunk.
 * `acknowledgements.retry_limit` The number of retry requests to
-  `services/collector/ack`. This defaults to 30 which, along with the default
+  `services/collector/ack`. Defaults to 30 which, along with the default
   `query_interval`, is 5 minutes of retrying as recommend by Splunk.
 
 ### Implementation
@@ -307,13 +310,13 @@ shared with a background tokio task which, for all pending `ackId`’s, will que
 retries remaining and the send end of a one-shot notification channel.
 
 This background task will query at an interval (configured or default) and with
-a retry limit (configured or default). If we receive `true` for an `ackId`,
-we'll notify an awaiting receiver with a `Status::Delivered`. If we receive
-`false` for an `ackId`, we decrement its remaining retry count. When remaining
-retries is `0`, we notify with `EventStatus::Dropped`.
+a retry limit (configured or default). If we receive `true` for an `ackId`, we
+remove the `ackId` from the map and notify an awaiting receiver with
+`EventStatus::Delivered`. If we receive `false` for an `ackId`, we decrement its
+remaining retry count. When remaining retries is `0`, we remove the `ackId` from
+the map and notify with `EventStatus::Dropped`.
 
-Back in the response handler, we’ll await the receiver. Once a status has been
-received, we remove the `ackId` from the map and proceed. Below is an example of
+Back in the response handler, we’ll await the receiver. Below is an example of
 response handler behavior.
 
 ```rust
@@ -332,7 +335,6 @@ fn call(&mut self, req: HecRequest) -> Self::Future {
                 Ok(_) => EventStatus::Dropped,
                 Err(_) => EventStatus::Failed,
             }
-            self.ack_id_to_status_map.remove(ack_id);
             ...
 
             // if ack_id is not found, fall back on current behavior
