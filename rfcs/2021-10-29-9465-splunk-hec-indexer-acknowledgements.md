@@ -270,6 +270,12 @@ based on the client provided `channelId`. Every time a `channelId` and
 corresponding `channel` information is used/accessed, we update the respective
 `last_used_timestamp` to current.
 
+We will also monitor the total number of pending acks across channels
+`total_pending_acks` (can be updated as we use and remove `ackId`s) to respect
+the `max_pending_acks` configuration. If a new request arrives and
+`total_pending_acks == max_pending_acks`, we can drop a number of acks from the
+least recently used channel (based on `last_used_timestamp`).
+
 To expire idle channels, we use a background task that shares the channel `Map`
 and compares each channel's `last_used_timestamp` to the current timestamp. If
 the difference exceeds the configured `max_idle_time`, the channel will be
