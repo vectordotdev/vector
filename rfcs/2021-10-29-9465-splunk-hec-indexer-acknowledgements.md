@@ -127,14 +127,29 @@ Users can configure the `splunk_hec` source with additional indexer acknowledgem
 type = "splunk_hec"
 # ...
 acknowledgements.enabled = true
-acknowledgements.max_pending_acks = 1_000_000
+acknowledgements.max_pending_acks = 10_000_000
+acknowledgements.max_number_of_ack_channel = 1_000_000
+acknowledgements.max_pending_acks_per_channel = 1_000_000
+acknowledgements.ack_idle_cleanup = true
+acknowledgements.max_idle_time = 300
 ```
 
-* `acknowledgements.enabled`  This defaults to `false` matching Splunk HEC's
+* `acknowledgements.enabled` This controls indexer acknowledgement enablement. Defaults to `false` matching Splunk HEC's
   opt-in behavior.
 * `acknowledgements.max_pending_acks` With acknowledgements enabled, this
-  controls the maximum number of pending query ackId's (to avoid memory issues).
-  This defaults to `10_000_000` matching Splunk HEC's default.
+  controls the maximum number of pending query ackId's overall (across all channels)
+  Defaults to `10_000_000` (Splunk default).
+* `acknowledgements.max_number_of_ack_channel` This controls the max number of
+  channels a client can use with the `splunk_hec` source. Defaults to
+  `1_000_000` (Splunk default).
+* `acknowledgements.max_pending_acks_per_channel` This controls the max number
+  of pending query ackId's per channel. Defaults to `1_000_000` (Splunk
+  default).
+* `acknowledgements.ack_idle_cleanup` This controls whether the `splunk_hec`
+  source will drop channel information (ackId's, statuses) after `max_idle_time`
+  seconds. Defaults to `false` (Splunk default).
+* `acknowledgements.max_idle_time` This controls the max channel idle time
+  before removal. Defaults to `600` seconds (Splunk default).
 
 Since Vector does not share Splunk’s internal constraints, we can relax certain
 protocol requirements to avoid unnecessary complexity. Specifically,
@@ -147,19 +162,15 @@ protocol requirements to avoid unnecessary complexity. Specifically,
     acknowledgement.
 
 * Splunk Channels
-  * The `splunk_hec` source will require channel IDs for acknowledgement.
-    Currently, we store channel IDs as an additional `LogEvent` field. If users
-    intend to move data from a `splunk_hec` source to a `splunk_hec` sink,
-    passing through the channel IDs can be helpful.
-  * Rather than assign `ackId`’s per channel, the `splunk_hec` source will
-    assign `ackId`’s across all its requests. In other words, if the source
-    receives two requests with differing channel IDs, it will reply with `ackId
-    = 0` and `ackId = 1` rather than `ackId = 0` and `ackId = 0`.
+  * Like Splunk, the `splunk_hec` source will require channel IDs for
+    acknowledgement. Currently, we store channel IDs as an additional `LogEvent`
+    field. If users intend to move data from a `splunk_hec` source to a
+    `splunk_hec` sink, passing through the channel IDs can be helpful.
+  * Like Splunk, the `splunk_hec` source will assign `ackId`’s per channel.
 
 * Pending acks
-  * We will support the overall `max_number_of_acked_requests_pending_query`
-    configuration described in Splunk documentation (`max_pending_acks`) to
-    avoid memory issues. We will not support the channel-based settings.
+  * We will support the same configuration settings described in Splunk
+    documentation mostly concerning pending `ackId`'s and channel configuration.
 
 ### Implementation
 
