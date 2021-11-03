@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -52,12 +54,17 @@ struct AppendFn {
 
 impl Expression for AppendFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let mut value = self.value.resolve(ctx)?.try_array()?;
-        let mut items = self.items.resolve(ctx)?.try_array()?;
+        let appended = self
+            .value
+            .resolve(ctx)?
+            .borrow()
+            .try_array()?
+            .iter()
+            .chain(self.items.resolve(ctx)?.borrow().try_array()?.iter())
+            .cloned()
+            .collect::<Value>();
 
-        value.append(&mut items);
-
-        Ok(value.into())
+        Ok(SharedValue::from(appended))
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -73,14 +80,14 @@ mod tests {
         append => Append;
 
         both_arrays_empty {
-            args: func_args![value: value!([]), items: value!([])],
-            want: Ok(value!([])),
+            args: func_args![value: shared_value!([]), items: shared_value!([])],
+            want: Ok(shared_value!([])),
             tdef: TypeDef::new().array::<TypeDef>(vec![]),
         }
 
         one_array_empty {
-            args: func_args![value: value!([]), items: value!([1, 2, 3])],
-            want: Ok(value!([1, 2, 3])),
+            args: func_args![value: shared_value!([]), items: shared_value!([1, 2, 3])],
+            want: Ok(shared_value!([1, 2, 3])),
             tdef: TypeDef::new().array_mapped::<i32, TypeDef>(map! {
                 0: Kind::Integer,
                 1: Kind::Integer,
@@ -89,8 +96,8 @@ mod tests {
         }
 
         neither_array_empty {
-            args: func_args![value: value!([1, 2, 3]), items: value!([4, 5, 6])],
-            want: Ok(value!([1, 2, 3, 4, 5, 6])),
+            args: func_args![value: shared_value!([1, 2, 3]), items: shared_value!([4, 5, 6])],
+            want: Ok(shared_value!([1, 2, 3, 4, 5, 6])),
             tdef: TypeDef::new().array_mapped::<i32, TypeDef>(map! {
                 0: Kind::Integer,
                 1: Kind::Integer,
@@ -102,8 +109,8 @@ mod tests {
         }
 
         mixed_array_types {
-            args: func_args![value: value!([1, 2, 3]), items: value!([true, 5.0, "bar"])],
-            want: Ok(value!([1, 2, 3, true, 5.0, "bar"])),
+            args: func_args![value: shared_value!([1, 2, 3]), items: shared_value!([true, 5.0, "bar"])],
+            want: Ok(shared_value!([1, 2, 3, true, 5.0, "bar"])),
             tdef: TypeDef::new().array_mapped::<i32, TypeDef>(map! {
                 0: Kind::Integer,
                 1: Kind::Integer,

@@ -81,7 +81,10 @@ impl Expression for UnnestFn {
         let target: Box<&dyn Target> = match self.path.target() {
             expression::Target::External => Box::new(ctx.target()) as Box<_>,
             expression::Target::Internal(v) => {
-                let v = ctx.state().variable(v.ident()).unwrap_or(&Value::Null);
+                let v = ctx
+                    .state()
+                    .variable(v.ident())
+                    .unwrap_or(SharedValue::from(Value::Null));
                 Box::new(v as &dyn Target) as Box<_>
             }
             expression::Target::Container(expr) => {

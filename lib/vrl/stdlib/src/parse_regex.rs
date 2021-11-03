@@ -128,7 +128,7 @@ mod tests {
                     .unwrap(),
                 numeric_groups: true,
             ],
-            want: Ok(value!({"bytes_in": "5667",
+            want: Ok(shared_value!({"bytes_in": "5667",
                              "host": "5.86.210.12",
                              "user": "zieme4647",
                              "timestamp": "19/06/2019:17:20:49 -0400",
@@ -174,7 +174,7 @@ mod tests {
                 value: "first group and second group",
                 pattern: Regex::new(r#"(?P<number>.*?) group"#).unwrap()
             ],
-            want: Ok(value!({"number": "first"})),
+            want: Ok(shared_value!({"number": "first"})),
             tdef: TypeDef::new()
                 .fallible()
                 .object::<&str, Kind>(map! {

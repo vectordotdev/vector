@@ -30,26 +30,22 @@ impl Value {
             Float(v) => Literal::from(v).into(),
             Boolean(v) => Literal::from(v).into(),
             Object(v) => {
-                todo!()
-                /*
                 let object = crate::expression::Object::from(
                     v.into_iter()
-                        .map(|(k, v)| (k, v.into_expr()))
+                        .map(|(k, v)| (k, v.borrow().clone().into_expr()))
                         .collect::<BTreeMap<_, _>>(),
                 );
 
                 Container::new(container::Variant::from(object)).into()
-                */
             }
             Array(v) => {
-                todo!()
-                /*
                 let array = crate::expression::Array::from(
-                    v.into_iter().map(|v| v.into_expr()).collect::<Vec<_>>(),
+                    v.into_iter()
+                        .map(|v| v.borrow().clone().into_expr())
+                        .collect::<Vec<_>>(),
                 );
 
                 Container::new(container::Variant::from(array)).into()
-                */
             }
             Timestamp(v) => Literal::from(v).into(),
             Regex(v) => Literal::from(v).into(),
@@ -426,7 +422,17 @@ impl Value {
         }
     }
 
-    pub fn try_array(self) -> Result<Vec<Rc<RefCell<Value>>>, Error> {
+    pub fn try_array(&self) -> Result<&[Rc<RefCell<Value>>], Error> {
+        match self {
+            Value::Array(v) => Ok(v),
+            _ => Err(Error::Expected {
+                got: self.kind(),
+                expected: Kind::Array,
+            }),
+        }
+    }
+
+    pub fn try_array_mut(&mut self) -> Result<&mut Vec<Rc<RefCell<Value>>>, Error> {
         match self {
             Value::Array(v) => Ok(v),
             _ => Err(Error::Expected {

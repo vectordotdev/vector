@@ -1,4 +1,5 @@
 use crate::expression::assignment;
+use crate::SharedValue;
 use crate::{parser::ast::Ident, TypeDef, Value};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -124,7 +125,7 @@ impl Compiler {
 #[derive(Debug, Default)]
 pub struct Runtime {
     /// The [`Value`] stored in each variable.
-    variables: HashMap<Ident, Rc<RefCell<Value>>>,
+    variables: HashMap<Ident, SharedValue>,
 }
 
 impl Runtime {
@@ -136,15 +137,15 @@ impl Runtime {
         self.variables.clear();
     }
 
-    pub fn variable(&self, ident: &Ident) -> Option<Rc<RefCell<Value>>> {
+    pub fn variable(&self, ident: &Ident) -> Option<SharedValue> {
         self.variables.get(ident).cloned()
     }
 
-    pub fn variable_mut(&mut self, ident: &Ident) -> Option<Rc<RefCell<Value>>> {
+    pub fn variable_mut(&mut self, ident: &Ident) -> Option<SharedValue> {
         self.variables.get_mut(ident).cloned()
     }
 
-    pub(crate) fn insert_variable(&mut self, ident: Ident, value: Rc<RefCell<Value>>) {
+    pub(crate) fn insert_variable(&mut self, ident: Ident, value: SharedValue) {
         self.variables.insert(ident, value);
     }
 }

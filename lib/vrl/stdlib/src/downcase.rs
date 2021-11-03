@@ -68,7 +68,7 @@ mod tests {
 
         simple {
             args: func_args![value: "FOO 2 bar"],
-            want: Ok(value!("foo 2 bar")),
+            want: Ok(shared_value!("foo 2 bar")),
             tdef: TypeDef::new().bytes(),
         }
     ];

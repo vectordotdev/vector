@@ -138,13 +138,13 @@ mod tests {
 
         parses {
             args: func_args![ value: r#"{"field": "value"}"# ],
-            want: Ok(value!({ field: "value" })),
+            want: Ok(shared_value!({ field: "value" })),
             tdef: type_def(),
         }
 
         complex_json {
             args: func_args![ value: r#"{"object": {"string":"value","number":42,"array":["hello","world"],"boolean":false}}"# ],
-            want: Ok(value!({ object: {string: "value", number: 42, array: ["hello", "world"], boolean: false} })),
+            want: Ok(shared_value!({ object: {string: "value", number: 42, array: ["hello", "world"], boolean: false} })),
             tdef: type_def(),
         }
 

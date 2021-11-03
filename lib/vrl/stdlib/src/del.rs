@@ -172,7 +172,7 @@ mod tests {
             (
                 // Array field exists
                 btreemap! { "exists" => value!([1, 2, 3]) },
-                Ok(value!([1, 2, 3])),
+                Ok(shared_value!([1, 2, 3])),
                 DelFn::new("exists"),
             ),
             (
@@ -195,14 +195,14 @@ mod tests {
             ),
             (
                 // Array field exists
-                btreemap! {"exists" => value!([1, 2, 3]) },
+                btreemap! {"exists" => shared_value!([1, 2, 3]) },
                 Ok(value!(2)),
                 DelFn::new(".exists[1]"),
             ),
         ];
         let tz = TimeZone::default();
         for (object, exp, func) in cases {
-            let mut object: Value = object.into();
+            let mut object: SharedValue = SharedValue::from(object.into());
             let mut runtime_state = vrl::state::Runtime::default();
             let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
             let got = func

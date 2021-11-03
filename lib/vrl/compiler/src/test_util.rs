@@ -31,12 +31,12 @@ macro_rules! test_type_def {
 #[macro_export]
 macro_rules! func_args {
     () => (
-        ::std::collections::HashMap::<&'static str, $crate::Value>::default()
+        ::std::collections::HashMap::<&'static str, $crate::SharedValue>::default()
     );
     ($($k:tt: $v:expr),+ $(,)?) => {
-        vec![$((stringify!($k), $v.into())),+]
+        vec![$((stringify!($k), $crate::SharedValue::from($v.into()))),+]
             .into_iter()
-            .collect::<::std::collections::HashMap<&'static str, $crate::Value>>()
+            .collect::<::std::collections::HashMap<&'static str, $crate::SharedValue>>()
     };
 }
 
@@ -49,10 +49,10 @@ macro_rules! bench_function {
             $(
                 group.bench_function(&format!("{}", stringify!($case)), |b| {
                     let mut compiler_state = $crate::state::Compiler::default();
-                    let (expression, want) = $crate::__prep_bench_or_test!($func, compiler_state, $args, $(Ok($crate::Value::from($ok)))? $(Err($err.to_owned()))?);
+                    let (expression, want) = $crate::__prep_bench_or_test!($func, compiler_state, $args, $(Ok($crate::SharedValue::from($crate::Value::from($ok))))? $(Err($err.to_owned()))?);
                     let expression = expression.unwrap();
                     let mut runtime_state = $crate::state::Runtime::default();
-                    let mut target: $crate::Value = ::std::collections::BTreeMap::default().into();
+                    let mut target: $crate::SharedValue = $crate::SharedValue::from(::std::collections::BTreeMap::default().into());
                     let tz = shared::TimeZone::Named(chrono_tz::Tz::UTC);
                     let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz);
 
@@ -88,11 +88,11 @@ macro_rules! test_function {
             fn [<$name _ $case:snake:lower>]() {
                 $before
                 let mut compiler_state = $crate::state::Compiler::default();
-                let (expression, want) = $crate::__prep_bench_or_test!($func, compiler_state, $args, $(Ok($crate::Value::from($ok)))? $(Err($err.to_owned()))?);
+                let (expression, want) = $crate::__prep_bench_or_test!($func, compiler_state, $args, $(Ok($crate::SharedValue::from($crate::Value::from($ok))))? $(Err($err.to_owned()))?);
                 match expression {
                     Ok(expression) => {
                         let mut runtime_state = $crate::state::Runtime::default();
-                        let mut target: $crate::Value = ::std::collections::BTreeMap::default().into();
+                        let mut target: $crate::SharedValue = $crate::SharedValue::from(::std::collections::BTreeMap::default().into());
                         let tz = $tz;
                         let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz);
 
@@ -109,7 +109,7 @@ macro_rules! test_function {
                         assert_eq!(err
                                    // We have to map to a value just to make sure the types match even though
                                    // it will never be used.
-                                   .map(|_| Value::Null)
+                                   .map(|_| $crate::SharedValue::from(Value::Null))
                                    .map_err(|e| format!("{:#}", e.message())), want);
                     }
                 }

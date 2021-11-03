@@ -36,14 +36,16 @@ impl From<EzValue> for Value {
     }
 }
 
+pub type SharedValue = Rc<RefCell<Value>>;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Bytes(Bytes),
     Integer(i64),
     Float(NotNan<f64>),
     Boolean(bool),
-    Object(BTreeMap<String, Rc<RefCell<Value>>>),
-    Array(Vec<Rc<RefCell<Value>>>),
+    Object(BTreeMap<String, SharedValue>),
+    Array(Vec<SharedValue>),
     Timestamp(DateTime<Utc>),
     Regex(Regex),
     Null,
@@ -56,6 +58,12 @@ impl Default for Value {
 }
 
 impl Eq for Value {}
+
+impl From<Value> for SharedValue {
+    fn from(value: Value) -> Self {
+        Rc::new(RefCell::new(value))
+    }
+}
 
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

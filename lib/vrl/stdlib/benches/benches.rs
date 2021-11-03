@@ -135,8 +135,8 @@ bench_function! {
     append => vrl_stdlib::Append;
 
     arrays {
-        args: func_args![value: value!([1, 2, 3]), items: value!([4, 5, 6])],
-        want: Ok(value!([1, 2, 3, 4, 5, 6])),
+        args: func_args![value: shared_value!([1, 2, 3]), items: shared_value!([4, 5, 6])],
+        want: Ok(shared_value!([1, 2, 3, 4, 5, 6])),
     }
 }
 
@@ -144,8 +144,8 @@ bench_function! {
     array => vrl_stdlib::Array;
 
     array {
-        args: func_args![value: value!([1,2,3])],
-        want: Ok(value!([1,2,3])),
+        args: func_args![value: shared_value!([1,2,3])],
+        want: Ok(shared_value!([1,2,3])),
     }
 }
 
@@ -153,8 +153,8 @@ bench_function! {
     assert => vrl_stdlib::Assert;
 
     literal {
-        args: func_args![condition: value!(true), message: "must be true"],
-        want: Ok(value!(true)),
+        args: func_args![condition: shared_value!(true), message: "must be true"],
+        want: Ok(shared_value!(true)),
     }
 }
 
@@ -162,8 +162,8 @@ bench_function! {
     assert_eq=> vrl_stdlib::AssertEq;
 
     literal {
-        args: func_args![left: value!(true), right: value!(true), message: "must be true"],
-        want: Ok(value!(true)),
+        args: func_args![left: shared_value!(true), right: shared_value!(true), message: "must be true"],
+        want: Ok(shared_value!(true)),
     }
 }
 
@@ -171,8 +171,8 @@ bench_function! {
     r#bool => vrl_stdlib::Boolean;
 
     r#bool {
-        args: func_args![value: value!(true)],
-        want: Ok(value!(true)),
+        args: func_args![value: shared_value!(true)],
+        want: Ok(shared_value!(true)),
     }
 }
 
@@ -190,16 +190,16 @@ bench_function! {
 
     array {
         args: func_args![
-            value: value!([null, 1, "" ]),
+            value: shared_value!([null, 1, "" ]),
         ],
-        want: Ok(value!([ 1 ])),
+        want: Ok(shared_value!([ 1 ])),
     }
 
     map {
         args: func_args![
-            value: value!({ "key1": null, "key2":  1, "key3": "" }),
+            value: shared_value!({ "key1": null, "key2":  1, "key3": "" }),
         ],
-        want: Ok(value!({ "key2": 1 })),
+        want: Ok(shared_value!({ "key2": 1 })),
     }
 }
 
@@ -208,12 +208,12 @@ bench_function! {
 
     case_sensitive {
         args: func_args![value: "abcdefg", substring: "cde", case_sensitive: true],
-        want: Ok(value!(true)),
+        want: Ok(shared_value!(true)),
     }
 
     case_insensitive {
         args: func_args![value: "abcdefg", substring: "CDE", case_sensitive: false],
-        want: Ok(value!(true)),
+        want: Ok(shared_value!(true)),
     }
 }
 
@@ -298,7 +298,7 @@ bench_function! {
                 "pnh" => "sin",
                 "sin" => "syd"
             },
-            fields_ordering: value!(["mow", "vvo", "pkc", "hrb", "tsn", "can", "pnh", "sin"]),
+            fields_ordering: shared_value!(["mow", "vvo", "pkc", "hrb", "tsn", "can", "pnh", "sin"]),
             key_value_delimiter: ":",
             field_delimiter: ","
         ],
@@ -310,7 +310,7 @@ bench_function! {
     encode_json => vrl_stdlib::EncodeJson;
 
     map {
-        args: func_args![value: value![{"field": "value"}]],
+        args: func_args![value: shared_value![{"field": "value"}]],
         want: Ok(r#"{"field":"value"}"#),
     }
 }
@@ -334,7 +334,7 @@ bench_function! {
                 "msg" => "This is a log message",
                 "log_id" => 12345,
             },
-            fields_ordering: value!(["lvl", "msg"])
+            fields_ordering: shared_value!(["lvl", "msg"])
         ],
         want: Ok(r#"lvl=info msg="This is a log message" log_id=12345"#),
     }
@@ -359,12 +359,12 @@ bench_function! {
 
     case_sensitive {
         args: func_args![value: "abcdefg", substring: "efg", case_sensitive: true],
-        want: Ok(value!(true)),
+        want: Ok(shared_value!(true)),
     }
 
     case_insensitive {
         args: func_args![value: "abcdefg", substring: "EFG", case_sensitive: false],
-        want: Ok(value!(true)),
+        want: Ok(shared_value!(true)),
     }
 }
 
@@ -373,17 +373,17 @@ bench_function! {
 
     str_matching {
         args: func_args![value: "foobarfoo", pattern: "bar"],
-        want: Ok(value!(3)),
+        want: Ok(shared_value!(3)),
     }
 
     str_too_long {
         args: func_args![value: "foo", pattern: "foobar"],
-        want: Ok(value!(-1)),
+        want: Ok(shared_value!(-1)),
     }
 
     regex_matching_start {
         args: func_args![value: "foobar", pattern: Value::Regex(Regex::new("fo+z?").unwrap().into())],
-        want: Ok(value!(0)),
+        want: Ok(shared_value!(0)),
     }
 }
 
@@ -391,24 +391,24 @@ bench_function! {
     flatten => vrl_stdlib::Flatten;
 
     nested_map {
-        args: func_args![value: value!({parent: {child1: 1, child2: 2}, key: "val"})],
-        want: Ok(value!({"parent.child1": 1, "parent.child2": 2, key: "val"})),
+        args: func_args![value: shared_value!({parent: {child1: 1, child2: 2}, key: "val"})],
+        want: Ok(shared_value!({"parent.child1": 1, "parent.child2": 2, key: "val"})),
     }
 
     nested_array {
-        args: func_args![value: value!([42, [43, 44]])],
-        want: Ok(value!([42, 43, 44])),
+        args: func_args![value: shared_value!([42, [43, 44]])],
+        want: Ok(shared_value!([42, 43, 44])),
     }
 
     map_and_array {
-        args: func_args![value: value!({
+        args: func_args![value: shared_value!({
             "parent": {
                 "child1": [1, [2, 3]],
                 "child2": {"grandchild1": 1, "grandchild2": [1, [2, 3], 4]},
             },
             "key": "val",
         })],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             "parent.child1": [1, [2, 3]],
             "parent.child2.grandchild1": 1,
             "parent.child2.grandchild2": [1, [2, 3], 4],
@@ -421,8 +421,8 @@ bench_function! {
     float => vrl_stdlib::Float;
 
     float {
-        args: func_args![value: value!(1.2)],
-        want: Ok(value!(1.2)),
+        args: func_args![value: shared_value!(1.2)],
+        want: Ok(shared_value!(1.2)),
     }
 }
 
@@ -445,7 +445,7 @@ bench_function! {
 
     hexidecimal {
         args: func_args![value: 42, base: 16],
-        want: Ok(value!("2a")),
+        want: Ok(shared_value!("2a")),
     }
 }
 
@@ -495,8 +495,8 @@ bench_function! {
     includes => vrl_stdlib::Includes;
 
     mixed_included_string {
-        args: func_args![value: value!(["foo", 1, true, [1,2,3]]), item: value!("foo")],
-        want: Ok(value!(true)),
+        args: func_args![value: shared_value!(["foo", 1, true, [1,2,3]]), item: shared_value!("foo")],
+        want: Ok(shared_value!(true)),
     }
 }
 
@@ -504,18 +504,18 @@ bench_function! {
     set => vrl_stdlib::Set;
 
     single {
-        args: func_args![value: value!({ "foo": "bar" }), path: vec!["baz"], data: true],
-        want: Ok(value!({ "foo": "bar", "baz": true })),
+        args: func_args![value: shared_value!({ "foo": "bar" }), path: vec!["baz"], data: true],
+        want: Ok(shared_value!({ "foo": "bar", "baz": true })),
     }
 
     nested {
-        args: func_args![value: value!({ "foo": { "bar": "baz" } }), path: vec!["foo", "bar", "qux"], data: 42],
-        want: Ok(value!({ "foo": { "bar": { "qux": 42 } } })),
+        args: func_args![value: shared_value!({ "foo": { "bar": "baz" } }), path: vec!["foo", "bar", "qux"], data: 42],
+        want: Ok(shared_value!({ "foo": { "bar": { "qux": 42 } } })),
     }
 
     indexing {
-        args: func_args![value: value!([0, 42, 91]), path: vec![3], data: 1],
-        want: Ok(value!([0, 42, 91, 1])),
+        args: func_args![value: shared_value!([0, 42, 91]), path: vec![3], data: 1],
+        want: Ok(shared_value!([0, 42, 91, 1])),
     }
 }
 
@@ -523,8 +523,8 @@ bench_function! {
     int => vrl_stdlib::Integer;
 
     int {
-        args: func_args![value: value!(1)],
-        want: Ok(value!(1)),
+        args: func_args![value: shared_value!(1)],
+        want: Ok(shared_value!(1)),
     }
 }
 
@@ -533,7 +533,7 @@ bench_function! {
 
     valid {
         args: func_args![value: "1.2.3.4"],
-        want: Ok(value!(16909060)),
+        want: Ok(shared_value!(16909060)),
     }
 }
 
@@ -556,7 +556,7 @@ bench_function! {
 
     valid {
         args: func_args![value: 16909060],
-        want: Ok(value!("1.2.3.4")),
+        want: Ok(shared_value!("1.2.3.4")),
     }
 }
 
@@ -621,7 +621,7 @@ bench_function! {
     }
 
     array {
-        args: func_args![value: value!([1, 2, 3])],
+        args: func_args![value: shared_value!([1, 2, 3])],
         want: Ok(true),
     }
 }
@@ -644,7 +644,7 @@ bench_function! {
     is_float => vrl_stdlib::IsFloat;
 
     array {
-        args: func_args![value: value!([1, 2, 3])],
+        args: func_args![value: shared_value!([1, 2, 3])],
         want: Ok(false),
     }
 
@@ -663,7 +663,7 @@ bench_function! {
     }
 
     object {
-        args: func_args![value: value!({"foo": "bar"})],
+        args: func_args![value: shared_value!({"foo": "bar"})],
         want: Ok(false),
     }
 }
@@ -677,7 +677,7 @@ bench_function! {
     }
 
     null {
-        args: func_args![value: value!(null)],
+        args: func_args![value: shared_value!(null)],
         want: Ok(true),
     }
 }
@@ -696,7 +696,7 @@ bench_function! {
     }
 
     null {
-        args: func_args![value: value!(null)],
+        args: func_args![value: shared_value!(null)],
         want: Ok(true),
     }
 
@@ -715,7 +715,7 @@ bench_function! {
     }
 
     object {
-        args: func_args![value: value!({"foo": "bar"})],
+        args: func_args![value: shared_value!({"foo": "bar"})],
         want: Ok(true),
     }
 }
@@ -724,12 +724,12 @@ bench_function! {
     is_regex => vrl_stdlib::IsRegex;
 
     regex {
-        args: func_args![value: value!(Regex::new(r"\d+").unwrap())],
+        args: func_args![value: shared_value!(Regex::new(r"\d+").unwrap())],
         want: Ok(true),
     }
 
     object {
-        args: func_args![value: value!({"foo": "bar"})],
+        args: func_args![value: shared_value!({"foo": "bar"})],
         want: Ok(false),
     }
 }
@@ -743,7 +743,7 @@ bench_function! {
     }
 
     array {
-        args: func_args![value: value!([1, 2, 3])],
+        args: func_args![value: shared_value!([1, 2, 3])],
         want: Ok(false),
     }
 }
@@ -757,7 +757,7 @@ bench_function! {
     }
 
     array {
-        args: func_args![value: value!([1, 2, 3])],
+        args: func_args![value: shared_value!([1, 2, 3])],
         want: Ok(false),
     }
 }
@@ -766,7 +766,7 @@ bench_function! {
     join => vrl_stdlib::Join;
 
     literal {
-        args: func_args![value: value!(["hello", "world"]), separator: " "],
+        args: func_args![value: shared_value!(["hello", "world"]), separator: " "],
         want: Ok("hello world"),
     }
 }
@@ -775,18 +775,18 @@ bench_function! {
     length => vrl_stdlib::Length;
 
     map {
-        args: func_args![value: value!({foo: "bar", baz: true, baq: [1, 2, 3]})],
+        args: func_args![value: shared_value!({foo: "bar", baz: true, baq: [1, 2, 3]})],
         want: Ok(3),
     }
 
     array {
-        args: func_args![value: value!([1, 2, 3, 4, true, "hello"])],
-        want: Ok(value!(6)),
+        args: func_args![value: shared_value!([1, 2, 3, 4, true, "hello"])],
+        want: Ok(shared_value!(6)),
     }
 
     string {
         args: func_args![value: "hello world"],
-        want: Ok(value!(11))
+        want: Ok(shared_value!(11))
     }
 }
 
@@ -796,7 +796,7 @@ bench_function! {
 
     literal {
         args: func_args![value: "ohno"],
-        want: Ok(value!(null)),
+        want: Ok(shared_value!(null)),
     }
 }
 
@@ -804,17 +804,17 @@ bench_function! {
     get => vrl_stdlib::Get;
 
     single {
-        args: func_args![value: value!({ "foo": "bar" }), path: vec!["foo"]],
+        args: func_args![value: shared_value!({ "foo": "bar" }), path: vec!["foo"]],
         want: Ok("bar"),
     }
 
     nested {
-        args: func_args![value: value!({ "foo": { "bar": "baz" } }), path: vec!["foo", "bar"]],
+        args: func_args![value: shared_value!({ "foo": { "bar": "baz" } }), path: vec!["foo", "bar"]],
         want: Ok("baz"),
     }
 
     indexing {
-        args: func_args![value: value!([0, 42, 91]), path: vec![-2]],
+        args: func_args![value: shared_value!([0, 42, 91]), path: vec![-2]],
         want: Ok(42),
     }
 }
@@ -842,7 +842,7 @@ bench_function! {
 
     single_match {
         args: func_args![
-            value: value!(["foo 1 bar"]),
+            value: shared_value!(["foo 1 bar"]),
             pattern: Regex::new(r"foo \d bar").unwrap(),
         ],
         want: Ok(true),
@@ -850,7 +850,7 @@ bench_function! {
 
     no_match {
         args: func_args![
-            value: value!(["foo x bar"]),
+            value: shared_value!(["foo x bar"]),
             pattern: Regex::new(r"foo \d bar").unwrap(),
         ],
         want: Ok(false),
@@ -858,7 +858,7 @@ bench_function! {
 
     some_match {
         args: func_args![
-            value: value!(["foo 2 bar", "foo 3 bar", "foo 4 bar", "foo 5 bar"]),
+            value: shared_value!(["foo 2 bar", "foo 3 bar", "foo 4 bar", "foo 5 bar"]),
             pattern: Regex::new(r"foo \d bar").unwrap(),
         ],
         want: Ok(true),
@@ -866,18 +866,18 @@ bench_function! {
 
     all_match {
         args: func_args![
-            value: value!(["foo 2 bar", "foo 3 bar", "foo 4 bar", "foo 5 bar"]),
+            value: shared_value!(["foo 2 bar", "foo 3 bar", "foo 4 bar", "foo 5 bar"]),
             pattern: Regex::new(r"foo \d bar").unwrap(),
-            all: value!(true)
+            all: shared_value!(true)
         ],
         want: Ok(true),
     }
 
     not_all_match {
         args: func_args![
-            value: value!(["foo 2 bar", "foo 3 bar", "foo 4 bar", "foo x bar"]),
+            value: shared_value!(["foo 2 bar", "foo 3 bar", "foo 4 bar", "foo x bar"]),
             pattern: Regex::new(r"foo \d bar").unwrap(),
-            all: value!(true)
+            all: shared_value!(true)
         ],
         want: Ok(false),
     }
@@ -887,77 +887,77 @@ bench_function! {
     match_datadog_query => vrl_stdlib::MatchDatadogQuery;
 
     equals_message {
-        args: func_args![value: value!({"message": "match by word boundary"}), query: "match"],
+        args: func_args![value: shared_value!({"message": "match by word boundary"}), query: "match"],
         want: Ok(true),
     }
 
     equals_tag {
-        args: func_args![value: value!({"tags": ["x:1", "y:2", "z:3"]}), query: "y:2"],
+        args: func_args![value: shared_value!({"tags": ["x:1", "y:2", "z:3"]}), query: "y:2"],
         want: Ok(true),
     }
 
     equals_facet {
-        args: func_args![value: value!({"custom": {"z": 1}}), query: "@z:1"],
+        args: func_args![value: shared_value!({"custom": {"z": 1}}), query: "@z:1"],
         want: Ok(true),
     }
 
     negate_wildcard_prefix_message {
-        args: func_args![value: value!({"message": "vector"}), query: "-*tor"],
+        args: func_args![value: shared_value!({"message": "vector"}), query: "-*tor"],
         want: Ok(false),
     }
 
     wildcard_prefix_tag_no_match {
-        args: func_args![value: value!({"tags": ["b:vector"]}), query: "a:*tor"],
+        args: func_args![value: shared_value!({"tags": ["b:vector"]}), query: "a:*tor"],
         want: Ok(false),
     }
 
     wildcard_suffix_facet {
-        args: func_args![value: value!({"custom": {"a": "vector"}}), query: "@a:vec*"],
+        args: func_args![value: shared_value!({"custom": {"a": "vector"}}), query: "@a:vec*"],
         want: Ok(true),
     }
 
     wildcard_multiple_message {
-        args: func_args![value: value!({"message": "vector"}), query: "v*c*r"],
+        args: func_args![value: shared_value!({"message": "vector"}), query: "v*c*r"],
         want: Ok(true),
     }
 
     not_wildcard_multiple_facet_no_match {
-        args: func_args![value: value!({"custom": {"b": "vector"}}), query: "NOT @a:v*c*r"],
+        args: func_args![value: shared_value!({"custom": {"b": "vector"}}), query: "NOT @a:v*c*r"],
         want: Ok(true),
     }
 
     negate_range_facet_between_no_match {
-        args: func_args![value: value!({"custom": {"a": 200}}), query: "-@a:[1 TO 6]"],
+        args: func_args![value: shared_value!({"custom": {"a": 200}}), query: "-@a:[1 TO 6]"],
         want: Ok(true),
     }
 
     not_range_facet_between_no_match_string {
-        args: func_args![value: value!({"custom": {"a": "7"}}), query: r#"NOT @a:["1" TO "60"]"#],
+        args: func_args![value: shared_value!({"custom": {"a": "7"}}), query: r#"NOT @a:["1" TO "60"]"#],
         want: Ok(true),
     }
 
     exclusive_range_message_lower {
-        args: func_args![value: value!({"message": "200"}), query: "{1 TO *}"],
+        args: func_args![value: shared_value!({"message": "200"}), query: "{1 TO *}"],
         want: Ok(true),
     }
 
     not_exclusive_range_message_upper_no_match {
-        args: func_args![value: value!({"message": "3"}), query: "NOT {* TO 3}"],
+        args: func_args![value: shared_value!({"message": "3"}), query: "NOT {* TO 3}"],
         want: Ok(true),
     }
 
     negate_message_and_or_2 {
-        args: func_args![value: value!({"message": "this contains the_other"}), query: "this AND -(that OR the_other)"],
+        args: func_args![value: shared_value!({"message": "this contains the_other"}), query: "this AND -(that OR the_other)"],
         want: Ok(false),
     }
 
     message_or_and {
-        args: func_args![value: value!({"message": "just this"}), query: "this OR (that AND the_other)"],
+        args: func_args![value: shared_value!({"message": "just this"}), query: "this OR (that AND the_other)"],
         want: Ok(true),
     }
 
     kitchen_sink_2 {
-        args: func_args![value: value!({"tags": ["c:that", "d:the_other"], "custom": {"b": "testing", "e": 3}}), query: "host:this OR ((@b:test* AND c:that) AND d:the_other @e:[1 TO 5])"],
+        args: func_args![value: shared_value!({"tags": ["c:that", "d:the_other"], "custom": {"b": "testing", "e": 3}}), query: "host:this OR ((@b:test* AND c:that) AND d:the_other @e:[1 TO 5])"],
         want: Ok(true),
     }
 }
@@ -976,10 +976,10 @@ bench_function! {
 
     simple {
         args: func_args![
-            to: value!({ "key1": "val1" }),
-            from: value!({ "key2": "val2" }),
+            to: shared_value!({ "key1": "val1" }),
+            from: shared_value!({ "key2": "val2" }),
         ],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             "key1": "val1",
             "key2": "val2",
         }))
@@ -987,16 +987,16 @@ bench_function! {
 
     shallow {
         args: func_args![
-            to: value!({
+            to: shared_value!({
                 "key1": "val1",
                 "child": { "grandchild1": "val1" },
             }),
-            from: value!({
+            from: shared_value!({
                 "key2": "val2",
                 "child": { "grandchild2": "val2" },
             })
         ],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             "key1": "val1",
             "key2": "val2",
             "child": { "grandchild2": "val2" },
@@ -1005,17 +1005,17 @@ bench_function! {
 
     deep {
         args: func_args![
-            to: value!({
+            to: shared_value!({
                 "key1": "val1",
                 "child": { "grandchild1": "val1" },
             }),
-            from: value!({
+            from: shared_value!({
                 "key2": "val2",
                 "child": { "grandchild2": "val2" },
             }),
             deep: true
         ],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             "key1": "val1",
             "key2": "val2",
             "child": {
@@ -1030,8 +1030,8 @@ bench_function! {
     object => vrl_stdlib::Object;
 
     object {
-        args: func_args![value: value!({"foo": "bar"})],
-        want: Ok(value!({"foo": "bar"})),
+        args: func_args![value: shared_value!({"foo": "bar"})],
+        want: Ok(shared_value!({"foo": "bar"})),
     }
 }
 
@@ -1042,7 +1042,7 @@ bench_function! {
         args: func_args![
             value: r#"http 2018-07-02T22:23:00.186641Z app/my-loadbalancer/50dc6c495c0c9188 192.168.131.39:2817 10.0.0.1:80 0.000 0.001 0.000 200 200 34 366 "GET http://www.example.com:80/ HTTP/1.1" "curl/7.46.0" - - arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067 "Root=1-58337262-36d228ad5d99923122bbe354" "-" "-" 0 2018-07-02T22:22:48.364000Z "forward" "-" "-" 10.0.0.1:80 200 "-" "-""#,
         ],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             "actions_executed": "forward",
             "chosen_cert_arn": null,
             "classification": null,
@@ -1105,7 +1105,7 @@ bench_function! {
     ]
 }
 "#],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             "owner":  "071959437513",
             "message_type":  "DATA_MESSAGE",
             "log_group":  "/jesse/test",
@@ -1132,7 +1132,7 @@ bench_function! {
             value:"3 eni-33333333333333333 123456789010 vpc-abcdefab012345678 subnet-22222222bbbbbbbbb i-01234567890123456 10.20.33.164 10.40.2.236 39812 80 6 3 IPv4 10.20.33.164 10.40.2.236 ACCEPT OK",
             format: "version interface_id account_id vpc_id subnet_id instance_id srcaddr dstaddr srcport dstport protocol tcp_flags type pkt_srcaddr pkt_dstaddr action log_status",
         ],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             "account_id": 123456789010i64,
             "action": "ACCEPT",
             "dstaddr": "10.40.2.236",
@@ -1161,7 +1161,7 @@ bench_function! {
         args: func_args![value: r#"127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326"#,
                          format: "common"
         ],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             "host": "127.0.0.1",
             "identity": "bob",
             "user": "frank",
@@ -1179,7 +1179,7 @@ bench_function! {
         args: func_args![value: r#"127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326 "http://www.seniorinfomediaries.com/vertical/channels/front-end/bandwidth" "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/1945-10-12 Firefox/37.0""#,
                          format: "combined"
         ],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             "agent": "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/1945-10-12 Firefox/37.0",
             "host": "127.0.0.1",
             "identity": "bob",
@@ -1199,7 +1199,7 @@ bench_function! {
         args: func_args![value: r#"[01/Mar/2021:12:00:19 +0000] [ab:alert] [pid 4803:tid 3814] [client 147.159.108.175:24259] I will bypass the haptic COM bandwidth, that should matrix the CSS driver!"#,
                          format: "error"
         ],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             "client": "147.159.108.175",
             "message": "I will bypass the haptic COM bandwidth, that should matrix the CSS driver!",
             "module": "ab",
@@ -1217,7 +1217,7 @@ bench_function! {
 
     literal {
         args: func_args![value: r#"127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326"#],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             "host": "127.0.0.1",
             "identity": "bob",
             "user": "frank",
@@ -1237,7 +1237,7 @@ bench_function! {
 
     literal {
         args: func_args![value: "foo,bar"],
-        want: Ok(value!(["foo","bar"]))
+        want: Ok(shared_value!(["foo","bar"]))
     }
 }
 
@@ -1255,7 +1255,7 @@ bench_function! {
 
     literal {
         args: func_args![value: "I20210131 14:48:54.411655 15520 main.c++:9] Hello world!"],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             "level": "info",
             "timestamp": (DateTime::parse_from_rfc3339("2021-01-31T14:48:54.411655Z").unwrap().with_timezone(&Utc)),
             "id": 15520,
@@ -1275,7 +1275,7 @@ bench_function! {
             pattern: "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}",
             remove_empty: false,
         ],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             "timestamp": "2020-10-02T23:22:12.223222Z",
             "level": "info",
             "message": "Hello world",
@@ -1307,7 +1307,7 @@ bench_function! {
 
     map {
         args: func_args![value: r#"{"key": "value"}"#],
-        want: Ok(value!({key: "value"})),
+        want: Ok(shared_value!({key: "value"})),
     }
 }
 
@@ -1318,7 +1318,7 @@ bench_function! {
         args: func_args! [
             value: r#"level=info msg="Stopping all fetchers" tag=stopping_fetchers id=ConsumerFetcherManager-1382721708341 module=kafka.consumer.ConsumerFetcherManager"#
         ],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             level: "info",
             msg: "Stopping all fetchers",
             tag: "stopping_fetchers",
@@ -1332,7 +1332,7 @@ bench_function! {
             value: r#"level=info msg="Stopping all fetchers" tag=stopping_fetchers id=ConsumerFetcherManager-1382721708341 module=kafka.consumer.ConsumerFetcherManager"#,
             accept_standalone_key: false
         ],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             level: "info",
             msg: "Stopping all fetchers",
             tag: "stopping_fetchers",
@@ -1366,7 +1366,7 @@ bench_function! {
             value: r#"172.17.0.1 alice - [01/Apr/2021:12:02:31 +0000] "POST /not-found HTTP/1.1" 404 153 "http://localhost/somewhere" "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.119 Safari/537.36" "2.75""#,
             format: "combined",
         ],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             "client": "172.17.0.1",
             "user": "alice",
             "timestamp": (DateTime::parse_from_rfc3339("2021-04-01T12:02:31Z").unwrap().with_timezone(&Utc)),
@@ -1386,7 +1386,7 @@ bench_function! {
         args: func_args![value: r#"2021/04/01 13:02:31 [error] 31#31: *1 open() "/usr/share/nginx/html/not-found" failed (2: No such file or directory), client: 172.17.0.1, server: localhost, request: "POST /not-found HTTP/1.1", host: "localhost:8081""#,
                          format: "error"
         ],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             "timestamp": (DateTime::parse_from_rfc3339("2021-04-01T13:02:31Z").unwrap().with_timezone(&Utc)),
             "severity": "error",
             "pid": 31,
@@ -1406,7 +1406,7 @@ bench_function! {
 
     literal {
         args: func_args![value: "foo=%2B1&bar=2"],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             foo: "+1",
             bar: "2",
         }))
@@ -1423,7 +1423,7 @@ bench_function! {
                 .unwrap(),
             numeric_groups: true
         ],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             "bytes_in": "5667",
             "host": "5.86.210.12",
             "user": "zieme4647",
@@ -1449,7 +1449,7 @@ bench_function! {
             value: "first group and second group",
             pattern: Regex::new(r#"(?P<number>.*?) group"#).unwrap()
         ],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             "number": "first",
         }))
     }
@@ -1464,7 +1464,7 @@ bench_function! {
             pattern: Regex::new(r#"(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)"#).unwrap(),
             numeric_groups: true
         ],
-        want: Ok(value!([
+        want: Ok(shared_value!([
                 {
                     "fruit": "apples",
                     "veg": "carrots",
@@ -1489,7 +1489,7 @@ bench_function! {
         args: func_args![
             value: r#"{ "test" => "value", "testNum" => 0.2, "testObj" => { "testBool" => true } }"#,
         ],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             test: "value",
             testNum: 0.2,
             testObj: {
@@ -1506,7 +1506,7 @@ bench_function! {
         args: func_args![
             value: r#"<190>Dec 28 2020 16:49:07 plertrood-thinkpad-x220 nginx: 127.0.0.1 - - [28/Dec/2019:16:49:07 +0000] "GET / HTTP/1.1" 304 0 "-" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:71.0) Gecko/20100101 Firefox/71.0""#
         ],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             "severity": "info",
             "facility": "local7",
             "timestamp": (Utc.ymd(2020, 12, 28).and_hms_milli(16, 49, 7, 0)),
@@ -1518,7 +1518,7 @@ bench_function! {
 
     rfc5424 {
         args: func_args![value: r#"<13>1 2020-03-13T20:45:38.119Z dynamicwireless.name non 2426 ID931 [exampleSDID@32473 iut="3" eventSource= "Application" eventID="1011"] Try to override the THX port, maybe it will reboot the neural interface!"#],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             "severity": "notice",
             "facility": "user",
             "timestamp": (Utc.ymd(2020, 3, 13).and_hms_milli(20, 45, 38, 119)),
@@ -1554,7 +1554,7 @@ bench_function! {
 
     literal {
         args: func_args![value: "217.250.207.207 - - [07/Sep/2020:16:38:00 -0400] \"DELETE /deliverables/next-generation/user-centric HTTP/1.1\" 205 11881"],
-        want: Ok(value!([
+        want: Ok(shared_value!([
             "217.250.207.207",
             null,
             null,
@@ -1571,7 +1571,7 @@ bench_function! {
 
     literal {
         args: func_args![value: "https://vector.dev"],
-        want: Ok(value!({
+        want: Ok(shared_value!({
                         "scheme": "https",
                         "username": "",
                         "password": "",
@@ -1589,7 +1589,7 @@ bench_function! {
 
     fast {
         args: func_args![value: "Mozilla Firefox 1.0.1 Mozilla/5.0 (X11; U; Linux i686; de-DE; rv:1.7.6) Gecko/20050223 Firefox/1.0.1"],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             "browser": {
                 "family": "Firefox",
                 "version": "1.0.1",
@@ -1606,7 +1606,7 @@ bench_function! {
 
     enriched {
         args: func_args![value: "Opera/9.80 (J2ME/MIDP; Opera Mini/4.3.24214; iPhone; CPU iPhone OS 4_2_1 like Mac OS X; AppleWebKit/24.783; U; en) Presto/2.5.25 Version/10.54", mode: "enriched"],
-        want: Ok(value!({
+        want: Ok(shared_value!({
             "browser": {
                 "family": "Opera Mini",
                 "major": "4",
@@ -1637,32 +1637,32 @@ bench_function! {
 
     simple_text {
         args: func_args![ value: r#"<a>test</a>"# ],
-        want: Ok(value!({ "a": "test" }))
+        want: Ok(shared_value!({ "a": "test" }))
     }
 
     include_attr {
         args: func_args![ value: r#"<a href="https://vector.dev">test</a>"# ],
-        want: Ok(value!({ "a": { "@href": "https://vector.dev", "text": "test" } }))
+        want: Ok(shared_value!({ "a": { "@href": "https://vector.dev", "text": "test" } }))
     }
 
     exclude_attr {
         args: func_args![ value: r#"<a href="https://vector.dev">test</a>"#, include_attr: false ],
-        want: Ok(value!({ "a": "test" }))
+        want: Ok(shared_value!({ "a": "test" }))
     }
 
     custom_text_key {
         args: func_args![ value: r#"<b>test</b>"#, text_key: "node", always_use_text_key: true ],
-        want: Ok(value!({ "b": { "node": "test" } }))
+        want: Ok(shared_value!({ "b": { "node": "test" } }))
     }
 
     nested_object {
         args: func_args![ value: r#"<a><b>one</b><c>two</c></a>"# ],
-        want: Ok(value!({ "a": { "b": "one", "c": "two" } }))
+        want: Ok(shared_value!({ "a": { "b": "one", "c": "two" } }))
     }
 
     nested_object_array {
         args: func_args![ value: r#"<a><b>one</b><b>two</b></a>"# ],
-        want: Ok(value!({ "a": { "b": ["one", "two"] } }))
+        want: Ok(shared_value!({ "a": { "b": ["one", "two"] } }))
     }
 
     header_and_comments {
@@ -1679,7 +1679,7 @@ bench_function! {
 
             <!-- Could literally be placed anywhere -->
         "#}],
-        want: Ok(value!(
+        want: Ok(shared_value!(
             {
                 "note": {
                     "to": "Tove",
@@ -1711,7 +1711,7 @@ bench_function! {
                 <item>1.0</item>
             </data>
         "#}],
-        want: Ok(value!(
+        want: Ok(shared_value!(
             {
                 "data": {
                     "item": [
@@ -1743,7 +1743,7 @@ bench_function! {
                 <item>1.0</item>
             </data>
         "#}, parse_null: false, parse_bool: false, parse_number: false],
-        want: Ok(value!(
+        want: Ok(shared_value!(
             {
                 "data": {
                     "item": [
@@ -1762,7 +1762,7 @@ bench_function! {
 
     untrimmed {
         args: func_args![ value: "<root>  <a>test</a>  </root>", trim: false ],
-        want: Ok(value!(
+        want: Ok(shared_value!(
             {
                 "root": {
                     "a": "test",
@@ -1782,8 +1782,8 @@ bench_function! {
     push => vrl_stdlib::Push;
 
     literal {
-        args: func_args![value: value!([11, false, 42.5]), item: "foo"],
-        want: Ok(value!([11, false, 42.5, "foo"])),
+        args: func_args![value: shared_value!([11, false, 42.5]), item: "foo"],
+        want: Ok(shared_value!([11, false, 42.5, "foo"])),
     }
 }
 
@@ -1811,17 +1811,17 @@ bench_function! {
     remove => vrl_stdlib::Remove;
 
     single {
-        args: func_args![value: value!({ "foo": "bar", "baz": true }), path: vec!["foo"]],
-        want: Ok(value!({ "baz": true })),
+        args: func_args![value: shared_value!({ "foo": "bar", "baz": true }), path: vec!["foo"]],
+        want: Ok(shared_value!({ "baz": true })),
     }
 
     nested {
-        args: func_args![value: value!({ "foo": { "bar": "baz" } }), path: vec!["foo", "bar"]],
-        want: Ok(value!({ "foo": {} })),
+        args: func_args![value: shared_value!({ "foo": { "bar": "baz" } }), path: vec!["foo", "bar"]],
+        want: Ok(shared_value!({ "foo": {} })),
     }
 
     indexing {
-        args: func_args![value: value!([0, 42, 91]), path: vec![-2]],
+        args: func_args![value: shared_value!([0, 42, 91]), path: vec![-2]],
         want: Ok(vec![0, 91]),
     }
 }
@@ -1852,8 +1852,8 @@ bench_function! {
     reverse_dns => vrl_stdlib::ReverseDns;
 
     google {
-        args: func_args![value: value!("8.8.8.8")],
-        want: Ok(value!("dns.google")),
+        args: func_args![value: shared_value!("8.8.8.8")],
+        want: Ok(shared_value!("dns.google")),
     }
 }
 
@@ -1916,12 +1916,12 @@ bench_function! {
 
     string {
         args: func_args![value: "foo,bar,baz", pattern: ","],
-        want: Ok(value!(["foo", "bar", "baz"]))
+        want: Ok(shared_value!(["foo", "bar", "baz"]))
     }
 
     regex {
         args: func_args![value: "foo,bar,baz", pattern: Regex::new("[,]").unwrap()],
-        want: Ok(value!(["foo", "bar", "baz"]))
+        want: Ok(shared_value!(["foo", "bar", "baz"]))
     }
 }
 
@@ -1930,12 +1930,12 @@ bench_function! {
 
     case_sensitive {
         args: func_args![value: "abcdefg", substring: "abc", case_sensitive: true],
-        want: Ok(value!(true)),
+        want: Ok(shared_value!(true)),
     }
 
     case_insensitive {
         args: func_args![value: "abcdefg", substring: "ABC", case_sensitive: false],
-        want: Ok(value!(true)),
+        want: Ok(shared_value!(true)),
     }
 }
 
@@ -2042,9 +2042,9 @@ bench_function! {
 
     default {
         args: func_args![
-            value: value!(["bar", "foo", "baz", "foo"]),
+            value: shared_value!(["bar", "foo", "baz", "foo"]),
         ],
-        want: Ok(value!({"bar": 1, "foo": 2, "baz": 1})),
+        want: Ok(shared_value!({"bar": 1, "foo": 2, "baz": 1})),
     }
 }
 
@@ -2053,7 +2053,7 @@ bench_function! {
 
     timestamp {
         args: func_args![value: Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)],
-        want: Ok(value!(Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0))),
+        want: Ok(shared_value!(Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0))),
     }
 }
 
@@ -2076,7 +2076,7 @@ bench_function! {
     }
 
     null {
-        args: func_args![value: value!(null)],
+        args: func_args![value: shared_value!(null)],
         want: Ok(false)
     }
 }
@@ -2100,7 +2100,7 @@ bench_function! {
     }
 
     null {
-        args: func_args![value: value!(null)],
+        args: func_args![value: shared_value!(null)],
         want: Ok(0.0)
     }
 }
@@ -2124,7 +2124,7 @@ bench_function! {
     }
 
     null {
-        args: func_args![value: value!(null)],
+        args: func_args![value: shared_value!(null)],
         want: Ok(0)
     }
 }
@@ -2157,7 +2157,7 @@ bench_function! {
     }
 
     null {
-        args: func_args![value: value!(null)],
+        args: func_args![value: shared_value!(null)],
         want: Ok("")
     }
 }
@@ -2166,8 +2166,8 @@ bench_function! {
     to_syslog_facility => vrl_stdlib::ToSyslogFacility;
 
     literal {
-        args: func_args![value: value!(23)],
-        want: Ok(value!("local7")),
+        args: func_args![value: shared_value!(23)],
+        want: Ok(shared_value!("local7")),
     }
 }
 
@@ -2175,8 +2175,8 @@ bench_function! {
     to_syslog_level => vrl_stdlib::ToSyslogLevel;
 
     literal {
-        args: func_args![value: value!(5)],
-        want: Ok(value!("notice")),
+        args: func_args![value: shared_value!(5)],
+        want: Ok(shared_value!("notice")),
     }
 }
 
@@ -2184,8 +2184,8 @@ bench_function! {
     to_syslog_severity => vrl_stdlib::ToSyslogSeverity;
 
     literal {
-        args: func_args![value: value!("info")],
-        want: Ok(value!(6)),
+        args: func_args![value: shared_value!("info")],
+        want: Ok(shared_value!(6)),
     }
 }
 
@@ -2244,16 +2244,16 @@ bench_function! {
 
     default {
         args: func_args![
-            value: value!(["bar", "foo", "baz", "foo"]),
+            value: shared_value!(["bar", "foo", "baz", "foo"]),
         ],
-        want: Ok(value!(["bar", "foo", "baz"])),
+        want: Ok(shared_value!(["bar", "foo", "baz"])),
     }
 
     mixed_values {
         args: func_args![
-            value: value!(["foo", [1,2,3], "123abc", 1, true, [1,2,3], "foo", true, 1]),
+            value: shared_value!(["foo", [1,2,3], "123abc", 1, true, [1,2,3], "foo", true, 1]),
         ],
-        want: Ok(value!(["foo", [1,2,3], "123abc", 1, true])),
+        want: Ok(shared_value!(["foo", [1,2,3], "123abc", 1, true])),
     }
 }
 

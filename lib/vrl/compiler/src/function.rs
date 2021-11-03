@@ -3,7 +3,7 @@ use crate::expression::{
 };
 use crate::parser::Node;
 use crate::value::Kind;
-use crate::{Span, Value};
+use crate::{SharedValue, Span, Value};
 use diagnostic::{DiagnosticError, Label, Note};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
@@ -274,6 +274,16 @@ impl From<HashMap<&'static str, Value>> for ArgumentList {
         Self(
             map.into_iter()
                 .map(|(k, v)| (k, v.into_expr()))
+                .collect::<HashMap<_, _>>(),
+        )
+    }
+}
+
+impl From<HashMap<&'static str, SharedValue>> for ArgumentList {
+    fn from(map: HashMap<&'static str, SharedValue>) -> Self {
+        Self(
+            map.into_iter()
+                .map(|(k, v)| (k, v.borrow().clone().into_expr()))
                 .collect::<HashMap<_, _>>(),
         )
     }

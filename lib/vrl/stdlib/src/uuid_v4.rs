@@ -35,7 +35,9 @@ impl Expression for UuidV4Fn {
         let mut buf = [0; 36];
         let uuid = uuid::Uuid::new_v4().to_hyphenated().encode_lower(&mut buf);
 
-        Ok(Bytes::copy_from_slice(uuid.as_bytes()).into())
+        Ok(SharedValue::from(
+            Bytes::copy_from_slice(uuid.as_bytes()).into(),
+        ))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
