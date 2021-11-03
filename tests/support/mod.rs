@@ -251,6 +251,7 @@ impl FunctionTransform for MockTransform {
                     }
                     MetricValue::AggregatedHistogram { .. } => None,
                     MetricValue::AggregatedSummary { .. } => None,
+                    MetricValue::Sketch { .. } => None,
                     MetricValue::Set { .. } => {
                         let mut values = BTreeSet::new();
                         values.insert(self.suffix.clone());

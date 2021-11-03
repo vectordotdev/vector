@@ -111,6 +111,7 @@ components: sinks: vector: {
 	how_it_works: components.sources.vector.how_it_works
 
 	telemetry: metrics: {
+		component_sent_bytes_total:       components.sources.internal_metrics.output.metrics.component_sent_bytes_total
 		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
 		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
 		processed_bytes_total:            components.sources.internal_metrics.output.metrics.processed_bytes_total

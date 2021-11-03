@@ -11,7 +11,7 @@ pub struct ErrorMessage {
 #[cfg(any(
     feature = "sources-utils-http-prelude",
     feature = "sources-utils-http-encoding",
-    feature = "sources-datadog"
+    feature = "sources-datadog_agent"
 ))]
 impl ErrorMessage {
     pub fn new(code: http::StatusCode, message: String) -> Self {

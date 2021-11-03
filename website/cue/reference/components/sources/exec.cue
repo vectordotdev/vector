@@ -78,12 +78,6 @@ components: sources: exec: {
 			required:    false
 			type: bool: default: true
 		}
-		event_per_line: {
-			common:      false
-			description: "Determine if events should be generated per line or buffered and output as a single event when script execution finishes."
-			required:    false
-			type: bool: default: true
-		}
 		maximum_buffer_size_bytes: {
 			common:      false
 			description: "The maximum buffer size allowed before a log event will be generated."

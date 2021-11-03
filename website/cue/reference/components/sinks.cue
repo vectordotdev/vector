@@ -1,9 +1,5 @@
 package metadata
 
-import (
-	"list"
-)
-
 components: sinks: [Name=string]: {
 	kind: "sink"
 
@@ -134,11 +130,22 @@ components: sinks: [Name=string]: {
 					type: string: {
 						default: features.send.compression.default
 						enum: {
-							if list.Contains(features.send.compression.algorithms, "none") {
-								none: "No compression."
-							}
-							if list.Contains(features.send.compression.algorithms, "gzip") {
-								gzip: "[Gzip](\(urls.gzip)) standard DEFLATE compression."
+							for algo in features.send.compression.algorithms {
+								if algo == "none" {
+									none: "No compression."
+								}
+								if algo == "gzip" {
+									gzip: "[Gzip](\(urls.gzip)) standard DEFLATE compression."
+								}
+								if algo == "snappy" {
+									snappy: "[Snappy](\(urls.snappy)) compression."
+								}
+								if algo == "lz4" {
+									lz4: "[lz4](\(urls.lz4)) compression."
+								}
+								if algo == "zstd" {
+									zstd: "[zstd](\(urls.zstd)) compression."
+								}
 							}
 						}
 					}
