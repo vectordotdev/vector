@@ -18,7 +18,7 @@ jobs:
   build-x86_64-unknown-linux-musl-packages:
     runs-on: [self-hosted, linux, x64, general]
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
@@ -34,7 +34,7 @@ jobs:
   build-x86_64-unknown-linux-gnu-packages:
     runs-on: [self-hosted, linux, x64, general]
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
@@ -58,7 +58,7 @@ jobs:
   build-aarch64-unknown-linux-musl-packages:
     runs-on: [self-hosted, linux, x64, general]
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
@@ -75,7 +75,7 @@ jobs:
   build-aarch64-unknown-linux-gnu-packages:
     runs-on: [self-hosted, linux, x64, general]
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
@@ -100,7 +100,7 @@ jobs:
   build-armv7-unknown-linux-gnueabihf-packages:
     runs-on: [self-hosted, linux, x64, general]
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
@@ -124,7 +124,7 @@ jobs:
   build-armv7-unknown-linux-musleabihf-packages:
     runs-on: [self-hosted, linux, x64, general]
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
@@ -140,7 +140,7 @@ jobs:
   build-x86_64-apple-darwin-packages:
     runs-on: macos-10.15
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
       - name: "Upgrade bash"
         run: brew install bash
       - name: "Install realpath dependency"
@@ -171,7 +171,7 @@ jobs:
     env:
       RUSTFLAGS: "-D warnings -Ctarget-feature=+crt-static"
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
       - name: "Add Vector version"
         run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
         shell: bash
@@ -256,7 +256,7 @@ jobs:
           systemd \
           make
       - name: checkout
-        uses: actions/checkout@v2.3.5
+        uses: actions/checkout@v2.4.0
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
@@ -291,7 +291,7 @@ jobs:
           tar \
           make
       - name: checkout
-        uses: actions/checkout@v2.3.5
+        uses: actions/checkout@v2.4.0
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
@@ -312,7 +312,7 @@ jobs:
       - build-x86_64-apple-darwin-packages
     steps:
       - name: checkout
-        uses: actions/checkout@v2.3.5
+        uses: actions/checkout@v2.4.0
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
@@ -332,7 +332,7 @@ jobs:
       - build-armv7-unknown-linux-gnueabihf-packages
       - deb-verify
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - name: Login to DockerHub
         uses: docker/login-action@v1.10.0
@@ -393,7 +393,7 @@ jobs:
       - rpm-verify
       - osx-verify
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
@@ -475,7 +475,7 @@ jobs:
       - rpm-verify
       - osx-verify
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
@@ -549,7 +549,7 @@ jobs:
     needs:
       - release-s3
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -566,7 +566,7 @@ jobs:
       - deb-verify
       - rpm-verify
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
