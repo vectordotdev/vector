@@ -1,17 +1,16 @@
 use crate::{
     config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration},
-        retries::RetryLogic,
-        sink::{self, Response},
-        BatchConfig, BatchSettings, Compression, EncodedEvent, EncodedLength, TowerRequestConfig,
+        BatchConfig,
+        BatchSettings,
+        Compression,
+        EncodedEvent, EncodedLength, encoding::{EncodingConfig, EncodingConfiguration}, retries::RetryLogic, sink::{self, Response}, TowerRequestConfig,
         VecBuffer,
     },
 };
 use bytes::Bytes;
-use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt};
+use futures::{future::BoxFuture, FutureExt, Sink, SinkExt, stream, StreamExt};
 use rusoto_core::RusotoError;
 use rusoto_firehose::{
     DescribeDeliveryStreamError, DescribeDeliveryStreamInput, KinesisFirehose,
@@ -27,6 +26,7 @@ use std::{
 use tower::Service;
 use tracing_futures::Instrument;
 use vector_core::ByteSizeOf;
+use crate::aws::rusoto::{self, AwsAuthentication, RegionOrEndpoint};
 
 // AWS Kinesis Firehose API accepts payloads up to 4MB or 500 events
 // https://docs.aws.amazon.com/firehose/latest/dev/limits.html
@@ -385,7 +385,7 @@ mod integration_tests {
     use rusoto_es::{CreateElasticsearchDomainRequest, Es, EsClient};
     use rusoto_firehose::{CreateDeliveryStreamInput, ElasticsearchDestinationConfiguration};
     use serde_json::{json, Value};
-    use tokio::time::{sleep, Duration};
+    use tokio::time::{Duration, sleep};
 
     #[tokio::test]
     async fn firehose_put_records() {

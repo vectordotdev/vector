@@ -2,22 +2,21 @@ mod request;
 
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
+        DataType, GenerateConfig, log_schema, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
     },
     event::{Event, LogEvent, Value},
     internal_events::TemplateRenderingFailed,
-    rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
         batch::{BatchConfig, BatchSettings},
-        encoding::{EncodingConfig, EncodingConfiguration},
-        retries::{FixedRetryPolicy, RetryLogic},
-        Compression, EncodedEvent, EncodedLength, PartitionBatchSink, PartitionBuffer,
-        PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings, VecBuffer,
+        Compression,
+        EncodedEvent,
+        EncodedLength, encoding::{EncodingConfig, EncodingConfiguration}, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
+        retries::{FixedRetryPolicy, RetryLogic}, TowerRequestConfig, TowerRequestSettings, VecBuffer,
     },
     template::Template,
 };
 use chrono::{Duration, Utc};
-use futures::{future::BoxFuture, ready, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{future::BoxFuture, FutureExt, ready, SinkExt, stream, StreamExt, TryFutureExt};
 use rusoto_core::{request::BufferedHttpResponse, RusotoError};
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogStreamError,
@@ -36,10 +35,11 @@ use tower::{
     buffer::Buffer,
     limit::{concurrency::ConcurrencyLimit, rate::RateLimit},
     retry::Retry,
-    timeout::Timeout,
-    Service, ServiceBuilder, ServiceExt,
+    Service,
+    ServiceBuilder, ServiceExt, timeout::Timeout,
 };
 use vector_core::ByteSizeOf;
+use crate::aws::rusoto::{self, AwsAuthentication, RegionOrEndpoint};
 
 // Estimated maximum size of InputLogEvent with an empty message
 const EVENT_SIZE_OVERHEAD: usize = 50;
@@ -681,10 +681,10 @@ mod tests {
     use super::*;
     use crate::{
         event::{Event, Value},
-        rusoto::RegionOrEndpoint,
     };
     use std::collections::HashMap;
     use std::convert::{TryFrom, TryInto};
+    use crate::aws::rusoto::RegionOrEndpoint;
 
     #[test]
     fn generate_config() {
@@ -861,14 +861,14 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::{ProxyConfig, SinkConfig, SinkContext},
-        rusoto::RegionOrEndpoint,
         test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
     };
-    use futures::{stream, SinkExt, StreamExt};
+    use futures::{SinkExt, stream, StreamExt};
     use pretty_assertions::assert_eq;
     use rusoto_core::Region;
     use rusoto_logs::{CloudWatchLogs, CreateLogGroupRequest, GetLogEventsRequest};
     use std::convert::TryFrom;
+    use crate::aws::rusoto::RegionOrEndpoint;
 
     const GROUP_NAME: &str = "vector-cw";
 

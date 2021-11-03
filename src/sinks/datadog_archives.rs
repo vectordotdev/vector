@@ -20,10 +20,11 @@ use vector_core::{
     ByteSizeOf,
 };
 
+use crate::aws::auth::AwsAuthentication;
+use crate::aws::rusoto::RegionOrEndpoint;
 use crate::{
     config::GenerateConfig,
     config::{DataType, SinkConfig, SinkContext},
-    rusoto::{AwsAuthentication, RegionOrEndpoint},
     sinks::{
         s3_common::{
             self,

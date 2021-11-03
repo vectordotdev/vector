@@ -5,28 +5,8 @@ use snafu::{ResultExt, Snafu};
 use std::convert::TryFrom;
 use std::str::FromStr;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-#[serde(default)]
-pub struct RegionOrEndpoint {
-    region: Option<String>,
-    endpoint: Option<String>,
-}
-
-impl RegionOrEndpoint {
-    pub const fn with_region(region: String) -> Self {
-        Self {
-            region: Some(region),
-            endpoint: None,
-        }
-    }
-
-    pub const fn with_endpoint(endpoint: String) -> Self {
-        Self {
-            region: None,
-            endpoint: Some(endpoint),
-        }
-    }
-}
+//TODO: backwards compat - use the type directly instead of from here
+pub use crate::aws::region::RegionOrEndpoint;
 
 #[derive(Debug, Snafu)]
 pub enum ParseError {

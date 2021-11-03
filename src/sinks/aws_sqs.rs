@@ -1,19 +1,18 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
+        DataType, GenerateConfig, log_schema, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
     },
     event::Event,
     internal_events::{AwsSqsEventSent, TemplateRenderingFailed},
-    rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration},
-        retries::RetryLogic,
-        sink::{self, Response},
-        BatchSettings, EncodedEvent, EncodedLength, TowerRequestConfig, VecBuffer,
+        BatchSettings,
+        EncodedEvent,
+        EncodedLength,
+        encoding::{EncodingConfig, EncodingConfiguration}, retries::RetryLogic, sink::{self, Response}, TowerRequestConfig, VecBuffer,
     },
     template::{Template, TemplateParseError},
 };
-use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
+use futures::{future::BoxFuture, FutureExt, Sink, SinkExt, stream, StreamExt, TryFutureExt};
 use rusoto_core::RusotoError;
 use rusoto_sqs::{
     GetQueueAttributesError, GetQueueAttributesRequest, SendMessageError, SendMessageRequest,
@@ -28,6 +27,7 @@ use std::{
 use tower::Service;
 use tracing_futures::Instrument;
 use vector_core::ByteSizeOf;
+use crate::aws::rusoto::{self, AwsAuthentication, RegionOrEndpoint};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -375,7 +375,7 @@ mod integration_tests {
     use rusoto_core::Region;
     use rusoto_sqs::{CreateQueueRequest, GetQueueUrlRequest, ReceiveMessageRequest};
     use std::collections::HashMap;
-    use tokio::time::{sleep, Duration};
+    use tokio::time::{Duration, sleep};
 
     #[tokio::test]
     async fn sqs_send_message_batch() {

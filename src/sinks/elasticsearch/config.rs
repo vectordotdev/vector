@@ -3,7 +3,7 @@ use crate::config::{DataType, SinkConfig, SinkContext};
 use crate::event::{EventRef, LogEvent, Value};
 use crate::http::HttpClient;
 use crate::internal_events::TemplateRenderingFailed;
-use crate::rusoto::RegionOrEndpoint;
+use crate::aws::rusoto::RegionOrEndpoint;
 use crate::sinks::elasticsearch::request_builder::ElasticsearchRequestBuilder;
 use crate::sinks::elasticsearch::sink::ElasticSearchSink;
 use crate::sinks::elasticsearch::{BatchActionTemplate, IndexTemplate};

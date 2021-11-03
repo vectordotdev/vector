@@ -53,8 +53,8 @@ pub mod list;
 pub(crate) mod pipeline;
 pub(crate) mod proto;
 pub mod providers;
-#[cfg(feature = "rusoto_core")]
-pub mod rusoto;
+#[cfg(any(feature = "rusoto_core", feature = "aws-config"))]
+pub mod aws;
 pub mod serde;
 #[cfg(windows)]
 pub mod service;
@@ -87,7 +87,7 @@ pub mod vector_windows;
 
 pub use pipeline::Pipeline;
 
-pub use vector_core::{event, mapping, metrics, Error, Result};
+pub use vector_core::{Error, event, mapping, metrics, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]

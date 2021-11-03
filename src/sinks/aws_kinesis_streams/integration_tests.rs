@@ -8,13 +8,13 @@ use crate::sinks::util::{BatchConfig, Compression};
 use crate::test_util::components;
 use crate::{
     config::SinkContext,
-    rusoto::RegionOrEndpoint,
     test_util::{random_lines_with_stream, random_string},
 };
 use rusoto_core::Region;
 use rusoto_kinesis::{Kinesis, KinesisClient};
 use std::sync::Arc;
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
+use crate::aws::rusoto::RegionOrEndpoint;
 
 #[tokio::test]
 async fn kinesis_put_records() {
