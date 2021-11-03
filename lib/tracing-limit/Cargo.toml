@@ -9,7 +9,7 @@ license = "MPL-2.0"
 [dependencies]
 ansi_term = { version = "0.12", default-features = false }
 tracing-core = { version = "0.1", default-features = false }
-tracing-subscriber = { version = "0.3", default-features = false }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["std"] }
 dashmap = { version = "4", default-features = false }
 
 [dev-dependencies]
