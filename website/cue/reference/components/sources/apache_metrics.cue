@@ -56,7 +56,6 @@ components: sources: apache_metrics: {
 			type: array: {
 				items: type: string: {
 					examples: ["http://localhost:8080/server-status/?auto"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -73,10 +72,8 @@ components: sources: apache_metrics: {
 			description: "The namespace of the metric. Disabled if empty."
 			required:    false
 			common:      false
-			warnings: []
 			type: string: {
 				default: "apache"
-				syntax:  "literal"
 			}
 		}
 	}

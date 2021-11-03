@@ -39,7 +39,6 @@ components: transforms: remove_tags: {
 			warnings: []
 			type: array: items: type: string: {
 				examples: ["tag1", "tag2"]
-				syntax: "literal"
 			}
 		}
 	}

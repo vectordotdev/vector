@@ -36,7 +36,6 @@ components: transforms: add_fields: {
 		fields: {
 			description: "A table of key/value pairs representing the keys to be added to the event."
 			required:    true
-			warnings: []
 			type: object: {
 				examples: [
 					{
@@ -55,7 +54,6 @@ components: transforms: add_fields: {
 					"*": {
 						description: "The name of the field to add. Accepts all supported configuration types. Use `.` for adding nested fields."
 						required:    true
-						warnings: []
 						type: "*": {}
 					}
 				}
@@ -65,7 +63,6 @@ components: transforms: add_fields: {
 			common:      true
 			description: "By default, fields will be overridden. Set this to `false` to avoid overwriting values."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 	}

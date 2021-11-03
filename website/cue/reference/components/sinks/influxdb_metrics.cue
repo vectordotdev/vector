@@ -50,11 +50,9 @@ components: sinks: influxdb_metrics: {
 				A namespace will be prefixed to a metric's name.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["service"]
-				syntax: "literal"
 			}
 		}
 	}

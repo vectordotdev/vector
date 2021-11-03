@@ -44,10 +44,8 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 			common:      true
 			description: "The log field to decode as an AWS CloudWatch Logs Subscription JSON event. The field must hold a string value."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "message"
-				syntax:  "literal"
 			}
 		}
 	}
@@ -70,7 +68,6 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 				required:    true
 				type: string: {
 					examples: ["hello", "{\"key\": \"value\"}"]
-					syntax: "literal"
 				}
 			}
 			id: {
@@ -78,7 +75,6 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 				required:    true
 				type: string: {
 					examples: ["35683658089614582423604394983260738922885519999578275840"]
-					syntax: "literal"
 				}
 			}
 			log_group: {
@@ -86,7 +82,6 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 				required:    true
 				type: string: {
 					examples: ["/lambda/test"]
-					syntax: "literal"
 				}
 			}
 			log_stream: {
@@ -94,7 +89,6 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 				required:    true
 				type: string: {
 					examples: ["2020/03/24/[$LATEST]794dbaf40a7846c4984ad80ebf110544"]
-					syntax: "literal"
 				}
 			}
 			owner: {
@@ -102,7 +96,6 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 				required:    true
 				type: string: {
 					examples: ["111111111111"]
-					syntax: "literal"
 				}
 			}
 			subscription_filters: {
@@ -110,7 +103,6 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 				required:    true
 				type: array: items: type: string: {
 					examples: ["Destination"]
-					syntax: "literal"
 				}
 			}
 		}

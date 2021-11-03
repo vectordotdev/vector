@@ -76,7 +76,6 @@ components: sources: heroku_logs: {
 				required:    true
 				type: string: {
 					examples: ["erlang"]
-					syntax: "literal"
 				}
 			}
 			host: fields._local_host
@@ -85,7 +84,6 @@ components: sources: heroku_logs: {
 				required:    true
 				type: string: {
 					examples: ["Hi from erlang"]
-					syntax: "literal"
 				}
 			}
 			proc_id: {
@@ -93,7 +91,6 @@ components: sources: heroku_logs: {
 				required:    true
 				type: string: {
 					examples: ["console"]
-					syntax: "literal"
 				}
 			}
 			timestamp: fields._current_timestamp

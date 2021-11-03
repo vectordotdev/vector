@@ -54,33 +54,27 @@ components: sources: statsd: {
 			description:   "The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port."
 			relevant_when: "mode = `tcp` or `udp`"
 			required:      true
-			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
-				syntax: "literal"
 			}
 		}
 		mode: {
 			description: "The type of socket to use."
 			required:    true
-			warnings: []
 			type: string: {
 				enum: {
 					tcp:  "TCP Socket."
 					udp:  "UDP Socket."
 					unix: "Unix Domain Socket."
 				}
-				syntax: "literal"
 			}
 		}
 		path: {
 			description:   "The unix socket path. *This should be an absolute path*."
 			relevant_when: "mode = `unix`"
 			required:      true
-			warnings: []
 			type: string: {
 				examples: ["/path/to/socket"]
-				syntax: "literal"
 			}
 		}
 		shutdown_timeout_secs: {
@@ -88,7 +82,6 @@ components: sources: statsd: {
 			description:   "The timeout before a connection is forcefully closed during shutdown."
 			relevant_when: "mode = `tcp`"
 			required:      false
-			warnings: []
 			type: uint: {
 				default: 30
 				unit:    "seconds"

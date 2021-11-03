@@ -43,18 +43,15 @@ components: transforms: logfmt_parser: {
 			common:      true
 			description: "If the specified `field` should be dropped (removed) after parsing."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 		field: {
 			common:      true
 			description: "The log field to parse."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child", "array[0]"]
-				syntax: "literal"
 			}
 		}
 		timezone: configuration._timezone

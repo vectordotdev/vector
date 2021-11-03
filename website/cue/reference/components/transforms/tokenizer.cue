@@ -43,27 +43,22 @@ components: transforms: tokenizer: {
 			common:      true
 			description: "If `true` the `field` will be dropped after parsing."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 		field: {
 			common:      true
 			description: "The log field to tokenize."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child"]
-				syntax: "literal"
 			}
 		}
 		field_names: {
 			description: "The log field names assigned to the resulting tokens, in order."
 			required:    true
-			warnings: []
 			type: array: items: type: string: {
 				examples: ["timestamp", "level", "message", "parent.child"]
-				syntax: "literal"
 			}
 		}
 		timezone: configuration._timezone

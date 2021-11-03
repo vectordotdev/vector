@@ -60,7 +60,6 @@ components: sources: http: {
 			required:    true
 			type: string: {
 				examples: ["0.0.0.0:\(_port)", "localhost:\(_port)"]
-				syntax: "literal"
 			}
 		}
 		encoding: {
@@ -75,7 +74,6 @@ components: sources: http: {
 					json:   "Array of JSON objects, which must be a JSON array containing JSON objects."
 					binary: "Binary or text, whole http request body is considered as one message."
 				}
-				syntax: "literal"
 			}
 		}
 		headers: {
@@ -86,7 +84,6 @@ components: sources: http: {
 				default: null
 				items: type: string: {
 					examples: ["User-Agent", "X-My-Custom-Header"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -99,7 +96,6 @@ components: sources: http: {
 				default: null
 				items: type: string: {
 					examples: ["application", "source"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -110,7 +106,6 @@ components: sources: http: {
 			type: string: {
 				default: "/"
 				examples: ["/event/path", "/logs"]
-				syntax: "literal"
 			}
 		}
 		strict_path: {
@@ -131,7 +126,6 @@ components: sources: http: {
 			type: string: {
 				default: "path"
 				examples: ["vector_http_path"]
-				syntax: "literal"
 			}
 		}
 	}
@@ -145,7 +139,6 @@ components: sources: http: {
 					required:      true
 					type: string: {
 						examples: ["Hello world"]
-						syntax: "literal"
 					}
 				}
 				path: {
@@ -153,7 +146,6 @@ components: sources: http: {
 					required:    true
 					type: string: {
 						examples: ["/", "/logs/event712"]
-						syntax: "literal"
 					}
 				}
 				timestamp: fields._current_timestamp
@@ -174,7 +166,6 @@ components: sources: http: {
 					required:    true
 					type: string: {
 						examples: ["/", "/logs/event712"]
-						syntax: "literal"
 					}
 				}
 				timestamp: fields._current_timestamp

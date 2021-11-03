@@ -19,8 +19,8 @@ components: transforms: compound: {
 
 	support: {
 		requirements: []
-		warnings: []
 		notices: []
+		warnings: []
 	}
 
 	configuration: {
@@ -32,7 +32,6 @@ components: transforms: compound: {
 				as if they were configured separately.
 				"""
 			required: true
-			warnings: []
 			type: array: {
 				items: type: object: {
 					options: {
@@ -40,11 +39,9 @@ components: transforms: compound: {
 							common:      true
 							description: "The ID to use for the transform. This will show up in metrics and logs in the format: `<compound transform id>.<step id>`. If not set, the index of the step will be used as its id."
 							required:    false
-							warnings: []
 							type: string: {
 								default: null
 								examples: ["my_filter_transform"]
-								syntax: "literal"
 							}
 						}
 						"*": {
@@ -53,7 +50,6 @@ components: transforms: compound: {
 							for the list of available transforms and their configuration.
 							"""
 							required:    true
-							warnings: []
 							type: object: {}
 						}
 					}

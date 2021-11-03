@@ -318,7 +318,7 @@ _values: {
 	//
 	// For example, the `tls.verify_hostname` option has a warning about
 	// reduced security if the option is disabled.
-	warnings: [...string]
+	warnings: [...string] | *[]
 
 	if !required {
 		// `common` specifes that the option is commonly used. It will bring the
@@ -465,7 +465,7 @@ _values: {
 		]
 	}
 
-	syntax: "file_system_path" | "field_path" | "literal" | "template" | "regex" | "remap_boolean_expression" | "remap_program" | "strftime"
+	syntax: *"literal" | "file_system_path" | "field_path" | "template" | "regex" | "remap_boolean_expression" | "remap_program" | "strftime"
 }
 
 #TypeTimestamp: {

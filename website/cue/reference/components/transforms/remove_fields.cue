@@ -37,16 +37,13 @@ components: transforms: remove_fields: {
 			common:      false
 			description: "If set to `true`, after removing fields, remove any parent objects that are now empty."
 			required:    false
-			warnings: []
 			type: bool: default: false
 		}
 		fields: {
 			description: "The log field names to drop."
 			required:    true
-			warnings: []
 			type: array: items: type: string: {
 				examples: ["field1", "field2", "parent.child"]
-				syntax: "literal"
 			}
 		}
 	}

@@ -53,10 +53,8 @@ components: sources: fluent: {
 		address: {
 			description: "The address to listen for TCP connections on."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)"]
-				syntax: "literal"
 			}
 		}
 	}
@@ -69,7 +67,6 @@ components: sources: fluent: {
 				required:    true
 				type: string: {
 					examples: ["127.0.0.1"]
-					syntax: "literal"
 				}
 			}
 			timestamp: {
@@ -82,7 +79,6 @@ components: sources: fluent: {
 				required:    true
 				type: string: {
 					examples: ["dummy.0"]
-					syntax: "literal"
 				}
 			}
 			"*": {
@@ -90,7 +86,6 @@ components: sources: fluent: {
 				required:    true
 				type: string: {
 					examples: ["hello world"]
-					syntax: "literal"
 				}
 			}
 		}

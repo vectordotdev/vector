@@ -35,11 +35,9 @@ components: transforms: sample: {
 				`key_field`, events will be count rated.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["message"]
-				syntax: "literal"
 			}
 		}
 		exclude: {
@@ -48,7 +46,6 @@ components: transforms: sample: {
 				The set of logical conditions to exclude events from sampling.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				default: null
 				examples: [
@@ -63,7 +60,6 @@ components: transforms: sample: {
 				`rate = 10` means 1 out of every 10 events will be forwarded and the rest will be dropped.
 				"""
 			required: true
-			warnings: []
 			type: uint: {
 				examples: [10]
 				unit: null

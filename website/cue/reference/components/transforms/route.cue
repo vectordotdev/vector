@@ -34,7 +34,6 @@ components: transforms: route: {
 				can then be referenced as an input by other components with the name `<transform_name>.<route_id>`.
 				"""
 			required: true
-			warnings: []
 			type: object: {
 				options: {
 					"*": {
@@ -43,7 +42,6 @@ components: transforms: route: {
 							condition will be included in this route.
 							"""
 						required: true
-						warnings: []
 						type: string: {
 							examples: [
 								#".status_code != 200 && !includes(["info", "debug"], .severity)"#,

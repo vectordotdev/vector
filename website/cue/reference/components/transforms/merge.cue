@@ -42,12 +42,10 @@ components: transforms: merge: {
 				Finally, the non-partial event fields are merged in, producing the resulting merged event.
 				"""
 			required: false
-			warnings: []
 			type: array: {
 				default: ["message"]
 				items: type: string: {
 					examples: ["message", "parent.child"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -58,11 +56,9 @@ components: transforms: merge: {
 				A consequent stream of partial events along with the first non-partial event will be merged together.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				default: "_partial"
 				examples: ["_partial", "parent.child"]
-				syntax: "literal"
 			}
 		}
 		stream_discriminant_fields: {
@@ -73,12 +69,10 @@ components: transforms: merge: {
 				Should be used to prevent events from unrelated sources from mixing together, as this affects partial event processing.
 				"""
 			required: false
-			warnings: []
 			type: array: {
 				default: []
 				items: type: string: {
 					examples: ["host", "parent.child"]
-					syntax: "literal"
 				}
 			}
 		}

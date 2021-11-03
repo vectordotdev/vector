@@ -57,7 +57,6 @@ components: sources: mongodb_metrics: {
 			type: array: {
 				items: type: string: {
 					examples: ["mongodb://localhost:27017"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -76,7 +75,6 @@ components: sources: mongodb_metrics: {
 			required:    false
 			type: string: {
 				default: "mongodb"
-				syntax:  "literal"
 			}
 		}
 	}

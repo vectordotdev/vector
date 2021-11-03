@@ -55,7 +55,6 @@ components: sources: prometheus_remote_write: {
 			required:    true
 			type: string: {
 				examples: ["0.0.0.0:9090"]
-				syntax: "literal"
 			}
 		}
 		auth: configuration._http_basic_auth

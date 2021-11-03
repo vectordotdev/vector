@@ -48,7 +48,6 @@ components: transforms: key_value_parser: {
 			common:      true
 			description: "If `true` will drop the specified `field` after parsing."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 
@@ -56,11 +55,9 @@ components: transforms: key_value_parser: {
 			common:      true
 			description: "The log field containing key/value pairs to parse. Must be a `string` value."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child", "array[0]"]
-				syntax: "literal"
 			}
 		}
 
@@ -71,7 +68,6 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: "="
 				examples: [":", "="]
-				syntax: "literal"
 			}
 		}
 
@@ -92,7 +88,6 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: "[whitespace]"
 				examples: [",", ";", "|"]
-				syntax: "literal"
 			}
 		}
 
@@ -108,7 +103,6 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: null
 				examples: ["root_field", "parent.child"]
-				syntax: "literal"
 			}
 		}
 
@@ -122,7 +116,6 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: null
 				examples: ["<>", "{}"]
-				syntax: "literal"
 			}
 		}
 
@@ -136,7 +129,6 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: null
 				examples: ["<>", "{}"]
-				syntax: "literal"
 			}
 		}
 

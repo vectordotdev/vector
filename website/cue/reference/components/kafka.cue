@@ -36,25 +36,22 @@ components: _kafka: {
 
 	support: {
 		requirements: []
-		warnings: []
 		notices: []
+		warnings: []
 	}
 
 	configuration: {
 		bootstrap_servers: {
 			description: "A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a \"bootstrap\" Kafka cluster that a Kafka client connects to initially to bootstrap itself."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["10.14.22.123:9092,10.14.23.332:9092"]
-				syntax: "literal"
 			}
 		}
 		librdkafka_options: {
 			common:      false
 			description: "Advanced options. See [librdkafka documentation](\(urls.librdkafka_config)) for details.\n"
 			required:    false
-			warnings: []
 			type: object: {
 				examples: [
 					{
@@ -70,7 +67,6 @@ components: _kafka: {
 			common:      false
 			description: "Default timeout for network requests.\n"
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 60000
 				examples: [30000, 60000]

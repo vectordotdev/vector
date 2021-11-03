@@ -138,11 +138,10 @@ components: sources: dnstap: {
 				description: "Dnstap event data type. Currently only 'Message' type is defined."
 				required:    false
 				type: string: {
+					default: null
 					enum: {
 						Message: "Payload is a dnstap message."
 					}
-					default: null
-					syntax:  "literal"
 				}
 			}
 			dataTypeId: {
@@ -159,6 +158,7 @@ components: sources: dnstap: {
 				description:   "Dnstap message type."
 				required:      false
 				type: string: {
+					default: null
 					enum: {
 						AuthQuery: """
 							A DNS query message received from a resolver by an
@@ -235,8 +235,6 @@ components: sources: dnstap: {
 							authoritative name server.
 							"""
 					}
-					default: null
-					syntax:  "literal"
 				}
 			}
 			messageTypeId: {
@@ -274,7 +272,6 @@ components: sources: dnstap: {
 						us: "microsecond"
 						ns: "nanosecond"
 					}
-					syntax: "literal"
 				}
 			}
 			timestamp: {
@@ -285,7 +282,6 @@ components: sources: dnstap: {
 				required: true
 				type: string: {
 					examples: ["2021-04-09T15:08:32.767098Z"]
-					syntax: "literal"
 				}
 			}
 			serverId: {
@@ -293,9 +289,8 @@ components: sources: dnstap: {
 				description: "DNS server identity."
 				required:    false
 				type: string: {
-					examples: ["ns1.example.com"]
 					default: null
-					syntax:  "literal"
+					examples: ["ns1.example.com"]
 				}
 			}
 			serverVersion: {
@@ -303,9 +298,8 @@ components: sources: dnstap: {
 				description: "DNS server version."
 				required:    false
 				type: string: {
-					examples: ["BIND 9.16.8"]
 					default: null
-					syntax:  "literal"
+					examples: ["BIND 9.16.8"]
 				}
 			}
 			extraInfo: {
@@ -313,9 +307,8 @@ components: sources: dnstap: {
 				description: "Extra data for this event."
 				required:    false
 				type: string: {
-					examples: ["an arbitrary byte-string annotation"]
 					default: null
-					syntax:  "literal"
+					examples: ["an arbitrary byte-string annotation"]
 				}
 			}
 			socketFamily: {
@@ -330,7 +323,6 @@ components: sources: dnstap: {
 						INET:  "IPv4 ([RFC 791](\(urls.rfc_791)))."
 						INET6: "IPv6 ([RFC 2460](\(urls.rfc_2460)))."
 					}
-					syntax: "literal"
 				}
 			}
 			socketProtocol: {
@@ -345,7 +337,6 @@ components: sources: dnstap: {
 						UDP: "User Datagram Protocol ([RFC 768](\(urls.rfc_768)))."
 						TCP: "Transmission Control Protocol ([RFC 793](\(urls.rfc_793)))."
 					}
-					syntax: "literal"
 				}
 			}
 			sourceAddress: {
@@ -354,7 +345,6 @@ components: sources: dnstap: {
 				required:      true
 				type: string: {
 					examples: ["192.0.2.8", "fc00::100"]
-					syntax: "literal"
 				}
 			}
 			sourcePort: {
@@ -374,7 +364,6 @@ components: sources: dnstap: {
 				required:      true
 				type: string: {
 					examples: ["192.0.2.18", "fc00::200"]
-					syntax: "literal"
 				}
 			}
 			responsePort: {
@@ -393,9 +382,8 @@ components: sources: dnstap: {
 				description: "Error message upon failure while parsing dnstap data."
 				required:    false
 				type: string: {
-					examples: ["Encountered error : Unexpected number of records in update section: 0"]
 					default: null
-					syntax:  "literal"
+					examples: ["Encountered error : Unexpected number of records in update section: 0"]
 				}
 			}
 			rawData: {
@@ -406,9 +394,8 @@ components: sources: dnstap: {
 					"""
 				required: false
 				type: string: {
-					examples: ["ChBqYW1lcy11YnVudHUtZGV2EgtCSU5EIDkuMTYuNXKdAQgCEAEYASIEfwAAASoEfwAAATDRyAM4AFoNB2V4YW1wbGUDY29tAGCTvf76BW3evGImcmlihYQAAAEAAAABAAACaDIHZXhhbXBsZQNjb20AAAYAAcAPAAYAAQAADhAAPQtiZGRzLWRuc3RhcAAKcG9zdG1hc3RlcgJubwVlbWFpbAZwbGVhc2UAJADGPgAADhAAAAJYACeNAAAADhB4AQ=="]
 					default: null
-					syntax:  "literal"
+					examples: ["ChBqYW1lcy11YnVudHUtZGV2EgtCSU5EIDkuMTYuNXKdAQgCEAEYASIEfwAAASoEfwAAATDRyAM4AFoNB2V4YW1wbGUDY29tAGCTvf76BW3evGImcmlihYQAAAEAAAABAAACaDIHZXhhbXBsZQNjb20AAAYAAcAPAAYAAQAADhAAPQtiZGRzLWRuc3RhcAAKcG9zdG1hc3RlcgJubwVlbWFpbAZwbGVhc2UAJADGPgAADhAAAAJYACeNAAAADhB4AQ=="]
 				}
 			}
 			requestData: {
@@ -440,7 +427,6 @@ components: sources: dnstap: {
 									us: "microsecond"
 									ns: "nanosecond"
 								}
-								syntax: "literal"
 							}
 						}
 						fullRcode: {
@@ -452,9 +438,9 @@ components: sources: dnstap: {
 								"""
 							required: false
 							type: uint: {
-								unit: null
-								examples: [0]
 								default: null
+								unit:    null
+								examples: [0]
 							}
 						}
 						rcodeName: {
@@ -465,6 +451,7 @@ components: sources: dnstap: {
 								"""
 							required: false
 							type: string: {
+								default: null
 								enum: {
 									NoError:   "No Error"
 									FormErr:   "Format Error"
@@ -486,8 +473,6 @@ components: sources: dnstap: {
 									BADTRUNC:  "Bad Truncation"
 									BADCOOKIE: "Bad/missing server cookie"
 								}
-								default: null
-								syntax:  "literal"
 							}
 						}
 						rawData: {
@@ -498,9 +483,8 @@ components: sources: dnstap: {
 								"""
 							required: false
 							type: string: {
-								examples: ["YoWEAAABAAAAAQAAAmgyB2V4YW1wbGUDY29tAAAGAAHADwAGAAEAAA4QAD0LYmRkcy1kbnN0YXAACnBvc3RtYXN0ZXICbm8FZW1haWwGcGxlYXNlACQAxj4AAA4QAAACWAAnjQAAAA4Q"]
 								default: null
-								syntax:  "literal"
+								examples: ["YoWEAAABAAAAAQAAAmgyB2V4YW1wbGUDY29tAAAGAAHADwAGAAEAAA4QAD0LYmRkcy1kbnN0YXAACnBvc3RtYXN0ZXICbm8FZW1haWwGcGxlYXNlACQAxj4AAA4QAAACWAAnjQAAAA4Q"]
 							}
 						}
 						header: {
@@ -698,7 +682,6 @@ components: sources: dnstap: {
 									us: "microsecond"
 									ns: "nanosecond"
 								}
-								syntax: "literal"
 							}
 						}
 						fullRcode: {
@@ -709,9 +692,9 @@ components: sources: dnstap: {
 								"""
 							required: false
 							type: uint: {
-								unit: null
-								examples: [0, 5]
 								default: null
+								unit:    null
+								examples: [0, 5]
 							}
 						}
 						rcodeName: {
@@ -719,6 +702,7 @@ components: sources: dnstap: {
 							description: "Textual response code corresponding to the 'fullRcode'"
 							required:    false
 							type: string: {
+								default: null
 								enum: {
 									NoError:   "No Error"
 									FormErr:   "Format Error"
@@ -740,8 +724,6 @@ components: sources: dnstap: {
 									BADTRUNC:  "Bad Truncation"
 									BADCOOKIE: "Bad/missing server cookie"
 								}
-								default: null
-								syntax:  "literal"
 							}
 						}
 						rawData: {
@@ -752,9 +734,8 @@ components: sources: dnstap: {
 								"""
 							required: false
 							type: string: {
-								examples: ["YoWEAAABAAAAAQAAAmgyB2V4YW1wbGUDY29tAAAGAAHADwAGAAEAAA4QAD0LYmRkcy1kbnN0YXAACnBvc3RtYXN0ZXICbm8FZW1haWwGcGxlYXNlACQAxj4AAA4QAAACWAAnjQAAAA4Q"]
 								default: null
-								syntax:  "literal"
+								examples: ["YoWEAAABAAAAAQAAAmgyB2V4YW1wbGUDY29tAAAGAAHADwAGAAEAAA4QAD0LYmRkcy1kbnN0YXAACnBvc3RtYXN0ZXICbm8FZW1haWwGcGxlYXNlACQAxj4AAA4QAAACWAAnjQAAAA4Q"]
 							}
 						}
 						header: {

@@ -59,17 +59,14 @@ components: sources: vector: {
 				The HTTP address to listen for connections on. It _must_ include a port.
 				"""
 			required: true
-			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)"]
-				syntax: "literal"
 			}
 		}
 		shutdown_timeout_secs: {
 			common:      false
 			description: "The timeout before a connection is forcefully closed during shutdown."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 30
 				unit:    "seconds"
@@ -86,7 +83,6 @@ components: sources: vector: {
 					"2": "Vector source API version 2"
 				}
 				default: "1"
-				syntax:  "literal"
 			}
 		}
 	}

@@ -44,6 +44,7 @@ components: transforms: "remap": {
 			common:      true
 			required:    false
 			type: string: {
+				default: null
 				examples: [
 					"""
 						. = parse_json!(.message)
@@ -53,8 +54,7 @@ components: transforms: "remap": {
 						.new_name = del(.old_name)
 						""",
 				]
-				syntax:  "remap_program"
-				default: null
+				syntax: "remap_program"
 			}
 		}
 		file: {
@@ -68,11 +68,10 @@ components: transforms: "remap": {
 			common:      true
 			required:    false
 			type: string: {
+				default: null
 				examples: [
 					"./my/program.vrl",
 				]
-				syntax:  "literal"
-				default: null
 			}
 		}
 		drop_on_error: {

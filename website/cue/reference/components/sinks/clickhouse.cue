@@ -81,11 +81,9 @@ components: sinks: clickhouse: {
 			common:      true
 			description: "The database that contains the table that data will be inserted into."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["mydatabase"]
-				syntax: "literal"
 			}
 		}
 		endpoint: {
@@ -93,16 +91,13 @@ components: sinks: clickhouse: {
 			required:    true
 			type: string: {
 				examples: ["http://localhost:8123"]
-				syntax: "literal"
 			}
 		}
 		table: {
 			description: "The table that data will be inserted into."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["mytable"]
-				syntax: "literal"
 			}
 		}
 		skip_unknown_fields: {

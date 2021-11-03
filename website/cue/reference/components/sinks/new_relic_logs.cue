@@ -67,36 +67,30 @@ components: sinks: new_relic_logs: {
 			common:      true
 			description: "Your New Relic insert key (if applicable)."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["xxxx", "${NEW_RELIC_INSERT_KEY}"]
-				syntax: "literal"
 			}
 		}
 		license_key: {
 			common:      true
 			description: "Your New Relic license key (if applicable)."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["xxxx", "${NEW_RELIC_LICENSE_KEY}"]
-				syntax: "literal"
 			}
 		}
 		region: {
 			common:      true
 			description: "The region to send data to."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "us"
 				enum: {
 					us: "United States"
 					eu: "Europe"
 				}
-				syntax: "literal"
 			}
 		}
 

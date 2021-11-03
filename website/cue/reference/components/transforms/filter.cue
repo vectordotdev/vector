@@ -31,7 +31,6 @@ components: transforms: filter: {
 				be forwarded.
 				"""
 			required: true
-			warnings: []
 			type: string: {
 				examples: [
 					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,

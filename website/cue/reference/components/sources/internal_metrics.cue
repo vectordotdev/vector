@@ -42,7 +42,6 @@ components: sources: internal_metrics: {
 			required:    false
 			type: string: {
 				default: "vector"
-				syntax:  "literal"
 			}
 		}
 		scrape_interval_secs: {
@@ -59,7 +58,6 @@ components: sources: internal_metrics: {
 			description: "Metric tag options."
 			required:    false
 
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -73,10 +71,8 @@ components: sources: internal_metrics: {
 				Set to "" to suppress this key.
 				"""
 						required:    false
-						warnings: []
 						type: string: {
 							default: "host"
-							syntax:  "literal"
 						}
 					}
 					pid_key: {
@@ -88,10 +84,8 @@ components: sources: internal_metrics: {
 					Set to "" to suppress this key.
 					"""
 						required: false
-						warnings: []
 						type: string: {
 							default: "pid"
-							syntax:  "literal"
 						}
 					}
 				}

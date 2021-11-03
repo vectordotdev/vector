@@ -44,14 +44,12 @@ components: sinks: console: {
 			common:      true
 			description: "The [standard stream](\(urls.standard_streams)) to write to."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "stdout"
 				enum: {
 					stdout: "Output will be written to [STDOUT](\(urls.stdout))"
 					stderr: "Output will be written to [STDERR](\(urls.stderr))"
 				}
-				syntax: "literal"
 			}
 		}
 	}

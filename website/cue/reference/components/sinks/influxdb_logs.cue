@@ -47,10 +47,8 @@ components: sinks: influxdb_logs: {
 			description: "A prefix that will be added to all logs names."
 			groups: ["v1", "v2"]
 			required: true
-			warnings: []
 			type: string: {
 				examples: ["service"]
-				syntax: "literal"
 			}
 		}
 	}

@@ -48,18 +48,15 @@ components: sources: eventstoredb_metrics: {
 			common:      true
 			description: "Endpoints to scrape stats from."
 			required:    false
-			warnings: []
 			type: string: {
 				examples: ["https://localhost:2113/stats"]
 				default: "https://localhost:2113/stats"
-				syntax:  "literal"
 			}
 		}
 		scrape_interval_secs: {
 			common:      true
 			description: "The interval between scrapes, in seconds."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 15
 				unit:    "seconds"
@@ -69,11 +66,9 @@ components: sources: eventstoredb_metrics: {
 			common:      false
 			description: "The namespace used otherwise will be defaulted to eventstoredb."
 			required:    false
-			warnings: []
 			type: string: {
 				examples: ["app-123-eventstoredb"]
 				default: "eventstoredb"
-				syntax:  "literal"
 			}
 		}
 	}

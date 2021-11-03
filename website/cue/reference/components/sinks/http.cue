@@ -84,10 +84,8 @@ components: sinks: http: {
 				but can also include the port, path, and any other valid part of a URI.
 				"""
 			required: true
-			warnings: []
 			type: string: {
 				examples: ["https://10.22.212.22:9000/endpoint"]
-				syntax: "literal"
 			}
 		}
 		healthcheck: type: object: options: uri: {
@@ -97,11 +95,9 @@ components: sinks: http: {
 				but can also include the port, path, and any other valid part of a URI.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["https://10.22.212.22:9000/health"]
-				syntax: "literal"
 			}
 		}
 	}

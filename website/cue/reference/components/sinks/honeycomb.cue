@@ -61,19 +61,15 @@ components: sinks: honeycomb: {
 		api_key: {
 			description: "The team key that will be used to authenticate against Honeycomb."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["${HONEYCOMB_API_KEY}", "some-api-key"]
-				syntax: "literal"
 			}
 		}
 		dataset: {
 			description: "The dataset that Vector will send logs to."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["my-honeycomb-dataset"]
-				syntax: "literal"
 			}
 		}
 	}

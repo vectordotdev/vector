@@ -65,7 +65,6 @@ components: sinks: prometheus_exporter: {
 			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)"]
-				syntax: "literal"
 			}
 		}
 		buckets: {
@@ -75,7 +74,6 @@ components: sinks: prometheus_exporter: {
 				metrics into histograms.
 				"""
 			required:    false
-			warnings: []
 			type: array: {
 				default: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
 				items: type: float: examples: [0.005, 0.01]
@@ -85,7 +83,6 @@ components: sinks: prometheus_exporter: {
 			common:      false
 			description: "Time interval between [set](\(urls.vector_data_model)/metric#set) values are reset."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 60
 				unit:    "seconds"
@@ -100,11 +97,9 @@ components: sinks: prometheus_exporter: {
 				follow Prometheus [naming conventions](\(urls.prometheus_metric_naming)).
 				"""
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["service"]
-				syntax: "literal"
 			}
 		}
 		quantiles: {
@@ -114,7 +109,6 @@ components: sinks: prometheus_exporter: {
 				into a summary.
 				"""
 			required:    false
-			warnings: []
 			type: array: {
 				default: [0.5, 0.75, 0.9, 0.95, 0.99]
 				items: type: float: examples: [0.5, 0.75, 0.9, 0.95, 0.99]
