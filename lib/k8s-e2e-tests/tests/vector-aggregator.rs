@@ -2,8 +2,6 @@ use indoc::indoc;
 use k8s_e2e_tests::*;
 use k8s_test_framework::{lock, vector::Config as VectorConfig};
 
-const HELM_CHART_VECTOR_AGGREGATOR: &str = "vector-aggregator";
-
 const HELM_VALUES_DUMMY_TOPOLOGY: &str = indoc! {r#"
     sources:
       dummy:
@@ -32,9 +30,10 @@ async fn dummy_topology() -> Result<(), Box<dyn std::error::Error>> {
     let override_name = get_override_name(&namespace, "vector-aggregator");
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGGREGATOR,
+            "vector-aggregator",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, false),
@@ -68,9 +67,10 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     let override_name = get_override_name(&namespace, "vector-aggregator");
 
     let vector = framework
-        .vector(
+        .helm_chart(
             &namespace,
-            HELM_CHART_VECTOR_AGGREGATOR,
+            "vector-aggregator",
+            "https://packages.timber.io/helm/nightly/",
             VectorConfig {
                 custom_helm_values: vec![&config_override_name(&override_name, false)],
                 ..Default::default()

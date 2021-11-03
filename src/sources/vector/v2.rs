@@ -1,22 +1,25 @@
 use crate::{
     config::SourceContext,
     config::{DataType, GenerateConfig, Resource},
+    internal_events::{EventsReceived, TcpBytesReceived},
     proto::vector as proto,
     shutdown::ShutdownSignalToken,
-    sources::Source,
+    sources::{util::AfterReadExt as _, Source},
+    tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
 
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::net::TcpStream;
 use tonic::{
-    transport::{Certificate, Identity, Server, ServerTlsConfig},
+    transport::{server::Connected, Certificate, Server},
     Request, Response, Status,
 };
 use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event};
+use vector_core::ByteSizeOf;
 
 #[derive(Debug, Clone)]
 pub struct Service {
@@ -36,6 +39,11 @@ impl proto::Service for Service {
             .into_iter()
             .map(Event::from)
             .collect();
+
+        emit!(&EventsReceived {
+            count: events.len(),
+            byte_size: events.size_of(),
+        });
 
         let receiver = self.acknowledgements.then(|| {
             let (batch, receiver) = BatchNotifier::new_with_receiver();
@@ -89,18 +97,10 @@ pub struct VectorConfig {
     #[serde(default = "default_shutdown_timeout_secs")]
     pub shutdown_timeout_secs: u64,
     #[serde(default)]
-    pub tls: Option<GrpcTlsConfig>,
+    tls: Option<TlsConfig>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
-pub struct GrpcTlsConfig {
-    ca_file: PathBuf,
-    crt_file: PathBuf,
-    key_file: PathBuf,
-}
-
-fn default_shutdown_timeout_secs() -> u64 {
+const fn default_shutdown_timeout_secs() -> u64 {
     30
 }
 
@@ -117,18 +117,20 @@ impl GenerateConfig for VectorConfig {
 
 impl VectorConfig {
     pub(super) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
-        let source = run(self.address, self.tls.clone(), cx).map_err(|error| {
+        let tls_settings = MaybeTlsSettings::from_config(&self.tls, true)?;
+
+        let source = run(self.address, tls_settings, cx).map_err(|error| {
             error!(message = "Source future failed.", %error);
         });
 
         Ok(Box::pin(source))
     }
 
-    pub(super) fn output_type(&self) -> DataType {
+    pub(super) const fn output_type(&self) -> DataType {
         DataType::Any
     }
 
-    pub(super) fn source_type(&self) -> &'static str {
+    pub(super) const fn source_type(&self) -> &'static str {
         "vector"
     }
 
@@ -139,7 +141,7 @@ impl VectorConfig {
 
 async fn run(
     address: SocketAddr,
-    tls: Option<GrpcTlsConfig>,
+    tls_settings: MaybeTlsSettings,
     cx: SourceContext,
 ) -> crate::Result<()> {
     let _span = crate::trace::current_span();
@@ -150,26 +152,89 @@ async fn run(
     });
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
 
-    let mut server = match tls {
-        Some(tls) => {
-            let ca = Certificate::from_pem(tokio::fs::read(&tls.ca_file).await?);
-            let crt = tokio::fs::read(&tls.crt_file).await?;
-            let key = tokio::fs::read(&tls.key_file).await?;
-            let identity = Identity::from_pem(crt, key);
+    let listener = tls_settings.bind(&address).await?;
+    let stream = listener.accept_stream().map(|result| {
+        result.map(|socket| {
+            let peer_addr = socket.connect_info().remote_addr.ip();
+            socket.after_read(move |byte_size| {
+                emit!(&TcpBytesReceived {
+                    byte_size,
+                    peer_addr
+                })
+            })
+        })
+    });
 
-            let tls_config = ServerTlsConfig::new().identity(identity).client_ca_root(ca);
-
-            Server::builder().tls_config(tls_config)?
-        }
-        None => Server::builder(),
-    };
-
-    server
+    Server::builder()
         .add_service(service)
-        .serve_with_shutdown(address, cx.shutdown.map(|token| tx.send(token).unwrap()))
+        .serve_with_incoming_shutdown(stream, cx.shutdown.map(|token| tx.send(token).unwrap()))
         .await?;
 
     drop(rx.await);
 
     Ok(())
+}
+
+#[derive(Clone)]
+pub struct MaybeTlsConnectInfo {
+    pub remote_addr: SocketAddr,
+    pub peer_certs: Option<Vec<Certificate>>,
+}
+
+impl Connected for MaybeTlsIncomingStream<TcpStream> {
+    type ConnectInfo = MaybeTlsConnectInfo;
+
+    fn connect_info(&self) -> Self::ConnectInfo {
+        MaybeTlsConnectInfo {
+            remote_addr: self.peer_addr(),
+            peer_certs: self
+                .ssl_stream()
+                .and_then(|s| s.ssl().peer_cert_chain())
+                .map(|s| {
+                    s.into_iter()
+                        .filter_map(|c| c.to_pem().ok())
+                        .map(Certificate::from_pem)
+                        .collect()
+                }),
+        }
+    }
+}
+
+#[cfg(feature = "sinks-vector")]
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::SinkContext;
+    use crate::sinks::vector::v2::VectorConfig as SinkConfig;
+    use crate::test_util::{self, components};
+    use crate::Pipeline;
+    use shared::assert_event_data_eq;
+
+    #[tokio::test]
+    async fn receive_message() {
+        let addr = test_util::next_addr();
+        let config = format!(r#"address = "{}""#, addr);
+        let source: VectorConfig = toml::from_str(&config).unwrap();
+
+        components::init_test();
+        let (tx, rx) = Pipeline::new_test();
+        let server = source.build(SourceContext::new_test(tx)).await.unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(addr).await;
+
+        // Ideally, this would be a fully custom agent to send the data,
+        // but the sink side already does such a test and this is good
+        // to ensure interoperability.
+        let config = format!(r#"address = "{}""#, addr);
+        let sink: SinkConfig = toml::from_str(&config).unwrap();
+        let cx = SinkContext::new_test();
+        let (sink, _) = sink.build(cx).await.unwrap();
+
+        let (events, stream) = test_util::random_events_with_stream(100, 100, None);
+        sink.run(stream).await.unwrap();
+        components::SOURCE_TESTS.assert(&components::TCP_SOURCE_TAGS);
+
+        let output = test_util::collect_ready(rx).await;
+        assert_event_data_eq!(events, output);
+    }
 }

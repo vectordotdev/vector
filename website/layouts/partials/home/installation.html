@@ -1,0 +1,74 @@
+{{ $install := .Params.installation }}
+{{ $features := .Params.installation_features }}
+{{ $methods := .Params.methods }}
+{{ $commands := site.Data.docs.administration.install_commands }}
+{{ $defaultCommand := (index $commands 0).title }}
+<div class="py-12 md:py-16 lg:py-20 mx-auto max-w-7xl px-8 md:px-4 lg:px-0">
+  <div class="text-center">
+    {{ partial "home/heading.html" (dict "title" $install.title) }}
+
+    <p class="mt-4 text-xl md:text-2xl font-light text-gray-700 dark:text-gray-200">
+      {{ $install.description }}
+    </p>
+
+    <div class="mt-8 lg:mt-10 inline-flex space-x-3 md:space-x-5 lg:space-x-8 w-full justify-center">
+      {{ range $install.logos }}
+      {{ $logo := printf "/img/logos/%s" .logo }}
+      <div class="w-16 md:w-20 lg:w-24 h-auto">
+        <a href="{{ .url }}">
+          <div class="rounded-full hover:shadow-lg">
+            {{ partial "svg.html" (dict "src" $logo "class" "install-icon") }}
+          </div>
+        </a>
+      </div>
+      {{ end }}
+    </div>
+  </div>
+
+  <div class="mt-8 lg:mt-10">
+    <div class="grid grid-cols-2 md:grid-cols-4 justify-items-center max-w-4xl mx-auto">
+      {{ range $install.features }}
+      <div class="flex items-center space-x-2">
+        <ion-icon name="{{ .ionicon }}" class="text-secondary dark:text-primary"></ion-icon>
+
+        <span class="text-gray-600 dark:text-gray-300 font-semibold">
+          {{ .title }}
+        </span>
+      </div>
+      {{ end }}
+    </div>
+  </div>
+
+  <div class="mt-12 max-w-5xl mx-auto flex flex-col space-y-10">
+    <div>
+      <p class="text-xl md:text-2xl font-semibold text-gray-700 dark:text-gray-200">
+        Install with a one-liner:
+      </p>
+
+      {{ partial "one-liner.html" . }}
+    </div>
+
+    <div>
+      <p class="text-lg md:text-xl lg:text-2xl font-semibold text-gray-700 dark:text-gray-200">
+        Or choose your preferred method:
+      </p>
+
+      <div class="mt-4 grid md:grid-cols-2 lg:grid-cols-4 md:gap-4 lg:gap-x-6 gap-y-1.5">
+        {{ range $install.methods }}
+        <a href="{{ .url }}" class="flex-1 py-1.5 md:py-2 px-3 md:px-4 shadow rounded-full bg-gray-200 text-dark hover:bg-primary hover:text-dark dark:bg-primary dark:text-dark dark:hover:bg-purple-v">
+          <div class="flex justify-between items-center">
+            <span class="uppercase text-xs md:text-sm font-semibold">
+              {{ .title }}
+            </span>
+
+            {{/* Heroicons: outline/chevron-right */}}
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </div>
+        </a>
+        {{ end }}
+      </div>
+    </div>
+  </div>
+</div>

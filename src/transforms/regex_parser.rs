@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{
         RegexParserConversionFailed, RegexParserFailedMatch, RegexParserMissingField,
@@ -46,8 +46,8 @@ impl_generate_config_from_default!(RegexParserConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "regex_parser")]
 impl TransformConfig for RegexParserConfig {
-    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
-        RegexParser::build(self, globals.timezone)
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        RegexParser::build(self, context.globals.timezone)
     }
 
     fn input_type(&self) -> DataType {
@@ -123,7 +123,7 @@ impl CompiledRegex {
                                 match conversion.convert(capture) {
                                     Ok(value) => Some((name.clone(), value)),
                                     Err(error) => {
-                                        emit!(RegexParserConversionFailed { name, error });
+                                        emit!(&RegexParserConversionFailed { name, error });
                                         None
                                     }
                                 }
@@ -132,7 +132,7 @@ impl CompiledRegex {
                 Some(values)
             }
             None => {
-                emit!(RegexParserFailedMatch { value });
+                emit!(&RegexParserFailedMatch { value });
                 None
             }
         }
@@ -249,7 +249,7 @@ impl FunctionTransform for RegexParser {
             let id = match regex_id {
                 Some(id) => id,
                 None => {
-                    emit!(RegexParserFailedMatch { value });
+                    emit!(&RegexParserFailedMatch { value });
                     if !self.drop_failed {
                         output.push(event);
                     };
@@ -271,7 +271,7 @@ impl FunctionTransform for RegexParser {
                         if self.overwrite_target {
                             log.remove(target_field);
                         } else {
-                            emit!(RegexParserTargetExists { target_field });
+                            emit!(&RegexParserTargetExists { target_field });
                             output.push(event);
                             return;
                         }
@@ -291,7 +291,7 @@ impl FunctionTransform for RegexParser {
                 return;
             }
         } else {
-            emit!(RegexParserMissingField { field: &self.field });
+            emit!(&RegexParserMissingField { field: &self.field });
         }
 
         if !self.drop_failed {
@@ -304,7 +304,7 @@ impl FunctionTransform for RegexParser {
 mod tests {
     use super::RegexParserConfig;
     use crate::{
-        config::{GlobalOptions, TransformConfig},
+        config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
     };
 
@@ -324,7 +324,7 @@ mod tests {
             patterns, config
         ))
         .unwrap()
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
         let parser = parser.as_function();

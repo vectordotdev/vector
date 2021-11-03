@@ -50,7 +50,7 @@ pub struct PubsubConfig {
     pub tls: Option<TlsOptions>,
 }
 
-fn default_skip_authentication() -> bool {
+const fn default_skip_authentication() -> bool {
     false
 }
 
@@ -74,7 +74,7 @@ impl SinkConfig for PubsubConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = PubsubSink::from_config(self).await?;
         let batch_settings = BatchSettings::default()
-            .bytes(bytesize::mib(10u64))
+            .bytes(10_000_000)
             .events(1000)
             .timeout(1)
             .parse_config(self.batch)?;
@@ -221,6 +221,7 @@ mod tests {
 #[cfg(feature = "gcp-pubsub-integration-tests")]
 mod integration_tests {
     use super::*;
+    use crate::test_util::components::{self, HTTP_SINK_TAGS};
     use crate::test_util::{random_events_with_stream, random_string, trace_init};
     use reqwest::{Client, Method, Response};
     use serde_json::{json, Value};
@@ -255,7 +256,7 @@ mod integration_tests {
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (input, events) = random_events_with_stream(100, 100, Some(batch));
-        sink.run(events).await.expect("Sending events failed");
+        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let response = pull_messages(&subscription, 1000).await;

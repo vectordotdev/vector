@@ -48,7 +48,12 @@ impl Function for Split {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _ctx: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
         let pattern = arguments.required("pattern");
         let limit = arguments.optional("limit").unwrap_or(expr!(999999999));

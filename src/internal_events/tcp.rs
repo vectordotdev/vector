@@ -1,6 +1,9 @@
-use super::InternalEvent;
+// ## skip check-events ##
+
 use crate::tls::TlsError;
 use metrics::counter;
+use std::net::IpAddr;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct TcpSocketConnectionEstablished {
@@ -87,7 +90,7 @@ pub struct TcpSocketError {
 
 impl InternalEvent for TcpSocketError {
     fn emit_logs(&self) {
-        debug!(message = "TCP socket error.", error = %self.error);
+        warn!(message = "TCP socket error.", error = %self.error);
     }
 
     fn emit_metrics(&self) {
@@ -107,5 +110,25 @@ impl InternalEvent for TcpSendAckError {
 
     fn emit_metrics(&self) {
         counter!("connection_send_ack_errors_total", 1, "mode" => "tcp");
+    }
+}
+
+#[derive(Debug)]
+pub struct TcpBytesReceived {
+    pub byte_size: usize,
+    pub peer_addr: IpAddr,
+}
+
+impl InternalEvent for TcpBytesReceived {
+    fn emit_logs(&self) {
+        trace!(message = "Bytes received.", byte_size = %self.byte_size, peer_addr = %self.peer_addr);
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_received_bytes_total", self.byte_size as u64,
+            "protocol" => "tcp",
+            "peer_addr" => self.peer_addr.to_string()
+        );
     }
 }

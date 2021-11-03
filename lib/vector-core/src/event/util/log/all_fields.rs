@@ -26,6 +26,8 @@ enum PathComponent<'a> {
 }
 
 /// Performs depth-first traversal of the nested structure.
+///
+/// If a key maps to an empty collection, the key and the empty collection will be returned.
 #[derive(Clone)]
 struct FieldsIter<'a> {
     /// Stack of iterators used for the depth-first traversal.
@@ -44,12 +46,12 @@ impl<'a> FieldsIter<'a> {
 
     fn push(&mut self, value: &'a Value, component: PathComponent<'a>) -> Option<&'a Value> {
         match value {
-            Value::Map(map) => {
+            Value::Map(map) if !map.is_empty() => {
                 self.stack.push(LeafIter::Map(map.iter()));
                 self.path.push(component);
                 None
             }
-            Value::Array(array) => {
+            Value::Array(array) if !array.is_empty() => {
                 self.stack.push(LeafIter::Array(array.iter().enumerate()));
                 self.path.push(component);
                 None
@@ -129,6 +131,7 @@ impl<'a> Serialize for FieldsIter<'a> {
 mod test {
     use super::super::test::fields_from_json;
     use super::*;
+    use pretty_assertions::assert_eq;
     use serde_json::json;
 
     #[test]
@@ -164,21 +167,25 @@ mod test {
                 }, [2]]
             },
             "a.b.c": 6,
+            "d": {},
+            "e": [],
         }));
         let expected: Vec<_> = vec![
-            ("a.a", &Value::Integer(4)),
-            ("a.array[0]", &Value::Null),
-            ("a.array[1]", &Value::Integer(3)),
-            ("a.array[2].x", &Value::Integer(1)),
-            ("a.array[3][0]", &Value::Integer(2)),
-            ("a.b.c", &Value::Integer(5)),
-            ("a\\.b\\.c", &Value::Integer(6)),
+            ("a.a", Value::Integer(4)),
+            ("a.array[0]", Value::Null),
+            ("a.array[1]", Value::Integer(3)),
+            ("a.array[2].x", Value::Integer(1)),
+            ("a.array[3][0]", Value::Integer(2)),
+            ("a.b.c", Value::Integer(5)),
+            ("a\\.b\\.c", Value::Integer(6)),
+            ("d", Value::Map(BTreeMap::new())),
+            ("e", Value::Array(Vec::new())),
         ]
         .into_iter()
         .map(|(k, v)| (k.into(), v))
         .collect();
 
-        let collected: Vec<_> = all_fields(&fields).collect();
+        let collected: Vec<_> = all_fields(&fields).map(|(k, v)| (k, v.clone())).collect();
         assert_eq!(collected, expected);
     }
 }

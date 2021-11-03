@@ -1,0 +1,170 @@
+{{ define "title" }}
+{{ .Title }} | Vector documentation
+{{ end }}
+
+{{ define "main" }}
+{{ $tag := .File.BaseFileName }}
+{{ $kind := .CurrentSection.Params.component_type }}
+{{ $config := index (index site.Data.docs.components $kind) $tag }}
+{{ $exampleConfigs := $config.example_configs }}
+{{ $noindex := .Params.noindex }}
+<div class="relative mx-auto px-4 sm:px-6 lg:px-10 mt-8">
+  <div class="lg:grid lg:grid-cols-16 lg:gap-8">
+    <div class="hidden lg:block lg:col-span-5 xl:col-span-4 pr-0 md:pr-6 lg:pr-12">
+      <nav aria-label="Sidebar" class="sticky top-8 h-screen overflow-auto pb-16" x-cloak>
+        {{ partial "docs/sidebar.html" . }}
+      </nav>
+    </div>
+
+    <main aria-label="Main documentation content" class="lg:col-span-11 xl:col-span-9 pr-0 lg:pr-24">
+      <div class="mb-4 md:mb-6">
+        {{ partial "breadcrumb.html" . }}
+      </div>
+
+      <div{{ if not $noindex }} id="page-content"{{ end }}>
+        <h1 class="dark:text-gray-50 font-secondary font-extrabold text-4xl lg:text-5xl leading-tight tracking-tight">
+          {{ .Title | markdownify }}
+        </h1>
+
+        {{ with .Description }}
+        <p class="dark:text-gray-200 mt-5 md:text-lg text-gray-500 prose dark:prose-dark max-w-none">
+          {{ . | markdownify }}
+        </p>
+        {{ end }}
+
+        <div class="mt-8">
+          {{ partial "docs/component-under-hero.html" . }}
+        </div>
+
+        <div class="mt-8">
+          {{ partial "page-actions.html" . }}
+        </div>
+
+        <div class="mt-12 prose dark:prose-dark max-w-none tracking-tight pb-32">
+          {{ with $config.description }}
+          <div class="prose dark:prose-dark max-w-none">
+            {{ . | markdownify }}
+          </div>
+          {{ end }}
+
+          {{ if $config.alias }}
+          {{ partial "docs/component-alias.html" (dict "kind" $kind "alias" $config.alias "current" $tag) }}
+          {{ end }}
+
+          {{/* Component requirements */}}
+          {{ with $config.support.requirements }}
+          {{ partial "heading.html" (dict "text" "Requirements" "level" 2) }}
+          {{ partial "data.html" (dict "component_requirements" .) }}
+          {{ end }}
+
+          {{/* Component warnings */}}
+          {{ with $config.support.warnings }}
+          {{ partial "heading.html" (dict "text" "Warnings" "level" 2) }}
+          {{ partial "data.html" (dict "component_warnings" .) }}
+          {{ end }}
+
+          {{/* Component configuration */}}
+          {{ with $config.configuration }}
+          {{ if gt (len .) 1 }} {{/* Don't display if only the "type" config is present */}}
+          {{ partial "heading.html" (dict "text" "Configuration" "level" 2) }}
+
+          {{ partial "components/example-configs.html" (dict "examples" $exampleConfigs) }}
+
+          {{ partial "data.html" (dict "component_config" . ) }}
+          {{ end }}
+          {{ end }}
+
+          {{/* Component environment variables */}}
+          {{ with $config.env_vars }}
+          {{ partial "heading.html" (dict "text" "Environment variables" "level" 2) }}
+          {{ partial "data.html" (dict "component_env_vars" . ) }}
+          {{ end }}
+
+          {{/* Component log/metric output */}}
+          {{ with $config.output }}
+          {{ partial "heading.html" (dict "text" "Output" "level" 2) }}
+          {{ partial "data.html" (dict "component_output" . ) }}
+          {{ end }}
+
+          {{/* Component telemetry output */}}
+          {{ with $config.telemetry }}
+          {{ partial "heading.html" (dict "text" "Telemetry" "level" 2) }}
+          {{ partial "data.html" (dict "component_telemetry" . ) }}
+          {{ end }}
+
+          {{/* Component examples */}}
+          {{ with $config.examples }}
+          {{ partial "heading.html" (dict "text" "Examples" "level" 2) }}
+          {{ partial "data.html" (dict "component_examples" . ) }}
+          {{ end }}
+
+          {{/* Cloud platform permissions */}}
+          {{ with $config.permissions }}
+          {{ partial "heading.html" (dict "text" "Permissions" "level" 2) }}
+          {{ partial "data.html" (dict "component_permissions" .) }}
+          {{ end }}
+
+          {{/* How it works */}}
+          {{ with $config.how_it_works }}
+          <div class="no-prose mt-12">
+            <span>
+              {{ partial "heading.html" (dict "text" "How it works" "level" 2) }}
+            </span>
+
+            <div class="mt-8 flex flex-col space-y-6">
+              {{ range $k, $v := . }}
+              <div>
+                <span>
+                  {{ partial "heading.html" (dict "text" $v.title "level" 3) }}
+                </span>
+
+                {{ with .svg }}
+                {{ partial "svg.html" (dict "src" .) }}
+                {{ end }}
+
+                <div class="mt-2 prose dark:prose-dark max-w-none">
+                  {{ $v.body | markdownify }}
+                </div>
+
+                {{ with $v.sub_sections }}
+                <div class="mt-2">
+                  {{ range . }}
+                  <span>
+                    {{ partial "heading.html" (dict "text" .title "level" 4) }}
+                  </span>
+
+                  {{ with .svg }}
+                  {{ partial "svg.html" (dict "src" .) }}
+                  {{ end }}
+
+                  <div class="mt-2 prose dark:prose-dark max-w-none">
+                    {{ .body | markdownify }}
+                  </div>
+                  {{ end }}
+                </div>
+                {{ end }}
+              </div>
+              {{ end }}
+            </div>
+          </div>
+          {{ end }}
+        </div>
+      </div>
+    </main>
+
+    <div class="hidden xl:block xl:col-span-3">
+      <aside aria-label="Table of contents" class="sticky top-8 h-screen overflow-auto">
+        {{ partial "toc.html" . }}
+      </aside>
+    </div>
+  </div>
+</div>
+{{ end }}
+
+{{ define "below" }}
+{{ partial "docs/pagination.html" . }}
+{{ end }}
+
+{{ define "subfooter" }}
+{{ partial "docs/mobile-nav.html" . }}
+{{ end }}

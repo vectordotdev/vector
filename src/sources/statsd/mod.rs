@@ -1,5 +1,7 @@
+use crate::sources::statsd::parser::ParseError;
 use crate::udp;
 use crate::{
+    codecs::{self, NewlineDelimitedCodec, Parser},
     config::{self, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
@@ -10,12 +12,12 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
-use codec::BytesDelimitedCodec;
-use futures::{stream, SinkExt, StreamExt, TryFutureExt};
+use futures::{SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use tokio::net::UdpSocket;
-use tokio_util::{codec::BytesCodec, udp::UdpFramed};
+use tokio_util::udp::UdpFramed;
 
 pub mod parser;
 #[cfg(unix)]
@@ -41,7 +43,7 @@ pub struct UdpConfig {
 }
 
 impl UdpConfig {
-    pub fn from_address(address: SocketAddr) -> Self {
+    pub const fn from_address(address: SocketAddr) -> Self {
         Self {
             address,
             receive_buffer_bytes: None,
@@ -62,6 +64,7 @@ struct TcpConfig {
 
 impl TcpConfig {
     #[cfg(all(test, feature = "sinks-prometheus"))]
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
@@ -73,7 +76,7 @@ impl TcpConfig {
     }
 }
 
-fn default_shutdown_timeout_secs() -> u64 {
+const fn default_shutdown_timeout_secs() -> u64 {
     30
 }
 
@@ -133,17 +136,28 @@ impl SourceConfig for StatsdConfig {
     }
 }
 
-pub(self) fn parse_event(line: &str) -> Option<Event> {
-    match parse(line) {
-        Ok(metric) => {
-            emit!(StatsdEventReceived {
-                byte_size: line.len()
-            });
-            Some(Event::Metric(metric))
-        }
-        Err(error) => {
-            emit!(StatsdInvalidRecord { error, text: line });
-            None
+#[derive(Debug, Clone)]
+pub struct StatsdParser;
+
+impl Parser for StatsdParser {
+    fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
+        match std::str::from_utf8(&bytes)
+            .map_err(ParseError::InvalidUtf8)
+            .and_then(parse)
+        {
+            Ok(metric) => {
+                emit!(&StatsdEventReceived {
+                    byte_size: bytes.len()
+                });
+                Ok(smallvec![Event::Metric(metric)])
+            }
+            Err(error) => {
+                emit!(&StatsdInvalidRecord {
+                    error: &error,
+                    bytes
+                });
+                Err(Box::new(error))
+            }
         }
     }
 }
@@ -154,7 +168,7 @@ async fn statsd_udp(
     mut out: Pipeline,
 ) -> Result<(), ()> {
     let socket = UdpSocket::bind(&config.address)
-        .map_err(|error| emit!(StatsdSocketError::bind(error)))
+        .map_err(|error| emit!(&StatsdSocketError::bind(error)))
         .await?;
 
     if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
@@ -169,23 +183,23 @@ async fn statsd_udp(
         r#type = "udp"
     );
 
-    let mut stream = UdpFramed::new(socket, BytesCodec::new()).take_until(shutdown);
+    let codec = codecs::Decoder::new(
+        Box::new(NewlineDelimitedCodec::new()),
+        Box::new(StatsdParser),
+    );
+    let mut stream = UdpFramed::new(socket, codec).take_until(shutdown);
     while let Some(frame) = stream.next().await {
         match frame {
-            Ok((bytes, _sock)) => {
-                let packet = String::from_utf8_lossy(bytes.as_ref());
-                let metrics = packet.lines().filter_map(parse_event).map(Ok);
-
-                // Need `boxed` to resolve a lifetime issue
-                // https://github.com/rust-lang/rust/issues/64552#issuecomment-669728225
-                let mut metrics = stream::iter(metrics).boxed();
-                if let Err(error) = out.send_all(&mut metrics).await {
-                    error!(message = "Error sending metric.", %error);
-                    break;
+            Ok(((events, _byte_size), _sock)) => {
+                for metric in events {
+                    if let Err(error) = out.send(metric).await {
+                        error!(message = "Error sending metric.", %error);
+                        break;
+                    }
                 }
             }
             Err(error) => {
-                emit!(StatsdSocketError::read(error));
+                emit!(&StatsdSocketError::read(error));
             }
         }
     }
@@ -197,16 +211,15 @@ async fn statsd_udp(
 struct StatsdTcpSource;
 
 impl TcpSource for StatsdTcpSource {
-    type Error = std::io::Error;
-    type Decoder = BytesDelimitedCodec;
+    type Error = codecs::Error;
+    type Item = SmallVec<[Event; 1]>;
+    type Decoder = codecs::Decoder;
 
     fn decoder(&self) -> Self::Decoder {
-        BytesDelimitedCodec::new(b'\n')
-    }
-
-    fn build_event(&self, line: Bytes, _host: Bytes) -> Option<Event> {
-        let line = String::from_utf8_lossy(line.as_ref());
-        parse_event(&line)
+        codecs::Decoder::new(
+            Box::new(NewlineDelimitedCodec::new()),
+            Box::new(StatsdParser),
+        )
     }
 }
 

@@ -1,6 +1,7 @@
 use crate::Error;
 use futures::FutureExt;
 use std::{
+    borrow::Cow,
     cmp,
     future::Future,
     pin::Pin,
@@ -12,9 +13,9 @@ use tower::{retry::Policy, timeout::error::Elapsed};
 
 pub enum RetryAction {
     /// Indicate that this request should be retried with a reason
-    Retry(String),
+    Retry(Cow<'static, str>),
     /// Indicate that this request should not be retried with a reason
-    DontRetry(String),
+    DontRetry(Cow<'static, str>),
     /// Indicate that this request should not be retried but the request was successful
     Successful,
 }
@@ -95,26 +96,27 @@ where
 
     fn retry(&self, _: &Req, result: Result<&Res, &Error>) -> Option<Self::Future> {
         match result {
-            Ok(response) => {
-                if self.remaining_attempts == 0 {
-                    error!("Retries exhausted; dropping the request.");
-                    return None;
-                }
-
-                match self.logic.should_retry_response(response) {
-                    RetryAction::Retry(reason) => {
-                        warn!(message = "Retrying after response.", reason = %reason);
-                        Some(self.build_retry())
+            Ok(response) => match self.logic.should_retry_response(response) {
+                RetryAction::Retry(reason) => {
+                    if self.remaining_attempts == 0 {
+                        error!(
+                            message = "OK/retry response but retries exhausted; dropping the request.",
+                            reason = ?reason
+                        );
+                        return None;
                     }
 
-                    RetryAction::DontRetry(reason) => {
-                        error!(message = "Not retriable; dropping the request.", reason = ?reason);
-                        None
-                    }
-
-                    RetryAction::Successful => None,
+                    warn!(message = "Retrying after response.", reason = %reason);
+                    Some(self.build_retry())
                 }
-            }
+
+                RetryAction::DontRetry(reason) => {
+                    error!(message = "Not retriable; dropping the request.", reason = ?reason);
+                    None
+                }
+
+                RetryAction::Successful => None,
+            },
             Err(error) => {
                 if self.remaining_attempts == 0 {
                     error!(message = "Retries exhausted; dropping the request.", %error);
@@ -133,7 +135,7 @@ where
                         None
                     }
                 } else if error.downcast_ref::<Elapsed>().is_some() {
-                    warn!("Request timed out.");
+                    warn!("Request timed out. If this happens often while the events are actually reaching their destination, try decreasing `batch.max_bytes` and/or using `compression` if applicable. Alternatively `request.timeout_secs` can be increased.");
                     Some(self.build_retry())
                 } else {
                     error!(
@@ -165,15 +167,15 @@ impl<L: RetryLogic> Future for RetryPolicyFuture<L> {
 }
 
 impl RetryAction {
-    pub fn is_retryable(&self) -> bool {
+    pub const fn is_retryable(&self) -> bool {
         matches!(self, RetryAction::Retry(_))
     }
 
-    pub fn is_not_retryable(&self) -> bool {
+    pub const fn is_not_retryable(&self) -> bool {
         matches!(self, RetryAction::DontRetry(_))
     }
 
-    pub fn is_successful(&self) -> bool {
+    pub const fn is_successful(&self) -> bool {
         matches!(self, RetryAction::Successful)
     }
 }
@@ -199,7 +201,7 @@ impl ExponentialBackoff {
     ///
     /// The resulting duration is calculated by taking the base to the `n`-th power,
     /// where `n` denotes the number of past attempts.
-    pub fn from_millis(base: u64) -> ExponentialBackoff {
+    pub const fn from_millis(base: u64) -> ExponentialBackoff {
         ExponentialBackoff {
             current: base,
             base,
@@ -213,13 +215,13 @@ impl ExponentialBackoff {
     /// For example, using a factor of `1000` will make each delay in units of seconds.
     ///
     /// Default factor is `1`.
-    pub fn factor(mut self, factor: u64) -> ExponentialBackoff {
+    pub const fn factor(mut self, factor: u64) -> ExponentialBackoff {
         self.factor = factor;
         self
     }
 
     /// Apply a maximum delay. No retry delay will be longer than this `Duration`.
-    pub fn max_delay(mut self, duration: Duration) -> ExponentialBackoff {
+    pub const fn max_delay(mut self, duration: Duration) -> ExponentialBackoff {
         self.max_delay = Some(duration);
         self
     }

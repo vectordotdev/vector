@@ -4,7 +4,7 @@ use cached::{proc_macro::cached, SizedCache};
 use datadog_search_syntax::{
     normalize_fields, parse, BooleanType, Comparison, ComparisonValue, Field, QueryNode,
 };
-use lookup::{parser::parse_lookup, LookupBuf};
+use lookup_lib::{parser::parse_lookup, LookupBuf};
 use regex::Regex;
 use std::borrow::Cow;
 
@@ -41,7 +41,12 @@ impl Function for MatchDatadogQuery {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _ctx: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
         let query_value = arguments.required_literal("query")?.to_value();
 

@@ -1,3 +1,4 @@
+mod ddsketch;
 mod handle;
 mod label_filter;
 mod recorder;
@@ -5,15 +6,30 @@ mod recorder;
 use std::sync::Arc;
 
 use crate::event::Metric;
+pub use crate::metrics::ddsketch::{AgentDDSketch, BinMap};
 pub use crate::metrics::handle::{Counter, Handle};
 use crate::metrics::label_filter::VectorLabelFilter;
 use crate::metrics::recorder::VectorRecorder;
 use metrics::Key;
 use metrics_tracing_context::TracingContextLayer;
-use metrics_util::{layers::Layer, Generational, NotTracked, Registry};
+use metrics_util::{layers::Layer, Generational, NotTracked};
 use once_cell::sync::OnceCell;
+use snafu::Snafu;
+
+pub(self) type Registry = metrics_util::Registry<Key, Handle, NotTracked<Handle>>;
+
+type Result<T> = std::result::Result<T, Error>;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Snafu)]
+pub enum Error {
+    #[snafu(display("Recorder already initialized."))]
+    AlreadyInitialized,
+    #[snafu(display("Metrics system was not initialized."))]
+    NotInitialized,
+}
 
 static CONTROLLER: OnceCell<Controller> = OnceCell::new();
+
 // Cardinality counter parameters, expose the internal metrics registry
 // cardinality. Useful for the end users to help understand the characteristics
 // of their environment and how vectors acts in it.
@@ -22,7 +38,7 @@ static CARDINALITY_KEY: Key = Key::from_static_name(CARDINALITY_KEY_NAME);
 
 /// Controller allows capturing metric snapshots.
 pub struct Controller {
-    registry: Arc<Registry<Key, Handle, NotTracked<Handle>>>,
+    recorder: VectorRecorder,
 }
 
 fn metrics_enabled() -> bool {
@@ -33,25 +49,15 @@ fn tracing_context_layer_enabled() -> bool {
     !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION"), Ok(x) if x == "true")
 }
 
-/// Initialize the metrics sub-system
-///
-/// # Errors
-///
-/// This function will error if it is called multiple times.
-pub fn init() -> crate::Result<()> {
+fn init(recorder: VectorRecorder) -> Result<()> {
     // An escape hatch to allow disabing internal metrics core. May be used for
     // performance reasons. This is a hidden and undocumented functionality.
     if !metrics_enabled() {
         metrics::set_boxed_recorder(Box::new(metrics::NoopRecorder))
-            .map_err(|_| "recorder already initialized")?;
+            .map_err(|_| Error::AlreadyInitialized)?;
         info!(message = "Internal metrics core is disabled.");
         return Ok(());
     }
-
-    ////
-    //// Prepare the registry
-    ////
-    let registry = Arc::new(Registry::<Key, Handle, NotTracked<Handle>>::untracked());
 
     ////
     //// Prepare the controller
@@ -62,11 +68,11 @@ pub fn init() -> crate::Result<()> {
     // interested in these metrics can grab copies. See `capture_metrics` and
     // its callers for an example.
     let controller = Controller {
-        registry: registry.clone(),
+        recorder: recorder.clone(),
     };
     CONTROLLER
         .set(controller)
-        .map_err(|_| "controller already initialized")?;
+        .map_err(|_| Error::AlreadyInitialized)?;
 
     ////
     //// Initialize the recorder.
@@ -75,7 +81,6 @@ pub fn init() -> crate::Result<()> {
     // The recorder is the interface between metrics-rs and our registry. In our
     // case it doesn't _do_ much other than shepherd into the registry and
     // update the cardinality counter, see above, as needed.
-    let recorder = VectorRecorder::new(registry);
     let recorder: Box<dyn metrics::Recorder> = if tracing_context_layer_enabled() {
         // Apply a layer to capture tracing span fields as labels.
         Box::new(TracingContextLayer::new(VectorLabelFilter).layer(recorder))
@@ -85,49 +90,67 @@ pub fn init() -> crate::Result<()> {
 
     // This where we combine metrics-rs and our registry. We box it to avoid
     // having to fiddle with statics ourselves.
-    metrics::set_boxed_recorder(recorder).map_err(|_| "recorder already initialized")?;
-
-    Ok(())
+    metrics::set_boxed_recorder(recorder).map_err(|_| Error::AlreadyInitialized)
 }
 
-/// Clear all metrics from the registry.
-pub fn reset(controller: &Controller) {
-    controller.registry.clear();
-}
-
-/// Get a handle to the globally registered controller, if it's initialized.
+/// Initialize the default metrics sub-system
 ///
 /// # Errors
 ///
-/// This function will fail if the metrics subsystem has not been correctly
-/// initialized.
-pub fn get_controller() -> crate::Result<&'static Controller> {
-    CONTROLLER
-        .get()
-        .ok_or_else(|| "metrics system not initialized".into())
+/// This function will error if it is called multiple times.
+pub fn init_global() -> Result<()> {
+    init(VectorRecorder::new_global())
 }
 
-/// Take a snapshot of all gathered metrics and expose them as metric
-/// [`Event`]s.
-pub fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Metric> {
-    let mut metrics: Vec<Metric> = Vec::new();
-    controller.registry.visit(|_kind, (key, handle)| {
-        metrics.push(Metric::from_metric_kv(key, handle.get_inner()));
-    });
+/// Initialize the thread-local metrics sub-system
+///
+/// # Errors
+///
+/// This function will error if it is called multiple times.
+pub fn init_test() -> Result<()> {
+    init(VectorRecorder::new_test())
+}
 
-    // Add alias `events_processed_total` for `events_out_total`.
-    for i in 0..metrics.len() {
-        let metric = &metrics[i];
-        if metric.name() == "events_out_total" {
-            let alias = metric.clone().with_name("processed_events_total");
-            metrics.push(alias);
-        }
+impl Controller {
+    /// Clear all metrics from the registry.
+    pub fn reset(&self) {
+        self.recorder.with_registry(Registry::clear);
     }
 
-    let handle = Handle::Counter(Arc::new(Counter::with_count(metrics.len() as u64 + 1)));
-    metrics.push(Metric::from_metric_kv(&CARDINALITY_KEY, &handle));
+    /// Get a handle to the globally registered controller, if it's initialized.
+    ///
+    /// # Errors
+    ///
+    /// This function will fail if the metrics subsystem has not been correctly
+    /// initialized.
+    pub fn get() -> Result<&'static Self> {
+        CONTROLLER.get().ok_or(Error::NotInitialized)
+    }
 
-    metrics.into_iter()
+    /// Take a snapshot of all gathered metrics and expose them as metric
+    /// [`Event`](crate::event::Event)s.
+    pub fn capture_metrics(&self) -> impl Iterator<Item = Metric> {
+        let mut metrics: Vec<Metric> = Vec::new();
+        self.recorder.with_registry(|registry| {
+            registry.visit(|_kind, (key, handle)| {
+                metrics.push(Metric::from_metric_kv(key, handle.get_inner()));
+            });
+        });
+
+        // Add alias `events_processed_total` for `events_out_total`.
+        for i in 0..metrics.len() {
+            let metric = &metrics[i];
+            if metric.name() == "events_out_total" {
+                let alias = metric.clone().with_name("processed_events_total");
+                metrics.push(alias);
+            }
+        }
+
+        let handle = Handle::Counter(Arc::new(Counter::with_count(metrics.len() as u64 + 1)));
+        metrics.push(Metric::from_metric_kv(&CARDINALITY_KEY, &handle));
+
+        metrics.into_iter()
+    }
 }
 
 #[macro_export]

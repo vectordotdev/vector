@@ -1,6 +1,8 @@
-use super::InternalEvent;
+// ## skip check-events ##
+
 use metrics::counter;
 use uuid::Uuid;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct AzureBlobErrorResponse {
@@ -18,7 +20,7 @@ impl InternalEvent for AzureBlobErrorResponse {
 }
 
 #[derive(Debug)]
-pub(crate) struct AzureBlobHttpError {
+pub struct AzureBlobHttpError {
     pub error: String,
 }
 
@@ -36,7 +38,7 @@ impl InternalEvent for AzureBlobHttpError {
     }
 }
 
-pub(crate) struct AzureBlobEventSent {
+pub struct AzureBlobEventSent {
     pub request_id: Uuid,
     pub byte_size: usize,
 }

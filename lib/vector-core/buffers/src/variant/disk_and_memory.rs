@@ -11,36 +11,40 @@ const ALPHABET: [&str; 27] = [
     "t", "u", "v", "w", "x", "y", "z", "_",
 ];
 
+// Memory buffers are also used with transforms which is opaque to users. We use
+// an instrument flag in the Memory variant to disable instrumentation to avoid
+// emitting metrics for such buffers.
 #[derive(Debug, Clone)]
 pub enum Variant {
     Memory {
         max_events: usize,
         when_full: WhenFull,
+        instrument: bool,
     },
     Disk {
         max_size: usize,
         when_full: WhenFull,
         data_dir: PathBuf,
-        name: String,
+        id: String,
     },
 }
 
 #[cfg(test)]
 #[derive(Debug, Clone)]
-struct Name {
+struct Id {
     inner: String,
 }
 
 #[cfg(test)]
-impl Arbitrary for Name {
+impl Arbitrary for Id {
     fn arbitrary(g: &mut Gen) -> Self {
-        let mut name = String::with_capacity(MAX_STR_SIZE);
+        let mut id = String::with_capacity(MAX_STR_SIZE);
         for _ in 0..(g.size() % MAX_STR_SIZE) {
             let idx: usize = usize::arbitrary(g) % ALPHABET.len();
-            name.push_str(ALPHABET[idx]);
+            id.push_str(ALPHABET[idx]);
         }
 
-        Name { inner: name }
+        Id { inner: id }
     }
 }
 
@@ -51,12 +55,13 @@ impl Arbitrary for Variant {
             Variant::Memory {
                 max_events: u16::arbitrary(g) as usize, // u16 avoids allocation failures
                 when_full: WhenFull::arbitrary(g),
+                instrument: false,
             }
         } else {
             Variant::Disk {
                 max_size: u16::arbitrary(g) as usize, // u16 avoids allocation failures
                 when_full: WhenFull::arbitrary(g),
-                name: Name::arbitrary(g).inner,
+                id: Id::arbitrary(g).inner,
                 data_dir: PathBuf::arbitrary(g),
             }
         }
@@ -67,27 +72,32 @@ impl Arbitrary for Variant {
             Variant::Memory {
                 max_events,
                 when_full,
+                instrument,
+                ..
             } => {
                 let when_full = *when_full;
+                let instrument = *instrument;
                 Box::new(max_events.shrink().map(move |me| Variant::Memory {
                     max_events: me,
                     when_full,
+                    instrument,
                 }))
             }
             Variant::Disk {
                 max_size,
                 when_full,
-                name,
+                id,
                 data_dir,
+                ..
             } => {
                 let max_size = *max_size;
                 let when_full = *when_full;
-                let name = name.clone();
+                let id = id.clone();
                 let data_dir = data_dir.clone();
                 Box::new(max_size.shrink().map(move |ms| Variant::Disk {
                     max_size: ms,
                     when_full,
-                    name: name.clone(),
+                    id: id.clone(),
                     data_dir: data_dir.clone(),
                 }))
             }

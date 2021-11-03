@@ -22,6 +22,8 @@ on:
       - "rust-toolchain"
       - "distribution/**"
   pull_request:
+    paths-ignore:
+      - "website/**"
 
 env:
   AUTOINSTALL: true
@@ -59,7 +61,7 @@ jobs:
       CARGO_PROFILE_RELEASE_OPT_LEVEL: 0
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 256
     steps:
-      - uses: actions/checkout@v2.3.4
+      - uses: actions/checkout@v2.3.5
       - run: make ci-sweep
       - uses: actions/cache@v2.1.6
         with:
@@ -93,7 +95,7 @@ jobs:
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e tests enable')
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e all targets')
     steps:
-      - uses: actions/github-script@v4.0.2
+      - uses: actions/github-script@v5
         id: set-matrix
         with:
           script: |
@@ -148,7 +150,7 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v2.3.4
+        uses: actions/checkout@v2.3.5
       - uses: actions/download-artifact@v2
         with:
           name: e2e-test-deb-package

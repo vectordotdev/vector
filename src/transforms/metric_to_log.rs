@@ -1,6 +1,7 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription,
+        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::{self, Event, LogEvent, Metric},
     internal_events::MetricToLogFailedSerialize,
@@ -36,10 +37,10 @@ impl GenerateConfig for MetricToLogConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "metric_to_log")]
 impl TransformConfig for MetricToLogConfig {
-    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(MetricToLog::new(
             self.host_tag.clone(),
-            self.timezone.unwrap_or(globals.timezone),
+            self.timezone.unwrap_or(context.globals.timezone),
         )))
     }
 
@@ -77,7 +78,7 @@ impl MetricToLog {
 
     pub fn transform_one(&self, metric: Metric) -> Option<LogEvent> {
         serde_json::to_value(&metric)
-            .map_err(|error| emit!(MetricToLogFailedSerialize { error }))
+            .map_err(|error| emit!(&MetricToLogFailedSerialize { error }))
             .ok()
             .and_then(|value| match value {
                 Value::Object(object) => {
@@ -351,7 +352,7 @@ mod tests {
             vec![
                 (String::from("aggregated_summary.count"), &Value::from(30)),
                 (
-                    String::from("aggregated_summary.quantiles[0].upper_limit"),
+                    String::from("aggregated_summary.quantiles[0].quantile"),
                     &Value::from(50.0)
                 ),
                 (
@@ -359,7 +360,7 @@ mod tests {
                     &Value::from(10.0)
                 ),
                 (
-                    String::from("aggregated_summary.quantiles[1].upper_limit"),
+                    String::from("aggregated_summary.quantiles[1].quantile"),
                     &Value::from(90.0)
                 ),
                 (

@@ -27,6 +27,7 @@ use std::{
 };
 use tower::Service;
 use tracing_futures::Instrument;
+use vector_core::ByteSizeOf;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -36,6 +37,8 @@ enum BuildError {
     MessageGroupIdNotAllowed,
     #[snafu(display("invalid topic template: {}", source))]
     TopicTemplate { source: TemplateParseError },
+    #[snafu(display("invalid message_deduplication_id template: {}", source))]
+    MessageDeduplicationIdTemplate { source: TemplateParseError },
 }
 
 #[derive(Debug, Snafu)]
@@ -60,6 +63,7 @@ pub struct SqsSinkConfig {
     pub region: RegionOrEndpoint,
     pub encoding: EncodingConfig<Encoding>,
     pub message_group_id: Option<String>,
+    pub message_deduplication_id: Option<String>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     // Deprecated name. Moved to auth.
@@ -158,6 +162,10 @@ impl SqsSink {
             (None, true) => return Err(Box::new(BuildError::MessageGroupIdMissing)),
             (None, false) => None,
         };
+        let message_deduplication_id = config
+            .message_deduplication_id
+            .map(Template::try_from)
+            .transpose()?;
 
         let sqs = SqsSink {
             client,
@@ -175,7 +183,13 @@ impl SqsSink {
             )
             .sink_map_err(|error| error!(message = "Fatal sqs sink error.", %error))
             .with_flat_map(move |event| {
-                stream::iter(encode_event(event, &encoding, message_group_id.as_ref())).map(Ok)
+                stream::iter(encode_event(
+                    event,
+                    &encoding,
+                    &message_group_id,
+                    &message_deduplication_id,
+                ))
+                .map(Ok)
             });
 
         Ok(sink)
@@ -201,6 +215,7 @@ impl Service<Vec<SendMessageEntry>> for SqsSink {
         let request = SendMessageRequest {
             message_body: entry.message_body,
             message_group_id: entry.message_group_id,
+            message_deduplication_id: entry.message_deduplication_id,
             queue_url: self.queue_url.clone(),
             ..Default::default()
         };
@@ -209,7 +224,7 @@ impl Service<Vec<SendMessageEntry>> for SqsSink {
             client
                 .send_message(request)
                 .inspect_ok(|result| {
-                    emit!(AwsSqsEventSent {
+                    emit!(&AwsSqsEventSent {
                         byte_size,
                         message_id: result.message_id.as_ref()
                     })
@@ -224,6 +239,7 @@ impl Service<Vec<SendMessageEntry>> for SqsSink {
 struct SendMessageEntry {
     message_body: String,
     message_group_id: Option<String>,
+    message_deduplication_id: Option<String>,
 }
 
 impl EncodedLength for SendMessageEntry {
@@ -249,17 +265,33 @@ impl RetryLogic for SqsRetryLogic {
 fn encode_event(
     mut event: Event,
     encoding: &EncodingConfig<Encoding>,
-    message_group_id: Option<&Template>,
+    message_group_id: &Option<Template>,
+    message_deduplication_id: &Option<Template>,
 ) -> Option<EncodedEvent<SendMessageEntry>> {
+    let byte_size = event.size_of();
     encoding.apply_rules(&mut event);
 
     let message_group_id = match message_group_id {
         Some(tpl) => match tpl.render_string(&event) {
             Ok(value) => Some(value),
             Err(error) => {
-                emit!(TemplateRenderingFailed {
+                emit!(&TemplateRenderingFailed {
                     error,
                     field: Some("message_group_id"),
+                    drop_event: true
+                });
+                return None;
+            }
+        },
+        None => None,
+    };
+    let message_deduplication_id = match message_deduplication_id {
+        Some(tpl) => match tpl.render_string(&event) {
+            Ok(value) => Some(value),
+            Err(error) => {
+                emit!(&TemplateRenderingFailed {
+                    error,
+                    field: Some("message_deduplication_id"),
                     drop_event: true
                 });
                 return None;
@@ -277,21 +309,27 @@ fn encode_event(
         Encoding::Json => serde_json::to_string(&log).expect("Error encoding event as json."),
     };
 
-    Some(EncodedEvent::new(SendMessageEntry {
-        message_body,
-        message_group_id,
-    }))
+    Some(EncodedEvent::new(
+        SendMessageEntry {
+            message_body,
+            message_group_id,
+            message_deduplication_id,
+        },
+        byte_size,
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::LogEvent;
     use std::collections::BTreeMap;
 
     #[test]
     fn sqs_encode_event_text() {
         let message = "hello world".to_string();
-        let event = encode_event(message.clone().into(), &Encoding::Text.into(), None).unwrap();
+        let event =
+            encode_event(message.clone().into(), &Encoding::Text.into(), &None, &None).unwrap();
 
         assert_eq!(&event.item.message_body, &message);
     }
@@ -301,12 +339,31 @@ mod tests {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("key", "value");
-        let event = encode_event(event, &Encoding::Json.into(), None).unwrap();
+        let event = encode_event(event, &Encoding::Json.into(), &None, &None).unwrap();
 
         let map: BTreeMap<String, String> = serde_json::from_str(&event.item.message_body).unwrap();
 
         assert_eq!(map[&log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
+    }
+
+    #[test]
+    fn sqs_encode_event_deduplication_id() {
+        let message_deduplication_id = Template::try_from("{{ transaction_id }}").unwrap();
+        let mut log = LogEvent::from("hello world".to_string());
+        log.insert("transaction_id", "some id");
+        let event = encode_event(
+            log.into(),
+            &Encoding::Json.into(),
+            &None,
+            &Some(message_deduplication_id),
+        )
+        .unwrap();
+
+        assert_eq!(
+            event.item.message_deduplication_id,
+            Some("some id".to_string())
+        );
     }
 }
 
@@ -340,6 +397,7 @@ mod integration_tests {
             region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
             encoding: Encoding::Text.into(),
             message_group_id: None,
+            message_deduplication_id: None,
             request: Default::default(),
             assume_role: None,
             auth: Default::default(),

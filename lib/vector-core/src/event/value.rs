@@ -7,10 +7,11 @@ use serde::{Deserialize, Serialize, Serializer};
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::Debug;
+use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
 use toml::value::Value as TomlValue;
 
-#[derive(PartialEq, PartialOrd, Debug, Clone, Deserialize)]
+#[derive(PartialOrd, Debug, Clone, Deserialize)]
 pub enum Value {
     Bytes(Bytes),
     Integer(i64),
@@ -22,14 +23,88 @@ pub enum Value {
     Null,
 }
 
+impl Eq for Value {}
+
+impl PartialEq<Value> for Value {
+    fn eq(&self, other: &Value) -> bool {
+        match (self, other) {
+            (Value::Array(a), Value::Array(b)) => a.eq(b),
+            (Value::Boolean(a), Value::Boolean(b)) => a.eq(b),
+            (Value::Bytes(a), Value::Bytes(b)) => a.eq(b),
+            (Value::Float(a), Value::Float(b)) => {
+                // This compares floats with the following rules:
+                // * NaNs compare as equal
+                // * Positive and negative infinity are not equal
+                // * -0 and +0 are not equal
+                // * Floats will compare using truncated portion
+                if a.is_sign_negative() == b.is_sign_negative() {
+                    if a.is_finite() && b.is_finite() {
+                        a.trunc().eq(&b.trunc())
+                    } else {
+                        a.is_finite() == b.is_finite()
+                    }
+                } else {
+                    false
+                }
+            }
+            (Value::Integer(a), Value::Integer(b)) => a.eq(b),
+            (Value::Map(a), Value::Map(b)) => a.eq(b),
+            (Value::Null, Value::Null) => true,
+            (Value::Timestamp(a), Value::Timestamp(b)) => a.eq(b),
+            _ => false,
+        }
+    }
+}
+
+impl Hash for Value {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+        match self {
+            Value::Array(v) => {
+                v.hash(state);
+            }
+            Value::Boolean(v) => {
+                v.hash(state);
+            }
+            Value::Bytes(v) => {
+                v.hash(state);
+            }
+            Value::Float(v) => {
+                // This hashes floats with the following rules:
+                // * NaNs hash as equal (covered by above discriminant hash)
+                // * Positive and negative infinity has to different values
+                // * -0 and +0 hash to different values
+                // * otherwise transmute to u64 and hash
+                if v.is_finite() {
+                    v.is_sign_negative().hash(state);
+                    let trunc: u64 = unsafe { std::mem::transmute(v.trunc().to_bits()) };
+                    trunc.hash(state);
+                } else if !v.is_nan() {
+                    v.is_sign_negative().hash(state);
+                } //else covered by discriminant hash
+            }
+            Value::Integer(v) => {
+                v.hash(state);
+            }
+            Value::Map(v) => {
+                v.hash(state);
+            }
+            Value::Null => {
+                //covered by discriminant hash
+            }
+            Value::Timestamp(v) => {
+                v.hash(state);
+            }
+        }
+    }
+}
+
 impl ByteSizeOf for Value {
     fn allocated_bytes(&self) -> usize {
         match self {
             Value::Bytes(bytes) => bytes.len(),
-            Value::Map(map) => map
-                .iter()
-                .fold(0, |acc, (k, v)| acc + k.len() + v.size_of()),
-            Value::Array(arr) => arr.iter().fold(0, |acc, v| acc + v.size_of()),
+            Value::Map(map) => map.size_of(),
+            Value::Array(arr) => arr.size_of(),
             _ => 0,
         }
     }
@@ -1276,6 +1351,58 @@ mod test {
         test_file.read_to_end(&mut buf)?;
 
         Ok(buf)
+    }
+
+    mod value_compare {
+        use super::*;
+
+        #[test]
+        fn compare_correctly() {
+            assert!(Value::Integer(0).eq(&Value::Integer(0)));
+            assert!(!Value::Integer(0).eq(&Value::Integer(1)));
+            assert!(!Value::Boolean(true).eq(&Value::Integer(2)));
+            assert!(Value::Float(1.2).eq(&Value::Float(1.4)));
+            assert!(!Value::Float(1.2).eq(&Value::Float(-1.2)));
+            assert!(!Value::Float(-0.0).eq(&Value::Float(0.0)));
+            assert!(!Value::Float(f64::NEG_INFINITY).eq(&Value::Float(f64::INFINITY)));
+            assert!(Value::Array(vec![Value::Integer(0), Value::Boolean(true)])
+                .eq(&Value::Array(vec![Value::Integer(0), Value::Boolean(true)])));
+            assert!(!Value::Array(vec![Value::Integer(0), Value::Boolean(true)])
+                .eq(&Value::Array(vec![Value::Integer(1), Value::Boolean(true)])));
+        }
+    }
+
+    mod value_hash {
+        use super::*;
+
+        fn hash(a: &Value) -> u64 {
+            let mut h = std::collections::hash_map::DefaultHasher::new();
+
+            a.hash(&mut h);
+            h.finish()
+        }
+
+        #[test]
+        fn hash_correctly() {
+            assert_eq!(hash(&Value::Integer(0)), hash(&Value::Integer(0)));
+            assert_ne!(hash(&Value::Integer(0)), hash(&Value::Integer(1)));
+            assert_ne!(hash(&Value::Boolean(true)), hash(&Value::Integer(2)));
+            assert_eq!(hash(&Value::Float(1.2)), hash(&Value::Float(1.4)));
+            assert_ne!(hash(&Value::Float(1.2)), hash(&Value::Float(-1.2)));
+            assert_ne!(hash(&Value::Float(-0.0)), hash(&Value::Float(0.0)));
+            assert_ne!(
+                hash(&Value::Float(f64::NEG_INFINITY)),
+                hash(&Value::Float(f64::INFINITY))
+            );
+            assert_eq!(
+                hash(&Value::Array(vec![Value::Integer(0), Value::Boolean(true)])),
+                hash(&Value::Array(vec![Value::Integer(0), Value::Boolean(true)]))
+            );
+            assert_ne!(
+                hash(&Value::Array(vec![Value::Integer(0), Value::Boolean(true)])),
+                hash(&Value::Array(vec![Value::Integer(1), Value::Boolean(true)]))
+            );
+        }
     }
 
     mod insert_get_remove {

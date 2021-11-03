@@ -15,11 +15,11 @@ pub struct VecBuffer<T> {
 }
 
 impl<T> VecBuffer<T> {
-    pub fn new(settings: BatchSize<Self>) -> Self {
+    pub const fn new(settings: BatchSize<Self>) -> Self {
         Self::new_with_settings(settings)
     }
 
-    fn new_with_settings(settings: BatchSize<Self>) -> Self {
+    const fn new_with_settings(settings: BatchSize<Self>) -> Self {
         Self {
             batch: None,
             bytes: 0,
@@ -36,15 +36,13 @@ impl<T: EncodedLength> Batch for VecBuffer<T> {
         config: BatchConfig,
         defaults: BatchSettings<Self>,
     ) -> Result<BatchSettings<Self>, BatchError> {
-        Ok(config
-            .use_size_as_events()?
-            .get_settings_or_default(defaults))
+        Ok(config.get_settings_or_default(defaults))
     }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         let new_bytes = self.bytes + item.encoded_length();
         if self.is_empty() && item.encoded_length() > self.settings.bytes {
-            err_event_too_large(item.encoded_length())
+            err_event_too_large(item.encoded_length(), self.settings.bytes)
         } else if self.num_items() >= self.settings.events || new_bytes > self.settings.bytes {
             PushResult::Overflow(item)
         } else {

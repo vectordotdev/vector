@@ -30,7 +30,12 @@ impl Function for ParseApacheLog {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _ctx: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let variants = vec![value!("common"), value!("combined"), value!("error")];
 
         let value = arguments.required("value");
@@ -288,7 +293,7 @@ mod tests {
 
             }),
             tdef: TypeDef::new().fallible().object(type_def_error()),
-            tz: shared::TimeZone::default(),
+            tz: shared::TimeZone::Named(chrono_tz::Tz::UTC),
         }
 
         log_line_valid_empty {

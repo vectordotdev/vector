@@ -1,0 +1,10 @@
+{{ $iconSizes := dict "1" "7" "2" "6" "3" "5" "4" "4" "5" "3" "6" "3" }}
+{{ $n := index $iconSizes (.Level | string) }}
+<h{{ .Level }} x-data="{ show: false }" x-on:mouseover="show = true" x-on:mouseleave="show = false" id="{{ .Anchor | safeURL }}">
+  {{ .Text | safeHTML }}
+  <a class="ml-2 relative" x-cloak x-show="show" href="#{{ .Anchor | safeURL }}">
+    <svg xmlns="http://www.w3.org/2000/svg" class="absolute inset-0 h-full h-{{ $n }} w-{{ $n }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+    </svg>
+  </a>
+</h{{ .Level }}>

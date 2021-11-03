@@ -188,20 +188,20 @@ impl FrameHandler for DnstapFrameHandler {
                 &self.schema.dnstap_root_data_schema().raw_data(),
                 base64::encode(&frame),
             );
-            emit!(DnstapEventReceived {
+            emit!(&DnstapEventReceived {
                 byte_size: frame_size
             });
             Some(event)
         } else {
             match parse_dnstap_data(&self.schema, log_event, frame) {
                 Err(err) => {
-                    emit!(DnstapParseDataError {
+                    emit!(&DnstapParseDataError {
                         error: format!("Dnstap protobuf decode error {:?}.", err).as_str()
                     });
                     None
                 }
                 Ok(_) => {
-                    emit!(DnstapEventReceived {
+                    emit!(&DnstapEventReceived {
                         byte_size: frame_size
                     });
                     Some(event)

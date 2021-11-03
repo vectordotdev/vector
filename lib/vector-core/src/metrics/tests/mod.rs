@@ -10,7 +10,7 @@ fn test_labels_injection() {
     let span = span!(
         Level::ERROR,
         "my span",
-        component_name = "my_component_name",
+        component_id = "my_component_id",
         component_type = "my_component_type",
         component_kind = "my_component_kind",
         some_other_label = "qwerty"
@@ -23,14 +23,16 @@ fn test_labels_injection() {
 
     counter!("labels_injected_total", 1);
 
-    let metric = super::capture_metrics(super::get_controller().unwrap())
+    let metric = super::Controller::get()
+        .unwrap()
+        .capture_metrics()
         .map(|e| e.into_metric())
         .find(|metric| metric.name() == "labels_injected_total")
         .unwrap();
 
     let expected_tags = Some(
         vec![
-            ("component_name".to_owned(), "my_component_name".to_owned()),
+            ("component_id".to_owned(), "my_component_id".to_owned()),
             ("component_type".to_owned(), "my_component_type".to_owned()),
             ("component_kind".to_owned(), "my_component_kind".to_owned()),
         ]
@@ -46,7 +48,9 @@ fn test_cardinality_metric() {
     let _ = super::init();
 
     let capture_value = || {
-        let metric = super::capture_metrics(super::get_controller().unwrap())
+        let metric = super::Controller::get()
+            .unwrap()
+            .capture_metrics()
             .map(Event::into_metric)
             .find(|metric| metric.name() == super::CARDINALITY_KEY_NAME)
             .unwrap();

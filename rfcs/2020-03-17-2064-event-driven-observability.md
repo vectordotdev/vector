@@ -232,7 +232,7 @@ I believe our goal here should be something like the following:
 
 1. Settle on a set of well-known pieces of context that we ensure are set
    uniformly on spans at the topology-building layer (e.g. `component_kind`,
-   `component_type`, `component_name`).
+   `component_type`, `component_id`).
 
 2. Rely on the existing `tracing` implementation to output that context in logs.
 

@@ -1,6 +1,6 @@
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::FilterEventDiscarded,
     transforms::{FunctionTransform, Transform},
@@ -30,8 +30,10 @@ impl GenerateConfig for FilterConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "filter")]
 impl TransformConfig for FilterConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
-        Ok(Transform::function(Filter::new(self.condition.build()?)))
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        Ok(Transform::function(Filter::new(
+            self.condition.build(&context.enrichment_tables)?,
+        )))
     }
 
     fn input_type(&self) -> DataType {
@@ -65,7 +67,7 @@ impl FunctionTransform for Filter {
         if self.condition.check(&event) {
             output.push(event);
         } else {
-            emit!(FilterEventDiscarded);
+            emit!(&FilterEventDiscarded);
         }
     }
 }
@@ -87,7 +89,7 @@ mod test {
     #[test]
     fn passes_metadata() {
         let mut filter = Filter {
-            condition: IsLogConfig {}.build().unwrap(),
+            condition: IsLogConfig {}.build(&Default::default()).unwrap(),
         };
         let event = Event::from("message");
         let metadata = event.metadata().clone();

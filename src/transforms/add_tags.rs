@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{AddTagsTagNotOverwritten, AddTagsTagOverwritten},
     transforms::{FunctionTransform, Transform},
@@ -39,7 +39,7 @@ impl GenerateConfig for AddTagsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "add_tags")]
 impl TransformConfig for AddTagsConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(AddTags::new(
             self.tags.clone(),
             self.overwrite,
@@ -60,7 +60,7 @@ impl TransformConfig for AddTagsConfig {
 }
 
 impl AddTags {
-    pub fn new(tags: IndexMap<String, String>, overwrite: bool) -> Self {
+    pub const fn new(tags: IndexMap<String, String>, overwrite: bool) -> Self {
         AddTags { tags, overwrite }
     }
 }
@@ -77,11 +77,11 @@ impl FunctionTransform for AddTags {
                         entry.insert(value.clone());
                     }
                     (Entry::Occupied(mut entry), true) => {
-                        emit!(AddTagsTagOverwritten { tag: name.as_ref() });
+                        emit!(&AddTagsTagOverwritten { tag: name.as_ref() });
                         entry.insert(value.clone());
                     }
                     (Entry::Occupied(_entry), false) => {
-                        emit!(AddTagsTagNotOverwritten { tag: name.as_ref() })
+                        emit!(&AddTagsTagNotOverwritten { tag: name.as_ref() })
                     }
                 }
             }

@@ -32,18 +32,18 @@ pub enum Conversion {
 #[derive(Debug, Eq, PartialEq, Snafu)]
 pub enum Error {
     #[snafu(display("Invalid boolean value {:?}", s))]
-    BoolParseError { s: String },
+    BoolParse { s: String },
     #[snafu(display("Invalid integer {:?}: {}", s, source))]
-    IntParseError { s: String, source: ParseIntError },
+    IntParse { s: String, source: ParseIntError },
     #[snafu(display("Invalid floating point number {:?}: {}", s, source))]
-    FloatParseError { s: String, source: ParseFloatError },
+    FloatParse { s: String, source: ParseFloatError },
     #[snafu(
         display("Invalid timestamp {:?}: {}", s, source),
         visibility(pub(super))
     )]
-    TimestampParseError { s: String, source: ChronoParseError },
+    TimestampParse { s: String, source: ChronoParseError },
     #[snafu(display("No matching timestamp format found for {:?}", s))]
-    AutoTimestampParseError { s: String },
+    AutoTimestampParse { s: String },
 }
 
 /// Helper function to parse a conversion map and check against a list of names
@@ -89,14 +89,16 @@ impl Conversion {
     ///  * `"timestamp|FORMAT"` => Timestamp using the given format
     pub fn parse(s: impl AsRef<str>, tz: TimeZone) -> Result<Self, ConversionError> {
         let s = s.as_ref();
-        match s {
-            "asis" | "bytes" | "string" => Ok(Self::Bytes),
-            "integer" | "int" => Ok(Self::Integer),
-            "float" => Ok(Self::Float),
-            "bool" | "boolean" => Ok(Self::Boolean),
-            "timestamp" => Ok(Self::Timestamp(tz)),
-            _ if s.starts_with("timestamp|") => {
-                let fmt = &s[10..];
+        let mut split = s.splitn(2, '|').map(|segment| segment.trim());
+        match (split.next(), split.next()) {
+            (Some("asis"), None) | (Some("bytes"), None) | (Some("string"), None) => {
+                Ok(Self::Bytes)
+            }
+            (Some("integer"), None) | (Some("int"), None) => Ok(Self::Integer),
+            (Some("float"), None) => Ok(Self::Float),
+            (Some("bool"), None) | (Some("boolean"), None) => Ok(Self::Boolean),
+            (Some("timestamp"), None) => Ok(Self::Timestamp(tz)),
+            (Some("timestamp"), Some(fmt)) => {
                 // DateTime<Utc> can only convert timestamps without
                 // time zones, and DateTime<FixedOffset> can only
                 // convert with tone zones, so this has to distinguish
@@ -120,15 +122,11 @@ impl Conversion {
             Self::Bytes => bytes.into(),
             Self::Integer => {
                 let s = String::from_utf8_lossy(&bytes);
-                s.parse::<i64>()
-                    .with_context(|| IntParseError { s })?
-                    .into()
+                s.parse::<i64>().with_context(|| IntParse { s })?.into()
             }
             Self::Float => {
                 let s = String::from_utf8_lossy(&bytes);
-                s.parse::<f64>()
-                    .with_context(|| FloatParseError { s })?
-                    .into()
+                s.parse::<f64>().with_context(|| FloatParse { s })?.into()
             }
             Self::Boolean => parse_bool(&String::from_utf8_lossy(&bytes))?.into(),
             Self::Timestamp(tz) => parse_timestamp(*tz, &String::from_utf8_lossy(&bytes))?.into(),
@@ -136,14 +134,14 @@ impl Conversion {
                 let s = String::from_utf8_lossy(&bytes);
                 let dt = tz
                     .datetime_from_str(&s, format)
-                    .context(TimestampParseError { s })?;
+                    .context(TimestampParse { s })?;
 
                 datetime_to_utc(dt).into()
             }
             Self::TimestampTzFmt(format) => {
                 let s = String::from_utf8_lossy(&bytes);
-                let dt = DateTime::parse_from_str(&s, format)
-                    .with_context(|| TimestampParseError { s })?;
+                let dt =
+                    DateTime::parse_from_str(&s, format).with_context(|| TimestampParse { s })?;
 
                 datetime_to_utc(dt).into()
             }
@@ -176,7 +174,7 @@ fn parse_bool(s: &str) -> Result<bool, Error> {
                 match s.to_lowercase().as_str() {
                     "true" | "t" | "yes" | "y" => Ok(true),
                     "false" | "f" | "no" | "n" => Ok(false),
-                    _ => Err(Error::BoolParseError { s: s.into() }),
+                    _ => Err(Error::BoolParse { s: s.into() }),
                 }
             }
         }
@@ -242,5 +240,5 @@ fn parse_timestamp(tz: TimeZone, s: &str) -> Result<DateTime<Utc>, Error> {
             return Ok(datetime_to_utc(result));
         }
     }
-    Err(Error::AutoTimestampParseError { s: s.into() })
+    Err(Error::AutoTimestampParse { s: s.into() })
 }

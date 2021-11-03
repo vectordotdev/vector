@@ -102,7 +102,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
     } else {
         let objects = opts.read_into_objects()?;
         let source = opts.read_program()?;
-        let program = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
+        let program = vrl::compile(&source, &stdlib::all(), None).map_err(|diagnostics| {
             Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
         })?;
 
@@ -125,13 +125,15 @@ fn run(opts: &Opts) -> Result<(), Error> {
     }
 }
 
+#[cfg(feature = "repl")]
 fn repl(objects: Vec<Value>, timezone: &TimeZone) -> Result<(), Error> {
-    if cfg!(feature = "repl") {
-        repl::run(objects, timezone);
-        Ok(())
-    } else {
-        Err(Error::ReplFeature)
-    }
+    repl::run(objects, timezone);
+    Ok(())
+}
+
+#[cfg(not(feature = "repl"))]
+fn repl(_objects: Vec<Value>, _timezone: &TimeZone) -> Result<(), Error> {
+    Err(Error::ReplFeature)
 }
 
 fn execute(

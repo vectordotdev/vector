@@ -67,6 +67,12 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     /// This method is executed at compile-time.
     fn type_def(&self, state: &crate::State) -> TypeDef;
 
+    /// Updates the state if necessary.
+    /// By default it does nothing.
+    fn update_state(&mut self, _state: &mut crate::State) -> Result<(), ExpressionError> {
+        Ok(())
+    }
+
     /// Format the expression into a consistent style.
     ///
     /// This defaults to not formatting, so that function implementations don't

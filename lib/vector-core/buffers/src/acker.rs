@@ -3,6 +3,16 @@ use metrics::counter;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
+/// A value that can be acknowledged.
+///
+/// This is used to define how many events should be acknowledged when this value has been
+/// processed.  Since the value might be tied to a single event, or to multiple events, this
+/// provides a generic mechanism for gathering the number of events to acknowledge.
+pub trait Ackable {
+    /// Number of events to acknowledge for this value.
+    fn ack_size(&self) -> usize;
+}
+
 #[derive(Debug, Clone)]
 pub enum Acker {
     Disk(Arc<AtomicUsize>, Arc<AtomicWaker>),
@@ -46,5 +56,14 @@ impl Acker {
         let acker = Acker::Disk(Arc::clone(&ack_counter), Arc::clone(&notifier));
 
         (acker, ack_counter)
+    }
+}
+
+impl<T> Ackable for Vec<T>
+where
+    T: Ackable,
+{
+    fn ack_size(&self) -> usize {
+        self.iter().map(|x| x.ack_size()).sum()
     }
 }

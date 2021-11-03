@@ -1,0 +1,12 @@
+{{ $kindSingular := .kind | singularize }}
+
+{{ partial "heading.html" (dict "text" "Alias" "level" 2) }}
+
+<p>
+  This component was previously called the <code>{{ .alias }}</code> {{ $kindSingular }}. Make sure to update your
+  Vector configuration to accommodate the name change:
+</p>
+
+{{ $diff := printf "[%s.my_%s_%s]\n+type = \"%s\"\n-type = \"%s\"" .kind .current (.kind | singularize) .current .alias }}
+
+{{ highlight $diff "diff" "" }}

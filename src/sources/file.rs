@@ -4,7 +4,9 @@ use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     encoding_transcode::{Decoder, Encoder},
     event::{BatchNotifier, Event, LogEvent},
-    internal_events::{FileEventReceived, FileOpen, FileSourceInternalEventsEmitter},
+    internal_events::{
+        FileBytesReceived, FileEventsReceived, FileOpen, FileSourceInternalEventsEmitter,
+    },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
     trace::{current_span, Instrument},
@@ -152,7 +154,7 @@ fn default_max_line_bytes() -> usize {
     bytesize::kib(100u64) as usize
 }
 
-fn default_lines() -> usize {
+const fn default_lines() -> usize {
     1
 }
 
@@ -210,7 +212,8 @@ impl SourceConfig for FileConfig {
         // other
         let data_dir = cx
             .globals
-            .resolve_and_make_data_subdir(self.data_dir.as_ref(), &cx.name)?;
+            // source are only global, name can be used for subdir
+            .resolve_and_make_data_subdir(self.data_dir.as_ref(), cx.key.id())?;
 
         // Clippy rule, because async_trait?
         #[allow(clippy::suspicious_else_formatting)]
@@ -331,6 +334,10 @@ pub fn file_source(
             .map(futures::stream::iter)
             .flatten()
             .map(move |mut line| {
+                emit!(&FileBytesReceived {
+                    byte_size: line.text.len(),
+                    file: &line.filename,
+                });
                 // transcode each line from the file's encoding charset to utf8
                 line.text = match encoding_decoder.as_mut() {
                     Some(d) => d.decode_to_utf8(line.text),
@@ -386,7 +393,7 @@ pub fn file_source(
         spawn_blocking(move || {
             let _enter = span.enter();
             let result = file_server.run(tx, shutdown, checkpointer);
-            emit!(FileOpen { count: 0 });
+            emit!(&FileOpen { count: 0 });
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
             // passed to the `JoinHandle` error, similar to the usual threads.
@@ -446,7 +453,8 @@ fn create_event(
     hostname: &Option<String>,
     file_key: &Option<String>,
 ) -> Event {
-    emit!(FileEventReceived {
+    emit!(&FileEventsReceived {
+        count: 1,
         file: &file,
         byte_size: line.len(),
     });
@@ -475,6 +483,7 @@ mod tests {
         event::{EventStatus, Value},
         shutdown::ShutdownSignal,
         sources::file,
+        test_util::components::{self, SOURCE_TESTS},
     };
     use encoding_rs::UTF_16LE;
     use pretty_assertions::assert_eq;
@@ -679,6 +688,36 @@ mod tests {
         }
         assert_eq!(hello_i, n);
         assert_eq!(goodbye_i, n);
+    }
+
+    // https://github.com/timberio/vector/issues/8363
+    #[tokio::test]
+    async fn file_read_empty_lines() {
+        let n = 5;
+
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+
+        let received = run_file_source(&config, false, NoAcks, async {
+            let mut file = File::create(&path).unwrap();
+
+            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+
+            writeln!(&mut file, "line for checkpointing").unwrap();
+            for _i in 0..n {
+                writeln!(&mut file).unwrap();
+            }
+
+            sleep_500_millis().await;
+        })
+        .await;
+
+        assert_eq!(received.len(), n + 1);
     }
 
     #[tokio::test]
@@ -1182,7 +1221,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received=run_file_source(&config, false, NoAcks, async {
+        let received = run_file_source(&config, false, NoAcks, async {
             let mut file = File::create(&path).unwrap();
 
             sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
@@ -1609,6 +1648,8 @@ mod tests {
         acking_mode: AckingMode,
         inner: impl Future<Output = ()>,
     ) -> Vec<Event> {
+        components::init_test();
+
         let (tx, rx) = if acking_mode == Acks {
             let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
             (tx, rx.boxed())
@@ -1631,6 +1672,7 @@ mod tests {
         if wait_shutdown {
             shutdown_done.await;
         }
+        SOURCE_TESTS.assert(&["file"]);
         result
     }
 

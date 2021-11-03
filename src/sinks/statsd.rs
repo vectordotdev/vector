@@ -12,7 +12,7 @@ use crate::{
         BatchConfig, BatchSettings, BatchSink, Buffer, Compression, EncodedEvent,
     },
 };
-use futures::{future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{future, stream, FutureExt, SinkExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::Display,
@@ -20,6 +20,7 @@ use std::{
     task::{Context, Poll},
 };
 use tower::{Service, ServiceBuilder};
+use vector_core::ByteSizeOf;
 
 pub struct StatsdSvc {
     inner: UdpService,
@@ -108,9 +109,12 @@ impl SinkConfig for StatsdSinkConfig {
                     cx.acker(),
                 )
                 .sink_map_err(|error| error!(message = "Fatal statsd sink error.", %error))
-                .with_flat_map(move |event| {
-                    stream::iter(encode_event(event, default_namespace.as_deref()))
-                        .map(|encoded| Ok(EncodedEvent::new(encoded)))
+                .with_flat_map(move |event: Event| {
+                    stream::iter({
+                        let byte_size = event.size_of();
+                        encode_event(event, default_namespace.as_deref())
+                            .map(|encoded| Ok(EncodedEvent::new(encoded, byte_size)))
+                    })
                 });
 
                 Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
@@ -205,7 +209,7 @@ fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<Vec<u8>
             }
         }
         _ => {
-            emit!(StatsdInvalidMetricReceived {
+            emit!(&StatsdInvalidMetricReceived {
                 value: metric.value(),
                 kind: &metric.kind(),
             });
@@ -241,7 +245,7 @@ mod test {
     use super::*;
     use crate::{event::Metric, test_util::*};
     use bytes::Bytes;
-    use futures::{channel::mpsc, TryStreamExt};
+    use futures::{channel::mpsc, StreamExt, TryStreamExt};
     use tokio::net::UdpSocket;
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
 

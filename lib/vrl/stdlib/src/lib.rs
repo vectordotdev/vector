@@ -38,6 +38,8 @@ mod encode_percent;
 mod ends_with;
 #[cfg(feature = "exists")]
 mod exists;
+#[cfg(feature = "find")]
+mod find;
 #[cfg(feature = "flatten")]
 mod flatten;
 #[cfg(feature = "float")]
@@ -50,6 +52,8 @@ mod format_int;
 mod format_number;
 #[cfg(feature = "format_timestamp")]
 mod format_timestamp;
+#[cfg(feature = "get")]
+mod get;
 #[cfg(feature = "get_env_var")]
 mod get_env_var;
 #[cfg(feature = "get_hostname")]
@@ -176,10 +180,16 @@ mod parse_xml;
 mod push;
 #[cfg(feature = "redact")]
 mod redact;
+#[cfg(feature = "remove")]
+mod remove;
 #[cfg(feature = "replace")]
 mod replace;
+#[cfg(feature = "reverse_dns")]
+mod reverse_dns;
 #[cfg(feature = "round")]
 mod round;
+#[cfg(feature = "set")]
+mod set;
 #[cfg(feature = "sha1")]
 mod sha1;
 #[cfg(feature = "sha2")]
@@ -200,6 +210,8 @@ mod strip_ansi_escape_codes;
 mod strip_whitespace;
 #[cfg(feature = "tag_types_externally")]
 mod tag_types_externally;
+#[cfg(feature = "tally")]
+mod tally;
 #[cfg(feature = "timestamp")]
 mod timestamp;
 #[cfg(feature = "to_bool")]
@@ -224,6 +236,8 @@ mod to_timestamp;
 mod to_unix_timestamp;
 #[cfg(feature = "truncate")]
 mod truncate;
+#[cfg(feature = "unique")]
+mod unique;
 #[cfg(feature = "unnest")]
 mod unnest;
 #[cfg(feature = "upcase")]
@@ -275,6 +289,8 @@ pub use encode_percent::EncodePercent;
 pub use ends_with::EndsWith;
 #[cfg(feature = "exists")]
 pub use exists::Exists;
+#[cfg(feature = "find")]
+pub use find::Find;
 #[cfg(feature = "flatten")]
 pub use flatten::Flatten;
 #[cfg(feature = "float")]
@@ -287,6 +303,8 @@ pub use format_int::FormatInt;
 pub use format_number::FormatNumber;
 #[cfg(feature = "format_timestamp")]
 pub use format_timestamp::FormatTimestamp;
+#[cfg(feature = "get")]
+pub use get::Get;
 #[cfg(feature = "get_env_var")]
 pub use get_env_var::GetEnvVar;
 #[cfg(feature = "get_hostname")]
@@ -405,10 +423,16 @@ pub use push::Push;
 pub use r#match::Match;
 #[cfg(feature = "redact")]
 pub use redact::Redact;
+#[cfg(feature = "remove")]
+pub use remove::Remove;
 #[cfg(feature = "replace")]
 pub use replace::Replace;
+#[cfg(feature = "reverse_dns")]
+pub use reverse_dns::ReverseDns;
 #[cfg(feature = "round")]
 pub use round::Round;
+#[cfg(feature = "set")]
+pub use set::Set;
 #[cfg(feature = "sha2")]
 pub use sha2::Sha2;
 #[cfg(feature = "sha3")]
@@ -427,6 +451,8 @@ pub use strip_ansi_escape_codes::StripAnsiEscapeCodes;
 pub use strip_whitespace::StripWhitespace;
 #[cfg(feature = "tag_types_externally")]
 pub use tag_types_externally::TagTypesExternally;
+#[cfg(feature = "tally")]
+pub use tally::Tally;
 #[cfg(feature = "timestamp")]
 pub use timestamp::Timestamp;
 #[cfg(feature = "to_bool")]
@@ -451,6 +477,8 @@ pub use to_timestamp::ToTimestamp;
 pub use to_unix_timestamp::ToUnixTimestamp;
 #[cfg(feature = "truncate")]
 pub use truncate::Truncate;
+#[cfg(feature = "unique")]
+pub use unique::Unique;
 #[cfg(feature = "unnest")]
 pub use unnest::Unnest;
 #[cfg(feature = "upcase")]
@@ -460,10 +488,10 @@ pub use uuid_v4::UuidV4;
 
 pub fn all() -> Vec<Box<dyn vrl::Function>> {
     vec![
-        #[cfg(feature = "array")]
-        Box::new(Array),
         #[cfg(feature = "append")]
         Box::new(Append),
+        #[cfg(feature = "array")]
+        Box::new(Array),
         #[cfg(feature = "assert")]
         Box::new(Assert),
         #[cfg(feature = "assert_eq")]
@@ -498,6 +526,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(EndsWith),
         #[cfg(feature = "exists")]
         Box::new(Exists),
+        #[cfg(feature = "find")]
+        Box::new(Find),
         #[cfg(feature = "flatten")]
         Box::new(Flatten),
         #[cfg(feature = "float")]
@@ -510,6 +540,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(FormatNumber),
         #[cfg(feature = "format_timestamp")]
         Box::new(FormatTimestamp),
+        #[cfg(feature = "get")]
+        Box::new(Get),
         #[cfg(feature = "get_env_var")]
         Box::new(GetEnvVar),
         #[cfg(feature = "get_hostname")]
@@ -576,12 +608,18 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         //Box::new(OnlyFields),
         #[cfg(feature = "object")]
         Box::new(Object),
+        #[cfg(feature = "parse_apache_log")]
+        Box::new(ParseApacheLog),
         #[cfg(feature = "parse_aws_alb_log")]
         Box::new(ParseAwsAlbLog),
         #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
         Box::new(ParseAwsCloudWatchLogSubscriptionMessage),
         #[cfg(feature = "parse_aws_vpc_flow_log")]
         Box::new(ParseAwsVpcFlowLog),
+        #[cfg(feature = "parse_common_log")]
+        Box::new(ParseCommonLog),
+        #[cfg(feature = "parse_csv")]
+        Box::new(ParseCsv),
         #[cfg(feature = "parse_duration")]
         Box::new(ParseDuration),
         #[cfg(feature = "parse_glog")]
@@ -592,12 +630,6 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseInt),
         #[cfg(feature = "parse_json")]
         Box::new(ParseJson),
-        #[cfg(feature = "parse_apache_log")]
-        Box::new(ParseApacheLog),
-        #[cfg(feature = "parse_common_log")]
-        Box::new(ParseCommonLog),
-        #[cfg(feature = "parse_csv")]
-        Box::new(ParseCsv),
         #[cfg(feature = "parse_key_value")]
         Box::new(ParseKeyValue),
         #[cfg(feature = "parse_klog")]
@@ -630,18 +662,18 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseXml),
         #[cfg(feature = "push")]
         Box::new(Push),
-        #[cfg(feature = "match")]
-        Box::new(Match),
-        #[cfg(feature = "match_any")]
-        Box::new(MatchAny),
-        #[cfg(feature = "match_array")]
-        Box::new(MatchArray),
         #[cfg(feature = "redact")]
         Box::new(Redact),
+        #[cfg(feature = "remove")]
+        Box::new(Remove),
         #[cfg(feature = "replace")]
         Box::new(Replace),
+        #[cfg(feature = "reverse_dns")]
+        Box::new(ReverseDns),
         #[cfg(feature = "round")]
         Box::new(Round),
+        #[cfg(feature = "set")]
+        Box::new(Set),
         #[cfg(feature = "sha1")]
         Box::new(Sha1),
         #[cfg(feature = "sha2")]
@@ -660,6 +692,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(StripAnsiEscapeCodes),
         #[cfg(feature = "strip_whitespace")]
         Box::new(StripWhitespace),
+        #[cfg(feature = "tally")]
+        Box::new(Tally),
         #[cfg(feature = "tag_types_externally")]
         Box::new(TagTypesExternally),
         #[cfg(feature = "timestamp")]
@@ -686,6 +720,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ToUnixTimestamp),
         #[cfg(feature = "truncate")]
         Box::new(Truncate),
+        #[cfg(feature = "unique")]
+        Box::new(Unique),
         #[cfg(feature = "unnest")]
         Box::new(Unnest),
         #[cfg(feature = "upcase")]

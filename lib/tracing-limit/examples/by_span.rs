@@ -22,7 +22,7 @@ fn main() {
                     let span = info_span!(
                         "sink",
                         component_kind = "sink",
-                        component_name = &key,
+                        component_id = &key,
                         component_type = "fake",
                         vrl_line_number = &line_number,
                     );

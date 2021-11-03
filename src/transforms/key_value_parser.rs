@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, TransformConfig, TransformDescription},
+    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{KeyValueFieldDoesNotExist, KeyValueParseFailed, KeyValueTargetExists},
     transforms::{FunctionTransform, Transform},
@@ -37,8 +37,8 @@ impl_generate_config_from_default!(KeyValueConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "key_value_parser")]
 impl TransformConfig for KeyValueConfig {
-    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
-        let timezone = self.timezone.unwrap_or(globals.timezone);
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        let timezone = self.timezone.unwrap_or(context.globals.timezone);
         let conversions = parse_conversion_map(&self.types, timezone)?;
         let field = self
             .field
@@ -144,7 +144,7 @@ impl FunctionTransform for KeyValue {
                     if self.overwrite_target {
                         log.remove(target_field);
                     } else {
-                        emit!(KeyValueTargetExists { target_field });
+                        emit!(&KeyValueTargetExists { target_field });
                         return output.push(event);
                     }
                 }
@@ -161,7 +161,7 @@ impl FunctionTransform for KeyValue {
                             log.insert(key, value);
                         }
                         Err(error) => {
-                            emit!(KeyValueParseFailed { key, error });
+                            emit!(&KeyValueParseFailed { key, error });
                         }
                     }
                 } else {
@@ -173,7 +173,7 @@ impl FunctionTransform for KeyValue {
                 log.remove(&self.field);
             }
         } else {
-            emit!(KeyValueFieldDoesNotExist {
+            emit!(&KeyValueFieldDoesNotExist {
                 field: self.field.to_string()
             });
         };
@@ -186,7 +186,7 @@ impl FunctionTransform for KeyValue {
 mod tests {
     use super::KeyValueConfig;
     use crate::{
-        config::{GlobalOptions, TransformConfig},
+        config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
     };
 
@@ -215,7 +215,7 @@ mod tests {
             trim_value,
             timezone: Default::default(),
         }
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
 

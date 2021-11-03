@@ -1,8 +1,0 @@
-subscription ComponentEventsOutTotalsSubscription($interval: Int!) {
-    componentEventsOutTotals(interval: $interval) {
-        name
-        metric {
-            eventsOutTotal
-        }
-    }
-}

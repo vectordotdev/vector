@@ -1,8 +1,8 @@
-use super::InternalEvent;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub(crate) struct KeyValueParseFailed {
+pub struct KeyValueParseFailed {
     pub key: String,
     pub error: crate::types::Error,
 }
@@ -25,7 +25,7 @@ impl InternalEvent for KeyValueParseFailed {
 }
 
 #[derive(Debug)]
-pub(crate) struct KeyValueTargetExists<'a> {
+pub struct KeyValueTargetExists<'a> {
     pub target_field: &'a String,
 }
 
@@ -46,7 +46,7 @@ impl<'a> InternalEvent for KeyValueTargetExists<'a> {
 }
 
 #[derive(Debug)]
-pub(crate) struct KeyValueFieldDoesNotExist {
+pub struct KeyValueFieldDoesNotExist {
     pub field: String,
 }
 
@@ -67,6 +67,6 @@ impl InternalEvent for KeyValueFieldDoesNotExist {
 }
 
 #[derive(Debug)]
-pub(crate) struct KeyValueMultipleSplitResults {
+pub struct KeyValueMultipleSplitResults {
     pub pair: String,
 }

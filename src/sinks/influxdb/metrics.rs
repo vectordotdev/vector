@@ -31,6 +31,8 @@ use std::{
     task::Poll,
 };
 use tower::Service;
+use vector_core::event::metric::{MetricSketch, Quantile};
+use vector_core::ByteSizeOf;
 
 #[derive(Clone)]
 struct InfluxDbSvc {
@@ -146,11 +148,12 @@ impl InfluxDbSvc {
                 sink::StdServiceLogic::default(),
             )
             .with_flat_map(move |event: Event| {
-                stream::iter(
+                stream::iter({
+                    let byte_size = event.size_of();
                     normalizer
                         .apply(event)
-                        .map(|metric| Ok(EncodedEvent::new(metric))),
-                )
+                        .map(|metric| Ok(EncodedEvent::new(metric, byte_size)))
+                })
             })
             .sink_map_err(|error| error!(message = "Fatal influxdb sink error.", %error));
 
@@ -302,7 +305,7 @@ fn get_type_and_fields(
                 .iter()
                 .map(|quantile| {
                     (
-                        format!("quantile_{}", quantile.upper_limit),
+                        format!("quantile_{}", quantile.quantile),
                         Field::Float(quantile.value),
                     )
                 })
@@ -320,6 +323,41 @@ fn get_type_and_fields(
             let fields = encode_distribution(samples, quantiles);
             ("distribution", fields)
         }
+        MetricValue::Sketch { sketch } => match sketch {
+            MetricSketch::AgentDDSketch(ddsketch) => {
+                // Hard-coded quantiles because InfluxDB can't natively do anything useful with the
+                // actual bins.
+                let mut fields = [0.5, 0.75, 0.9, 0.99]
+                    .iter()
+                    .map(|q| {
+                        let quantile = Quantile {
+                            quantile: *q,
+                            value: ddsketch.quantile(*q).unwrap_or(0.0),
+                        };
+                        (quantile.as_percentile(), Field::Float(quantile.value))
+                    })
+                    .collect::<HashMap<_, _>>();
+                fields.insert("count".to_owned(), Field::UnsignedInt(ddsketch.count()));
+                fields.insert(
+                    "min".to_owned(),
+                    Field::Float(ddsketch.min().unwrap_or(f64::MAX)),
+                );
+                fields.insert(
+                    "max".to_owned(),
+                    Field::Float(ddsketch.max().unwrap_or(f64::MIN)),
+                );
+                fields.insert(
+                    "sum".to_owned(),
+                    Field::Float(ddsketch.sum().unwrap_or(0.0)),
+                );
+                fields.insert(
+                    "avg".to_owned(),
+                    Field::Float(ddsketch.avg().unwrap_or(0.0)),
+                );
+
+                ("sketch", Some(fields))
+            }
+        },
     }
 }
 

@@ -1,0 +1,28 @@
+{{ $id := (.id | default .text) | urlize }}
+{{ $text := .text | markdownify }}
+{{ $level := .level | default 2 }}
+{{ $iconSizes := dict "1" "7" "2" "6" "3" "5" "4" "4" "5" "3" "6" "3" }}
+{{ $n := index $iconSizes ($level | string) }}
+<h{{ $level }} x-data="{ show: false }" x-on:mouseover="show = true" x-on:mouseleave="show = false" id="{{ $id }}" class="flex items-center text-dark dark:text-gray-200{{ if .bold }} font-bold{{ end }}{{ if .toc_hide }} js-toc-ignore{{ end }}{{ if .mono }} font-mono{{ end }}">
+  {{ if .href }}
+  <a href="{{ .href }}">
+    {{ $text }}
+  </a>
+  {{ else if .anchor }}
+  <a href="#{{ $id }}">
+    {{ $text }}
+  </a>
+  {{ else }}
+  <span>
+    {{ $text }}
+  </span>
+  {{ end }}
+
+  {{ if ne .icon false }}
+  <a class="ml-2" x-cloak x-show="show" href="#{{ $id }}">
+    <svg xmlns="http://www.w3.org/2000/svg" class="text-secondary dark:text-primary h-{{ $n }} w-{{ $n }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+    </svg>
+  </a>
+  {{ end }}
+</h{{ $level }}>

@@ -1,30 +1,36 @@
 use crate::{
     config::{DataType, GenerateConfig, Resource, SinkContext, SinkHealthcheckOptions},
     event::{proto::EventWrapper, Event},
+    internal_events::EndpointBytesSent,
     proto::vector as proto,
     sinks::util::{
-        retries::RetryLogic, sink, BatchConfig, BatchSettings, BatchSink, EncodedEvent,
+        retries::RetryLogic, uri, BatchConfig, BatchSettings, BatchSink, EncodedEvent,
         EncodedLength, ServiceBuilderExt, TowerRequestConfig, VecBuffer,
     },
     sinks::{Healthcheck, VectorSink},
+    tls::{tls_connector_builder, MaybeTlsSettings, TlsConfig},
 };
 use futures::{future::BoxFuture, stream, SinkExt, StreamExt, TryFutureExt};
 use http::uri::Uri;
+use hyper::client::HttpConnector;
+use hyper_openssl::HttpsConnector;
+use hyper_proxy::ProxyConnector;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::path::PathBuf;
 use std::task::{Context, Poll};
-use tonic::{
-    transport::{Certificate, Channel, ClientTlsConfig, Endpoint, Identity},
-    IntoRequest,
-};
+use tonic::{body::BoxBody, IntoRequest};
 use tower::ServiceBuilder;
+use vector_core::config::proxy::ProxyConfig;
+use vector_core::ByteSizeOf;
 
-type Client = proto::Client<Channel>;
-type Response = Result<tonic::Response<proto::PushEventsResponse>, tonic::Status>;
+#[derive(Clone, Debug)]
+struct Client {
+    inner: proto::Client<HyperSvc>,
+    protocol: String,
+    endpoint: String,
+}
 
-// TODO: rename
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
@@ -34,15 +40,7 @@ pub struct VectorConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(default)]
-    pub tls: Option<GrpcTlsConfig>,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
-pub struct GrpcTlsConfig {
-    ca_file: PathBuf,
-    crt_file: PathBuf,
-    key_file: PathBuf,
+    tls: Option<TlsConfig>,
 }
 
 impl GenerateConfig for VectorConfig {
@@ -60,18 +58,28 @@ fn default_config(address: &str) -> VectorConfig {
     }
 }
 
-/// grpc doesn't like an address without a scheme, so we default to http if one isn't specified in
-/// the address.
-fn default_http(address: &str) -> crate::Result<Uri> {
+/// grpc doesn't like an address without a scheme, so we default to http or https if one isn't
+/// specified in the address.
+fn with_default_scheme(address: &str, tls: bool) -> crate::Result<Uri> {
     let uri: Uri = address.parse()?;
     if uri.scheme().is_none() {
-        // Default the scheme to http.
+        // Default the scheme to http or https.
         let mut parts = uri.into_parts();
-        parts.scheme = Some(
-            "http"
-                .parse()
-                .unwrap_or_else(|_| unreachable!("http should be valid")),
-        );
+
+        parts.scheme = if tls {
+            Some(
+                "https"
+                    .parse()
+                    .unwrap_or_else(|_| unreachable!("https should be valid")),
+            )
+        } else {
+            Some(
+                "http"
+                    .parse()
+                    .unwrap_or_else(|_| unreachable!("http should be valid")),
+            )
+        };
+
         if parts.path_and_query.is_none() {
             parts.path_and_query = Some(
                 "/".parse()
@@ -84,38 +92,77 @@ fn default_http(address: &str) -> crate::Result<Uri> {
     }
 }
 
+fn new_client(
+    tls_settings: &MaybeTlsSettings,
+    proxy_config: &ProxyConfig,
+) -> crate::Result<hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>> {
+    let mut http = HttpConnector::new();
+    http.enforce_http(false);
+
+    let tls = tls_connector_builder(tls_settings)?;
+    let mut https = HttpsConnector::with_connector(http, tls)?;
+
+    let settings = tls_settings.tls().cloned();
+    https.set_callback(move |c, _uri| {
+        if let Some(settings) = &settings {
+            settings.apply_connect_configuration(c);
+        }
+
+        Ok(())
+    });
+
+    let mut proxy = ProxyConnector::new(https).unwrap();
+    proxy_config.configure(&mut proxy)?;
+
+    Ok(hyper::Client::builder().http2_only(true).build(proxy))
+}
+
+#[derive(Clone, Debug)]
+struct HyperSvc {
+    uri: Uri,
+    client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
+}
+
+impl tower::Service<hyper::Request<BoxBody>> for HyperSvc {
+    type Response = hyper::Response<hyper::Body>;
+    type Error = hyper::Error;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, mut req: hyper::Request<BoxBody>) -> Self::Future {
+        let uri = Uri::builder()
+            .scheme(self.uri.scheme().unwrap().clone())
+            .authority(self.uri.authority().unwrap().clone())
+            .path_and_query(req.uri().path_and_query().unwrap().clone())
+            .build()
+            .unwrap();
+
+        *req.uri_mut() = uri;
+
+        Box::pin(self.client.request(req))
+    }
+}
+
 impl VectorConfig {
     pub(crate) async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoint = Endpoint::from(default_http(&self.address)?);
-        let endpoint = match &self.tls {
-            Some(tls) => {
-                let host = get_authority(&self.address)?;
-                let ca = Certificate::from_pem(tokio::fs::read(&tls.ca_file).await?);
-                let crt = tokio::fs::read(&tls.crt_file).await?;
-                let key = tokio::fs::read(&tls.key_file).await?;
-                let identity = Identity::from_pem(crt, key);
+        let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
+        let uri = with_default_scheme(&self.address, tls.is_tls())?;
 
-                let tls_config = ClientTlsConfig::new()
-                    .identity(identity)
-                    .ca_certificate(ca)
-                    .domain_name(host);
+        let client = new_client(&tls, cx.proxy())?;
 
-                endpoint.tls_config(tls_config)?
-            }
-            None => endpoint,
-        };
-
-        let client = proto::Client::new(endpoint.connect_lazy()?);
-
-        let healthcheck_client = if let Some(uri) = cx.healthcheck.uri.clone() {
-            let endpoint = Endpoint::from(uri.uri);
-            proto::Client::new(endpoint.connect_lazy()?)
-        } else {
-            client.clone()
-        };
+        let healthcheck_uri = cx
+            .healthcheck
+            .uri
+            .clone()
+            .map(|uri| uri.uri)
+            .unwrap_or_else(|| uri.clone());
+        let healthcheck_client = Client::new(client.clone(), healthcheck_uri);
 
         let healthcheck = healthcheck(healthcheck_client, cx.healthcheck.clone());
-
+        let client = Client::new(client, uri);
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let batch = BatchSettings::default()
             .events(1000)
@@ -134,15 +181,15 @@ impl VectorConfig {
         Ok((VectorSink::Sink(Box::new(sink)), Box::pin(healthcheck)))
     }
 
-    pub(super) fn input_type(&self) -> DataType {
+    pub(super) const fn input_type(&self) -> DataType {
         DataType::Any
     }
 
-    pub(super) fn sink_type(&self) -> &'static str {
+    pub(super) const fn sink_type(&self) -> &'static str {
         "vector"
     }
 
-    pub(super) fn resources(&self) -> Vec<Resource> {
+    pub(super) const fn resources(&self) -> Vec<Resource> {
         Vec::new()
     }
 }
@@ -153,7 +200,7 @@ async fn healthcheck(mut client: Client, options: SinkHealthcheckOptions) -> cra
         return Ok(());
     }
 
-    let request = client.health_check(proto::HealthCheckRequest {});
+    let request = client.inner.health_check(proto::HealthCheckRequest {});
 
     if let Ok(response) = request.await {
         let status = proto::ServingStatus::from_i32(response.into_inner().status);
@@ -166,11 +213,19 @@ async fn healthcheck(mut client: Client, options: SinkHealthcheckOptions) -> cra
     Err(Box::new(Error::Health))
 }
 
-fn get_authority(url: &str) -> Result<String, Error> {
-    url.parse::<Uri>()
-        .ok()
-        .and_then(|uri| uri.authority().map(ToString::to_string))
-        .ok_or(Error::NoHost)
+impl Client {
+    fn new(
+        client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
+        uri: Uri,
+    ) -> Self {
+        let (protocol, endpoint) = uri::protocol_endpoint(uri.clone());
+        let inner = proto::Client::new(HyperSvc { uri, client });
+        Self {
+            inner,
+            protocol,
+            endpoint,
+        }
+    }
 }
 
 impl tower::Service<Vec<EventWrapper>> for Client {
@@ -191,10 +246,18 @@ impl tower::Service<Vec<EventWrapper>> for Client {
         let mut client = self.clone();
 
         let request = proto::PushEventsRequest { events };
+        let byte_size = request.encoded_len();
         let future = async move {
             client
+                .inner
                 .push_events(request.into_request())
-                .map_ok(|_| ())
+                .map_ok(|_response| {
+                    emit!(&EndpointBytesSent {
+                        byte_size,
+                        protocol: &client.protocol,
+                        endpoint: &client.endpoint,
+                    });
+                })
                 .map_err(|source| Error::Request { source })
                 .await
         };
@@ -204,21 +267,20 @@ impl tower::Service<Vec<EventWrapper>> for Client {
 }
 
 fn encode_event(mut event: Event) -> EncodedEvent<EventWrapper> {
+    let byte_size = event.size_of();
     let finalizers = event.metadata_mut().take_finalizers();
     let item = event.into();
 
-    EncodedEvent { item, finalizers }
+    EncodedEvent {
+        item,
+        finalizers,
+        byte_size,
+    }
 }
 
 impl EncodedLength for EventWrapper {
     fn encoded_length(&self) -> usize {
         self.encoded_len()
-    }
-}
-
-impl sink::Response for Response {
-    fn is_successful(&self) -> bool {
-        self.is_ok()
     }
 }
 
@@ -242,8 +304,22 @@ impl RetryLogic for VectorGrpcRetryLogic {
     type Response = ();
 
     fn is_retriable_error(&self, err: &Self::Error) -> bool {
+        use tonic::Code::*;
+
         match err {
-            Error::Request { source } => !matches!(source.code(), tonic::Code::Unknown),
+            Error::Request { source } => !matches!(
+                source.code(),
+                // List taken from
+                //
+                // <https://github.com/grpc/grpc/blob/ed1b20777c69bd47e730a63271eafc1b299f6ca0/doc/statuscodes.md>
+                NotFound
+                    | InvalidArgument
+                    | AlreadyExists
+                    | PermissionDenied
+                    | OutOfRange
+                    | Unimplemented
+                    | Unauthenticated
+            ),
             _ => true,
         }
     }
@@ -254,14 +330,17 @@ mod tests {
     use super::*;
     use crate::{
         config::SinkContext,
-        sinks::util::test::build_test_server_status,
-        test_util::{next_addr, random_lines_with_stream},
+        sinks::util::test::build_test_server_generic,
+        test_util::{components, next_addr, random_lines_with_stream},
     };
-    use bytes::Bytes;
+    use bytes::{BufMut, Bytes, BytesMut};
     use futures::{channel::mpsc, StreamExt};
-    use http::{request::Parts, StatusCode};
+    use http::request::Parts;
     use hyper::Method;
     use vector_core::event::{BatchNotifier, BatchStatus};
+
+    // one byte for the compression flag plus four bytes for the length
+    const GRPC_HEADER_SIZE: usize = 5;
 
     #[test]
     fn generate_config() {
@@ -279,17 +358,26 @@ mod tests {
 
         let cx = SinkContext::new_test();
 
+        components::init_test();
         let (sink, _) = config.build(cx).await.unwrap();
-        let (rx, trigger, server) = build_test_server_status(in_addr, StatusCode::OK);
+        let (rx, trigger, server) = build_test_server_generic(in_addr, move || {
+            hyper::Response::builder()
+                .header("grpc-status", "0") // OK
+                .header("content-type", "application/grpc")
+                .body(hyper::Body::from(encode_body(proto::PushEventsResponse {})))
+                .unwrap()
+        });
+
         tokio::spawn(server);
 
-        let (batch, _receiver) = BatchNotifier::new_with_receiver();
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (input_lines, events) = random_lines_with_stream(8, num_lines, Some(batch));
 
         sink.run(events).await.unwrap();
         drop(trigger);
-        // This check fails, ref https://github.com/timberio/vector/issues/7624
-        // assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+        components::SINK_TESTS.assert(&components::HTTP_SINK_TAGS);
 
         let output_lines = get_received(rx, |parts| {
             assert_eq!(Method::POST, parts.method);
@@ -306,7 +394,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // This test hangs, possibly an infinite retry loop
     async fn acknowledges_error() {
         let num_lines = 10;
 
@@ -318,28 +405,34 @@ mod tests {
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).await.unwrap();
-        let (rx, trigger, server) = build_test_server_status(in_addr, StatusCode::FORBIDDEN);
+        let (_rx, trigger, server) = build_test_server_generic(in_addr, move || {
+            hyper::Response::builder()
+                .header("grpc-status", "7") // permission denied
+                .header("content-type", "application/grpc")
+                .body(tonic::body::empty_body())
+                .unwrap()
+        });
+
         tokio::spawn(server);
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        let (input_lines, events) = random_lines_with_stream(8, num_lines, Some(batch));
+        let (_, events) = random_lines_with_stream(8, num_lines, Some(batch));
 
         sink.run(events).await.unwrap();
         drop(trigger);
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Errored));
+    }
 
-        let output_lines = get_received(rx, |parts| {
-            assert_eq!(Method::POST, parts.method);
-            assert_eq!("/vector.Vector/PushEvents", parts.uri.path());
-            assert_eq!(
-                "application/grpc",
-                parts.headers.get("content-type").unwrap().to_str().unwrap()
-            );
-        })
-        .await;
-
-        assert_eq!(num_lines, output_lines.len());
-        assert_eq!(input_lines, output_lines);
+    #[test]
+    fn test_with_default_scheme() {
+        assert_eq!(
+            with_default_scheme("0.0.0.0", false).unwrap().to_string(),
+            "http://0.0.0.0/"
+        );
+        assert_eq!(
+            with_default_scheme("0.0.0.0", true).unwrap().to_string(),
+            "https://0.0.0.0/"
+        );
     }
 
     async fn get_received(
@@ -349,11 +442,7 @@ mod tests {
         rx.map(|(parts, body)| {
             assert_parts(parts);
 
-            // Remove the grpc header, which is:
-            // 1 bytes for compressed/not compressed
-            // 4 bytes for the message len
-            // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests
-            let proto_body = body.slice(5..);
+            let proto_body = body.slice(GRPC_HEADER_SIZE..);
 
             let req = proto::PushEventsRequest::decode(proto_body).unwrap();
 
@@ -371,5 +460,38 @@ mod tests {
         .into_iter()
         .flatten()
         .collect()
+    }
+
+    // taken from <https://github.com/hyperium/tonic/blob/5aa8ae1fec27377cd4c2a41d309945d7e38087d0/examples/src/grpc-web/client.rs#L45-L75>
+    fn encode_body<T>(msg: T) -> Bytes
+    where
+        T: prost::Message,
+    {
+        let mut buf = BytesMut::with_capacity(1024);
+
+        // first skip past the header
+        // cannot write it yet since we don't know the size of the
+        // encoded message
+        buf.reserve(GRPC_HEADER_SIZE);
+        unsafe {
+            buf.advance_mut(GRPC_HEADER_SIZE);
+        }
+
+        // write the message
+        msg.encode(&mut buf).unwrap();
+
+        // now we know the size of encoded message and can write the
+        // header
+        let len = buf.len() - GRPC_HEADER_SIZE;
+        {
+            let mut buf = &mut buf[..GRPC_HEADER_SIZE];
+
+            // compression flag, 0 means "no compression"
+            buf.put_u8(0);
+
+            buf.put_u32(len as u32);
+        }
+
+        buf.split_to(len + GRPC_HEADER_SIZE).freeze()
     }
 }

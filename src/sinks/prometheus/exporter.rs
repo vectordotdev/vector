@@ -76,7 +76,7 @@ fn default_address() -> SocketAddr {
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 9598)
 }
 
-fn default_flush_period_secs() -> u64 {
+const fn default_flush_period_secs() -> u64 {
     60
 }
 
@@ -251,7 +251,7 @@ impl PrometheusExporter {
                         )
                     });
 
-                    emit!(PrometheusServerRequestComplete {
+                    emit!(&PrometheusServerRequestComplete {
                         status_code: response.status(),
                     });
 
@@ -288,7 +288,7 @@ impl PrometheusExporter {
 
 #[async_trait]
 impl StreamSink for PrometheusExporter {
-    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.start_server_if_needed().await;
         while let Some(event) = input.next().await {
             let item = event.into_metric();
@@ -377,7 +377,7 @@ impl Hash for MetricEntry {
             }
             MetricValue::AggregatedSummary { quantiles, .. } => {
                 for quantile in quantiles {
-                    quantile.upper_limit.to_bits().hash(state);
+                    quantile.quantile.to_bits().hash(state);
                 }
             }
             _ => {}
@@ -422,7 +422,7 @@ impl PartialEq for MetricEntry {
                         && quantiles1
                             .iter()
                             .zip(quantiles2.iter())
-                            .all(|(q1, q2)| q1.upper_limit == q2.upper_limit)
+                            .all(|(q1, q2)| q1.quantile == q2.quantile)
                 }
                 _ => true,
             }
@@ -492,10 +492,7 @@ mod tests {
         trace_init();
 
         let client_settings = MaybeTlsSettings::from_config(&tls_config, false).unwrap();
-        let proto = match &tls_config {
-            Some(_) => "https",
-            None => "http",
-        };
+        let proto = client_settings.http_protocol_name();
 
         let address = next_addr();
         let config = PrometheusExporterConfig {
@@ -591,7 +588,7 @@ mod tests {
         };
         let cx = SinkContext::new_test();
 
-        let mut sink = PrometheusExporter::new(config, cx.acker());
+        let sink = Box::new(PrometheusExporter::new(config, cx.acker()));
 
         let m1 = Metric::new(
             "absolute",
@@ -616,11 +613,13 @@ mod tests {
             Event::Metric(m1.clone().with_value(MetricValue::Counter { value: 40. })),
         ];
 
+        let internal_metrics = Arc::clone(&sink.metrics);
+
         sink.run(Box::pin(futures::stream::iter(metrics)))
             .await
             .unwrap();
 
-        let map = &sink.metrics.read().unwrap().map;
+        let map = &internal_metrics.read().unwrap().map;
 
         assert_eq!(
             map.get_full(&MetricEntry(m1)).unwrap().1.value(),

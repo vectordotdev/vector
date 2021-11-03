@@ -1,0 +1,53 @@
+{{ $tagline := site.Params.tagline }}
+{{ $undertagline := site.Params.undertagline }}
+{{ $subtagline := site.Params.subtagline }}
+{{ $latest := index site.Data.docs.versions 0 }}
+{{ $link := printf "releases/%s" $latest | relURL }}
+{{ $links := site.Menus.doc_quick_links }}
+{{ $modes := slice "Light" "Dark" }}
+
+<div class="py-24 md:py-32 lg:py-48 mx-auto max-w-7xl relative" x-data="{ active: false }">
+  <div class="text-center">
+    <a href="{{ $link }}" @mouseover="active = true" @mouseover.away="active = false" class="dark:bg-gray-800 bg-gradient-to-r uppercase from-primary to-purple-v inline-flex items-center text-white rounded-full py-1 px-1.5 sm:text-base lg:text-sm xl:text-base">
+      <span class="bg-black text-white font-semibold px-2.5 py-0 lg:py-0.5 text-xs leading-5 tracking-tight rounded-full">
+        New
+      </span>
+      <span class="ml-2.5 lg:ml-3 text-xs md:text-sm font-semibold">
+        Vector version <span class="font-extrabold">{{ $latest }}</span>
+      </span>
+      {{/* Heroicon name: solid/chevron-right */}}
+      <svg xmlns="http://www.w3.org/2000/svg" :class="{ 'translate-x-0.5': active }" class="text-white ml-2 w-4 h-4 transition transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+      </svg>
+    </a>
+
+    <div class="my-6 md:my-8 lg:my-10">
+      {{ range $modes }}
+      {{ $src := printf "/img/logos/vector-logo-%s.svg" (. | lower) }}
+      <div x-show="$store.global.is{{ . }}()">
+        {{ partial "svg.html" (dict "src" $src "class" "mx-auto w-3/4 md:w-7/12") }}
+      </div>
+      {{ end }}
+    </div>
+
+    <p class="dark:text-gray-300 text-dark text-xl lg:text-3xl">
+      {{ site.Params.description }}
+    </p>
+
+    <div class="mt-6 md:mt-8 lg:mt-10 inline-flex space-x-2">
+      {{ range $links }}
+      <a href="{{ .URL }}" class="uppercase font-semibold text-xs md:text-sm tracking-tight shadow-sm py-1 px-3.5 rounded-full hover:shadow bg-gray-200 text-dark hover:bg-primary hover:text-dark dark:bg-primary dark:hover:bg-purple-v">
+        <div class="flex items-center space-x-2 flex-wrap sm:flex-nowrap justify-center h-full">
+          <div class="text-sm">
+            <ion-icon name="{{ .Params.ionicon }}"></ion-icon>
+          </div>
+
+          <span>
+            {{ .Name }}
+          </span>
+        </div>
+      </a>
+      {{ end }}
+    </div>
+  </div>
+</div>

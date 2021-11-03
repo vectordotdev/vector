@@ -1,6 +1,6 @@
+use crate::emit;
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
-    emit,
     event::{Event, VrlTarget},
     internal_events::VrlConditionExecutionError,
 };
@@ -22,7 +22,10 @@ impl_generate_config_from_default!(VrlConfig);
 
 #[typetag::serde(name = "vrl")]
 impl ConditionConfig for VrlConfig {
-    fn build(&self) -> crate::Result<Box<dyn Condition>> {
+    fn build(
+        &self,
+        enrichment_tables: &enrichment::TableRegistry,
+    ) -> crate::Result<Box<dyn Condition>> {
         // TODO(jean): re-add this to VRL
         // let constraint = TypeConstraint {
         //     allow_any: false,
@@ -41,9 +44,15 @@ impl ConditionConfig for VrlConfig {
             .into_iter()
             .filter(|f| f.identifier() != "del")
             .filter(|f| f.identifier() != "only_fields")
+            .chain(enrichment::vrl_functions().into_iter())
             .collect::<Vec<_>>();
 
-        let program = vrl::compile(&self.source, &functions).map_err(|diagnostics| {
+        let program = vrl::compile(
+            &self.source,
+            &functions,
+            Some(Box::new(enrichment_tables.clone())),
+        )
+        .map_err(|diagnostics| {
             Formatter::new(&self.source, diagnostics)
                 .colored()
                 .to_string()
@@ -93,7 +102,7 @@ impl Condition for Vrl {
                 _ => false,
             })
             .unwrap_or_else(|_| {
-                emit!(VrlConditionExecutionError);
+                emit!(&VrlConditionExecutionError);
                 false
             })
     }
@@ -208,9 +217,15 @@ mod test {
             let source = source.to_owned();
             let config = VrlConfig { source };
 
-            assert_eq!(config.build().map(|_| ()).map_err(|e| e.to_string()), build);
+            assert_eq!(
+                config
+                    .build(&Default::default())
+                    .map(|_| ())
+                    .map_err(|e| e.to_string()),
+                build
+            );
 
-            if let Ok(cond) = config.build() {
+            if let Ok(cond) = config.build(&Default::default()) {
                 assert_eq!(
                     cond.check_with_context(&event),
                     check.map_err(|e| e.to_string())

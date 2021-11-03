@@ -1,6 +1,6 @@
 use crate::serde::Fields;
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{
         AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten, TemplateRenderingFailed,
@@ -58,7 +58,7 @@ impl GenerateConfig for AddFieldsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "add_fields")]
 impl TransformConfig for AddFieldsConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         let all_fields = self.fields.clone().all_fields().collect::<IndexMap<_, _>>();
         let mut fields = IndexMap::with_capacity(all_fields.len());
         for (key, value) in all_fields {
@@ -109,7 +109,7 @@ impl FunctionTransform for AddFields {
                 TemplateOrValue::Template(v) => match v.render_string(&event) {
                     Ok(v) => v,
                     Err(error) => {
-                        emit!(TemplateRenderingFailed {
+                        emit!(&TemplateRenderingFailed {
                             error,
                             field: Some(&key),
                             drop_event: false
@@ -122,10 +122,10 @@ impl FunctionTransform for AddFields {
             };
             if self.overwrite {
                 if event.as_mut_log().insert(&key_string, value).is_some() {
-                    emit!(AddFieldsFieldOverwritten { field: &key });
+                    emit!(&AddFieldsFieldOverwritten { field: &key });
                 }
             } else if event.as_mut_log().contains(&key_string) {
-                emit!(AddFieldsFieldNotOverwritten { field: &key });
+                emit!(&AddFieldsFieldNotOverwritten { field: &key });
             } else {
                 event.as_mut_log().insert(&key_string, value);
             }

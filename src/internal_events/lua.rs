@@ -1,5 +1,7 @@
-use super::InternalEvent;
+// ## skip check-events ##
+
 use metrics::{counter, gauge};
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct LuaGcTriggered {
@@ -8,7 +10,7 @@ pub struct LuaGcTriggered {
 
 impl InternalEvent for LuaGcTriggered {
     fn emit_metrics(&self) {
-        gauge!("memory_used_bytes", self.used_memory as f64);
+        gauge!("lua_memory_used_bytes", self.used_memory as f64);
     }
 }
 

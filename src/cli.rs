@@ -31,7 +31,7 @@ impl Opts {
         Opts::from_clap(&app.get_matches())
     }
 
-    pub fn log_level(&self) -> &'static str {
+    pub const fn log_level(&self) -> &'static str {
         let (quiet_level, verbose_level) = match self.sub_command {
             Some(SubCommand::Validate(_))
             | Some(SubCommand::Graph(_))
@@ -150,11 +150,6 @@ pub struct RootOpts {
     /// Watch for changes in configuration file, and reload accordingly.
     #[structopt(short, long, env = "VECTOR_WATCH_CONFIG")]
     pub watch_config: bool,
-
-    /// [experimental] Send internal tracing spans to a local APM-enabled Datadog agent with
-    /// a granularity matching the current log level.
-    #[structopt(long, env = "VECTOR_ENABLE_DATADOG_TRACING", takes_value(false))]
-    pub enable_datadog_tracing: bool,
 }
 
 impl RootOpts {
@@ -189,7 +184,7 @@ pub enum SubCommand {
     List(list::Opts),
 
     /// Run Vector config unit tests, then exit. This command is experimental and therefore subject to change.
-    /// For guidance on how to write unit tests check out: https://vector.dev/guides/level-up/unit-testing/
+    /// For guidance on how to write unit tests check out <https://vector.dev/guides/level-up/unit-testing/>.
     Test(unit_test::Opts),
 
     /// Output the topology as visual representation using the DOT language which can be rendered by GraphViz

@@ -1,8 +1,8 @@
-use super::InternalEvent;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub(crate) struct DedupeEventDiscarded {
+pub struct DedupeEventDiscarded {
     pub event: crate::event::Event,
 }
 

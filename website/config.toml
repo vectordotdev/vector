@@ -1,0 +1,309 @@
+title = "Vector"
+baseURL = "https://vector.dev"
+disableKinds = ["taxonomy", "term"]
+copyright = "Datadog, Inc."
+languageCode = "en-us"
+
+[build]
+writeStats = true
+
+[minify]
+disableSVG = true
+
+# Syntax highlighting
+[markup.highlight]
+noClasses = false
+
+# Markup config overrides
+[markup.goldmark.renderer]
+unsafe = true
+
+# Language configuration
+defaultContentLanguage = "en"
+
+[languages.en]
+title = "Vector"
+contentDir = "content/en"
+weight = 1
+
+[params]
+description = "A lightweight, ultra-fast tool for building observability pipelines"
+tagline = "Take control of your observability stack"
+undertagline = "Collect, transform, and route all your observability data with one simple tool"
+subtagline = "Vector is deployed over 1,000,000 times per month by Fortune 500 companies and startups"
+alpine_js_version = "2.8.2"
+ionicons_version = "5.4.0"
+site_logo = "img/vector-open-graph.png"
+favicon = "favicon.ico"
+display_banner = false # Whether to display the top banner in layouts/partials/banner.html
+
+# Update this every time there's a new "generation" of the site. Incrementing this forces the browser to refresh any
+# state persisted in localStorage. You should do that whenever there's some change in the front-end logic that requires
+# wiping out the user's localStorage, for example a new news banner that we want to show. Think of it as cache
+# invalidation that we control.
+site_generation = 2
+
+# Search
+[params.search]
+algolia_app_id = "EOIG7V0A2O"
+# Note that it's okay to use this on the front end: https://www.algolia.com/doc/guides/security/api-keys/#search-only-api-key
+algolia_public_api_key = "5f712eef8e5dcf4ac4bbbd0099960626"
+
+algolia_index_prod = "vector_docs_prod"
+algolia_index_staging = "vector_docs_staging"
+algolia_autocomplete_theme = "classic"
+
+# VRL JSON server
+
+# Generated _redirects file for Netlify
+[mediaTypes."text/netlify"]
+delimiter = ""
+
+[outputFormats.REDIRECTS]
+mediaType = "text/netlify"
+baseName = "_redirects"
+
+# Outputs (including search.json and _redirects files)
+[outputs]
+home = ["HTML", "JSON", "RSS", "REDIRECTS"]
+
+# CSS generation
+[[params.css]]
+input = "css/style.css"
+output = "css/style.css"
+postcss = true
+post_process = true
+
+[[params.css]]
+input = "sass/unpurged.sass"
+output = "css/unpurged.css"
+
+[[params.css]]
+input = "sass/home.sass"
+output = "css/home.css"
+home_page_only = true
+
+[params.social]
+twitter_handle = "vectordotdev"
+github_repo = "vectordotdev/vector"
+discord = "https://chat.vector.dev"
+
+# Datadog configuration
+[params.datadog_config]
+application_id = "0b95923b-b06d-445b-893f-a861e93d6ea3"
+client_token = "puba5f23a97d613091ae2ca8c0f4a135af4"
+service_name = "vector"
+
+## Menus
+
+# Main page doc links
+[[languages.en.menus.doc_quick_links]]
+name = "Quickstart"
+url = "/docs/setup/quickstart"
+params = { emphasis = true, ionicon = "rocket-outline" }
+weight = 1
+
+[[languages.en.menus.doc_quick_links]]
+name = "Vector Remap Language"
+url = "/docs/reference/vrl"
+params = { ionicon = "map-outline" }
+weight = 2
+
+[[languages.en.menus.doc_quick_links]]
+name = "Components"
+url = "/components"
+params = { ionicon = "link-outline" }
+weight = 3
+
+# Navbar menu
+[[languages.en.menus.navbar]]
+name = "Docs"
+url = "/docs"
+weight = 1
+
+[[languages.en.menus.navbar]]
+name = "Guides"
+url = "/guides"
+weight = 2
+
+[[languages.en.menus.navbar]]
+name = "Components"
+url = "/components"
+weight = 3
+
+[[languages.en.menus.navbar]]
+name = "Download"
+url = "/download"
+weight = 4
+
+[[languages.en.menus.navbar]]
+name = "Blog"
+url = "/blog"
+weight = 5
+
+# Footer menu
+[[languages.en.menus.footer]]
+name = "About"
+identifier = "about"
+weight = 1
+
+[[languages.en.menus.footer]]
+name = "What is Vector?"
+url = "/docs/about"
+parent = "about"
+weight = 1
+
+[[languages.en.menus.footer]]
+name = "Contact us"
+url = "/community"
+parent = "about"
+weight = 2
+
+[[languages.en.menus.footer]]
+name = "Components"
+url = "/components"
+identifier = "components"
+weight = 2
+
+[[languages.en.menus.footer]]
+name = "Sources"
+url = "/docs/reference/configuration/sources"
+parent = "components"
+weight = 1
+
+[[languages.en.menus.footer]]
+name = "Transforms"
+url = "/docs/reference/configuration/transforms"
+parent = "components"
+weight = 2
+
+[[languages.en.menus.footer]]
+name = "Sinks"
+url = "/docs/reference/configuration/sinks"
+parent = "components"
+weight = 3
+
+[[languages.en.menus.footer]]
+name = "Setup"
+url = "/docs/setup"
+identifier = "setup"
+weight = 3
+
+[[languages.en.menus.footer]]
+name = "Installation"
+url = "/docs/setup/installation"
+parent = "setup"
+weight = 1
+
+[[languages.en.menus.footer]]
+name = "Deployment"
+url = "/docs/setup/deployment"
+parent = "setup"
+weight = 2
+
+[[languages.en.menus.footer]]
+name = "Configuration"
+url = "/docs/reference/configuration"
+parent = "setup"
+weight = 3
+
+[[languages.en.menus.footer]]
+name = "Administration"
+url = "/docs/administration"
+parent = "setup"
+weight = 4
+
+[[languages.en.menus.footer]]
+name = "Community"
+url = "/community"
+identifier = "community"
+weight = 4
+
+[[languages.en.menus.footer]]
+name = "GitHub"
+url = "https://github.com/vectordotdev/vector"
+parent = "community"
+weight = 1
+
+[[languages.en.menus.footer]]
+name = "Twitter"
+url = "https://twitter.com/vectordotdev"
+parent = "community"
+weight = 2
+
+[[languages.en.menus.footer]]
+name = "Chat"
+url = "https://chat.vector.dev"
+parent = "community"
+weight = 3
+
+# Extra links under the "Meta" section in the docs
+[[languages.en.menus.meta]]
+name = "Privacy"
+url = "https://github.com/vectordotdev/vector/blob/master/PRIVACY.md"
+weight = 1
+
+[[languages.en.menus.meta]]
+name = "Security"
+url = "https://github.com/vectordotdev/vector/security/policy"
+weight = 2
+
+[[languages.en.menus.meta]]
+name = "Releases"
+url = "https://github.com/vectordotdev/vector/blob/master/RELEASES.md"
+weight = 3
+
+[[languages.en.menus.meta]]
+name = "Versioning"
+url = "https://github.com/vectordotdev/vector/blob/master/VERSIONING.md"
+weight = 4
+
+# Buttons in "community" section on main page
+[[languages.en.menus.community]]
+name = "View GitHub repo"
+params = { color = "black", dark = "white", icon = "github" }
+url = "https://github.com/vectordotdev/vector"
+weight = 1
+
+[[languages.en.menus.community]]
+name = "Chat with us on Discord"
+params = { color = "discord-purple", icon = "discord" }
+url = "https://chat.vector.dev"
+weight = 2
+
+
+# Mini icons in navbar and footer
+[[languages.en.menus.comms]]
+name = "Twitter"
+params = { color = "twitter-blue", icon = "twitter" }
+url = "https://twitter.com/vectordotdev"
+weight = 1
+
+[[languages.en.menus.comms]]
+name = "GitHub"
+params = { color = "black", dark = "white", icon = "github" }
+url = "https://github.com/vectordotdev/vector"
+weight = 2
+
+[[languages.en.menus.comms]]
+name = "Chat"
+params = { color = "discord-purple", icon = "discord" }
+url = "https://chat.vector.dev"
+weight = 3
+
+[[languages.en.menus.comms]]
+name = "RSS"
+params = { color = "rss-orange", icon = "rss" }
+url = "/blog/index.xml"
+weight = 4
+
+# Links in subfooter
+[[languages.en.menus.subfooter]]
+name = "Security policy"
+url = "https://github.com/vectordotdev/vector/blob/master/PRIVACY.md"
+weight = 1
+
+[[languages.en.menus.subfooter]]
+name = "Privacy policy"
+url = "https://github.com/vectordotdev/vector/blob/master/PRIVACY.md"
+weight = 2

@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{path::PathBuf, pin::Pin, sync::Arc, time::Duration};
 use tokio::{net::UnixStream, time::sleep};
+use vector_core::ByteSizeOf;
 
 #[derive(Debug, Snafu)]
 pub enum UnixError {
@@ -37,7 +38,7 @@ pub struct UnixSinkConfig {
 }
 
 impl UnixSinkConfig {
-    pub fn new(path: PathBuf) -> Self {
+    pub const fn new(path: PathBuf) -> Self {
         Self { path }
     }
 
@@ -61,11 +62,11 @@ struct UnixConnector {
 }
 
 impl UnixConnector {
-    fn new(path: PathBuf) -> Self {
+    const fn new(path: PathBuf) -> Self {
         Self { path }
     }
 
-    fn fresh_backoff() -> ExponentialBackoff {
+    const fn fresh_backoff() -> ExponentialBackoff {
         // TODO: make configurable
         ExponentialBackoff::from_millis(2)
             .factor(250)
@@ -81,11 +82,11 @@ impl UnixConnector {
         loop {
             match self.connect().await {
                 Ok(stream) => {
-                    emit!(UnixSocketConnectionEstablished { path: &self.path });
+                    emit!(&UnixSocketConnectionEstablished { path: &self.path });
                     return stream;
                 }
                 Err(error) => {
-                    emit!(UnixSocketConnectionFailed {
+                    emit!(&UnixSocketConnectionFailed {
                         error,
                         path: &self.path
                     });
@@ -133,20 +134,25 @@ impl UnixSink {
 #[async_trait]
 impl StreamSink for UnixSink {
     // Same as TcpSink, more details there.
-    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let encode_event = Arc::clone(&self.encode_event);
         let mut input = input
             .map(|mut event| {
+                let byte_size = event.size_of();
                 let finalizers = event.metadata_mut().take_finalizers();
                 encode_event(event)
-                    .map(|item| EncodedEvent { item, finalizers })
-                    .unwrap_or_else(|| EncodedEvent::new(Bytes::new()))
+                    .map(|item| EncodedEvent {
+                        item,
+                        finalizers,
+                        byte_size,
+                    })
+                    .unwrap_or_else(|| EncodedEvent::new(Bytes::new(), 0))
             })
             .peekable();
 
         while Pin::new(&mut input).peek().await.is_some() {
             let mut sink = self.connect().await;
-            let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
+            let _open_token = OpenGauge::new().open(|count| emit!(&ConnectionOpen { count }));
 
             let result = match sink
                 .send_all_peekable(&mut (&mut input).map(|item| item.item).peekable())
@@ -157,8 +163,8 @@ impl StreamSink for UnixSink {
             };
 
             if let Err(error) = result {
-                emit!(UnixSocketError {
-                    error,
+                emit!(&UnixSocketError {
+                    error: &error,
                     path: &self.connector.path
                 });
             }

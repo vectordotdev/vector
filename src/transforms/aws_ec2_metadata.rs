@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, ProxyConfig, TransformConfig, TransformDescription},
+    config::{DataType, ProxyConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful},
@@ -12,16 +12,14 @@ use hyper::{body::to_bytes as body_to_bytes, Body};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt as _;
 use std::{
-    collections::{hash_map::RandomState, HashSet},
+    collections::{HashMap, HashSet},
     error, fmt,
     future::ready,
     pin::Pin,
+    sync::{Arc, RwLock},
 };
 use tokio::time::{sleep, Duration, Instant};
 use tracing_futures::Instrument;
-
-type WriteHandle = evmap::WriteHandle<String, Bytes, (), RandomState>;
-type ReadHandle = evmap::ReadHandle<String, Bytes, (), RandomState>;
 
 const AMI_ID_KEY: &str = "ami-id";
 const AVAILABILITY_ZONE_KEY: &str = "availability-zone";
@@ -87,7 +85,7 @@ pub struct Ec2Metadata {
 
 #[derive(Clone, Debug)]
 pub struct Ec2MetadataTransform {
-    state: ReadHandle,
+    state: Arc<RwLock<HashMap<String, Bytes>>>,
 }
 
 #[derive(Debug, Clone)]
@@ -115,8 +113,8 @@ impl_generate_config_from_default!(Ec2Metadata);
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
-    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
-        let (read, write) = evmap::new();
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        let state: Arc<RwLock<HashMap<String, Bytes>>> = Arc::new(RwLock::new(HashMap::new()));
 
         // Check if the namespace is set to `""` which should mean that we do
         // not want a prefixed namespace.
@@ -145,11 +143,17 @@ impl TransformConfig for Ec2Metadata {
             .clone()
             .unwrap_or_else(|| DEFAULT_FIELD_WHITELIST.clone());
 
-        let proxy = ProxyConfig::merge_with_env(&globals.proxy, &self.proxy);
+        let proxy = ProxyConfig::merge_with_env(&context.globals.proxy, &self.proxy);
         let http_client = HttpClient::new(None, &proxy)?;
 
-        let mut client =
-            MetadataClient::new(http_client, host, keys, write, refresh_interval, fields);
+        let mut client = MetadataClient::new(
+            http_client,
+            host,
+            keys,
+            Arc::clone(&state),
+            refresh_interval,
+            fields,
+        );
 
         client.refresh_metadata().await?;
 
@@ -161,7 +165,7 @@ impl TransformConfig for Ec2Metadata {
             .instrument(info_span!("aws_ec2_metadata: worker")),
         );
 
-        Ok(Transform::task(Ec2MetadataTransform { state: read }))
+        Ok(Transform::task(Ec2MetadataTransform { state }))
     }
 
     fn input_type(&self) -> DataType {
@@ -192,21 +196,16 @@ impl TaskTransform for Ec2MetadataTransform {
 
 impl Ec2MetadataTransform {
     fn transform_one(&mut self, mut event: Event) -> Event {
-        if let Some(read_ref) = self.state.read() {
+        if let Ok(state) = self.state.read() {
             match event {
                 Event::Log(ref mut log) => {
-                    read_ref.into_iter().for_each(|(k, v)| {
-                        if let Some(value) = v.get_one() {
-                            log.insert(k.clone(), value.clone());
-                        }
+                    state.iter().for_each(|(k, v)| {
+                        log.insert(k.clone(), v.clone());
                     });
                 }
                 Event::Metric(ref mut metric) => {
-                    read_ref.into_iter().for_each(|(k, v)| {
-                        if let Some(value) = v.get_one() {
-                            metric
-                                .insert_tag(k.clone(), String::from_utf8_lossy(value).to_string());
-                        }
+                    state.iter().for_each(|(k, v)| {
+                        metric.insert_tag(k.clone(), String::from_utf8_lossy(v).to_string());
                     });
                 }
             }
@@ -221,7 +220,7 @@ struct MetadataClient {
     host: Uri,
     token: Option<(Bytes, Instant)>,
     keys: Keys,
-    state: WriteHandle,
+    state: Arc<RwLock<HashMap<String, Bytes>>>,
     refresh_interval: Duration,
     fields: HashSet<String>,
 }
@@ -244,7 +243,7 @@ impl MetadataClient {
         client: HttpClient<Body>,
         host: Uri,
         keys: Keys,
-        state: WriteHandle,
+        state: Arc<RwLock<HashMap<String, Bytes>>>,
         refresh_interval: Duration,
         fields: Vec<String>,
     ) -> Self {
@@ -263,10 +262,10 @@ impl MetadataClient {
         loop {
             match self.refresh_metadata().await {
                 Ok(_) => {
-                    emit!(AwsEc2MetadataRefreshSuccessful);
+                    emit!(&AwsEc2MetadataRefreshSuccessful);
                 }
                 Err(error) => {
-                    emit!(AwsEc2MetadataRefreshFailed { error });
+                    emit!(&AwsEc2MetadataRefreshFailed { error });
                 }
             }
 
@@ -313,121 +312,132 @@ impl MetadataClient {
         Ok(token)
     }
 
-    pub async fn get_document(&mut self) -> Result<IdentityDocument, crate::Error> {
-        let body = self.get_metadata(&DYNAMIC_DOCUMENT).await?;
-
-        serde_json::from_slice(&body[..])
-            .context(ParseIdentityDocument {})
-            .map_err(Into::into)
+    pub async fn get_document(&mut self) -> Result<Option<IdentityDocument>, crate::Error> {
+        self.get_metadata(&DYNAMIC_DOCUMENT)
+            .await?
+            .map(|body| {
+                serde_json::from_slice(&body[..])
+                    .context(ParseIdentityDocument {})
+                    .map_err(Into::into)
+            })
+            .transpose()
     }
 
     pub async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
-        use std::collections::HashMap;
-
         let mut state: HashMap<String, Bytes> = HashMap::new();
 
         // Fetch all resources, _then_ add them to the state map.
-        let document = self.get_document().await?;
-
-        if self.fields.contains(AMI_ID_KEY) {
-            state.insert(self.keys.ami_id_key.clone(), document.image_id.into());
-        }
-
-        if self.fields.contains(INSTANCE_ID_KEY) {
-            state.insert(
-                self.keys.instance_id_key.clone(),
-                document.instance_id.into(),
-            );
-        }
-
-        if self.fields.contains(INSTANCE_TYPE_KEY) {
-            state.insert(
-                self.keys.instance_type_key.clone(),
-                document.instance_type.into(),
-            );
-        }
-
-        if self.fields.contains(REGION_KEY) {
-            state.insert(self.keys.region_key.clone(), document.region.into());
-        }
-
-        if self.fields.contains(AVAILABILITY_ZONE_KEY) {
-            let availability_zone = self.get_metadata(&AVAILABILITY_ZONE).await?;
-            state.insert(self.keys.availability_zone_key.clone(), availability_zone);
-        }
-
-        if self.fields.contains(LOCAL_HOSTNAME_KEY) {
-            let local_hostname = self.get_metadata(&LOCAL_HOSTNAME).await?;
-            state.insert(self.keys.local_hostname_key.clone(), local_hostname);
-        }
-
-        if self.fields.contains(LOCAL_IPV4_KEY) {
-            let local_ipv4 = self.get_metadata(&LOCAL_IPV4).await?;
-            state.insert(self.keys.local_ipv4_key.clone(), local_ipv4);
-        }
-
-        if self.fields.contains(PUBLIC_HOSTNAME_KEY) {
-            let public_hostname = self.get_metadata(&PUBLIC_HOSTNAME).await?;
-            state.insert(self.keys.public_hostname_key.clone(), public_hostname);
-        }
-
-        if self.fields.contains(PUBLIC_IPV4_KEY) {
-            let public_ipv4 = self.get_metadata(&PUBLIC_IPV4).await?;
-            state.insert(self.keys.public_ipv4_key.clone(), public_ipv4);
-        }
-
-        if self.fields.contains(SUBNET_ID_KEY) || self.fields.contains(VPC_ID_KEY) {
-            let mac = self.get_metadata(&MAC).await?;
-            let mac = String::from_utf8_lossy(&mac[..]);
-
-            if self.fields.contains(SUBNET_ID_KEY) {
-                let subnet_path = format!(
-                    "/latest/meta-data/network/interfaces/macs/{}/subnet-id",
-                    mac
-                );
-
-                let subnet_path = subnet_path.parse().context(ParsePath {
-                    value: subnet_path.clone(),
-                })?;
-
-                let subnet_id = self.get_metadata(&subnet_path).await?;
-                state.insert(self.keys.subnet_id_key.clone(), subnet_id);
+        if let Some(document) = self.get_document().await? {
+            if self.fields.contains(AMI_ID_KEY) {
+                state.insert(self.keys.ami_id_key.clone(), document.image_id.into());
             }
 
-            if self.fields.contains(VPC_ID_KEY) {
-                let vpc_path = format!("/latest/meta-data/network/interfaces/macs/{}/vpc-id", mac);
-
-                let vpc_path = vpc_path.parse().context(ParsePath {
-                    value: vpc_path.clone(),
-                })?;
-
-                let vpc_id = self.get_metadata(&vpc_path).await?;
-                state.insert(self.keys.vpc_id_key.clone(), vpc_id);
-            }
-        }
-
-        if self.fields.contains(ROLE_NAME_KEY) {
-            let role_names = self.get_metadata(&ROLE_NAME).await?;
-            let role_names = String::from_utf8_lossy(&role_names[..]);
-
-            for (i, role_name) in role_names.lines().enumerate() {
+            if self.fields.contains(INSTANCE_ID_KEY) {
                 state.insert(
-                    format!("{}[{}]", self.keys.role_name_key, i),
-                    role_name.to_string().into(),
+                    self.keys.instance_id_key.clone(),
+                    document.instance_id.into(),
                 );
             }
+
+            if self.fields.contains(INSTANCE_TYPE_KEY) {
+                state.insert(
+                    self.keys.instance_type_key.clone(),
+                    document.instance_type.into(),
+                );
+            }
+
+            if self.fields.contains(REGION_KEY) {
+                state.insert(self.keys.region_key.clone(), document.region.into());
+            }
+
+            if self.fields.contains(AVAILABILITY_ZONE_KEY) {
+                if let Some(availability_zone) = self.get_metadata(&AVAILABILITY_ZONE).await? {
+                    state.insert(self.keys.availability_zone_key.clone(), availability_zone);
+                }
+            }
+
+            if self.fields.contains(LOCAL_HOSTNAME_KEY) {
+                if let Some(local_hostname) = self.get_metadata(&LOCAL_HOSTNAME).await? {
+                    state.insert(self.keys.local_hostname_key.clone(), local_hostname);
+                }
+            }
+
+            if self.fields.contains(LOCAL_IPV4_KEY) {
+                if let Some(local_ipv4) = self.get_metadata(&LOCAL_IPV4).await? {
+                    state.insert(self.keys.local_ipv4_key.clone(), local_ipv4);
+                }
+            }
+
+            if self.fields.contains(PUBLIC_HOSTNAME_KEY) {
+                if let Some(public_hostname) = self.get_metadata(&PUBLIC_HOSTNAME).await? {
+                    state.insert(self.keys.public_hostname_key.clone(), public_hostname);
+                }
+            }
+
+            if self.fields.contains(PUBLIC_IPV4_KEY) {
+                if let Some(public_ipv4) = self.get_metadata(&PUBLIC_IPV4).await? {
+                    state.insert(self.keys.public_ipv4_key.clone(), public_ipv4);
+                }
+            }
+
+            if self.fields.contains(SUBNET_ID_KEY) || self.fields.contains(VPC_ID_KEY) {
+                if let Some(mac) = self.get_metadata(&MAC).await? {
+                    let mac = String::from_utf8_lossy(&mac[..]);
+
+                    if self.fields.contains(SUBNET_ID_KEY) {
+                        let subnet_path = format!(
+                            "/latest/meta-data/network/interfaces/macs/{}/subnet-id",
+                            mac
+                        );
+
+                        let subnet_path = subnet_path.parse().context(ParsePath {
+                            value: subnet_path.clone(),
+                        })?;
+
+                        if let Some(subnet_id) = self.get_metadata(&subnet_path).await? {
+                            state.insert(self.keys.subnet_id_key.clone(), subnet_id);
+                        }
+                    }
+
+                    if self.fields.contains(VPC_ID_KEY) {
+                        let vpc_path =
+                            format!("/latest/meta-data/network/interfaces/macs/{}/vpc-id", mac);
+
+                        let vpc_path = vpc_path.parse().context(ParsePath {
+                            value: vpc_path.clone(),
+                        })?;
+
+                        if let Some(vpc_id) = self.get_metadata(&vpc_path).await? {
+                            state.insert(self.keys.vpc_id_key.clone(), vpc_id);
+                        }
+                    }
+                }
+            }
+
+            if self.fields.contains(ROLE_NAME_KEY) {
+                if let Some(role_names) = self.get_metadata(&ROLE_NAME).await? {
+                    let role_names = String::from_utf8_lossy(&role_names[..]);
+
+                    for (i, role_name) in role_names.lines().enumerate() {
+                        state.insert(
+                            format!("{}[{}]", self.keys.role_name_key, i),
+                            role_name.to_string().into(),
+                        );
+                    }
+                }
+            }
+
+            {
+                if let Ok(mut old_state) = self.state.write() {
+                    old_state.extend(state);
+                }
+            }
         }
-
-        self.state.extend(state);
-
-        // Make changes viewable to the transform. This may block if
-        // readers are still reading.
-        self.state.refresh();
 
         Ok(())
     }
 
-    async fn get_metadata(&mut self, path: &PathAndQuery) -> Result<Bytes, crate::Error> {
+    async fn get_metadata(&mut self, path: &PathAndQuery) -> Result<Option<Bytes>, crate::Error> {
         let token = self.get_token().await.with_context(|| FetchToken {})?;
 
         let mut parts = self.host.clone().into_parts();
@@ -442,22 +452,25 @@ impl MetadataClient {
             .header(TOKEN_HEADER.as_ref(), token.as_ref())
             .body(Body::empty())?;
 
-        let res = self
+        match self
             .client
             .send(req)
             .await
             .map_err(crate::Error::from)
             .and_then(|res| match res.status() {
-                StatusCode::OK => Ok(res),
+                StatusCode::OK => Ok(Some(res)),
+                StatusCode::NOT_FOUND => Ok(None),
                 status_code => Err(UnexpectedHttpStatusError {
                     status: status_code,
                 }
                 .into()),
-            })?;
-
-        let body = body_to_bytes(res.into_body()).await?;
-
-        Ok(body)
+            })? {
+            Some(res) => {
+                let body = body_to_bytes(res.into_body()).await?;
+                Ok(Some(body))
+            }
+            None => Ok(None),
+        }
     }
 }
 
@@ -528,8 +541,8 @@ enum Ec2MetadataError {
 mod integration_tests {
     use super::*;
     use crate::{
-        config::GlobalOptions, event::metric, event::LogEvent, event::Metric,
-        test_util::trace_init, transforms::TaskTransform,
+        event::metric, event::LogEvent, event::Metric, test_util::trace_init,
+        transforms::TaskTransform,
     };
     use futures::{SinkExt, StreamExt};
 
@@ -559,7 +572,7 @@ mod integration_tests {
 
     async fn make_transform(config: Ec2Metadata) -> Box<dyn TaskTransform> {
         config
-            .build(&GlobalOptions::default())
+            .build(&TransformContext::default())
             .await
             .unwrap()
             .into_task()

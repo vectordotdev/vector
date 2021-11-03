@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     transforms::{FunctionTransform, Transform},
 };
@@ -29,7 +29,7 @@ impl GenerateConfig for FieldFilterConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "field_filter")]
 impl TransformConfig for FieldFilterConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         warn!(
             message =
                 r#"The "field_filter" transform is deprecated, use the "filter" transform instead"#
@@ -60,7 +60,7 @@ pub struct FieldFilter {
 }
 
 impl FieldFilter {
-    pub fn new(field_name: String, value: String) -> Self {
+    pub const fn new(field_name: String, value: String) -> Self {
         Self { field_name, value }
     }
 }

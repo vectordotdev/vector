@@ -138,10 +138,8 @@ fi
 export CONTAINER_IMAGE
 
 # Set the deployment commands for integration tests.
-KUBE_TEST_DEPLOY_COMMAND="$(pwd)/scripts/deploy-kubernetes-test.sh"
+KUBE_TEST_DEPLOY_COMMAND="$(pwd)/scripts/deploy-chart-test.sh"
 export KUBE_TEST_DEPLOY_COMMAND
-KUBE_TEST_DEPLOY_GENERIC_COMMAND="$(pwd)/scripts/deploy-public-chart-test.sh"
-export KUBE_TEST_DEPLOY_GENERIC_COMMAND
 
 # Prepare args.
 CARGO_TEST_ARGS_CARGO=()

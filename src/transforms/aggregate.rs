@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{metric, Event, EventMetadata},
     internal_events::{AggregateEventRecorded, AggregateFlushed, AggregateUpdateFailed},
     transforms::{TaskTransform, Transform},
@@ -21,7 +21,7 @@ pub struct AggregateConfig {
     pub interval_ms: u64,
 }
 
-fn default_interval_ms() -> u64 {
+const fn default_interval_ms() -> u64 {
     10 * 1000
 }
 
@@ -34,7 +34,7 @@ impl_generate_config_from_default!(AggregateConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "aggregate")]
 impl TransformConfig for AggregateConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Aggregate::new(self).map(Transform::task)
     }
 
@@ -80,7 +80,7 @@ impl Aggregate {
                     if existing.0.kind == data.kind && existing.0.update(&data) {
                         existing.1.merge(metadata);
                     } else {
-                        emit!(AggregateUpdateFailed);
+                        emit!(&AggregateUpdateFailed);
                         *existing = (data, metadata);
                     }
                 }
@@ -94,7 +94,7 @@ impl Aggregate {
             }
         };
 
-        emit!(AggregateEventRecorded);
+        emit!(&AggregateEventRecorded);
     }
 
     fn flush_into(&mut self, output: &mut Vec<Event>) {
@@ -103,7 +103,7 @@ impl Aggregate {
             output.push(Event::Metric(metric));
         }
 
-        emit!(AggregateFlushed);
+        emit!(&AggregateFlushed);
     }
 }
 
@@ -417,7 +417,7 @@ interval_ms = 999999
 "#,
         )
         .unwrap()
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
 
@@ -478,7 +478,7 @@ interval_ms = 999999
 "#,
         )
         .unwrap()
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
 

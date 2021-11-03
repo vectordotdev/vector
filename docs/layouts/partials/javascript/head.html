@@ -1,9 +1,0 @@
-{{ $appJs   := "js/app.js"}}
-{{ $appJsOpts := dict "targetPath" $appJs "minify" true }}
-{{ $app  := resources.Get $appJs | resources.ExecuteAsTemplate $appJs . | js.Build $appJsOpts }}
-<script type="text/javascript" src="{{ $app.RelPermalink }}" integrity="{{ $app.Data.Integrity }}"></script>
-
-{{/* We have a few Ionicons icons scattered throughout */}}
-{{ $version := site.Params.ionicons_version }}
-<script type="module" src="https://unpkg.com/ionicons@{{ $version }}/dist/ionicons/ionicons.esm.js"></script>
-<script nomodule="" src="https://unpkg.com/ionicons@{{ $version }}/dist/ionicons/ionicons.js"></script>

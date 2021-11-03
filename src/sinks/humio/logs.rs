@@ -1,7 +1,7 @@
 use super::{host_key, Encoding};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    sinks::splunk_hec::HecSinkConfig,
+    sinks::splunk_hec::logs::config::HecSinkLogsConfig,
     sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
     sinks::{Healthcheck, VectorSink},
     template::Template,
@@ -19,21 +19,19 @@ pub struct HumioLogsConfig {
     pub(in crate::sinks::humio) endpoint: Option<String>,
     pub(in crate::sinks::humio) source: Option<Template>,
     pub(in crate::sinks::humio) encoding: EncodingConfig<Encoding>,
-
     pub(in crate::sinks::humio) event_type: Option<Template>,
-
     #[serde(default = "host_key")]
     pub(in crate::sinks::humio) host_key: String,
-
+    #[serde(default)]
+    pub(in crate::sinks::humio) indexed_fields: Vec<String>,
+    #[serde(default)]
+    pub(in crate::sinks::humio) index: Option<Template>,
     #[serde(default)]
     pub(in crate::sinks::humio) compression: Compression,
-
     #[serde(default)]
     pub(in crate::sinks::humio) request: TowerRequestConfig,
-
     #[serde(default)]
     pub(in crate::sinks::humio) batch: BatchConfig,
-
     pub(in crate::sinks::humio) tls: Option<TlsOptions>,
 }
 
@@ -49,6 +47,8 @@ impl GenerateConfig for HumioLogsConfig {
             source: None,
             encoding: Encoding::Json.into(),
             event_type: None,
+            indexed_fields: vec![],
+            index: None,
             host_key: host_key(),
             compression: Compression::default(),
             request: TowerRequestConfig::default(),
@@ -76,15 +76,15 @@ impl SinkConfig for HumioLogsConfig {
 }
 
 impl HumioLogsConfig {
-    fn build_hec_config(&self) -> HecSinkConfig {
+    fn build_hec_config(&self) -> HecSinkLogsConfig {
         let endpoint = self.endpoint.clone().unwrap_or_else(|| HOST.to_string());
 
-        HecSinkConfig {
+        HecSinkLogsConfig {
             token: self.token.clone(),
             endpoint,
             host_key: self.host_key.clone(),
-            indexed_fields: vec![],
-            index: None,
+            indexed_fields: self.indexed_fields.clone(),
+            index: self.index.clone(),
             sourcetype: self.event_type.clone(),
             source: self.source.clone(),
             encoding: self.encoding.clone().into_encoding(),
@@ -99,46 +99,10 @@ impl HumioLogsConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::Event;
-    use crate::sinks::util::{http::HttpSink, test::load_sink};
-    use chrono::Utc;
-    use serde::Deserialize;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<HumioLogsConfig>();
-    }
-
-    #[derive(Deserialize, Debug)]
-    struct HecEventJson {
-        time: f64,
-    }
-
-    #[test]
-    fn humio_valid_time_field() {
-        let event = Event::from("hello world");
-
-        let (config, _cx) = load_sink::<HumioLogsConfig>(
-            r#"
-            token = "alsdkfjaslkdfjsalkfj"
-            host = "https://127.0.0.1"
-            encoding = "json"
-        "#,
-        )
-        .unwrap();
-        let config = config.build_hec_config();
-
-        let bytes = config.encode_event(event).unwrap();
-        let hec_event = serde_json::from_slice::<HecEventJson>(&bytes[..]).unwrap();
-
-        let now = Utc::now().timestamp_millis() as f64 / 1000f64;
-        assert!(
-            (hec_event.time - now).abs() < 0.2,
-            "hec_event.time = {}, now = {}",
-            hec_event.time,
-            now
-        );
-        assert_eq!((hec_event.time * 1000f64).fract(), 0f64);
     }
 }
 
@@ -150,13 +114,12 @@ mod integration_tests {
         config::{log_schema, SinkConfig, SinkContext},
         event::Event,
         sinks::util::Compression,
-        test_util::random_string,
+        test_util::{components, components::HTTP_SINK_TAGS, random_string},
     };
     use chrono::Utc;
-    use futures::stream;
     use indoc::indoc;
     use serde_json::{json, Value as JsonValue};
-    use std::{collections::HashMap, convert::TryFrom, future::ready};
+    use std::{collections::HashMap, convert::TryFrom};
 
     // matches humio container address
     const HOST: &str = "http://localhost:8080";
@@ -177,7 +140,7 @@ mod integration_tests {
         let log = event.as_mut_log();
         log.insert(log_schema().host_key(), host.clone());
 
-        sink.run(stream::once(ready(event))).await.unwrap();
+        components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
 
         let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -213,7 +176,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.run(stream::once(ready(event))).await.unwrap();
+        components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
 
         let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -246,7 +209,7 @@ mod integration_tests {
                 .as_mut_log()
                 .insert("@timestamp", Utc::now().to_rfc3339());
 
-            sink.run(stream::once(ready(event))).await.unwrap();
+            components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
 
             let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -269,7 +232,7 @@ mod integration_tests {
             let message = random_string(100);
             let event = Event::from(message.clone());
 
-            sink.run(stream::once(ready(event))).await.unwrap();
+            components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
 
             let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -286,6 +249,8 @@ mod integration_tests {
             encoding: Encoding::Json.into(),
             event_type: None,
             host_key: log_schema().host_key().to_string(),
+            indexed_fields: vec![],
+            index: None,
             compression: Compression::None,
             request: TowerRequestConfig::default(),
             batch: BatchConfig {

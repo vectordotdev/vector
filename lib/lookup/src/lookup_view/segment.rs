@@ -85,31 +85,31 @@ impl<'a> Segment<'a> {
     }
 }
 
-#[inherent(pub)]
+#[inherent]
 impl<'a> LookSegment<'a> for Segment<'a> {
     type Field = Field<'a>;
 
-    fn field(field: Field<'a>) -> Segment<'a> {
+    pub fn field(field: Field<'a>) -> Segment<'a> {
         Segment::Field(field)
     }
 
-    fn is_field(&self) -> bool {
+    pub fn is_field(&self) -> bool {
         matches!(self, Segment::Field(_))
     }
 
-    fn index(v: isize) -> Segment<'a> {
+    pub fn index(v: isize) -> Segment<'a> {
         Segment::Index(v)
     }
 
-    fn is_index(&self) -> bool {
+    pub fn is_index(&self) -> bool {
         matches!(self, Segment::Index(_))
     }
 
-    fn coalesce(v: Vec<Field<'a>>) -> Segment<'a> {
+    pub fn coalesce(v: Vec<Field<'a>>) -> Segment<'a> {
         Segment::Coalesce(v)
     }
 
-    fn is_coalesce(&self) -> bool {
+    pub fn is_coalesce(&self) -> bool {
         matches!(self, Segment::Coalesce(_))
     }
 }

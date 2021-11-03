@@ -95,7 +95,7 @@ impl SinkConfig for InfluxDbLogsConfig {
         let healthcheck = self.healthcheck(client.clone())?;
 
         let batch = BatchSettings::default()
-            .bytes(bytesize::mib(1u64))
+            .bytes(1_000_000)
             .timeout(1)
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&TowerRequestConfig {
@@ -240,7 +240,7 @@ mod tests {
             http::HttpSink,
             test::{build_test_server_status, load_sink},
         },
-        test_util::next_addr,
+        test_util::{components, components::HTTP_SINK_TAGS, next_addr},
     };
     use chrono::{offset::TimeZone, Utc};
     use futures::{channel::mpsc, stream, StreamExt};
@@ -591,7 +591,11 @@ mod tests {
         }
         drop(batch);
 
+        components::init_test();
         sink.run(stream::iter(events)).await.unwrap();
+        if batch_status == BatchStatus::Delivered {
+            components::SINK_TESTS.assert(&HTTP_SINK_TAGS);
+        }
 
         assert_eq!(receiver.try_recv(), Ok(batch_status));
 
@@ -663,6 +667,7 @@ mod integration_tests {
             test_util::{onboarding_v2, BUCKET, ORG, TOKEN},
             InfluxDb2Settings,
         },
+        test_util::components::{self, HTTP_SINK_TAGS},
     };
     use chrono::Utc;
     use futures::stream;
@@ -708,7 +713,7 @@ mod integration_tests {
 
         let events = vec![Event::Log(event1), Event::Log(event2)];
 
-        sink.run(stream::iter(events)).await.unwrap();
+        components::run_sink(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 

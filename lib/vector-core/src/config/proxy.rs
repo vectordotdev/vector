@@ -35,7 +35,7 @@ impl NoProxyInterceptor {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug, PartialEq, Eq)]
-#[serde(default)]
+#[serde(deny_unknown_fields)]
 pub struct ProxyConfig {
     #[serde(
         default = "ProxyConfig::default_enabled",

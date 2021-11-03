@@ -33,10 +33,16 @@ pub mod source;
 mod test_util;
 pub mod transform;
 pub use buffers;
-mod byte_size_of;
+pub mod partition;
 pub mod serde;
+pub mod stream;
+pub mod time;
+pub use core_common::byte_size_of::ByteSizeOf;
 
-pub use byte_size_of::ByteSizeOf;
+#[cfg(any(test, feature = "test"))]
+pub use core_common::event_test_util;
+pub use core_common::internal_event;
+
 use std::path::PathBuf;
 
 #[macro_use]

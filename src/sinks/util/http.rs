@@ -1,13 +1,14 @@
 use super::{
     retries::{RetryAction, RetryLogic},
     sink::{self, ServiceLogic},
-    Batch, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
-    TowerRequestSettings,
+    uri, Batch, ElementCount, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink,
+    TowerRequestConfig, TowerRequestSettings,
 };
 use crate::{
     buffers::Acker,
     event::Event,
     http::{HttpClient, HttpError},
+    internal_events::EndpointBytesSent,
 };
 use bytes::{Buf, Bytes};
 use futures::{future::BoxFuture, ready, Sink};
@@ -16,6 +17,7 @@ use hyper::{body, Body};
 use indexmap::IndexMap;
 use pin_project::pin_project;
 use serde::{Deserialize, Serialize};
+use std::marker::PhantomData;
 use std::{
     fmt,
     future::Future,
@@ -26,6 +28,7 @@ use std::{
     time::Duration,
 };
 use tower::Service;
+use vector_core::ByteSizeOf;
 
 #[async_trait::async_trait]
 pub trait HttpSink: Send + Sync + 'static {
@@ -57,7 +60,7 @@ pub struct BatchedHttpSink<
     SL = sink::StdServiceLogic<http::Response<Bytes>>,
 > where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
     SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
 {
@@ -78,7 +81,7 @@ pub struct BatchedHttpSink<
 impl<T, B> BatchedHttpSink<T, B>
 where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     pub fn new(
@@ -105,7 +108,7 @@ where
 impl<T, B, RL, SL> BatchedHttpSink<T, B, RL, SL>
 where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     RL: RetryLogic<Response = http::Response<Bytes>, Error = HttpError> + Send + 'static,
     SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
@@ -150,7 +153,7 @@ where
 impl<T, B, RL, SL> Sink<Event> for BatchedHttpSink<T, B, RL, SL>
 where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
     RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
     SL: ServiceLogic<Response = http::Response<Bytes>> + Send + 'static,
@@ -174,9 +177,14 @@ where
     }
 
     fn start_send(self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
+        let byte_size = event.size_of();
         let finalizers = event.metadata_mut().take_finalizers();
         if let Some(item) = self.sink.encode_event(event) {
-            *self.project().slot = Some(EncodedEvent { item, finalizers });
+            *self.project().slot = Some(EncodedEvent {
+                item,
+                finalizers,
+                byte_size,
+            });
         }
 
         Ok(())
@@ -202,7 +210,7 @@ where
 pub struct PartitionHttpSink<T, B, K, RL = HttpRetryLogic>
 where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     RL: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
@@ -223,7 +231,7 @@ where
 impl<T, B, K> PartitionHttpSink<T, B, K, HttpRetryLogic>
 where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
@@ -251,7 +259,7 @@ where
 impl<T, B, K, RL> PartitionHttpSink<T, B, K, RL>
 where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     RL: RetryLogic<Response = http::Response<Bytes>, Error = HttpError> + Send + 'static,
@@ -291,12 +299,18 @@ where
             slot: None,
         }
     }
+
+    /// Enforces per partition ordering of request.
+    pub fn ordered(mut self) -> Self {
+        self.inner.ordered();
+        self
+    }
 }
 
 impl<T, B, K, RL> Sink<Event> for PartitionHttpSink<T, B, K, RL>
 where
     B: Batch,
-    B::Output: Clone + Send + 'static,
+    B::Output: ByteSizeOf + ElementCount + Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
@@ -322,8 +336,13 @@ where
 
     fn start_send(self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
         let finalizers = event.metadata_mut().take_finalizers();
+        let byte_size = event.size_of();
         if let Some(item) = self.sink.encode_event(event) {
-            *self.project().slot = Some(EncodedEvent { item, finalizers });
+            *self.project().slot = Some(EncodedEvent {
+                item,
+                finalizers,
+                byte_size,
+            });
         }
 
         Ok(())
@@ -365,7 +384,7 @@ impl<F, B> HttpBatchService<F, B> {
 impl<F, B> Service<B> for HttpBatchService<F, B>
 where
     F: Future<Output = crate::Result<hyper::Request<Vec<u8>>>> + Send + 'static,
-    B: Send + 'static,
+    B: ByteSizeOf + ElementCount + Send + 'static,
 {
     type Response = http::Response<Bytes>;
     type Error = crate::Error;
@@ -380,8 +399,21 @@ where
         let mut http_client = self.inner.clone();
 
         Box::pin(async move {
-            let request = request_builder(body).await?.map(Body::from);
+            let request = request_builder(body).await?;
+            let byte_size = request.body().len();
+            let request = request.map(Body::from);
+            let (protocol, endpoint) = uri::protocol_endpoint(request.uri().clone());
+
             let response = http_client.call(request).await?;
+
+            if response.status().is_success() {
+                emit!(&EndpointBytesSent {
+                    byte_size,
+                    protocol: &protocol,
+                    endpoint: &endpoint
+                });
+            }
+
             let (parts, body) = response.into_parts();
             let mut body = body::aggregate(body).await?;
             Ok(hyper::Response::from_parts(
@@ -430,13 +462,73 @@ impl RetryLogic for HttpRetryLogic {
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
-            _ if status.is_server_error() => RetryAction::Retry(format!(
-                "{}: {}",
-                status,
-                String::from_utf8_lossy(response.body())
-            )),
+            _ if status.is_server_error() => RetryAction::Retry(
+                format!("{}: {}", status, String::from_utf8_lossy(response.body())).into(),
+            ),
             _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("response status: {}", status)),
+            _ => RetryAction::DontRetry(format!("response status: {}", status).into()),
+        }
+    }
+}
+
+/// A more generic version of `HttpRetryLogic` that accepts anything that can be converted
+/// to a status code
+#[derive(Debug)]
+pub struct HttpStatusRetryLogic<F, T> {
+    func: F,
+    request: PhantomData<T>,
+}
+
+impl<F, T> HttpStatusRetryLogic<F, T>
+where
+    F: Fn(&T) -> StatusCode + Clone + Send + Sync + 'static,
+    T: Send + Sync + 'static,
+{
+    pub fn new(func: F) -> HttpStatusRetryLogic<F, T> {
+        HttpStatusRetryLogic {
+            func,
+            request: PhantomData,
+        }
+    }
+}
+
+impl<F, T> RetryLogic for HttpStatusRetryLogic<F, T>
+where
+    F: Fn(&T) -> StatusCode + Clone + Send + Sync + 'static,
+    T: Send + Sync + 'static,
+{
+    type Error = HttpError;
+    type Response = T;
+
+    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
+        true
+    }
+
+    fn should_retry_response(&self, response: &T) -> RetryAction {
+        let status = (self.func)(response);
+
+        match status {
+            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
+            StatusCode::NOT_IMPLEMENTED => {
+                RetryAction::DontRetry("endpoint not implemented".into())
+            }
+            _ if status.is_server_error() => {
+                RetryAction::Retry(format!("Http Status: {}", status).into())
+            }
+            _ if status.is_success() => RetryAction::Successful,
+            _ => RetryAction::DontRetry(format!("Http status: {}", status).into()),
+        }
+    }
+}
+
+impl<F, T> Clone for HttpStatusRetryLogic<F, T>
+where
+    F: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            func: self.func.clone(),
+            request: PhantomData,
         }
     }
 }
@@ -463,7 +555,7 @@ impl RequestConfig {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{config::ProxyConfig, sinks::util::service::Concurrency, test_util::next_addr};
+    use crate::{config::ProxyConfig, test_util::next_addr};
     use futures::{future::ready, StreamExt};
     use hyper::{
         service::{make_service_fn, service_fn},
@@ -540,12 +632,5 @@ mod test {
 
         let (body, _rest) = rx.into_future().await;
         assert_eq!(body.unwrap(), "hello");
-    }
-
-    #[test]
-    fn alias_in_flight_limit_works() {
-        let cfg = toml::from_str::<RequestConfig>("in_flight_limit = 10")
-            .expect("Fixed concurrency failed for in_flight_limit param");
-        assert_eq!(cfg.tower.concurrency(), &Concurrency::Fixed(10));
     }
 }

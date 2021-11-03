@@ -54,9 +54,9 @@ jobs:
     runs-on: [self-hosted, linux, x64, benchmarks]
     strategy:
       matrix:
-        target: [bench, bench-remap-functions, bench-remap, bench-wasm, bench-languages, bench-metrics, bench-dnstap, bench-transform]
+        target: [bench, bench-remap-functions, bench-remap, bench-languages, bench-metrics, bench-dnstap, bench-transform]
     steps:
-      - uses: actions/checkout@v2.3.4
+      - uses: actions/checkout@v2.3.5
       - uses: actions/cache@v2.1.6
         with:
           path: |

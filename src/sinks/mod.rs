@@ -25,8 +25,14 @@ pub mod blackhole;
 pub mod clickhouse;
 #[cfg(feature = "sinks-console")]
 pub mod console;
-#[cfg(feature = "sinks-datadog")]
+#[cfg(any(
+    feature = "sinks-datadog_events",
+    feature = "sinks-datadog_logs",
+    feature = "sinks-datadog_metrics"
+))]
 pub mod datadog;
+#[cfg(feature = "sinks-datadog_archives")]
+pub mod datadog_archives;
 #[cfg(feature = "sinks-elasticsearch")]
 pub mod elasticsearch;
 #[cfg(feature = "sinks-file")]
@@ -59,6 +65,8 @@ pub mod prometheus;
 pub mod pulsar;
 #[cfg(feature = "sinks-redis")]
 pub mod redis;
+#[cfg(any(feature = "sinks-aws_s3", feature = "sinks-datadog_archives"))]
+pub mod s3_common;
 #[cfg(feature = "sinks-sematext")]
 pub mod sematext;
 #[cfg(feature = "sinks-socket")]

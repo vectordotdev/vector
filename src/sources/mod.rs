@@ -8,7 +8,7 @@ pub mod aws_ecs_metrics;
 pub mod aws_kinesis_firehose;
 #[cfg(feature = "sources-aws_s3")]
 pub mod aws_s3;
-#[cfg(feature = "sources-datadog")]
+#[cfg(any(feature = "sources-datadog_agent"))]
 pub mod datadog;
 #[cfg(all(unix, feature = "sources-dnstap"))]
 pub mod dnstap;
@@ -65,7 +65,7 @@ pub mod syslog;
 #[cfg(feature = "sources-vector")]
 pub mod vector;
 
-mod util;
+pub(crate) mod util;
 
 pub use vector_core::source::Source;
 
