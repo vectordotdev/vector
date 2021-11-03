@@ -22,7 +22,7 @@ echo "is generally better. Higher skewness or kurtosis numbers indicate a"
 echo "lack of consistency in behavior, making predictions of fitness in the"
 echo "field challenging."
 echo ""
-for soak_dir in ${CAPTURE_DIR}/*; do
+for soak_dir in "${CAPTURE_DIR}"/*; do
     SOAK_NAME=$(basename "${soak_dir}")
     echo " --- "
     echo "# \`${SOAK_NAME}\`"
