@@ -15,6 +15,8 @@ name: Soak
 
 on:
   pull_request:
+    paths-ignore:
+      - "website/**"
 
 jobs:
   cancel-previous:
@@ -32,9 +34,9 @@ jobs:
     runs-on: [self-hosted, linux, x64, general]
     steps:
       #
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
 
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
         with:
           ref: master
           path: baseline-vector
@@ -68,7 +70,7 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        uses: docker/metadata-action@548e2346a9987b56d8a4104fe776321ff8e23440
         with:
           flavor: |
             latest=false
@@ -93,7 +95,7 @@ jobs:
     name: Build comparison 'soak-vector' container
     runs-on: [self-hosted, linux, x64, general]
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
@@ -107,7 +109,7 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        uses: docker/metadata-action@548e2346a9987b56d8a4104fe776321ff8e23440
         with:
           flavor: |
             latest=false
@@ -127,23 +129,42 @@ jobs:
           cache-from: type=gha, scope=${{ github.workflow }}
           cache-to: type=gha, scope=${{ github.workflow }}
 
+  compute-test-plan:
+    name: Compute soak test plan
+    runs-on: ubuntu-20.04
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2.4.0
+
+      - uses: actions/github-script@v5
+        id: set-matrix
+        with:
+          script: |
+            const fs = require('fs')
+            target = fs.readdirSync('soaks/tests')
+
+            const matrix = {
+              target
+            }
+
+            core.setOutput('matrix', matrix)
+      - name: Dump matrix context
+        env:
+          MATRIX_CONTEXT: ${{ toJson(steps.set-matrix.outputs.matrix) }}
+        run: echo "$MATRIX_CONTEXT"
+
   soak-baseline:
     name: Soak (${{ matrix.target }}) - baseline
     if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak]
-    needs: [build-baseline-image]
+    needs: [compute-test-plan, build-baseline-image]
     strategy:
-      matrix:
-        target:
-          - datadog_agent_remap_datadog_logs
-          - syslog_humio_logs
-          - syslog_log2metric_humio_metrics
-          - syslog_loki
-          - syslog_regex_logs2metric_ddmetrics
-          - syslog_splunk_hec_logs
+      matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2.4.0
 
       - name: Download baseline-soak artifact
         uses: actions/download-artifact@v1
@@ -152,33 +173,26 @@ jobs:
 
       - name: Run baseline experiment
         run: |
-          rm -rf /tmp/${{ matrix.target }}/
-          mkdir -p /tmp/${{ matrix.target }}/
-          ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "baseline" `cat baseline-soak/tag` /tmp/${{ matrix.target }}
+          rm -rf /tmp/${{ github.event.number }}/${{ matrix.target }}/
+          mkdir -p /tmp/${{ github.event.number }}/${{ matrix.target }}/
+          ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "baseline" `cat baseline-soak/tag` /tmp/${{ github.event.number }}/${{ matrix.target }}
 
       - name: Upload timing captures
         uses: actions/upload-artifact@v1
         with:
-          name: ${{ matrix.target}}-captures
-          path: /tmp/${{ matrix.target }}
+          name: ${{ github.event.number }}-captures
+          path: /tmp/${{ github.event.number }}
 
   soak-comparison:
     name: Soak (${{ matrix.target }}) - comparison
     if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak]
-    needs: [build-comparison-image]
+    needs: [compute-test-plan, build-comparison-image]
     strategy:
-      matrix:
-        target:
-          - datadog_agent_remap_datadog_logs
-          - syslog_humio_logs
-          - syslog_log2metric_humio_metrics
-          - syslog_loki
-          - syslog_regex_logs2metric_ddmetrics
-          - syslog_splunk_hec_logs
+      matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2.4.0
 
       - name: Download baseline-soak artifact
         uses: actions/download-artifact@v1
@@ -187,49 +201,42 @@ jobs:
 
       - name: Run comparison experiment
         run: |
-          rm -rf /tmp/${{ matrix.target }}/
-          mkdir -p /tmp/${{ matrix.target }}/
-          ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "comparison" "${{ github.sha }}-${{ github.sha }}" /tmp/${{ matrix.target }}
+          rm -rf /tmp/${{ github.event.number }}/${{ matrix.target }}/
+          mkdir -p /tmp/${{ github.event.number }}/${{ matrix.target }}/
+          ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "comparison" "${{ github.sha }}-${{ github.sha }}" /tmp/${{ github.event.number }}/${{ matrix.target }}
 
       - name: Upload timing captures
         uses: actions/upload-artifact@v1
         with:
-          name: ${{ matrix.target}}-captures
-          path: /tmp/${{ matrix.target }}
+          name: ${{ github.event.number }}-captures
+          path: /tmp/${{ github.event.number }}
 
   analyze-results:
     name: Soak analysis (${{ matrix.target }})
     if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak] # could be general if we move away from miller
-    needs: [soak-baseline, soak-comparison]
+    needs: [compute-test-plan, soak-baseline, soak-comparison]
     strategy:
-      matrix:
-        target:
-          - datadog_agent_remap_datadog_logs
-          - syslog_humio_logs
-          - syslog_log2metric_humio_metrics
-          - syslog_loki
-          - syslog_regex_logs2metric_ddmetrics
-          - syslog_splunk_hec_logs
+      matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2.4.0
 
       - name: Download captures artifact
         uses: actions/download-artifact@v1
         with:
-          name: ${{ matrix.target }}-captures
+          name: ${{ github.event.number }}-captures
 
       - name: Analyze captures
         run: |
-          ./soaks/bin/analyze_experiment.sh ${{ matrix.target }}-captures
+          ./soaks/bin/analyze_experiment.sh ${{ github.event.number }}-captures/${{ matrix.target }}
 
   observer:
     name: Build and push 'observer' to Github CR
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2.4.0
 
       - name: Set up Docker Buildx
         id: buildx
@@ -244,7 +251,7 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        uses: docker/metadata-action@548e2346a9987b56d8a4104fe776321ff8e23440
         with:
           images: ghcr.io/${{ github.repository }}/soak-observer
           tags: type=sha, format=long
