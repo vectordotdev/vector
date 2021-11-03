@@ -60,6 +60,7 @@ components: transforms: lua: {
 						description: "A function which is called when the first event comes, before calling `hooks.process`"
 						required:    false
 						type: string: {
+							default: null
 							examples: [
 								"""
 				                function (emit)
@@ -93,6 +94,7 @@ components: transforms: lua: {
 						description: "A function which is called when Vector is stopped. It can produce new events using `emit` function."
 						required:    false
 						type: string: {
+							default: null
 							examples: [
 								"""
 				                function (emit)
@@ -111,6 +113,7 @@ components: transforms: lua: {
 			description: "A list of directories to search when loading a Lua file via the `require` function. If not specified, the modules are looked up in the directories of Vector's configs."
 			required:    false
 			type: array: {
+				default: null
 				items: type: string: {
 					examples: ["/etc/vector/lua"]}
 			}
@@ -120,6 +123,7 @@ components: transforms: lua: {
 			description: "The source which is evaluated when the transform is created."
 			required:    false
 			type: string: {
+				default: null
 				examples: [
 					"""
 						function init()
@@ -161,8 +165,11 @@ components: transforms: lua: {
 			common:      false
 			description: "Configures timers which are executed periodically at given interval."
 			required:    false
-			type: array: items: type: object: {
-				options: {
+
+			type: array: {
+				default: null
+
+				items: type: object: options: {
 					handler: {
 						description: "Defines a handler function which is executed periodically at `interval_seconds`. It can produce new events using `emit` function."
 						required:    true

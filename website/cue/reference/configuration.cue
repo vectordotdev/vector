@@ -151,6 +151,7 @@ configuration: {
 					description: "The URL to proxy HTTP requests through."
 					required:    false
 					type: string: {
+						default: null
 						examples: ["http://foo.bar:3128"]
 					}
 				}
@@ -159,6 +160,7 @@ configuration: {
 					description: "The URL to proxy HTTPS requests through."
 					required:    false
 					type: string: {
+						default: null
 						examples: ["http://foo.bar:3128"]
 					}
 				}
@@ -176,7 +178,9 @@ configuration: {
 							Splat | `*` matches all hosts
 							"""
 					required:    false
+
 					type: array: {
+						default: null
 						items: type: string: {
 							examples: ["localhost", ".foo.bar", "*"]
 						}
@@ -260,7 +264,7 @@ configuration: {
 			title: "Automatic namespacing of component files"
 			body: """
 				You can split your configuration files in component-type related folders.
-				
+
 				For example, you can create the sink `foo` in the folder `/path/to/vector/config/sinks/foo.toml` and
 				configure it as follows:
 

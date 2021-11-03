@@ -61,6 +61,7 @@ components: sinks: datadog_metrics: {
 			required: false
 			warnings: []
 			type: string: {
+				default: null
 				examples: ["service"]
 			}
 		}

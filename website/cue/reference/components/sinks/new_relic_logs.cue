@@ -78,6 +78,7 @@ components: sinks: new_relic_logs: {
 			description: "Your New Relic insert key (if applicable)."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["xxxx", "${NEW_RELIC_INSERT_KEY}"]
 			}
 		}
@@ -86,6 +87,7 @@ components: sinks: new_relic_logs: {
 			description: "Your New Relic license key (if applicable)."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["xxxx", "${NEW_RELIC_LICENSE_KEY}"]
 			}
 		}

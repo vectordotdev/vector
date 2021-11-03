@@ -84,6 +84,7 @@ components: sinks: splunk_hec_metrics: {
 				"""
 			required: false
 			type: string: {
+				default: null
 				examples: ["service"]
 			}
 		}
@@ -102,6 +103,7 @@ components: sinks: splunk_hec_metrics: {
         				"""
 			required:    false
 			type: string: {
+				default: null
 				examples: ["hostname"]
 			}
 		}
@@ -110,6 +112,7 @@ components: sinks: splunk_hec_metrics: {
 			description: "The name of the index where send the events to. If not specified, the default index is used."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["{{ host }}", "custom_index"]
 				syntax: "template"
 			}
@@ -119,6 +122,7 @@ components: sinks: splunk_hec_metrics: {
 			description: "The source of events sent to this sink. If unset, the Splunk collector will set it."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["{{ file }}", "/var/log/syslog", "UDP:514"]
 				syntax: "template"
 			}
@@ -128,6 +132,7 @@ components: sinks: splunk_hec_metrics: {
 			description: "The sourcetype of events sent to this sink. If unset, Splunk will default to httpevent."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["{{ sourcetype }}", "_json", "httpevent"]
 				syntax: "template"
 			}

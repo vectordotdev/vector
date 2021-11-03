@@ -79,7 +79,8 @@ components: sources: generator: {
 			description: "The total number of lines to output. By default the source continuously prints logs (infinitely)."
 			required:    false
 			type: uint: {
-				unit: null
+				default: null
+				unit:    null
 			}
 		}
 		lines: {
@@ -88,6 +89,7 @@ components: sources: generator: {
 			relevant_when: "`format` = `shuffle`"
 			required:      false
 			type: array: {
+				default: null
 				items: type: string: {
 					examples: ["Line 1", "Line 2"]
 				}

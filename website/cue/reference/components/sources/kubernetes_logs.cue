@@ -186,13 +186,13 @@ components: sources: kubernetes_logs: {
 			common:      false
 			description: "The exact time the event was ingested into Vector."
 			required:    false
-			type: string: {}
+			type: string: default: null
 		}
 		kube_config_file: {
 			common:      false
 			description: "Optional path to a kubeconfig file readable by Vector. If not set, Vector will try to connect to Kubernetes using in-cluster configuration."
 			required:    false
-			type: string: {}
+			type: string: default: null
 		}
 		self_node_name: {
 			common:      false
@@ -291,6 +291,7 @@ components: sources: kubernetes_logs: {
 				required:    false
 				common:      true
 				type: string: {
+					default: null
 					examples: ["busybox:1.30"]
 				}
 			}
@@ -299,6 +300,7 @@ components: sources: kubernetes_logs: {
 				required:    false
 				common:      true
 				type: string: {
+					default: null
 					examples: ["coredns"]
 				}
 			}
@@ -316,6 +318,7 @@ components: sources: kubernetes_logs: {
 				required:    false
 				common:      true
 				type: string: {
+					default: null
 					examples: ["192.168.1.1"]
 				}
 			}
@@ -324,6 +327,7 @@ components: sources: kubernetes_logs: {
 				required:    false
 				common:      true
 				type: string: {
+					default: null
 					examples: ["192.168.1.1", "::1"]
 				}
 			}
@@ -350,6 +354,7 @@ components: sources: kubernetes_logs: {
 				required:    false
 				common:      true
 				type: string: {
+					default: null
 					examples: ["coredns-qwertyuiop-qwert"]
 				}
 			}
@@ -358,6 +363,7 @@ components: sources: kubernetes_logs: {
 				required:    false
 				common:      true
 				type: string: {
+					default: null
 					examples: ["kube-system"]
 				}
 			}
@@ -366,6 +372,7 @@ components: sources: kubernetes_logs: {
 				required:    false
 				common:      true
 				type: string: {
+					default: null
 					examples: ["minikube"]
 				}
 			}
@@ -374,6 +381,7 @@ components: sources: kubernetes_logs: {
 				required:    false
 				common:      true
 				type: string: {
+					default: null
 					examples: ["ba46d8c9-9541-4f6b-bbf9-d23b36f2f136"]
 				}
 			}

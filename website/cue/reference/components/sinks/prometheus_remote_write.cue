@@ -107,6 +107,7 @@ components: sinks: prometheus_remote_write: {
 				"""
 			required:    false
 			type: string: {
+				default: null
 				examples: ["service"]
 			}
 		}
@@ -133,6 +134,7 @@ components: sinks: prometheus_remote_write: {
 			description: "If set, a header named `X-Scope-OrgID` will be added to outgoing requests with the text of this setting. This may be used by Cortex or other remote services to identify the tenant making the request."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["my-domain"]
 				syntax: "template"
 			}

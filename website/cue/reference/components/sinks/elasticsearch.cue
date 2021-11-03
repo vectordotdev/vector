@@ -130,6 +130,7 @@ components: sinks: elasticsearch: {
 						description: "The [AWS region](\(urls.aws_regions)) of the target service. This defaults to the region named in the endpoint parameter, or the value of the `$AWS_REGION` or `$AWS_DEFAULT_REGION` environment variables if that cannot be determined, or \"us-east-1\"."
 						required:    false
 						type: string: {
+							default: null
 							examples: ["us-east-1"]
 						}
 					}
@@ -259,6 +260,7 @@ components: sinks: elasticsearch: {
 			description: "The name of the event key that should map to Elasticsearch's [`_id` field](\(urls.elasticsearch_id_field)). By default, Vector does not set the `_id` field, which allows Elasticsearch to set this automatically. You should think carefully about setting your own Elasticsearch IDs, since this can [hinder performance](\(urls.elasticsearch_id_performance))."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["id", "_id"]
 			}
 		}
@@ -307,6 +309,7 @@ components: sinks: elasticsearch: {
 			description: "Name of the pipeline to apply."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["pipeline-name"]
 			}
 		}

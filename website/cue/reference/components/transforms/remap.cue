@@ -54,6 +54,7 @@ components: transforms: "remap": {
 			common:      true
 			required:    false
 			type: string: {
+				default: null
 				examples: [
 					"""
 						. = parse_json!(.message)
@@ -77,6 +78,7 @@ components: transforms: "remap": {
 			common:      true
 			required:    false
 			type: string: {
+				default: null
 				examples: [
 					"./my/program.vrl",
 				]

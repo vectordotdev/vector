@@ -90,6 +90,7 @@ components: sinks: gcp_cloud_storage: {
 			description: "Predefined ACL to apply to the created objects. For more information, see [Predefined ACLs](\(urls.gcs_predefined_acl)). If this is not set, GCS will apply a default ACL when the object is created."
 			required:    false
 			type: string: {
+				default: null
 				enum: {
 					"authenticated-read":        "Gives the bucket or object owner OWNER permission, and gives all authenticated Google account holders READER permission."
 					"bucket-owner-full-control": "Gives the object and bucket owners OWNER permission."
@@ -113,6 +114,7 @@ components: sinks: gcp_cloud_storage: {
 			description: "The filename for a Google Cloud service account credentials JSON file used to authenticate access to the Cloud Storage API. If this is unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.\n\nIf no filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is running on. If Vector is not running on a GCE instance, you must define a credentials file as above."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["/path/to/credentials.json"]
 			}
 		}
@@ -157,6 +159,7 @@ components: sinks: gcp_cloud_storage: {
 			description: "The set of metadata `key:value` pairs for the created objects. See the [GCS custom metadata](\(urls.gcs_custom_metadata)) documentation for more details."
 			required:    false
 			type: string: {
+				default: null
 				examples: []
 			}
 		}
@@ -166,6 +169,7 @@ components: sinks: gcp_cloud_storage: {
 			description: "The storage class for the created objects. See [the GCP storage classes](\(urls.gcs_storage_classes)) for more details."
 			required:    false
 			type: string: {
+				default: null
 				enum: {
 					STANDARD: "Standard Storage is best for data that is frequently accessed and/or stored for only brief periods of time. This is the default."
 					NEARLINE: "Nearline Storage is a low-cost, highly durable storage service for storing infrequently accessed data."

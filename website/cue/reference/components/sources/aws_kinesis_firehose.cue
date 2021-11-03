@@ -84,7 +84,8 @@ components: sources: aws_kinesis_firehose: {
 				all requests as authenticated.
 				"""
 			required: false
-			type: "string": {
+			type: string: {
+				default: null
 				examples: ["A94A8FE5CCB19BA61C4C08"]
 			}
 		}

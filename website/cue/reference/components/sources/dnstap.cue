@@ -83,7 +83,8 @@ components: sources: dnstap: {
 				"""
 			required: false
 			type: uint: {
-				unit: null
+				default: null
+				unit:    null
 				examples: [0o777, 0o754, 508]
 			}
 		}
@@ -95,7 +96,8 @@ components: sources: dnstap: {
 				"""
 			required: false
 			type: uint: {
-				unit: "bytes"
+				default: null
+				unit:    "bytes"
 			}
 			warnings: [
 				"""
@@ -113,7 +115,8 @@ components: sources: dnstap: {
 				"""
 			required: false
 			type: uint: {
-				unit: "bytes"
+				default: null
+				unit:    "bytes"
 			}
 			warnings: [
 				"""
@@ -142,6 +145,7 @@ components: sources: dnstap: {
 				description: "Dnstap event data type. Currently only 'Message' type is defined."
 				required:    false
 				type: string: {
+					default: null
 					enum: {
 						Message: "Payload is a dnstap message."
 					}
@@ -161,6 +165,7 @@ components: sources: dnstap: {
 				description:   "Dnstap message type."
 				required:      false
 				type: string: {
+					default: null
 					enum: {
 						AuthQuery: """
 							A DNS query message received from a resolver by an
@@ -291,6 +296,7 @@ components: sources: dnstap: {
 				description: "DNS server identity."
 				required:    false
 				type: string: {
+					default: null
 					examples: ["ns1.example.com"]
 				}
 			}
@@ -299,6 +305,7 @@ components: sources: dnstap: {
 				description: "DNS server version."
 				required:    false
 				type: string: {
+					default: null
 					examples: ["BIND 9.16.8"]
 				}
 			}
@@ -307,6 +314,7 @@ components: sources: dnstap: {
 				description: "Extra data for this event."
 				required:    false
 				type: string: {
+					default: null
 					examples: ["an arbitrary byte-string annotation"]
 				}
 			}
@@ -381,6 +389,7 @@ components: sources: dnstap: {
 				description: "Error message upon failure while parsing dnstap data."
 				required:    false
 				type: string: {
+					default: null
 					examples: ["Encountered error : Unexpected number of records in update section: 0"]
 				}
 			}
@@ -392,6 +401,7 @@ components: sources: dnstap: {
 					"""
 				required: false
 				type: string: {
+					default: null
 					examples: ["ChBqYW1lcy11YnVudHUtZGV2EgtCSU5EIDkuMTYuNXKdAQgCEAEYASIEfwAAASoEfwAAATDRyAM4AFoNB2V4YW1wbGUDY29tAGCTvf76BW3evGImcmlihYQAAAEAAAABAAACaDIHZXhhbXBsZQNjb20AAAYAAcAPAAYAAQAADhAAPQtiZGRzLWRuc3RhcAAKcG9zdG1hc3RlcgJubwVlbWFpbAZwbGVhc2UAJADGPgAADhAAAAJYACeNAAAADhB4AQ=="]
 				}
 			}
@@ -435,7 +445,8 @@ components: sources: dnstap: {
 								"""
 							required: false
 							type: uint: {
-								unit: null
+								default: null
+								unit:    null
 								examples: [0]
 							}
 						}
@@ -447,6 +458,7 @@ components: sources: dnstap: {
 								"""
 							required: false
 							type: string: {
+								default: null
 								enum: {
 									NoError:   "No Error"
 									FormErr:   "Format Error"
@@ -478,6 +490,7 @@ components: sources: dnstap: {
 								"""
 							required: false
 							type: string: {
+								default: null
 								examples: ["YoWEAAABAAAAAQAAAmgyB2V4YW1wbGUDY29tAAAGAAHADwAGAAEAAA4QAD0LYmRkcy1kbnN0YXAACnBvc3RtYXN0ZXICbm8FZW1haWwGcGxlYXNlACQAxj4AAA4QAAACWAAnjQAAAA4Q"]
 							}
 						}
@@ -686,7 +699,8 @@ components: sources: dnstap: {
 								"""
 							required: false
 							type: uint: {
-								unit: null
+								default: null
+								unit:    null
 								examples: [0, 5]
 							}
 						}
@@ -695,6 +709,7 @@ components: sources: dnstap: {
 							description: "Textual response code corresponding to the 'fullRcode'"
 							required:    false
 							type: string: {
+								default: null
 								enum: {
 									NoError:   "No Error"
 									FormErr:   "Format Error"
@@ -726,6 +741,7 @@ components: sources: dnstap: {
 								"""
 							required: false
 							type: string: {
+								default: null
 								examples: ["YoWEAAABAAAAAQAAAmgyB2V4YW1wbGUDY29tAAAGAAHADwAGAAEAAA4QAD0LYmRkcy1kbnN0YXAACnBvc3RtYXN0ZXICbm8FZW1haWwGcGxlYXNlACQAxj4AAA4QAAACWAAnjQAAAA4Q"]
 							}
 						}

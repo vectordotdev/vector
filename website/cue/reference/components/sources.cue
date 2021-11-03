@@ -12,6 +12,7 @@ components: sources: [Name=string]: {
 					description: "The directory used to persist file checkpoint positions. By default, the global `data_dir` option is used. Please make sure the Vector project has write permissions to this dir."
 					required:    false
 					type: string: {
+						default: null
 						examples: ["/var/lib/vector"]
 						syntax: "file_system_path"
 					}
@@ -108,6 +109,7 @@ components: sources: [Name=string]: {
 									required:    false
 									common:      false
 									type: uint: {
+										default: null
 										examples: [65535, 102400]
 										unit: "bytes"
 									}
@@ -125,6 +127,7 @@ components: sources: [Name=string]: {
 									required:    false
 									common:      false
 									type: uint: {
+										default: null
 										examples: [65535, 102400]
 										unit: "bytes"
 									}
@@ -142,6 +145,7 @@ components: sources: [Name=string]: {
 									required:    false
 									common:      false
 									type: uint: {
+										default: null
 										examples: [65535, 102400]
 										unit: "bytes"
 									}
@@ -185,6 +189,7 @@ components: sources: [Name=string]: {
 							description: "Encoding of the source messages. Takes one of the encoding [label strings](\(urls.encoding_charset_labels)) defined as part of the [Encoding Standard](\(urls.encoding_standard)). When set, the messages are transcoded from the specified encoding to UTF-8, which is the encoding vector assumes internally for string-like data. Enable this transcoding operation if you need your data to be in UTF-8 for further processing. At the time of transcoding, any malformed sequences (that can't be mapped to UTF-8) will be replaced with [replacement character](\(urls.unicode_replacement_character)) and warnings will be logged."
 							required:    false
 							type: string: {
+								default: null
 								examples: ["utf-16le", "utf-16be"]
 							}
 						}
@@ -219,6 +224,7 @@ components: sources: [Name=string]: {
 					description: "Configures the receive buffer size using the `SO_RCVBUF` option on the socket."
 					required:    false
 					type: uint: {
+						default: null
 						examples: [65536]
 						unit: "bytes"
 					}
@@ -241,7 +247,8 @@ components: sources: [Name=string]: {
 								description: "The time a connection needs to be idle before sending TCP keepalive probes."
 								required:    false
 								type: uint: {
-									unit: "seconds"
+									default: null
+									unit:    "seconds"
 								}
 							}
 						}

@@ -23,6 +23,7 @@ components: sinks: _sematext: {
 			relevant_when: "region is not set"
 			required:      false
 			type: string: {
+				default: null
 				examples: ["http://127.0.0.1", "http://example.com"]
 			}
 		}

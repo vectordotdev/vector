@@ -57,6 +57,7 @@ components: sinks: kafka: {
 			description: "The log field name or tags key to use for the topic key. If the field does not exist in the log or in tags, a blank value will be used. If unspecified, the key is not sent. Kafka uses a hash of the key to choose the partition or uses round-robin if the record has no key."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["user_id"]
 			}
 		}
@@ -82,13 +83,14 @@ components: sinks: kafka: {
 						common:      true
 						description: "Enable SASL/SCRAM authentication to the remote. (Not supported on Windows at this time.)"
 						required:    false
-						type: bool: {}
+						type: bool: default: null
 					}
 					mechanism: {
 						common:      true
 						description: "The Kafka SASL/SCRAM mechanisms."
 						required:    false
 						type: string: {
+							default: null
 							examples: ["SCRAM-SHA-256", "SCRAM-SHA-512"]
 						}
 					}
@@ -97,6 +99,7 @@ components: sinks: kafka: {
 						description: "The Kafka SASL/SCRAM authentication password."
 						required:    false
 						type: string: {
+							default: null
 							examples: ["password"]
 						}
 					}
@@ -105,6 +108,7 @@ components: sinks: kafka: {
 						description: "The Kafka SASL/SCRAM authentication username."
 						required:    false
 						type: string: {
+							default: null
 							examples: ["username"]
 						}
 					}
@@ -124,6 +128,7 @@ components: sinks: kafka: {
 			description: "The log field name to use for the Kafka headers. If ommited, no headers will be written."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["headers"]
 			}
 		}

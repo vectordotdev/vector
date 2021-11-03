@@ -76,6 +76,7 @@ components: sources: splunk_hec: {
 			required:    false
 			warnings: ["This option has been deprecated, the `valid_tokens` option should be used."]
 			type: string: {
+				default: null
 				examples: ["A94A8FE5CCB19BA61C4C08"]
 			}
 		}
@@ -83,8 +84,12 @@ components: sources: splunk_hec: {
 			common:      true
 			description: "If supplied, incoming requests must supply one of these tokens in the `Authorization` header, just as a client would if it was communicating with the Splunk HEC endpoint directly. If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated."
 			required:    false
-			type: array: items: type: string: {
-				examples: ["A94A8FE5CCB19BA61C4C08"]
+			type: array: {
+				default: null
+
+				items: type: string: {
+					examples: ["A94A8FE5CCB19BA61C4C08"]
+				}
 			}
 		}
 	}

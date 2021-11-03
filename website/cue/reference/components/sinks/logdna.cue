@@ -110,6 +110,7 @@ components: sinks: logdna: {
 			description: "The IP address that will be attached to each batch of events."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["0.0.0.0"]
 			}
 		}
@@ -118,6 +119,7 @@ components: sinks: logdna: {
 			description: "The mac address that will be attached to each batch of events."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["my-mac-address"]
 			}
 		}
@@ -126,6 +128,7 @@ components: sinks: logdna: {
 			description: "The tags that will be attached to each batch of events."
 			required:    false
 			type: array: {
+				default: null
 				items: type: string: {
 					examples: ["tag1", "tag2"]
 				}

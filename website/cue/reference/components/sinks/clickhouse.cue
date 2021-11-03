@@ -93,6 +93,7 @@ components: sinks: clickhouse: {
 			description: "The database that contains the table that data will be inserted into."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["mydatabase"]
 			}
 		}

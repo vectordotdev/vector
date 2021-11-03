@@ -42,6 +42,7 @@ components: transforms: throttle: {
 				"""
 			required: false
 			type: string: {
+				default: null
 				examples: [
 					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
 				]
@@ -58,6 +59,7 @@ components: transforms: throttle: {
 				"""
 			required: false
 			type: string: {
+				default: null
 				examples: ["message", "{{ hostname }}"]
 				syntax: "template"
 			}

@@ -108,6 +108,7 @@ components: sinks: loki: {
 						description: "Any Loki label, templatable"
 						required:    false
 						type: string: {
+							default: null
 							examples: ["vector", "{{ event_field }}"]
 							syntax: "template"
 						}
@@ -154,6 +155,7 @@ components: sinks: loki: {
 				"""
 			required:    false
 			type: string: {
+				default: null
 				examples: ["some_tenant_id", "{{ event_field }}"]
 				syntax: "template"
 			}

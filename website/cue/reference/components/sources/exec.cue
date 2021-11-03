@@ -70,7 +70,7 @@ components: sources: exec: {
 			common:      false
 			required:    false
 			description: "The directory in which to run the command."
-			type: string: {}
+			type: string: default: null
 		}
 		include_stderr: {
 			common:      false
@@ -147,6 +147,7 @@ components: sources: exec: {
 				description: "The data stream from which the event originated."
 				required:    false
 				type: string: {
+					default: null
 					examples: ["stdout", "stderr"]
 				}
 			}

@@ -82,6 +82,7 @@ components: sinks: aws_kinesis_streams: components._aws & {
 			description: "The log field used as the Kinesis record's partition key value."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["user_id"]
 			}
 		}

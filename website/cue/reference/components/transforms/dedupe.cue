@@ -63,6 +63,7 @@ components: transforms: dedupe: {
 						description: "The field names to ignore when deciding if an Event is a duplicate. Incompatible with the `fields.match` option."
 						required:    false
 						type: array: {
+							default: null
 							items: type: string: {
 								examples: ["field1", "parent.child_field"]
 							}

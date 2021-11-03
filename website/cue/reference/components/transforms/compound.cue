@@ -50,6 +50,7 @@ components: transforms: compound: {
 							description: "The ID to use for the transform. This will show up in metrics and logs in the format: `<compound transform id>.<step id>`. If not set, the index of the step will be used as its id."
 							required:    false
 							type: string: {
+								default: null
 								examples: ["my_filter_transform"]
 							}
 						}

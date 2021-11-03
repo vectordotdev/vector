@@ -61,6 +61,7 @@ components: sinks: influxdb_metrics: {
 				"""
 			required: false
 			type: string: {
+				default: null
 				examples: ["service"]
 			}
 		}

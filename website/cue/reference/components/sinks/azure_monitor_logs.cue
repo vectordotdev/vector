@@ -76,6 +76,7 @@ components: sinks: azure_monitor_logs: {
 			description: "[Resource ID](https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-headers) of the Azure resource the data should be associated with."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/otherResourceGroup/providers/Microsoft.Storage/storageAccounts/examplestorage", "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/examplegroup/providers/Microsoft.SQL/servers/serverName/databases/databaseName"]
 			}
 		}

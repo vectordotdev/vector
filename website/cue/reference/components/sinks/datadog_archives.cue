@@ -107,6 +107,7 @@ components: sinks: datadog_archives: {
           			"""
 						required: false
 						type: string: {
+							default: null
 							enum: {
 								STANDARD:            "The default storage class. If you don't specify the storage class when you upload an object, Amazon S3 assigns the STANDARD storage class."
 								REDUCED_REDUNDANCY:  "Designed for noncritical, reproducible data that can be stored with less redundancy than the STANDARD storage class. AWS recommends that you not use this storage class. The STANDARD storage class is more cost effective. "

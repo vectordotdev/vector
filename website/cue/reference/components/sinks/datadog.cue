@@ -40,6 +40,7 @@ components: sinks: _datadog: {
 			relevant_when: "site is not set"
 			required:      false
 			type: string: {
+				default: null
 				examples: ["127.0.0.1:8080", "example.com:12345"]
 			}
 		}
@@ -50,6 +51,7 @@ components: sinks: _datadog: {
 			relevant_when: "endpoint is not set"
 			warnings: ["This option has been deprecated, the `site` option should be used."]
 			type: string: {
+				default: null
 				enum: {
 					us: "United States"
 					eu: "Europe"

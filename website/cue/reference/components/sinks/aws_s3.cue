@@ -83,6 +83,7 @@ components: sinks: aws_s3: components._aws & {
 			description: "Canned ACL to apply to the created objects. For more information, see [Canned ACL](\(urls.aws_s3_canned_acl))."
 			required:    false
 			type: string: {
+				default: null
 				enum: {
 					"private":                   "Owner gets `FULL_CONTROL`. No one else has access rights (default)."
 					"public-read":               "Owner gets `FULL_CONTROL`. The AllUsers group gets `READ` access."
@@ -108,6 +109,7 @@ components: sinks: aws_s3: components._aws & {
 			description: "Specifies what content encodings have been applied to the object and thus what decoding mechanisms must be applied to obtain the media-type referenced by the Content-Type header field. By default calculated from `compression` value."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["gzip"]
 			}
 		}
@@ -152,6 +154,7 @@ components: sinks: aws_s3: components._aws & {
 			description: "Gives the named [grantee](\(urls.aws_s3_grantee)) READ, READ_ACP, and WRITE_ACP permissions on the created objects."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
 			}
 		}
@@ -161,6 +164,7 @@ components: sinks: aws_s3: components._aws & {
 			description: "Allows the named [grantee](\(urls.aws_s3_grantee)) to read the created objects and their metadata."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
 			}
 		}
@@ -170,6 +174,7 @@ components: sinks: aws_s3: components._aws & {
 			description: "Allows the named [grantee](\(urls.aws_s3_grantee)) to read the created objects' ACL."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
 			}
 		}
@@ -179,6 +184,7 @@ components: sinks: aws_s3: components._aws & {
 			description: "Allows the named [grantee](\(urls.aws_s3_grantee)) to write the created objects' ACL."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
 			}
 		}
@@ -199,6 +205,7 @@ components: sinks: aws_s3: components._aws & {
 			description: "The Server-side Encryption algorithm used when storing these objects."
 			required:    false
 			type: string: {
+				default: null
 				enum: {
 					"AES256":  "256-bit Advanced Encryption Standard"
 					"aws:kms": "AWS managed key encryption"
@@ -211,6 +218,7 @@ components: sinks: aws_s3: components._aws & {
 			description: "If `server_side_encryption` has the value `\"aws.kms\"`, this specifies the ID of the AWS Key Management Service (AWS KMS) symmetrical customer managed customer master key (CMK) that will used for the created objects. If not specified, Amazon S3 uses the AWS managed CMK in AWS to protect the data."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["abcd1234"]
 			}
 		}
@@ -220,6 +228,7 @@ components: sinks: aws_s3: components._aws & {
 			description: "The storage class for the created objects. See [the S3 Storage Classes](https://docs.aws.amazon.com/AmazonS3/latest/dev/storage-class-intro.html) for more details."
 			required:    false
 			type: string: {
+				default: null
 				enum: {
 					STANDARD:            "The default storage class. If you don't specify the storage class when you upload an object, Amazon S3 assigns the STANDARD storage class."
 					REDUCED_REDUNDANCY:  "Designed for noncritical, reproducible data that can be stored with less redundancy than the STANDARD storage class. AWS recommends that you not use this storage class. The STANDARD storage class is more cost effective. "

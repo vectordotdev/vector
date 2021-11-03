@@ -80,6 +80,7 @@ components: sinks: gcp_stackdriver_metrics: {
 			description: "The filename for a Google Cloud service account credentials JSON file used to authenticate access to the Stackdriver Logging API. If this is unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.\n\nIf no filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is running on. If Vector is not running on a GCE instance, you must define a credentials file as above."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["/path/to/credentials.json"]
 			}
 		}
@@ -124,6 +125,7 @@ components: sinks: gcp_stackdriver_metrics: {
 						description: "Values for all of the labels listed in the associated monitored resource descriptor.\n\nFor example, Compute Engine VM instances use the labels `projectId`, `instanceId`, and `zone`."
 						required:    false
 						type: string: {
+							default: null
 							examples: ["vector-123456", "Twilight"]
 						}
 					}

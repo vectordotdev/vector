@@ -82,6 +82,7 @@ components: sinks: aws_sqs: components._aws & {
 			description: "The tag that specifies that a message belongs to a specific message group. Can be applied only to FIFO queues."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["vector", "vector-%Y-%m-%d"]
 				syntax: "template"
 			}
@@ -97,6 +98,7 @@ components: sinks: aws_sqs: components._aws & {
 			"""
 			required:    false
 			type: string: {
+				default: null
 				examples: ["{{ transaction_id }}"]
 				syntax: "template"
 			}

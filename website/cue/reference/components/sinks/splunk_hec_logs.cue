@@ -98,6 +98,7 @@ components: sinks: splunk_hec_logs: {
 				"""
 			required:    false
 			type: string: {
+				default: null
 				examples: ["hostname"]
 			}
 		}
@@ -106,6 +107,7 @@ components: sinks: splunk_hec_logs: {
 			description: "The name of the index where to send the events to. If not specified, the default index is used."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["{{ host }}", "custom_index"]
 				syntax: "template"
 			}
@@ -115,6 +117,7 @@ components: sinks: splunk_hec_logs: {
 			description: "Fields to be [added to Splunk index](\(urls.splunk_hec_indexed_fields))."
 			required:    false
 			type: array: {
+				default: null
 				items: type: string: {
 					examples: ["field1", "field2"]
 					syntax: "field_path"
@@ -126,6 +129,7 @@ components: sinks: splunk_hec_logs: {
 			description: "The source of events sent to this sink. Typically the filename the logs originated from. If unset, the Splunk collector will set it."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["{{ file }}", "/var/log/syslog", "UDP:514"]
 				syntax: "template"
 			}
@@ -135,6 +139,7 @@ components: sinks: splunk_hec_logs: {
 			description: "The sourcetype of events sent to this sink. If unset, Splunk will default to httpevent."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["{{ sourcetype }}", "_json", "httpevent"]
 				syntax: "template"
 			}

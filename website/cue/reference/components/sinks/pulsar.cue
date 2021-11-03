@@ -73,6 +73,7 @@ components: sinks: pulsar: {
 						description: "The basic authentication name."
 						required:    false
 						type: string: {
+							default: null
 							examples: ["${PULSAR_NAME}", "name123"]
 						}
 					}
@@ -81,6 +82,7 @@ components: sinks: pulsar: {
 						description: "The basic authentication password."
 						required:    false
 						type: string: {
+							default: null
 							examples: ["${PULSAR_TOKEN}", "123456789"]
 						}
 					}

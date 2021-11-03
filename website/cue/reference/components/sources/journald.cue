@@ -152,6 +152,7 @@ components: sources: journald: {
 			description: "The full path of the journal directory. If not set, `journalctl` will use the default system journal paths"
 			required:    false
 			type: string: {
+				default: null
 				examples: ["/run/log/journal"]
 			}
 		}
@@ -175,6 +176,7 @@ components: sources: journald: {
 					description: "Any Journald field"
 					required:    false
 					type: string: {
+						default: null
 						examples: ["/usr/sbin/ntpd", "c36e9ea52800a19d214cb71b53263a28"]
 					}
 				}

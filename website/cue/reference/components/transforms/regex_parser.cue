@@ -88,6 +88,7 @@ components: transforms: regex_parser: {
 			description: "If this setting is present, the parsed fields will be inserted into the log as a sub-object with this name. If a field with the same name already exists, the parser will fail and produce an error."
 			required:    false
 			type: string: {
+				default: null
 				examples: ["root_field", "parent.child"]
 			}
 		}
