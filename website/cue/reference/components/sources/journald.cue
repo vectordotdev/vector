@@ -29,14 +29,8 @@ components: sources: journald: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            false
-			"x86_64-pc-windows-msv":          false
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
+			"x86_64-apple-darwin":   false
+			"x86_64-pc-windows-msv": false
 		}
 
 		requirements: []

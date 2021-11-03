@@ -35,7 +35,6 @@ components: transforms: wasm: {
 			"armv7-unknown-linux-musleabihf": false
 			"x86_64-apple-darwin":            false
 			"x86_64-pc-windows-msv":          false
-			"x86_64-unknown-linux-gnu":       true
 			"x86_64-unknown-linux-musl":      false
 		}
 
