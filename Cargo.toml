@@ -315,7 +315,7 @@ tokio-test = "0.4.2"
 tower-test = "0.4.0"
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 walkdir = "2.3.2"
-wiremock = "0.5.7"
+wiremock = "0.5.8"
 quickcheck = "1.0.3"
 lookup = { path = "lib/lookup", features = ["arbitrary"] }
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "16bcf0ab1bb6e380d966a69d314de1e99ede553a", features = ["azurite_workaround"] }
