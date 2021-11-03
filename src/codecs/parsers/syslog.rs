@@ -93,9 +93,9 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
     }
 
     for element in parsed.structured_data.into_iter() {
-        for (name, value) in element.params.into_iter() {
+        for (name, value) in element.params() {
             let key = format!("{}.{}", element.id, name);
-            log.insert(key, value.to_string());
+            log.insert(key, value);
         }
     }
 }
