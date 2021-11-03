@@ -1,9 +1,11 @@
 use super::{
-    builder::ConfigBuilder, format, validation, vars, ComponentKey, Config, ConfigPath, Format,
-    FormatHint,
+    builder::ConfigBuilder, format, validation, vars, ComponentKey, Config, ConfigPath,
+    EnrichmentTableOuter, Format, FormatHint, SinkOuter, SourceOuter, TestDefinition,
+    TransformOuter,
 };
 use crate::signal;
 use glob::glob;
+use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use std::{
     collections::HashMap,
@@ -33,6 +35,121 @@ fn default_config_paths() -> Vec<ConfigPath> {
 
 lazy_static! {
     pub static ref CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::default();
+}
+
+fn component_name(path: &Path) -> Result<String, Vec<String>> {
+    path.file_stem()
+        .and_then(|name| name.to_str())
+        .map(|name| name.to_string())
+        .ok_or_else(|| vec![format!("Couldn't get component name for file: {:?}", path)])
+}
+
+trait ConfigLoader: Sized + serde::de::DeserializeOwned {
+    fn load_from_file(
+        path: &Path,
+    ) -> Result<Option<(ComponentKey, Self, Vec<String>)>, Vec<String>> {
+        let name = component_name(path).map(ComponentKey::from)?;
+        if let Some(file) = open_config(path) {
+            let format = Format::from_path(path).ok();
+            let (component, warnings): (Self, Vec<String>) = load(file, format)?;
+            Ok(Some((name, component, warnings)))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn load_from_dir(
+        path: &Path,
+    ) -> Result<(IndexMap<ComponentKey, Self>, Vec<String>), Vec<String>> {
+        let mut result = IndexMap::new();
+        let readdir = path
+            .read_dir()
+            .map_err(|err| vec![format!("Could not read config dir: {:?}, {}.", path, err)])?;
+        let mut warnings = Vec::new();
+        let mut errors = Vec::new();
+        for res in readdir {
+            match res {
+                Ok(direntry) => {
+                    let entry_path = direntry.path();
+                    if entry_path.is_file() {
+                        match Self::load_from_file(&entry_path) {
+                            Ok(Some((name, component, warns))) => {
+                                result.insert(name, component);
+                                warnings.extend(warns);
+                            }
+                            Ok(None) => (),
+                            Err(errs) => errors.extend(errs),
+                        }
+                    }
+                }
+                Err(err) => {
+                    errors.push(format!(
+                        "Could not read file in config dir: {:?}, {}.",
+                        path, err
+                    ));
+                }
+            }
+        }
+        if errors.is_empty() {
+            Ok((result, warnings))
+        } else {
+            Err(errors)
+        }
+    }
+
+    fn load_subfolder(&mut self, _path: &Path) -> Result<Vec<String>, Vec<String>> {
+        Ok(Vec::new())
+    }
+}
+
+impl ConfigLoader for EnrichmentTableOuter {}
+impl ConfigLoader for TransformOuter<String> {}
+impl ConfigLoader for SinkOuter<String> {}
+impl ConfigLoader for SourceOuter {}
+impl ConfigLoader for TestDefinition {}
+
+impl ConfigLoader for ConfigBuilder {
+    fn load_subfolder(&mut self, path: &Path) -> Result<Vec<String>, Vec<String>> {
+        match path.file_name().and_then(|name| name.to_str()) {
+            Some("enrichment_tables") => {
+                let (tables, warnings) = EnrichmentTableOuter::load_from_dir(path)?;
+                self.enrichment_tables.extend(tables);
+                Ok(warnings)
+            }
+            Some("sinks") => {
+                let (sinks, warnings) = SinkOuter::load_from_dir(path)?;
+                self.sinks.extend(sinks);
+                Ok(warnings)
+            }
+            Some("sources") => {
+                let (sources, warnings) = SourceOuter::load_from_dir(path)?;
+                self.sources.extend(sources);
+                Ok(warnings)
+            }
+            Some("tests") => {
+                let (tests, warnings) = TestDefinition::load_from_dir(path)?;
+                self.tests.extend(tests.into_iter().map(|(_, value)| value));
+                Ok(warnings)
+            }
+            Some("transforms") => {
+                let (transforms, warnings) = TransformOuter::load_from_dir(path)?;
+                self.transforms.extend(transforms);
+                Ok(warnings)
+            }
+            Some(name) => {
+                // ignore hidden folders
+                if name.starts_with('.') {
+                    Ok(Vec::new())
+                } else {
+                    Err(vec![format!(
+                        "Couldn't identify component type for folder {:?}",
+                        path
+                    )])
+                }
+            }
+            None => Ok(Vec::new()),
+        }
+    }
 }
 
 /// Merge the paths coming from different cli flags with different formats into
@@ -135,84 +252,14 @@ pub async fn load_from_paths_with_provider(
 
 fn load_builder_from_file(
     path: &Path,
-    format: Option<Format>,
     builder: &mut ConfigBuilder,
 ) -> Result<Vec<String>, Vec<String>> {
-    if let Some(file) = open_config(path) {
-        let format = format.or_else(|| Format::from_path(path).ok());
-        let (loaded, warnings) = load(file, format)?;
-        builder.append(loaded)?;
-        Ok(warnings)
-    } else {
-        Ok(Vec::new())
-    }
-}
-
-fn component_name(path: &Path) -> Result<String, Vec<String>> {
-    path.file_stem()
-        .and_then(|name| name.to_str())
-        .map(|name| name.to_string())
-        .ok_or_else(|| vec![format!("Couldn't get component name for file: {:?}", path)])
-}
-
-fn load_component_from_file<T, U>(
-    path: &Path,
-    builder: &mut ConfigBuilder,
-    updater: U,
-) -> Result<Vec<String>, Vec<String>>
-where
-    T: serde::de::DeserializeOwned,
-    U: Fn(&mut ConfigBuilder, ComponentKey, T),
-{
-    let name = component_name(path).map(ComponentKey::from)?;
-    if let Some(file) = open_config(path) {
-        let format = Format::from_path(path).ok();
-        let (component, warnings): (T, Vec<String>) = load(file, format)?;
-        updater(builder, name, component);
-        Ok(warnings)
-    } else {
-        Ok(Vec::new())
-    }
-}
-
-fn load_components_from_dir<F, T>(
-    path: &Path,
-    builder: &mut ConfigBuilder,
-    loader: F,
-) -> Result<Vec<String>, Vec<String>>
-where
-    T: serde::de::DeserializeOwned,
-    F: Fn(&mut ConfigBuilder, ComponentKey, T),
-    F: Copy,
-{
-    let readdir = path
-        .read_dir()
-        .map_err(|err| vec![format!("Could not read config dir: {:?}, {}.", path, err)])?;
-    let mut warnings = Vec::new();
-    let mut errors = Vec::new();
-    for res in readdir {
-        match res {
-            Ok(direntry) => {
-                let entry_path = direntry.path();
-                if entry_path.is_file() {
-                    match load_component_from_file(&direntry.path(), builder, loader) {
-                        Ok(warns) => warnings.extend(warns),
-                        Err(errs) => errors.extend(errs),
-                    }
-                }
-            }
-            Err(err) => {
-                errors.push(format!(
-                    "Could not read file in config dir: {:?}, {}.",
-                    path, err
-                ));
-            }
+    match ConfigBuilder::load_from_file(path)? {
+        Some((_, loaded, warnings)) => {
+            builder.append(loaded)?;
+            Ok(warnings)
         }
-    }
-    if errors.is_empty() {
-        Ok(warnings)
-    } else {
-        Err(errors)
+        None => Ok(Vec::new()),
     }
 }
 
@@ -230,51 +277,12 @@ fn load_builder_from_dir(
             Ok(direntry) => {
                 let entry_path = direntry.path();
                 if entry_path.is_file() {
-                    match load_builder_from_file(&direntry.path(), None, builder) {
+                    match load_builder_from_file(&direntry.path(), builder) {
                         Ok(warns) => warnings.extend(warns),
                         Err(errs) => errors.extend(errs),
                     }
                 } else if entry_path.is_dir() {
-                    let result = match direntry.file_name().to_str() {
-                        Some("enrichment_tables") => {
-                            load_components_from_dir(&entry_path, builder, |b, name, table| {
-                                b.enrichment_tables.insert(name, table);
-                            })
-                        }
-                        Some("sinks") => {
-                            load_components_from_dir(&entry_path, builder, |b, name, sink| {
-                                b.sinks.insert(name, sink);
-                            })
-                        }
-                        Some("sources") => {
-                            load_components_from_dir(&entry_path, builder, |b, name, source| {
-                                b.sources.insert(name, source);
-                            })
-                        }
-                        Some("tests") => {
-                            load_components_from_dir(&entry_path, builder, |b, _, test| {
-                                b.tests.push(test);
-                            })
-                        }
-                        Some("transforms") => {
-                            load_components_from_dir(&entry_path, builder, |b, name, transform| {
-                                b.transforms.insert(name, transform);
-                            })
-                        }
-                        Some(name) => {
-                            // ignore hidden folders
-                            if name.starts_with('.') {
-                                Ok(Vec::new())
-                            } else {
-                                Err(vec![format!(
-                                    "Couldn't identify component type for folder {:?}",
-                                    entry_path
-                                )])
-                            }
-                        }
-                        None => Ok(Vec::new()),
-                    };
-                    match result {
+                    match builder.load_subfolder(&entry_path) {
                         Ok(warns) => warnings.extend(warns),
                         Err(errs) => errors.extend(errs),
                     }
@@ -304,8 +312,8 @@ pub fn load_builder_from_paths(
 
     for config_path in config_paths {
         match config_path {
-            ConfigPath::File(path, format) => {
-                match load_builder_from_file(path, *format, &mut result) {
+            ConfigPath::File(path, _) => {
+                match load_builder_from_file(path, &mut result) {
                     Ok(warns) => warnings.extend(warns),
                     Err(errs) => errors.extend(errs),
                 };
