@@ -120,7 +120,8 @@ In addition to the overall protocol, there are a few details worth highlighting:
 
 ### User Experience
 
-Users can configure the `splunk_hec` source with additional indexer acknowledgement related settings.
+Users can configure the `splunk_hec` source with additional indexer
+acknowledgement related settings.
 
 ```toml
 [sources.splunk_hec]
@@ -134,8 +135,8 @@ acknowledgements.ack_idle_cleanup = true
 acknowledgements.max_idle_time = 300
 ```
 
-* `acknowledgements.enabled` This controls indexer acknowledgement enablement. Defaults to `false` matching Splunk HEC's
-  opt-in behavior.
+* `acknowledgements.enabled` This controls indexer acknowledgement enablement.
+  Defaults to `false` matching Splunk HEC's opt-in behavior.
 * `acknowledgements.max_pending_acks` With acknowledgements enabled, this
   controls the maximum number of pending query ackId's overall (across all channels)
   Defaults to `10_000_000` (Splunk default).
