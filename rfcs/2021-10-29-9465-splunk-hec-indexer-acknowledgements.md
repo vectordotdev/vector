@@ -174,27 +174,29 @@ protocol requirements to avoid unnecessary complexity. Specifically,
 
 ### Implementation
 
-Implementation details mostly concern creating, storing, and updating `ackId`’s
-and statuses. The following suggested implementation prioritizes memory
-efficiency.
+First, we describe implementation details for creating, storing, and updating
+`ackId`’s and statuses. The following suggested implementation prioritizes
+memory efficiency.
 
-#### Data Structures
+Second, we describe implementation details for channel behavior.
+
+#### AckId Data Structures
 
 * A [bitvec](https://docs.rs/bitvec/0.22.3/bitvec/) (or similar structure)
   `ack_ids_in_use` whose indices represent `ackId`’s, max size is determined by
-  `max_pending_acks`, and is initialized with all `0`'s'. A value of `0` at an
+  `max_pending_acks_per_channel`, and is initialized with all `0`'s'. A value of `0` at an
   index indicates that the `ackId` is not in-use. A value of `1` indicates
   in-use.
 * A bitvec `ack_ids_ack_status` whose indices also correspond to `ackId`’s, max
-  size is determined by `max_pending_acks`, and is initialized with all `0`'s. A
+  size is determined by `max_pending_acks_per_channel`, and is initialized with all `0`'s. A
   value of `0` at an index indicates that the associated request data has not
   yet been delivered. A value of `1` indicates that the data has been delivered.
-  These two bitvecs will be wrapped in a struct with useful methods. A single
-  bitvec is not necessarily sufficient as we care about 3 states: `ackId` is
-  available, `ackId` is pending/dropped, and `ackId` is delivered.
 * An index pointer `currently_available_ack_id` initialized with `0`.
+* The above will be wrapped in a simple struct with utility methods. Note, a
+  single bitvec is not necessarily sufficient as we care about 3 states: `ackId`
+  is available, `ackId` is pending/dropped, and `ackId` is delivered.
 
-#### Process
+#### AckId Process
 
 * Assigning and updating `ackId`’s and statuses
   * To assign a new `ackId` to a new request, we use the
@@ -249,6 +251,26 @@ efficiency.
     bitvec.
   * If we return true for an ackId, we mark `ack_ids_in_use[ack_id] = 0` and
     `ack_ids_ack_status[ack_id] = 0`. The `ackId` can then be reused.
+
+#### Channel Behavior
+
+The above `ackId` process will occur per-channel. As part of the `splunk_hec`
+source struct, we will store a `Arc<Mutex<Map<channel_id, channel>>>` where
+`channel_id` is a `String` value and `channel` is a struct wrapping a
+`last_used_timestamp` (for expiring channels) and the ackId structure described
+above.
+
+Incoming requests will be required to specify a `channelId`. On receiving a new
+`channelId`, we create a new instance of `channel` and insert it into the `Map`.
+We handle all `ackId` processing after drilling in to the appropriate ackId data
+based on the client provided `channelId`. Every time a `channelId` and
+corresponding `channel` information is used, we update the respective
+`last_used_timestamp` to current.
+
+To expire idle channels, we use a background task that shares the channel `Map`
+and compares each channel's `last_used_timestamp` to the current timestamp. If
+the difference exceeds the configured `max_idle_time`, the channel will be
+removed. This background task will loop at an interval based on `max_idle_time`.
 
 ## Proposal: `splunk_hec` Sinks Indexer Acknowledgement
 
