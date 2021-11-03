@@ -307,6 +307,7 @@ impl StreamSink for PrometheusExporter {
             if interval > self.config.flush_period_secs as i64 {
                 metrics.last_flush_timestamp = now;
 
+                let now = Instant::now();
                 metrics.map = metrics
                     .map
                     .drain(..)
@@ -317,7 +318,8 @@ impl StreamSink for PrometheusExporter {
                         (entry, metadata)
                     })
                     .filter(|(_metric, metadata)| {
-                        metadata.updated_at.elapsed().as_secs() < self.config.flush_period_secs
+                        now.duration_since(metadata.updated_at).as_secs()
+                            < self.config.flush_period_secs
                     })
                     .collect();
             }
