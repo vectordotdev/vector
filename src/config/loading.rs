@@ -425,13 +425,14 @@ mod tests {
 
     #[test]
     fn load_namespacing_failing() {
-        let path = PathBuf::from("./tests/namespacing-fail");
-        let configs = vec![ConfigPath::Dir(path)];
+        let path = PathBuf::from(".").join("tests").join("namespacing-fail");
+        let configs = vec![ConfigPath::Dir(path.clone())];
         let errors = load_builder_from_paths(&configs).unwrap_err();
         assert_eq!(errors.len(), 1);
-        assert_eq!(
-            errors[0],
-            "Couldn't identify component type for folder \"./tests/namespacing-fail/foo\""
+        let msg = format!(
+            "Couldn't identify component type for folder {:?}",
+            path.join("foo")
         );
+        assert_eq!(errors[0], msg);
     }
 }
