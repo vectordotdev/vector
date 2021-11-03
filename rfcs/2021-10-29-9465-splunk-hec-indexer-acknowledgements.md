@@ -147,7 +147,7 @@ protocol requirements to avoid unnecessary complexity. Specifically,
     acknowledgement.
 
 * Splunk Channels
-  * The `splunk_hec` source will not require channel IDs for acknowledgement.
+  * The `splunk_hec` source will require channel IDs for acknowledgement.
     Currently, we store channel IDs as an additional `LogEvent` field. If users
     intend to move data from a `splunk_hec` source to a `splunk_hec` sink,
     passing through the channel IDs can be helpful.
@@ -195,12 +195,11 @@ efficiency.
       the bitvec, we wrap around to index `0` and search for the nearest
       available `ackId` (i.e. where `ack_ids_in_use[index] = 0`).
     * If there are no available `ackId`’s, we can begin to drop pending, in-use
-      `ackId`’s, setting `ack_ids_in_use[...] = 0`. For simplicity, we can drop
-      starting from the lowest `ackId` values (though there may be edge cases
-      here that can cause this to continuously drop the same `ackId`'s). We
-      should drop a chunk of pending `ackId`’s rather than a single `ackId` at a
-      time to avoid potentially re-scanning the `ack_ids_in_use` array on the
-      next incoming request.
+      `ackId`’s, setting `ack_ids_in_use[...] = 0`. We drop starting from
+      `currently_available_ack_id + 1` which will generally be the oldest
+      pending `ackId`'s. We should drop a chunk of pending `ackId`’s rather than
+      a single `ackId` at a time to avoid potentially re-scanning the
+      `ack_ids_in_use` array on the next incoming request.
   * To associate request data to the assigned `ackId` and receive the status of
     the data, we will use the existing `BatchNotifier`/`BatchReceiver` system
     from vector’s overall end-to-end-acknowledgement infrastructure.
@@ -250,6 +249,16 @@ acknowledgements if the user has enabled it in their Splunk instance (if
 `splunk_hec` sinks will continue to finalize events based on the HEC response
 status code.
 
+Users can configure the `splunk_hec` sinks with the following indexer
+acknowledgement settings
+
+* `acknowledgements.query_interval` The amount of time to wait between requests
+  to `services/collector/ack`. This defaults to 10 seconds as recommended by
+  Splunk.
+* `acknowledgements.retry_limit` The number of retry requests to
+  `services/collector/ack`. This defaults to 30 which, along with the default
+  `query_interval`, is 5 minutes of retrying as recommend by Splunk.
+
 ### Implementation
 
 * [Splunk recommendations for client integration with indexer acknowledgement](https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/AboutHECIDXAck#Indexer_acknowledgment_client_behavior)
@@ -264,12 +273,11 @@ shared with a background tokio task which, for all pending `ackId`’s, will que
 `/services/collector/ack`. The `(u8, Sender)` map value represents the number of
 retries remaining and the send end of a one-shot notification channel.
 
-This background task will query at an interval of 10
-seconds (as recommended by Splunk), and we set the retry limit to `30` (5
-minutes of retrying as recommended by Splunk). If we receive `true` for an
-`ackId`, we'll notify an awaiting receiver with a `Status::Delivered`. If we
-receive `false` for an `ackId`, we decrement its remaining retry count. When
-remaining retries is `0`, we notify with `EventStatus::Dropped`.
+This background task will query at an interval (configured or default) and with
+a retry limit (configured or default). If we receive `true` for an `ackId`,
+we'll notify an awaiting receiver with a `Status::Delivered`. If we receive
+`false` for an `ackId`, we decrement its remaining retry count. When remaining
+retries is `0`, we notify with `EventStatus::Dropped`.
 
 Back in the response handler, we’ll await the receiver. Once a status has been
 received, we remove the `ackId` from the map and proceed. Below is an example of
@@ -340,7 +348,7 @@ fn call(&mut self, req: HecRequest) -> Self::Future {
 ### `splunk_hec` Sink Indexer Acknowledgement
 
 * Refactor `build_request` to use channel ID
-* Implement the shared structure and background task logic (querying
+* Add the shared structure and implement background task logic (querying
   `/services/collector/ack`)
 * Refactor current `HecService` code to handle responses according to indexer
   acknowledgement integration
