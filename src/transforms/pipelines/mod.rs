@@ -12,6 +12,8 @@ inventory::submit! {
     TransformDescription::new::<PipelinesConfig>("pipelines")
 }
 
+/// This represent the configuration of a single pipeline,
+/// not the pipelines transform itself.
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct PipelineConfig {
     name: String,
@@ -43,6 +45,7 @@ impl PipelineConfig {
     }
 }
 
+/// This represent an ordered list of pipelines depending on the event type.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct EventTypeConfig {
@@ -81,6 +84,7 @@ impl EventTypeConfig {
     }
 }
 
+/// The configuration of the pipelines transform itself.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct PipelinesConfig {
     #[serde(default)]
