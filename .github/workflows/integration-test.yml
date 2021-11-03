@@ -21,6 +21,8 @@ on:
       - "Makefile"
       - "rust-toolchain"
   pull_request:
+    paths-ignore:
+      - "website/**"
 
 env:
   AUTOINSTALL: true
