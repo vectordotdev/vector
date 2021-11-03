@@ -175,7 +175,7 @@ jobs:
         run: |
           rm -rf /tmp/${{ github.event.number }}/${{ matrix.target }}/
           mkdir -p /tmp/${{ github.event.number }}/${{ matrix.target }}/
-          ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "baseline" `cat baseline-soak/tag` /tmp/${{ github.event.number }}/${{ matrix.target }}
+          ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "baseline" `cat baseline-soak/tag` /tmp/${{ github.event.number }}
 
       - name: Upload timing captures
         uses: actions/upload-artifact@v1
@@ -203,7 +203,7 @@ jobs:
         run: |
           rm -rf /tmp/${{ github.event.number }}/${{ matrix.target }}/
           mkdir -p /tmp/${{ github.event.number }}/${{ matrix.target }}/
-          ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "comparison" "${{ github.sha }}-${{ github.sha }}" /tmp/${{ github.event.number }}/${{ matrix.target }}
+          ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "comparison" "${{ github.sha }}-${{ github.sha }}" /tmp/${{ github.event.number }}
 
       - name: Upload timing captures
         uses: actions/upload-artifact@v1
@@ -215,9 +215,7 @@ jobs:
     name: Soak analysis (${{ matrix.target }})
     if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak] # could be general if we move away from miller
-    needs: [compute-test-plan, soak-baseline, soak-comparison]
-    strategy:
-      matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
+    needs: [soak-baseline, soak-comparison]
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
@@ -229,7 +227,7 @@ jobs:
 
       - name: Analyze captures
         run: |
-          ./soaks/bin/analyze_experiment.sh ${{ github.event.number }}-captures/${{ matrix.target }}
+          ./soaks/bin/analyze_experiment.sh ${{ github.event.number }}-captures/
 
   observer:
     name: Build and push 'observer' to Github CR
