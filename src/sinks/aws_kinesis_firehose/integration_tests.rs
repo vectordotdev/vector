@@ -55,7 +55,7 @@ async fn firehose_put_records() {
 
     let cx = SinkContext::new_test();
 
-    let mut sink = config.build(cx).await.unwrap();
+    let sink = config.build(cx).await.unwrap();
 
     let (input, events) = random_events_with_stream(100, 100, None);
 
