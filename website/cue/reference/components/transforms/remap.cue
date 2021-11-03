@@ -101,6 +101,7 @@ components: transforms: "remap": {
 				"""
 			type: bool: default: true
 		}
+		timezone: configuration._timezone
 	}
 
 	input: {
