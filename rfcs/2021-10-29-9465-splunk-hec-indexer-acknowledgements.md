@@ -259,33 +259,40 @@ requests. After submitting events to HEC, we will parse the HTTP response for an
 `ackId`. If no `ackId` is found, we rely on the current behavior of setting
 `EventStatus` based solely on the HTTP status code.
 
-If an `ackId` is found, we store it in a `Map<u64, bool>` shared with a
-background tokio task which, for all pending `ackId`’s, will query
-`/services/collector/ack`. This background task will query at an interval of 10
-seconds (as recommended by Splunk) and update the shared structure based on the
-results. Meanwhile, back in the HEC response handler, we’ll check the shared
-structure for `true` at 10 second intervals up to a maximum time limit (5
-minutes as recommended by Splunk).
+If an `ackId` is found, we store it in a `Arc<Mutex<Map<u64, (u8, Sender)>>>`
+shared with a background tokio task which, for all pending `ackId`’s, will query
+`/services/collector/ack`. The `(u8, Sender)` map value represents the number of
+retries remaining and the send end of a one-shot notification channel.
+
+This background task will query at an interval of 10
+seconds (as recommended by Splunk), and we set the retry limit to `30` (5
+minutes of retrying as recommended by Splunk). If we receive `true` for an
+`ackId`, we'll notify an awaiting receiver with a `Status::Delivered`. If we
+receive `false` for an `ackId`, we decrement its remaining retry count. When
+remaining retries is `0`, we notify with `EventStatus::Dropped`.
+
+Back in the response handler, we’ll await the receiver. Once a status has been
+received, we remove the `ackId` from the map and proceed. Below is an example of
+response handler behavior.
 
 ```rust
 fn call(&mut self, req: HecRequest) -> Self::Future {
         let mut http_service = self.batch_service.clone();
         Box::pin(async move {
             ...
+
             // handle response
             let response = http_service.call(req).await?;
             // if ack_id is found
-            self.ack_id_to_status_map.insert(ack_id, false);
-            let mut interval = time::interval(Duration::from_secs(10));
-            let mut retries = 0;
-            while retries < RETRY_LIMIT {
-                interval.tick().await;
-                if self.ack_id_to_status_map.get(ack_id) {
-                    // set EventStatus::Delivered and update map
-                    break;
-                }
-                retries += 1;
+            let (tx, rx) = oneshot::channel::<EventStatus>();
+            self.ack_id_to_status_map.insert(ack_id, (30, tx));
+            let event_status = match rx.await {
+                Ok(EventStatus::Delivered) => EventStatus::Delivered,
+                Ok(_) => EventStatus::Dropped,
+                Err(_) => EventStatus::Failed,
             }
+            self.ack_id_to_status_map.remove(ack_id);
+            ...
 
             // if ack_id is not found, fall back on current behavior
             let event_status = if response.status().is_success() {
@@ -300,12 +307,6 @@ fn call(&mut self, req: HecRequest) -> Self::Future {
         })
     }
 ```
-
-If we receive a `true` response, we remove the ackId from the shared structure
-and set `EventStatus::Delivered`.
-
-If we do not receive a `true` response and the time limit expires, we remove the
-ackId from the shared structure and set `EventStatus::Dropped`.
 
 ## Alternatives
 
