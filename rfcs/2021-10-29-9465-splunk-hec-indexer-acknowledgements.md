@@ -184,18 +184,18 @@ Second, we describe implementation details for channel behavior.
 #### AckId Data Structures
 
 * A [bitvec::BitVec](https://docs.rs/bitvec/0.22.3/bitvec/) (or similar
-  structure) `ack_ids_in_use` whose indices represent `ackId`’s, max size is
-  determined by `max_pending_acks_per_channel`, and is initialized with all
-  `0`'s. A value of `0` at an index indicates that the `ackId` is not in-use. A
-  value of `1` indicates in-use.
-* A bitvec `ack_ids_ack_status` whose indices also correspond to `ackId`’s, max
-  size is determined by `max_pending_acks_per_channel`, and is initialized with
-  all `0`'s. A value of `0` at an index indicates that the associated request
-  data has not yet been delivered. A value of `1` indicates that the data has
-  been delivered. The two bitvecs will be wrapped in a struct with utility
-  methods for setting bits, removing in use ids, etc. Note, a single bitvec is
-  not necessarily sufficient as we care about 3 states: `ackId` is available,
-  `ackId` is pending/dropped, and `ackId` is delivered.
+  structure) `ack_ids_in_use` whose indices represent `ackId`’s and max size is
+  determined by `max_pending_acks_per_channel`. This `bitvec` will grow
+  dynamically. A value of `0` at an index indicates that the `ackId` is not
+  in-use. A value of `1` indicates in-use.
+* A bitvec `ack_ids_ack_status` whose indices also correspond to `ackId`’s and
+  max size is determined by `max_pending_acks_per_channel`. This `bitvec` will
+  grow dynamically. A value of `0` at an index indicates that the associated
+  request data has not yet been delivered. A value of `1` indicates that the
+  data has been delivered. The two bitvecs will be wrapped in a struct with
+  utility methods for setting bits, removing in use ids, etc. Note, a single
+  bitvec is not necessarily sufficient as we care about 3 states: `ackId` is
+  available, `ackId` is pending/dropped, and `ackId` is delivered.
 * An index pointer `currently_available_ack_id` initialized with `0`.
 * The above will be wrapped in a `HecAckInfo` struct with utility methods.
 
@@ -362,11 +362,13 @@ fn call(&mut self, req: HecRequest) -> Self::Future {
 
 ## Outstanding Questions
 
-* For `splunk_hec` source, there are several choices to be made in regards to
+* ~~For `splunk_hec` source, there are several choices to be made in regards to
   how closely we mimic the real Splunk HEC indexer acknowledgements behavior.
   While we’d like to avoid inheriting Splunk’s issues wherever possible, we’d
   also like to make this as fully functional as users need. Does the above make
-  sense in terms of what our users need from vector?
+  sense in terms of what our users need from vector?~~ We will support most of
+  the same Splunk HEC indexer acknowledgements behavior for better user
+  experience and robustness.
 * For `splunk_hec` sink, should we instead allow users to configure channel
   behavior (e.g. list of channel IDs, # of channels to use, etc.)?
 
