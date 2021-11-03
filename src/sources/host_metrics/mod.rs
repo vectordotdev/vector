@@ -72,7 +72,8 @@ pub struct HostMetricsConfig {
     collectors: Option<Vec<Collector>>,
     #[serde(default)]
     namespace: Namespace,
-    config_hash: Option<String>,
+    #[serde(skip)]
+    version: Option<String>,
 
     #[cfg(target_os = "linux")]
     #[serde(default)]
@@ -118,10 +119,10 @@ impl SourceConfig for HostMetricsConfig {
 
 impl HostMetricsConfig {
     /// Return a host metrics config with enterprise reporting defaults.
-    pub fn enterprise<T: Into<String>>(config_hash: T) -> Self {
+    pub fn enterprise<T: Into<String>>(version: T) -> Self {
         Self {
             namespace: Namespace(Some("pipelines".to_owned())),
-            config_hash: Some(config_hash.into()),
+            version: Some(version.into()),
             ..Self::default()
         }
     }
@@ -179,7 +180,7 @@ impl HostMetrics {
 
     async fn capture_metrics(&self) -> impl Iterator<Item = Event> {
         let hostname = crate::get_hostname();
-        let config_hash = self.config.config_hash.clone();
+        let version = self.config.version.clone();
 
         let mut metrics = Vec::new();
         #[cfg(target_os = "linux")]
@@ -213,9 +214,9 @@ impl HostMetrics {
                 metric.insert_tag("host".into(), hostname.into());
             }
         }
-        if let Some(config_hash) = &config_hash {
+        if let Some(version) = &version {
             for metric in &mut metrics {
-                metric.insert_tag("config_hash".to_owned(), config_hash.clone());
+                metric.insert_tag("version".to_owned(), version.clone());
             }
         }
         emit!(&HostMetricsEventReceived {

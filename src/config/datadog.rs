@@ -64,16 +64,12 @@ pub fn try_attach(config: &mut Config) -> bool {
     let internal_metrics_id = OutputId::from(ComponentKey::from(INTERNAL_METRICS_KEY));
     let datadog_metrics_id = ComponentKey::from(DATADOG_METRICS_KEY);
 
-    // Create internal sources for host and internal metrics. We're distinct sources here and not
-    // attempting to reuse existing ones, to configure it according to enterprise requirements.
-    let mut host_metrics =
-        HostMetricsConfig::enterprise(config.hash.as_ref().expect("Config should contain hash"));
+    let version = config.version.as_ref().expect("Config should be versioned");
 
-    // Create an internal metrics source. We're using a distinct source here and not
-    // attempting to reuse an existing one, to configure it according to enterprise requirements.
-    let mut internal_metrics = InternalMetricsConfig::enterprise(
-        config.hash.as_ref().expect("Config should contain hash"),
-    );
+    // Create internal sources for host and internal metrics. We're using distinct sources here and
+    // not attempting to reuse existing ones, to configure according to enterprise requirements.
+    let mut host_metrics = HostMetricsConfig::enterprise(version);
+    let mut internal_metrics = InternalMetricsConfig::enterprise(version);
 
     // Override default scrape intervals.
     host_metrics.scrape_interval_secs(config.datadog.reporting_interval_secs);
@@ -108,7 +104,7 @@ mod tests {
 
     fn default_with_hash() -> Config {
         Config {
-            hash: Some("".to_owned()),
+            version: Some("".to_owned()),
             ..Config::default()
         }
     }
