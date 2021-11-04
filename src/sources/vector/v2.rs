@@ -12,7 +12,6 @@ use crate::{
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-use std::sync::Arc;
 use tokio::net::TcpStream;
 use tonic::{
     transport::{server::Connected, Certificate, Server},
@@ -45,14 +44,7 @@ impl proto::Service for Service {
             byte_size: events.size_of(),
         });
 
-        let receiver = self.acknowledgements.then(|| {
-            let (batch, receiver) = BatchNotifier::new_with_receiver();
-            for event in &mut events {
-                event.add_batch_notifier(Arc::clone(&batch));
-            }
-
-            receiver
-        });
+        let receiver = BatchNotifier::maybe_apply_to_events(self.acknowledgements, &mut events);
 
         self.pipeline
             .clone()
