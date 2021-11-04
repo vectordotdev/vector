@@ -24,8 +24,6 @@ pub struct AwsKinesisFirehoseConfig {
     framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
     decoding: Box<dyn ParserConfig>,
-    #[serde(default)]
-    acknowledgements: bool,
 }
 
 #[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -58,7 +56,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
             self.access_key.clone(),
             self.record_compression.unwrap_or_default(),
             decoder,
-            self.acknowledgements,
+            cx.acknowledgements.enabled,
             cx.out,
         );
 
@@ -104,7 +102,6 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
             record_compression: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            acknowledgements: false,
         })
         .unwrap()
     }
@@ -178,7 +175,6 @@ mod tests {
                 record_compression,
                 framing: default_framing_message_based(),
                 decoding: default_decoding(),
-                acknowledgements: true,
             }
             .build(SourceContext::new_test(sender))
             .await
