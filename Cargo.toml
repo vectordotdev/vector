@@ -129,7 +129,7 @@ tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features 
 
 # Metrics
 metrics = { version = "0.17.0", default-features = false, features = ["std"] }
-metrics-tracing-context = { version = "0.8.0", default-features = false }
+metrics-tracing-context = { version = "0.8.1", default-features = false }
 metrics-util = { version = "0.10.1", default-features = false, features = ["std"] }
 
 # Aws
@@ -270,7 +270,7 @@ stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
 structopt = { version = "0.3.25", default-features = false }
 syslog = { version = "5.0.0", default-features = false, optional = true }
-syslog_loose = { version = "0.15.0", default-features = false, optional = true }
+syslog_loose = { version = "0.16.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.4", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = { version = "0.5.8", default-features = false }
 typetag = { version = "0.1.7", default-features = false }
@@ -315,7 +315,7 @@ tokio-test = "0.4.2"
 tower-test = "0.4.0"
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 walkdir = "2.3.2"
-wiremock = "0.5.7"
+wiremock = "0.5.8"
 quickcheck = "1.0.3"
 lookup = { path = "lib/lookup", features = ["arbitrary"] }
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "16bcf0ab1bb6e380d966a69d314de1e99ede553a", features = ["azurite_workaround"] }
