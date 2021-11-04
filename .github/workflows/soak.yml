@@ -15,8 +15,6 @@ name: Soak
 
 on:
   pull_request:
-    paths-ignore:
-      - "website/**"
 
 jobs:
   cancel-previous:
