@@ -367,7 +367,10 @@
 
           {{ range $k, $v := $v.type }}
           {{ partial "badge.html" (dict "word" $k "color" "gray") }}
-          {{ partial "badge.html" (dict "word" $v.syntax "color" "gray") }}
+
+          {{ with $v.syntax }}
+          {{ partial "badge.html" (dict "word" . "color" "gray") }}
+          {{ end }}
           {{ end }}
         </span>
       </span>
