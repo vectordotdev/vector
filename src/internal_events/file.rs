@@ -39,6 +39,7 @@ impl InternalEvent for FileBytesSent<'_> {
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 mod source {
     use super::{FileOpen, InternalEvent};
+    use crate::emit;
     use file_source::FileSourceInternalEvents;
     use metrics::counter;
     use std::{io::Error, path::Path, time::Duration};

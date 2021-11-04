@@ -146,9 +146,9 @@ impl RetryLogic for GcsRetryLogic {
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
-            _ if status.is_server_error() => RetryAction::Retry(format!("{}", status)),
+            _ if status.is_server_error() => RetryAction::Retry(format!("{}", status).into()),
             _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("response status: {}", status)),
+            _ => RetryAction::DontRetry(format!("response status: {}", status).into()),
         }
     }
 }

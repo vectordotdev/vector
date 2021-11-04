@@ -3,7 +3,7 @@ use crate::{
     buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    internal_events::{EventsSent, FileBytesSent, FileOpen, TemplateRenderingFailed},
+    internal_events::{FileBytesSent, FileOpen, TemplateRenderingFailed},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
@@ -20,6 +20,7 @@ use futures::{
 };
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
+use vector_core::internal_event::EventsSent;
 use vector_core::ByteSizeOf;
 
 use tokio::{

@@ -57,6 +57,7 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
         transforms,
         tests: builder.tests,
         expansions,
+        ..Config::default()
     };
 
     for test in &config.tests {

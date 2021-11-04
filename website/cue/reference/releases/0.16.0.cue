@@ -19,8 +19,8 @@ releases: "0.16.0": {
 	* [improved rate limit defaults for sinks](/highlights/2021-08-20-rate-limits)
 	* the public release of the [aggregator Helm chart beta](/highlights/2021-08-24-vector-aggregator)
 
-	It also contains a number of additional enhancements and bug fixes. Check out the [highlights](#highlights) and
-	[changelog](#changelog) for more details.
+	It also contains a number of additional enhancements and bug fixes. Check out the
+	[highlights](/releases/0.16.0#highlights) and [changelog](/releases/0.16.0#changelog) for more details.
 	"""
 
 	whats_next: [

@@ -11,6 +11,8 @@ use http::{
 use hyper::Body;
 use std::task::Poll;
 use tower::Service;
+use vector_core::internal_event::EventsSent;
+use vector_core::stream::DriverResponse;
 
 #[derive(Debug, Clone)]
 pub struct GcsService {
@@ -36,20 +38,27 @@ impl GcsService {
 #[derive(Clone, Debug)]
 pub struct GcsRequest {
     pub body: Bytes,
-    pub key: String,
     pub settings: GcsRequestSettings,
+    pub metadata: GcsMetadata,
+}
+
+#[derive(Clone, Debug)]
+pub struct GcsMetadata {
+    pub key: String,
+    pub count: usize,
+    pub byte_size: usize,
     pub finalizers: EventFinalizers,
 }
 
 impl Ackable for GcsRequest {
     fn ack_size(&self) -> usize {
-        self.body.len()
+        self.metadata.count
     }
 }
 
 impl Finalizable for GcsRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
-        std::mem::take(&mut self.finalizers)
+        std::mem::take(&mut self.metadata.finalizers)
     }
 }
 
@@ -62,17 +71,26 @@ pub struct GcsRequestSettings {
     pub content_type: HeaderValue,
     pub content_encoding: Option<HeaderValue>,
     pub storage_class: HeaderValue,
-    pub metadata: Vec<(HeaderName, HeaderValue)>,
+    pub headers: Vec<(HeaderName, HeaderValue)>,
 }
 
 #[derive(Debug)]
 pub struct GcsResponse {
     pub inner: http::Response<Body>,
+    pub count: usize,
+    pub events_byte_size: usize,
 }
 
-impl AsRef<EventStatus> for GcsResponse {
-    fn as_ref(&self) -> &EventStatus {
-        &EventStatus::Delivered
+impl DriverResponse for GcsResponse {
+    fn event_status(&self) -> EventStatus {
+        EventStatus::Delivered
+    }
+
+    fn events_sent(&self) -> EventsSent {
+        EventsSent {
+            count: self.count,
+            byte_size: self.events_byte_size,
+        }
     }
 }
 
@@ -88,7 +106,7 @@ impl Service<GcsRequest> for GcsService {
     fn call(&mut self, request: GcsRequest) -> Self::Future {
         let settings = request.settings;
 
-        let uri = format!("{}{}", self.base_url, request.key)
+        let uri = format!("{}{}", self.base_url, request.metadata.key)
             .parse::<Uri>()
             .unwrap();
         let mut builder = Request::put(uri);
@@ -103,19 +121,23 @@ impl Service<GcsRequest> for GcsService {
             .map(|ce| headers.insert("content-encoding", ce));
         settings.acl.map(|acl| headers.insert("x-goog-acl", acl));
         headers.insert("x-goog-storage-class", settings.storage_class);
-        for (p, v) in settings.metadata {
+        for (p, v) in settings.headers {
             headers.insert(p, v);
         }
 
-        let mut request = builder.body(Body::from(request.body)).unwrap();
+        let mut http_request = builder.body(Body::from(request.body)).unwrap();
         if let Some(creds) = &self.creds {
-            creds.apply(&mut request);
+            creds.apply(&mut http_request);
         }
 
         let mut client = self.client.clone();
         Box::pin(async move {
-            let result = client.call(request).await;
-            result.map(|inner| GcsResponse { inner })
+            let result = client.call(http_request).await;
+            result.map(|inner| GcsResponse {
+                inner,
+                count: request.metadata.count,
+                events_byte_size: request.metadata.byte_size,
+            })
         })
     }
 }

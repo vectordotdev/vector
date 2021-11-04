@@ -9,9 +9,9 @@ use futures::stream::BoxStream;
 use futures_util::StreamExt;
 use std::{fmt, num::NonZeroUsize};
 use tower::Service;
-use vector_core::stream::BatcherSettings;
+use vector_core::buffers::Acker;
+use vector_core::stream::{BatcherSettings, DriverResponse};
 use vector_core::{buffers::Ackable, event::Finalizable, sink::StreamSink};
-use vector_core::{buffers::Acker, event::EventStatus};
 
 pub struct GcsSink<Svc, RB> {
     acker: Acker,
@@ -43,7 +43,7 @@ impl<Svc, RB> GcsSink<Svc, RB>
 where
     Svc: Service<RB::Request> + Send + 'static,
     Svc::Future: Send + 'static,
-    Svc::Response: AsRef<EventStatus> + Send + 'static,
+    Svc::Response: DriverResponse + Send + 'static,
     Svc::Error: fmt::Debug + Into<crate::Error> + Send,
     RB: RequestBuilder<(String, Vec<Event>)> + Send + Sync + 'static,
     RB::Error: fmt::Debug + Send,
@@ -80,7 +80,7 @@ impl<Svc, RB> StreamSink for GcsSink<Svc, RB>
 where
     Svc: Service<RB::Request> + Send + 'static,
     Svc::Future: Send + 'static,
-    Svc::Response: AsRef<EventStatus> + Send + 'static,
+    Svc::Response: DriverResponse + Send + 'static,
     Svc::Error: fmt::Debug + Into<crate::Error> + Send,
     RB: RequestBuilder<(String, Vec<Event>)> + Send + Sync + 'static,
     RB::Error: fmt::Debug + Send,

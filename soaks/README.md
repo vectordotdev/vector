@@ -1,10 +1,16 @@
-p# Soak Tests
+# Soak Tests
 
 This directory contains vector's soak tests, the integrated variant of our
 benchmarks. The idea was first described in [RFC
 6531](../rfcs/2021-02-23-6531-performance-testing.md) and has been steadily
 improved as laid out in [Issue
 9515](https://github.com/vectordotdev/vector/issues/9515).
+
+## Index of Soaks
+
+* [Datadog Agent -> Remap -> Datadog Logs](./tests/datadog_agent_remap_datadog_logs/README.md)
+* [Syslog -> Loki](./tests/syslog_loki/README.md)
+* [Syslog -> Regex (VRL) -> Log2Metric ->  Datadog Metrics](./tests/syslog_regex_logs2metric_ddmetrics/README.md)
 
 ## Requirements
 
@@ -28,22 +34,17 @@ support programs in a minikube and some glue code to observe vector in
 operation. Consider this command:
 
 ```shell
-> ./soaks/soak.sh datadog_agent_remap_datadog_logs a32c7fd09978f76a3f1bd360c3a8d07a49538b70 be8ceafbf994d06f505bdd9fb392b00e0ba661f2
+> ./soaks/soak.sh --local-image --soak datadog_agent_remap_datadog_logs --baseline a32c7fd09978f76a3f1bd360c3a8d07a49538b70 --comparison be8ceafbf994d06f505bdd9fb392b00e0ba661f2
 ```
 
 Here we run the soak test `datadog_agent_remap_datadog_logs` comparing vector at
 `a32c7fd09978f76a3f1bd360c3a8d07a49538b70` with vector at
 `be8ceafbf994d06f505bdd9fb392b00e0ba661f2`. Two vector containers will be built
-for each SHA. Time is saved by building vector only against the features needed
-to complete the experiment. Users define these flags in files named `FEATURES`
-under the soak directory, see
-[`soaks/datadog_agent_remap_datadog_logs/FEATURES`]. The soak itself is defined
-in terraform, see [`soaks/datadog_agent_remap_datadog_logs/terraform`].
+for each SHA. The soak itself is defined in terraform, see
+[`soaks/datadog_agent_remap_datadog_logs/terraform`].
 
 After running this command you will, in about ten minutes depending on whether
 you need to build containers or not, see a summary:
-
-
 
 ```shell
 ...
@@ -75,4 +76,91 @@ higher "tailedness". Improving this summary is a matter of importance.
 
 ## Defining Your Own Soak
 
-This is premature.
+Assuming you can follow the pattern of an existing soak test you _should_ be
+able to define a soak by copying the relevant soak into a new directory and
+updating the configuration that is present in that soak's terraform. Consider
+the "Datadog Agent -> Remap -> Datadog Logs" soak in
+[`datadog_agent_remap_datadog_logs/`](datadog_agent_remap_datadog_logs/). If you
+`tree` that directory you'll see:
+
+```shell
+> tree tests/datadog_agent_remap_datadog_logs
+tests/datadog_agent_remap_datadog_logs
+├── README.md
+└── terraform
+    ├── http_blackhole.toml
+    ├── http_gen.toml
+    ├── main.tf
+    ├── prometheus.tf
+    ├── prometheus.yml
+    ├── variables.tf
+    └── vector.toml
+
+1 directory, 9 files
+```
+
+The `terraform/` sub-directory contains a small project definition. It's clear
+we can thin this out further -- the prometheus setup is common to all soaks --
+but the primary things you need to concern yourself with are:
+
+* `main.tf`
+* `vector.toml`
+* `http_blackhole.toml`
+* `http_gen.toml`
+
+The `main.tf` contents are:
+
+```terraform
+terraform {
+  required_providers {
+    kubernetes = {
+      version = "~> 2.5.0"
+      source  = "hashicorp/kubernetes"
+    }
+  }
+}
+
+provider "kubernetes" {
+  config_path = "~/.kube/config"
+}
+
+
+resource "kubernetes_namespace" "soak" {
+  metadata {
+    name = "soak"
+  }
+}
+
+module "vector" {
+  source       = "../../common/terraform/modules/vector"
+  type         = var.type
+  vector_image = var.vector_image
+  sha          = var.sha
+  test_name    = "datadog_agent_remap_datadog_logs"
+  vector-toml  = file("${path.module}/vector.toml")
+  namespace    = kubernetes_namespace.soak.metadata[0].name
+  depends_on   = [module.http-blackhole]
+}
+module "http-blackhole" {
+  source              = "../../common/terraform/modules/lading_http_blackhole"
+  type                = var.type
+  http-blackhole-toml = file("${path.module}/http_blackhole.toml")
+  namespace           = kubernetes_namespace.soak.metadata[0].name
+}
+module "http-gen" {
+  source        = "../../common/terraform/modules/lading_http_gen"
+  type          = var.type
+  http-gen-toml = file("${path.module}/http_gen.toml")
+  namespace     = kubernetes_namespace.soak.metadata[0].name
+}
+```
+
+This sets up a kubernetes provider pegged to minikube, creates a namespace
+'soak' and installs three modules into that namespace: vector, http-blackhole
+and http-gen. The module definitions are in the `common/` directory but suffice
+to say they install vector and its lading test peers into 'soak', configuring
+with the `toml` files referenced above. There are a handful of modules available
+for use in soak testing; please add more as your infrastructure needs
+dictate. If at all possible do not require services external to the minikube.
+
+Newly added soaks in `tests/` will be ran automatically by CI.

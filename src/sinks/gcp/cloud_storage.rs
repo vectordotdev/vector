@@ -1,5 +1,6 @@
 use super::{GcpAuthConfig, GcpCredentials, Scope};
 use crate::sinks::gcs_common::config::{GcsRetryLogic, BASE_URL};
+use crate::sinks::gcs_common::service::GcsMetadata;
 use crate::sinks::util::partitioner::KeyPartitioner;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
@@ -37,7 +38,7 @@ use std::{
 };
 use tower::ServiceBuilder;
 use uuid::Uuid;
-use vector_core::event::{EventFinalizers, Finalizable};
+use vector_core::{event::Finalizable, ByteSizeOf};
 
 const NAME: &str = "gcp_cloud_storage";
 
@@ -183,7 +184,7 @@ struct RequestSettings {
     content_type: HeaderValue,
     content_encoding: Option<HeaderValue>,
     storage_class: HeaderValue,
-    metadata: Vec<(HeaderName, HeaderValue)>,
+    headers: Vec<(HeaderName, HeaderValue)>,
     extension: String,
     time_format: String,
     append_uuid: bool,
@@ -192,7 +193,7 @@ struct RequestSettings {
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
-    type Metadata = (String, usize, EventFinalizers);
+    type Metadata = GcsMetadata;
     type Events = Vec<Event>;
     type Encoder = EncodingConfig<StandardEncodings>;
     type Payload = Bytes;
@@ -211,12 +212,16 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
         let (partition_key, mut events) = input;
         let finalizers = events.take_finalizers();
 
-        ((partition_key, events.len(), finalizers), events)
+        let metadata = GcsMetadata {
+            key: partition_key,
+            count: events.len(),
+            byte_size: events.size_of(),
+            finalizers,
+        };
+        (metadata, events)
     }
 
-    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        let (key, batch_size, finalizers) = metadata;
-
+    fn build_request(&self, mut metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
         // TODO: pull the seconds from the last event
         let filename = {
             let seconds = Utc::now().format(&self.time_format);
@@ -229,21 +234,20 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
             }
         };
 
-        let key = format!("{}{}.{}", key, filename, self.extension);
+        metadata.key = format!("{}{}.{}", metadata.key, filename, self.extension);
 
-        trace!(message = "Sending events.", bytes = ?payload.len(), events_len = ?batch_size, key = ?key);
+        trace!(message = "Sending events.", bytes = ?payload.len(), events_len = ?metadata.count, key = ?metadata.key);
 
         GcsRequest {
             body: payload,
-            key,
             settings: GcsRequestSettings {
                 acl: self.acl.clone(),
                 content_type: self.content_type.clone(),
                 content_encoding: self.content_encoding.clone(),
                 storage_class: self.storage_class.clone(),
-                metadata: self.metadata.clone(),
+                headers: self.headers.clone(),
             },
-            finalizers,
+            metadata,
         }
     }
 }
@@ -284,7 +288,7 @@ impl RequestSettings {
             content_type,
             content_encoding,
             storage_class,
-            metadata,
+            headers: metadata,
             extension,
             time_format,
             append_uuid,
@@ -360,15 +364,15 @@ mod tests {
     #[test]
     fn gcs_build_request() {
         let req = build_request(Some("ext"), false, Compression::None);
-        assert_eq!(req.key, "key/date.ext".to_string());
+        assert_eq!(req.metadata.key, "key/date.ext".to_string());
 
         let req = build_request(None, false, Compression::None);
-        assert_eq!(req.key, "key/date.log".to_string());
+        assert_eq!(req.metadata.key, "key/date.log".to_string());
 
         let req = build_request(None, false, Compression::gzip_default());
-        assert_eq!(req.key, "key/date.log.gz".to_string());
+        assert_eq!(req.metadata.key, "key/date.log.gz".to_string());
 
         let req = build_request(None, true, Compression::gzip_default());
-        assert_ne!(req.key, "key/date.log.gz".to_string());
+        assert_ne!(req.metadata.key, "key/date.log.gz".to_string());
     }
 }

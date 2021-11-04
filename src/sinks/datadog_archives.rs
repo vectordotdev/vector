@@ -207,7 +207,7 @@ impl DatadogArchivesSinkConfig {
     ) -> std::result::Result<VectorSink, ConfigError> {
         // we use lower default limits, because we send 100mb batches,
         // thus no need in the the higher number of outcoming requests
-        let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
+        let request_limits = self.request.unwrap_with(&Default::default());
         let service = ServiceBuilder::new()
             .settings(request_limits, S3RetryLogic)
             .service(service);
@@ -534,7 +534,7 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
                 content_type,
                 content_encoding,
                 storage_class: self.storage_class.clone(),
-                metadata: self.metadata.clone(),
+                headers: self.metadata.clone(),
             },
             finalizers,
         }

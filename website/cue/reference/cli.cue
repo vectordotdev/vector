@@ -468,6 +468,23 @@ cli: {
 		}
 	}
 
+	env_vars: {
+		VECTOR_LOG: {
+			description: "Vector's log level. Each log level includes messages from higher priority levels."
+			type: string: {
+				default: "INFO"
+				enum: {
+					ERROR: "Only show error logs. The same as `-qq`"
+					WARN:  "Include warnings. The same as `-q`"
+					INFO:  "Include logs about Vector's operation. This is the default."
+					DEBUG: "Includes logs useful for debugging or troubleshooting Vector. The same as `-v`"
+					TRACE: "Most verbose log level. Can be used for troubleshooting Vector. The same as `-vv`"
+				}
+				examples: ["DEBUG", "INFO"]
+			}
+		}
+	}
+
 	// Helpers
 	_paths_arg: {
 		type:    "list"

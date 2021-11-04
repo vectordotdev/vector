@@ -37,10 +37,12 @@ mod concat;
 mod conditions;
 #[cfg(feature = "sinks-console")]
 mod console;
-#[cfg(feature = "sinks-datadog")]
+#[cfg(feature = "sinks-datadog_events")]
 mod datadog_events;
-#[cfg(feature = "sinks-datadog")]
+#[cfg(feature = "sinks-datadog_logs")]
 mod datadog_logs;
+#[cfg(feature = "sinks-datadog_metrics")]
+mod datadog_metrics;
 #[cfg(any(feature = "codecs"))]
 mod decoder;
 #[cfg(feature = "transforms-dedupe")]
@@ -134,11 +136,21 @@ mod syslog;
 mod tag_cardinality_limit;
 mod tcp;
 mod template;
+#[cfg(feature = "transforms-throttle")]
+mod throttle;
 #[cfg(feature = "transforms-tokenizer")]
 mod tokenizer;
 mod udp;
 mod unix;
 mod vector;
+
+#[cfg(any(
+    feature = "sources-file",
+    feature = "sources-kubernetes_logs",
+    feature = "sinks-file",
+))]
+mod file;
+mod windows;
 
 pub mod kubernetes;
 
@@ -175,10 +187,12 @@ pub use self::concat::*;
 pub use self::conditions::*;
 #[cfg(feature = "sinks-console")]
 pub use self::console::*;
-#[cfg(feature = "sinks-datadog")]
+#[cfg(feature = "sinks-datadog_events")]
 pub use self::datadog_events::*;
-#[cfg(feature = "sinks-datadog")]
+#[cfg(feature = "sinks-datadog_logs")]
 pub use self::datadog_logs::*;
+#[cfg(feature = "sinks-datadog_metrics")]
+pub use self::datadog_metrics::*;
 #[cfg(any(feature = "codecs"))]
 pub use self::decoder::*;
 #[cfg(feature = "transforms-dedupe")]
@@ -216,7 +230,7 @@ pub(crate) use self::host_metrics::*;
     feature = "sources-utils-http",
     feature = "sources-utils-http-encoding",
     feature = "sinks-http",
-    feature = "sources-datadog",
+    feature = "sources-datadog_agent",
     feature = "sources-splunk_hec",
 ))]
 pub(crate) use self::http::*;
@@ -282,6 +296,8 @@ pub use self::syslog::*;
 pub(crate) use self::tag_cardinality_limit::*;
 pub use self::tcp::*;
 pub use self::template::*;
+#[cfg(feature = "transforms-throttle")]
+pub use self::throttle::*;
 #[cfg(feature = "transforms-tokenizer")]
 pub(crate) use self::tokenizer::*;
 pub use self::udp::*;
@@ -292,13 +308,16 @@ pub use self::windows::*;
 #[cfg(feature = "sources-mongodb_metrics")]
 pub use mongodb_metrics::*;
 
+// this version won't be needed once all `InternalEvent`s implement `name()`
 #[cfg(test)]
 #[macro_export]
 macro_rules! emit {
-    ($event:expr) => {{
-        crate::test_util::components::record_internal_event(stringify!($event));
-        vector_core::internal_event::emit($event)
-    }};
+    ($event:expr) => {
+        vector_core::internal_event::emit(&vector_core::internal_event::DefaultName {
+            event: $event,
+            name: stringify!($event),
+        })
+    };
 }
 
 #[cfg(not(test))]
@@ -308,15 +327,6 @@ macro_rules! emit {
         vector_core::internal_event::emit($event)
     };
 }
-
-// Modules that require emit! macro so they need to be defined after the macro.
-#[cfg(any(
-    feature = "sources-file",
-    feature = "sources-kubernetes_logs",
-    feature = "sinks-file",
-))]
-mod file;
-mod windows;
 
 const ELLIPSIS: &str = "[...]";
 
