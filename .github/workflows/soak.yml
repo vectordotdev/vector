@@ -61,8 +61,8 @@ jobs:
     outputs:
       comparison-sha: ${{ steps.comparison.outputs.COMPARISON_SHA }}
       comparison-tag: ${{ steps.comparison.outputs.COMPARISON_TAG }}
-      baseline-sha: ${{ steps.comparison.outputs.BASELINE_SHA }}
-      baseline-tag: ${{ steps.comparison.outputs.BASELINE_TAG }}
+      baseline-sha: ${{ steps.baseline.outputs.BASELINE_SHA }}
+      baseline-tag: ${{ steps.baseline.outputs.BASELINE_TAG }}
     steps:
       - uses: actions/checkout@v2.3.5
         with:
