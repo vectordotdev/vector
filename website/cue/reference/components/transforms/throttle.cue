@@ -19,16 +19,6 @@ components: transforms: throttle: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -41,7 +31,6 @@ components: transforms: throttle: {
 				The set of logical conditions to exclude events from rate limiting.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				default: null
 				examples: [
@@ -59,7 +48,6 @@ components: transforms: throttle: {
 				or if the event doesn’t have `key_field`, the event be will not be rate limited separately.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["message", "{{ hostname }}"]
@@ -73,7 +61,6 @@ components: transforms: throttle: {
 				Each unique key will have its own `threshold`.
 				"""
 			required: true
-			warnings: []
 			type: uint: {
 				examples: [100, 10000]
 				unit: null
@@ -84,7 +71,6 @@ components: transforms: throttle: {
 				The time frame in which the configured `threshold` is applied.
 				"""
 			required: true
-			warnings: []
 			type: uint: {
 				examples: [1, 60, 86400]
 				unit: "seconds"

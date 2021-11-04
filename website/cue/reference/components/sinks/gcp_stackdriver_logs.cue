@@ -59,16 +59,6 @@ components: sinks: gcp_stackdriver_logs: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -84,11 +74,9 @@ components: sinks: gcp_stackdriver_logs: {
 				or `project_id`.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["012345-6789AB-CDEF01"]
-				syntax: "literal"
 			}
 		}
 		credentials_path: {
@@ -103,11 +91,9 @@ components: sinks: gcp_stackdriver_logs: {
 				file as above.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["/path/to/credentials.json"]
-				syntax: "literal"
 			}
 		}
 		folder_id: {
@@ -120,17 +106,14 @@ components: sinks: gcp_stackdriver_logs: {
 				Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
 				"""
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["My Folder"]
-				syntax: "literal"
 			}
 		}
 		log_id: {
 			description: "The log ID to which to publish logs. This is a name you create to identify this log stream."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["vector-logs", "{{ component_id }}"]
 				syntax: "template"
@@ -145,11 +128,9 @@ components: sinks: gcp_stackdriver_logs: {
 				Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["622418129737"]
-				syntax: "literal"
 			}
 		}
 		project_id: {
@@ -160,16 +141,13 @@ components: sinks: gcp_stackdriver_logs: {
 				Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
 				"""
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["vector-123456"]
-				syntax: "literal"
 			}
 		}
 		resource: {
 			description: "Options for describing the logging resource."
 			required:    true
-			warnings: []
 			type: object: {
 				examples: [
 					{
@@ -188,10 +166,8 @@ components: sinks: gcp_stackdriver_logs: {
 							more details.
 							"""
 						required:    true
-						warnings: []
 						type: string: {
 							examples: ["global", "gce_instance"]
-							syntax: "literal"
 						}
 					}
 					"*": {
@@ -202,7 +178,6 @@ components: sinks: gcp_stackdriver_logs: {
 							For example, Compute Engine VM instances use the labels `instance_id` and `zone`.
 							"""
 						required: false
-						warnings: []
 						type: string: {
 							default: null
 							examples: ["Twilight", "{{ zone }}"]
@@ -226,11 +201,9 @@ components: sinks: gcp_stackdriver_logs: {
 				details on the value of the `severity` field.
 				"""
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["severity"]
-				syntax: "literal"
 			}
 		}
 	}

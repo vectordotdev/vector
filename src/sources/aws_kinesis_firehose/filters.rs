@@ -21,6 +21,7 @@ pub fn firehose(
     access_key: Option<String>,
     record_compression: Compression,
     decoder: codecs::Decoder,
+    acknowledgements: bool,
     out: Pipeline,
 ) -> impl Filter<Extract = impl warp::Reply, Error = Infallible> + Clone {
     warp::post()
@@ -43,6 +44,7 @@ pub fn firehose(
         .and(parse_body())
         .and(warp::any().map(move || record_compression))
         .and(warp::any().map(move || decoder.clone()))
+        .and(warp::any().map(move || acknowledgements))
         .and(warp::any().map(move || out.clone()))
         .and_then(handlers::firehose)
         .recover(handle_firehose_rejection)

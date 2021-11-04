@@ -60,16 +60,6 @@ components: sinks: splunk_hec_metrics: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -86,7 +76,6 @@ components: sinks: splunk_hec_metrics: {
 			type: string: {
 				default: null
 				examples: ["service"]
-				syntax: "literal"
 			}
 		}
 		endpoint: {
@@ -94,7 +83,6 @@ components: sinks: splunk_hec_metrics: {
 			required:    true
 			type: string: {
 				examples: ["https://http-inputs-hec.splunkcloud.com", "https://hec.splunk.com:8088", "http://example.com"]
-				syntax: "literal"
 			}
 		}
 		host_key: {
@@ -104,18 +92,15 @@ components: sinks: splunk_hec_metrics: {
         				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
         				"""
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["hostname"]
-				syntax: "literal"
 			}
 		}
 		index: {
 			common:      true
 			description: "The name of the index where send the events to. If not specified, the default index is used."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["{{ host }}", "custom_index"]
@@ -126,7 +111,6 @@ components: sinks: splunk_hec_metrics: {
 			common:      true
 			description: "The source of events sent to this sink. If unset, the Splunk collector will set it."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["{{ file }}", "/var/log/syslog", "UDP:514"]
@@ -137,7 +121,6 @@ components: sinks: splunk_hec_metrics: {
 			common:      true
 			description: "The sourcetype of events sent to this sink. If unset, Splunk will default to httpevent."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["{{ sourcetype }}", "_json", "httpevent"]
@@ -147,10 +130,8 @@ components: sinks: splunk_hec_metrics: {
 		token: {
 			description: "Your Splunk HEC token."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["${SPLUNK_HEC_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
-				syntax: "literal"
 			}
 		}
 	}

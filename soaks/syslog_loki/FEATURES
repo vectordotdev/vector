@@ -1,1 +1,0 @@
-FEATURES="sources-internal_metrics,sources-syslog,sinks-prometheus,sinks-loki"

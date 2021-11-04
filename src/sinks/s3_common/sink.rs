@@ -1,3 +1,4 @@
+use crate::sinks::util::partitioner::KeyPartitioner;
 use crate::{
     config::SinkContext,
     event::Event,
@@ -13,8 +14,6 @@ use vector_core::stream::DriverResponse;
 use vector_core::{
     buffers::Ackable, event::Finalizable, sink::StreamSink, stream::BatcherSettings,
 };
-
-use crate::sinks::s3_common::partitioner::KeyPartitioner;
 
 pub struct S3Sink<Svc, RB> {
     acker: Acker,

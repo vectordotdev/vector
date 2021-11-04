@@ -52,16 +52,6 @@ components: sinks: honeycomb: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -71,19 +61,15 @@ components: sinks: honeycomb: {
 		api_key: {
 			description: "The team key that will be used to authenticate against Honeycomb."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["${HONEYCOMB_API_KEY}", "some-api-key"]
-				syntax: "literal"
 			}
 		}
 		dataset: {
 			description: "The dataset that Vector will send logs to."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["my-honeycomb-dataset"]
-				syntax: "literal"
 			}
 		}
 	}
