@@ -1,10 +1,8 @@
 use tokio_stream::wrappers::ReceiverStream;
-use tokio_util::sync::PollSender;
 
+use crate::topology::channel::{BufferReceiver, BufferSender};
+use crate::topology::poll_sender::PollSender;
 use crate::WhenFull;
-
-use super::channel::{BufferReceiver, BufferSender};
-
 /// Value that can be used as a stage in a buffer topology.
 pub trait IntoBuffer<T> {
     /// Converts this value into a sender and receiver pair suitable for use in a buffer topology.
@@ -58,8 +56,11 @@ impl<T> TopologyBuilder<T> {
     /// Consumes this builder, returning the sender and receiver that can be used by components.
     ///
     /// # Errors
+    /// 
     /// If there was a configuration error with one of the stages, an error variant will be returned
     /// explaining the issue.
+    /// 
+    /// TODO: we should have a dedicated error type, not a string
     pub fn build(self) -> Result<(BufferSender<T>, BufferReceiver<T>), String> {
         // We pop stages off in reverse order to build from the inside out.
         let mut current_stage = None;
@@ -97,5 +98,28 @@ impl<T> TopologyBuilder<T> {
         }
 
         current_stage.ok_or("no stage was defined".into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn single_stage_topology() {
+        todo!()
+    }
+
+    #[test]
+    fn two_stage_topology() {
+        todo!()
+    }
+
+    #[test]
+    fn two_stage_topology_with_non_overflow_first_stage() {
+        todo!()
+    }
+
+    #[test]
+    fn two_stage_topology_with_overflow_second_stage() {
+        todo!()
     }
 }

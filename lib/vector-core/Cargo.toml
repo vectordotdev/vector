@@ -45,7 +45,7 @@ snafu = { version = "0.6.10", default-features = false }
 substring = { version = "1.4", default-features = false }
 tokio = { version = "1.12.0", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, optional = true }
-tokio-util = { version = "0.6.8", default-features = false, features = ["time"] }
+tokio-util = { version = "0.6", default-features = false, features = ["time"] }
 toml = { version = "0.5.8", default-features = false }
 tower = { version = "0.4", default-features = false, features = ["util"] }
 tracing = { version = "0.1.29", default-features = false }
