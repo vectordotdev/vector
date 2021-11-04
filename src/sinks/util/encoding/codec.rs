@@ -27,6 +27,16 @@ pub enum StandardEncodings {
 }
 
 impl StandardEncodings {
+    pub const fn content_type(&self) -> &str {
+        match self {
+            StandardEncodings::Text => "text/plain",
+            StandardEncodings::Json => "application/json",
+            StandardEncodings::Ndjson => "application/x-ndjson",
+        }
+    }
+}
+
+impl StandardEncodings {
     fn batch_pre_hook(self, writer: &mut dyn io::Write) -> io::Result<usize> {
         let buf = match self {
             StandardEncodings::Json => Some(&[b'[']),

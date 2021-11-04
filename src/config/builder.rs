@@ -23,7 +23,7 @@ pub struct ConfigBuilder {
     pub api: api::Options,
     #[cfg(feature = "datadog-pipelines")]
     #[serde(default)]
-    pub datadog: datadog::Options,
+    pub datadog: Option<datadog::Options>,
     #[serde(default)]
     pub healthchecks: HealthcheckOptions,
     #[serde(default)]
@@ -186,9 +186,11 @@ impl ConfigBuilder {
         #[cfg(feature = "datadog-pipelines")]
         {
             self.datadog = with.datadog;
-            if self.datadog.enabled {
-                // enable other enterprise features
-                self.global.enterprise = true;
+            if let Some(datadog) = &self.datadog {
+                if datadog.enabled {
+                    // enable other enterprise features
+                    self.global.enterprise = true;
+                }
             }
         }
 

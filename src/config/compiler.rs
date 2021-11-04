@@ -1,7 +1,4 @@
-use super::{
-    builder::ConfigBuilder, graph::Graph, validation, ComponentKey, Config, ExpandType, OutputId,
-    TransformOuter,
-};
+use super::{builder::ConfigBuilder, graph::Graph, validation, ComponentKey, Config, OutputId};
 use indexmap::{IndexMap, IndexSet};
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
@@ -116,36 +113,9 @@ pub(super) fn expand_macros(
     let mut expansions = IndexMap::new();
     let mut errors = Vec::new();
 
-    while let Some((k, mut t)) = config.transforms.pop() {
-        if let Some((expanded, expand_type)) = match t.inner.expand() {
-            Ok(e) => e,
-            Err(err) => {
-                errors.push(format!("failed to expand transform '{}': {}", k, err));
-                continue;
-            }
-        } {
-            let mut children = Vec::new();
-            let mut inputs = t.inputs.clone();
-
-            for (name, child) in expanded {
-                let full_name = ComponentKey::global(format!("{}.{}", k, name));
-
-                expanded_transforms.insert(
-                    full_name.clone(),
-                    TransformOuter {
-                        inputs,
-                        inner: child,
-                    },
-                );
-                children.push(full_name.clone());
-                inputs = match expand_type {
-                    ExpandType::Parallel => t.inputs.clone(),
-                    ExpandType::Serial => vec![full_name.to_string()],
-                }
-            }
-            expansions.insert(k.clone(), children);
-        } else {
-            expanded_transforms.insert(k, t);
+    while let Some((key, transform)) = config.transforms.pop() {
+        if let Err(error) = transform.expand(key, &mut expanded_transforms, &mut expansions) {
+            errors.push(error);
         }
     }
     config.transforms = expanded_transforms;
