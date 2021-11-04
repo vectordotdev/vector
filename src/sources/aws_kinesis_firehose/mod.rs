@@ -24,8 +24,6 @@ pub struct AwsKinesisFirehoseConfig {
     framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
     decoding: Box<dyn ParserConfig>,
-    #[serde(default)]
-    acknowledgements: bool,
 }
 
 #[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -58,7 +56,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
             self.access_key.clone(),
             self.record_compression.unwrap_or_default(),
             decoder,
-            self.acknowledgements,
+            cx.acknowledgements.enabled,
             cx.out,
         );
 
@@ -104,7 +102,6 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
             record_compression: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            acknowledgements: false,
         })
         .unwrap()
     }
@@ -170,6 +167,8 @@ mod tests {
         let status = if delivered { Delivered } else { Failed };
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
+        let mut cx = SourceContext::new_test(sender);
+        cx.acknowledgements.enabled = true;
         tokio::spawn(async move {
             AwsKinesisFirehoseConfig {
                 address,
@@ -178,9 +177,8 @@ mod tests {
                 record_compression,
                 framing: default_framing_message_based(),
                 decoding: default_decoding(),
-                acknowledgements: true,
             }
-            .build(SourceContext::new_test(sender))
+            .build(cx)
             .await
             .unwrap()
             .await

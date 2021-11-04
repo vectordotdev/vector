@@ -137,7 +137,7 @@ impl SourceConfig for KafkaSourceConfig {
             decoder,
             cx.shutdown,
             cx.out,
-            cx.acknowledgements,
+            cx.acknowledgements.enabled,
         )))
     }
 
