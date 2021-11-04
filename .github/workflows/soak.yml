@@ -64,25 +64,29 @@ jobs:
           ref: master
           path: baseline-vector
 
-      - name: Set baseline TAG, store in file
-        id: baseline
+      - name: Setup comparison variables
+        run: |
+          export COMPARISON_SHA=$${{ github.sha }}
+          export COMPARISON_TAG="${{ github.sha }}-${{ github.sha }}"
+
+          echo "comparison sha is: ${COMPARISON_SHA}"
+          echo "comparison tag is: ${COMPARISON_TAG}"
+
+          echo "::set-output name=COMPARISON_TAG::${COMPARISON_TAG}"
+          echo "::set-output name=COMPARISON_SHA::${COMPARISON_SHA}"
+
+      - name: Setup baseline variables
         run: |
           pushd baseline-vector
           export BASELINE_SHA=$(git rev-parse HEAD)
           popd
 
           export BASELINE_TAG="${{ github.sha }}-${BASELINE_SHA}"
-          export COMPARISON_TAG="${{ github.sha }}-${{ github.sha }}"
-
           echo "baseline sha is: ${BASELINE_SHA}"
-          echo "comparison sha is: ${COMPARISON_SHA}"
           echo "baseline tag is: ${BASELINE_TAG}"
-          echo "comparison tag is: ${COMPARISON_TAG}"
 
           echo "::set-output name=BASELINE_TAG::${BASELINE_TAG}"
           echo "::set-output name=BASELINE_SHA::${BASELINE_SHA}"
-          echo "::set-output name=COMPARISON_TAG::${COMPARISON_TAG}"
-          echo "::set-output name=COMPARISON_SHA::${COMPARISON_SHA}"
 
   build-baseline-image:
     name: Build baseline 'soak-vector' container
