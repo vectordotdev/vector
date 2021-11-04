@@ -229,9 +229,12 @@ jobs:
   analyze-results:
     name: Soak analysis
     if: ${{ github.actor != 'dependabot[bot]' }}
-    runs-on: [self-hosted, linux, x64, soak] # could be general if we move away from miller
+    runs-on: ubuntu-20.04
     needs: [compute-soak-meta, soak-baseline, soak-comparison]
     steps:
+      - name: Install 'miller'
+        run: sudo apt-get install -y miller
+
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
 
@@ -246,7 +249,7 @@ jobs:
 
   observer:
     name: Build and push 'observer' to Github CR
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
