@@ -111,7 +111,15 @@ cli: {
 		}
 	}
 
-	options: {
+	// Reusable options
+	_core_options: {
+
+		"color": {
+			description: env_vars.VECTOR_COLOR.description
+			default:     env_vars.VECTOR_COLOR.type.string.default
+			enum:        env_vars.VECTOR_COLOR.type.string.enum
+			env_var:     "VECTOR_COLOR"
+		}
 		"config": {
 			_short:      "c"
 			description: env_vars.VECTOR_CONFIG.description
@@ -124,17 +132,20 @@ cli: {
 			type:        "string"
 			env_var:     "VECTOR_CONFIG_DIR"
 		}
-		"color": {
-			description: env_vars.VECTOR_COLOR.description
-			default:     env_vars.VECTOR_COLOR.type.string.default
-			enum:        env_vars.VECTOR_COLOR.type.string.enum
-			env_var:     "VECTOR_COLOR"
+		"config-toml": {
+			description: env_vars.VECTOR_CONFIG_TOML.description
+			type:        "string"
+			env_var:     "VECTOR_CONFIG_TOML"
 		}
-		"threads": {
-			_short:      "t"
-			description: env_vars.VECTOR_THREADS.description
-			type:        "integer"
-			env_var:     "VECTOR_THREADS"
+		"config-json": {
+			description: env_vars.VECTOR_CONFIG_JSON.description
+			type:        "string"
+			env_var:     "VECTOR_CONFIG_JSON"
+		}
+		"config-yaml": {
+			description: env_vars.VECTOR_CONFIG_YAML.description
+			type:        "string"
+			env_var:     "VECTOR_CONFIG_YAML"
 		}
 		"log-format": {
 			description: env_vars.VECTOR_LOG_FORMAT.description
@@ -142,7 +153,16 @@ cli: {
 			enum:        env_vars.VECTOR_LOG_FORMAT.type.string.enum
 			env_var:     "VECTOR_LOG_FORMAT"
 		}
+
+		"threads": {
+			_short:      "t"
+			description: env_vars.VECTOR_THREADS.description
+			type:        "integer"
+			env_var:     "VECTOR_THREADS"
+		}
 	}
+
+	options: _core_options
 
 	commands: {
 		"graph": {
@@ -155,7 +175,7 @@ cli: {
 
 			example: "vector graph --config /etc/vector/vector.toml | dot -Tsvg > graph.svg"
 
-			options: options
+			options: _core_options
 		}
 		"generate": {
 			description: "Generate a Vector configuration containing a list of components"
