@@ -1,18 +1,31 @@
 # RFC  - 2021-11-XX - Ingest APM stats in `datadog-agent` source
 
-Datadog traces support in `datadog-agent` source was initially documented in this [RFC][trace-support-pr]. However the Datadog `trace-agent` submit more data that juste traces. It also send statistics ("APM Stats") about running time of each instrumented resource (i.e. a given piece of code) that are aggregated over time (based on 100% of the traces received). Those APM stats are very important as they can highlight code hot spots and ease aggregation. Also as an integral part of the Datadog APM product, APM stats should be handled by Vector.
+Datadog traces support in `datadog-agent` source was initially documented in this [RFC][trace-support-pr]. However the
+Datadog `trace-agent` submit more data that juste traces. It also send statistics ("APM Stats") about running time of
+each instrumented resource (i.e. a given piece of code) that are aggregated over time (based on 100% of the traces
+received). Those APM stats are very important as they can highlight code hot spots and ease aggregation. Also as an
+integral part of the Datadog APM product, APM stats should be handled by Vector.
 
 [trace-support-pr]: https://github.com/vectordotdev/vector/pull/9634
 
 ## Context
 
-Traces are new in Vector, initial support is focusing on traces coming from the Datadog Agent, the [RFC][trace-support-pr] discussing about traces describes how those traces will be handled in Vector and highlighted the need to support APM stats.
+Traces are new in Vector, initial support is focusing on traces coming from the Datadog Agent, the
+[RFC][trace-support-pr] discussing about traces describes how those traces will be handled in Vector and highlighted the
+need to support APM stats.
 
-APM stats are encoded using protobuf, the current schema is available in the [datadog-agent][apm-stats-proto] repository. APM stats may be computed by the tracing lib in some cases or most of the time by the trace agent, but once they are emitted by the `trace-agent` there is no difference except a [boolean value][client-side-marker] that indicates where it was computed.
+APM stats are encoded using protobuf, the current schema is available in the [datadog-agent][apm-stats-proto]
+repository. APM stats may be computed by the tracing lib in some cases or most of the time by the trace agent, but once
+they are emitted by the `trace-agent` there is no difference except a [boolean value][client-side-marker] that indicates
+where it was computed. They are sent by the `trace-agent` to the same endpoint as trace payloads, only the path differ,
+allowing easy discrimination between trace & APM stats payloads.
 
-Those stats are computed by a componen named [concentrator] in the trace-agent. There is a [dedicated path][client-stats-aggregator] for APM stats that comes directly from tracing libraries. But ultimately they flow through datadog with the same [sending code][stats-writer].
+Those stats are computed by a component named [concentrator] in the trace-agent. There is a [dedicated
+path][client-stats-aggregator] for APM stats that comes directly from tracing libraries. But ultimately they flow
+through datadog with the same [sending code][stats-writer].
 
-If we details a bit the actual content of a stats payload, it is a list of [`ClientGroupedStats`][client-grouped-stats-proto]:
+If we details a bit the actual content of a stats payload, it is a list of
+[`ClientGroupedStats`][client-grouped-stats-proto]:
 ```
 	string service = 1;
 	string name = 2;
@@ -29,7 +42,27 @@ If we details a bit the actual content of a stats payload, it is a list of [`Cli
 	uint64 topLevelHits = 13; // count of top level spans aggregated in the groupedstats
 ```
 
-So it is basically a group of various metrics that can be represented in Vector (Sketches are support since this [PR][sketch-pr]). In the proto definition sketches are stored as unstructured bytes slices, but those [fields][call-to-toproto] are filled with a [protobuf encoded ddsketch][ddsktech-proto]. Given the sketch implementation in Vector is also [heavily based on ddsketch][vector-sketch]  this should not cause any significant accuracy loss (TBC).
+So it is basically a group of various metrics that can be represented in Vector (Sketches are support since this
+[PR][sketch-pr]). In the proto definition sketches are stored as unstructured bytes slices, but those
+[fields][call-to-toproto] are filled with a [protobuf encoded ddsketch][ddsktech-proto]. Given the sketch implementation
+in Vector is also [heavily based on ddsketch][vector-sketch]  this should not cause any significant accuracy loss
+(**TBC**).
+
+This raises the question of having a second (assuming that the `datadog-agent` sources accepts Datadog Agent metrics -
+[RFC][dd-agent-metric-rfc]), unrelated, metric stream coming out of the `datadog-agent` source. Obviously metrics
+ingested from APM stats will have to be routed along with traces, and most often they will follow a different path that
+other plain metrics. Thus it is suggested to re-arrange the `datadog-agent` source according to the following points
+(Additional details on what exactly are "Datadog Agents" can be found in the trace support [RFC][trace-support-pr] and
+may provide relevant context for undermentionned points):
+
+* Keep one Vector source per kind of Datadog Agent
+* Then we would have the following Vector sources:
+  * `datadog-core`: would be the current `datadog-agent` sources, it would receive the data sent by the Datadog "core" Agent (the agent that collects logs & metrics). Note that renaming this source is probably optional, but documentation update would be required anyway.
+  * `datadog-trace`: would support all data sent by the `trace-agent`
+  * And so on as the support list grow:
+    * `datadog-process` source for the Datadog `process-agent`
+    * `datadog-security` for the Datadog security Agent
+    * Etc.
 
 [apm-stats-proto]: https://github.com/DataDog/datadog-agent/blob/dc2f202/pkg/trace/pb/stats.proto
 [client-side-marker]: https://github.com/DataDog/datadog-agent/blob/dc2f202/pkg/trace/pb/stats.proto#L15
@@ -41,41 +74,53 @@ So it is basically a group of various metrics that can be represented in Vector 
 [call-to-toproto]: https://github.com/DataDog/datadog-agent/blob/dc2f202/pkg/trace/stats/statsraw.go#L53-L62
 [ddsktech-proto]: https://github.com/DataDog/sketches-go/blob/0829b5a6a3c9627d1faee6c690611067ee110e38/ddsketch/pb/ddsketch.proto
 [vector-sketch]: https://github.com/vectordotdev/vector/blob/4db23b3/lib/vector-core/src/metrics/ddsketch.rs#L202-L213
+[dd-agent-metric-rfc]: https://github.com/vectordotdev/vector/pull/9057
 
 ## Cross cutting concerns
 
-N/A
+None identified so far.
 
 ## Scope
 
 ### In scope
 
 - Decode APM request (protobuf) received from the trace agent
-- Convert those into a Vector internal representation
+- Convert those into a Vector metric internal representation
 - Enable the passthrough use case (trace-agent -> Vector -> Datadog) in a lossless fashion
 
 ### Out of scope
 
-- Compute APM stats in Vector
+- Compute APM stats in Vector, but this should be kept in mind as a valuable feature for third party traces
 - Any support for other kind of traces
 
 ## Pain
 
 - Vector has no trace support
+- Mixing metrics coming out of Datadog Core Agent ("standard" Datadog Metrics) and Datadog Trace Agent (APM stats) is
+  probably a bad idea as the would always be followed by a routing logic in the topology.
 
 ## Proposal
 
 ### User Experience
 
-- The `datadog-agent` source will accept APM stats (along with traces), and emit Vector metrics with some (TBD) metadata
-- The `datadog-trace` sink will accept metrics (sketches) and do the opposite conversion, pending that expected tags will be there
+- The Vector source will accept APM stats (along with traces), and emit Vector metrics with including all
+  metadata as metric tags.
+- The `datadog-trace` sink will accept metrics (sketches) and do the opposite conversion, pending that expected tags
+  will be there.
+- Regarding the Datadog trace-agent config, the APM stats endpoint is the same as the trace one (`apm_config.apm_dd_url`
+  config key), there is nothing else to configure.
+- API key management will be the same as it is for other Datadog sources/sinks.
 
 ### Implementation
 
-- Import all APM stats as standard vector metrics in the `datadog-agent` source with all possible metadata to allow the pass-through scenario.
-- In the upcoming `datadog-trace` implement a sending loop that aggregate metrics and rebuild relavant payload based on the same aggregation key to build comptabible payloads:
-   - TODO: add details about aggregation key
-   - TODO: add details about the flushing loop
+- Import all APM stats as standard vector metrics in the `datadog-agent` source with all possible metadata to allow the lossless pass-through scenario.
+- In the upcoming `datadog-trace` sink implement a sending loop that aggregate metrics and rebuild relavant payload based on the same aggregation key to build comptabible payloads:
+   - Incoming metrics will be buffered, and populate a struct matching the [APM stats base object][client-grouped-stats-proto], those struct will be stored in a map according to the very same kind of [keys][trace-stats-agg-key] used by the trace-agent.
+   - And every 10 seconds (this is the sending interval of the trace-agent) serializing and flushing those to Datadog. To account for late metrics the sink would have to keep 2 or 3 buckets in the past and delay flushing accordingly. This would rely on the [bucket timestamp][btime] kept by the trace agent and [stored in APM stats payload][csb-start].
+
+[trace-stats-agg-key]: https://github.com/DataDog/datadog-agent/blob/dc2f202/pkg/trace/stats/aggregation.go#L20-L42
+[btime]: https://github.com/DataDog/datadog-agent/blob/dc2f202/pkg/trace/stats/concentrator.go#L148-L159
+[csb-start]: https://github.com/DataDog/datadog-agent/blob/dc2f202/pkg/trace/pb/stats.proto#L47
 
 ## Rationale
 
@@ -84,8 +129,7 @@ N/A
 
 ## Drawbacks
 
-- Why should we not do this?
-- What kind on ongoing burden does this place on the team?
+None identified so far.
 
 ## Prior Art
 
@@ -97,27 +141,24 @@ N/A
   - either completely drop APM stats, not really an option as it would lead to user experience degradation
   - compute APM stats in the `datadog-trace` sink, could work but to match the accuracy of current APM stats, Vector
     would have to receive 100% of traces, which may not always be possible
-
-
+- Dump the whole APM payload into a log event `Value::Bytes` field and re-send it as is to Datadog. This might still be
+  retained as a minimal implementation upon early user interest.
 
 ## Outstanding Questions
 
-- List any remaining questions.
-- Use this to resolve ambiguity and collaborate with your team during the RFC process.
-- *These must be resolved before the RFC can be merged.*
+- Confirms `datadog-agent` source re-arrangement, including having a new `datadog-trace` one, or even opt for a more
+  verbose anming : `datadog-trace-agent` /  `datadog-core-agent` sources)
 
 ## Plan Of Attack
 
 Incremental steps to execute this change. These will be converted to issues after the RFC is approved:
 
-- [ ] Submit a PR with spike-level code _roughly_ demonstrating the change.
-- [ ] Incremental change #1
-- [ ] Incremental change #2
-- [ ] ...
-
-Note: This can be filled out during the review process.
+- [ ] Implement APM stats decoding in the relevant Vector source
+- [ ] Implement a collecting loop in the `datadog-trace` sinks that re-aggregate the metrics from the preivous step into
+  APM stats payloads
 
 ## Future Improvements
 
 - Compute APM stats in the `datadog-traces` sink for any trace format
+- Overall all most improvement from the Datadog trace [RFC][trace-support-pr] applies here
 
