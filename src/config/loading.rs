@@ -44,7 +44,7 @@ fn component_name(path: &Path) -> Result<String, Vec<String>> {
         .ok_or_else(|| vec![format!("Couldn't get component name for file: {:?}", path)])
 }
 
-trait ConfigLoader: Sized + serde::de::DeserializeOwned {
+trait LoadableConfig: Sized + serde::de::DeserializeOwned {
     fn load_from_file(
         path: &Path,
     ) -> Result<Option<(ComponentKey, Self, Vec<String>)>, Vec<String>> {
@@ -102,13 +102,13 @@ trait ConfigLoader: Sized + serde::de::DeserializeOwned {
     }
 }
 
-impl ConfigLoader for EnrichmentTableOuter {}
-impl ConfigLoader for TransformOuter<String> {}
-impl ConfigLoader for SinkOuter<String> {}
-impl ConfigLoader for SourceOuter {}
-impl ConfigLoader for TestDefinition {}
+impl LoadableConfig for EnrichmentTableOuter {}
+impl LoadableConfig for TransformOuter<String> {}
+impl LoadableConfig for SinkOuter<String> {}
+impl LoadableConfig for SourceOuter {}
+impl LoadableConfig for TestDefinition {}
 
-impl ConfigLoader for ConfigBuilder {
+impl LoadableConfig for ConfigBuilder {
     fn load_subfolder(&mut self, path: &Path) -> Result<Vec<String>, Vec<String>> {
         match path.file_name().and_then(|name| name.to_str()) {
             Some("enrichment_tables") => {
