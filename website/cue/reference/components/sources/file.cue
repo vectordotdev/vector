@@ -30,16 +30,6 @@ components: sources: file: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: [
 			"""
 				The `vector` process must have the ability to read the files
@@ -66,7 +56,6 @@ components: sources: file: {
 				default: null
 				items: type: string: {
 					examples: ["\(_directory)/binary-file.log"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -78,7 +67,6 @@ components: sources: file: {
 			type: string: {
 				default: "file"
 				examples: ["file"]
-				syntax: "literal"
 			}
 		}
 		fingerprint: {
@@ -96,7 +84,6 @@ components: sources: file: {
 							checksum:         "Read first N lines of the file, skipping the first `ignored_header_bytes` bytes, to uniquely identify files via a checksum."
 							device_and_inode: "Uses the [device and inode](\(urls.inode)) to unique identify files."
 						}
-						syntax: "literal"
 					}
 				}
 				ignored_header_bytes: {
@@ -148,7 +135,6 @@ components: sources: file: {
 			required:    false
 			type: string: {
 				default: "host"
-				syntax:  "literal"
 			}
 		}
 		ignore_not_found: {
@@ -172,7 +158,6 @@ components: sources: file: {
 			required:    true
 			type: array: items: type: string: {
 				examples: ["\(_directory)/**/*.log"]
-				syntax: "literal"
 			}
 		}
 		line_delimiter: {
@@ -182,7 +167,6 @@ components: sources: file: {
 			type: string: {
 				default: "\n"
 				examples: ["\r\n"]
-				syntax: "literal"
 			}
 		}
 		max_line_bytes: {
@@ -228,7 +212,6 @@ components: sources: file: {
 			description: "In the absence of a checkpoint, this setting tells Vector where to start reading files that are present at startup."
 			required:    false
 			type: string: {
-				syntax:  "literal"
 				default: "beginning"
 				enum: {
 					"beginning": "Read from the beginning of the file."
@@ -252,7 +235,6 @@ components: sources: file: {
 				required:    true
 				type: string: {
 					examples: ["\(_directory)/apache/access.log"]
-					syntax: "literal"
 				}
 			}
 			host: fields._local_host
@@ -261,7 +243,6 @@ components: sources: file: {
 				required:    true
 				type: string: {
 					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
-					syntax: "literal"
 				}
 			}
 			timestamp: fields._current_timestamp

@@ -113,7 +113,7 @@ datadog-search-syntax = { path = "lib/datadog/search-syntax", optional = true }
 async-stream = "0.3.2"
 async-trait = "0.1.51"
 futures = { version = "0.3.17", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.12.0", default-features = false, features = ["full"] }
+tokio = { version = "1.13.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.7", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.6.8", default-features = false, features = ["codec", "time", "io"] }
@@ -270,7 +270,7 @@ stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
 structopt = { version = "0.3.25", default-features = false }
 syslog = { version = "5.0.0", default-features = false, optional = true }
-syslog_loose = { version = "0.15.0", default-features = false, optional = true }
+syslog_loose = { version = "0.16.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.4", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = { version = "0.5.8", default-features = false }
 typetag = { version = "0.1.7", default-features = false }
@@ -303,19 +303,19 @@ approx = "0.5.0"
 assert_cmd = "2.0.2"
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
-libc = "0.2.104"
+libc = "0.2.106"
 libz-sys = "1.1.3"
 matches = "0.1.9"
 pretty_assertions = "1.0.0"
 reqwest = { version = "0.11.6", features = ["json"] }
 proptest = "1.0"
 tempfile = "3.2.0"
-tokio = { version = "1.12.0", features = ["test-util"] }
+tokio = { version = "1.13.0", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl", "test"] }
 walkdir = "2.3.2"
-wiremock = "0.5.7"
+wiremock = "0.5.8"
 quickcheck = "1.0.3"
 lookup = { path = "lib/lookup", features = ["arbitrary"] }
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "16bcf0ab1bb6e380d966a69d314de1e99ede553a", features = ["azurite_workaround"] }
@@ -515,6 +515,7 @@ transforms-logs = [
   "transforms-lua",
   "transforms-merge",
   "transforms-metric_to_log",
+  "transforms-pipelines",
   "transforms-reduce",
   "transforms-regex_parser",
   "transforms-remap",
@@ -534,6 +535,7 @@ transforms-metrics = [
   "transforms-log_to_metric",
   "transforms-lua",
   "transforms-metric_to_log",
+  "transforms-pipelines",
   "transforms-remap",
   "transforms-remove_tags",
   "transforms-tag_cardinality_limit",
@@ -561,6 +563,7 @@ transforms-logfmt_parser = ["logfmt"]
 transforms-lua = ["mlua", "vector_core/lua"]
 transforms-merge = []
 transforms-metric_to_log = []
+transforms-pipelines = []
 transforms-reduce = []
 transforms-regex_parser = []
 transforms-remap = []
@@ -636,7 +639,7 @@ sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-clickhouse = []
 sinks-console = []
-sinks-datadog_archives = ["sinks-aws_s3"]
+sinks-datadog_archives = ["sinks-aws_s3", "sinks-gcp"]
 sinks-datadog_events = []
 sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build"]

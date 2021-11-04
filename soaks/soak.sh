@@ -71,4 +71,4 @@ echo "Captures will be recorded into ${capture_dir}"
 
 popd
 
-./bin/analyze_experiment.sh "${capture_dir}"
+./bin/analyze_experiment.sh "${capture_dir}" "${BASELINE}" "${COMPARISON}"

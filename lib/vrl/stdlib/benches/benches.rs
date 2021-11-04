@@ -110,6 +110,7 @@ criterion_group!(
               strip_ansi_escape_codes,
               strip_whitespace,
               tally,
+              tally_value,
               timestamp,
               to_bool,
               to_float,
@@ -2045,6 +2046,18 @@ bench_function! {
             value: value!(["bar", "foo", "baz", "foo"]),
         ],
         want: Ok(value!({"bar": 1, "foo": 2, "baz": 1})),
+    }
+}
+
+bench_function! {
+    tally_value => vrl_stdlib::TallyValue;
+
+    default {
+        args: func_args![
+            array: value!(["bar", "foo", "baz", "foo"]),
+            value: "foo",
+        ],
+        want: Ok(value!(2)),
     }
 }
 

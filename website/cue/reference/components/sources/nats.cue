@@ -38,7 +38,6 @@ components: sources: nats: {
 			type: string: {
 				default: "vector"
 				examples: ["foo", "API Name Option Example"]
-				syntax: "literal"
 			}
 		}
 	}
@@ -51,7 +50,6 @@ components: sources: nats: {
 				required:    true
 				type: string: {
 					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
-					syntax: "literal"
 				}
 			}
 		}

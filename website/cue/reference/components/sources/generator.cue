@@ -26,17 +26,6 @@ components: sources: generator: {
 	}
 
 	support: {
-
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -50,7 +39,6 @@ components: sources: generator: {
 		format: {
 			description: "The format of the randomly generated output."
 			required:    true
-			warnings: []
 			type: string: {
 				enum: {
 					"shuffle":       "Lines are chosen at random from the list specified using `lines`."
@@ -60,7 +48,6 @@ components: sources: generator: {
 					"bsd_syslog":    "Randomly generated logs in Syslog format ([RFC 3164](\(urls.syslog_3164)))."
 					"json":          "Randomly generated HTTP server logs in [JSON](\(urls.json)) format."
 				}
-				syntax: "literal"
 			}
 		}
 		interval: {
@@ -71,7 +58,6 @@ components: sources: generator: {
 				quickly as possible, set `interval` to `0.0`.
 				"""
 			required: false
-			warnings: []
 			type: float: {
 				default: 1.0
 				examples: [1.0, 0.1, 0.01]
@@ -81,7 +67,6 @@ components: sources: generator: {
 			common:      false
 			description: "The total number of lines to output. By default the source continuously prints logs (infinitely)."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: null
 				unit:    null
@@ -92,12 +77,10 @@ components: sources: generator: {
 			description:   "The list of lines to output."
 			relevant_when: "`format` = `shuffle`"
 			required:      false
-			warnings: []
 			type: array: {
 				default: null
 				items: type: string: {
 					examples: ["Line 1", "Line 2"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -106,7 +89,6 @@ components: sources: generator: {
 			relevant_when: "`format` = `shuffle`"
 			description:   "If `true`, each output line starts with an increasing sequence number, beginning with 0."
 			required:      false
-			warnings: []
 			type: bool: default: false
 		}
 	}

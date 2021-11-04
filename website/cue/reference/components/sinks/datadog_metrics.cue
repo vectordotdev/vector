@@ -65,7 +65,6 @@ components: sinks: datadog_metrics: {
 			type: string: {
 				default: null
 				examples: ["service"]
-				syntax: "literal"
 			}
 		}
 	}

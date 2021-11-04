@@ -26,16 +26,6 @@ components: transforms: geoip: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -51,7 +41,6 @@ components: transforms: geoip: {
 			required:    true
 			type: string: {
 				examples: ["/path/to/GeoLite2-City.mmdb", "/path/to/GeoLite2-ISP.mmdb"]
-				syntax: "literal"
 			}
 		}
 		source: {
@@ -59,7 +48,6 @@ components: transforms: geoip: {
 			required:    true
 			type: string: {
 				examples: ["ip_address", "x-forwarded-for", "parent.child", "array[0]"]
-				syntax: "literal"
 			}
 		}
 		target: {
@@ -69,7 +57,6 @@ components: transforms: geoip: {
 			type: string: {
 				default: "geoip"
 				examples: ["geoip", "parent.child"]
-				syntax: "literal"
 			}
 		}
 	}
@@ -131,8 +118,8 @@ components: transforms: geoip: {
 							required:    false
 							common:      false
 							type: uint: {
-								unit:    null
 								default: null
+								unit:    null
 								examples: [701, 721]
 							}
 							groups: ["ASN", "ISP"]
@@ -152,7 +139,6 @@ components: transforms: geoip: {
 									"MCI Communications Services, Inc. d/b/a Verizon Business",
 									"DoD Network Information Center",
 								]
-								syntax: "literal"
 							}
 							groups: ["ASN", "ISP"]
 						}
@@ -163,7 +149,6 @@ components: transforms: geoip: {
 							required:    true
 							type: string: {
 								examples: ["New York", "Brooklyn", "Chicago"]
-								syntax: "literal"
 							}
 							groups: ["City"]
 						}
@@ -183,7 +168,6 @@ components: transforms: geoip: {
 									OC: "Oceania"
 									SA: "South America"
 								}
-								syntax: "literal"
 							}
 							groups: ["City"]
 						}
@@ -195,7 +179,6 @@ components: transforms: geoip: {
 							required:    true
 							type: string: {
 								examples: ["US", "US-PR", "FR", "FR-BL", "GB", "A1", "A2"]
-								syntax: "literal"
 							}
 							groups: ["City"]
 						}
@@ -210,7 +193,6 @@ components: transforms: geoip: {
 							type: string: {
 								default: null
 								examples: ["Verizon Business"]
-								syntax: "literal"
 							}
 							groups: ["ISP"]
 						}
@@ -219,7 +201,6 @@ components: transforms: geoip: {
 							required:    true
 							type: string: {
 								examples: ["51.75"]
-								syntax: "literal"
 							}
 							groups: ["City"]
 						}
@@ -228,7 +209,6 @@ components: transforms: geoip: {
 							required:    true
 							type: string: {
 								examples: ["-1.25"]
-								syntax: "literal"
 							}
 							groups: ["City"]
 						}
@@ -243,7 +223,6 @@ components: transforms: geoip: {
 							type: string: {
 								default: null
 								examples: ["Verizon Business"]
-								syntax: "literal"
 							}
 							groups: ["ISP"]
 						}
@@ -254,7 +233,6 @@ components: transforms: geoip: {
 							required:    true
 							type: string: {
 								examples: ["07094", "10010", "OX1"]
-								syntax: "literal"
 							}
 							groups: ["City"]
 						}
@@ -267,7 +245,6 @@ components: transforms: geoip: {
 							required:    true
 							type: string: {
 								examples: ["America/New_York", "Asia/Atyrau", "Europe/London"]
-								syntax: "literal"
 							}
 							groups: ["City"]
 						}

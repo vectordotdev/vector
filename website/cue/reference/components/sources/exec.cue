@@ -28,16 +28,6 @@ components: sources: exec: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -56,7 +46,6 @@ components: sources: exec: {
 					scheduled: "Scheduled exec mechanism."
 					streaming: "Streaming exec mechanism."
 				}
-				syntax: "literal"
 			}
 		}
 		command: {
@@ -64,20 +53,14 @@ components: sources: exec: {
 			description: "The command to be run, plus any arguments required."
 			type: array: {
 				examples: [["echo", "Hello World!"], ["ls", "-la"]]
-				items: type: string: {
-					syntax: "literal"
-				}
+				items: type: string: {}
 			}
 		}
 		working_directory: {
 			common:      false
 			required:    false
 			description: "The directory in which to run the command."
-			warnings: []
-			type: string: {
-				default: null
-				syntax:  "literal"
-			}
+			type: string: default: null
 		}
 		include_stderr: {
 			common:      false
@@ -98,7 +81,6 @@ components: sources: exec: {
 			common:      true
 			description: "The scheduled options."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -119,7 +101,6 @@ components: sources: exec: {
 			common:      true
 			description: "The streaming options."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -135,7 +116,6 @@ components: sources: exec: {
 						description:   "The interval in seconds between restarting streaming commands if needed."
 						relevant_when: "mode = `streaming`"
 						required:      false
-						warnings: []
 						type: uint: {
 							default: 5
 							unit:    "seconds"
@@ -157,9 +137,8 @@ components: sources: exec: {
 				description: "The data stream from which the event originated."
 				required:    false
 				type: string: {
-					examples: ["stdout", "stderr"]
 					default: null
-					syntax:  "literal"
+					examples: ["stdout", "stderr"]
 				}
 			}
 			pid: {
@@ -176,7 +155,6 @@ components: sources: exec: {
 				type: array: {
 					items: type: string: {
 						examples: ["echo", "Hello World!", "ls", "-la"]
-						syntax: "literal"
 					}
 				}
 			}

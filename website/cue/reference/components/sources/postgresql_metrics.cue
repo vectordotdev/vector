@@ -41,16 +41,6 @@ components: sources: postgresql_metrics: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 
 		warnings: []
@@ -68,7 +58,6 @@ components: sources: postgresql_metrics: {
 			type: array: {
 				items: type: string: {
 					examples: ["postgresql://postgres:vector@localhost:5432/postgres"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -87,7 +76,6 @@ components: sources: postgresql_metrics: {
 			required:    false
 			type: string: {
 				default: "postgresql"
-				syntax:  "literal"
 			}
 		}
 		include_databases: {
@@ -103,7 +91,6 @@ components: sources: postgresql_metrics: {
 				default: null
 				items: type: string: {
 					examples: ["^postgres$", "^vector$", "^foo"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -120,7 +107,6 @@ components: sources: postgresql_metrics: {
 				default: null
 				items: type: string: {
 					examples: ["^postgres$", "^template.*", ""]
-					syntax: "literal"
 				}
 			}
 		}
@@ -134,10 +120,8 @@ components: sources: postgresql_metrics: {
 					ca_file: {
 						description: "Path to CA certificate file."
 						required:    true
-						warnings: []
 						type: string: {
 							examples: ["certs/ca.pem"]
-							syntax: "literal"
 						}
 					}
 				}

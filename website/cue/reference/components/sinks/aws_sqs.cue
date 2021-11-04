@@ -54,16 +54,6 @@ components: sinks: aws_sqs: components._aws & {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -73,17 +63,14 @@ components: sinks: aws_sqs: components._aws & {
 		queue_url: {
 			description: "The URL of the Amazon SQS queue to which messages are sent."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
-				syntax: "literal"
 			}
 		}
 		message_group_id: {
 			common:      false
 			description: "The tag that specifies that a message belongs to a specific message group. Can be applied only to FIFO queues."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["vector", "vector-%Y-%m-%d"]
@@ -100,7 +87,6 @@ components: sinks: aws_sqs: components._aws & {
 			deduplication.
 			"""
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["{{ transaction_id }}"]
