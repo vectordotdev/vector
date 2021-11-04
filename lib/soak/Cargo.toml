@@ -23,7 +23,7 @@ default-features = false
 features = []
 
 [dependencies.tokio]
-version = "1.12"
+version = "1.13"
 default-features = false
 features = ["rt", "rt-multi-thread", "macros", "fs", "io-util", "io-std"]
 
