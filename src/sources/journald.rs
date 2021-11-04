@@ -1,7 +1,7 @@
 use crate::{
     codecs::{BoxedFramingError, CharacterDelimitedCodec},
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
-    event::{Event, LogEvent, Value},
+    event::{BatchNotifier, Event, LogEvent, Value},
     internal_events::{JournaldEventReceived, JournaldInvalidRecord},
     shutdown::ShutdownSignal,
     Pipeline,
@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Error as JsonError, Value as JsonValue};
 use snafu::{ResultExt, Snafu};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::{
     collections::{HashMap, HashSet},
     io::SeekFrom,
@@ -184,6 +185,7 @@ impl SourceConfig for JournaldConfig {
                 batch_size,
                 remap_priority: self.remap_priority,
                 out: cx.out,
+                acknowledgements: cx.acknowledgements,
             }
             .run_shutdown(cx.shutdown, start),
         ))
@@ -205,6 +207,7 @@ struct JournaldSource {
     batch_size: usize,
     remap_priority: bool,
     out: Pipeline,
+    acknowledgements: bool,
 }
 
 impl JournaldSource {
@@ -293,6 +296,7 @@ impl JournaldSource {
     ) -> bool {
         loop {
             let mut saw_record = false;
+            let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
 
             for _ in 0..self.batch_size {
                 let bytes = match stream.next().await {
@@ -334,7 +338,7 @@ impl JournaldSource {
                     byte_size: bytes.len()
                 });
 
-                match self.out.send(create_event(record)).await {
+                match self.out.send(create_event(record, &batch)).await {
                     Ok(_) => {}
                     Err(error) => {
                         error!(message = "Could not send journald log.", %error);
@@ -345,6 +349,10 @@ impl JournaldSource {
             }
 
             if saw_record {
+                if let Some(receiver) = receiver {
+                    // Ignore the received status, we can't do anything with failures here.
+                    receiver.await;
+                }
                 Self::save_checkpoint(checkpointer, &*cursor).await;
             }
         }
@@ -433,8 +441,12 @@ fn create_command(
     command
 }
 
-fn create_event(record: Record) -> Event {
+fn create_event(record: Record, batch: &Option<Arc<BatchNotifier>>) -> Event {
     let mut log = LogEvent::from_iter(record);
+    if let Some(batch) = batch {
+        log = log.with_batch_notifier(batch);
+    }
+
     // Convert some journald-specific field names into Vector standard ones.
     if let Some(message) = log.remove(MESSAGE) {
         log.insert(log_schema().message_key(), message);
@@ -649,6 +661,7 @@ mod checkpointer_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::EventStatus;
     use futures::Stream;
     use std::pin::Pin;
     use std::{
@@ -728,7 +741,7 @@ mod tests {
         exclude_matches: Matches,
         cursor: Option<&str>,
     ) -> Vec<Event> {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
         let (trigger, shutdown, _) = ShutdownSignal::new_wired();
 
         let tempdir = tempdir().unwrap();
@@ -753,6 +766,7 @@ mod tests {
             batch_size: DEFAULT_BATCH_SIZE,
             remap_priority: true,
             out: tx,
+            acknowledgements: true,
         }
         .run_shutdown(
             shutdown,

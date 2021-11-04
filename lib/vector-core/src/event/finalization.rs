@@ -221,6 +221,18 @@ impl BatchNotifier {
         (Arc::new(notifier), BatchStatusReceiver(receiver))
     }
 
+    /// Optionally call `new_with_receiver` and wrap the result in `Option`s
+    pub fn maybe_new_with_receiver(
+        enabled: bool,
+    ) -> (Option<Arc<Self>>, Option<BatchStatusReceiver>) {
+        if enabled {
+            let (batch, receiver) = Self::new_with_receiver();
+            (Some(batch), Some(receiver))
+        } else {
+            (None, None)
+        }
+    }
+
     /// Apply a new batch notifier to a batch of events, and return the receiver.
     pub fn maybe_apply_to_events(
         enabled: bool,
