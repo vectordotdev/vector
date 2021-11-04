@@ -1,5 +1,4 @@
 use std::{
-    fmt,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -13,6 +12,24 @@ use crate::topology::{
     strategy::PollStrategy,
 };
 use crate::WhenFull;
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum SendState {
+    // This sender should drop the next item it receives.
+    DropNext,
+    // The base sender is ready to be sent an item.
+    BaseReady,
+    // The overflow sender is ready to be sent an item.
+    OverflowReady,
+    // Default state.
+    Idle,
+}
+
+impl SendState {
+    fn is_ready(self) -> bool {
+        matches!(self, SendState::BaseReady | SendState::OverflowReady)
+    }
+}
 
 /// A buffer sender.
 ///
@@ -30,36 +47,31 @@ use crate::WhenFull;
 /// accept the event.  In "drop newest" mode, any event being sent when the channel is full will be
 /// dropped and proceed no further. In "overflow" mode, events will be sent to another buffer
 /// sender.  Callers can specify the overflow sender to use when constructing their buffers initially.
+#[derive(Debug)]
 pub struct BufferSender<T> {
     base: PollSender<T>,
-    base_ready: bool,
-    drop_next: bool,
     overflow: Option<Pin<Box<BufferSender<T>>>>,
-    overflow_ready: bool,
+    state: SendState,
     when_full: WhenFull,
 }
 
 impl<T> BufferSender<T> {
     /// Creates a new [`BufferSender`] wrapping the given channel sender.
-    pub(crate) fn new(sender: PollSender<T>, when_full: WhenFull) -> Self {
+    pub(crate) fn new(base: PollSender<T>, when_full: WhenFull) -> Self {
         Self {
-            base: sender.into(),
-            base_ready: false,
-            drop_next: false,
+            base,
             overflow: None,
-            overflow_ready: false,
+            state: SendState::Idle,
             when_full,
         }
     }
 
     /// Creates a new [`BufferSender`] wrapping the given channel sender and overflow sender.
-    pub(crate) fn with_overflow(sender: PollSender<T>, overflow: BufferSender<T>) -> Self {
+    pub(crate) fn with_overflow(base: PollSender<T>, overflow: BufferSender<T>) -> Self {
         Self {
-            base: sender.into(),
-            base_ready: false,
-            drop_next: false,
+            base,
             overflow: Some(Box::pin(overflow)),
-            overflow_ready: false,
+            state: SendState::Idle,
             when_full: WhenFull::Overflow,
         }
     }
@@ -89,7 +101,7 @@ impl<T: Send + 'static> BufferSender<T> {
 
 impl<T> Sink<T> for BufferSender<T>
 where
-    T: fmt::Debug + Send + 'static,
+    T: Send + 'static,
 {
     type Error = PollSendError<T>;
 
@@ -104,25 +116,22 @@ where
         // already acquired one that has not been used yet.  Thus, it is safe for us to call
         // `poll_reserve` multiple times.  If either the base or overflow are ready, it means we got
         // back a successful response from `poll_reserve`, so we can just short circuit here.
-        if self.base_ready || self.overflow_ready {
+        if self.state.is_ready() {
             return Poll::Ready(Ok(()));
         }
 
-        let result = match self.base.poll_reserve(cx) {
+        let (result, next_state) = match self.base.poll_reserve(cx) {
             Poll::Ready(result) => match result {
                 // We reserved a sending slot in the base channel.
-                Ok(()) => {
-                    self.base_ready = true;
-                    Poll::Ready(Ok(()))
-                }
+                Ok(()) => (Poll::Ready(Ok(())), SendState::BaseReady),
                 // Base sender's underlying channel is closed.
-                Err(e) => Poll::Ready(Err(e)),
+                Err(e) => (Poll::Ready(Err(e)), SendState::Idle),
             },
             // Our base sender was not able to immediately reserve a sending slot.
             Poll::Pending => match self.when_full {
                 // We need to block.  Nothing else to do, as the base sender will notify us when
                 // there's capacity to do the send.
-                WhenFull::Block => Poll::Pending,
+                WhenFull::Block => (Poll::Pending, SendState::Idle),
                 // We need to drop the next item.  We have to wait until the caller hands it over to
                 // us in order to drop it, though, so we pretend we're ready and mark ourselves to
                 // drop the next item when `start_send` is called.
@@ -139,10 +148,7 @@ where
                 // TODO: In the future, `PollSender<T>::start_send` may be tweaked to attempt a
                 // call to `Sender<T>::try_send` as a last ditch effort when `PollSender<T>` has not
                 // yet reserved the sending slot.  We could take advantage of this ourselves.
-                WhenFull::DropNewest => {
-                    self.drop_next = true;
-                    Poll::Ready(Ok(()))
-                }
+                WhenFull::DropNewest => (Poll::Ready(Ok(())), SendState::DropNext),
                 // We're supposed to overflow.  Quickly check to make sure we even have an overflow
                 // sender configured, and then figure out if the overflow sender can actually accept
                 // a send at the moment.
@@ -152,52 +158,37 @@ where
                         // Our overflow sender is ready for sending, so we mark ourselves so we know
                         // which sender to write to when `start_send` is called next.
                         Poll::Ready(result) => match result {
-                            Ok(()) => {
-                                self.overflow_ready = true;
-                                Poll::Ready(Ok(()))
-                            }
-                            Err(e) => Poll::Ready(Err(e)),
+                            Ok(()) => (Poll::Ready(Ok(())), SendState::OverflowReady),
+                            Err(e) => (Poll::Ready(Err(e)), SendState::Idle),
                         },
                         // Our overflow sender is not ready, either, so there's nothing else to do
                         // here except wait for a wakeup from either the base sender or overflow sender.
-                        Poll::Pending => Poll::Pending,
+                        Poll::Pending => (Poll::Pending, SendState::Idle),
                     },
                 },
             },
         };
+
+        self.state = next_state;
         result
     }
 
     fn start_send(mut self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        // TODO: we should probably use a state enum for base ready vs overflow ready vs drop next
-
-        // If we've been instructed to drop the next item, do so now.
-        if self.drop_next {
+        let result = match self.state {
+            // Sender isn't ready at all.
+            SendState::Idle => panic!(
+                "`start_send` should not be called unless `poll_ready` returned successfully"
+            ),
             // We've been instructed to drop the next item.
-            //
-            // TODO: need to emit a metric here that we dropped
-            drop(item);
-            self.drop_next = false;
-            return Ok(());
-        }
+            SendState::DropNext => Ok(()),
+            // Base is ready, so send the item there.
+            SendState::BaseReady => self.send_item(item),
+            // Overflow is ready, so send the item there.
+            SendState::OverflowReady => self.overflow.as_mut().unwrap().as_mut().start_send(item),
+        };
 
-        if !self.base_ready && !self.overflow_ready {
-            // TODO: I don't super like panicking but this feels fine for the current design phase.
-            panic!("`start_send` should not be called unless `poll_ready` returned successfully");
-        }
-
-        if self.base_ready {
-            let result = self.send_item(item);
-            self.base_ready = false;
-            result
-        } else {
-            let result = match self.overflow.as_mut() {
-                None => panic!("overflow mode set, but no overflow sender present"),
-                Some(overflow) => overflow.as_mut().start_send(item),
-            };
-            self.overflow_ready = false;
-            result
-        }
+        self.state = SendState::Idle;
+        result
     }
 
     fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -242,6 +233,7 @@ where
 /// is undefined, as the receiver will try to manage polling both its own buffer, as well as the
 /// overflow buffer, in order to fairly balance throughput.
 #[pin_project]
+#[derive(Debug)]
 pub struct BufferReceiver<T> {
     #[pin]
     base: ReceiverStream<T>,
@@ -299,96 +291,15 @@ mod tests {
     };
 
     use futures::{SinkExt, StreamExt};
-    use tokio::{
-        pin,
-        sync::{mpsc::channel, Barrier},
-        time::sleep,
-    };
-    use tokio_stream::wrappers::ReceiverStream;
+    use tokio::{pin, sync::Barrier, time::sleep};
 
     use crate::{
         topology::{
-            builder::IntoBuffer,
             channel::{BufferReceiver, BufferSender},
-            poll_sender::PollSender,
+            test_util::{assert_current_send_capacity, build_buffer},
         },
         WhenFull,
     };
-
-    struct PassthroughChannel {
-        capacity: usize,
-    }
-
-    impl PassthroughChannel {
-        fn new(capacity: usize) -> Self {
-            PassthroughChannel { capacity }
-        }
-    }
-
-    impl IntoBuffer<u64> for PassthroughChannel {
-        fn into_buffer_parts(self) -> (PollSender<u64>, ReceiverStream<u64>) {
-            let (tx, rx) = channel(self.capacity);
-
-            (PollSender::new(tx), ReceiverStream::new(rx))
-        }
-    }
-
-    fn build_buffer(
-        capacity: usize,
-        mode: WhenFull,
-        overflow_mode: Option<WhenFull>,
-    ) -> (BufferSender<u64>, BufferReceiver<u64>) {
-        match mode {
-            WhenFull::Block | WhenFull::DropNewest => {
-                let passthrough = PassthroughChannel::new(capacity);
-                let (sender, receiver) = passthrough.into_buffer_parts();
-                let sender = BufferSender::new(sender, mode);
-                let receiver = BufferReceiver::new(receiver);
-                (sender, receiver)
-            }
-            WhenFull::Overflow => {
-                let overflow_mode = overflow_mode
-                    .expect("overflow_mode must be specified when base is in overflow mode");
-                let overflow_channel = PassthroughChannel::new(capacity);
-                let (overflow_sender, overflow_receiver) = overflow_channel.into_buffer_parts();
-                let overflow_sender = BufferSender::new(overflow_sender, overflow_mode);
-                let overflow_receiver = BufferReceiver::new(overflow_receiver);
-
-                let base_channel = PassthroughChannel::new(capacity);
-                let (base_sender, base_receiver) = base_channel.into_buffer_parts();
-                let base_sender = BufferSender::with_overflow(base_sender, overflow_sender);
-                let base_receiver = BufferReceiver::with_overflow(base_receiver, overflow_receiver);
-
-                (base_sender, base_receiver)
-            }
-        }
-    }
-
-    fn get_base_sender_capacity<T: Send + 'static>(sender: &BufferSender<T>) -> usize {
-        sender
-            .get_base_ref()
-            .get_ref()
-            .expect("channel should be live")
-            .capacity()
-    }
-
-    fn get_overflow_sender_capacity<T: Send + 'static>(sender: &BufferSender<T>) -> Option<usize> {
-        sender
-            .get_overflow_ref()
-            .and_then(|s| s.get_base_ref().get_ref())
-            .map(|s| s.capacity())
-    }
-
-    fn assert_current_send_capacity<T>(
-        sender: &mut BufferSender<T>,
-        base_expected: usize,
-        overflow_expected: Option<usize>,
-    ) where
-        T: fmt::Debug + Send + 'static,
-    {
-        assert_eq!(get_base_sender_capacity(&sender), base_expected);
-        assert_eq!(get_overflow_sender_capacity(&sender), overflow_expected);
-    }
 
     async fn assert_send_ok_with_capacities<T>(
         sender: &mut BufferSender<T>,
@@ -481,7 +392,7 @@ mod tests {
         // It also drops the sender and receives all remaining messages on the receiver, returning
         // them to us to check.
         let mut results = blocking_send_and_drain_receiver(tx, rx, 4).await;
-        results.sort();
+        results.sort_unstable();
         assert_eq!(results, vec![1, 2, 3, 4]);
     }
 
@@ -505,7 +416,7 @@ mod tests {
         // Then, when we collect all of the messages from the receiver, we should only get back the
         // first three of them.
         let mut results = drain_receiver(tx, rx).await;
-        results.sort();
+        results.sort_unstable();
         assert_eq!(results, vec![1, 2, 3]);
     }
 
@@ -531,7 +442,7 @@ mod tests {
         // It also drops the sender and receives all remaining messages on the receiver, returning
         // them to us to check.
         let mut results = blocking_send_and_drain_receiver(tx, rx, 5).await;
-        results.sort();
+        results.sort_unstable();
         assert_eq!(results, vec![1, 2, 3, 4, 5]);
     }
 
@@ -558,7 +469,7 @@ mod tests {
         // Then, when we collect all of the messages from the receiver, we should only get back the
         // first four of them.
         let mut results = drain_receiver(tx, rx).await;
-        results.sort();
+        results.sort_unstable();
         assert_eq!(results, vec![1, 2, 7, 8]);
     }
 }

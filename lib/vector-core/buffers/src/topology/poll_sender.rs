@@ -277,7 +277,7 @@ mod tests {
         let (send, mut recv) = channel(3);
         let mut send = PollSender::new(send);
 
-        for i in 1..=3i32 {
+        for i in 1..=3_i32 {
             let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
             assert_ready_ok!(reserve.poll());
             send.start_send(i).unwrap();
@@ -314,7 +314,7 @@ mod tests {
         let mut send = PollSender::new(send);
         let send2 = send.get_ref().cloned().unwrap();
 
-        for i in 1..=3i32 {
+        for i in 1..=3_i32 {
             let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
             assert_ready_ok!(reserve.poll());
             send.start_send(i).unwrap();
