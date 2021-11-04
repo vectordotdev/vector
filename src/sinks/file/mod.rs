@@ -2,7 +2,7 @@ use crate::expiring_hash_map::ExpiringHashMap;
 use crate::{
     buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::{Event, EventStatus},
+    event::{Event, EventStatus, Finalizable},
     internal_events::{FileBytesSent, FileOpen, TemplateRenderingFailed},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -294,7 +294,7 @@ impl FileSink {
 
         trace!(message = "Writing an event to file.", path = ?path);
         let event_size = event.size_of();
-        let finalizers = event.metadata_mut().take_finalizers();
+        let finalizers = event.take_finalizers();
         match write_event_to_file(file, event, &self.encoding).await {
             Ok(byte_size) => {
                 finalizers.update_status(EventStatus::Delivered);
