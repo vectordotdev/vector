@@ -3,7 +3,7 @@ on:
 - pull_request_target
 
 jobs:
-  triage:
+  label:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/labeler@v3
