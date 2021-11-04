@@ -19,16 +19,6 @@ components: transforms: log_to_metric: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -38,17 +28,14 @@ components: transforms: log_to_metric: {
 		metrics: {
 			description: "A table of key/value pairs representing the keys to be added to the event."
 			required:    true
-			warnings: []
 			type: array: items: type: object: {
 				examples: []
 				options: {
 					field: {
 						description: "The log field to use as the metric."
 						required:    true
-						warnings: []
 						type: string: {
 							examples: ["duration", "parent.child"]
-							syntax: "literal"
 						}
 					}
 					increment_by_value: {
@@ -56,9 +43,8 @@ components: transforms: log_to_metric: {
 							If `true` the metric will be incremented by the `field` value.
 							If `false` the metric will be incremented by 1 regardless of the `field` value.
 							"""
-						required: false
-						common:   false
-						warnings: []
+						required:      false
+						common:        false
 						relevant_when: #"type = "counter""#
 						type: bool: {
 							default: false
@@ -68,16 +54,14 @@ components: transforms: log_to_metric: {
 						description: """
 							The kind of the metric.
 							"""
-						required: false
-						common:   false
-						warnings: []
+						required:      false
+						common:        false
 						relevant_when: #"type = "counter""#
 						type: string: {
 							enum: {
 								absolute:    "An absolute counter value."
 								incremental: "In incremental counter value."
 							}
-							syntax:  "literal"
 							default: "incremental"
 						}
 					}
@@ -85,29 +69,26 @@ components: transforms: log_to_metric: {
 						description: "The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`."
 						required:    false
 						common:      true
-						warnings: []
 						type: string: {
-							examples: ["duration_total"]
 							default: null
-							syntax:  "template"
+							examples: ["duration_total"]
+							syntax: "template"
 						}
 					}
 					namespace: {
 						description: "The namespace of the metric."
 						required:    false
 						common:      true
-						warnings: []
 						type: string: {
-							examples: ["service"]
 							default: null
-							syntax:  "template"
+							examples: ["service"]
+							syntax: "template"
 						}
 					}
 					tags: {
 						description: "Key/value pairs representing [metric tags](\(urls.vector_metric)#tags)."
 						required:    false
 						common:      true
-						warnings: []
 						type: object: {
 							examples: [
 								{
@@ -123,7 +104,6 @@ components: transforms: log_to_metric: {
 	                      Environment variables and field interpolation is allowed.
 	                      """
 									required:    true
-									warnings: []
 									type: "*": {}
 								}
 							}
@@ -132,7 +112,6 @@ components: transforms: log_to_metric: {
 					type: {
 						description: "The metric type."
 						required:    true
-						warnings: []
 						type: string: {
 							enum: {
 								counter:   "A [counter metric type](\(urls.vector_metric)#counter)."
@@ -141,7 +120,6 @@ components: transforms: log_to_metric: {
 								set:       "A [set metric type](\(urls.vector_metric)#set)."
 								summary:   "A [distribution metric type](\(urls.vector_metric)#distribution) with summary statistic."
 							}
-							syntax: "literal"
 						}
 					}
 				}

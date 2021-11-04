@@ -579,7 +579,6 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/certificate_authority.crt"]
-							syntax: "literal"
 						}
 					}
 					crt_file: {
@@ -589,7 +588,6 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.crt"]
-							syntax: "literal"
 						}
 					}
 					key_file: {
@@ -599,7 +597,6 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.key"]
-							syntax: "literal"
 						}
 					}
 					key_pass: {
@@ -609,7 +606,6 @@ components: {
 						type: string: {
 							default: null
 							examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
-							syntax: "literal"
 						}
 					}
 
@@ -653,7 +649,6 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/certificate_authority.crt"]
-							syntax: "literal"
 						}
 					}
 					crt_file: {
@@ -663,7 +658,6 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.crt"]
-							syntax: "literal"
 						}
 					}
 					key_file: {
@@ -673,7 +667,6 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.key"]
-							syntax: "literal"
 						}
 					}
 					key_pass: {
@@ -683,7 +676,6 @@ components: {
 						type: string: {
 							default: null
 							examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
-							syntax: "literal"
 						}
 					}
 
@@ -725,7 +717,6 @@ components: {
 						type: string: {
 							default: null
 							examples: ["http://foo.bar:3128"]
-							syntax: "literal"
 						}
 					}
 					https: {
@@ -735,7 +726,6 @@ components: {
 						type: string: {
 							default: null
 							examples: ["http://foo.bar:3128"]
-							syntax: "literal"
 						}
 					}
 					no_proxy: {
@@ -756,7 +746,6 @@ components: {
 							default: null
 							items: type: string: {
 								examples: ["localhost", ".foo.bar", "*"]
-								syntax: "literal"
 							}
 						}
 					}
@@ -777,40 +766,32 @@ components: {
 					password: {
 						description: "The basic authentication password."
 						required:    true
-						warnings: []
 						type: string: {
 							examples: [Args.password_example, "password"]
-							syntax: "literal"
 						}
 					}
 					strategy: {
 						description: "The authentication strategy to use."
 						required:    true
-						warnings: []
 						type: string: {
 							enum: {
 								basic:  "The [basic authentication strategy](\(urls.basic_auth))."
 								bearer: "The bearer token authentication strategy."
 							}
-							syntax: "literal"
 						}
 					}
 					token: {
 						description: "The token to use for bearer authentication"
 						required:    true
-						warnings: []
 						type: string: {
 							examples: ["${API_TOKEN}", "xyz123"]
-							syntax: "literal"
 						}
 					}
 					user: {
 						description: "The basic authentication user name."
 						required:    true
-						warnings: []
 						type: string: {
 							examples: [Args.username_example, "username"]
-							syntax: "literal"
 						}
 					}
 				}
@@ -820,26 +801,21 @@ components: {
 				common:      false
 				description: "Options for HTTP Basic Authentication."
 				required:    false
-				warnings: []
 				type: object: {
 					examples: []
 					options: {
 						username: {
 							description: "The basic authentication user name."
 							required:    true
-							warnings: []
 							type: string: {
 								examples: ["${HTTP_USERNAME}", "username"]
-								syntax: "literal"
 							}
 						}
 						password: {
 							description: "The basic authentication password."
 							required:    true
-							warnings: []
 							type: string: {
 								examples: ["${HTTP_PASSWORD}", "password"]
-								syntax: "literal"
 							}
 						}
 					}
@@ -855,11 +831,9 @@ components: {
 					indicate system local time.
 					"""
 				required:    false
-				warnings: []
 				type: string: {
 					default: "local"
 					examples: ["local", "America/NewYork", "EST5EDT"]
-					syntax: "literal"
 				}
 			}
 
@@ -908,7 +882,6 @@ components: {
 					**Note**: the examples in this table are for 54 seconds after 2:37 am on December 1st, 2020 in Pacific Standard Time.
 					"""
 				required:    false
-				warnings: []
 
 				type: object: {
 					examples: [
@@ -941,7 +914,6 @@ components: {
 							"my-source-or-transform-id",
 							"prefix-*",
 						]
-						syntax: "literal"
 					}
 				}
 			}
@@ -954,7 +926,6 @@ components: {
 					enum: #Enum | *{
 						"\(Name)": "The type of this component."
 					}
-					syntax: "literal"
 				}
 			}
 		}
@@ -972,7 +943,6 @@ components: {
 				type: string: {
 					default: null
 					examples: ["http://foo.bar:3128"]
-					syntax: "literal"
 				}
 			}
 			_https_proxy: {
@@ -987,7 +957,6 @@ components: {
 				type: string: {
 					default: null
 					examples: ["http://foo.bar:3128"]
-					syntax: "literal"
 				}
 			}
 			_no_proxy: {
@@ -1012,7 +981,6 @@ components: {
 				type: string: {
 					default: null
 					examples: ["localhost,.example.com,192.168.0.0./16", "*"]
-					syntax: "literal"
 				}
 			}
 			if features.collect != _|_ {

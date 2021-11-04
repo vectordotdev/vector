@@ -22,7 +22,7 @@ ADD scripts/environment/setup-helm.sh /git/timberio/vector/scripts/environment/
 ADD scripts/environment/release-flags.sh /git/timberio/vector/scripts/environment/
 ADD scripts/Gemfile scripts/Gemfile.lock \
     /git/timberio/vector/scripts/
-ADD rust-toolchain \
+ADD rust-toolchain.toml \
     /git/timberio/vector/
 RUN ./scripts/environment/prepare.sh
 RUN ./scripts/environment/setup-helm.sh
