@@ -350,7 +350,7 @@ mod tests {
             let res = spawn_send(
                 addr,
                 timestamp,
-                vec![&record],
+                vec![record],
                 None,
                 false,
                 record_compression,
@@ -449,7 +449,7 @@ mod tests {
         let res = spawn_send(
             addr,
             timestamp,
-            vec![&RECORD.as_bytes()],
+            vec![RECORD.as_bytes()],
             None,
             false,
             Compression::None,
