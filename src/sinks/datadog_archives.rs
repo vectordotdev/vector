@@ -152,7 +152,7 @@ const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = {
 };
 
 impl DatadogArchivesSinkConfig {
-    async fn bulid_sink(
+    async fn build_sink(
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
@@ -570,7 +570,7 @@ impl SinkConfig for DatadogArchivesSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink_and_healthcheck = self.bulid_sink(cx).await?;
+        let sink_and_healthcheck = self.build_sink(cx).await?;
         Ok(sink_and_healthcheck)
     }
 
@@ -836,7 +836,7 @@ mod tests {
                 tls: None,
             };
 
-            let res = config.bulid_sink(SinkContext::new_test()).await;
+            let res = config.build_sink(SinkContext::new_test()).await;
 
             if supported {
                 assert!(res.is_ok());
