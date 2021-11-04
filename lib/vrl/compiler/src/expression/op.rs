@@ -1,10 +1,8 @@
 use crate::expression::{self, Expr, Noop, Resolved};
 use crate::parser::{ast, Node};
-use crate::{value, Context, Expression, State, TypeDef, Value};
+use crate::{value, Context, Expression, SharedValue, State, TypeDef, Value};
 use diagnostic::{DiagnosticError, Label, Note, Span, Urls};
-use std::cell::RefCell;
 use std::fmt;
-use std::rc::Rc;
 
 #[derive(Clone, PartialEq)]
 pub struct Op {
@@ -114,7 +112,7 @@ impl Expression for Op {
             _ => todo!(),
         };
 
-        Ok(Rc::new(RefCell::new(res)))
+        Ok(SharedValue::from(res))
     }
 
     fn type_def(&self, state: &State) -> TypeDef {

@@ -1,12 +1,10 @@
 use crate::{expression::*, EzValue};
-use crate::{Function, Program, State, Value};
+use crate::{Function, Program, State};
 use chrono::{TimeZone, Utc};
 use diagnostic::DiagnosticError;
 use ordered_float::NotNan;
 use parser::ast::{self, AssignmentOp, Node};
-use std::cell::RefCell;
 use std::convert::TryFrom;
-use std::rc::Rc;
 
 pub type Errors = Vec<Box<dyn DiagnosticError>>;
 

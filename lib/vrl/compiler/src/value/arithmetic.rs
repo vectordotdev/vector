@@ -1,15 +1,13 @@
 use ordered_float::NotNan;
 
 use super::{Error, Value};
-use crate::ExpressionError;
-use std::cell::RefCell;
+use crate::{ExpressionError, SharedValue};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
-use std::rc::Rc;
 
 impl Value {
     /// Similar to [`std::ops::Mul`], but fallible (e.g. `TryMul`).
-    pub fn try_mul(&self, rhs: Rc<RefCell<Self>>) -> Result<Self, Error> {
+    pub fn try_mul(&self, rhs: SharedValue) -> Result<Self, Error> {
         let rhs = rhs.borrow();
         let err = || Error::Mul(self.kind(), rhs.kind());
 
@@ -30,7 +28,7 @@ impl Value {
     }
 
     /// Similar to [`std::ops::Div`], but fallible (e.g. `TryDiv`).
-    pub fn try_div(&self, rhs: Rc<RefCell<Self>>) -> Result<Self, Error> {
+    pub fn try_div(&self, rhs: SharedValue) -> Result<Self, Error> {
         todo!()
 
         /*
@@ -53,7 +51,7 @@ impl Value {
     }
 
     /// Similar to [`std::ops::Add`], but fallible (e.g. `TryAdd`).
-    pub fn try_add(&self, rhs: Rc<RefCell<Self>>) -> Result<Self, Error> {
+    pub fn try_add(&self, rhs: SharedValue) -> Result<Self, Error> {
         let rhs = rhs.borrow();
 
         let err = || Error::Add(self.kind(), rhs.kind());
@@ -79,7 +77,7 @@ impl Value {
     }
 
     /// Similar to [`std::ops::Sub`], but fallible (e.g. `TrySub`).
-    pub fn try_sub(&self, rhs: Rc<RefCell<Self>>) -> Result<Self, Error> {
+    pub fn try_sub(&self, rhs: SharedValue) -> Result<Self, Error> {
         let rhs = rhs.borrow();
 
         let err = || Error::Sub(self.kind(), rhs.kind());
@@ -213,7 +211,7 @@ impl Value {
         Ok(value)
     }
 
-    pub fn try_merge(&self, rhs: Rc<RefCell<Self>>) -> Result<Self, Error> {
+    pub fn try_merge(&self, rhs: SharedValue) -> Result<Self, Error> {
         let rhs = rhs.borrow();
         let err = || Error::Merge(self.kind(), rhs.kind());
 
@@ -222,7 +220,7 @@ impl Value {
                 .iter()
                 .chain(rhv.iter())
                 .map(|(k, v)| (k.clone(), v.clone()))
-                .collect::<BTreeMap<String, Rc<RefCell<Value>>>>()
+                .collect::<BTreeMap<String, SharedValue>>()
                 .into(),
             _ => return Err(err()),
         };
@@ -232,7 +230,7 @@ impl Value {
 
     /// Similar to [`std::cmp::Eq`], but does a lossless comparison for integers
     /// and floats.
-    pub fn eq_lossy(&self, rhs: Rc<RefCell<Self>>) -> bool {
+    pub fn eq_lossy(&self, rhs: SharedValue) -> bool {
         use Value::*;
         let rhs = rhs.borrow();
 

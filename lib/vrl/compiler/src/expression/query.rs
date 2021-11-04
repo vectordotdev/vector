@@ -1,11 +1,9 @@
 use crate::expression::{assignment, Container, FunctionCall, Resolved, Variable};
 use crate::parser::ast::Ident;
-use crate::{Context, Expression, State, TypeDef, Value};
+use crate::{Context, Expression, SharedValue, State, TypeDef, Value};
 use lookup::LookupBuf;
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fmt;
-use std::rc::Rc;
 
 #[derive(Clone, PartialEq)]
 pub struct Query {
@@ -71,7 +69,7 @@ impl Expression for Query {
                     .get(&self.path)
                     .ok()
                     .flatten()
-                    .unwrap_or_else(|| Rc::new(RefCell::new(Value::Null))))
+                    .unwrap_or_else(|| SharedValue::from(Value::Null)))
             }
             Internal(variable) => variable.resolve(ctx)?,
             FunctionCall(call) => call.resolve(ctx)?,
@@ -81,14 +79,14 @@ impl Expression for Query {
         Ok(crate::Target::get(&value, &self.path)
             .ok()
             .flatten()
-            .unwrap_or_else(|| Rc::new(RefCell::new(Value::Null))))
+            .unwrap_or_else(|| SharedValue::from(Value::Null)))
     }
 
-    fn as_value(&self) -> Option<Rc<RefCell<Value>>> {
+    fn as_value(&self) -> Option<SharedValue> {
         match self.target {
-            Target::Internal(ref variable) => variable
-                .value()
-                .and_then(|v| Value::get_by_path(v, self.path())),
+            Target::Internal(ref variable) => {
+                variable.value().and_then(|v| v.get_by_path(self.path()))
+            }
             _ => None,
         }
     }

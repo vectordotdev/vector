@@ -1,8 +1,6 @@
 use crate::expression::assignment;
 use crate::SharedValue;
-use crate::{parser::ast::Ident, TypeDef, Value};
-use std::cell::RefCell;
-use std::rc::Rc;
+use crate::{parser::ast::Ident, TypeDef};
 use std::{any::Any, collections::HashMap};
 
 /// The state held by the compiler.

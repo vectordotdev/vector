@@ -1,9 +1,8 @@
-use crate::{Context, Span, State, TypeDef, Value};
+use crate::SharedValue;
+use crate::{Context, Span, State, TypeDef};
 use diagnostic::{DiagnosticError, Label, Note};
 use dyn_clone::{clone_trait_object, DynClone};
-use std::cell::RefCell;
 use std::fmt;
-use std::rc::Rc;
 
 mod abort;
 mod array;
@@ -47,7 +46,7 @@ pub use query::Target;
 pub use unary::Unary;
 pub use variable::Variable;
 
-pub type Resolved = Result<Rc<RefCell<Value>>, ExpressionError>;
+pub type Resolved = Result<SharedValue, ExpressionError>;
 
 pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     /// Resolve an expression to a concrete [`Value`].
@@ -60,7 +59,7 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     /// Resolve an expression to a value without any context, if possible.
     ///
     /// This returns `Some` for static expressions, or `None` for dynamic expressions.
-    fn as_value(&self) -> Option<Rc<RefCell<Value>>> {
+    fn as_value(&self) -> Option<SharedValue> {
         None
     }
 
@@ -147,7 +146,7 @@ impl Expression for Expr {
         }
     }
 
-    fn as_value(&self) -> Option<Rc<RefCell<Value>>> {
+    fn as_value(&self) -> Option<SharedValue> {
         use Expr::*;
 
         match self {

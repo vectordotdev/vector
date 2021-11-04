@@ -5,10 +5,8 @@ use crate::parser::Node;
 use crate::value::Kind;
 use crate::{SharedValue, Span, Value};
 use diagnostic::{DiagnosticError, Label, Note};
-use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
-use std::rc::Rc;
 
 pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticError>>;
 
@@ -321,7 +319,7 @@ pub enum Error {
     #[error(r#"invalid enum variant""#)]
     InvalidEnumVariant {
         keyword: &'static str,
-        value: Rc<RefCell<Value>>,
+        value: SharedValue,
         variants: Vec<Value>,
     },
 

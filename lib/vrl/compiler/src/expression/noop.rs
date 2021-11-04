@@ -1,15 +1,13 @@
 use crate::expression::Resolved;
-use crate::{Context, Expression, State, TypeDef, Value};
-use std::cell::RefCell;
+use crate::{Context, Expression, SharedValue, State, TypeDef, Value};
 use std::fmt;
-use std::rc::Rc;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Noop;
 
 impl Expression for Noop {
     fn resolve(&self, _: &mut Context) -> Resolved {
-        Ok(Rc::new(RefCell::new(Value::Null)))
+        Ok(SharedValue::from(Value::Null))
     }
 
     fn type_def(&self, _: &State) -> TypeDef {

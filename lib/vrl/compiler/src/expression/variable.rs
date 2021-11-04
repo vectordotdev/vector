@@ -1,11 +1,9 @@
 use crate::expression::{levenstein, Resolved};
 use crate::parser::ast::Ident;
-use crate::{Context, Expression, EzValue, Span, State, TypeDef, Value};
+use crate::{Context, Expression, EzValue, SharedValue, Span, State, TypeDef, Value};
 
 use diagnostic::{DiagnosticError, Label};
-use std::cell::RefCell;
 use std::fmt;
-use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Variable {
@@ -37,10 +35,10 @@ impl Variable {
         &self.ident
     }
 
-    pub fn value(&self) -> Option<Rc<RefCell<Value>>> {
+    pub fn value(&self) -> Option<SharedValue> {
         self.value
             .as_ref()
-            .map(|v| Rc::new(RefCell::new(v.clone().into())))
+            .map(|v| SharedValue::from(Value::from(v.clone())))
     }
 
     pub fn noop(ident: Ident) -> Self {
@@ -53,7 +51,7 @@ impl Expression for Variable {
         Ok(ctx
             .state()
             .variable(&self.ident)
-            .unwrap_or_else(|| Rc::new(RefCell::new(Value::Null))))
+            .unwrap_or_else(|| SharedValue::from(Value::Null)))
     }
 
     fn type_def(&self, state: &State) -> TypeDef {

@@ -1,13 +1,13 @@
+use crate::SharedValue;
+
 use super::Value;
 use bytes::Bytes;
 use chrono::SecondsFormat;
 use serde::de::{Error, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize, Serializer};
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::fmt;
-use std::rc::Rc;
 
 impl Serialize for Value {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -108,8 +108,8 @@ impl<'de> Deserialize<'de> for Value {
                 V: SeqAccess<'de>,
             {
                 let mut vec = Vec::new();
-                while let Some(value) = visitor.next_element()? {
-                    vec.push(Rc::new(RefCell::new(value)));
+                while let Some(value) = visitor.next_element::<Value>()? {
+                    vec.push(SharedValue::from(value));
                 }
 
                 Ok(Value::Array(vec))
@@ -120,8 +120,8 @@ impl<'de> Deserialize<'de> for Value {
                 V: MapAccess<'de>,
             {
                 let mut map = BTreeMap::new();
-                while let Some((key, value)) = visitor.next_entry()? {
-                    map.insert(key, Rc::new(RefCell::new(value)));
+                while let Some((key, value)) = visitor.next_entry::<_, Value>()? {
+                    map.insert(key, SharedValue::from(value));
                 }
 
                 Ok(Value::Object(map))

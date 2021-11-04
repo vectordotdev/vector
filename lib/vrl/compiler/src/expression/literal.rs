@@ -1,4 +1,5 @@
 use crate::expression::Resolved;
+use crate::SharedValue;
 use crate::{value::Regex, Context, Expression, Span, State, TypeDef, Value};
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
@@ -6,10 +7,8 @@ use diagnostic::{DiagnosticError, Label, Note, Urls};
 use ordered_float::NotNan;
 use parser::ast::{self, Node};
 use std::borrow::Cow;
-use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::fmt;
-use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
@@ -23,10 +22,10 @@ pub enum Literal {
 }
 
 impl Literal {
-    pub fn to_value(&self) -> Rc<RefCell<Value>> {
+    pub fn to_value(&self) -> SharedValue {
         use Literal::*;
 
-        Rc::new(RefCell::new(match self {
+        SharedValue::from(match self {
             String(v) => Value::Bytes(v.clone()),
             Integer(v) => Value::Integer(*v),
             Float(v) => Value::Float(v.to_owned()),
@@ -34,7 +33,7 @@ impl Literal {
             Regex(v) => Value::Regex(v.clone()),
             Timestamp(v) => Value::Timestamp(v.to_owned()),
             Null => Value::Null,
-        }))
+        })
     }
 }
 
@@ -65,11 +64,11 @@ impl TryFrom<Node<ast::Literal>> for Literal {
 
 impl Expression for Literal {
     fn resolve(&self, _: &mut Context) -> Resolved {
-        Ok(self.to_value())
+        Ok(SharedValue::from(self.to_value()))
     }
 
-    fn as_value(&self) -> Option<Rc<RefCell<Value>>> {
-        Some(self.to_value())
+    fn as_value(&self) -> Option<SharedValue> {
+        Some(SharedValue::from(self.to_value()))
     }
 
     fn type_def(&self, _: &State) -> TypeDef {

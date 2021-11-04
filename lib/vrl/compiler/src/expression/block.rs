@@ -1,8 +1,6 @@
 use crate::expression::{Expr, Resolved};
-use crate::{Context, Expression, State, TypeDef, Value};
-use std::cell::RefCell;
+use crate::{Context, Expression, SharedValue, State, TypeDef, Value};
 use std::fmt;
-use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Block {
@@ -25,10 +23,7 @@ impl Expression for Block {
             .iter()
             .map(|expr| expr.resolve(ctx))
             .collect::<Result<Vec<_>, _>>()
-            .map(|mut v| {
-                v.pop()
-                    .unwrap_or_else(|| Rc::new(RefCell::new(Value::Null)))
-            })
+            .map(|mut v| v.pop().unwrap_or_else(|| SharedValue::from(Value::Null)))
     }
 
     fn type_def(&self, state: &State) -> TypeDef {

@@ -8,13 +8,12 @@ mod regex;
 mod serde;
 mod target;
 
+use crate::SharedValue;
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
 use ordered_float::NotNan;
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fmt;
-use std::rc::Rc;
 
 pub use self::regex::Regex;
 pub use error::Error;
@@ -36,9 +35,7 @@ impl From<EzValue> for Value {
     }
 }
 
-pub type SharedValue = Rc<RefCell<Value>>;
-
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Hash, PartialEq)]
 pub enum Value {
     Bytes(Bytes),
     Integer(i64),
@@ -58,12 +55,6 @@ impl Default for Value {
 }
 
 impl Eq for Value {}
-
-impl From<Value> for SharedValue {
-    fn from(value: Value) -> Self {
-        Rc::new(RefCell::new(value))
-    }
-}
 
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -106,6 +97,8 @@ impl fmt::Display for Value {
 
 #[cfg(test)]
 mod test {
+    use crate::SharedValue;
+
     use super::Value;
     use bytes::Bytes;
     use chrono::DateTime;
@@ -186,7 +179,7 @@ mod test {
             Value::Array(
                 vec!["foo", "bar"]
                     .into_iter()
-                    .map(std::convert::Into::into)
+                    .map(|s| SharedValue::from(Value::from(s)))
                     .collect()
             )
             .to_string(),

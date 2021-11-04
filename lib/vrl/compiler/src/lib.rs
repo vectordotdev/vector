@@ -6,6 +6,7 @@ mod test_util;
 
 pub mod expression;
 pub mod function;
+pub mod shared_value;
 pub mod state;
 pub mod type_def;
 pub mod value;
@@ -17,10 +18,11 @@ pub use context::Context;
 pub use expression::{Expression, ExpressionError, Resolved};
 pub use function::{Function, Parameter};
 pub use program::Program;
+pub use shared_value::SharedValue;
 pub use target::Target;
 pub use type_def::TypeDef;
 pub use value::EzValue;
-pub use value::{SharedValue, Value};
+pub use value::Value;
 
 pub use paste::paste;
 

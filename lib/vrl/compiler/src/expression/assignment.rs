@@ -3,13 +3,11 @@ use crate::parser::{
     ast::{self, Ident},
     Node,
 };
-use crate::{Context, Expression, EzValue, Span, State, TypeDef, Value};
+use crate::{Context, Expression, EzValue, SharedValue, Span, State, TypeDef, Value};
 use diagnostic::{DiagnosticError, Label, Note};
 use lookup::LookupBuf;
-use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::fmt;
-use std::rc::Rc;
 
 #[derive(Clone, PartialEq)]
 pub struct Assignment {
@@ -190,12 +188,7 @@ pub enum Target {
 }
 
 impl Target {
-    fn insert_type_def(
-        &self,
-        state: &mut State,
-        type_def: TypeDef,
-        value: Option<Rc<RefCell<Value>>>,
-    ) {
+    fn insert_type_def(&self, state: &mut State, type_def: TypeDef, value: Option<SharedValue>) {
         use Target::*;
 
         fn set_type_def(
@@ -248,7 +241,7 @@ impl Target {
         }
     }
 
-    fn insert(&self, value: Rc<RefCell<Value>>, ctx: &mut Context) {
+    fn insert(&self, value: SharedValue, ctx: &mut Context) {
         use Target::*;
 
         match self {
@@ -264,10 +257,10 @@ impl Target {
                 // Update existing variable using the provided path, or create a
                 // new value in the store.
                 match ctx.state_mut().variable_mut(ident) {
-                    Some(stored) => Value::insert_by_path(stored, path, value),
+                    Some(stored) => stored.insert_by_path(path, value),
                     None => ctx
                         .state_mut()
-                        .insert_variable(ident.clone(), Value::at_path(value, path)),
+                        .insert_variable(ident.clone(), value.at_path(path)),
                 }
             }
 
@@ -383,13 +376,13 @@ where
                 default,
             } => match expr.resolve(ctx) {
                 Ok(value) => {
-                    ok.insert(Rc::clone(&value), ctx);
-                    err.insert(Rc::new(RefCell::new(Value::Null)), ctx);
+                    ok.insert(value.clone(), ctx);
+                    err.insert(SharedValue::from(Value::Null), ctx);
                     value
                 }
                 Err(error) => {
-                    ok.insert(Rc::new(RefCell::new(default.clone().into())), ctx);
-                    let value = Rc::new(RefCell::new(Value::from(error.to_string())));
+                    ok.insert(SharedValue::from(Value::from(default.clone())), ctx);
+                    let value = SharedValue::from(error.to_string());
                     err.insert(value.clone(), ctx);
                     value
                 }
@@ -429,7 +422,7 @@ where
 #[derive(Debug, Clone)]
 pub(crate) struct Details {
     pub type_def: TypeDef,
-    pub value: Option<Rc<RefCell<Value>>>,
+    pub value: Option<SharedValue>,
 }
 
 // -----------------------------------------------------------------------------

@@ -4,7 +4,7 @@
 #[macro_export]
 macro_rules! expr {
     ($($v:tt)*) => {{
-        let value = $crate::value!($($v)*);
+        let value = $crate::shared_value!($($v)*);
         value.into_expression()
     }};
 }
@@ -34,7 +34,7 @@ macro_rules! func_args {
         ::std::collections::HashMap::<&'static str, $crate::SharedValue>::default()
     );
     ($($k:tt: $v:expr),+ $(,)?) => {
-        vec![$((stringify!($k), $crate::SharedValue::from($v.into()))),+]
+        vec![$((stringify!($k), $crate::SharedValue::from($crate::Value::from($v)))),+]
             .into_iter()
             .collect::<::std::collections::HashMap<&'static str, $crate::SharedValue>>()
     };
@@ -92,7 +92,7 @@ macro_rules! test_function {
                 match expression {
                     Ok(expression) => {
                         let mut runtime_state = $crate::state::Runtime::default();
-                        let mut target: $crate::SharedValue = $crate::SharedValue::from(::std::collections::BTreeMap::default().into());
+                        let mut target: $crate::SharedValue = $crate::SharedValue::from($crate::Value::from(::std::collections::BTreeMap::default()));
                         let tz = $tz;
                         let mut ctx = $crate::Context::new(&mut target, &mut runtime_state, &tz);
 

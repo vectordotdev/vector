@@ -1,10 +1,9 @@
 use crate::expression::{Block, Expr, Resolved};
 use crate::parser::Node;
+use crate::SharedValue;
 use crate::{value::Kind, Context, Expression, Span, State, TypeDef, Value};
 use diagnostic::{DiagnosticError, Label, Note, Urls};
-use std::cell::RefCell;
 use std::fmt;
-use std::rc::Rc;
 
 pub type Result = std::result::Result<Predicate, Error>;
 
@@ -42,7 +41,7 @@ impl Expression for Predicate {
             .iter()
             .map(|expr| expr.resolve(ctx))
             .collect::<std::result::Result<Vec<_>, _>>()
-            .map(|mut v| v.pop().unwrap_or(Rc::new(RefCell::new(Value::Null))))
+            .map(|mut v| v.pop().unwrap_or(SharedValue::from(Value::Null)))
     }
 
     fn type_def(&self, state: &State) -> TypeDef {

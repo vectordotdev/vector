@@ -1,15 +1,13 @@
 use super::{Error, Kind, Regex, Value};
 use crate::expression::{container, Container, Expr, Literal};
-use crate::Expression;
+use crate::{Expression, SharedValue};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use std::borrow::Cow;
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
-use std::rc::Rc;
 
 impl Value {
     /// Convert a given [`Value`] into a [`Expression`] trait object.
@@ -68,9 +66,9 @@ impl Value {
         }
     }
 
-    pub fn try_integer(self) -> Result<i64, Error> {
+    pub fn try_integer(&self) -> Result<i64, Error> {
         match self {
-            Value::Integer(v) => Ok(v),
+            Value::Integer(v) => Ok(*v),
             _ => Err(Error::Expected {
                 got: self.kind(),
                 expected: Kind::Integer,
@@ -153,7 +151,7 @@ impl Value {
         }
     }
 
-    pub fn try_float(self) -> Result<f64, Error> {
+    pub fn try_float(&self) -> Result<f64, Error> {
         match self {
             Value::Float(v) => Ok(v.into_inner()),
             _ => Err(Error::Expected {
@@ -215,9 +213,9 @@ impl Value {
         }
     }
 
-    pub fn try_bytes(self) -> Result<Bytes, Error> {
+    pub fn try_bytes(&self) -> Result<Bytes, Error> {
         match self {
-            Value::Bytes(v) => Ok(v),
+            Value::Bytes(v) => Ok(v.clone()),
             _ => Err(Error::Expected {
                 got: self.kind(),
                 expected: Kind::Bytes,
@@ -307,9 +305,9 @@ impl Value {
         }
     }
 
-    pub fn try_boolean(self) -> Result<bool, Error> {
+    pub fn try_boolean(&self) -> Result<bool, Error> {
         match self {
-            Value::Boolean(v) => Ok(v),
+            Value::Boolean(v) => Ok(*v),
             _ => Err(Error::Expected {
                 got: self.kind(),
                 expected: Kind::Boolean,
@@ -338,7 +336,7 @@ impl Value {
         }
     }
 
-    pub fn try_regex(self) -> Result<Regex, Error> {
+    pub fn try_regex(&self) -> Result<&Regex, Error> {
         match self {
             Value::Regex(v) => Ok(v),
             _ => Err(Error::Expected {
@@ -375,7 +373,7 @@ impl Value {
         }
     }
 
-    pub fn try_null(self) -> Result<(), Error> {
+    pub fn try_null(&self) -> Result<(), Error> {
         match self {
             Value::Null => Ok(()),
             _ => Err(Error::Expected {
@@ -408,21 +406,21 @@ impl Value {
         matches!(self, Value::Array(_))
     }
 
-    pub fn as_array(&self) -> Option<&[Rc<RefCell<Value>>]> {
+    pub fn as_array(&self) -> Option<&[SharedValue]> {
         match self {
             Value::Array(v) => Some(v),
             _ => None,
         }
     }
 
-    pub fn as_array_mut(&mut self) -> Option<&mut Vec<Rc<RefCell<Value>>>> {
+    pub fn as_array_mut(&mut self) -> Option<&mut Vec<SharedValue>> {
         match self {
             Value::Array(v) => Some(v),
             _ => None,
         }
     }
 
-    pub fn try_array(&self) -> Result<&[Rc<RefCell<Value>>], Error> {
+    pub fn try_array(&self) -> Result<&[SharedValue], Error> {
         match self {
             Value::Array(v) => Ok(v),
             _ => Err(Error::Expected {
@@ -432,7 +430,7 @@ impl Value {
         }
     }
 
-    pub fn try_array_mut(&mut self) -> Result<&mut Vec<Rc<RefCell<Value>>>, Error> {
+    pub fn try_array_mut(&mut self) -> Result<&mut Vec<SharedValue>, Error> {
         match self {
             Value::Array(v) => Ok(v),
             _ => Err(Error::Expected {
@@ -445,13 +443,16 @@ impl Value {
 
 impl<T: Into<Value>> From<Vec<T>> for Value {
     fn from(v: Vec<T>) -> Self {
-        //Value::Array(v.into_iter().map(Into::into).collect::<Vec<_>>())
-        todo!()
+        Value::Array(
+            v.into_iter()
+                .map(|v| SharedValue::from(v.into()))
+                .collect::<Vec<_>>(),
+        )
     }
 }
 
-impl FromIterator<Rc<RefCell<Value>>> for Value {
-    fn from_iter<I: IntoIterator<Item = Rc<RefCell<Value>>>>(iter: I) -> Self {
+impl FromIterator<SharedValue> for Value {
+    fn from_iter<I: IntoIterator<Item = SharedValue>>(iter: I) -> Self {
         Value::Array(iter.into_iter().collect::<Vec<_>>())
     }
 }
@@ -463,21 +464,21 @@ impl Value {
         matches!(self, Value::Object(_))
     }
 
-    pub fn as_object(&self) -> Option<&BTreeMap<String, Rc<RefCell<Value>>>> {
+    pub fn as_object(&self) -> Option<&BTreeMap<String, SharedValue>> {
         match self {
             Value::Object(v) => Some(v),
             _ => None,
         }
     }
 
-    pub fn as_object_mut(&mut self) -> Option<&mut BTreeMap<String, Rc<RefCell<Value>>>> {
+    pub fn as_object_mut(&mut self) -> Option<&mut BTreeMap<String, SharedValue>> {
         match self {
             Value::Object(v) => Some(v),
             _ => None,
         }
     }
 
-    pub fn try_object(self) -> Result<BTreeMap<String, Rc<RefCell<Value>>>, Error> {
+    pub fn try_object(&self) -> Result<&BTreeMap<String, SharedValue>, Error> {
         match self {
             Value::Object(v) => Ok(v),
             _ => Err(Error::Expected {
@@ -488,8 +489,8 @@ impl Value {
     }
 }
 
-impl From<BTreeMap<String, Rc<RefCell<Value>>>> for Value {
-    fn from(value: BTreeMap<String, Rc<RefCell<Value>>>) -> Self {
+impl From<BTreeMap<String, SharedValue>> for Value {
+    fn from(value: BTreeMap<String, SharedValue>) -> Self {
         Value::Object(value)
     }
 }
@@ -515,9 +516,9 @@ impl Value {
         }
     }
 
-    pub fn try_timestamp(self) -> Result<DateTime<Utc>, Error> {
+    pub fn try_timestamp(&self) -> Result<DateTime<Utc>, Error> {
         match self {
-            Value::Timestamp(v) => Ok(v),
+            Value::Timestamp(v) => Ok(*v),
             _ => Err(Error::Expected {
                 got: self.kind(),
                 expected: Kind::Timestamp,

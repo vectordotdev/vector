@@ -1,8 +1,6 @@
 use crate::expression::{Block, Expr, Literal, Predicate, Resolved};
-use crate::{Context, Expression, State, TypeDef, Value};
-use std::cell::RefCell;
+use crate::{Context, Expression, SharedValue, State, TypeDef, Value};
 use std::fmt;
-use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct IfStatement {
@@ -42,7 +40,7 @@ impl Expression for IfStatement {
                 .alternative
                 .as_ref()
                 .map(|block| block.resolve(ctx))
-                .unwrap_or_else(|| Ok(Rc::new(RefCell::new(Value::Null)))),
+                .unwrap_or_else(|| Ok(SharedValue::from(Value::Null))),
         }
     }
 
