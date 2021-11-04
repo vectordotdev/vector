@@ -3,6 +3,9 @@ use crate::transforms::Transform;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
+/// This transform is a simple helper to chain expansions.
+/// You can put a list of transforms that expands in parallel inside a transform that
+/// expands in serial.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ExpanderConfig {

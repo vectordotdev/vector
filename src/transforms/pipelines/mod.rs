@@ -1,3 +1,61 @@
+/// This pipelines transform is a bit complex and needs a simple example.
+///
+/// If we take the following example in consideration
+///
+/// ```toml
+/// [transforms.my_pipelines]
+/// type = "pipelines"
+/// inputs = ["syslog"]
+///
+/// [transforms.my_pipelines.logs]
+/// order = ["foo", "bar"]
+///
+/// [transforms.my_pipelines.logs.pipelines.foo]
+/// name = "foo pipeline"
+///
+/// [[transforms.my_pipelines.logs.pipelines.foo.transforms]]
+/// # any transform configuration
+///
+/// [[transforms.my_pipelines.logs.pipelines.foo.transforms]]
+/// # any transform configuration
+///
+/// [transforms.my_pipelines.logs.pipelines.bar]
+/// name = "bar pipeline"
+///
+/// [transforms.my_pipelines.logs.pipelines.bar.transforms]]
+/// # any transform configuration
+///
+/// [transforms.my_pipelines.metrics]
+/// order = ["hello", "world"]
+///
+/// [transforms.my_pipelines.metrics.pipelines.hello]
+/// name = "hello pipeline"
+///
+/// [[transforms.my_pipelines.metrics.pipelines.hello.transforms]]
+/// # any transform configuration
+///
+/// [[transforms.my_pipelines.metrics.pipelines.hello.transforms]]
+/// # any transform configuration
+///
+/// [transforms.my_pipelines.metrics.pipelines.world]
+/// name = "world pipeline"
+///
+/// [[transforms.my_pipelines.metrics.pipelines.world.transforms]]
+/// # any transform configuration
+/// ```
+///
+/// The pipelines transform will first expand into 2 parallel transforms for `logs` and
+/// `metrics`. A `Noop` transform will be also added to aggregate `logs` and `metrics`
+/// into a single transform and to be able to use the transform name (`my_pipelines`) as an input.
+///
+/// Then the `logs` group of pipelines will be expanded into a `EventFilter` followed by
+/// a series `PipelineConfig` via the `EventRouter` transform. At the end, a `Noop` alias is added
+/// to be able to refer `logs` as `my_pipelines.logs`.
+/// Same thing for the `metrics` group of pipelines.
+///
+/// Each pipeline will then be expanded into a list of its transforms and at the end of each
+/// expansion, a `Noop` transform will be added to use the `pipeline` name as an alias
+/// (`my_pipelines.logs.transforms.foo`).
 mod expander;
 mod router;
 
@@ -12,7 +70,7 @@ inventory::submit! {
     TransformDescription::new::<PipelinesConfig>("pipelines")
 }
 
-/// This represent the configuration of a single pipeline,
+/// This represents the configuration of a single pipeline,
 /// not the pipelines transform itself.
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct PipelineConfig {
@@ -33,6 +91,7 @@ impl Clone for PipelineConfig {
 }
 
 impl PipelineConfig {
+    /// Expands a single pipeline into a series of its transforms.
     fn serial(&self) -> Box<dyn TransformConfig> {
         let pipelines: IndexMap<String, Box<dyn TransformConfig>> = self
             .transforms
@@ -61,6 +120,8 @@ impl EventTypeConfig {
 
     fn names(&self) -> Vec<String> {
         if let Some(ref names) = self.order {
+            // This assumes all the pipelines are present in the `order` field.
+            // If a pipeline is missing, it won't be used.
             names.clone()
         } else {
             let mut names = self.pipelines.keys().cloned().collect::<Vec<String>>();
@@ -69,6 +130,8 @@ impl EventTypeConfig {
         }
     }
 
+    /// Expands a group of pipelines into a series of pipelines.
+    /// They will then be expanded into a series of transforms.
     fn serial(&self) -> Box<dyn TransformConfig> {
         let pipelines: IndexMap<String, Box<dyn TransformConfig>> = self
             .names()
@@ -94,6 +157,8 @@ pub struct PipelinesConfig {
 }
 
 impl PipelinesConfig {
+    /// Transforms the actual transform in 2 parallel transforms.
+    /// They are wrapped into an EventRouterConfig transform in order to filter logs and metrics.
     fn parallel(&self) -> IndexMap<String, Box<dyn TransformConfig>> {
         let mut map: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
 
@@ -127,6 +192,7 @@ impl TransformConfig for PipelinesConfig {
     ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
         Ok(Some((
             self.parallel(),
+            // need to aggregate to be able to use the transform name as an input.
             ExpandType::Parallel { aggregates: true },
         )))
     }
@@ -183,6 +249,8 @@ impl PipelinesConfig {
 #[cfg(test)]
 mod tests {
     use super::{GenerateConfig, PipelinesConfig};
+    use crate::config::{ComponentKey, TransformOuter};
+    use indexmap::IndexMap;
 
     #[test]
     fn generate_config() {
@@ -198,5 +266,39 @@ mod tests {
         assert_eq!(foo.transforms.len(), 2);
         let bar = config.logs.pipelines.get("bar").unwrap();
         assert_eq!(bar.transforms.len(), 1);
+    }
+
+    #[test]
+    fn expanding() {
+        let config = PipelinesConfig::generate_config();
+        let config: PipelinesConfig = config.try_into().unwrap();
+        let outer = TransformOuter {
+            inputs: Vec::<String>::new(),
+            inner: Box::new(config),
+        };
+        let name = ComponentKey::global("foo");
+        let mut transforms = IndexMap::new();
+        let mut expansions = IndexMap::new();
+        outer
+            .expand(name, &mut transforms, &mut expansions)
+            .unwrap();
+        assert_eq!(transforms.len(), 9);
+        assert_eq!(
+            transforms
+                .keys()
+                .map(|key| key.to_string())
+                .collect::<Vec<String>>(),
+            vec![
+                "foo.logs.filter",
+                "foo.logs.transforms.foo.0",
+                "foo.logs.transforms.foo.1",
+                "foo.logs.transforms.foo",
+                "foo.logs.transforms.bar.0",
+                "foo.logs.transforms.bar",
+                "foo.logs.transforms",
+                "foo.logs",
+                "foo"
+            ],
+        );
     }
 }

@@ -428,7 +428,7 @@ impl<T> TransformOuter<T> {
 }
 
 impl TransformOuter<String> {
-    fn expand(
+    pub(crate) fn expand(
         mut self,
         key: ComponentKey,
         transforms: &mut IndexMap<ComponentKey, TransformOuter<String>>,
