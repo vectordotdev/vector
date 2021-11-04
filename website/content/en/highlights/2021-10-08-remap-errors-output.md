@@ -55,20 +55,19 @@ Given a config of:
 [sinks.errors_out]
   type = "console"
   inputs = ["remap.errors"]
-  encoding.codec = "text"
+  encoding.codec = "json"
 ```
 
 You would expect to see output like the following:
 
 ```json
-{"foo":"baz","message":"valid message","processed":true,"timestamp":"2021-10-08T18:04:09.269236640Z"}
-{"foo":"baz","message":"valid message","processed":true,"timestamp":"2021-10-08T18:04:10.269192981Z"}
-invalid message
-invalid message
-{"foo":"bar","message":"valid message","processed":true,"timestamp":"2021-10-08T18:04:14.270154463Z"}
-{"foo":"baz","message":"valid message","processed":true,"timestamp":"2021-10-08T18:04:15.269096128Z"}
-invalid message
-{"foo":"baz","message":"valid message","processed":true,"timestamp":"2021-10-08T18:04:17.269055424Z"}
+{"foo":"baz","message":"valid message","processed":true,"timestamp":"2021-11-04T00:13:54.845323668Z"}
+{"foo":"bar","message":"valid message","processed":true,"timestamp":"2021-11-04T00:13:55.845118393Z"}
+{"message":"invalid message","metadata":{"component":"remap","error":"function call error for \"object\" at (9:39): function call error for \"parse_json\" at (17:38): unable to parse json: expected value at line 1 column 1"},"timestamp":"2021-11-04T00:13:56.844752457Z"}
+{"foo":"baz","message":"valid message","processed":true,"timestamp":"2021-11-04T00:13:57.845617799Z"}
+{"message":"invalid message","metadata":{"component":"remap","error":"function call error for \"object\" at (9:39): function call error for \"parse_json\" at (17:38): unable to parse json: expected value at line 1 column 1"},"timestamp":"2021-11-04T00:13:58.844292261Z"}
+{"foo":"bar","message":"valid message","processed":true,"timestamp":"2021-11-04T00:13:59.845723298Z"}
+{"foo":"bar","message":"valid message","processed":true,"timestamp":"2021-11-04T00:14:00.844884731Z"}
 ```
 
 All of the events that were valid JSON were processed and output as JSON via the
