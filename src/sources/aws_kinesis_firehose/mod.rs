@@ -167,6 +167,8 @@ mod tests {
         let status = if delivered { Delivered } else { Failed };
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
+        let mut cx = SourceContext::new_test(sender);
+        cx.acknowledgements.enabled = true;
         tokio::spawn(async move {
             AwsKinesisFirehoseConfig {
                 address,
@@ -176,7 +178,7 @@ mod tests {
                 framing: default_framing_message_based(),
                 decoding: default_decoding(),
             }
-            .build(SourceContext::new_test(sender))
+            .build(cx)
             .await
             .unwrap()
             .await
