@@ -49,7 +49,9 @@ jobs:
           popd
 
           echo "::set-output name=TAG::${{ github.sha }}-${SHA}"
+          echo "::set-output name=SHA::${{ github.sha }}"
           echo -n "${{ github.sha }}-${SHA}" > tag
+          echo -n "${SHA}" > sha
 
       - name: Upload TAG for baseline
         uses: actions/upload-artifact@v1
@@ -212,7 +214,7 @@ jobs:
           path: /tmp/${{ github.event.number }}
 
   analyze-results:
-    name: Soak analysis (${{ matrix.target }})
+    name: Soak analysis
     if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak] # could be general if we move away from miller
     needs: [soak-baseline, soak-comparison]
@@ -225,9 +227,14 @@ jobs:
         with:
           name: ${{ github.event.number }}-captures
 
+      - name: Download baseline-soak artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: baseline-soak
+
       - name: Analyze captures
         run: |
-          ./soaks/bin/analyze_experiment.sh ${{ github.event.number }}-captures/
+          ./soaks/bin/analyze_experiment.sh ${{ github.event.number }}-captures/ `cat baseline-soak/sha` ${{ github.sha }}
 
   observer:
     name: Build and push 'observer' to Github CR
