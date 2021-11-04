@@ -244,8 +244,18 @@ jobs:
           name: ${{ github.event.number }}-captures
 
       - name: Analyze captures
+        id: analyze
         run: |
-          ./soaks/bin/analyze_experiment.sh ${{ github.event.number }}-captures/ ${{ needs.compute-soak-meta.outputs.baseline-sha }} ${{ needs.compute-soak-meta.outputs.comparison-sha }}
+          export RESULT=$./soaks/bin/analyze_experiment.sh ${{ github.event.number }}-captures/ ${{ needs.compute-soak-meta.outputs.baseline-sha }} ${{ needs.compute-soak-meta.outputs.comparison-sha }})
+          echo "${RESULT}"
+          echo "::set-output name=RESULT::${RESULT}"
+
+      - uses: actions/github-script@v3
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            const { issue: { number: issue_number }, repo: { owner, repo }  } = context;
+            github.issues.createComment({ issue_number, owner, repo, body: '${{ steps.analyze.outputs.RESULT }}' });
 
   observer:
     name: Build and push 'observer' to Github CR
