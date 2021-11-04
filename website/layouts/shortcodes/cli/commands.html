@@ -241,11 +241,13 @@
         {{ end }}
       </td>
       <td>
-        <a href="#{{ .env_var }}">
+        {{ with .env_var }}
+        <a href="#{{ . }}">
           <code>
-            {{ .env_var }}
+            {{ . }}
           </code>
         </a>
+        {{ end }}
       </td>
 
       <td>
