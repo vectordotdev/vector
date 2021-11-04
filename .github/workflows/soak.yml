@@ -196,7 +196,7 @@ jobs:
     name: Soak (${{ matrix.target }}) - comparison
     if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak]
-    needs: [compuate-soak-meta, compute-test-plan, build-comparison-image]
+    needs: [compute-soak-meta, compute-test-plan, build-comparison-image]
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
