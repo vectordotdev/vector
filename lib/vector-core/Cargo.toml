@@ -43,7 +43,7 @@ serde_json = { version = "1.0.68", default-features = false }
 shared = { path = "../shared" }
 snafu = { version = "0.6.10", default-features = false }
 substring = { version = "1.4", default-features = false }
-tokio = { version = "1.12.0", default-features = false }
+tokio = { version = "1.13.0", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, optional = true }
 tokio-util = { version = "0.6", default-features = false, features = ["time"] }
 toml = { version = "0.5.8", default-features = false }

@@ -538,10 +538,17 @@ components: {
 		configuration: {
 			_acknowledgements: {
 				common:      true
-				description: "Controls if the source will wait for destination sinks to deliver the events before acknowledging receipt."
-				warnings: ["Disabling this option may lead to loss of data, as destination sinks may reject events after the source acknowledges their successful receipt."]
-				required: false
-				type: bool: default: false
+				description: "Controls how acknowledgements are handled by this source."
+				required:    false
+				type: object: options: {
+					enabled: {
+						common:      true
+						description: "Controls if the source will wait for destination sinks to deliver the events before acknowledging receipt."
+						warnings: ["Disabling this option may lead to loss of data, as destination sinks may reject events after the source acknowledges their successful receipt."]
+						required: false
+						type: bool: default: false
+					}
+				}
 			}
 
 			_tls_accept: {
