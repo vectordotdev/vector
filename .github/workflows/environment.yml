@@ -1,14 +1,10 @@
 name: Environment Suite
 
 on:
-  pull_request:
-    paths-ignore:
-      - "website/**"
+  pull_request: {}
   push:
     branches:
       - master
-    paths-ignore:
-      - "website/**"
   workflow_dispatch:
 
 env:
