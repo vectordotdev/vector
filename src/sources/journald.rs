@@ -297,12 +297,14 @@ impl JournaldSource {
         loop {
             let mut saw_record = false;
             let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
+            let mut exiting = None;
 
             for _ in 0..self.batch_size {
                 let bytes = match stream.next().await {
                     None => {
                         warn!("Journalctl process stopped.");
-                        return true;
+                        exiting = Some(true);
+                        break;
                     }
                     Some(Ok(text)) => text,
                     Some(Err(error)) => {
@@ -343,17 +345,24 @@ impl JournaldSource {
                     Err(error) => {
                         error!(message = "Could not send journald log.", %error);
                         // `out` channel is closed, don't restart journalctl.
-                        return false;
+                        exiting = Some(false);
+                        break;
                     }
                 }
             }
 
+            drop(batch);
             if saw_record {
                 if let Some(receiver) = receiver {
                     // Ignore the received status, we can't do anything with failures here.
                     receiver.await;
                 }
-                Self::save_checkpoint(checkpointer, &*cursor).await;
+                if exiting != Some(false) {
+                    Self::save_checkpoint(checkpointer, &*cursor).await;
+                }
+            }
+            if let Some(x) = exiting {
+                break x;
             }
         }
     }
@@ -923,6 +932,47 @@ mod tests {
         assert_eq!(received.len(), 2);
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140004000));
         assert_eq!(timestamp(&received[1]), value_ts(1578529839, 140005000));
+    }
+
+    #[tokio::test]
+    async fn waits_for_acknowledgements() {
+        let (tx, mut rx) = Pipeline::new_test();
+
+        let tempdir = tempdir().unwrap();
+        let mut checkpoint_path = tempdir.path().to_path_buf();
+        checkpoint_path.push(CHECKPOINT_FILENAME);
+
+        let mut checkpointer = Checkpointer::new(checkpoint_path.clone())
+            .await
+            .expect("Creating checkpointer failed!");
+
+        let mut cursor = checkpointer.get().await.unwrap();
+
+        let mut source = JournaldSource {
+            include_matches: Default::default(),
+            exclude_matches: Default::default(),
+            checkpoint_path,
+            batch_size: DEFAULT_BATCH_SIZE,
+            remap_priority: true,
+            out: tx,
+            acknowledgements: true,
+        };
+        let (stream, _stop) = FakeJournal::new(&cursor);
+        let mut handle =
+            tokio_test::task::spawn(source.run_stream(stream, &mut checkpointer, &mut cursor));
+
+        // Drive the journal until it waits for the acknowledgement.
+        assert_eq!(handle.poll(), Poll::Pending);
+        assert!(!handle.is_woken());
+        // Acknowledge all the received events.
+        let mut count = 0;
+        while let Ok(Some(event)) = rx.try_next() {
+            event.metadata().update_status(EventStatus::Delivered);
+            count += 1;
+        }
+        assert_eq!(count, 8);
+        // Make sure it is woken up again after receiving the acknowledgement.
+        assert!(handle.is_woken());
     }
 
     #[test]
