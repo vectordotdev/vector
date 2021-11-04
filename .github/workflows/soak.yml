@@ -29,14 +29,37 @@ jobs:
           access_token: ${{ secrets.GITHUB_TOKEN }}
           all_but_latest: true # can cancel workflows scheduled later
 
-  build-baseline-image:
-    name: Build baseline 'soak-vector' container
-    runs-on: [self-hosted, linux, x64, general]
+  compute-test-plan:
+    name: Compute soak test plan
+    runs-on: ubuntu-20.04
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      #
-      - uses: actions/checkout@v2.4.0
+      - name: Check out the repo
+        uses: actions/checkout@v2
 
-      - uses: actions/checkout@v2.4.0
+      - uses: actions/github-script@v5
+        id: set-matrix
+        with:
+          script: |
+            const fs = require('fs')
+            target = fs.readdirSync('soaks/tests')
+
+            const matrix = {
+              target
+            }
+
+            core.setOutput('matrix', matrix)
+      - name: Dump matrix context
+        env:
+          MATRIX_CONTEXT: ${{ toJson(steps.set-matrix.outputs.matrix) }}
+        run: echo "$MATRIX_CONTEXT"
+
+  compute-soak-meta:
+    name: Compute metadata for soaks
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2.3.5
         with:
           ref: master
           path: baseline-vector
@@ -45,19 +68,33 @@ jobs:
         id: baseline
         run: |
           pushd baseline-vector
-          export SHA=$(git rev-parse HEAD)
+          export BASELINE_SHA=$(git rev-parse HEAD)
           popd
 
-          echo "::set-output name=TAG::${{ github.sha }}-${SHA}"
-          echo "::set-output name=SHA::${{ github.sha }}"
-          echo -n "${{ github.sha }}-${SHA}" > tag
-          echo -n "${SHA}" > sha
+          export BASELINE_TAG="${{ github.sha }}-${BASELINE_SHA}"
+          export COMPARISON_TAG="${{ github.sha }}-${{ github.sha }}"
 
-      - name: Upload TAG for baseline
-        uses: actions/upload-artifact@v1
+          echo "baseline sha is: ${BASELINE_SHA}"
+          echo "comparison sha is: ${COMPARISON_SHA}"
+          echo "baseline tag is: ${BASELINE_TAG}"
+          echo "comparison tag is: ${COMPARISON_TAG}"
+
+          echo "::set-output name=BASELINE_TAG::${BASELINE_TAG}"
+          echo "::set-output name=BASELINE_SHA::${BASELINE_SHA}"
+          echo "::set-output name=COMPARISON_TAG::${COMPARISON_TAG}"
+          echo "::set-output name=COMPARISON_SHA::${COMPARISON_SHA}"
+
+  build-baseline-image:
+    name: Build baseline 'soak-vector' container
+    runs-on: [self-hosted, linux, x64, general]
+    needs: [compute-soak-meta]
+    steps:
+      - uses: actions/checkout@v2.3.5
+
+      - uses: actions/checkout@v2.3.5
         with:
-          name: baseline-soak
-          path: tag
+          ref: master
+          path: baseline-vector
 
       - name: Set up Docker Buildx
         id: buildx
@@ -79,7 +116,7 @@ jobs:
             prefix=
             suffix=
           images: ghcr.io/${{ github.repository }}/soak-vector
-          tags: type=raw, value=${{ steps.baseline.outputs.TAG }}
+          tags: type=raw, value=${{ needs.compute-soak-meta.outputs.BASELINE_TAG }}
 
       - name: Build and push 'soak-vector' image
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
@@ -96,6 +133,7 @@ jobs:
   build-comparison-image:
     name: Build comparison 'soak-vector' container
     runs-on: [self-hosted, linux, x64, general]
+    needs: [compute-soak-meta]
     steps:
       - uses: actions/checkout@v2.4.0
 
@@ -118,7 +156,7 @@ jobs:
             prefix=
             suffix=
           images: ghcr.io/${{ github.repository }}/soak-vector
-          tags: type=raw, value=${{ github.sha }}-${{ github.sha }}
+          tags: type=raw, value=${{ needs.compute-soak-meta.outputs.COMPARISON_TAG }}
 
       - name: Build and push 'soak-vector' image
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
@@ -131,53 +169,22 @@ jobs:
           cache-from: type=gha, scope=${{ github.workflow }}
           cache-to: type=gha, scope=${{ github.workflow }}
 
-  compute-test-plan:
-    name: Compute soak test plan
-    runs-on: ubuntu-20.04
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - name: Check out the repo
-        uses: actions/checkout@v2.4.0
-
-      - uses: actions/github-script@v5
-        id: set-matrix
-        with:
-          script: |
-            const fs = require('fs')
-            target = fs.readdirSync('soaks/tests')
-
-            const matrix = {
-              target
-            }
-
-            core.setOutput('matrix', matrix)
-      - name: Dump matrix context
-        env:
-          MATRIX_CONTEXT: ${{ toJson(steps.set-matrix.outputs.matrix) }}
-        run: echo "$MATRIX_CONTEXT"
-
   soak-baseline:
     name: Soak (${{ matrix.target }}) - baseline
     if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak]
-    needs: [compute-test-plan, build-baseline-image]
+    needs: [compute-soak-meta, compute-test-plan, build-baseline-image]
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
 
-      - name: Download baseline-soak artifact
-        uses: actions/download-artifact@v1
-        with:
-          name: baseline-soak
-
       - name: Run baseline experiment
         run: |
           rm -rf /tmp/${{ github.event.number }}/${{ matrix.target }}/
           mkdir -p /tmp/${{ github.event.number }}/${{ matrix.target }}/
-          ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "baseline" `cat baseline-soak/tag` /tmp/${{ github.event.number }}
+          ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "baseline" ${{ needs.compute-soak-meta.outputs.BASELINE_TAG }} /tmp/${{ github.event.number }}
 
       - name: Upload timing captures
         uses: actions/upload-artifact@v1
@@ -189,23 +196,18 @@ jobs:
     name: Soak (${{ matrix.target }}) - comparison
     if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak]
-    needs: [compute-test-plan, build-comparison-image]
+    needs: [compuate-soak-meta, compute-test-plan, build-comparison-image]
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
 
-      - name: Download baseline-soak artifact
-        uses: actions/download-artifact@v1
-        with:
-          name: baseline-soak
-
       - name: Run comparison experiment
         run: |
           rm -rf /tmp/${{ github.event.number }}/${{ matrix.target }}/
           mkdir -p /tmp/${{ github.event.number }}/${{ matrix.target }}/
-          ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "comparison" "${{ github.sha }}-${{ github.sha }}" /tmp/${{ github.event.number }}
+          ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "comparison" ${{ needs.compute-soak-meta.outputs.COMPARISON_TAG }} /tmp/${{ github.event.number }}
 
       - name: Upload timing captures
         uses: actions/upload-artifact@v1
@@ -217,7 +219,7 @@ jobs:
     name: Soak analysis
     if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: [self-hosted, linux, x64, soak] # could be general if we move away from miller
-    needs: [soak-baseline, soak-comparison]
+    needs: [compute-soak-meta, soak-baseline, soak-comparison]
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
@@ -227,14 +229,9 @@ jobs:
         with:
           name: ${{ github.event.number }}-captures
 
-      - name: Download baseline-soak artifact
-        uses: actions/download-artifact@v1
-        with:
-          name: baseline-soak
-
       - name: Analyze captures
         run: |
-          ./soaks/bin/analyze_experiment.sh ${{ github.event.number }}-captures/ `cat baseline-soak/sha` ${{ github.sha }}
+          ./soaks/bin/analyze_experiment.sh ${{ github.event.number }}-captures/ ${{ needs.compute-soak-meta.outputs.BASELINE_SHA }} ${{ needs.compute-soak-meta.outputs.COMPARISON_SHA }}
 
   observer:
     name: Build and push 'observer' to Github CR
