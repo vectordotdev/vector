@@ -10,12 +10,10 @@ use futures_util::StreamExt;
 use std::{fmt, num::NonZeroUsize};
 use tower::Service;
 use vector_core::buffers::Acker;
-use vector_core::stream::DriverResponse;
-use vector_core::{
-    buffers::Ackable, event::Finalizable, sink::StreamSink, stream::BatcherSettings,
-};
+use vector_core::stream::{BatcherSettings, DriverResponse};
+use vector_core::{buffers::Ackable, event::Finalizable, sink::StreamSink};
 
-pub struct S3Sink<Svc, RB> {
+pub struct GcsSink<Svc, RB> {
     acker: Acker,
     service: Svc,
     request_builder: RB,
@@ -23,7 +21,7 @@ pub struct S3Sink<Svc, RB> {
     batcher_settings: BatcherSettings,
 }
 
-impl<Svc, RB> S3Sink<Svc, RB> {
+impl<Svc, RB> GcsSink<Svc, RB> {
     pub fn new(
         cx: SinkContext,
         service: Svc,
@@ -32,16 +30,16 @@ impl<Svc, RB> S3Sink<Svc, RB> {
         batcher_settings: BatcherSettings,
     ) -> Self {
         Self {
-            partitioner,
             acker: cx.acker(),
             service,
             request_builder,
+            partitioner,
             batcher_settings,
         }
     }
 }
 
-impl<Svc, RB> S3Sink<Svc, RB>
+impl<Svc, RB> GcsSink<Svc, RB>
 where
     Svc: Service<RB::Request> + Send + 'static,
     Svc::Future: Send + 'static,
@@ -65,7 +63,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        error!("Failed to build S3 request: {:?}.", e);
+                        error!("Failed to build GCS request: {:?}.", e);
                         None
                     }
                     Ok(req) => Some(req),
@@ -78,7 +76,7 @@ where
 }
 
 #[async_trait]
-impl<Svc, RB> StreamSink for S3Sink<Svc, RB>
+impl<Svc, RB> StreamSink for GcsSink<Svc, RB>
 where
     Svc: Service<RB::Request> + Send + 'static,
     Svc::Future: Send + 'static,
