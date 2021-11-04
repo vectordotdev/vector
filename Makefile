@@ -31,8 +31,6 @@ export AUTODESPAWN ?= ${AUTOSPAWN}
 export AUTOINSTALL ?= false
 # Override to true for a bit more log output in your environment building (more coming!)
 export VERBOSE ?= false
-# Override to set a different Rust toolchain
-export RUST_TOOLCHAIN ?= $(shell cat rust-toolchain)
 # Override the container tool. Tries docker first and then tries podman.
 export CONTAINER_TOOL ?= auto
 ifeq ($(CONTAINER_TOOL),auto)
