@@ -11,7 +11,7 @@ impl Function for TallyValue {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "count matching values",
-            source: r#"tally_value!(["foo", "bar", "foo", "baz"], "foo")"#,
+            source: r#"tally_value(["foo", "bar", "foo", "baz"], "foo")"#,
             result: Ok("2"),
         }]
     }
