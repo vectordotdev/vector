@@ -8,9 +8,9 @@ improved as laid out in [Issue
 
 ## Index of Soaks
 
-* [Datadog Agent -> Remap -> Datadog Logs](./datadog_agent_remap_datadog_logs/README.md)
-* [Syslog -> Loki](./syslog_loki/README.md)
-* [Syslog -> Regex (VRL) -> Log2Metric ->  Datadog Metrics](./syslog_regex_logs2metric_ddmetrics/README.md)
+* [Datadog Agent -> Remap -> Datadog Logs](./tests/datadog_agent_remap_datadog_logs/README.md)
+* [Syslog -> Loki](./tests/syslog_loki/README.md)
+* [Syslog -> Regex (VRL) -> Log2Metric ->  Datadog Metrics](./tests/syslog_regex_logs2metric_ddmetrics/README.md)
 
 ## Requirements
 
@@ -34,17 +34,14 @@ support programs in a minikube and some glue code to observe vector in
 operation. Consider this command:
 
 ```shell
-> ./soaks/soak.sh datadog_agent_remap_datadog_logs a32c7fd09978f76a3f1bd360c3a8d07a49538b70 be8ceafbf994d06f505bdd9fb392b00e0ba661f2
+> ./soaks/soak.sh --local-image --soak datadog_agent_remap_datadog_logs --baseline a32c7fd09978f76a3f1bd360c3a8d07a49538b70 --comparison be8ceafbf994d06f505bdd9fb392b00e0ba661f2
 ```
 
 Here we run the soak test `datadog_agent_remap_datadog_logs` comparing vector at
 `a32c7fd09978f76a3f1bd360c3a8d07a49538b70` with vector at
 `be8ceafbf994d06f505bdd9fb392b00e0ba661f2`. Two vector containers will be built
-for each SHA. Time is saved by building vector only against the features needed
-to complete the experiment. Users define these flags in files named `FEATURES`
-under the soak directory, see
-[`soaks/datadog_agent_remap_datadog_logs/FEATURES`]. The soak itself is defined
-in terraform, see [`soaks/datadog_agent_remap_datadog_logs/terraform`].
+for each SHA. The soak itself is defined in terraform, see
+[`soaks/datadog_agent_remap_datadog_logs/terraform`].
 
 After running this command you will, in about ten minutes depending on whether
 you need to build containers or not, see a summary:
@@ -87,9 +84,8 @@ the "Datadog Agent -> Remap -> Datadog Logs" soak in
 `tree` that directory you'll see:
 
 ```shell
-> tree datadog_agent_remap_datadog_logs
-datadog_agent_remap_datadog_logs
-├── FEATURES
+> tree tests/datadog_agent_remap_datadog_logs
+tests/datadog_agent_remap_datadog_logs
 ├── README.md
 └── terraform
     ├── http_blackhole.toml
@@ -103,18 +99,9 @@ datadog_agent_remap_datadog_logs
 1 directory, 9 files
 ```
 
-The `FEATURES` file defines which feature flags will be lit when vector is
-built. As of this writing that file contains:
-
-```shell
-FEATURES="sources-internal_metrics,sinks-prometheus,sources-datadog,sinks-datadog,transforms-remap"
-```
-
-This is a shell include file. You must set the features you need for vector to
-run for your test and the fewer flags you include the faster your build time
-will be. The `terraform/` sub-directory contains a small project
-definition. It's clear we can thin this out further -- the prometheus setup is
-common to all soaks -- but the primary things you need to concern yourself with are:
+The `terraform/` sub-directory contains a small project definition. It's clear
+we can thin this out further -- the prometheus setup is common to all soaks --
+but the primary things you need to concern yourself with are:
 
 * `main.tf`
 * `vector.toml`
@@ -175,3 +162,5 @@ to say they install vector and its lading test peers into 'soak', configuring
 with the `toml` files referenced above. There are a handful of modules available
 for use in soak testing; please add more as your infrastructure needs
 dictate. If at all possible do not require services external to the minikube.
+
+Newly added soaks in `tests/` will be ran automatically by CI.

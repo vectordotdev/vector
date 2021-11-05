@@ -1,0 +1,39 @@
+# Generic component-level labels and high-level groupings.
+"domain: sources":
+- src/sources/**/*
+
+"domain: sinks":
+- src/sinks/**/*
+
+"domain: transforms":
+- src/transforms/**/*
+
+"domain: topology":
+- src/topology/**/*
+
+"domain: codecs":
+- src/codecs/**/*
+
+"domain: core":
+- lib/vector-core/**/*
+
+"domain: vrl":
+- lib/vrl/**/*
+
+"domain: ci":
+- scripts/**/*
+
+"domain: releasing":
+- distribution/**/*
+- scripts/package-*
+- scripts/release-*
+
+"domain: rfc":
+- rfcs/**/*
+
+"domain: external docs":
+- website/cue/**/*
+
+# Run integration tests when any files specifically related to integration tests are changed/
+"ci-condition: integration tests enable":
+- scripts/setup_integration/**/*

@@ -67,7 +67,7 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule) -> Result<Value, Error> {
                 match value {
                     // root-level maps must be merged
                     Value::Object(map) if path.is_root() || path.segments[0].is_index() => {
-                        parsed.as_object_mut().unwrap().extend(map);
+                        parsed.as_object_mut().expect("root is object").extend(map);
                     }
                     // anything else at the root leve must be ignored
                     _ if path.is_root() || path.segments[0].is_index() => {}
