@@ -59,7 +59,7 @@ jobs:
     name: Compute metadata for soaks
     runs-on: ubuntu-20.04
     outputs:
-      pr-number: ${{ github.event.issue.number }}
+      pr-number: ${{ steps.pr-metadata.outputs.PR_NUMBER }}
       comparison-sha: ${{ steps.comparison.outputs.COMPARISON_SHA }}
       comparison-tag: ${{ steps.comparison.outputs.COMPARISON_TAG }}
       baseline-sha: ${{ steps.baseline.outputs.BASELINE_SHA }}
@@ -71,8 +71,11 @@ jobs:
           path: baseline-vector
 
       - name: Report on PR metadata
+        id: pr-metadata
         run: |
-          echo "PR number: ${{ github.event.issue.number }}"
+          export PR_NUMBER=${{ github.event.number }}
+          echo "::set-output name=PR_NUMBER::${PR_NUMBER}"
+          echo "PR number: ${PR_NUMBER}"
 
       - name: Setup comparison variables
         id: comparison
