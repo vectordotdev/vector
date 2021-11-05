@@ -117,19 +117,16 @@ impl<T> TopologyBuilder<T> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        topology::{
-            builder::TopologyError,
-            test_util::{assert_current_send_capacity, PassthroughChannel},
-        },
-        WhenFull,
+        topology::{builder::TopologyError, test_util::assert_current_send_capacity},
+        MemoryBuffer, WhenFull,
     };
 
     use super::TopologyBuilder;
 
     #[test]
     fn single_stage_topology_block() {
-        let mut builder = TopologyBuilder::default();
-        builder.stage(PassthroughChannel::new(1), WhenFull::Block);
+        let mut builder = TopologyBuilder::<u64>::default();
+        builder.stage(MemoryBuffer::new(1), WhenFull::Block);
         let result = builder.build();
         assert!(result.is_ok());
 
@@ -139,8 +136,8 @@ mod tests {
 
     #[test]
     fn single_stage_topology_drop_newest() {
-        let mut builder = TopologyBuilder::default();
-        builder.stage(PassthroughChannel::new(1), WhenFull::DropNewest);
+        let mut builder = TopologyBuilder::<u64>::default();
+        builder.stage(MemoryBuffer::new(1), WhenFull::DropNewest);
         let result = builder.build();
         assert!(result.is_ok());
 
@@ -150,8 +147,8 @@ mod tests {
 
     #[test]
     fn single_stage_topology_overflow() {
-        let mut builder = TopologyBuilder::default();
-        builder.stage(PassthroughChannel::new(1), WhenFull::Overflow);
+        let mut builder = TopologyBuilder::<u64>::default();
+        builder.stage(MemoryBuffer::new(1), WhenFull::Overflow);
         assert_eq!(
             builder.build().unwrap_err(),
             TopologyError::OverflowWhenLast
@@ -160,9 +157,9 @@ mod tests {
 
     #[test]
     fn two_stage_topology_block() {
-        let mut builder = TopologyBuilder::default();
-        builder.stage(PassthroughChannel::new(1), WhenFull::Block);
-        builder.stage(PassthroughChannel::new(1), WhenFull::Block);
+        let mut builder = TopologyBuilder::<u64>::default();
+        builder.stage(MemoryBuffer::new(1), WhenFull::Block);
+        builder.stage(MemoryBuffer::new(1), WhenFull::Block);
         assert_eq!(
             builder.build().unwrap_err(),
             TopologyError::NextStageNotUsed { stage_idx: 0 }
@@ -171,9 +168,9 @@ mod tests {
 
     #[test]
     fn two_stage_topology_drop_newest() {
-        let mut builder = TopologyBuilder::default();
-        builder.stage(PassthroughChannel::new(1), WhenFull::DropNewest);
-        builder.stage(PassthroughChannel::new(1), WhenFull::Block);
+        let mut builder = TopologyBuilder::<u64>::default();
+        builder.stage(MemoryBuffer::new(1), WhenFull::DropNewest);
+        builder.stage(MemoryBuffer::new(1), WhenFull::Block);
         assert_eq!(
             builder.build().unwrap_err(),
             TopologyError::NextStageNotUsed { stage_idx: 0 }
@@ -182,9 +179,9 @@ mod tests {
 
     #[test]
     fn two_stage_topology_overflow() {
-        let mut builder = TopologyBuilder::default();
-        builder.stage(PassthroughChannel::new(1), WhenFull::Overflow);
-        builder.stage(PassthroughChannel::new(1), WhenFull::Block);
+        let mut builder = TopologyBuilder::<u64>::default();
+        builder.stage(MemoryBuffer::new(1), WhenFull::Overflow);
+        builder.stage(MemoryBuffer::new(1), WhenFull::Block);
 
         let result = builder.build();
         assert!(result.is_ok());

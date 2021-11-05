@@ -57,7 +57,7 @@ pub struct BufferSender<T> {
 
 impl<T> BufferSender<T> {
     /// Creates a new [`BufferSender`] wrapping the given channel sender.
-    pub(crate) fn new(base: PollSender<T>, when_full: WhenFull) -> Self {
+    pub fn new(base: PollSender<T>, when_full: WhenFull) -> Self {
         Self {
             base,
             overflow: None,
@@ -67,7 +67,7 @@ impl<T> BufferSender<T> {
     }
 
     /// Creates a new [`BufferSender`] wrapping the given channel sender and overflow sender.
-    pub(crate) fn with_overflow(base: PollSender<T>, overflow: BufferSender<T>) -> Self {
+    pub fn with_overflow(base: PollSender<T>, overflow: BufferSender<T>) -> Self {
         Self {
             base,
             overflow: Some(Box::pin(overflow)),
@@ -243,7 +243,7 @@ pub struct BufferReceiver<T> {
 
 impl<T> BufferReceiver<T> {
     /// Creates a new [`BufferReceiver`] wrapping the given channel receiver.
-    pub(crate) fn new(receiver: ReceiverStream<T>) -> Self {
+    pub fn new(receiver: ReceiverStream<T>) -> Self {
         Self {
             base: receiver,
             overflow: None,
@@ -252,7 +252,7 @@ impl<T> BufferReceiver<T> {
     }
 
     /// Creates a new [`BufferReceiver`] wrapping the given channel receiver and overflow receiver.
-    pub(crate) fn with_overflow(receiver: ReceiverStream<T>, overflow: BufferReceiver<T>) -> Self {
+    pub fn with_overflow(receiver: ReceiverStream<T>, overflow: BufferReceiver<T>) -> Self {
         Self {
             base: receiver,
             overflow: Some(Box::new(overflow)),

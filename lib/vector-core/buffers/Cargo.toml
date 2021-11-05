@@ -42,3 +42,7 @@ required-features = ["disk-buffer"]
 [[bench]]
 name = "in_memory"
 harness = false
+
+[[bench]]
+name = "in_memory_v2"
+harness = false

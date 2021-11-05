@@ -1,31 +1,10 @@
-use tokio::sync::mpsc::{channel, Sender};
-use tokio_stream::wrappers::ReceiverStream;
+use tokio::sync::mpsc::Sender;
 
-use crate::WhenFull;
-
-use super::{
+use crate::topology::{
     builder::IntoBuffer,
     channel::{BufferReceiver, BufferSender},
-    poll_sender::PollSender,
 };
-
-pub struct PassthroughChannel {
-    capacity: usize,
-}
-
-impl PassthroughChannel {
-    pub fn new(capacity: usize) -> Self {
-        PassthroughChannel { capacity }
-    }
-}
-
-impl IntoBuffer<u64> for PassthroughChannel {
-    fn into_buffer_parts(self) -> (PollSender<u64>, ReceiverStream<u64>) {
-        let (tx, rx) = channel(self.capacity);
-
-        (PollSender::new(tx), ReceiverStream::new(rx))
-    }
-}
+use crate::{MemoryBuffer, WhenFull};
 
 /// Builds a buffer using in-memory channels.
 ///
@@ -39,8 +18,8 @@ pub fn build_buffer(
 ) -> (BufferSender<u64>, BufferReceiver<u64>) {
     match mode {
         WhenFull::Block | WhenFull::DropNewest => {
-            let passthrough = PassthroughChannel::new(capacity);
-            let (sender, receiver) = passthrough.into_buffer_parts();
+            let channel = MemoryBuffer::new(capacity);
+            let (sender, receiver) = channel.into_buffer_parts();
             let sender = BufferSender::new(sender, mode);
             let receiver = BufferReceiver::new(receiver);
             (sender, receiver)
@@ -48,12 +27,12 @@ pub fn build_buffer(
         WhenFull::Overflow => {
             let overflow_mode = overflow_mode
                 .expect("overflow_mode must be specified when base is in overflow mode");
-            let overflow_channel = PassthroughChannel::new(capacity);
+            let overflow_channel = MemoryBuffer::new(capacity);
             let (overflow_sender, overflow_receiver) = overflow_channel.into_buffer_parts();
             let overflow_sender = BufferSender::new(overflow_sender, overflow_mode);
             let overflow_receiver = BufferReceiver::new(overflow_receiver);
 
-            let base_channel = PassthroughChannel::new(capacity);
+            let base_channel = MemoryBuffer::new(capacity);
             let (base_sender, base_receiver) = base_channel.into_buffer_parts();
             let base_sender = BufferSender::with_overflow(base_sender, overflow_sender);
             let base_receiver = BufferReceiver::with_overflow(base_receiver, overflow_receiver);
