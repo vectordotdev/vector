@@ -3,10 +3,11 @@
 set -o errexit
 set -o pipefail
 set -o nounset
-#set -o xtrace
+set -o xtrace
 
 __dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SOAK_ROOT="${__dir}/.."
+ROOT="${__dir}/../../"
+SOAK_ROOT="${ROOT}/soaks"
 
 display_usage() {
     echo ""
@@ -25,6 +26,10 @@ build_vector() {
         git remote add origin https://github.com/vectordotdev/vector.git
         git fetch --depth 1 origin "${SHA}"
         git checkout FETCH_HEAD
+        # Overwrite any .dockerignore in the build context. Docker can't, uh,
+        # ignore its own ignore file and older vectors had an overly strict
+        # ignore file, meaning we can't build vector in that setup.
+        cp "${ROOT}/.dockerignore" .
         popd
     fi
 
