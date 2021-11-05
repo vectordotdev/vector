@@ -4,7 +4,7 @@ This RFC discusses changes to apply framing and encoding across sinks in a consi
 
 ## Context
 
-In the context of sinks, we refer with _encoding_ to serializing an event to bytes and with _framing_ to the process of wrapping one or multiple serialized events into a bounded message that can be sent as a payload.
+In the context of sinks, we refer with _encoding_ to serializing an event to bytes and with _framing_ to the process of wrapping one or multiple serialized events into a bounded message that can be sent as payload to a sink.
 
 Currently, most sinks include the common `EncodingConfig<T>` in their config. It takes a generic argument where enums specify which encodings they support. However, the actual encoding logic is reimplemented by each sink individually, rather than falling back to a shared inventory of codec implementations. This leads to unnecessary drift in their feature set and behavior.
 
@@ -16,77 +16,76 @@ The codec work is very interweaved with the ongoing [schema work](https://github
 
 We want to hand over the reshaping responsibilities to the schema, and provide a transition layer to support existing reshaping capabilities of sinks until schema mappers are implemented.
 
-Another related current work is `StandardEncoding` which has been introduced in [#9215](https://github.com/vectordotdev/vector/pull/9215). It aims to solve one of our goals, by providing a consistent set of codec implementations. However, it does not separate the reshaping responsibilities.
+Another related current work is `StandardEncoding` which has been introduced in [#9215](https://github.com/vectordotdev/vector/pull/9215). It provides a consistent set of codec implementations aims and therefore aligns with our goals. However, it does not separate the reshaping responsibilities.
 
 ## Scope
 
 ### In scope
 
-- List work being directly addressed with this RFC.
+- Common support structures for encoding/framing
+- Set of commonly used encoding (text, JSON, ...) and framing (newline-delimited, octet-counting, ...) methods
+- Strategy for integrating encoding/framing with sinks
 
 ### Out of scope
 
-- List work that is completely out of scope. Use this to keep discussions focused. Please note the "future changes" section at the bottom.
+- Integration with schema system (automatic transformation of event fields depending)
 
 ## Pain
 
-- What internal or external *pain* are we solving?
-- Do not cover benefits of your change, this is covered in the "Rationale" section.
+Internally, we don't share implementations for encoding strategies that are very commonly used (e.g. JSON, newline-delimited). This leads to duplicated effort and missing guidance for handling encoding in sinks since no canonical implementation exists.
+
+Externally, users are restricted by the available custom set of encodings implemented by the sink. There does not exist any mental model for consistent encoding/framing options for event data that applies to all sinks.
 
 ## Proposal
 
 ### User Experience
 
-- Explain your change as if you were describing it to a Vector user. We should be able to share this section with a Vector user to solicit feedback.
-- Does this change break backward compatibility? If so, what should users do to upgrade?
+Users should be able to set `encoding` and `framing` options on sinks, analogously to the `decoding` and `framing` options on sources. These options uniformly control how the event _payload_ is encoded. This distinction is important, as encoding for the sink specific _protocol_ and the event _payload_ are separate concerns. The payload should still be encoded according to the sink's protocol, and the sink should provide additional options if there are multiple protocols to choose from, e.g. under a `protocol` key.
+
+The fields containing event transformations in sinks on the current `encoding` options (`schema`, `only_fields`, `except_fields`, `timestamp_format`) should be moved to a dedicated option, e.g. `schema` or `transform`. Thus, this would introduce a breaking change in configurations. However, migration would be relatively straight-forward by nesting these options under the new key.
 
 ### Implementation
 
-- Explain your change as if you were presenting it to the Vector team.
-- When possible, demonstrate with psuedo code not text.
-- Be specific. Be opinionated. Avoid ambiguity.
+The following common config structures will be provided, analogously to the decoding/framing configs:
 
-## Rationale
+```rust
+pub trait SerializerConfig: Debug + DynClone + Send + Sync {
+    /// Builds a serializer from this configuration.
+    ///
+    /// Fails if the configuration is invalid.
+    fn build(&self) -> crate::Result<BoxedSerializer>;
+}
+```
 
-- Why is this change worth it?
-- What is the impact of not doing this?
-- How does this position us for success in the future?
+```rust
+pub trait FramingConfig: Debug + DynClone + Send + Sync {
+    /// Builds a framer from this configuration.
+    ///
+    /// Fails if the configuration is invalid.
+    fn build(&self) -> crate::Result<BoxedFramer>;
+}
+```
 
-## Drawbacks
+These can be build to form an `Encoder`:
 
-- Why should we not do this?
-- What kind on ongoing burden does this place on the team?
+```rust
+/// An encoder that can encode structured events to byte messages.
+pub struct Encoder {
+    serializer: BoxedSerializer,
+    framer: BoxedFramer,
+}
+```
 
-## Prior Art
-
-- List prior art, the good and bad.
-- Why can't we simply use or copy them?
-
-## Alternatives
-
-- What other approaches have been considered and why did you not choose them?
-- How about not doing this at all?
-
-## Outstanding Questions
-
-- List any remaining questions.
-- Use this to resolve ambiguity and collaborate with your team during the RFC process.
-- *These must be resolved before the RFC can be merged.*
+`Encoder` implements `tokio_util::codec::Encoder<SmallVec<[Event; 1]>>`. Internally, events first go through the `Serializer` which implements `tokio_util::codec::Encoder<SmallVec<[Event; 1]>>` and are then handed over to the `Framer` which implements `tokio_util::codec::Encoder<Bytes>`.
 
 ## Plan Of Attack
 
 Incremental steps to execute this change. These will be converted to issues after the RFC is approved:
 
-- [ ] Submit a PR with spike-level code _roughly_ demonstrating the change.
-- [ ] Incremental change #1
-- [ ] Incremental change #2
-- [ ] ...
-
-Note: This can be filled out during the review process.
-
-## Future Improvements
-
-- List any future improvements. Use this to keep your "plan of attack" scope small and project a sound design.
+- [ ] Implementation of support structures (`Encoder`, `SerializerConfig`, `FramingConfig`)
+- [ ] Implementation of selected `encoders`/`framers` (e.g. `JSON` and `newline_delimited`)
+- [ ] Example integration with first sink, e.g. `socket` or `http` which benefit most from generic encoding/framing options
+- [ ] Subsequent PRs for each integration to a sink
 
 ## Surveyed Sinks
 
