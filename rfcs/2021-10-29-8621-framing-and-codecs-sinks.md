@@ -89,37 +89,38 @@ Incremental steps to execute this change. These will be converted to issues afte
 
 ## Surveyed Sinks
 
-Initial investigation for this RFC 
+Overview for the current state of sinks regarding encoding:
 
-- aws_cloudwatch_logs: EncodingConfig, Encoding { Text, Json, }, enveloped in rusoto_logs::InputLogEvent. Text reads message_key()
-- aws_kinesis_firehose: EncodingConfig, Encoding { Text, Json, }, enveloped in rusoto_firehose::Record that serializes to base64. Text reads message_key()
-- aws_kinesis_streams: EncodingConfig, Encoding { Text, Json, }, enveloped in rusoto_kinesis::PutRecordsRequestEntry. Text reads message_key()
-- aws_s3: EncodingConfig, StandardEncodings { Text, Json, Ndjson, }, uses util::{RequestBuilder, Encoder, Compressor}. Text reads message_key()
-- aws_sqs: EncodingConfig, Encoding { Text, Json, }, enveloped in EncodedEvent<SendMessageEntry>. Text reads message_key()
-- azure_blob: EncodingConfig, Encoding { Ndjson, Text, }, enveloped in EncodedEvent<PartitionInnerBuffer>. Text reads message_key()
-- azure_monitor_logs: EncodingConfigWithDefault, Encoding { Default, }, only uses transformation capabilities
-- blackhole: -/-
-- clickhouse: EncodingConfigWithDefault, Encoding { Default, }, only uses transformation capabilities
-- console: EncodingConfig, Encoding { Text, Json, }. Text reads message_key()
-- datadog: EncodingConfigFixed, DatadogLogsJsonEncoding
-- datadog_archives
-- elasticsearch
-- file: EncodingConfig, Encoding { Text, Ndjson, }. Text reads message_key()
-- gcp
-- honeycomb
-- http: EncodingConfig, Encoding { Text, Ndjson, Json, }. Enveloped in HTTP request. Request-level compression. Sets headers depending on encoding
-- humio
-- influxdb
-- kafka: EncodingConfig, StandardEncodings { Text, Json, Ndjson, }, doesn't apply transformations?, uses Encoder<Event> for StandardEncodings encode_input, enveloped in KafkaRequest
-- logdna
-- loki
-- nats
-- new_relic_logs
-- papertrail
-- pulsar
-- redis
-- sematext
-- socket: EncodingConfig, Encoding { Text, Json, }. Text reads message_key()
-- splunk_hec
-- vector
-
+|sink|encoding config|notes|
+|-|-|-|
+|`aws_cloudwatch_logs`| `EncodingConfig<Encoding { Text, Json }>` | Enveloped in `rusoto_logs::InputLogEvent`. `Text` reads message_key()
+|`aws_kinesis_firehose`| `EncodingConfig<Encoding { Text, Json }>` | Enveloped in `rusoto_firehose::Record` that serializes to base64. `Text` reads `message_key()`
+|`aws_kinesis_streams`| `EncodingConfig<Encoding { Text, Json }>` | Enveloped in `rusoto_kinesis::PutRecordsRequestEntry`. `Text` reads `message_key()`
+|`aws_s3`| `EncodingConfig<StandardEncodings { Text, Json, Ndjson }>` | Uses util::{RequestBuilder, Encoder, Compressor}. `Text` reads `message_key()`
+|`aws_sqs`| `EncodingConfig<Encoding { Text, Json }>` | Enveloped in EncodedEvent<SendMessageEntry>. `Text` reads `message_key()`
+|`azure_blob`| `EncodingConfig<Encoding { Ndjson, Text }>` | Enveloped in EncodedEvent<PartitionInnerBuffer>. `Text` reads `message_key()`
+|`azure_monitor_logs`| `EncodingConfigWithDefault<Encoding { Default }>` | Reshapes events only, without encoding
+|`blackhole`| -/-
+|`clickhouse`| `EncodingConfigWithDefault<Encoding { Default }>` | Reshapes events only, without encoding
+|`console`| `EncodingConfig<Encoding { Text, Json }>` | `Text` reads `message_key()`
+|`datadog`| `EncodingConfigFixed<DatadogLogsJsonEncoding>` | Doesn't provide options to encode the event payload separately from the protocol
+|`datadog_archives`|
+|`elasticsearch`|
+|`file`| `EncodingConfig<Encoding { Text, Ndjson }>` | `Text` reads `message_key()`
+|`gcp`|
+|`honeycomb`|
+|`http`| `EncodingConfig<Encoding { Text, Ndjson, Json }>` | Enveloped in HTTP request. Request-level compression. Sets headers depending on encoding config
+|`humio`|
+|`influxdb`|
+|`kafka`| `EncodingConfig<StandardEncodings { Text, Json, Ndjson }>` | Doesn't reshape, uses `Encoder<Event>` for `StandardEncodings` in `encode_input`, enveloped in `KafkaRequest`
+|`logdna`|
+|`loki`|
+|`nats`|
+|`new_relic_logs`|
+|`papertrail`|
+|`pulsar`|
+|`redis`|
+|`sematext`|
+|`socket`| `EncodingConfig<Encoding { Text, Json }>` | `Text` reads `message_key()`
+|`splunk_hec`|
+|`vector`|
