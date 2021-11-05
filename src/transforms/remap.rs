@@ -44,7 +44,7 @@ impl TransformConfig for RemapConfig {
     }
 
     fn named_outputs(&self) -> Vec<String> {
-        vec![String::from("errors")]
+        vec![String::from("dropped")]
     }
 
     fn input_type(&self) -> DataType {
@@ -137,9 +137,7 @@ impl FallibleFunctionTransform for Remap {
         // ignore events if their failed/aborted, in which case we can skip the
         // cloning, since any mutations made by VRL will be ignored regardless.
         #[allow(clippy::if_same_then_else)]
-        let original_event = if self.program.can_fail() {
-            Some(event.clone())
-        } else if !self.drop_on_abort && self.program.can_abort() {
+        let original_event = if self.program.can_fail() || self.program.can_abort() {
             Some(event.clone())
         } else {
             None
@@ -158,13 +156,25 @@ impl FallibleFunctionTransform for Remap {
                     output.push(event)
                 }
             }
-            Err(Terminate::Abort(_)) => {
+            Err(Terminate::Abort(error)) => {
                 emit!(&RemapMappingAbort {
                     event_dropped: self.drop_on_abort,
                 });
 
                 if !self.drop_on_abort {
                     output.push(original_event.expect("event will be set"))
+                } else {
+                    let mut erred_event = original_event.expect("event will be set");
+                    if let Event::Log(ref mut log) = &mut erred_event {
+                        log.insert(
+                            log_schema().metadata_key(),
+                            serde_json::json!({
+                                "error": error.to_string(),
+                                "component": self.component_key,
+                            }),
+                        );
+                    }
+                    err_output.push(erred_event)
                 }
             }
             Err(Terminate::Error(error)) => {
