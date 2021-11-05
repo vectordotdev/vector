@@ -7,8 +7,8 @@ use lookup::LookupBuf;
 
 use crate::{
     ast::{self, Destination, GrokPattern},
-    date,
     grok_filter::GrokFilter,
+    matchers::date,
     parse_grok_pattern::parse_grok_pattern,
 };
 use itertools::{Itertools, Position};
