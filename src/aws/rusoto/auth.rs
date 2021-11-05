@@ -57,6 +57,11 @@ impl AwsAuthentication {
 }
 #[cfg(test)]
 mod test {
+    use super::*;
+    use crate::aws::auth::AwsAuthentication;
+    use rusoto_core::Region;
+    use std::fs::File;
+    use std::io::Write;
 
     #[test]
     fn parsing_credentials_file() {
