@@ -43,7 +43,7 @@ pub fn build_buffer(
 }
 
 /// Gets the current capacity of the underlying base channel of the given sender.
-pub fn get_base_sender_capacity<T: Send + 'static>(sender: &BufferSender<T>) -> usize {
+fn get_base_sender_capacity<T: Send + 'static>(sender: &BufferSender<T>) -> usize {
     sender
         .get_base_ref()
         .get_ref()
@@ -54,7 +54,7 @@ pub fn get_base_sender_capacity<T: Send + 'static>(sender: &BufferSender<T>) -> 
 /// Gets the current capacity of the underlying overflow channel of the given sender..
 ///
 /// As overflow is optional, the return value will be `None` is overflow is not configured.
-pub fn get_overflow_sender_capacity<T: Send + 'static>(sender: &BufferSender<T>) -> Option<usize> {
+fn get_overflow_sender_capacity<T: Send + 'static>(sender: &BufferSender<T>) -> Option<usize> {
     sender
         .get_overflow_ref()
         .and_then(|s| s.get_base_ref().get_ref())
@@ -64,6 +64,7 @@ pub fn get_overflow_sender_capacity<T: Send + 'static>(sender: &BufferSender<T>)
 /// Asserts the given sender's capacity, both for base and overflow, match the given values.
 ///
 /// The overflow value is wrapped in `Option<T>` as not all senders will have overflow configured.
+#[allow(clippy::missing_panics_doc)]
 pub fn assert_current_send_capacity<T>(
     sender: &mut BufferSender<T>,
     base_expected: usize,
