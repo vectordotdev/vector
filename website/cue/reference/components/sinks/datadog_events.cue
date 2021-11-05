@@ -5,7 +5,7 @@ components: sinks: datadog_events: {
 
 	classes: sinks._datadog.classes & {
 		development: "beta"
-		delivery:    "best_effort"
+		delivery:    "at_least_once"
 	}
 
 	features: {
