@@ -376,8 +376,9 @@ fn call(&mut self, req: HecRequest) -> Self::Future {
   sense in terms of what our users need from vector?~~ We will support most of
   the same Splunk HEC indexer acknowledgements behavior for better user
   experience and robustness.
-* For `splunk_hec` sink, should we instead allow users to configure channel
-  behavior (e.g. list of channel IDs, # of channels to use, etc.)?
+* ~~For `splunk_hec` sink, should we instead allow users to configure channel
+  behavior (e.g. list of channel IDs, # of channels to use, etc.)?~~ We will
+  leave this for future work.
 
 ## Plan of Attack
 
@@ -397,3 +398,7 @@ fn call(&mut self, req: HecRequest) -> Self::Future {
 * Refactor current `HecService` code to handle responses according to indexer
   acknowledgement integration
 * Integration and performance testing
+
+## Future Improvements
+
+* Allow advanced configuration of channel ID generation for `splunk_hec` sinks
