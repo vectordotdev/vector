@@ -435,6 +435,32 @@ cli: {
 	}
 
 	env_vars: {
+		PROCFS_ROOT: {
+			description: """
+				Sets an arbitrary path to the system's [procfs](\(urls.procfs)) root. This can be
+				used to expose host metrics from within a container. Vector uses the system's
+				`/proc` by default.
+				"""
+			type: string: default: null
+		}
+		RUST_BACKTRACE: {
+			description: """
+				Enables [Rust](\(urls.rust)) backtraces when errors are logged. We recommend using
+				this only when debugging, as it can degrade Vector's performance.
+				"""
+			type: bool: default: false
+		}
+		SYSFS_ROOT: {
+			description: """
+				Sets an arbitrary path to the system's [sysfs](\(urls.sysfs)) root. This can be used
+				to expose host metrics from within a container. Vector uses the system's `/sys` by
+				default.
+				"""
+			type: string: {
+				default: null
+				examples: ["/mnt/host/sys"]
+			}
+		}
 		VECTOR_COLOR: {
 			description: "Control when ANSI terminal formatting is used."
 			type: string: {
