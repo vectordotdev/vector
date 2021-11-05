@@ -1,12 +1,12 @@
 use crate::codecs::Decoder;
 use crate::config::log_schema;
 use crate::event::{BatchNotifier, Event};
-use crate::event::{BatchStatus, Value};
+use crate::event::{BatchStatus};
 use crate::shutdown::ShutdownSignal;
 use crate::sources::util::TcpError;
 use crate::Pipeline;
 use aws_sdk_sqs::model::DeleteMessageBatchRequestEntry;
-use aws_sdk_sqs::output::ReceiveMessageOutput;
+
 use aws_sdk_sqs::Client as SqsClient;
 use bytes::Bytes;
 use futures::future::ready;
@@ -88,7 +88,7 @@ impl SqsSource {
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
                 for message in messages {
                     if let Some(body) = message.body {
-                        let mut stream = decode_message(self.decoder.clone(), &body);
+                        let stream = decode_message(self.decoder.clone(), &body);
 
                         let mut stream = stream.map_ok(|event| event.with_batch_notifier(&batch));
                         let send_result = out.send_all(&mut stream).await;

@@ -1,5 +1,3 @@
-use crate::aws::rusoto::AwsCredentialsProvider;
-use rusoto_core::Region;
 use serde::{Deserialize, Serialize};
 
 /// Configuration for configuring authentication strategy for AWS.
@@ -26,8 +24,6 @@ pub enum AwsAuthentication {
     #[derivative(Default)]
     Default {},
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -145,32 +141,5 @@ mod tests {
             }
             _ => panic!(),
         }
-    }
-
-    #[test]
-    fn parsing_credentials_file() {
-        let tmpdir = tempfile::tempdir().unwrap();
-        let tmpfile_path = tmpdir.path().join("credentials");
-        let mut tmpfile = File::create(&tmpfile_path).unwrap();
-
-        writeln!(
-            tmpfile,
-            r#"
-            [default]
-            aws_access_key_id = default-access-key-id
-            aws_secret_access_key = default-secret
-        "#
-        )
-        .unwrap();
-
-        let auth = AwsAuthentication::File {
-            credentials_file: tmpfile_path.to_str().unwrap().to_string(),
-            profile: Some("default".to_string()),
-        };
-        let result = auth.build(&Region::AfSouth1, None).unwrap();
-        assert!(matches!(result, AwsCredentialsProvider::File { .. }));
-
-        drop(tmpfile);
-        tmpdir.close().unwrap();
     }
 }

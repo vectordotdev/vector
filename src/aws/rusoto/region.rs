@@ -1,6 +1,6 @@
 use http::{uri::InvalidUri, Uri};
 use rusoto_core::{region::ParseRegionError, Region};
-use serde::{Deserialize, Serialize};
+
 use snafu::{ResultExt, Snafu};
 use std::convert::TryFrom;
 use std::str::FromStr;
