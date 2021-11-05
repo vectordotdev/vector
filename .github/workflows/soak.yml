@@ -59,6 +59,7 @@ jobs:
     name: Compute metadata for soaks
     runs-on: ubuntu-20.04
     outputs:
+      pr-number: ${{ steps.pr-metadata.outputs.PR_NUMBER }}
       comparison-sha: ${{ steps.comparison.outputs.COMPARISON_SHA }}
       comparison-tag: ${{ steps.comparison.outputs.COMPARISON_TAG }}
       baseline-sha: ${{ steps.baseline.outputs.BASELINE_SHA }}
@@ -68,6 +69,13 @@ jobs:
         with:
           ref: master
           path: baseline-vector
+
+      - name: Report on PR metadata
+        id: pr-metadata
+        run: |
+          export PR_NUMBER=${{ github.event.number }}
+          echo "::set-output name=PR_NUMBER::${PR_NUMBER}"
+          echo "PR number: ${PR_NUMBER}"
 
       - name: Setup comparison variables
         id: comparison
@@ -188,12 +196,18 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
+      - uses: actions/cache@v2
+        with:
+          key: ${{ needs.compute-soak-meta.outputs.baseline-tag }}-${{ matrix.target }}
+          path: |
+            /tmp/${{ github.event.number }}/${{ matrix.target }}
+
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
 
       - name: Run baseline experiment
+        if: steps.cache-primes.outputs.cache-hit != 'true'
         run: |
-          rm -rf /tmp/${{ github.event.number }}/${{ matrix.target }}/
           mkdir -p /tmp/${{ github.event.number }}/${{ matrix.target }}/
           ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "baseline" ${{ needs.compute-soak-meta.outputs.baseline-tag }} /tmp/${{ github.event.number }}
 
@@ -211,12 +225,18 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
+      - uses: actions/cache@v2
+        with:
+          key: ${{ needs.compute-soak-meta.outputs.comparison-tag }}-${{ matrix.target }}
+          path: |
+            /tmp/${{ github.event.number }}/${{ matrix.target }}
+
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
 
       - name: Run comparison experiment
+        if: steps.cache-primes.outputs.cache-hit != 'true'
         run: |
-          rm -rf /tmp/${{ github.event.number }}/${{ matrix.target }}/
           mkdir -p /tmp/${{ github.event.number }}/${{ matrix.target }}/
           ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "comparison" ${{ needs.compute-soak-meta.outputs.comparison-tag }} /tmp/${{ github.event.number }}
 
@@ -245,40 +265,17 @@ jobs:
 
       - name: Analyze captures
         run: |
-          ./soaks/bin/analyze_experiment.sh ${{ github.event.number }}-captures/ ${{ needs.compute-soak-meta.outputs.baseline-sha }} ${{ needs.compute-soak-meta.outputs.comparison-sha }}
+          ./soaks/bin/analyze_experiment.sh ${{ github.event.number }}-captures/ ${{ needs.compute-soak-meta.outputs.baseline-sha }} ${{ needs.compute-soak-meta.outputs.comparison-sha }} > /tmp/${{ github.event.number}}-${{ github.run_number }}-analysis
 
-  observer:
-    name: Build and push 'observer' to Github CR
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Check out the repo
-        uses: actions/checkout@v2.4.0
-
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v1
-
-      - name: Log in to the Container registry
-        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+      - name: Read analysis file
+        id: read-analysis
+        uses: juliangruber/read-file-action@v1
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          path: /tmp/${{ github.event.number }}-${{ github.run_number }}-analysis
 
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@548e2346a9987b56d8a4104fe776321ff8e23440
+      - name: Post Results To PR
+        uses: peter-evans/create-or-update-comment@v1
         with:
-          images: ghcr.io/${{ github.repository }}/soak-observer
-          tags: type=sha, format=long
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
-        with:
-          context: .
-          file: lib/soak/Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha, scope=${{ github.workflow }}
-          cache-to: type=gha, scope=${{ github.workflow }}
+          issue-number: ${{ needs.compute-soak-meta.outputs.pr-number }}
+          edit-mode: replace
+          body: ${{ steps.read-analysis.outputs.content }}
