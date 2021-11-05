@@ -185,7 +185,7 @@ impl SourceConfig for JournaldConfig {
                 batch_size,
                 remap_priority: self.remap_priority,
                 out: cx.out,
-                acknowledgements: cx.acknowledgements,
+                acknowledgements: cx.acknowledgements.enabled,
             }
             .run_shutdown(cx.shutdown, start),
         ))

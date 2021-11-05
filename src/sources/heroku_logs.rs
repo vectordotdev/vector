@@ -290,7 +290,7 @@ mod tests {
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
         let mut context = SourceContext::new_test(sender);
-        context.acknowledgements = acknowledgements;
+        context.acknowledgements.enabled = acknowledgements;
         tokio::spawn(async move {
             LogplexConfig {
                 address,

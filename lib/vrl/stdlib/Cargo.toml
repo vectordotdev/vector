@@ -33,7 +33,7 @@ sha-2 = { package = "sha2", version = "0.9", optional = true }
 sha-3 = { package = "sha3", version = "0.9", optional = true }
 shared = { path = "../../shared", default-features = false, optional = true }
 strip-ansi-escapes = { version = "0.1", optional = true }
-syslog_loose = { version = "0.15", optional = true }
+syslog_loose = { version = "0.16", optional = true }
 tracing = { version = "0.1", optional = true }
 url = { version = "2", optional = true }
 uuid = { version = "0.8", features = ["v4"], optional = true }
@@ -150,6 +150,7 @@ default = [
     "strip_ansi_escape_codes",
     "strip_whitespace",
     "tally",
+    "tally_value",
     "tag_types_externally",
     "timestamp",
     "to_bool",
@@ -272,6 +273,7 @@ strip_ansi_escape_codes = ["bytes", "strip-ansi-escapes"]
 strip_whitespace = []
 tag_types_externally = ["shared/btreemap"]
 tally = []
+tally_value = []
 timestamp = []
 to_bool = ["shared/conversion"]
 to_float = ["shared/conversion"]

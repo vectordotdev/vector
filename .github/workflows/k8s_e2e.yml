@@ -22,8 +22,6 @@ on:
       - "rust-toolchain"
       - "distribution/**"
   pull_request:
-    paths-ignore:
-      - "website/**"
 
 env:
   AUTOINSTALL: true

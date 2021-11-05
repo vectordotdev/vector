@@ -7,5 +7,5 @@
 !build.rs
 !Cargo.lock
 !Cargo.toml
-!rust-toolchain
+!rust-toolchain.toml
 !scripts

@@ -45,9 +45,6 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         let protocol = tls.http_protocol_name();
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
         let path = path.to_owned();
-        let out = cx.out;
-        let shutdown = cx.shutdown;
-        let acknowledgements = cx.acknowledgements;
         Ok(Box::pin(async move {
             let span = crate::trace::current_span();
             let mut filter: BoxedFilter<()> = warp::post().boxed();
@@ -105,7 +102,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                 events
                             });
 
-                        handle_request(events, acknowledgements, out.clone())
+                        handle_request(events, cx.acknowledgements.enabled, cx.out.clone())
                     },
                 )
                 .with(warp::trace(move |_info| span.clone()));
@@ -127,7 +124,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             warp::serve(routes)
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),
-                    shutdown.map(|_| ()),
+                    cx.shutdown.map(|_| ()),
                 )
                 .await;
             Ok(())
