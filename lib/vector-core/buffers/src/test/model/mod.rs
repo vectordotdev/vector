@@ -113,8 +113,8 @@ impl Drop for VariantGuard {
 ///
 /// Acks are not modeled yet. I believe doing so would be a straightforward
 /// process.
-#[test]
-fn model_check() {
+#[tokio::test]
+async fn model_check() {
     fn inner(variant: Variant, actions: Vec<Action>) -> TestResult {
         if !check(&variant) {
             return TestResult::discard();

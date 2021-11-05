@@ -14,8 +14,10 @@ leveldb = { version = "0.8.6", default-features = false, optional = true }
 metrics = { version = "0.17.0", default-features = false, features = ["std"] }
 pin-project = { version = "1.0.8", default-features = false }
 serde = { version = "1.0.130", default-features = false, features = ["derive"] }
-snafu = { version = "0.6.10", default-features = false, features = ["std"], optional = true }
-tokio = { version = "1.12.0", default-features = false, features = ["rt", "macros", "rt-multi-thread"] }
+snafu = { version = "0.6.10", default-features = false, features = ["std"] }
+tokio = { version = "1.13.0", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync"] }
+tokio-stream = { version = "0.1", default-features = false, features = ["sync"] }
+tokio-util = { version = "0.6", default-features = false }
 tracing = { version = "0.1.29", default-features = false }
 
 [dev-dependencies]
@@ -26,11 +28,11 @@ tempdir = "0.3"
 tokio-test = "0.4.2"
 metrics-exporter-prometheus = "0.6"
 metrics-util = { version = "0.10.1", default-features = false }
-metrics-tracing-context = { version = "0.8.0", default-features = false }
-tracing-subscriber = { version = "0.2.24", default-features = false }
+metrics-tracing-context = { version = "0.8.1", default-features = false }
+tracing-subscriber = { version = "0.2.25", default-features = false, features = ["registry"] }
 
 [features]
-disk-buffer = ["db-key", "snafu", "leveldb"]
+disk-buffer = ["db-key", "leveldb"]
 
 [[bench]]
 name = "on_disk"
@@ -39,4 +41,8 @@ required-features = ["disk-buffer"]
 
 [[bench]]
 name = "in_memory"
+harness = false
+
+[[bench]]
+name = "in_memory_v2"
 harness = false

@@ -71,7 +71,7 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
                 match value {
                     // root-level maps must be merged
                     Value::Object(map) if path.is_root() || path.segments[0].is_index() => {
-                        parsed.as_object_mut().unwrap().extend(map);
+                        parsed.as_object_mut().expect("root is object").extend(map);
                     }
                     // anything else at the root leve must be ignored
                     _ if path.is_root() || path.segments[0].is_index() => {}
@@ -386,6 +386,23 @@ mod tests {
                    "field" =>  Value::Array(vec![1.into(), "INFO".into(), Value::Null]),
                 },
             })
+        );
+    }
+
+    #[test]
+    fn error_on_circular_dependency() {
+        let err = parse_grok_rules(
+            // patterns
+            &[r#"%{pattern1}"#.to_string()],
+            // aliases with a circular dependency
+            btreemap! {
+            "pattern1" => r#"%{pattern2}"#.to_string(),
+            "pattern2" => r#"%{pattern1}"#.to_string()},
+        )
+        .unwrap_err();
+        assert_eq!(
+            format!("{}", err),
+            "Circular dependency found in the alias 'pattern1'"
         );
     }
 }

@@ -23,16 +23,6 @@ components: sources: aws_s3: components._aws & {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: [
 			"""
 				The AWS S3 source requires a SQS queue configured to receive S3
@@ -57,7 +47,6 @@ components: sources: aws_s3: components._aws & {
 				enum: {
 					sqs: "Consume S3 objects by polling for bucket notifications sent to an [AWS SQS queue](\(urls.aws_sqs))."
 				}
-				syntax: "literal"
 			}
 		}
 		compression: {
@@ -72,14 +61,12 @@ components: sources: aws_s3: components._aws & {
 					zstd: "ZSTD format."
 					none: "Uncompressed."
 				}
-				syntax: "literal"
 			}
 		}
 		sqs: {
 			common:      true
 			description: "SQS strategy options. Required if strategy=`sqs`."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -87,7 +74,6 @@ components: sources: aws_s3: components._aws & {
 						common:      true
 						description: "How long to wait when polling SQS for new messages."
 						required:    false
-						warnings: []
 						type: uint: {
 							default: 15
 							unit:    "seconds"
@@ -107,16 +93,13 @@ components: sources: aws_s3: components._aws & {
 						common:      true
 						description: "Whether to delete the message once Vector processes it. It can be useful to set this to `false` to debug or during initial Vector setup."
 						required:    false
-						warnings: []
 						type: bool: default: true
 					}
 					queue_url: {
 						description: "The URL of the SQS queue to receive bucket notifications from."
 						required:    true
-						warnings: []
 						type: string: {
 							examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
-							syntax: "literal"
 						}
 					}
 				}
@@ -132,7 +115,6 @@ components: sources: aws_s3: components._aws & {
 				required:    true
 				type: string: {
 					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
-					syntax: "literal"
 				}
 			}
 			timestamp: fields._current_timestamp & {
@@ -143,7 +125,6 @@ components: sources: aws_s3: components._aws & {
 				required:    true
 				type: string: {
 					examples: ["my-bucket"]
-					syntax: "literal"
 				}
 			}
 			object: {
@@ -151,7 +132,6 @@ components: sources: aws_s3: components._aws & {
 				required:    true
 				type: string: {
 					examples: ["AWSLogs/111111111111/vpcflowlogs/us-east-1/2020/10/26/111111111111_vpcflowlogs_us-east-1_fl-0c5605d9f1baf680d_20201026T1950Z_b1ea4a7a.log.gz"]
-					syntax: "literal"
 				}
 			}
 			region: {
@@ -159,7 +139,6 @@ components: sources: aws_s3: components._aws & {
 				required:    true
 				type: string: {
 					examples: ["us-east-1"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -197,34 +176,36 @@ components: sources: aws_s3: components._aws & {
 				[transforms.elasticloadbalancing_fields_parsed]
 				type = "regex_parser"
 				inputs = ["s3"]
-				regex = '(?x)^
-						(?P<type>[\\w]+)[ ]
-						(?P<timestamp>[\\w:.-]+)[ ]
-						(?P<elb>[^\\s]+)[ ]
-						(?P<client_host>[\\d.:-]+)[ ]
-						(?P<target_host>[\\d.:-]+)[ ]
-						(?P<request_processing_time>[\\d.-]+)[ ]
-						(?P<target_processing_time>[\\d.-]+)[ ]
-						(?P<response_processing_time>[\\d.-]+)[ ]
-						(?P<elb_status_code>[\\d-]+)[ ]
-						(?P<target_status_code>[\\d-]+)[ ]
-						(?P<received_bytes>[\\d-]+)[ ]
-						(?P<sent_bytes>[\\d-]+)[ ]
-						"(?P<request_method>[\\w-]+)[ ]
-						(?P<request_url>[^\\s]+)[ ]
-						(?P<request_protocol>[^"\\s]+)"[ ]
-						"(?P<user_agent>[^"]+)"[ ]
-						(?P<ssl_cipher>[^\\s]+)[ ]
-						(?P<ssl_protocol>[^\\s]+)[ ]
-						(?P<target_group_arn>[\\w.:/-]+)[ ]
-						"(?P<trace_id>[^\\s"]+)"[ ]
-						"(?P<domain_name>[^\\s"]+)"[ ]
-						"(?P<chosen_cert_arn>[\\w:./-]+)"[ ]
-						(?P<matched_rule_priority>[\\d-]+)[ ]
-						(?P<request_creation_time>[\\w.:-]+)[ ]
-						"(?P<actions_executed>[\\w,-]+)"[ ]
-						"(?P<redirect_url>[^"]+)"[ ]
-						"(?P<error_reason>[^"]+)"'
+				regex = '''
+					(?x)^
+					(?P<type>[\\w]+)[ ]
+					(?P<timestamp>[\\w:.-]+)[ ]
+					(?P<elb>[^\\s]+)[ ]
+					(?P<client_host>[\\d.:-]+)[ ]
+					(?P<target_host>[\\d.:-]+)[ ]
+					(?P<request_processing_time>[\\d.-]+)[ ]
+					(?P<target_processing_time>[\\d.-]+)[ ]
+					(?P<response_processing_time>[\\d.-]+)[ ]
+					(?P<elb_status_code>[\\d-]+)[ ]
+					(?P<target_status_code>[\\d-]+)[ ]
+					(?P<received_bytes>[\\d-]+)[ ]
+					(?P<sent_bytes>[\\d-]+)[ ]
+					"(?P<request_method>[\\w-]+)[ ]
+					(?P<request_url>[^\\s]+)[ ]
+					(?P<request_protocol>[^"\\s]+)"[ ]
+					"(?P<user_agent>[^"]+)"[ ]
+					(?P<ssl_cipher>[^\\s]+)[ ]
+					(?P<ssl_protocol>[^\\s]+)[ ]
+					(?P<target_group_arn>[\\w.:/-]+)[ ]
+					"(?P<trace_id>[^\\s"]+)"[ ]
+					"(?P<domain_name>[^\\s"]+)"[ ]
+					"(?P<chosen_cert_arn>[\\w:./-]+)"[ ]
+					(?P<matched_rule_priority>[\\d-]+)[ ]
+					(?P<request_creation_time>[\\w.:-]+)[ ]
+					"(?P<actions_executed>[\\w,-]+)"[ ]
+					"(?P<redirect_url>[^"]+)"[ ]
+					"(?P<error_reason>[^"]+)"
+				'''
 				field = "message"
 				drop_failed = false
 

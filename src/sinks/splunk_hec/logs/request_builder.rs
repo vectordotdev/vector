@@ -1,8 +1,11 @@
 use vector_core::event::{EventFinalizers, Finalizable};
 
-use crate::sinks::util::{encoding::EncodingConfig, Compression, RequestBuilder};
+use crate::sinks::{
+    splunk_hec::common::request::HecRequest,
+    util::{encoding::EncodingConfig, Compression, RequestBuilder},
+};
 
-use super::{encoder::HecLogsEncoder, service::HecLogsRequest, sink::HecProcessedEvent};
+use super::{encoder::HecLogsEncoder, sink::HecProcessedEvent};
 
 pub struct HecLogsRequestBuilder {
     pub compression: Compression,
@@ -14,7 +17,7 @@ impl RequestBuilder<Vec<HecProcessedEvent>> for HecLogsRequestBuilder {
     type Events = Vec<HecProcessedEvent>;
     type Encoder = EncodingConfig<HecLogsEncoder>;
     type Payload = Vec<u8>;
-    type Request = HecLogsRequest;
+    type Request = HecRequest;
     type Error = std::io::Error;
 
     fn compression(&self) -> Compression {
@@ -35,7 +38,7 @@ impl RequestBuilder<Vec<HecProcessedEvent>> for HecLogsRequestBuilder {
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
         let (events_count, events_byte_size, finalizers) = metadata;
-        HecLogsRequest {
+        HecRequest {
             body: payload,
             finalizers,
             events_count,
