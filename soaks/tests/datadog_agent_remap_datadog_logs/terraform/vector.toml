@@ -16,10 +16,6 @@ address = "0.0.0.0:8282"
 ## Transforms
 ##
 
-[transforms.parse_message]
-type = "noop"
-inputs = ["datadog_agent"]
-
 ##
 ## Sinks
 ##
@@ -31,7 +27,7 @@ address = "0.0.0.0:9090"
 
 [sinks.datadog_logs]
 type = "datadog_logs"
-inputs = ["parse_message"]
+inputs = ["datadog_agent"]
 endpoint = "http://http-blackhole:8080"
 default_api_key = "DEADBEEF"
 healthcheck.enabled = false
