@@ -184,39 +184,43 @@ Second, we describe implementation details for channel behavior.
 
 #### AckId Data Structures
 
-* A [bitvec::BitVec](https://docs.rs/bitvec/0.22.3/bitvec/) (or similar
-  structure) `ack_ids_in_use` whose indices represent `ackId`’s and max size is
-  determined by `max_pending_acks_per_channel`. This `bitvec` will grow
-  dynamically. A value of `0` at an index indicates that the `ackId` is not
-  in-use. A value of `1` indicates in-use.
-* A bitvec `ack_ids_ack_status` whose indices also correspond to `ackId`’s and
-  max size is determined by `max_pending_acks_per_channel`. This `bitvec` will
-  grow dynamically. A value of `0` at an index indicates that the associated
-  request data has not yet been delivered. A value of `1` indicates that the
-  data has been delivered. The two bitvecs will be wrapped in a struct with
-  utility methods for setting bits, removing in use ids, etc. Note, a single
-  bitvec is not necessarily sufficient as we care about 3 states: `ackId` is
-  available, `ackId` is pending/dropped, and `ackId` is delivered.
-* An index pointer `currently_available_ack_id` initialized with `0`.
+* A
+  [RoaringTreemap](https://docs.rs/roaring/0.8.0/roaring/treemap/struct.RoaringTreemap.html)
+  (memory efficient bitset representing a set of integers) `ack_ids_in_use`. An
+  `ackId` will be a `u64` value whose membership in the bitmap will indicate
+  in-use. The maximum number of elements allowed in the bitmap at any given time
+  is determined by `max_pending_acks_per_channel`.
+* A `RoaringTreemap` `ack_ids_ack_status`. Membership of an `ackId` in
+  `ack_ids_ack_status` indicates that the request data associated with said
+  `ackId` has been delivered. Otherwise the request data is pending
+  acknowledgement or dropped. Max size is again determined by
+  `max_pending_acks_per_channel`. Note, a single bitmap is not necessarily
+  sufficient as we care about 3 states: `ackId` is available, `ackId` is
+  pending/dropped, and `ackId` is delivered.
+* A `u64` value `currently_available_ack_id` initialized with `0`.
 * The above will be wrapped in a `HecAckInfo` struct with utility methods.
 
 #### AckId Process
 
 * Assigning and updating `ackId`’s and statuses
   * To assign a new `ackId` to a new request, we use the
-    `currently_available_ack_id` current value and set
-    `ack_ids_in_use[currently_available_ack_id] = 1`. We increment
-    `currently_available_ack_id` to the next index. We respond to the request
-    with a `200 OK` with the `ackId` included in the JSON body.
-    * If incrementing causes `currently_available_ack_id` to exceed the size of
-      the bitvec, we wrap around to index `0` and search for the nearest
-      available `ackId` (i.e. where `ack_ids_in_use[index] = 0`).
-    * If there are no available `ackId`’s, we can begin to drop pending, in-use
-      `ackId`’s, setting `ack_ids_in_use[...] = 0`. We drop starting from
-      `currently_available_ack_id + 1` which will generally be the oldest
-      pending `ackId`'s. We should drop a chunk of pending `ackId`’s rather than
-      a single `ackId` at a time to avoid potentially re-scanning the
-      `ack_ids_in_use` array on the next incoming request.
+    `currently_available_ack_id` current value and insert the value into
+    `ack_ids_in_use`. We increment `currently_available_ack_id` by 1. We respond
+    to the request with a `200 OK` with the `ackId` included in the JSON body.
+    Given the benefits of a roaring bitmap, supporting a potentially sparse and
+    wide range of `ackId` values is still manageable.
+    * If `max_pending_acks_per_channel == ack_ids_in_use.len()`, we drop
+      `ackId`'s starting from `ack_ids_in_use.min()` which will generally be the
+      oldest pending acks.
+    * Incrementing `currently_available_ack_id` to exceed the `u64::MAX_SIZE`
+      should be extremely rare, especially given that ack info is handled per
+      channel and channels can be treated ephemerally (expiring after, for
+      example, 10 minutes of idling). To simplify this edge case, we can
+      consider resetting `ack_ids_in_use` and `ack_ids_ack_status` and setting
+      `currently_available_ack_id = 0` at this point. If we did not reset and
+      simply wrapped `currently_available_ack_id` back to `0`, we may begin
+      having issues with the pending ack drop strategy
+      (`ack_ids_in_use.min()` may no longer be oldest).
   * To associate request data to the assigned `ackId` and receive the status of
     the data, we will use the existing `BatchNotifier`/`BatchReceiver` system
     from Vector’s overall end-to-end-acknowledgement infrastructure.
@@ -246,15 +250,14 @@ Second, we describe implementation details for channel behavior.
     }
     ```
 
-  * When the data in the request is successfully delivered, we mark
-    `ack_ids_ack_status[currently_available_ack_id] = 1`.
+  * When the data in the request is successfully delivered, we add the
+    respective `ackId` to `ack_ids_ack_status`.
 * Querying ackId status
   * We add a new `/services/collector/ack` route
-  * `ackId`’s from incoming requests are used to index into
-    `ack_ids_ack_status`. We return true/false depending on the value in the
-    bitvec.
-  * If we return true for an ackId, we mark `ack_ids_in_use[ack_id] = 0` and
-    `ack_ids_ack_status[ack_id] = 0`. The `ackId` can then be reused.
+  * `ackId`’s from incoming requests are used to query `ack_ids_ack_status`. We
+    return true/false depending on whether the value is a member of the bitmap.
+  * If we return true for an `ackId`, we remove said `ackId` from `ack_ids_in_use` and
+    `ack_ids_ack_status`. The `ackId` can then be reused.
 
 #### Channel Behavior
 
