@@ -279,39 +279,3 @@ jobs:
           issue-number: ${{ needs.compute-soak-meta.outputs.pr-number }}
           edit-mode: replace
           body: ${{ steps.read-analysis.outputs.content }}
-
-  observer:
-    name: Build and push 'observer' to Github CR
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Check out the repo
-        uses: actions/checkout@v2.4.0
-
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v1
-
-      - name: Log in to the Container registry
-        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@548e2346a9987b56d8a4104fe776321ff8e23440
-        with:
-          images: ghcr.io/${{ github.repository }}/soak-observer
-          tags: type=sha, format=long
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
-        with:
-          context: .
-          file: lib/soak/Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha, scope=${{ github.workflow }}
-          cache-to: type=gha, scope=${{ github.workflow }}
