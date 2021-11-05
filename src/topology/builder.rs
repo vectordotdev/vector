@@ -252,15 +252,16 @@ pub async fn build_pieces(
                             t.transform(&mut buf, v);
                             output_buf.append(&mut buf);
                         }
-                        emit!(&EventsSent {
-                            count: output_buf.len(),
-                            byte_size: output_buf.size_of(),
-                        });
+
+                        let count = output_buf.len();
+                        let byte_size = output_buf.size_of();
 
                         timer.start_wait();
                         output
                             .send_all(&mut stream::iter(output_buf.into_iter()).map(Ok))
                             .await?;
+
+                        emit!(&EventsSent { count, byte_size });
                     }
                     debug!("Finished.");
                     Ok(TaskOutput::Transform)
@@ -308,10 +309,8 @@ pub async fn build_pieces(
                         }
 
                         // TODO: account for error outputs separately?
-                        emit!(&EventsSent {
-                            count: output_buf.len() + err_output_buf.len(),
-                            byte_size: output_buf.size_of() + err_output_buf.size_of(),
-                        });
+                        let count = output_buf.len() + err_output_buf.len();
+                        let byte_size = output_buf.size_of() + err_output_buf.size_of();
 
                         timer.start_wait();
                         for event in output_buf {
@@ -322,6 +321,8 @@ pub async fn build_pieces(
                             errors_output.feed(event).await.expect("unit error");
                         }
                         errors_output.flush().await.expect("unit error");
+
+                        emit!(&EventsSent { count, byte_size });
                     }
 
                     debug!("Finished.");
