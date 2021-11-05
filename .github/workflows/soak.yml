@@ -253,12 +253,12 @@ jobs:
         with:
           path: /tmp/${{ github.event.number }}-${{ github.run_number }}-analysis
 
-      - uses: actions/github-script@v3
+      - name: Post Results To PR
+        uses: peter-evans/create-or-update-comment@v1.4
         with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
-          script: |
-            const { issue: { number: issue_number }, repo: { owner, repo }  } = context;
-            github.issues.createComment({ issue_number, owner, repo, body: '${{ steps.read-analysis.outputs.content }}' });
+          issue-number: ${{ github.event.inputs.pr-number }}
+          edit-mode: replace
+          body: ${{ steps.read-analysis.outputs.content }}
 
   observer:
     name: Build and push 'observer' to Github CR
