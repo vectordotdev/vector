@@ -104,10 +104,13 @@ impl Timer {
     }
 
     /// Complete the current waiting span and begin a non-waiting span
-    pub fn stop_wait(&mut self) {
+    pub fn stop_wait(&mut self) -> Instant {
         if self.waiting {
-            self.end_span();
+            let now = self.end_span();
             self.waiting = false;
+            now
+        } else {
+            Instant::now()
         }
     }
 
@@ -118,9 +121,9 @@ impl Timer {
         // End the current span so it can be accounted for, but do not change
         // whether or not we're in the waiting state. This way the next span
         // inherits the correct status.
-        self.end_span();
+        let now = self.end_span();
 
-        let total_duration = self.overall_start.elapsed();
+        let total_duration = now.duration_since(self.overall_start);
         let wait_ratio = self.total_wait.as_secs_f64() / total_duration.as_secs_f64();
         let utilization = 1.0 - wait_ratio;
 
@@ -134,10 +137,11 @@ impl Timer {
         self.total_wait = Duration::new(0, 0);
     }
 
-    fn end_span(&mut self) {
+    fn end_span(&mut self) -> Instant {
         if self.waiting {
             self.total_wait += self.span_start.elapsed();
         }
         self.span_start = Instant::now();
+        self.span_start
     }
 }

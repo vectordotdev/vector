@@ -234,10 +234,10 @@ pub async fn build_pieces(
                 let transform = async move {
                     timer.start_wait();
                     while let Some(events) = input_rx.next().await {
-                        timer.stop_wait();
-                        if last_report.elapsed().as_secs() >= 5 {
+                        let stopped = timer.stop_wait();
+                        if stopped.duration_since(last_report).as_secs() >= 5 {
                             timer.report();
-                            last_report = Instant::now();
+                            last_report = stopped;
                         }
 
                         emit!(&EventsReceived {
@@ -286,10 +286,10 @@ pub async fn build_pieces(
                 let transform = async move {
                     timer.start_wait();
                     while let Some(events) = input_rx.next().await {
-                        timer.stop_wait();
-                        if last_report.elapsed().as_secs() >= 5 {
+                        let stopped = timer.stop_wait();
+                        if stopped.duration_since(last_report).as_secs() >= 5 {
                             timer.report();
-                            last_report = Instant::now();
+                            last_report = stopped;
                         }
 
                         emit!(&EventsReceived {
