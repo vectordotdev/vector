@@ -63,12 +63,11 @@ done
 
 pushd "${__dir}"
 
-capture_dir=$(mktemp -d /tmp/"${SOAK_NAME}".XXXXXX)
+capture_dir=$(mktemp -d /tmp/soak-captures.XXXXXX)
 echo "Captures will be recorded into ${capture_dir}"
 
 ./bin/soak_one.sh "${USE_LOCAL_IMAGE}" "${SOAK_NAME}" "baseline" "${BASELINE}" "${capture_dir}"
 ./bin/soak_one.sh "${USE_LOCAL_IMAGE}" "${SOAK_NAME}" "comparison" "${COMPARISON}" "${capture_dir}"
+./bin/analyze_experiment.sh "${capture_dir}" "${BASELINE}" "${COMPARISON}"
 
 popd
-
-./bin/analyze_experiment.sh "${capture_dir}" "${BASELINE}" "${COMPARISON}"
