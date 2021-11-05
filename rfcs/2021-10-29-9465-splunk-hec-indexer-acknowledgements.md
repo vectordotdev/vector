@@ -262,7 +262,7 @@ Second, we describe implementation details for channel behavior.
 #### Channel Behavior
 
 The above `ackId` process will occur per-channel. As part of the `splunk_hec`
-source struct, we will store a `Arc<Mutex<Map<channel_id, channel>>>` where
+source struct, we will store a `Arc<RwLock<Map<channel_id, channel>>>` where
 `channel_id` is a `String` value and `channel` is a struct wrapping a
 `last_used_timestamp` (used to expire channels) and the `HecAckInfo` structure
 described above.
