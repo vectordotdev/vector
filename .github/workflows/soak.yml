@@ -59,6 +59,7 @@ jobs:
     name: Compute metadata for soaks
     runs-on: ubuntu-20.04
     outputs:
+      pr-number: ${{ github.event.issue.number }}
       comparison-sha: ${{ steps.comparison.outputs.COMPARISON_SHA }}
       comparison-tag: ${{ steps.comparison.outputs.COMPARISON_TAG }}
       baseline-sha: ${{ steps.baseline.outputs.BASELINE_SHA }}
@@ -68,6 +69,10 @@ jobs:
         with:
           ref: master
           path: baseline-vector
+
+      - name: Report on PR metadata
+        run: |
+          echo "PR number: ${{ github.event.issue.number }}"
 
       - name: Setup comparison variables
         id: comparison
@@ -268,7 +273,7 @@ jobs:
       - name: Post Results To PR
         uses: peter-evans/create-or-update-comment@v1
         with:
-          issue-number: ${{ github.event.issue.number }}
+          issue-number: ${{ needs.compute-soak-meta.outputs.pr-number }}
           edit-mode: replace
           body: ${{ steps.read-analysis.outputs.content }}
 
