@@ -13,7 +13,7 @@ serde = { version = "1.0.130", features = ["derive"] }
 serde_json = { version = "1.0.68", features = ["raw_value"] }
 
 # Error handling
-anyhow = "1.0.44"
+anyhow = "1.0.45"
 
 # Tokio / Futures
 async-stream = "0.3.2"
