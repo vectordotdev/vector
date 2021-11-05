@@ -10,10 +10,8 @@ use aws_types::region::Region;
 use aws_types::Credentials;
 
 impl AwsAuthentication {
-    pub async fn build_config(&self, region: Region) -> Config {
-        let mut builder = Builder::default().region(region);
-
-        let credentials_provider = match self {
+    pub async fn credentials_provider(&self) -> SharedCredentialsProvider {
+        match self {
             Self::Static {
                 access_key_id,
                 secret_access_key,
@@ -44,8 +42,21 @@ impl AwsAuthentication {
             AwsAuthentication::Default {} => {
                 SharedCredentialsProvider::new(default_credentials_provider().await)
             }
-        };
-        builder.credentials_provider(credentials_provider).build()
+        }
+    }
+
+    // pub async fn build_config(&self, region: Region) -> Config {
+    //     let mut builder = Builder::default().region(region);
+    //
+    //     let credentials_provider = ;
+    //     builder.credentials_provider(credentials_provider).build()
+    // }
+
+    pub(crate) fn test_auth() -> AwsAuthentication {
+        AwsAuthentication::Static {
+            access_key_id: "dummy".to_string(),
+            secret_access_key: "dummy".to_string(),
+        }
     }
 }
 

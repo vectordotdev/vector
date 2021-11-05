@@ -15,10 +15,17 @@ impl RegionOrEndpoint {
         }
     }
 
-    pub const fn with_endpoint(endpoint: String) -> Self {
+    pub fn with_endpoint(endpoint: impl Into<String>) -> Self {
         Self {
             region: None,
-            endpoint: Some(endpoint),
+            endpoint: Some(endpoint.into()),
+        }
+    }
+
+    pub fn with_both(region: impl Into<String>, endpoint: impl Into<String>) -> Self {
+        Self {
+            region: Some(region.into()),
+            endpoint: Some(endpoint.into()),
         }
     }
 }

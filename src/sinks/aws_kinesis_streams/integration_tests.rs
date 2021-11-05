@@ -2,6 +2,7 @@
 #![cfg(test)]
 
 use super::*;
+use crate::aws::rusoto::RegionOrEndpoint;
 use crate::config::SinkConfig;
 use crate::sinks::util::encoding::StandardEncodings;
 use crate::sinks::util::{BatchConfig, Compression};
@@ -13,8 +14,7 @@ use crate::{
 use rusoto_core::Region;
 use rusoto_kinesis::{Kinesis, KinesisClient};
 use std::sync::Arc;
-use tokio::time::{Duration, sleep};
-use crate::aws::rusoto::RegionOrEndpoint;
+use tokio::time::{sleep, Duration};
 
 #[tokio::test]
 async fn kinesis_put_records() {
@@ -30,7 +30,7 @@ async fn kinesis_put_records() {
     let config = KinesisSinkConfig {
         stream_name: stream.clone(),
         partition_key_field: None,
-        region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
+        region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
         encoding: StandardEncodings::Text.into(),
         compression: Compression::None,
         batch: BatchConfig {

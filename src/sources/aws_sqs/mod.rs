@@ -1,4 +1,5 @@
 mod config;
+mod integration_tests;
 mod source;
 
 use crate::config::SourceDescription;

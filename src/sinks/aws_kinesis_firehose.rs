@@ -1,16 +1,17 @@
+use crate::aws::rusoto::{self, AwsAuthentication, RegionOrEndpoint};
 use crate::{
     config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     sinks::util::{
-        BatchConfig,
-        BatchSettings,
-        Compression,
-        EncodedEvent, EncodedLength, encoding::{EncodingConfig, EncodingConfiguration}, retries::RetryLogic, sink::{self, Response}, TowerRequestConfig,
+        encoding::{EncodingConfig, EncodingConfiguration},
+        retries::RetryLogic,
+        sink::{self, Response},
+        BatchConfig, BatchSettings, Compression, EncodedEvent, EncodedLength, TowerRequestConfig,
         VecBuffer,
     },
 };
 use bytes::Bytes;
-use futures::{future::BoxFuture, FutureExt, Sink, SinkExt, stream, StreamExt};
+use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt};
 use rusoto_core::RusotoError;
 use rusoto_firehose::{
     DescribeDeliveryStreamError, DescribeDeliveryStreamInput, KinesisFirehose,
@@ -26,7 +27,6 @@ use std::{
 use tower::Service;
 use tracing_futures::Instrument;
 use vector_core::ByteSizeOf;
-use crate::aws::rusoto::{self, AwsAuthentication, RegionOrEndpoint};
 
 // AWS Kinesis Firehose API accepts payloads up to 4MB or 500 events
 // https://docs.aws.amazon.com/firehose/latest/dev/limits.html
@@ -295,7 +295,7 @@ mod tests {
     fn check_batch_size() {
         let config = KinesisFirehoseSinkConfig {
             stream_name: String::from("test"),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
             encoding: EncodingConfig::from(Encoding::Json),
             compression: Compression::None,
             batch: BatchConfig {
@@ -323,7 +323,7 @@ mod tests {
     fn check_batch_events() {
         let config = KinesisFirehoseSinkConfig {
             stream_name: String::from("test"),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
             encoding: EncodingConfig::from(Encoding::Json),
             compression: Compression::None,
             batch: BatchConfig {
@@ -385,7 +385,7 @@ mod integration_tests {
     use rusoto_es::{CreateElasticsearchDomainRequest, Es, EsClient};
     use rusoto_firehose::{CreateDeliveryStreamInput, ElasticsearchDestinationConfiguration};
     use serde_json::{json, Value};
-    use tokio::time::{Duration, sleep};
+    use tokio::time::{sleep, Duration};
 
     #[tokio::test]
     async fn firehose_put_records() {
@@ -403,7 +403,7 @@ mod integration_tests {
 
         let config = KinesisFirehoseSinkConfig {
             stream_name: stream.clone(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
             encoding: EncodingConfig::from(Encoding::Json), // required for ES destination w/ localstack
             compression: Compression::None,
             batch: BatchConfig {
