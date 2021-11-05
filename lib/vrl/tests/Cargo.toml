@@ -2,7 +2,7 @@
 name = "vrl-tests"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@timber.io>"]
-edition = "2018"
+edition = "2021"
 publish = false
 
 [dependencies]
@@ -21,4 +21,4 @@ regex = "1"
 serde = "1"
 serde_json = "1"
 structopt = { version = "0.3", default-features = false }
-tracing-subscriber = { version = "0.2", default-features = false, features = ["fmt"] }
+tracing-subscriber = { version = "0.2.25", default-features = false, features = ["fmt"] }

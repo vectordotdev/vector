@@ -1,9 +1,14 @@
-use crate::event::{self, BTreeMap, WithMetadata};
+use crate::{
+    event::{self, BTreeMap, WithMetadata},
+    metrics::AgentDDSketch,
+};
 use chrono::TimeZone;
 
 include!(concat!(env!("OUT_DIR"), "/event.rs"));
 pub use event_wrapper::Event;
 pub use metric::Value as MetricValue;
+
+use super::metric::MetricSketch;
 
 impl From<Event> for EventWrapper {
     fn from(event: Event) -> Self {
@@ -95,6 +100,11 @@ impl From<Metric> for event::Metric {
                 quantiles: summary.quantiles.into_iter().map(Into::into).collect(),
                 count: summary.count,
                 sum: summary.sum,
+            },
+            MetricValue::Sketch(sketch) => match sketch.sketch.unwrap() {
+                sketch::Sketch::AgentDdSketch(ddsketch) => event::MetricValue::Sketch {
+                    sketch: ddsketch.into(),
+                },
             },
         };
 
@@ -194,6 +204,26 @@ impl From<event::Metric> for WithMetadata<Metric> {
                 count,
                 sum,
             }),
+            event::MetricValue::Sketch { sketch } => match sketch {
+                MetricSketch::AgentDDSketch(ddsketch) => {
+                    let bin_map = ddsketch.bin_map();
+                    let (keys, counts) = bin_map.into_parts();
+                    let keys = keys.into_iter().map(i32::from).collect();
+                    let counts = counts.into_iter().map(u32::from).collect();
+
+                    MetricValue::Sketch(Sketch {
+                        sketch: Some(sketch::Sketch::AgentDdSketch(sketch::AgentDdSketch {
+                            count: ddsketch.count(),
+                            min: ddsketch.min().unwrap_or(f64::MAX),
+                            max: ddsketch.max().unwrap_or(f64::MIN),
+                            sum: ddsketch.sum().unwrap_or(0.0),
+                            avg: ddsketch.avg().unwrap_or(0.0),
+                            k: keys,
+                            n: counts,
+                        })),
+                    })
+                }
+            },
         };
 
         let data = Metric {
@@ -232,6 +262,58 @@ impl From<event::Event> for EventWrapper {
 impl From<event::Event> for WithMetadata<EventWrapper> {
     fn from(event: event::Event) -> Self {
         WithMetadata::<Event>::from(event).into()
+    }
+}
+
+impl From<AgentDDSketch> for Sketch {
+    fn from(ddsketch: AgentDDSketch) -> Self {
+        let bin_map = ddsketch.bin_map();
+        let (keys, counts) = bin_map.into_parts();
+        let ddsketch = sketch::AgentDdSketch {
+            count: ddsketch.count(),
+            min: ddsketch.min().unwrap_or(f64::MAX),
+            max: ddsketch.max().unwrap_or(f64::MIN),
+            sum: ddsketch.sum().unwrap_or(0.0),
+            avg: ddsketch.avg().unwrap_or(0.0),
+            k: keys.into_iter().map(i32::from).collect(),
+            n: counts.into_iter().map(u32::from).collect(),
+        };
+        Sketch {
+            sketch: Some(sketch::Sketch::AgentDdSketch(ddsketch)),
+        }
+    }
+}
+
+impl From<sketch::AgentDdSketch> for MetricSketch {
+    fn from(sketch: sketch::AgentDdSketch) -> Self {
+        // These safe conversions are annoying because the Datadog Agent internally uses i16/u16,
+        // but the proto definition uses i32/u32, so we have to jump through these hoops.
+        let keys = sketch
+            .k
+            .into_iter()
+            .map(|k| (k, k > 0))
+            .map(|(k, pos)| {
+                k.try_into()
+                    .unwrap_or_else(|_| if pos { i16::MAX } else { i16::MIN })
+            })
+            .collect::<Vec<_>>();
+        let counts = sketch
+            .n
+            .into_iter()
+            .map(|n| n.try_into().unwrap_or(u16::MAX))
+            .collect::<Vec<_>>();
+        MetricSketch::AgentDDSketch(
+            AgentDDSketch::from_raw(
+                sketch.count as u32,
+                sketch.min,
+                sketch.max,
+                sketch.sum,
+                sketch.avg,
+                &keys,
+                &counts,
+            )
+            .expect("keys/counts were unexpectedly mismatched"),
+        )
     }
 }
 

@@ -68,7 +68,11 @@ impl Service<AzureBlobRequest> for AzureBlobService {
                 .instrument(info_span!("request"))
                 .await;
 
-            result.map(|inner| AzureBlobResponse { inner })
+            result.map(|inner| AzureBlobResponse {
+                inner,
+                count: request.metadata.count,
+                events_byte_size: request.metadata.byte_size,
+            })
         })
     }
 }

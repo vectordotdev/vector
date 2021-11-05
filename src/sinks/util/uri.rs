@@ -40,6 +40,25 @@ impl UriSerde {
             auth: self.auth.clone(),
         }
     }
+
+    /// Creates a new instance of `UriSerde` by appending a path to the existing one.
+    pub fn append_path(&self, path: &str) -> crate::Result<Self> {
+        let uri = self.uri.to_string();
+        let self_path = uri.trim_end_matches('/');
+        let other_path = path.trim_start_matches('/');
+        let path = format!("{}/{}", self_path, other_path);
+        let uri = path.parse::<Uri>()?;
+        Ok(Self {
+            uri,
+            auth: self.auth.clone(),
+        })
+    }
+
+    #[allow(clippy::missing_const_for_fn)] // constant functions cannot evaluate destructors
+    pub fn with_auth(mut self, auth: Option<Auth>) -> Self {
+        self.auth = auth;
+        self
+    }
 }
 
 impl Serialize for UriSerde {
@@ -146,6 +165,37 @@ fn get_basic_auth(authority: &Authority) -> (Authority, Option<Auth>) {
     }
 }
 
+/// Simplify the URI into a protocol and endpoint by removing the
+/// "query" portion of the `path_and_query`.
+pub fn protocol_endpoint(uri: Uri) -> (String, String) {
+    let mut parts = uri.into_parts();
+
+    // Drop any username and password
+    parts.authority = parts.authority.map(|auth| {
+        let host = auth.host();
+        match auth.port() {
+            None => host.to_string(),
+            Some(port) => format!("{}:{}", host, port),
+        }
+        .parse()
+        .unwrap_or_else(|_| unreachable!())
+    });
+
+    // Drop the query and fragment
+    parts.path_and_query = parts.path_and_query.map(|pq| {
+        pq.path()
+            .parse::<PathAndQuery>()
+            .unwrap_or_else(|_| unreachable!())
+    });
+
+    (
+        parts.scheme.clone().unwrap_or(Scheme::HTTP).as_str().into(),
+        Uri::from_parts(parts)
+            .unwrap_or_else(|_| unreachable!())
+            .to_string(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -192,5 +242,23 @@ mod tests {
         );
 
         test_parse("user@example.com", "example.com", Some(("user", "")));
+    }
+
+    #[test]
+    fn protocol_endpoint_parses_urls() {
+        let parse = |uri: &str| protocol_endpoint(uri.parse().unwrap());
+
+        assert_eq!(
+            parse("http://example.com/"),
+            ("http".into(), "http://example.com/".into())
+        );
+        assert_eq!(
+            parse("https://user:pass@example.org:123/path?query"),
+            ("https".into(), "https://example.org:123/path".into())
+        );
+        assert_eq!(
+            parse("gopher://example.net:123/path?query#frag,emt"),
+            ("gopher".into(), "gopher://example.net:123/path".into())
+        );
     }
 }

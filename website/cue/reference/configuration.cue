@@ -19,7 +19,6 @@ configuration: {
 			type: string: {
 				default: "/var/lib/vector/"
 				examples: ["/var/lib/vector", "/var/local/lib/vector/", "/home/user/vector/"]
-				syntax: "literal"
 			}
 		}
 
@@ -31,7 +30,6 @@ configuration: {
 				events.
 				"""
 			required: false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -44,7 +42,6 @@ configuration: {
 						type: string: {
 							default: "message"
 							examples: ["message", "@message"]
-							syntax: "literal"
 						}
 					}
 
@@ -57,7 +54,6 @@ configuration: {
 						type: string: {
 							default: "timestamp"
 							examples: ["timestamp", "@timestamp"]
-							syntax: "literal"
 						}
 					}
 
@@ -70,7 +66,6 @@ configuration: {
 						type: string: {
 							default: "host"
 							examples: ["host", "@host"]
-							syntax: "literal"
 						}
 					}
 
@@ -84,7 +79,6 @@ configuration: {
 						type: string: {
 							default: "source_type"
 							examples: ["source_type", "@source_type"]
-							syntax: "literal"
 						}
 					}
 				}
@@ -97,7 +91,6 @@ configuration: {
 				Configures health checks for all sinks.
 				"""
 			required: false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -108,7 +101,6 @@ configuration: {
 							option overrides it.
 							"""
 						required: false
-						warnings: []
 						type: bool: {
 							default: true
 						}
@@ -121,7 +113,6 @@ configuration: {
 							`--require-healthy` command line flag.
 							"""
 						required: false
-						warnings: []
 						type: bool: {
 							default: false
 						}
@@ -138,11 +129,9 @@ configuration: {
 				[TZ database](\(urls.tz_time_zones)), or `local` to indicate system local time.
 				"""
 			required:    false
-			warnings: []
 			type: string: {
 				default: "local"
 				examples: ["local", "America/NewYork", "EST5EDT"]
-				syntax: "literal"
 			}
 		}
 
@@ -164,7 +153,6 @@ configuration: {
 					type: string: {
 						default: null
 						examples: ["http://foo.bar:3128"]
-						syntax: "literal"
 					}
 				}
 				https: {
@@ -174,7 +162,6 @@ configuration: {
 					type: string: {
 						default: null
 						examples: ["http://foo.bar:3128"]
-						syntax: "literal"
 					}
 				}
 				no_proxy: {
@@ -191,11 +178,11 @@ configuration: {
 							Splat | `*` matches all hosts
 							"""
 					required:    false
+
 					type: array: {
 						default: null
 						items: type: string: {
 							examples: ["localhost", ".foo.bar", "*"]
-							syntax: "literal"
 						}
 					}
 				}
@@ -270,6 +257,29 @@ configuration: {
 
 				```bash
 				vector --config /etc/vector/*.toml
+				```
+				"""
+		}
+		automatic_namespacing: {
+			title: "Automatic namespacing of component files"
+			body: """
+				You can split your configuration files in component-type related folders.
+
+				For example, you can create the sink `foo` in the folder `/path/to/vector/config/sinks/foo.toml` and
+				configure it as follows:
+
+				```toml
+				type = "sink_type"
+				# here the sinks options
+				```
+
+				You can do the same for other kinds of components like `sources`, `transforms`, `tests` and `enrichment_tables`.
+
+				For vector to find and load the different configuration files, you need to load your configuration with
+				the `--config-dir` argument.
+
+				```bash
+				vector --config-dir /path/to/vector/config
 				```
 				"""
 		}

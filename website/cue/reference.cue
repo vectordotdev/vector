@@ -76,6 +76,11 @@ _values: {
 //                }
 #Enum: [Name=_]: string
 
+#EnvVars: #Schema & {[Type=string]: {
+	common:   true
+	required: false
+}}
+
 #Event: {
 	{log?: #LogEvent} |
 	{metric?: #MetricEvent}
@@ -318,7 +323,7 @@ _values: {
 	//
 	// For example, the `tls.verify_hostname` option has a warning about
 	// reduced security if the option is disabled.
-	warnings: [...string]
+	warnings: [...string] | *[]
 
 	if !required {
 		// `common` specifes that the option is commonly used. It will bring the
@@ -336,14 +341,14 @@ _values: {
 }
 
 #TargetTriples: {
-	"aarch64-unknown-linux-gnu":      bool
-	"aarch64-unknown-linux-musl":     bool
-	"armv7-unknown-linux-gnueabihf":  bool
-	"armv7-unknown-linux-musleabihf": bool
-	"x86_64-apple-darwin":            bool
-	"x86_64-pc-windows-msv":          bool
-	"x86_64-unknown-linux-gnu":       bool
-	"x86_64-unknown-linux-musl":      bool
+	"aarch64-unknown-linux-gnu":      bool | *true
+	"aarch64-unknown-linux-musl":     bool | *true
+	"armv7-unknown-linux-gnueabihf":  bool | *true
+	"armv7-unknown-linux-musleabihf": bool | *true
+	"x86_64-apple-darwin":            bool | *true
+	"x86_64-pc-windows-msv":          bool | *true
+	"x86_64-unknown-linux-gnu":       bool | *true
+	"x86_64-unknown-linux-musl":      bool | *true
 }
 
 #Timestamp: =~"^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.\\d{6}Z"
@@ -465,7 +470,7 @@ _values: {
 		]
 	}
 
-	syntax: "file_system_path" | "field_path" | "literal" | "template" | "regex" | "remap_boolean_expression" | "remap_program" | "strftime"
+	syntax: *"literal" | "file_system_path" | "field_path" | "template" | "regex" | "remap_boolean_expression" | "remap_program" | "strftime"
 }
 
 #TypeTimestamp: {

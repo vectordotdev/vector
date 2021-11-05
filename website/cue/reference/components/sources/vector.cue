@@ -43,16 +43,6 @@ components: sources: vector: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -69,17 +59,14 @@ components: sources: vector: {
 				The HTTP address to listen for connections on. It _must_ include a port.
 				"""
 			required: true
-			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)"]
-				syntax: "literal"
 			}
 		}
 		shutdown_timeout_secs: {
 			common:      false
 			description: "The timeout before a connection is forcefully closed during shutdown."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 30
 				unit:    "seconds"
@@ -96,7 +83,6 @@ components: sources: vector: {
 					"2": "Vector source API version 2"
 				}
 				default: "1"
-				syntax:  "literal"
 			}
 		}
 	}
@@ -122,8 +108,10 @@ components: sources: vector: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
-		protobuf_decode_errors_total:    components.sources.internal_metrics.output.metrics.protobuf_decode_errors_total
-		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
+		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
+		protobuf_decode_errors_total:         components.sources.internal_metrics.output.metrics.protobuf_decode_errors_total
 	}
 }

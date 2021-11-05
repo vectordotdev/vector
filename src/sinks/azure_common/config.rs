@@ -11,6 +11,8 @@ use futures::FutureExt;
 use http::StatusCode;
 use snafu::Snafu;
 use std::sync::Arc;
+use vector_core::internal_event::EventsSent;
+use vector_core::stream::DriverResponse;
 
 #[derive(Debug, Clone)]
 pub struct AzureBlobRequest {
@@ -60,11 +62,20 @@ impl RetryLogic for AzureBlobRetryLogic {
 #[derive(Debug)]
 pub struct AzureBlobResponse {
     pub inner: PutBlockBlobResponse,
+    pub count: usize,
+    pub events_byte_size: usize,
 }
 
-impl AsRef<EventStatus> for AzureBlobResponse {
-    fn as_ref(&self) -> &EventStatus {
-        &EventStatus::Delivered
+impl DriverResponse for AzureBlobResponse {
+    fn event_status(&self) -> EventStatus {
+        EventStatus::Delivered
+    }
+
+    fn events_sent(&self) -> EventsSent {
+        EventsSent {
+            count: self.count,
+            byte_size: self.events_byte_size,
+        }
     }
 }
 

@@ -63,17 +63,6 @@ components: sinks: clickhouse: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
-
 		requirements: [
 			"""
 				[Clickhouse](\(urls.clickhouse)) version `>= 1.1.54378` is required.
@@ -92,11 +81,9 @@ components: sinks: clickhouse: {
 			common:      true
 			description: "The database that contains the table that data will be inserted into."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["mydatabase"]
-				syntax: "literal"
 			}
 		}
 		endpoint: {
@@ -104,16 +91,13 @@ components: sinks: clickhouse: {
 			required:    true
 			type: string: {
 				examples: ["http://localhost:8123"]
-				syntax: "literal"
 			}
 		}
 		table: {
 			description: "The table that data will be inserted into."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["mytable"]
-				syntax: "literal"
 			}
 		}
 		skip_unknown_fields: {

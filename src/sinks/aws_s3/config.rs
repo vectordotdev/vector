@@ -12,7 +12,7 @@ use crate::{
             service::S3Service,
         },
         util::{
-            encoding::EncodingConfig, BatchConfig, Compression, Concurrency, ServiceBuilderExt,
+            encoding::EncodingConfig, BatchConfig, Compression, ServiceBuilderExt,
             TowerRequestConfig,
         },
         Healthcheck,
@@ -27,8 +27,6 @@ use vector_core::sink::VectorSink;
 use super::sink::S3RequestOptions;
 use crate::sinks::util::partitioner::KeyPartitioner;
 
-const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
-    TowerRequestConfig::new(Concurrency::Fixed(50)).rate_limit_num(250);
 const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = BatchSettings::const_default()
     .bytes(10_000_000)
     .timeout(300);
@@ -112,7 +110,7 @@ impl S3SinkConfig {
         // requests into in order to ship files to S3.  We build this here in
         // order to configure the client/service with retries, concurrency
         // limits, rate limits, and whatever else the client should have.
-        let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
+        let request_limits = self.request.unwrap_with(&Default::default());
         let service = ServiceBuilder::new()
             .settings(request_limits, S3RetryLogic)
             .service(service);
