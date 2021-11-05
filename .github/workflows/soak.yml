@@ -190,9 +190,9 @@ jobs:
     steps:
       - uses: actions/cache@v2
         with:
+          key: ${{ needs.compute-soak-meta.outputs.baseline-tag }}-${{ matrix.target }}
           path: |
             /tmp/${{ github.event.number }}/${{ matrix.target }}
-        key: ${{ needs.compute-soak-meta.outputs.baseline-tag }}-${{ matrix.target }}
 
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
@@ -219,9 +219,9 @@ jobs:
     steps:
       - uses: actions/cache@v2
         with:
+          key: ${{ needs.compute-soak-meta.outputs.comparison-tag }}-${{ matrix.target }}
           path: |
             /tmp/${{ github.event.number }}/${{ matrix.target }}
-        key: ${{ needs.compute-soak-meta.outputs.comparison-tag }}-${{ matrix.target }}
 
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
