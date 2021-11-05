@@ -268,7 +268,7 @@ jobs:
       - name: Post Results To PR
         uses: peter-evans/create-or-update-comment@v1
         with:
-          issue-number: ${{ github.event.inputs.pr-number }}
+          issue-number: ${{ github.event.issue.number }}
           edit-mode: replace
           body: ${{ steps.read-analysis.outputs.content }}
 
