@@ -188,12 +188,18 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
+      - uses: actions/cache@v2
+        with:
+          path: |
+            /tmp/${{ github.event.number }}/${{ matrix.target }}
+        key: ${{ needs.compute-soak-meta.outputs.baseline-tag }}-${{ matrix.target }}
+
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
 
       - name: Run baseline experiment
+        if: steps.cache-primes.outputs.cache-hit != 'true'
         run: |
-          rm -rf /tmp/${{ github.event.number }}/${{ matrix.target }}/
           mkdir -p /tmp/${{ github.event.number }}/${{ matrix.target }}/
           ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "baseline" ${{ needs.compute-soak-meta.outputs.baseline-tag }} /tmp/${{ github.event.number }}
 
@@ -211,12 +217,18 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
+      - uses: actions/cache@v2
+        with:
+          path: |
+            /tmp/${{ github.event.number }}/${{ matrix.target }}
+        key: ${{ needs.compute-soak-meta.outputs.comparison-tag }}-${{ matrix.target }}
+
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
 
       - name: Run comparison experiment
+        if: steps.cache-primes.outputs.cache-hit != 'true'
         run: |
-          rm -rf /tmp/${{ github.event.number }}/${{ matrix.target }}/
           mkdir -p /tmp/${{ github.event.number }}/${{ matrix.target }}/
           ./soaks/bin/soak_one.sh "false" ${{ matrix.target }} "comparison" ${{ needs.compute-soak-meta.outputs.comparison-tag }} /tmp/${{ github.event.number }}
 
@@ -254,7 +266,7 @@ jobs:
           path: /tmp/${{ github.event.number }}-${{ github.run_number }}-analysis
 
       - name: Post Results To PR
-        uses: peter-evans/create-or-update-comment@v1.4
+        uses: peter-evans/create-or-update-comment@v1
         with:
           issue-number: ${{ github.event.inputs.pr-number }}
           edit-mode: replace
