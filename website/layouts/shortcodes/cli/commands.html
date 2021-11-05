@@ -241,13 +241,9 @@
         {{ end }}
       </td>
       <td>
-        {{ with .env_var }}
-        <a href="#{{ . | urlize }}">
-          <code>
-            {{ . }}
-          </code>
-        </a>
-        {{ end }}
+        <code>
+          {{ .env_var }}
+        </code>
       </td>
 
       <td>

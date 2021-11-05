@@ -367,53 +367,26 @@
 
           {{ range $k, $v := $v.type }}
           {{ partial "badge.html" (dict "word" $k "color" "gray") }}
-
-          {{ with $v.syntax }}
-          {{ partial "badge.html" (dict "word" . "color" "gray") }}
-          {{ end }}
-
-          {{ if $v.enum }}
-          {{ partial "badge.html" (dict "word" "enum" "color" "yellow") }}
-          {{ end }}
+          {{ partial "badge.html" (dict "word" $v.syntax "color" "gray") }}
           {{ end }}
         </span>
       </span>
 
-      <div class="mt-4 prose prose-sm dark:prose-dark max-w-none">
+      <div class="my-4 prose prose-sm dark:prose-dark max-w-none">
         {{ $v.description | markdownify }}
       </div>
 
       {{ range $k, $v := $v.type }}
       {{ with $v.default }}
-      <span class="mt-2 text-sm">
+      <span>
         Default: <code>{{ . }}</code>
       </span>
       {{ end }}
       {{ end }}
 
       {{ range $k, $v := $v.type }}
-      {{/* Enum */}}
-      {{ with $v.enum }}
-      <div class="mt-3 border rounded py-2 px-3 dark:border-gray-700">
-        <span class="flex justify-between items-center">
-          <span class="font-semibold">
-            Enum options
-          </span>
-
-          <span class="flex items-center space-x-1">
-            {{ partial "badge.html" (dict "word" $k "color" "gray") }}
-            {{ partial "badge.html" (dict "word" $v.syntax "color" "gray") }}
-          </span>
-        </span>
-
-        <div class="mt-4 prose dark:prose-dark max-w-none">
-          {{ template "enum-options-table" . }}
-        </div>
-      </div>
-      {{ end }}
-
       {{ with $v.examples }}
-      <div x-data="{ open: false }" class="mt-3 border rounded py-2 px-3 dark:border-gray-700">
+      <div x-data="{ open: false }" class="border rounded py-2 px-3 dark:border-gray-700">
         <span class="flex justify-between items-center">
           <span class="font-semibold">
             Examples

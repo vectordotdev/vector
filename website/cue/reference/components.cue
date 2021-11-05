@@ -153,6 +153,11 @@ components: {
 	// * `stream` - one event at a time
 	#EgressMethod: "batch" | "dynamic" | "expose" | "stream"
 
+	#EnvVars: #Schema & {[Type=string]: {
+		common:   true
+		required: false
+	}}
+
 	#Features: {
 		_args: {
 			egress_method: string
