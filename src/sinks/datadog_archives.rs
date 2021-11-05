@@ -1,6 +1,5 @@
 use std::{
-    collections::BTreeMap,
-    collections::HashSet,
+    collections::{BTreeMap, HashMap, HashSet},
     convert::TryFrom,
     io::{self, Write},
     sync::atomic::{AtomicU32, Ordering},
@@ -8,6 +7,7 @@ use std::{
 
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{SecondsFormat, Utc};
+use http::header::{HeaderName, HeaderValue};
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -23,34 +23,43 @@ use vector_core::{
 use crate::{
     config::GenerateConfig,
     config::{DataType, SinkConfig, SinkContext},
+    http::HttpClient,
     rusoto::{AwsAuthentication, RegionOrEndpoint},
+    serde::to_string,
     sinks::{
+        gcp::{GcpAuthConfig, GcpCredentials},
+        gcs_common::{
+            self,
+            config::{GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass, BASE_URL},
+            service::{GcsRequest, GcsRequestSettings, GcsService},
+            sink::GcsSink,
+        },
         s3_common::{
             self,
             config::{
-                build_healthcheck, create_service, S3CannedAcl, S3RetryLogic,
-                S3ServerSideEncryption, S3StorageClass,
+                create_service, S3CannedAcl, S3RetryLogic, S3ServerSideEncryption, S3StorageClass,
             },
-            partitioner::KeyPartitioner,
             service::{S3Metadata, S3Request, S3Service},
             sink::S3Sink,
         },
+        util::partitioner::KeyPartitioner,
+        util::Concurrency,
         util::{ServiceBuilderExt, TowerRequestConfig},
         VectorSink,
     },
     template::Template,
+    tls::{TlsOptions, TlsSettings},
 };
+
+use goauth::scopes::Scope;
 
 use super::util::{
     batch::BatchError,
     encoding::{Encoder, StandardEncodings},
     BatchSettings, Compression, RequestBuilder,
 };
+use crate::sinks::gcs_common::service::GcsMetadata;
 
-const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = BatchSettings::const_default()
-    .timeout(900)
-    .bytes(100_000_000)
-    .events(25_000);
 const DEFAULT_COMPRESSION: Compression = Compression::gzip_default();
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -63,6 +72,9 @@ pub struct DatadogArchivesSinkConfig {
     pub request: TowerRequestConfig,
     #[serde(default)]
     pub aws_s3: Option<S3Config>,
+    #[serde(default)]
+    pub gcp_cloud_storage: Option<GcsConfig>,
+    pub tls: Option<TlsOptions>,
 }
 
 #[derive(Deserialize, Serialize, Default, Debug, Clone)]
@@ -90,6 +102,16 @@ pub struct S3Options {
     tags: Option<BTreeMap<String, String>>,
 }
 
+#[derive(Deserialize, Serialize, Default, Debug, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct GcsConfig {
+    acl: Option<GcsPredefinedAcl>,
+    storage_class: Option<GcsStorageClass>,
+    metadata: Option<HashMap<String, String>>,
+    #[serde(flatten)]
+    auth: GcpAuthConfig,
+}
+
 impl GenerateConfig for DatadogArchivesSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -97,7 +119,9 @@ impl GenerateConfig for DatadogArchivesSinkConfig {
             bucket: "".to_owned(),
             key_prefix: None,
             request: TowerRequestConfig::default(),
-            aws_s3: Some(S3Config::default()),
+            aws_s3: None,
+            gcp_cloud_storage: None,
+            tls: None,
         })
         .unwrap()
     }
@@ -115,8 +139,21 @@ enum ConfigError {
 
 const KEY_TEMPLATE: &str = "/dt=%Y%m%d/hour=%H/";
 
+/// We should avoid producing many small batches - this might slow down Log Rehydration,
+/// these values are similar with how DataDog's Log Archives work internally:
+/// batch size - 100mb
+/// batch timeout - 15min
+const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = {
+    BatchSettings::const_default()
+        .bytes(100_000_000)
+        .timeout(900)
+};
+
 impl DatadogArchivesSinkConfig {
-    fn new(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build_sink(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         match &self.service[..] {
             "aws_s3" => {
                 let s3_config = self.aws_s3.as_ref().expect("s3 config wasn't provided");
@@ -125,7 +162,33 @@ impl DatadogArchivesSinkConfig {
                 let svc = self
                     .build_s3_sink(&s3_config.options, service, cx)
                     .map_err(|error| format!("{}", error))?;
-                Ok((svc, build_healthcheck(self.bucket.clone(), client)?))
+                Ok((
+                    svc,
+                    s3_common::config::build_healthcheck(self.bucket.clone(), client)?,
+                ))
+            }
+            "gcp_cloud_storage" => {
+                let gcs_config = self
+                    .gcp_cloud_storage
+                    .as_ref()
+                    .expect("gcs config wasn't provided");
+                let creds = gcs_config
+                    .auth
+                    .make_credentials(Scope::DevStorageReadWrite)
+                    .await?;
+                let base_url = format!("{}{}/", BASE_URL, self.bucket);
+                let tls = TlsSettings::from_options(&self.tls)?;
+                let client = HttpClient::new(tls, cx.proxy())?;
+                let healthcheck = gcs_common::config::build_healthcheck(
+                    self.bucket.clone(),
+                    client.clone(),
+                    base_url.clone(),
+                    creds.clone(),
+                )?;
+                let sink = self
+                    .build_gcs_sink(client, base_url, creds, cx)
+                    .map_err(|error| format!("{}", error))?;
+                Ok((sink, healthcheck))
             }
 
             service => Err(Box::new(ConfigError::UnsupportedService {
@@ -173,6 +236,63 @@ impl DatadogArchivesSinkConfig {
             DatadogS3RequestBuilder::new(self.bucket.clone(), self.key_prefix.clone(), s3_config);
 
         let sink = S3Sink::new(cx, service, request_builder, partitioner, batcher_settings);
+
+        Ok(VectorSink::Stream(Box::new(sink)))
+    }
+
+    pub fn build_gcs_sink(
+        &self,
+        client: HttpClient,
+        base_url: String,
+        creds: Option<GcpCredentials>,
+        cx: SinkContext,
+    ) -> crate::Result<VectorSink> {
+        let request = self.request.unwrap_with(&TowerRequestConfig {
+            concurrency: Concurrency::Fixed(25),
+            rate_limit_num: Some(1000),
+            ..Default::default()
+        });
+
+        let batcher_settings = DEFAULT_BATCH_SETTINGS.into_batcher_settings()?;
+
+        let svc = ServiceBuilder::new()
+            .settings(request, GcsRetryLogic)
+            .service(GcsService::new(client, base_url, creds));
+
+        let gcs_config = self
+            .gcp_cloud_storage
+            .as_ref()
+            .expect("gcs config wasn't provided")
+            .clone();
+
+        let acl = gcs_config
+            .acl
+            .map(|acl| HeaderValue::from_str(&to_string(acl)).unwrap());
+        let storage_class = gcs_config.storage_class.unwrap_or_default();
+        let storage_class = HeaderValue::from_str(&to_string(storage_class)).unwrap();
+        let metadata = gcs_config
+            .metadata
+            .as_ref()
+            .map(|metadata| {
+                metadata
+                    .iter()
+                    .map(make_header)
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .unwrap_or_else(|| Ok(vec![]))?;
+        let request_builder = DatadogGcsRequestBuilder {
+            bucket: self.bucket.clone(),
+            key_prefix: self.key_prefix.clone(),
+            acl,
+            storage_class,
+            metadata,
+            encoding: DatadogArchivesEncoding::default(),
+            compression: DEFAULT_COMPRESSION,
+        };
+
+        let partitioner = DatadogArchivesSinkConfig::build_partitioner();
+
+        let sink = GcsSink::new(cx, svc, request_builder, partitioner, batcher_settings);
 
         Ok(VectorSink::Stream(Box::new(sink)))
     }
@@ -326,16 +446,8 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
     }
 
     fn build_request(&self, mut metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        let filename = Uuid::new_v4().to_string();
-
-        metadata.partition_key = format!(
-            "{}/{}{}.{}",
-            self.key_prefix.clone().unwrap_or_default(),
-            metadata.partition_key,
-            filename,
-            "json.gz"
-        )
-        .replace("//", "/");
+        metadata.partition_key =
+            generate_object_key(self.key_prefix.clone(), metadata.partition_key);
 
         trace!(
             message = "Sending events.",
@@ -368,6 +480,90 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
     }
 }
 
+#[derive(Debug)]
+struct DatadogGcsRequestBuilder {
+    bucket: String,
+    key_prefix: Option<String>,
+    acl: Option<HeaderValue>,
+    storage_class: HeaderValue,
+    metadata: Vec<(HeaderName, HeaderValue)>,
+    encoding: DatadogArchivesEncoding,
+    compression: Compression,
+}
+
+impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
+    type Metadata = GcsMetadata;
+    type Events = Vec<Event>;
+    type Payload = Bytes;
+    type Request = GcsRequest;
+    type Encoder = DatadogArchivesEncoding;
+    type Error = io::Error;
+
+    fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+        let (key, mut events) = input;
+        let finalizers = events.take_finalizers();
+        let metadata = GcsMetadata {
+            key,
+            count: events.len(),
+            byte_size: events.size_of(),
+            finalizers,
+        };
+
+        (metadata, events)
+    }
+
+    fn build_request(&self, mut metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+        metadata.key = generate_object_key(self.key_prefix.clone(), metadata.key);
+
+        trace!(
+            message = "Sending events.",
+            bytes = ?payload.len(),
+            events_len = ?metadata.count,
+            bucket = ?self.bucket,
+            key = ?metadata.key
+        );
+
+        let content_type = HeaderValue::from_str(StandardEncodings::Ndjson.content_type()).unwrap();
+        let content_encoding = DEFAULT_COMPRESSION
+            .content_encoding()
+            .map(|ce| HeaderValue::from_str(&to_string(ce)).unwrap());
+
+        GcsRequest {
+            body: payload,
+            settings: GcsRequestSettings {
+                acl: self.acl.clone(),
+                content_type,
+                content_encoding,
+                storage_class: self.storage_class.clone(),
+                headers: self.metadata.clone(),
+            },
+            metadata,
+        }
+    }
+
+    fn compression(&self) -> Compression {
+        self.compression
+    }
+
+    fn encoder(&self) -> &Self::Encoder {
+        &self.encoding
+    }
+}
+
+fn generate_object_key(key_prefix: Option<String>, partition_key: String) -> String {
+    let filename = Uuid::new_v4().to_string();
+
+    let key = format!(
+        "{}/{}{}.{}",
+        key_prefix.unwrap_or_default(),
+        partition_key,
+        filename,
+        "json.gz"
+    )
+    .replace("//", "/");
+    key
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "datadog_archives")]
 impl SinkConfig for DatadogArchivesSinkConfig {
@@ -375,7 +571,7 @@ impl SinkConfig for DatadogArchivesSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink_and_healthcheck = self.new(cx)?;
+        let sink_and_healthcheck = self.build_sink(cx).await?;
         Ok(sink_and_healthcheck)
     }
 
@@ -386,6 +582,14 @@ impl SinkConfig for DatadogArchivesSinkConfig {
     fn sink_type(&self) -> &'static str {
         "datadog_archives"
     }
+}
+
+// Make a header pair from a key-value string pair
+fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, HeaderValue)> {
+    Ok((
+        HeaderName::from_bytes(name.as_bytes())?,
+        HeaderValue::from_str(value)?,
+    ))
 }
 
 #[cfg(test)]
@@ -629,9 +833,11 @@ mod tests {
                     region: RegionOrEndpoint::with_region("us-east-1".to_owned()),
                     auth: Default::default(),
                 }),
+                gcp_cloud_storage: None,
+                tls: None,
             };
 
-            let res = config.new(SinkContext::new_test());
+            let res = config.build_sink(SinkContext::new_test()).await;
 
             if supported {
                 assert!(res.is_ok());

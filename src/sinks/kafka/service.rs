@@ -9,10 +9,13 @@ use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::util::Timeout;
 use std::task::{Context, Poll};
 use tower::Service;
+use vector_core::internal_event::{BytesSent, EventsSent};
+use vector_core::stream::DriverResponse;
 
 pub struct KafkaRequest {
     pub body: Vec<u8>,
     pub metadata: KafkaRequestMetadata,
+    pub event_byte_size: usize,
 }
 
 pub struct KafkaRequestMetadata {
@@ -23,11 +26,20 @@ pub struct KafkaRequestMetadata {
     pub topic: String,
 }
 
-pub struct KafkaResponse {}
+pub struct KafkaResponse {
+    event_byte_size: usize,
+}
 
-impl AsRef<EventStatus> for KafkaResponse {
-    fn as_ref(&self) -> &EventStatus {
-        &EventStatus::Delivered
+impl DriverResponse for KafkaResponse {
+    fn event_status(&self) -> EventStatus {
+        EventStatus::Delivered
+    }
+
+    fn events_sent(&self) -> EventsSent {
+        EventsSent {
+            count: 1,
+            byte_size: self.event_byte_size,
+        }
     }
 }
 
@@ -67,7 +79,6 @@ impl Service<KafkaRequest> for KafkaService {
         let kafka_producer = self.kafka_producer.clone();
 
         Box::pin(async move {
-            let _ = &request;
             let mut record = FutureRecord::to(&request.metadata.topic).payload(&request.body);
             if let Some(key) = &request.metadata.key {
                 record = record.key(&key[..]);
@@ -81,7 +92,16 @@ impl Service<KafkaRequest> for KafkaService {
 
             //rdkafka will internally retry forever if the queue is full
             let result = match kafka_producer.send(record, Timeout::Never).await {
-                Ok((_partition, _offset)) => Ok(KafkaResponse {}),
+                Ok((_partition, _offset)) => {
+                    emit!(&BytesSent {
+                        byte_size: request.body.len()
+                            + request.metadata.key.map(|x| x.len()).unwrap_or(0),
+                        protocol: "kafka"
+                    });
+                    Ok(KafkaResponse {
+                        event_byte_size: request.event_byte_size,
+                    })
+                }
                 Err((kafka_err, _original_record)) => Err(kafka_err),
             };
             result

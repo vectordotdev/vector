@@ -7,6 +7,7 @@
 #![deny(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::type_complexity)] // long-types happen, especially in async code
+#![allow(clippy::must_use_candidate)]
 
 #[macro_use]
 extern crate tracing;
@@ -19,6 +20,7 @@ pub mod disk;
 mod internal_events;
 #[cfg(test)]
 mod test;
+pub mod topology;
 mod variant;
 
 use crate::buffer_usage_data::BufferUsageData;
@@ -108,6 +110,7 @@ where
 pub enum WhenFull {
     Block,
     DropNewest,
+    Overflow,
 }
 
 impl Default for WhenFull {
@@ -119,6 +122,9 @@ impl Default for WhenFull {
 #[cfg(test)]
 impl Arbitrary for WhenFull {
     fn arbitrary(g: &mut Gen) -> Self {
+        // TODO: We explicitly avoid generating "overflow" as a possible value because nothing yet
+        // supports handling it, and will be defaulted to to using "block" if they encounter
+        // "overflow".  Thus, there's no reason to emit it here... yet.
         if bool::arbitrary(g) {
             WhenFull::Block
         } else {
@@ -192,7 +198,7 @@ impl<S> MemoryBufferInput<S> {
         buffer_usage_data: Option<Arc<BufferUsageData>>,
     ) -> Self {
         let drop = match when_full {
-            WhenFull::Block => None,
+            WhenFull::Block | WhenFull::Overflow => None,
             WhenFull::DropNewest => Some(false),
         };
 

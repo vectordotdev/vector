@@ -1,7 +1,6 @@
 use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    emit,
     internal_events::BlackholeEventReceived,
     sinks::util::StreamSink,
 };

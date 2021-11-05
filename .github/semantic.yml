@@ -32,6 +32,7 @@ scopes:
   - codecs # Anything related to Vector's codecs (encoding/decoding)
   - compression # Anything related to compressing data within Vector
   - config # Anything related to configuring Vector
+  - core # Anything related to core crates i.e. vector-core, core-common, etc
   - data model # Anything related to Vector's internal data model
   - deps # Anything related to Vector's dependencies
   - dev # Anything related to Vector's development environment
@@ -56,6 +57,7 @@ scopes:
   - releasing # Anything related to releasing Vector
   - reliability # Anything related to Vector's reliability
   - reload # Anything related to reloading Vector (updating configuration)
+  - rfc # Anything related to Vector RFCs
   - schemas # Anything related to internal Vector event schemas
   - security # Anything related to security
   - setup # Anything related to setting up or installing Vector

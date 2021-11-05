@@ -261,7 +261,7 @@ mod tests {
         let path = path.to_owned();
         let path_key = path_key.to_owned();
         let mut context = SourceContext::new_test(sender);
-        context.acknowledgements = acknowledgements;
+        context.acknowledgements.enabled = acknowledgements;
         tokio::spawn(async move {
             SimpleHttpConfig {
                 address,

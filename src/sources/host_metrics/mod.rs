@@ -72,7 +72,10 @@ pub struct HostMetricsConfig {
     collectors: Option<Vec<Collector>>,
     #[serde(default)]
     namespace: Namespace,
-    config_hash: Option<String>,
+    #[serde(skip)]
+    version: Option<String>,
+    #[serde(skip)]
+    configuration_key: Option<String>,
 
     #[cfg(target_os = "linux")]
     #[serde(default)]
@@ -118,10 +121,11 @@ impl SourceConfig for HostMetricsConfig {
 
 impl HostMetricsConfig {
     /// Return a host metrics config with enterprise reporting defaults.
-    pub fn enterprise<T: Into<String>>(config_hash: T) -> Self {
+    pub fn enterprise(version: impl Into<String>, configuration_key: impl Into<String>) -> Self {
         Self {
             namespace: Namespace(Some("pipelines".to_owned())),
-            config_hash: Some(config_hash.into()),
+            version: Some(version.into()),
+            configuration_key: Some(configuration_key.into()),
             ..Self::default()
         }
     }
@@ -179,7 +183,8 @@ impl HostMetrics {
 
     async fn capture_metrics(&self) -> impl Iterator<Item = Event> {
         let hostname = crate::get_hostname();
-        let config_hash = self.config.config_hash.clone();
+        let version = self.config.version.clone();
+        let configuration_key = self.config.configuration_key.clone();
 
         let mut metrics = Vec::new();
         #[cfg(target_os = "linux")]
@@ -213,9 +218,14 @@ impl HostMetrics {
                 metric.insert_tag("host".into(), hostname.into());
             }
         }
-        if let Some(config_hash) = &config_hash {
+        if let Some(version) = &version {
             for metric in &mut metrics {
-                metric.insert_tag("config_hash".to_owned(), config_hash.clone());
+                metric.insert_tag("version".to_owned(), version.clone());
+            }
+        }
+        if let Some(configuration_key) = &configuration_key {
+            for metric in &mut metrics {
+                metric.insert_tag("configuration_key".to_owned(), configuration_key.clone());
             }
         }
         emit!(&HostMetricsEventReceived {

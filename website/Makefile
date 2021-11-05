@@ -72,8 +72,8 @@ algolia:
 
 # Useful for locally debugging issues that arise only on the deployed production site
 run-production-site-locally:
-	make setup cue-build production-build
-	python -m http.server 8000 --directory ./public --bind 127.0.0.1
+	make setup structured-data production-build
+	python3 -m http.server 1313 --directory ./public --bind 127.0.0.1
 
 # Local dev build with no link checking and no Yarn dependency fetching
 quick-build: clean structured-data production-build

@@ -266,6 +266,93 @@ Or using a [globbing syntax][glob]:
 vector --config /etc/vector/*.toml
 ```
 
+#### Automatic namespacing
+
+You can also split your configuration by grouping the components by their type, one directory per component type, where the file name is used as the component id. For example:
+
+{{< tabs default="vector.toml" >}}
+{{< tab title="vector.toml" >}}
+
+```toml
+# Set global options
+data_dir = "/var/lib/vector"
+
+# Vector's API (disabled by default)
+# Enable and try it out with the `vector top` command
+[api]
+enabled = false
+# address = "127.0.0.1:8686"
+
+'''
+```
+
+{{< /tab >}}
+{{< tab title="sources/apache_logs.toml" >}}
+
+```toml
+# Ingest data by tailing one or more files
+type         = "file"
+include      = ["/var/log/apache2/*.log"]    # supports globbing
+ignore_older = 86400                         # 1 day
+```
+
+{{< /tab >}}
+{{< tab title="transforms/remap.toml" >}}
+
+```toml
+# Structure and parse via Timber's Remap Language
+inputs = ["apache_logs"]
+type   = "remap"
+source = '''
+. = parse_apache_log(.message)
+```
+
+{{< /tab >}}
+{{< tab title="transforms/apache_sampler.toml" >}}
+
+```toml
+# Sample the data to save on cost
+inputs = ["apache_parser"]
+type   = "sampler"
+rate   = 50                   # only keep 50%
+. = parse_apache_log(.message)
+```
+
+{{< /tab >}}
+{{< tab title="sinks/es_cluster.toml" >}}
+
+```toml
+# Send structured data to a short-term storage
+inputs = ["apache_sampler"]             # only take sampled data
+type   = "elasticsearch"
+host   = "http://79.12.221.222:9200"    # local or external host
+index  = "vector-%Y-%m-%d"              # daily indices
+```
+
+{{< /tab >}}
+{{< tab title="sinks/s3_archives.toml" >}}
+
+```toml
+# Send structured data to a cost-effective long-term storage
+inputs          = ["apache_parser"]    # don't sample for S3
+type            = "aws_s3"
+region          = "us-east-1"
+bucket          = "my-log-archives"
+key_prefix      = "date=%Y-%m-%d"      # daily partitions, hive friendly format
+compression     = "gzip"               # compress final objects
+encoding        = "ndjson"             # new line delimited JSON
+batch.max_bytes = 10000000             # 10mb uncompressed
+```
+
+{{< /tab >}}
+{{< /tabs >}}
+
+Vector then needs to be started using the `--config-dir` argument to specify the root configuration folder.
+
+```bash
+vector --config-dir /etc/vector
+```
+
 #### Wilcards in component IDs
 
 Vector supports wildcards (`*`) in component IDs when building your topology.

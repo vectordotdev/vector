@@ -1,3 +1,4 @@
+use super::{AfterReadExt as _, TcpError};
 use crate::{
     config::Resource,
     event::Event,
@@ -5,7 +6,6 @@ use crate::{
         ConnectionOpen, OpenGauge, TcpBytesReceived, TcpSendAckError, TcpSocketConnectionError,
     },
     shutdown::ShutdownSignal,
-    sources::util::TcpError,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
     Pipeline,
@@ -13,15 +13,13 @@ use crate::{
 use bytes::Bytes;
 use futures::{future::BoxFuture, FutureExt, Sink, SinkExt, StreamExt};
 use listenfd::ListenFd;
-use pin_project::pin_project;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use smallvec::SmallVec;
 use socket2::SockRef;
 use std::net::{IpAddr, SocketAddr};
-use std::task::{Context, Poll};
-use std::{fmt, io, mem::drop, pin::Pin, time::Duration};
+use std::{fmt, io, mem::drop, time::Duration};
 use tokio::{
-    io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf},
+    io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
     time::sleep,
 };
@@ -217,7 +215,12 @@ async fn handle_stream<T>(
         }
     }
 
-    let socket = TcpSocketWrapper::new(socket, peer_addr);
+    let socket = socket.after_read(move |byte_size| {
+        emit!(&TcpBytesReceived {
+            byte_size,
+            peer_addr
+        });
+    });
     let mut reader = FramedRead::new(socket, source.decoder());
     let host = Bytes::from(peer_addr.to_string());
 
@@ -324,62 +327,6 @@ where
             .checked_sub(1)
             .ok_or_else(|| de::Error::custom("systemd indices start from 1, found 0")),
         _ => Err(de::Error::custom("must start with \"systemd\"")),
-    }
-}
-
-/// This wraps the inner socket and emits `BytesReceived` with the
-/// actual number of bytes read before handling framing.
-#[pin_project]
-struct TcpSocketWrapper<T> {
-    #[pin]
-    inner: T,
-    peer_addr: IpAddr,
-}
-
-impl<T> TcpSocketWrapper<T> {
-    const fn new(inner: T, peer_addr: IpAddr) -> Self {
-        Self { inner, peer_addr }
-    }
-
-    const fn get_ref(&self) -> &T {
-        &self.inner
-    }
-}
-
-impl<T: AsyncRead> AsyncRead for TcpSocketWrapper<T> {
-    fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<tokio::io::Result<()>> {
-        let before = buf.filled().len();
-        let this = self.project();
-        let result = this.inner.poll_read(cx, buf);
-        if let Poll::Ready(Ok(())) = result {
-            emit!(&TcpBytesReceived {
-                byte_size: buf.filled().len() - before,
-                peer_addr: *this.peer_addr,
-            });
-        }
-        result
-    }
-}
-
-impl<T: AsyncWrite> AsyncWrite for TcpSocketWrapper<T> {
-    fn poll_write(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<Result<usize, io::Error>> {
-        self.project().inner.poll_write(cx, buf)
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        self.project().inner.poll_flush(cx)
-    }
-
-    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        self.project().inner.poll_shutdown(cx)
     }
 }
 

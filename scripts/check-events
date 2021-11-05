@@ -123,25 +123,27 @@ $all_events = Hash::new { |hash, key| hash[key] = Event::new(key) }
 error_count = 0
 
 # Scan sources and build internal structures
-Find.find('src') do |path|
+Find.find('.') do |path|
   if path.end_with? '.rs'
     text = File.read(path)
 
     # Check log message texts for correct formatting. See below for the
     # full regex
-    text.scan(/(trace|debug|info|warn|error)!\(\s*(message\s*=\s*)?"([^({)][^("]+)"/) do
-      |type, has_message_prefix, message|
-      reports = []
-      reports.append('Message must start with a capital.') unless message.match(/^[[:upper:]]/)
-      reports.append('Message must end with a period.') unless message.match(/\.$/)
-      unless reports.empty?
-        puts "#{path}: Errors in message \"#{message}\":"
-        reports.each { |report| puts "  #{report}" }
-        error_count += 1
+    if (path.start_with? 'src/')
+      text.scan(/(trace|debug|info|warn|error)!\(\s*(message\s*=\s*)?"([^({)][^("]+)"/) do
+        |type, has_message_prefix, message|
+        reports = []
+        reports.append('Message must start with a capital.') unless message.match(/^[[:upper:]]/)
+        reports.append('Message must end with a period.') unless message.match(/\.$/)
+        unless reports.empty?
+          puts "#{path}: Errors in message \"#{message}\":"
+          reports.each { |report| puts "  #{report}" }
+          error_count += 1
+        end
       end
     end
 
-    if path.start_with? 'src/internal_events/' and !text.match?(/## skip check-events ##/i)
+    if (path.start_with? 'src/internal_events/' or path.start_with? 'lib/vector_core/core_common/src/internal_event/') and !text.match?(/## skip check-events ##/i)
       # Scan internal event structs for member names
       text.scan(/[\n ]struct (\S+?)(?:<.+?>)?(?: {\n(.+?)\n\s*}|;)\n/m) do |struct_name, members|
         $all_events[struct_name].path = path

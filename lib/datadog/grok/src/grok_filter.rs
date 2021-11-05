@@ -87,10 +87,7 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
                 .map_err(|_e| {
                     GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string())
                 })
-                .map(|f| (f as i64).into())
-                .map_err(|_e| {
-                    GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string())
-                })?),
+                .map(|f| (f as i64).into())?),
             _ => Err(GrokRuntimeError::FailedToApplyFilter(
                 filter.to_string(),
                 value.to_string(),
