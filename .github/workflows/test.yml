@@ -1,14 +1,10 @@
 name: Test Suite
 
 on:
-  pull_request:
-    paths-ignore:
-      - "website/**"
+  pull_request: {}
   push:
     branches:
       - master
-    paths-ignore:
-      - "website/**"
 
 env:
   AUTOINSTALL: true

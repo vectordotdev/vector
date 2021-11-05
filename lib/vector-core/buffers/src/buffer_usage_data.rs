@@ -27,7 +27,7 @@ impl BufferUsageData {
         max_size_events: Option<usize>,
     ) -> Arc<Self> {
         let dropped_event_count = match when_full {
-            WhenFull::Block => None,
+            WhenFull::Block | WhenFull::Overflow => None,
             WhenFull::DropNewest => Some(AtomicU64::new(0)),
         };
 

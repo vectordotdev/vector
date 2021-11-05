@@ -5,6 +5,7 @@
 {{ $img := site.Params.site_logo | absURL }}
 {{ $imgAlt := printf "Logo for %s" site.Title }}
 {{ $twitter := printf "@%s" site.Params.social.twitter_handle }}
+{{ $title := cond (eq .Layout "component") (printf "%s %s" .Title .Params.kind) .Title }}
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
 <meta http-equiv="x-ua-compatible" content="id=edge">
@@ -28,7 +29,7 @@
 <meta name="twitter:creator" content="{{ $twitter }}">
 
 {{/* OpenGraph metadata */}}
-<meta property="og:title" content="{{ .Title }}">
+<meta property="og:title" content="{{ $title }}">
 <meta property="og:image" content="{{ $img }}">
 <meta property="og:url" content="{{ $url }}">
 {{ with $desc }}
@@ -36,7 +37,7 @@
 {{ end }}
 
 {{/* For Algolia search */}}
-<meta name="algolia:title" content="{{ .Title }}">
+<meta name="algolia:title" content="{{ $title }}">
 {{ with .Params.tags }}
 <meta name="keywords" content="{{ delimit . "," }}">
 {{ end }}
