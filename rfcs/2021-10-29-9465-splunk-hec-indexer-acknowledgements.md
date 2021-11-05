@@ -27,12 +27,12 @@ source-side implementation, and outlines a sink-side integration.
 ## Pain
 
 For the `splunk_hec` source, supporting indexer acknowledgements enables
-customers relying on Splunk HEC to more easily transition to vector. Some
+customers relying on Splunk HEC to more easily transition to Vector. Some
 third-party Splunk integrations (e.g. AWS Kinesis Firehose) require the indexer
 acknowledgement feature.
 
 For the `splunk_hec` sinks, supporting indexer acknowledgements improves the
-accuracy of vector’s end-to-end acknowledgement system when used with
+accuracy of Vector’s end-to-end acknowledgement system when used with
 `splunk_hec` sinks.
 
 ## Overview: Splunk HEC Indexer Acknowledgement
@@ -219,7 +219,7 @@ Second, we describe implementation details for channel behavior.
       `ack_ids_in_use` array on the next incoming request.
   * To associate request data to the assigned `ackId` and receive the status of
     the data, we will use the existing `BatchNotifier`/`BatchReceiver` system
-    from vector’s overall end-to-end-acknowledgement infrastructure.
+    from Vector’s overall end-to-end-acknowledgement infrastructure.
 
     ```rust
     async fn handle_request(acknowledgements: bool, events: Vec<Events>, out: Pipeline, ack_id: usize...) {
@@ -364,7 +364,7 @@ fn call(&mut self, req: HecRequest) -> Self::Future {
   mentioned](https://github.com/vectordotdev/vector/issues/2374#issuecomment-795367929)
   the possibility of simply adding a mock implementation of indexer
   acknowledgements wherein queries to `/services/collector/ack` return true for
-  any ackId. This was suggested prior to the existence of vector’s internal
+  any ackId. This was suggested prior to the existence of Vector’s internal
   end-to-end acknowledgements system.
 
 ## Outstanding Questions
@@ -373,7 +373,7 @@ fn call(&mut self, req: HecRequest) -> Self::Future {
   how closely we mimic the real Splunk HEC indexer acknowledgements behavior.
   While we’d like to avoid inheriting Splunk’s issues wherever possible, we’d
   also like to make this as fully functional as users need. Does the above make
-  sense in terms of what our users need from vector?~~ We will support most of
+  sense in terms of what our users need from Vector?~~ We will support most of
   the same Splunk HEC indexer acknowledgements behavior for better user
   experience and robustness.
 * ~~For `splunk_hec` sink, should we instead allow users to configure channel
