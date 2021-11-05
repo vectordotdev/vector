@@ -17,14 +17,8 @@ address = "0.0.0.0:8282"
 ##
 
 [transforms.parse_message]
-type = "remap"
+type = "noop"
 inputs = ["datadog_agent"]
-source = '''
-pyld, err = parse_json(.message)
-if err == null {
-  .message = pyld.mineral
-}
-'''
 
 ##
 ## Sinks
