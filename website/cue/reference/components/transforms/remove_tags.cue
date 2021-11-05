@@ -19,22 +19,12 @@ components: transforms: remove_tags: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: [
 			"""
 			\(remove_tags._remap_deprecation_notice)
 
-			```vrl
+			```coffee
 			del(.tag)
 			```
 			""",
@@ -49,7 +39,6 @@ components: transforms: remove_tags: {
 			warnings: []
 			type: array: items: type: string: {
 				examples: ["tag1", "tag2"]
-				syntax: "literal"
 			}
 		}
 	}

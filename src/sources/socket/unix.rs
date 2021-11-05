@@ -1,5 +1,6 @@
 use crate::{
     codecs::{Decoder, FramingConfig, ParserConfig},
+    config::log_schema,
     event::Event,
     internal_events::{SocketEventsReceived, SocketMode},
     serde::default_decoding,
@@ -11,6 +12,7 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -52,16 +54,16 @@ fn handle_events(
         count: events.len()
     });
 
+    let now = Utc::now();
+
     for event in events {
         let log = event.as_mut_log();
 
-        log.insert(
-            crate::config::log_schema().source_type_key(),
-            Bytes::from("socket"),
-        );
+        log.try_insert(log_schema().source_type_key(), Bytes::from("socket"));
+        log.try_insert(log_schema().timestamp_key(), now);
 
         if let Some(ref host) = received_from {
-            log.insert(host_key, host.clone());
+            log.try_insert(host_key, host.clone());
         }
     }
 }

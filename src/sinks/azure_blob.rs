@@ -10,9 +10,8 @@ use crate::{
             encoding::{EncodingConfig, EncodingConfiguration},
             retries::RetryLogic,
             sink::Response,
-            BatchConfig, BatchSettings, Buffer, Compression, Concurrency, EncodedEvent,
-            PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
-            TowerRequestConfig,
+            BatchConfig, BatchSettings, Buffer, Compression, EncodedEvent, PartitionBatchSink,
+            PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -131,7 +130,6 @@ impl SinkConfig for AzureBlobSinkConfig {
 impl AzureBlobSinkConfig {
     pub fn new(&self, client: Arc<ContainerClient>, cx: SinkContext) -> Result<VectorSink> {
         let request = self.request.unwrap_with(&TowerRequestConfig {
-            concurrency: Concurrency::Fixed(50),
             rate_limit_num: Some(250),
             ..Default::default()
         });
@@ -248,7 +246,7 @@ impl Service<AzureBlobSinkRequest> for AzureBlobSink {
 }
 
 impl Compression {
-    pub const fn content_type(&self) -> &'static str {
+    pub const fn content_type(self) -> &'static str {
         match self {
             Self::None => "text/plain",
             Self::Gzip(_) => "application/gzip",

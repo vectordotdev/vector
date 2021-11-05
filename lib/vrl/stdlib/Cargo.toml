@@ -2,7 +2,7 @@
 name = "vrl-stdlib"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@timber.io>"]
-edition = "2018"
+edition = "2021"
 publish = false
 license = "MPL-2.0"
 
@@ -20,8 +20,7 @@ dns-lookup = { version = "1.0.8", optional = true }
 grok = { version = "1", optional = true }
 hex = { version = "0.4", optional = true }
 hostname = { version = "0.3", optional = true }
-# pinned due to https://github.com/tkaitchuck/aHash/issues/95
-indexmap = { version = "~1.6.2", default-features = false, optional = true}
+indexmap = { version = "~1.7.0", default-features = false, optional = true}
 lazy_static = { version = "1", optional = true }
 md-5 = { version = "0.9", optional = true }
 nom = { version = "7", optional = true }
@@ -34,14 +33,14 @@ sha-2 = { package = "sha2", version = "0.9", optional = true }
 sha-3 = { package = "sha3", version = "0.9", optional = true }
 shared = { path = "../../shared", default-features = false, optional = true }
 strip-ansi-escapes = { version = "0.1", optional = true }
-syslog_loose = { version = "0.15", optional = true }
+syslog_loose = { version = "0.16", optional = true }
 tracing = { version = "0.1", optional = true }
 url = { version = "2", optional = true }
 uuid = { version = "0.8", features = ["v4"], optional = true }
 roxmltree = { version = "0.14.1", optional = true }
-woothee = { version = "0.12.1", optional = true }
+woothee = { version = "0.13.0", optional = true }
 uaparser = { version = "0.4.0", optional = true }
-cached = { version = "0.25.1", optional = true }
+cached = { version = "0.26.2", optional = true }
 
 [dev-dependencies]
 anyhow = "1"
@@ -151,6 +150,7 @@ default = [
     "strip_ansi_escape_codes",
     "strip_whitespace",
     "tally",
+    "tally_value",
     "tag_types_externally",
     "timestamp",
     "to_bool",
@@ -273,6 +273,7 @@ strip_ansi_escape_codes = ["bytes", "strip-ansi-escapes"]
 strip_whitespace = []
 tag_types_externally = ["shared/btreemap"]
 tally = []
+tally_value = []
 timestamp = []
 to_bool = ["shared/conversion"]
 to_float = ["shared/conversion"]

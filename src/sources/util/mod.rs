@@ -1,3 +1,5 @@
+#[cfg(any(feature = "sources-http"))]
+mod body_decoding;
 mod encoding_config;
 #[cfg(any(feature = "sources-file", feature = "sources-kafka"))]
 pub mod finalizer;
@@ -23,7 +25,11 @@ mod tcp_error;
 mod unix_datagram;
 #[cfg(all(unix, feature = "sources-utils-unix"))]
 mod unix_stream;
+#[cfg(any(feature = "sources-utils-tls", feature = "sources-vector"))]
+mod wrappers;
 
+#[cfg(any(feature = "sources-http"))]
+pub use self::body_decoding::Encoding;
 #[cfg(feature = "sources-utils-http-query")]
 pub use self::http::add_query_parameters;
 #[cfg(any(
@@ -50,3 +56,5 @@ pub use tcp_error::TcpError;
 pub use unix_datagram::build_unix_datagram_source;
 #[cfg(all(unix, feature = "sources-utils-unix",))]
 pub use unix_stream::build_unix_stream_source;
+#[cfg(any(feature = "sources-utils-tls", feature = "sources-vector"))]
+pub use wrappers::AfterReadExt;

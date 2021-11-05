@@ -1,7 +1,7 @@
 use crate::{
     codecs::{BoxedFramingError, CharacterDelimitedCodec},
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
-    event::{Event, LogEvent, Value},
+    event::{BatchNotifier, Event, LogEvent, Value},
     internal_events::{BytesReceived, JournaldEventsReceived, JournaldInvalidRecordError},
     shutdown::ShutdownSignal,
     Pipeline,
@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Error as JsonError, Value as JsonValue};
 use snafu::{ResultExt, Snafu};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::{
     collections::{HashMap, HashSet},
     io::SeekFrom,
@@ -184,6 +185,7 @@ impl SourceConfig for JournaldConfig {
                 batch_size,
                 remap_priority: self.remap_priority,
                 out: cx.out,
+                acknowledgements: cx.acknowledgements.enabled,
             }
             .run_shutdown(cx.shutdown, start),
         ))
@@ -205,6 +207,7 @@ struct JournaldSource {
     batch_size: usize,
     remap_priority: bool,
     out: Pipeline,
+    acknowledgements: bool,
 }
 
 impl JournaldSource {
@@ -296,13 +299,14 @@ impl JournaldSource {
             let mut count = 0;
             let mut byte_size = 0;
             let mut events = Vec::new();
-            let mut exiting = false;
+            let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
+            let mut exiting = None;
 
             for _ in 0..self.batch_size {
                 let bytes = match stream.next().await {
                     None => {
                         warn!("Journalctl process stopped.");
-                        exiting = true;
+                        exiting = Some(true);
                         break;
                     }
                     Some(Ok(text)) => text,
@@ -331,12 +335,13 @@ impl JournaldSource {
 
                 if !filter_matches(&record, &self.include_matches, &self.exclude_matches) {
                     record_size += bytes.len();
-                    let event = create_event(record);
+                    let event = create_event(record, &batch);
                     count += 1;
                     byte_size += event.size_of();
                     events.push(event);
                 }
             }
+            drop(batch);
 
             if record_size > 0 {
                 emit!(&BytesReceived {
@@ -344,22 +349,31 @@ impl JournaldSource {
                     protocol: "journald",
                 });
             }
+
             if count > 0 {
                 emit!(&JournaldEventsReceived { count, byte_size });
                 if !events.is_empty() {
                     match self.out.send_all(&mut stream::iter(events).map(Ok)).await {
-                        Ok(_) => {}
+                        Ok(_) => {
+                            if let Some(receiver) = receiver {
+                                // Ignore the received status, we can't do anything with failures here.
+                                receiver.await;
+                            }
+                        }
                         Err(error) => {
                             error!(message = "Could not send journald log.", %error);
                             // `out` channel is closed, don't restart journalctl.
-                            break false;
+                            exiting = Some(false);
                         }
                     }
                 }
-                Self::save_checkpoint(checkpointer, &*cursor).await;
+                if exiting != Some(false) {
+                    Self::save_checkpoint(checkpointer, &*cursor).await;
+                }
             }
-            if exiting {
-                break true;
+
+            if let Some(x) = exiting {
+                break x;
             }
         }
     }
@@ -447,8 +461,12 @@ fn create_command(
     command
 }
 
-fn create_event(record: Record) -> Event {
+fn create_event(record: Record, batch: &Option<Arc<BatchNotifier>>) -> Event {
     let mut log = LogEvent::from_iter(record);
+    if let Some(batch) = batch {
+        log = log.with_batch_notifier(batch);
+    }
+
     // Convert some journald-specific field names into Vector standard ones.
     if let Some(message) = log.remove(MESSAGE) {
         log.insert(log_schema().message_key(), message);
@@ -663,7 +681,7 @@ mod checkpointer_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::components;
+    use crate::{event::EventStatus, test_util::components};
     use futures::Stream;
     use std::pin::Pin;
     use std::{
@@ -744,7 +762,7 @@ mod tests {
         cursor: Option<&str>,
     ) -> Vec<Event> {
         components::init_test();
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
         let (trigger, shutdown, _) = ShutdownSignal::new_wired();
 
         let tempdir = tempdir().unwrap();
@@ -769,6 +787,7 @@ mod tests {
             batch_size: DEFAULT_BATCH_SIZE,
             remap_priority: true,
             out: tx,
+            acknowledgements: true,
         }
         .run_shutdown(
             shutdown,
@@ -927,6 +946,47 @@ mod tests {
         assert_eq!(received.len(), 2);
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140004000));
         assert_eq!(timestamp(&received[1]), value_ts(1578529839, 140005000));
+    }
+
+    #[tokio::test]
+    async fn waits_for_acknowledgements() {
+        let (tx, mut rx) = Pipeline::new_test();
+
+        let tempdir = tempdir().unwrap();
+        let mut checkpoint_path = tempdir.path().to_path_buf();
+        checkpoint_path.push(CHECKPOINT_FILENAME);
+
+        let mut checkpointer = Checkpointer::new(checkpoint_path.clone())
+            .await
+            .expect("Creating checkpointer failed!");
+
+        let mut cursor = checkpointer.get().await.unwrap();
+
+        let mut source = JournaldSource {
+            include_matches: Default::default(),
+            exclude_matches: Default::default(),
+            checkpoint_path,
+            batch_size: DEFAULT_BATCH_SIZE,
+            remap_priority: true,
+            out: tx,
+            acknowledgements: true,
+        };
+        let (stream, _stop) = FakeJournal::new(&cursor);
+        let mut handle =
+            tokio_test::task::spawn(source.run_stream(stream, &mut checkpointer, &mut cursor));
+
+        // Drive the journal until it waits for the acknowledgement.
+        assert_eq!(handle.poll(), Poll::Pending);
+        assert!(!handle.is_woken());
+        // Acknowledge all the received events.
+        let mut count = 0;
+        while let Ok(Some(event)) = rx.try_next() {
+            event.metadata().update_status(EventStatus::Delivered);
+            count += 1;
+        }
+        assert_eq!(count, 8);
+        // Make sure it is woken up again after receiving the acknowledgement.
+        assert!(handle.is_woken());
     }
 
     #[test]

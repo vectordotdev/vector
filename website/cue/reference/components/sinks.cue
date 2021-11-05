@@ -1,9 +1,5 @@
 package metadata
 
-import (
-	"list"
-)
-
 components: sinks: [Name=string]: {
 	kind: "sink"
 
@@ -101,7 +97,6 @@ components: sinks: [Name=string]: {
 									For comparison, AWS gp2 volumes are usually too slow for common cases.
 									"""
 								}
-								syntax: "literal"
 							}
 						}
 						when_full: {
@@ -114,7 +109,6 @@ components: sinks: [Name=string]: {
 									block:       "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."
 									drop_newest: "Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."
 								}
-								syntax: "literal"
 							}
 						}
 					}
@@ -136,15 +130,24 @@ components: sinks: [Name=string]: {
 					type: string: {
 						default: features.send.compression.default
 						enum: {
-							if list.Contains(features.send.compression.algorithms, "none") {
-								none:   "No compression."
-								syntax: "literal"
-							}
-							if list.Contains(features.send.compression.algorithms, "gzip") {
-								gzip: "[Gzip](\(urls.gzip)) standard DEFLATE compression."
+							for algo in features.send.compression.algorithms {
+								if algo == "none" {
+									none: "No compression."
+								}
+								if algo == "gzip" {
+									gzip: "[Gzip](\(urls.gzip)) standard DEFLATE compression."
+								}
+								if algo == "snappy" {
+									snappy: "[Snappy](\(urls.snappy)) compression."
+								}
+								if algo == "lz4" {
+									lz4: "[lz4](\(urls.lz4)) compression."
+								}
+								if algo == "zstd" {
+									zstd: "[zstd](\(urls.zstd)) compression."
+								}
 							}
 						}
-						syntax: "literal"
 					}
 				}
 			}
@@ -195,7 +198,6 @@ components: sinks: [Name=string]: {
 											}
 										}
 									}
-									syntax: "literal"
 								}
 							}
 						}
@@ -236,7 +238,6 @@ components: sinks: [Name=string]: {
 									rfc3339: "Formats as a RFC3339 string"
 									unix:    "Formats as a unix timestamp"
 								}
-								syntax: "literal"
 							}
 						}
 					}
@@ -305,8 +306,8 @@ components: sinks: [Name=string]: {
 										rtt_deviation_scale: {
 											common: false
 											description: """
-                                                When calculating the past RTT average, we also compute a secondary "deviation" value that indicates how variable those values are. We use that deviation when comparing the past RTT average to the current measurements, so we can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to an appropriate range. Valid values are greater than or equal to 0, and we expect reasonable values to range from 1.0 to 3.0. Larger values cause the algorithm to ignore larger increases in the RTT.
-                                            """
+											When calculating the past RTT average, we also compute a secondary "deviation" value that indicates how variable those values are. We use that deviation when comparing the past RTT average to the current measurements, so we can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to an appropriate range. Valid values are greater than or equal to 0, and we expect reasonable values to range from 1.0 to 3.0. Larger values cause the algorithm to ignore larger increases in the RTT.
+											"""
 											required: false
 											type: float: default: 2.0
 										}
@@ -387,7 +388,6 @@ components: sinks: [Name=string]: {
 									common:      false
 									description: "Options for custom headers."
 									required:    false
-									warnings: []
 									type: object: {
 										examples: [
 											{

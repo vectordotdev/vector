@@ -16,22 +16,12 @@ components: transforms: add_fields: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: [
 			"""
 			\(add_fields._remap_deprecation_notice)
 
-			```vrl
+			```coffee
 			.severity = "crit"
 			.status = 200
 			.success_codes = [200, 201, 202, 204]
@@ -46,7 +36,6 @@ components: transforms: add_fields: {
 		fields: {
 			description: "A table of key/value pairs representing the keys to be added to the event."
 			required:    true
-			warnings: []
 			type: object: {
 				examples: [
 					{
@@ -65,7 +54,6 @@ components: transforms: add_fields: {
 					"*": {
 						description: "The name of the field to add. Accepts all supported configuration types. Use `.` for adding nested fields."
 						required:    true
-						warnings: []
 						type: "*": {}
 					}
 				}
@@ -75,7 +63,6 @@ components: transforms: add_fields: {
 			common:      true
 			description: "By default, fields will be overridden. Set this to `false` to avoid overwriting values."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 	}

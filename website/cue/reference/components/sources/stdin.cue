@@ -29,16 +29,6 @@ components: sources: stdin: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -57,17 +47,14 @@ components: sources: stdin: {
 				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
 				"""
 			required:    false
-			warnings: []
 			type: string: {
 				default: "host"
-				syntax:  "literal"
 			}
 		}
 		max_length: {
 			common:      false
 			description: "The maximum bytes size of a message before rest of it will be discarded."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 102400
 				unit:    "bytes"

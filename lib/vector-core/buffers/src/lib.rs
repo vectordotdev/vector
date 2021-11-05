@@ -7,6 +7,7 @@
 #![deny(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::type_complexity)] // long-types happen, especially in async code
+#![allow(clippy::must_use_candidate)]
 
 #[macro_use]
 extern crate tracing;
@@ -19,6 +20,7 @@ pub mod disk;
 mod internal_events;
 #[cfg(test)]
 mod test;
+pub mod topology;
 mod variant;
 
 use crate::buffer_usage_data::BufferUsageData;
@@ -71,7 +73,7 @@ where
             ..
         } => {
             let buffer_dir = format!("{}_buffer", id);
-            let buffer_usage_data = BufferUsageData::new(when_full, span);
+            let buffer_usage_data = BufferUsageData::new(when_full, span, Some(max_size), None);
             let (tx, rx, acker) =
                 disk::open(&data_dir, &buffer_dir, max_size, buffer_usage_data.clone())
                     .map_err(|error| error.to_string())?;
@@ -86,7 +88,8 @@ where
         } => {
             let (tx, rx) = mpsc::channel(max_events);
             if instrument {
-                let buffer_usage_data = BufferUsageData::new(when_full, span);
+                let buffer_usage_data =
+                    BufferUsageData::new(when_full, span, None, Some(max_events));
                 let tx = BufferInputCloner::Memory(tx, when_full, Some(buffer_usage_data.clone()));
                 let rx = rx.inspect(move |item: &T| {
                     buffer_usage_data.increment_sent_event_count_and_byte_size(1, item.size_of());
@@ -107,6 +110,7 @@ where
 pub enum WhenFull {
     Block,
     DropNewest,
+    Overflow,
 }
 
 impl Default for WhenFull {
@@ -118,6 +122,9 @@ impl Default for WhenFull {
 #[cfg(test)]
 impl Arbitrary for WhenFull {
     fn arbitrary(g: &mut Gen) -> Self {
+        // TODO: We explicitly avoid generating "overflow" as a possible value because nothing yet
+        // supports handling it, and will be defaulted to to using "block" if they encounter
+        // "overflow".  Thus, there's no reason to emit it here... yet.
         if bool::arbitrary(g) {
             WhenFull::Block
         } else {
@@ -191,7 +198,7 @@ impl<S> MemoryBufferInput<S> {
         buffer_usage_data: Option<Arc<BufferUsageData>>,
     ) -> Self {
         let drop = match when_full {
-            WhenFull::Block => None,
+            WhenFull::Block | WhenFull::Overflow => None,
             WhenFull::DropNewest => Some(false),
         };
 

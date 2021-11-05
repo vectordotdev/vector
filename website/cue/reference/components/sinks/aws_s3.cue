@@ -38,10 +38,8 @@ components: sinks: aws_s3: components._aws & {
 			}
 			proxy: enabled: true
 			request: {
-				enabled:        true
-				concurrency:    50
-				rate_limit_num: 250
-				headers:        false
+				enabled: true
+				headers: false
 			}
 			tls: enabled: false
 			to: {
@@ -63,19 +61,9 @@ components: sinks: aws_s3: components._aws & {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
-		warnings: []
 		notices: []
+		warnings: []
 	}
 
 	configuration: {
@@ -84,7 +72,6 @@ components: sinks: aws_s3: components._aws & {
 			common:      false
 			description: "Canned ACL to apply to the created objects. For more information, see [Canned ACL](\(urls.aws_s3_canned_acl))."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				enum: {
@@ -97,16 +84,13 @@ components: sinks: aws_s3: components._aws & {
 					"bucket-owner-full-control": "Both the object owner and the bucket owner get `FULL_CONTROL` over the object."
 					"log-delivery-write":        "The LogDelivery group gets `WRITE` and `READ_ACP` permissions on the bucket. For more information about logs, see [Amazon S3 Server Access Logging](\(urls.aws_s3_server_access_logs))."
 				}
-				syntax: "literal"
 			}
 		}
 		bucket: {
 			description: "The S3 bucket name. Do not include a leading `s3://` or a trailing `/`."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["my-bucket"]
-				syntax: "literal"
 			}
 		}
 		content_encoding: {
@@ -114,11 +98,9 @@ components: sinks: aws_s3: components._aws & {
 			common:      false
 			description: "Specifies what content encodings have been applied to the object and thus what decoding mechanisms must be applied to obtain the media-type referenced by the Content-Type header field. By default calculated from `compression` value."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["gzip"]
-				syntax: "literal"
 			}
 		}
 		content_type: {
@@ -126,10 +108,8 @@ components: sinks: aws_s3: components._aws & {
 			common:      false
 			description: "A standard MIME type describing the format of the contents."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "text/x-log"
-				syntax:  "literal"
 			}
 		}
 		filename_append_uuid: {
@@ -137,7 +117,6 @@ components: sinks: aws_s3: components._aws & {
 			common:      false
 			description: "Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 		filename_extension: {
@@ -145,10 +124,8 @@ components: sinks: aws_s3: components._aws & {
 			common:      false
 			description: "The filename extension to use in the object name."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "log"
-				syntax:  "literal"
 			}
 		}
 		filename_time_format: {
@@ -156,7 +133,6 @@ components: sinks: aws_s3: components._aws & {
 			common:      false
 			description: "The format of the resulting object file name. [`strftime` specifiers](\(urls.strptime_specifiers)) are supported."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "%s"
 				syntax:  "strftime"
@@ -167,11 +143,9 @@ components: sinks: aws_s3: components._aws & {
 			common:      false
 			description: "Gives the named [grantee](\(urls.aws_s3_grantee)) READ, READ_ACP, and WRITE_ACP permissions on the created objects."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
-				syntax: "literal"
 			}
 		}
 		grant_read: {
@@ -179,11 +153,9 @@ components: sinks: aws_s3: components._aws & {
 			common:      false
 			description: "Allows the named [grantee](\(urls.aws_s3_grantee)) to read the created objects and their metadata."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
-				syntax: "literal"
 			}
 		}
 		grant_read_acp: {
@@ -191,11 +163,9 @@ components: sinks: aws_s3: components._aws & {
 			common:      false
 			description: "Allows the named [grantee](\(urls.aws_s3_grantee)) to read the created objects' ACL."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
-				syntax: "literal"
 			}
 		}
 		grant_write_acp: {
@@ -203,11 +173,9 @@ components: sinks: aws_s3: components._aws & {
 			common:      false
 			description: "Allows the named [grantee](\(urls.aws_s3_grantee)) to write the created objects' ACL."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be", "person@email.com", "http://acs.amazonaws.com/groups/global/AllUsers"]
-				syntax: "literal"
 			}
 		}
 		key_prefix: {
@@ -215,7 +183,6 @@ components: sinks: aws_s3: components._aws & {
 			common:      true
 			description: "A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 \"folder\"."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "date=%F/"
 				examples: ["date=%F/", "date=%F/hour=%H/", "year=%Y/month=%m/day=%d/", "application_id={{ application_id }}/date=%F/"]
@@ -227,14 +194,12 @@ components: sinks: aws_s3: components._aws & {
 			common:      false
 			description: "The Server-side Encryption algorithm used when storing these objects."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				enum: {
 					"AES256":  "256-bit Advanced Encryption Standard"
 					"aws:kms": "AWS managed key encryption"
 				}
-				syntax: "literal"
 			}
 		}
 		ssekms_key_id: {
@@ -242,11 +207,9 @@ components: sinks: aws_s3: components._aws & {
 			common:      false
 			description: "If `server_side_encryption` has the value `\"aws.kms\"`, this specifies the ID of the AWS Key Management Service (AWS KMS) symmetrical customer managed customer master key (CMK) that will used for the created objects. If not specified, Amazon S3 uses the AWS managed CMK in AWS to protect the data."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["abcd1234"]
-				syntax: "literal"
 			}
 		}
 		storage_class: {
@@ -254,7 +217,6 @@ components: sinks: aws_s3: components._aws & {
 			common:      false
 			description: "The storage class for the created objects. See [the S3 Storage Classes](https://docs.aws.amazon.com/AmazonS3/latest/dev/storage-class-intro.html) for more details."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				enum: {
@@ -266,14 +228,12 @@ components: sinks: aws_s3: components._aws & {
 					GLACIER:             "Use for archives where portions of the data might need to be retrieved in minutes."
 					DEEP_ARCHIVE:        "Use for archiving data that rarely needs to be accessed."
 				}
-				syntax: "literal"
 			}
 		}
 		tags: {
 			common:      false
 			description: "The tag-set for the object."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: [{"Tag1": "Value1"}]
 				options: {}
@@ -412,7 +372,10 @@ components: sinks: aws_s3: components._aws & {
 	]
 
 	telemetry: metrics: {
-		events_discarded_total:  components.sources.internal_metrics.output.metrics.events_discarded_total
-		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
+		component_sent_bytes_total:       components.sources.internal_metrics.output.metrics.component_sent_bytes_total
+		component_sent_events_total:      components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total: components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		events_discarded_total:           components.sources.internal_metrics.output.metrics.events_discarded_total
+		processing_errors_total:          components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

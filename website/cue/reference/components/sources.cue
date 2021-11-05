@@ -46,7 +46,6 @@ components: sources: [Name=string]: {
 								halt_before:      "All consecutive lines not matching this pattern are included in the group. This is useful where a log line contains a marker indicating that it begins a new message."
 								halt_with:        "All consecutive lines, up to and including the first line matching this pattern, are included in the group. This is useful where a log line ends with a termination marker, such as a semicolon."
 							}
-							syntax: "literal"
 						}
 					}
 					start_pattern: {
@@ -91,7 +90,6 @@ components: sources: [Name=string]: {
 									newline_delimited:   "Byte frames which are delimited by a newline character."
 									octet_counting:      "Byte frames according to the [octet counting](\(urls.rfc_6587_3_4_1)) format."
 								}
-								syntax: "literal"
 							}
 						}
 						character_delimited: {
@@ -104,7 +102,6 @@ components: sources: [Name=string]: {
 									required:    true
 									type: string: {
 										examples: ["\n", "\t"]
-										syntax: "literal"
 									}
 								}
 								max_length: {
@@ -112,7 +109,7 @@ components: sources: [Name=string]: {
 									required:    false
 									common:      false
 									type: uint: {
-										default: 102400
+										default: null
 										examples: [65535, 102400]
 										unit: "bytes"
 									}
@@ -130,7 +127,7 @@ components: sources: [Name=string]: {
 									required:    false
 									common:      false
 									type: uint: {
-										default: 102400
+										default: null
 										examples: [65535, 102400]
 										unit: "bytes"
 									}
@@ -148,7 +145,7 @@ components: sources: [Name=string]: {
 									required:    false
 									common:      false
 									type: uint: {
-										default: 102400
+										default: null
 										examples: [65535, 102400]
 										unit: "bytes"
 									}
@@ -173,7 +170,6 @@ components: sources: [Name=string]: {
 									json:   "Events being parsed from a JSON string."
 									syslog: "Events being parsed from a Syslog message."
 								}
-								syntax: "literal"
 							}
 						}
 					}
@@ -195,7 +191,6 @@ components: sources: [Name=string]: {
 							type: string: {
 								default: null
 								examples: ["utf-16le", "utf-16be"]
-								syntax: "literal"
 							}
 						}
 					}
@@ -285,7 +280,6 @@ components: sources: [Name=string]: {
 					required:    true
 					type: string: {
 						examples: [_values.local_host]
-						syntax: "literal"
 					}
 				}
 
@@ -294,7 +288,6 @@ components: sources: [Name=string]: {
 					required:    true
 					type: string: {
 						examples: ["2019-02-13T19:48:34+00:00 [info] Started GET \"/\" for 127.0.0.1"]
-						syntax: "literal"
 					}
 				}
 			}

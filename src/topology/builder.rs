@@ -9,7 +9,7 @@ use crate::{
         ComponentKey, DataType, OutputId, ProxyConfig, SinkContext, SourceContext, TransformContext,
     },
     event::Event,
-    internal_events::{EventsReceived, EventsSent},
+    internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
     transforms::Transform,
     Pipeline,
@@ -27,6 +27,7 @@ use tokio::{
     select,
     time::{timeout, Duration},
 };
+use vector_core::internal_event::EventsSent;
 use vector_core::ByteSizeOf;
 
 lazy_static! {
@@ -229,7 +230,7 @@ pub async fn build_pieces(
                     .inspect(|events| {
                         emit!(&EventsReceived {
                             count: events.len(),
-                            byte_size: events.iter().map(|e| e.size_of()).sum(),
+                            byte_size: events.size_of(),
                         });
                     })
                     .flat_map(move |events| {
@@ -242,7 +243,7 @@ pub async fn build_pieces(
                         }
                         emit!(&EventsSent {
                             count: output.len(),
-                            byte_size: output.iter().map(|event| event.size_of()).sum(),
+                            byte_size: output.size_of(),
                         });
                         stream::iter(output.into_iter()).map(Ok)
                     })
@@ -278,8 +279,7 @@ pub async fn build_pieces(
                         // TODO: account for error outputs separately?
                         emit!(&EventsSent {
                             count: buf.len() + err_buf.len(),
-                            byte_size: buf.iter().map(|event| event.size_of()).sum::<usize>()
-                                + err_buf.iter().map(|event| event.size_of()).sum::<usize>(),
+                            byte_size: buf.size_of() + err_buf.size_of(),
                         });
 
                         for event in buf {

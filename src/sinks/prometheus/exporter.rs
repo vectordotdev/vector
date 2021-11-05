@@ -28,6 +28,7 @@ use std::{
     net::SocketAddr,
     ops::{Deref, DerefMut},
     sync::{Arc, RwLock},
+    time::Instant,
 };
 use stream_cancel::{Trigger, Tripwire};
 
@@ -161,8 +162,13 @@ struct PrometheusExporter {
 }
 
 struct ExpiringMetrics {
-    map: IndexMap<MetricEntry, bool>,
+    map: IndexMap<MetricEntry, MetricMetadata>,
     last_flush_timestamp: i64,
+}
+
+struct MetricMetadata {
+    is_incremental_set: bool,
+    updated_at: Instant,
 }
 
 fn handle(
@@ -171,7 +177,7 @@ fn handle(
     buckets: &[f64],
     quantiles: &[f64],
     expired: bool,
-    metrics: &IndexMap<MetricEntry, bool>,
+    metrics: &IndexMap<MetricEntry, MetricMetadata>,
 ) -> Response<Body> {
     let mut response = Response::new(Body::empty());
 
@@ -301,14 +307,19 @@ impl StreamSink for PrometheusExporter {
             if interval > self.config.flush_period_secs as i64 {
                 metrics.last_flush_timestamp = now;
 
+                let now = Instant::now();
                 metrics.map = metrics
                     .map
                     .drain(..)
-                    .map(|(MetricEntry(mut metric), is_incremental_set)| {
-                        if is_incremental_set {
-                            metric.zero();
+                    .map(|(mut entry, metadata)| {
+                        if metadata.is_incremental_set {
+                            entry.0.zero();
                         }
-                        (MetricEntry(metric), is_incremental_set)
+                        (entry, metadata)
+                    })
+                    .filter(|(_metric, metadata)| {
+                        now.duration_since(metadata.updated_at).as_secs()
+                            < self.config.flush_period_secs
                     })
                     .collect();
             }
@@ -316,20 +327,32 @@ impl StreamSink for PrometheusExporter {
             match item.kind() {
                 MetricKind::Incremental => {
                     let mut entry = MetricEntry(item.into_absolute());
-                    if let Some((MetricEntry(mut existing), _)) = metrics.map.remove_entry(&entry) {
-                        if existing.update(&entry) {
-                            entry = MetricEntry(existing);
+                    if let Some((MetricEntry(mut metric), _)) = metrics.map.remove_entry(&entry) {
+                        if metric.update(&entry) {
+                            entry = MetricEntry(metric);
                         } else {
                             warn!(message = "Metric changed type, dropping old value.", series = %entry.series());
                         }
                     }
                     let is_set = matches!(entry.value(), MetricValue::Set { .. });
-                    metrics.map.insert(entry, is_set);
+                    metrics.map.insert(
+                        entry,
+                        MetricMetadata {
+                            is_incremental_set: is_set,
+                            updated_at: Instant::now(),
+                        },
+                    );
                 }
                 MetricKind::Absolute => {
                     let new = MetricEntry(item);
                     metrics.map.remove(&new);
-                    metrics.map.insert(new, false);
+                    metrics.map.insert(
+                        new,
+                        MetricMetadata {
+                            is_incremental_set: false,
+                            updated_at: Instant::now(),
+                        },
+                    );
                 }
             };
 
@@ -377,7 +400,7 @@ impl Hash for MetricEntry {
             }
             MetricValue::AggregatedSummary { quantiles, .. } => {
                 for quantile in quantiles {
-                    quantile.upper_limit.to_bits().hash(state);
+                    quantile.quantile.to_bits().hash(state);
                 }
             }
             _ => {}
@@ -422,7 +445,7 @@ impl PartialEq for MetricEntry {
                         && quantiles1
                             .iter()
                             .zip(quantiles2.iter())
-                            .all(|(q1, q2)| q1.upper_limit == q2.upper_limit)
+                            .all(|(q1, q2)| q1.quantile == q2.quantile)
                 }
                 _ => true,
             }
@@ -492,10 +515,7 @@ mod tests {
         trace_init();
 
         let client_settings = MaybeTlsSettings::from_config(&tls_config, false).unwrap();
-        let proto = match &tls_config {
-            Some(_) => "https",
-            None => "http",
-        };
+        let proto = client_settings.http_protocol_name();
 
         let address = next_addr();
         let config = PrometheusExporterConfig {
@@ -654,6 +674,7 @@ mod integration_tests {
         prometheus_scrapes_metrics().await;
         time::sleep(time::Duration::from_millis(500)).await;
         reset_on_flush_period().await;
+        expire_on_flush_period().await;
     }
 
     async fn prometheus_scrapes_metrics() {
@@ -742,6 +763,66 @@ mod integration_tests {
             result["data"]["result"][0]["value"][1],
             Value::String("2".into())
         );
+    }
+
+    async fn expire_on_flush_period() {
+        let config = PrometheusExporterConfig {
+            address: PROMETHEUS_ADDRESS.parse().unwrap(),
+            flush_period_secs: 3,
+            ..Default::default()
+        };
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (tx, rx) = mpsc::unbounded_channel();
+        tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
+
+        // metrics that will not be updated for a full flush period and therefore should expire
+        let (name1, event) = tests::create_metric_set(None, vec!["42"]);
+        tx.send(event).expect("Failed to send.");
+        let (name2, event) = tests::create_metric_gauge(None, 100.0);
+        tx.send(event).expect("Failed to send.");
+
+        // Wait a bit for the sink to process the events
+        time::sleep(time::Duration::from_secs(1)).await;
+
+        // Exporter should present both metrics at first
+        let body = fetch_exporter_body().await;
+        assert!(body.contains(&name1));
+        assert!(body.contains(&name2));
+
+        // Wait long enough to put us past flush_period_secs for the metric that wasn't updated
+        for _ in 0..7 {
+            // Update the first metric, ensuring it doesn't expire
+            let (_, event) = tests::create_metric_set(Some(name1.clone()), vec!["43"]);
+            tx.send(event).expect("Failed to send.");
+
+            // Wait a bit for time to pass
+            time::sleep(time::Duration::from_secs(1)).await;
+        }
+
+        // Exporter should present only the one that got updated
+        let body = fetch_exporter_body().await;
+        assert!(body.contains(&name1));
+        dbg!(&name1);
+        dbg!(&name2);
+        println!("{}", &body);
+        assert!(!body.contains(&name2));
+    }
+
+    async fn fetch_exporter_body() -> String {
+        let url = format!("http://{}/metrics", PROMETHEUS_ADDRESS);
+        let request = Request::get(url)
+            .body(Body::empty())
+            .expect("Error creating request.");
+        let proxy = ProxyConfig::default();
+        let result = HttpClient::new(None, &proxy)
+            .unwrap()
+            .send(request)
+            .await
+            .expect("Could not send request");
+        let result = hyper::body::to_bytes(result.into_body())
+            .await
+            .expect("Error fetching body");
+        String::from_utf8_lossy(&result).to_string()
     }
 
     async fn prometheus_query(query: &str) -> Value {

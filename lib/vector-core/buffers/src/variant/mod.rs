@@ -10,3 +10,6 @@ pub use memory_only::*;
 mod disk_and_memory;
 #[cfg(feature = "disk-buffer")]
 pub use disk_and_memory::*;
+
+mod in_memory_v2;
+pub use in_memory_v2::*;

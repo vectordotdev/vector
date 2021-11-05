@@ -26,16 +26,6 @@ components: sources: internal_metrics: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		notices: []
 		requirements: []
 		warnings: []
@@ -52,7 +42,6 @@ components: sources: internal_metrics: {
 			required:    false
 			type: string: {
 				default: "vector"
-				syntax:  "literal"
 			}
 		}
 		scrape_interval_secs: {
@@ -69,7 +58,6 @@ components: sources: internal_metrics: {
 			description: "Metric tag options."
 			required:    false
 
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -83,10 +71,8 @@ components: sources: internal_metrics: {
 				Set to "" to suppress this key.
 				"""
 						required:    false
-						warnings: []
 						type: string: {
 							default: "host"
-							syntax:  "literal"
 						}
 					}
 					pid_key: {
@@ -98,10 +84,8 @@ components: sources: internal_metrics: {
 					Set to "" to suppress this key.
 					"""
 						required: false
-						warnings: []
 						type: string: {
 							default: "pid"
-							syntax:  "literal"
 						}
 					}
 				}
@@ -580,16 +564,20 @@ components: sources: internal_metrics: {
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags & {
-				protocol: {
-					description: "The protocol used to send the bytes."
-					required:    true
-				}
 				endpoint: {
-					description: "The endpoint that the bytes were sent to. For HTTP, this will be the host and path only, excluding the query string."
+					description: "The endpoint to which the bytes were sent. For HTTP, this will be the host and path only, excluding the query string."
 					required:    false
 				}
 				file: {
 					description: "The absolute path of the destination file."
+					required:    false
+				}
+				protocol: {
+					description: "The protocol used to send the bytes."
+					required:    true
+				}
+				region: {
+					description: "The AWS region name to which the bytes were sent. In some configurations, this may be a literal hostname."
 					required:    false
 				}
 			}
@@ -1148,6 +1136,7 @@ components: sources: internal_metrics: {
 			required:    true
 			enum: {
 				"delete_failed":               "The file deletion failed."
+				"encode_failed":               "The encode operation failed."
 				"field_missing":               "The event field was missing."
 				"glob_failed":                 "The glob pattern match operation failed."
 				"http_error":                  "The HTTP request resulted in an error code."

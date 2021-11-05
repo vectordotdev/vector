@@ -266,6 +266,7 @@ Name | Description
 | `sinks-blackhole`                                    | Enables building the [`blackhole` sink](/docs/reference/configuration/sinks/blackhole)
 | `sinks-clickhouse`                                   | Enables building the [`clickhouse` sink](/docs/reference/configuration/sinks/clickhouse)
 | `sinks-console`                                      | Enables building the [`console` sink](/docs/reference/configuration/sinks/console)
+| `sinks-datadog_events`                               | Enables building the [`datadog_events` sink](/docs/reference/configuration/sinks/datadog_events)
 | `sinks-datadog_logs`                                 | Enables building the [`datadog_logs` sink](/docs/reference/configuration/sinks/datadog_logs)
 | `sinks-datadog_metrics`                              | Enables building the [`datadog_metrics` sink](/docs/reference/configuration/sinks/datadog_metrics)
 | `sinks-elasticsearch`                                | Enables building the [`elasticsearch` sink](/docs/reference/configuration/sinks/elasticsearch)

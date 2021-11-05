@@ -82,7 +82,7 @@ impl SourceConfig for DatadogAgentConfig {
 
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let listener = tls.bind(&self.address).await?;
-        let service = source.event_service(cx.acknowledgements, cx.out.clone());
+        let service = source.event_service(cx.acknowledgements.enabled, cx.out.clone());
 
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
@@ -166,13 +166,7 @@ impl DatadogAgentSource {
     ) -> Result<Response, Rejection> {
         match events {
             Ok(mut events) => {
-                let receiver = acknowledgements.then(|| {
-                    let (batch, receiver) = BatchNotifier::new_with_receiver();
-                    for event in &mut events {
-                        event.add_batch_notifier(Arc::clone(&batch));
-                    }
-                    receiver
-                });
+                let receiver = BatchNotifier::maybe_apply_to_events(acknowledgements, &mut events);
 
                 let mut events = futures::stream::iter(events).map(Ok);
                 out.send_all(&mut events)
@@ -265,17 +259,17 @@ impl DatadogAgentSource {
                     Ok(Some((events, _byte_size))) => {
                         for mut event in events {
                             if let Event::Log(ref mut log) = event {
-                                log.insert_flat(self.log_schema_timestamp_key, now);
-                                log.insert_flat(
+                                log.try_insert_flat("status", message.status.clone());
+                                log.try_insert_flat("timestamp", message.timestamp);
+                                log.try_insert_flat("hostname", message.hostname.clone());
+                                log.try_insert_flat("service", message.service.clone());
+                                log.try_insert_flat("ddsource", message.ddsource.clone());
+                                log.try_insert_flat("ddtags", message.ddtags.clone());
+                                log.try_insert_flat(
                                     self.log_schema_source_type_key,
                                     Bytes::from("datadog_agent"),
                                 );
-                                log.insert_flat("status", message.status.clone());
-                                log.insert_flat("timestamp", message.timestamp);
-                                log.insert_flat("hostname", message.hostname.clone());
-                                log.insert_flat("service", message.service.clone());
-                                log.insert_flat("ddsource", message.ddsource.clone());
-                                log.insert_flat("ddtags", message.ddtags.clone());
+                                log.try_insert_flat(self.log_schema_timestamp_key, now);
                                 if let Some(k) = &api_key {
                                     log.metadata_mut().set_datadog_api_key(Some(Arc::clone(k)));
                                 }
@@ -434,7 +428,7 @@ mod tests {
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
         let mut context = SourceContext::new_test(sender);
-        context.acknowledgements = acknowledgements;
+        context.acknowledgements.enabled = acknowledgements;
         tokio::spawn(async move {
             DatadogAgentConfig {
                 address,
