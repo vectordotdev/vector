@@ -166,13 +166,7 @@ impl DatadogAgentSource {
     ) -> Result<Response, Rejection> {
         match events {
             Ok(mut events) => {
-                let receiver = acknowledgements.then(|| {
-                    let (batch, receiver) = BatchNotifier::new_with_receiver();
-                    for event in &mut events {
-                        event.add_batch_notifier(Arc::clone(&batch));
-                    }
-                    receiver
-                });
+                let receiver = BatchNotifier::maybe_apply_to_events(acknowledgements, &mut events);
 
                 let mut events = futures::stream::iter(events).map(Ok);
                 out.send_all(&mut events)
