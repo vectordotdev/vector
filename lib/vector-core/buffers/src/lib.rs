@@ -7,6 +7,7 @@
 #![deny(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::type_complexity)] // long-types happen, especially in async code
+#![allow(clippy::must_use_candidate)]
 
 #[macro_use]
 extern crate tracing;
