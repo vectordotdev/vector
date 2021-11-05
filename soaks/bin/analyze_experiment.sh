@@ -38,7 +38,7 @@ for soak_dir in "${CAPTURE_DIR}"/*; do
     HEADER=$(echo "${OUTPUT}" | head -n1)
     BODY=$(echo "${OUTPUT}" | tail -n+2)
 
-    echo "${HEADER}" | sed 's/^/|\ /g' | sed 's/\t/\ |\ /g' | sed 's/$/\ |/g'
+    echo "${HEADER}" | sed 's/,/\ \|\ /g' | sed 's/^/|\ /g' | sed 's/$/\ |/g'
     echo "| --- | --- | --- | --- | --- | --- | --- |"
-    echo "${BODY}" | sed 's/,/\ \|\ /g' | sed 's/^/|\ /g' | sed 's/$/\ |/g'
+    echo "${BODY}"   | sed 's/,/\ \|\ /g' | sed 's/^/|\ /g' | sed 's/$/\ |/g'
 done
