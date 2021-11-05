@@ -113,7 +113,6 @@ cli: {
 
 	// Reusable options
 	_core_options: {
-
 		"color": {
 			description: env_vars.VECTOR_COLOR.description
 			default:     env_vars.VECTOR_COLOR.type.string.default
