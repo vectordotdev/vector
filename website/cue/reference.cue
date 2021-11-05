@@ -76,6 +76,11 @@ _values: {
 //                }
 #Enum: [Name=_]: string
 
+#EnvVars: #Schema & {[Type=string]: {
+	common:   true
+	required: false
+}}
+
 #Event: {
 	{log?: #LogEvent} |
 	{metric?: #MetricEvent}
