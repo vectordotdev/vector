@@ -466,9 +466,9 @@ cli: {
 			type: string: {
 				default: "auto"
 				enum: {
-					always: "Always enable ANSI terminal formatting always"
-					auto:   "Detect ANSI terminal formatting and enable if supported"
-					never:  "Disable ANSI terminal formatting"
+					always: "Always enable ANSI terminal formatting."
+					auto:   "Detect ANSI terminal formatting and enable if supported."
+					never:  "Disable ANSI terminal formatting."
 				}
 			}
 		}
