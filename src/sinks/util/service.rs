@@ -103,6 +103,10 @@ impl TowerRequestConfig {
         }
     }
 
+    pub const fn const_default() -> Self {
+        Self::new(CONCURRENCY_DEFAULT)
+    }
+
     pub const fn timeout_secs(mut self, timeout_secs: u64) -> Self {
         self.timeout_secs = Some(timeout_secs);
         self

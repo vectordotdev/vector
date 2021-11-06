@@ -17,6 +17,8 @@ pub mod aws_s3;
 pub mod aws_sqs;
 #[cfg(feature = "sinks-azure_blob")]
 pub mod azure_blob;
+#[cfg(any(feature = "sinks-azure_blob", feature = "sinks-datadog_archives"))]
+pub mod azure_common;
 #[cfg(feature = "sinks-azure_monitor_logs")]
 pub mod azure_monitor_logs;
 #[cfg(feature = "sinks-blackhole")]
