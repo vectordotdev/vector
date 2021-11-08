@@ -54,16 +54,16 @@ pub enum Error {
 /// For further documentation and the full list of available matcher and filters check out https://docs.datadoghq.com/logs/processing/parsing
 pub fn parse_grok_rules(
     patterns: &[String],
-    aliases: BTreeMap<&str, String>,
+    aliases: BTreeMap<String, String>,
 ) -> Result<Vec<GrokRule>, Error> {
     let mut parsed_aliases: HashMap<String, ParsedGrokRule> = HashMap::new();
     let mut inflight_parsed_aliases = vec![];
 
-    for (name, definition) in &aliases {
-        if !definition.is_empty() {
+    for (name, alias) in &aliases {
+        if !alias.is_empty() {
             let parsed_alias = parse_alias(
                 name,
-                definition,
+                alias,
                 &aliases,
                 &mut parsed_aliases,
                 &mut inflight_parsed_aliases,
@@ -98,10 +98,10 @@ struct ParsedGrokRule {
 /// - `definition` - the definition of the alias
 /// - `parsed_aliases` - aliases that have already been parsed
 /// - `inflight_parsed_aliases` - names of the aliases that are being currently parsed(aliases can refer to other aliases) to catch circular dependencies
-fn parse_alias<'a>(
-    name: &'a str,
-    definition: &'a str,
-    aliases: &BTreeMap<&'a str, String>,
+fn parse_alias(
+    name: &str,
+    definition: &str,
+    aliases: &BTreeMap<String, String>,
     parsed_aliases: &mut HashMap<String, ParsedGrokRule>,
     inflight_parsed_aliases: &mut Vec<String>,
 ) -> Result<ParsedGrokRule, Error> {
@@ -131,7 +131,7 @@ fn parse_alias<'a>(
 /// - `grok` - an instance of Grok parser
 fn parse_pattern(
     pattern: &str,
-    aliases: &BTreeMap<&str, String>,
+    aliases: &BTreeMap<String, String>,
     parsed_aliases: &mut HashMap<String, ParsedGrokRule>,
     grok: &mut Grok,
 ) -> Result<GrokRule, Error> {
@@ -161,9 +161,9 @@ fn parse_pattern(
 /// - `aliases` - all aliases and their definitions
 /// - `parsed_aliases` - aliases that have already been parsed
 /// - `inflight_parsed_aliases` - names of the aliases that are being currently parsed(aliases can refer to other aliases) to catch circular dependencies
-fn parse_grok_rule<'a>(
-    rule: &'a str,
-    aliases: &BTreeMap<&'a str, String>,
+fn parse_grok_rule(
+    rule: &str,
+    aliases: &BTreeMap<String, String>,
     parsed_aliases: &mut HashMap<String, ParsedGrokRule>,
     inflight_parsed_aliases: &mut Vec<String>,
 ) -> Result<ParsedGrokRule, Error> {
@@ -281,7 +281,7 @@ fn index_repeated_fields(grok_patterns: Vec<GrokPattern>) -> Vec<GrokPattern> {
 fn purify_grok_pattern(
     pattern: &GrokPattern,
     mut filters: &mut HashMap<LookupBuf, Vec<GrokFilter>>,
-    aliases: &BTreeMap<&str, String>,
+    aliases: &BTreeMap<String, String>,
     parsed_aliases: &mut HashMap<String, ParsedGrokRule>,
     inflight_parsed_aliases: &mut Vec<String>,
 ) -> Result<String, Error> {
