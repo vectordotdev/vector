@@ -1016,6 +1016,16 @@ dependencies = [
 
 [[package]]
 name = "chrono-tz"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2554a3155fec064362507487171dcc4edc3df60cb10f3a1fb10ed8094822b120"
+dependencies = [
+ "chrono",
+ "parse-zoneinfo",
+]
+
+[[package]]
+name = "chrono-tz"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "64c01c1c607d25c71bbaa67c113d6c6b36c434744b4fd66691d711b5b1bc0c8b"
@@ -1638,6 +1648,8 @@ name = "datadog-grok"
 version = "0.1.0"
 dependencies = [
  "bytes 1.1.0",
+ "chrono",
+ "chrono-tz 0.5.3",
  "derivative",
  "grok",
  "itertools",
@@ -1647,6 +1659,7 @@ dependencies = [
  "lookup",
  "onig",
  "ordered-float",
+ "peeking_take_while",
  "percent-encoding",
  "regex",
  "serde",
@@ -6197,7 +6210,7 @@ version = "0.1.0"
 dependencies = [
  "bytes 1.1.0",
  "chrono",
- "chrono-tz",
+ "chrono-tz 0.6.0",
  "derivative",
  "nom 7.0.0",
  "serde",
@@ -7991,7 +8004,7 @@ dependencies = [
  "bytes 1.1.0",
  "cached",
  "chrono",
- "chrono-tz",
+ "chrono-tz 0.6.0",
  "cidr-utils",
  "criterion",
  "csv",
@@ -8030,7 +8043,7 @@ version = "0.1.0"
 dependencies = [
  "ansi_term 0.12.1",
  "chrono",
- "chrono-tz",
+ "chrono-tz 0.6.0",
  "enrichment",
  "glob",
  "prettydiff",
