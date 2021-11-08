@@ -245,7 +245,7 @@ md-5 = { version = "0.9", optional = true }
 mlua = { version = "0.6.6", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 mongodb = { version = "2.0.1", default-features = false, features = ["tokio-runtime"], optional = true }
 async-nats = { version = "0.10.1", default-features = false, optional = true }
-nom = { version = "7.0.0", default-features = false, optional = true }
+nom = { version = "7.1.0", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 num_cpus = { version = "1.13.0", default-features = false }
 once_cell = { version = "1.8", default-features = false }
