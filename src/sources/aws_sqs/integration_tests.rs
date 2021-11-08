@@ -6,17 +6,15 @@ use crate::aws::region::RegionOrEndpoint;
 use crate::config::log_schema;
 use crate::config::{SourceConfig, SourceContext};
 use crate::event::Event;
-use crate::http::Auth;
 use crate::sources::aws_sqs::config::AwsSqsConfig;
 use crate::test_util::random_string;
 use crate::Pipeline;
-use aws_sdk_sqs::model::SendMessageBatchRequestEntry;
 use aws_sdk_sqs::output::CreateQueueOutput;
 use aws_sdk_sqs::Endpoint;
 use aws_types::region::Region;
-use futures::{FutureExt, StreamExt};
+use futures::StreamExt;
 use http::Uri;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::timeout;
@@ -41,9 +39,9 @@ async fn ensure_queue(queue_name: &str, client: &aws_sdk_sqs::Client) -> CreateQ
         .unwrap()
 }
 
-async fn send_test_events(mut count: u32, queue_url: &str, client: &aws_sdk_sqs::Client) {
+async fn send_test_events(count: u32, queue_url: &str, client: &aws_sdk_sqs::Client) {
     for i in 0..count {
-        let x = client
+        client
             .send_message()
             .message_body(calculate_message(i))
             .queue_url(queue_url)
@@ -54,7 +52,7 @@ async fn send_test_events(mut count: u32, queue_url: &str, client: &aws_sdk_sqs:
 }
 
 async fn get_sqs_client() -> aws_sdk_sqs::Client {
-    let mut config = aws_sdk_sqs::config::Builder::new()
+    let config = aws_sdk_sqs::config::Builder::new()
         .credentials_provider(AwsAuthentication::test_auth().credentials_provider().await)
         .endpoint_resolver(Endpoint::immutable(
             Uri::from_str("http://localhost:4566").unwrap(),
@@ -84,9 +82,8 @@ pub async fn test() {
         ..Default::default()
     };
 
-    println!("Spawning source task");
     let (tx, rx) = Pipeline::new_test();
-    let source_task = tokio::spawn(async move {
+    tokio::spawn(async move {
         config
             .build(SourceContext::new_test(tx))
             .await

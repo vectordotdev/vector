@@ -28,9 +28,9 @@ pub enum AwsAuthentication {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs::File;
-    use std::io::Write;
-    use tempfile;
+    
+    
+    
 
     #[derive(Serialize, Deserialize, Clone, Debug)]
     struct ComponentConfig {

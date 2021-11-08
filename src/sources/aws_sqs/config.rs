@@ -1,12 +1,10 @@
 use crate::aws::auth::AwsAuthentication;
-use crate::aws::rusoto::RegionOrEndpoint;
 use crate::codecs::{DecodingConfig, FramingConfig, ParserConfig};
 use crate::config::{DataType, SourceConfig, SourceContext};
 use crate::serde::{default_decoding, default_framing_message_based};
 use crate::sources::aws_sqs::source::SqsSource;
 
-
-
+use crate::aws::region::RegionOrEndpoint;
 use serde::{Deserialize, Serialize};
 use std::cmp;
 

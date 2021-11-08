@@ -1,4 +1,5 @@
 mod config;
+mod events;
 mod integration_tests;
 mod source;
 

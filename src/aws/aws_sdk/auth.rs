@@ -45,14 +45,8 @@ impl AwsAuthentication {
         }
     }
 
-    // pub async fn build_config(&self, region: Region) -> Config {
-    //     let mut builder = Builder::default().region(region);
-    //
-    //     let credentials_provider = ;
-    //     builder.credentials_provider(credentials_provider).build()
-    // }
-
-    pub(crate) fn test_auth() -> AwsAuthentication {
+    #[cfg(test)]
+    pub fn test_auth() -> AwsAuthentication {
         AwsAuthentication::Static {
             access_key_id: "dummy".to_string(),
             secret_access_key: "dummy".to_string(),

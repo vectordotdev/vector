@@ -1,22 +1,28 @@
 use crate::codecs::Decoder;
 use crate::config::log_schema;
+use crate::event::BatchStatus;
 use crate::event::{BatchNotifier, Event};
-use crate::event::{BatchStatus};
 use crate::shutdown::ShutdownSignal;
 use crate::sources::util::TcpError;
 use crate::Pipeline;
-use aws_sdk_sqs::model::DeleteMessageBatchRequestEntry;
+use aws_sdk_sqs::model::{DeleteMessageBatchRequestEntry, MessageSystemAttributeName};
+use std::collections::HashMap;
 
+use super::events::*;
+use crate::vector_core::ByteSizeOf;
+use async_stream::stream;
 use aws_sdk_sqs::Client as SqsClient;
 use bytes::Bytes;
-use futures::future::ready;
+use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, TryStreamExt};
 use futures::{SinkExt, Stream, StreamExt};
 use std::io::Cursor;
 use std::panic;
+use std::str::FromStr;
 use tokio::time::Duration;
 use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
+use vector_core::internal_event::EventsReceived;
 
 // This is the maximum SQS supports in a single batch request
 const MAX_BATCH_SIZE: i32 = 10;
@@ -69,6 +75,7 @@ impl SqsSource {
             .queue_url(&self.queue_url)
             .max_number_of_messages(MAX_BATCH_SIZE)
             .wait_time_seconds(self.poll_secs as i32)
+            .attribute_names(MessageSystemAttributeName::SentTimestamp.as_str())
             .send()
             .await;
 
@@ -84,27 +91,38 @@ impl SqsSource {
 
         if let Some(messages) = receive_message_output.messages {
             let mut receipts_to_ack = vec![];
-            if acknowledgements {
-                let (batch, receiver) = BatchNotifier::new_with_receiver();
-                for message in messages {
-                    if let Some(body) = message.body {
-                        let stream = decode_message(self.decoder.clone(), &body);
 
+            let mut batch_receiver = None;
+            for message in messages {
+                if let Some(body) = message.body {
+                    emit!(&AwsSqsBytesReceived {
+                        byte_size: body.len()
+                    });
+                    let timestamp = get_timestamp(&message.attributes);
+                    let stream = decode_message(self.decoder.clone(), &body, timestamp);
+                    pin!(stream);
+                    let send_result = if acknowledgements {
+                        let (batch, receiver) = BatchNotifier::new_with_receiver();
                         let mut stream = stream.map_ok(|event| event.with_batch_notifier(&batch));
-                        let send_result = out.send_all(&mut stream).await;
+                        batch_receiver = Some(receiver);
+                        out.send_all(&mut stream).await
+                    } else {
+                        out.send_all(&mut stream).await
+                    };
 
-                        match send_result {
-                            Err(err) => error!(message = "Error sending to sink.", error = %err),
-                            Ok(()) => {
-                                // a receipt handle should always exist
-                                if let Some(receipt_handle) = message.receipt_handle {
-                                    receipts_to_ack.push(receipt_handle);
-                                }
+                    match send_result {
+                        Err(err) => error!(message = "Error sending to sink.", error = %err),
+                        Ok(()) => {
+                            // a receipt handle should always exist
+                            if let Some(receipt_handle) = message.receipt_handle {
+                                receipts_to_ack.push(receipt_handle);
                             }
                         }
                     }
                 }
+            }
 
+            if let Some(receiver) = batch_receiver {
                 let client = self.client.clone();
                 let queue_url = self.queue_url.clone();
                 tokio::spawn(async move {
@@ -114,24 +132,19 @@ impl SqsSource {
                     }
                 });
             } else {
-                for message in messages {
-                    if let Some(body) = message.body {
-                        let mut stream = decode_message(self.decoder.clone(), &body);
-                        match out.send_all(&mut stream).await {
-                            Err(err) => error!(message = "Error sending to sink.", error = %err),
-                            Ok(()) => {
-                                // a receipt handle should always exist
-                                if let Some(receipt_handle) = message.receipt_handle {
-                                    receipts_to_ack.push(receipt_handle);
-                                }
-                            }
-                        }
-                    }
-                }
                 delete_messages(&self.client, &receipts_to_ack, &self.queue_url).await;
             }
         }
     }
+}
+
+fn get_timestamp(
+    attributes: &Option<HashMap<MessageSystemAttributeName, String>>,
+) -> Option<DateTime<Utc>> {
+    attributes.as_ref().and_then(|attributes| {
+        let sent_time_str = attributes.get(&MessageSystemAttributeName::SentTimestamp)?;
+        Some(Utc.timestamp_millis(i64::from_str(sent_time_str).ok()?))
+    })
 }
 
 async fn delete_messages(client: &SqsClient, receipts: &[String], queue_url: &str) {
@@ -147,37 +160,100 @@ async fn delete_messages(client: &SqsClient, receipts: &[String], queue_url: &st
             );
         }
         if let Err(err) = batch.send().await {
-            //TODO: emit as event?
-            error!("SQS Delete failed: {:?}", err);
+            emit!(&SqsMessageDeleteError { error: &err });
         }
     }
 }
 
-fn decode_message<E>(decoder: Decoder, message: &str) -> impl Stream<Item = Result<Event, E>> {
+fn decode_message<E>(
+    decoder: Decoder,
+    message: &str,
+    sent_time: Option<DateTime<Utc>>,
+) -> impl Stream<Item = Result<Event, E>> {
     let schema = log_schema();
 
     let payload = Cursor::new(Bytes::copy_from_slice(message.as_bytes()));
-    FramedRead::new(payload, decoder)
-        .map(|input| match input {
-            Ok((mut events, _)) => {
-                let mut event = events.pop().expect("event must exist");
-                if let Event::Log(ref mut log) = event {
-                    log.try_insert(schema.source_type_key(), Bytes::from("aws_sqs"));
-                    // log.try_insert(schema.timestamp_key(), timestamp);
-                }
+    let mut stream = FramedRead::new(payload, decoder);
 
-                Some(Some(Ok(event)))
-            }
-            Err(e) => {
-                // Error is logged by `crate::codecs::Decoder`, no further handling
-                // is needed here.
-                if !e.can_continue() {
-                    Some(None)
-                } else {
-                    None
+    let stream = stream! {
+        loop {
+            match stream.next().await {
+                Some(Ok((events, _))) => {
+                    let count = events.len();
+                    let mut total_events_size = 0;
+                    for mut event in events {
+                        if let Event::Log(ref mut log) = event {
+                            log.try_insert(schema.source_type_key(), Bytes::from("aws_sqs"));
+                            if let Some(sent_time) = sent_time {
+                                log.try_insert(schema.timestamp_key(), sent_time);
+                            }
+                        }
+                        total_events_size += event.size_of();
+                        yield event;
+                    }
+                    emit!(&EventsReceived {
+                        byte_size: total_events_size,
+                        count
+                    });
+                },
+                Some(Err(error)) => {
+                    // Error is logged by `crate::codecs::Decoder`, no further handling
+                    // is needed here.
+                    if !error.can_continue() {
+                        break;
+                    }
                 }
+                None => break,
             }
-        })
-        .take_while(|x| ready(x.is_some()))
-        .filter_map(|x| ready(x.expect("should have inner value")))
+        }
+    };
+    stream.map(Ok)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::SecondsFormat;
+
+    #[tokio::test]
+    async fn test_decode() {
+        let message = "test";
+        let now = Utc::now();
+        let stream = decode_message::<()>(Decoder::default(), "test", Some(now));
+        let events: Vec<_> = stream.collect().await;
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0]
+                .clone()
+                .unwrap()
+                .as_log()
+                .get(log_schema().message_key())
+                .unwrap()
+                .to_string_lossy(),
+            message
+        );
+        assert_eq!(
+            events[0]
+                .clone()
+                .unwrap()
+                .as_log()
+                .get(log_schema().timestamp_key())
+                .unwrap()
+                .to_string_lossy(),
+            now.to_rfc3339_opts(SecondsFormat::AutoSi, true)
+        );
+    }
+
+    #[test]
+    fn test_get_timestamp() {
+        let attributes = HashMap::from([(
+            MessageSystemAttributeName::SentTimestamp,
+            "1636408546018".to_string(),
+        )]);
+
+        assert_eq!(
+            get_timestamp(&Some(attributes)),
+            Some(Utc.timestamp_millis(1636408546018))
+        );
+    }
 }
