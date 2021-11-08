@@ -297,10 +297,7 @@ pub async fn build_pieces(
                         });
 
                         let mut output_buf = Vec::with_capacity(events.len());
-                        let mut buf = Vec::with_capacity(4); // also an arbitrary,
-                                                             // smallish constant
-                        t.transform(&mut buf, events);
-                        output_buf.append(&mut buf);
+                        t.transform(&mut output_buf, events);
 
                         let count = output_buf.len();
                         let byte_size = output_buf.size_of();
