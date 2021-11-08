@@ -7723,6 +7723,7 @@ dependencies = [
  "quickcheck",
  "rand 0.8.4",
  "rand_distr",
+ "rayon",
  "rdkafka",
  "redis",
  "regex",

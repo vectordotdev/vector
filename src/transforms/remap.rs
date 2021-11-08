@@ -2,19 +2,17 @@ use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, VrlTarget},
     internal_events::{RemapMappingAbort, RemapMappingError},
-    transforms::Transform,
+    transforms::{BatchedFunctionTransform, Transform},
     Result,
 };
 
-use futures::{stream, Stream, StreamExt};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::PathBuf;
-use std::pin::Pin;
-use vector_core::transform::TaskTransform;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Terminate};
 
@@ -41,7 +39,7 @@ impl_generate_config_from_default!(RemapConfig);
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
     async fn build(&self, context: &TransformContext) -> Result<Transform> {
-        Remap::new(self.clone(), &context.enrichment_tables).map(Transform::task)
+        Remap::new(self.clone(), &context.enrichment_tables).map(Transform::batched_function)
     }
 
     fn input_type(&self) -> DataType {
@@ -60,7 +58,6 @@ impl TransformConfig for RemapConfig {
 #[derive(Debug)]
 pub struct Remap {
     program: Program,
-    runtime: Runtime,
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
@@ -98,79 +95,10 @@ impl Remap {
 
         Ok(Remap {
             program,
-            runtime: Runtime::default(),
             timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
         })
-    }
-
-    fn transform_one(&mut self, event: Event) -> impl Stream<Item = Event>
-    where
-        Self: 'static,
-    {
-        // If a program can fail or abort at runtime, we need to clone the
-        // original event and keep it around, to allow us to discard any
-        // mutations made to the event while the VRL program runs, before it
-        // failed or aborted.
-        //
-        // The `drop_on_{error, abort}` transform config allows operators to
-        // ignore events if their failed/aborted, in which case we can skip the
-        // cloning, since any mutations made by VRL will be ignored regardless.
-        #[allow(clippy::if_same_then_else)]
-        let original_event = if !self.drop_on_error && self.program.can_fail() {
-            Some(event.clone())
-        } else if !self.drop_on_abort && self.program.can_abort() {
-            Some(event.clone())
-        } else {
-            None
-        };
-
-        let mut target: VrlTarget = event.into();
-
-        let result = self
-            .runtime
-            .resolve(&mut target, &self.program, &self.timezone);
-        self.runtime.clear();
-
-        match result {
-            Ok(_) => {
-                // TODO
-                // for event in target.into_events() {
-                //     output.push(event)
-                // }
-
-                stream::iter(target.into_events().collect::<Vec<_>>())
-            }
-            Err(Terminate::Abort(_)) => {
-                emit!(&RemapMappingAbort {
-                    event_dropped: self.drop_on_abort,
-                });
-
-                if !self.drop_on_abort {
-                    stream::iter(vec![original_event.expect("event will be set")])
-                } else {
-                    stream::iter(vec![])
-                }
-            }
-            Err(Terminate::Error(error)) => {
-                emit!(&RemapMappingError {
-                    error: error.to_string(),
-                    event_dropped: self.drop_on_error,
-                });
-
-                if !self.drop_on_error {
-                    stream::iter(vec![original_event.expect("event will be set")])
-                } else {
-                    stream::iter(vec![])
-                }
-            }
-        }
-    }
-
-    #[cfg(test)]
-    const fn runtime(&self) -> &Runtime {
-        &self.runtime
     }
 }
 
@@ -178,7 +106,6 @@ impl Clone for Remap {
     fn clone(&self) -> Self {
         Self {
             program: self.program.clone(),
-            runtime: Runtime::default(),
             timezone: self.timezone,
             drop_on_error: self.drop_on_error,
             drop_on_abort: self.drop_on_abort,
@@ -186,16 +113,63 @@ impl Clone for Remap {
     }
 }
 
-impl TaskTransform for Remap {
-    fn transform(
-        self: Box<Self>,
-        task: Pin<Box<dyn Stream<Item = Event> + Send>>,
-    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
-    where
-        Self: 'static,
-    {
-        let mut inner = self;
-        Box::pin(task.flat_map(move |v| inner.transform_one(v)))
+impl BatchedFunctionTransform for Remap {
+    fn transform(&mut self, output: &mut Vec<Event>, events: Vec<Event>) {
+        let mut out = events
+            .into_par_iter()
+            .filter_map(|event| {
+                // If a program can fail or abort at runtime, we need to clone the
+                // original event and keep it around, to allow us to discard any
+                // mutations made to the event while the VRL program runs, before it
+                // failed or aborted.
+                //
+                // The `drop_on_{error, abort}` transform config allows operators to
+                // ignore events if their failed/aborted, in which case we can skip the
+                // cloning, since any mutations made by VRL will be ignored regardless.
+                #[allow(clippy::if_same_then_else)]
+                let original_event = if !self.drop_on_error && self.program.can_fail() {
+                    Some(event.clone())
+                } else if !self.drop_on_abort && self.program.can_abort() {
+                    Some(event.clone())
+                } else {
+                    None
+                };
+
+                let mut target: VrlTarget = event.into();
+
+                let result = Runtime::default().resolve(&mut target, &self.program, &self.timezone);
+
+                match result {
+                    Ok(_) => Some(target.into_events().collect::<Vec<_>>()),
+                    Err(Terminate::Abort(_)) => {
+                        emit!(&RemapMappingAbort {
+                            event_dropped: self.drop_on_abort,
+                        });
+
+                        if !self.drop_on_abort {
+                            Some(vec![original_event.expect("event will be set")])
+                        } else {
+                            None
+                        }
+                    }
+                    Err(Terminate::Error(error)) => {
+                        emit!(&RemapMappingError {
+                            error: error.to_string(),
+                            event_dropped: self.drop_on_error,
+                        });
+
+                        if !self.drop_on_error {
+                            Some(vec![original_event.expect("event will be set")])
+                        } else {
+                            None
+                        }
+                    }
+                }
+            })
+            .flatten_iter()
+            .collect::<Vec<_>>();
+
+        output.append(&mut out);
     }
 }
 
@@ -265,42 +239,6 @@ mod tests {
 
     fn get_field_string(event: &Event, field: &str) -> String {
         event.as_log().get(field).unwrap().to_string_lossy()
-    }
-
-    #[test]
-    fn check_remap_doesnt_share_state_between_events() {
-        let conf = RemapConfig {
-            source: Some(".foo = .sentinel".to_string()),
-            file: None,
-            timezone: TimeZone::default(),
-            drop_on_error: true,
-            drop_on_abort: false,
-        };
-        let mut tform = Remap::new(conf, &Default::default()).unwrap();
-        assert!(tform.runtime().is_empty());
-
-        let event1 = {
-            let mut event1 = LogEvent::from("event1");
-            event1.insert("sentinel", "bar");
-            Event::from(event1)
-        };
-        let metadata1 = event1.metadata().clone();
-        let result1 = transform_one(&mut tform, event1).unwrap();
-        assert_eq!(get_field_string(&result1, "message"), "event1");
-        assert_eq!(get_field_string(&result1, "foo"), "bar");
-        assert_eq!(result1.metadata(), &metadata1);
-        assert!(tform.runtime().is_empty());
-
-        let event2 = {
-            let event2 = LogEvent::from("event2");
-            Event::from(event2)
-        };
-        let metadata2 = event2.metadata().clone();
-        let result2 = transform_one(&mut tform, event2).unwrap();
-        assert_eq!(get_field_string(&result2, "message"), "event2");
-        assert_eq!(result2.as_log().get("foo"), Some(&Value::Null));
-        assert_eq!(result2.metadata(), &metadata2);
-        assert!(tform.runtime().is_empty());
     }
 
     #[test]

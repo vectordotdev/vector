@@ -13,6 +13,7 @@ mod config;
 /// transforms act as a coordination or barrier point.
 pub enum Transform {
     Function(Box<dyn FunctionTransform>),
+    BatchedFunction(Box<dyn BatchedFunctionTransform>),
     FallibleFunction(Box<dyn FallibleFunctionTransform>),
     Task(Box<dyn TaskTransform>),
 }
@@ -55,6 +56,10 @@ impl Transform {
                 "Called `Transform::into_function` on something that was not a function variant."
             ),
         }
+    }
+
+    pub fn batched_function(v: impl BatchedFunctionTransform + 'static) -> Self {
+        Transform::BatchedFunction(Box::new(v))
     }
 
     /// Create a new fallible function transform.
@@ -142,6 +147,10 @@ impl Transform {
 ///   `TaskTransform` or vice versa.
 pub trait FunctionTransform: Send + dyn_clone::DynClone + Sync {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event);
+}
+
+pub trait BatchedFunctionTransform: Send + dyn_clone::DynClone + Sync {
+    fn transform(&mut self, output: &mut Vec<Event>, events: Vec<Event>);
 }
 
 dyn_clone::clone_trait_object!(FunctionTransform);

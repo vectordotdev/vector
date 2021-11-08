@@ -6,7 +6,7 @@ use std::{error::Error, fmt};
 
 pub type RuntimeResult = Result<Value, Terminate>;
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Runtime {
     state: state::Runtime,
     root_lookup: LookupBuf,

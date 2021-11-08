@@ -119,7 +119,7 @@ impl Compiler {
 }
 
 /// The state used at runtime to track changes as they happen.
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Runtime {
     /// The [`Value`] stored in each variable.
     variables: HashMap<Ident, Value>,

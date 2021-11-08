@@ -272,6 +272,55 @@ pub async fn build_pieces(
 
                 Task::new(key.clone(), typetag, transform)
             }
+            Transform::BatchedFunction(mut t) => {
+                let (mut output, control) = Fanout::new();
+
+                let mut input_rx = input_rx
+                    .filter(move |event| ready(filter_event_type(event, input_type)))
+                    .ready_chunks(128); // 128 is an arbitrary, smallish constant
+
+                let mut timer = crate::utilization::Timer::new();
+                let mut last_report = Instant::now();
+
+                let transform = async move {
+                    timer.start_wait();
+                    while let Some(events) = input_rx.next().await {
+                        let stopped = timer.stop_wait();
+                        if stopped.duration_since(last_report).as_secs() >= 5 {
+                            timer.report();
+                            last_report = stopped;
+                        }
+
+                        emit!(&EventsReceived {
+                            count: events.len(),
+                            byte_size: events.size_of(),
+                        });
+
+                        let mut output_buf = Vec::with_capacity(events.len());
+                        let mut buf = Vec::with_capacity(4); // also an arbitrary,
+                                                             // smallish constant
+                        t.transform(&mut buf, events);
+                        output_buf.append(&mut buf);
+
+                        let count = output_buf.len();
+                        let byte_size = output_buf.size_of();
+
+                        timer.start_wait();
+                        output
+                            .send_all(&mut stream::iter(output_buf.into_iter()).map(Ok))
+                            .await?;
+
+                        emit!(&EventsSent { count, byte_size });
+                    }
+                    debug!("Finished.");
+                    Ok(TaskOutput::Transform)
+                }
+                .boxed();
+
+                outputs.insert(OutputId::from(key), control);
+
+                Task::new(key.clone(), typetag, transform)
+            }
             Transform::FallibleFunction(mut t) => {
                 let (mut output, control) = Fanout::new();
                 let (mut errors_output, errors_control) = Fanout::new();

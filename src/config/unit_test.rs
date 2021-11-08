@@ -157,6 +157,12 @@ fn walk(
                 targets = target.next.clone();
                 transforms.insert(key, target);
             }
+            Transform::BatchedFunction(ref mut t) => {
+                t.transform(&mut results, inputs.clone());
+
+                targets = target.next.clone();
+                transforms.insert(key, target);
+            }
             Transform::Task(t) => {
                 error!("Using a recently refactored `TaskTransform` in a unit test. You may experience limited support for multiple inputs.");
                 let in_stream = futures::stream::iter(inputs.clone());
