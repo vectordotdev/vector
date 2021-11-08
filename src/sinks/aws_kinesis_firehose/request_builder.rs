@@ -1,4 +1,3 @@
-use crate::buffers::Ackable;
 use crate::event::{Event, LogEvent};
 use crate::event::{EventFinalizers, Finalizable};
 use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
@@ -7,6 +6,7 @@ use bytes::Bytes;
 
 use rusoto_firehose::Record;
 use std::io;
+use vector_core::buffers::Ackable;
 use vector_core::ByteSizeOf;
 
 pub struct KinesisRequestBuilder {

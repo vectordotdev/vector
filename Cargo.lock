@@ -862,6 +862,7 @@ dependencies = [
  "pretty_assertions",
  "quickcheck",
  "serde",
+ "serde_yaml",
  "snafu",
  "tempdir",
  "tokio",
@@ -6093,9 +6094,9 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "1.10.0"
+version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "062b87e45d8f26714eacfaef0ed9a583e2bfd50ebd96bdd3c200733bd5758e2c"
+checksum = "ad6056b4cb69b6e43e3a0f055def223380baecc99da683884f205bf347f7c4b3"
 dependencies = [
  "rustversion",
  "serde",
@@ -7747,6 +7748,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
+ "serde_with",
  "serde_yaml",
  "sha2",
  "shared",

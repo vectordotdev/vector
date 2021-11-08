@@ -1,4 +1,5 @@
-use crate::{buffers::EventStream, event::Event, stats};
+use crate::topology::EventStream;
+use crate::{event::Event, stats};
 use futures::{Stream, StreamExt};
 use metrics::gauge;
 use pin_project::pin_project;

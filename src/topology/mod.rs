@@ -15,7 +15,6 @@ mod task;
 mod test;
 
 use crate::{
-    buffers::{self, EventStream},
     config::{ComponentKey, Config, ConfigDiff, OutputId},
     event::Event,
     topology::{
@@ -32,13 +31,16 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tokio::sync::{mpsc, watch};
+use vector_core::buffers::{Acker, BufferInputCloner, BufferStream};
 
 type TaskHandle = tokio::task::JoinHandle<Result<TaskOutput, ()>>;
 
+pub type EventStream = BufferStream<Event>;
+
 type BuiltBuffer = (
-    buffers::BufferInputCloner<Event>,
+    BufferInputCloner<Event>,
     Arc<Mutex<Option<Pin<EventStream>>>>,
-    buffers::Acker,
+    Acker,
 );
 
 type Outputs = HashMap<OutputId, fanout::ControlChannel>;

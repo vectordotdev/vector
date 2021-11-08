@@ -37,7 +37,7 @@ use super::{
     service::{Map, ServiceBuilderExt},
     EncodedEvent,
 };
-use crate::{buffers::Acker, event::EventStatus};
+use crate::event::EventStatus;
 use futures::{
     future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream, TryFutureExt,
 };
@@ -56,7 +56,7 @@ use tokio::{
 };
 use tower::{Service, ServiceBuilder};
 use tracing_futures::Instrument;
-use vector_core::internal_event::EventsSent;
+use vector_core::{buffers::Acker, internal_event::EventsSent};
 
 // === StreamSink ===
 
@@ -636,7 +636,6 @@ impl<'a> Response for &'a str {}
 mod tests {
     use super::*;
     use crate::{
-        buffers::Acker,
         sinks::util::{BatchSettings, EncodedLength, VecBuffer},
         test_util::trace_init,
     };
@@ -647,6 +646,7 @@ mod tests {
         sync::{atomic::Ordering::Relaxed, Arc, Mutex},
     };
     use tokio::{task::yield_now, time::Instant};
+    use vector_core::buffers::Acker;
 
     const TIMEOUT: Duration = Duration::from_secs(10);
 

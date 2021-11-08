@@ -4,7 +4,6 @@ use super::{
     BuiltBuffer, ConfigDiff,
 };
 use crate::{
-    buffers,
     config::{
         ComponentKey, DataType, OutputId, ProxyConfig, SinkContext, SourceContext, TransformContext,
     },
@@ -27,8 +26,11 @@ use tokio::{
     select,
     time::{timeout, Duration},
 };
-use vector_core::internal_event::EventsSent;
 use vector_core::ByteSizeOf;
+use vector_core::{
+    buffers::{BufferInputCloner, BufferType},
+    internal_event::EventsSent,
+};
 
 lazy_static! {
     static ref ENRICHMENT_TABLES: enrichment::TableRegistry = enrichment::TableRegistry::default();
@@ -91,7 +93,7 @@ pub async fn load_enrichment_tables<'a>(
 }
 
 pub struct Pieces {
-    pub inputs: HashMap<ComponentKey, (buffers::BufferInputCloner<Event>, Vec<OutputId>)>,
+    pub inputs: HashMap<ComponentKey, (BufferInputCloner<Event>, Vec<OutputId>)>,
     pub outputs: HashMap<ComponentKey, HashMap<Option<String>, fanout::ControlChannel>>,
     pub tasks: HashMap<ComponentKey, Task>,
     pub source_tasks: HashMap<ComponentKey, Task>,
@@ -361,10 +363,10 @@ pub async fn build_pieces(
         let (tx, rx, acker) = if let Some(buffer) = buffers.remove(key) {
             buffer
         } else {
-            let buffer_type = match sink.buffer {
-                buffers::BufferConfig::Memory { .. } => "memory",
+            let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
+                BufferType::Memory { .. } => "memory",
                 #[cfg(feature = "disk-buffer")]
-                buffers::BufferConfig::Disk { .. } => "disk",
+                BufferType::Disk { .. } => "disk",
             };
             let buffer_span = error_span!(
                 "sink",
@@ -375,7 +377,9 @@ pub async fn build_pieces(
                 component_name = %key.id(),
                 buffer_type = buffer_type,
             );
-            let buffer = sink.buffer.build(&config.global.data_dir, key, buffer_span);
+            let buffer = sink
+                .buffer
+                .build(&config.global.data_dir, key.to_string(), buffer_span);
             match buffer {
                 Err(error) => {
                     errors.push(format!("Sink \"{}\": {}", key, error));

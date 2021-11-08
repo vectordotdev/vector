@@ -10,7 +10,6 @@ mod integration_test {
     use crate::sinks::util::{BatchConfig, StreamSink};
     use crate::test_util::components;
     use crate::{
-        buffers::Acker,
         kafka::{KafkaAuthConfig, KafkaSaslConfig, KafkaTlsConfig},
         test_util::{random_lines_with_stream, random_string, wait_for},
         tls::TlsOptions,
@@ -24,6 +23,7 @@ mod integration_test {
     };
     use std::collections::HashMap;
     use std::{collections::BTreeMap, future::ready, thread, time::Duration};
+    use vector_core::buffers::Acker;
     use vector_core::event::{BatchNotifier, BatchStatus};
 
     #[tokio::test]

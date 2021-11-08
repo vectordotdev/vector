@@ -1,5 +1,4 @@
 use crate::{
-    buffers::Acker,
     config::{DataType, GenerateConfig, Resource, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricData, MetricKind, MetricValue},
     event::Event,
@@ -31,6 +30,7 @@ use std::{
     time::Instant,
 };
 use stream_cancel::{Trigger, Tripwire};
+use vector_core::buffers::Acker;
 
 use super::collector::{self, MetricCollector as _};
 
