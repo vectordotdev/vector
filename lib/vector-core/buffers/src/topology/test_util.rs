@@ -1,10 +1,44 @@
+use bytes::{Buf, BufMut};
 use tokio::sync::mpsc::Sender;
 
-use crate::topology::{
-    builder::IntoBuffer,
-    channel::{BufferReceiver, BufferSender},
+use crate::{
+    bytes::{DecodeBytes, EncodeBytes},
+    topology::{
+        builder::IntoBuffer,
+        channel::{BufferReceiver, BufferSender},
+    },
+    Bufferable,
 };
 use crate::{MemoryBuffer, WhenFull};
+
+// Silly implementation of `EncodeBytes`/`DecodeBytes` to fulfill `Bufferable` for our test buffer code.
+impl EncodeBytes<u64> for u64 {
+    type Error = ();
+
+    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
+    where
+        B: BufMut,
+        Self: Sized,
+    {
+        buffer.put_u64(self);
+        Ok(())
+    }
+}
+
+impl DecodeBytes<u64> for u64 {
+    type Error = String;
+
+    fn decode<B>(mut buffer: B) -> Result<u64, Self::Error>
+    where
+        B: Buf,
+    {
+        if buffer.remaining() >= 8 {
+            Ok(buffer.get_u64())
+        } else {
+            Err("need 8 bytes minimum".to_string())
+        }
+    }
+}
 
 /// Builds a buffer using in-memory channels.
 ///
@@ -43,7 +77,7 @@ pub fn build_buffer(
 }
 
 /// Gets the current capacity of the underlying base channel of the given sender.
-fn get_base_sender_capacity<T: Send + 'static>(sender: &BufferSender<T>) -> usize {
+fn get_base_sender_capacity<T: Bufferable>(sender: &BufferSender<T>) -> usize {
     sender
         .get_base_ref()
         .get_ref()
@@ -54,7 +88,7 @@ fn get_base_sender_capacity<T: Send + 'static>(sender: &BufferSender<T>) -> usiz
 /// Gets the current capacity of the underlying overflow channel of the given sender..
 ///
 /// As overflow is optional, the return value will be `None` is overflow is not configured.
-fn get_overflow_sender_capacity<T: Send + 'static>(sender: &BufferSender<T>) -> Option<usize> {
+fn get_overflow_sender_capacity<T: Bufferable>(sender: &BufferSender<T>) -> Option<usize> {
     sender
         .get_overflow_ref()
         .and_then(|s| s.get_base_ref().get_ref())
@@ -70,7 +104,7 @@ pub fn assert_current_send_capacity<T>(
     base_expected: usize,
     overflow_expected: Option<usize>,
 ) where
-    T: Send + 'static,
+    T: Bufferable,
 {
     assert_eq!(get_base_sender_capacity(sender), base_expected);
     assert_eq!(get_overflow_sender_capacity(sender), overflow_expected);

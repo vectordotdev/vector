@@ -56,7 +56,7 @@ pub fn build<T>(
     span: Span,
 ) -> Result<(BufferInputCloner<T>, BufferStream<T>, Acker), String>
 where
-    T: Bufferable + Clone + 'static,
+    T: Bufferable + Clone,
 {
     match variant {
         #[cfg(feature = "disk-buffer")]
@@ -136,6 +136,7 @@ pub trait Bufferable:
 {
 }
 
+// Blanket implementation for anything that is already bufferable.
 impl<T> Bufferable for T where
     T: ByteSizeOf + EncodeBytes<Self> + DecodeBytes<Self> + Send + Sync + Unpin + Sized + 'static
 {

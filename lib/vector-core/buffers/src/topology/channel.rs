@@ -7,11 +7,14 @@ use futures::{Sink, Stream};
 use pin_project::pin_project;
 use tokio_stream::wrappers::ReceiverStream;
 
-use crate::topology::{
-    poll_sender::{PollSendError, PollSender},
-    strategy::PollStrategy,
-};
 use crate::WhenFull;
+use crate::{
+    topology::{
+        poll_sender::{PollSendError, PollSender},
+        strategy::PollStrategy,
+    },
+    Bufferable,
+};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum SendState {
@@ -77,7 +80,7 @@ impl<T> BufferSender<T> {
     }
 }
 
-impl<T: Send + 'static> BufferSender<T> {
+impl<T: Bufferable> BufferSender<T> {
     #[cfg(test)]
     pub(crate) fn get_base_ref(&self) -> &PollSender<T> {
         &self.base
@@ -99,10 +102,7 @@ impl<T: Send + 'static> BufferSender<T> {
     }
 }
 
-impl<T> Sink<T> for BufferSender<T>
-where
-    T: Send + 'static,
-{
+impl<T: Bufferable> Sink<T> for BufferSender<T> {
     type Error = PollSendError<T>;
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -261,7 +261,7 @@ impl<T> BufferReceiver<T> {
     }
 }
 
-impl<T> Stream for BufferReceiver<T> {
+impl<T: Bufferable> Stream for BufferReceiver<T> {
     type Item = T;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -285,7 +285,6 @@ impl<T> Stream for BufferReceiver<T> {
 #[cfg(test)]
 mod tests {
     use std::{
-        fmt,
         sync::Arc,
         time::{Duration, Instant},
     };
@@ -298,7 +297,7 @@ mod tests {
             channel::{BufferReceiver, BufferSender},
             test_util::{assert_current_send_capacity, build_buffer},
         },
-        WhenFull,
+        Bufferable, WhenFull,
     };
 
     async fn assert_send_ok_with_capacities<T>(
@@ -307,7 +306,7 @@ mod tests {
         base_expected: usize,
         overflow_expected: Option<usize>,
     ) where
-        T: fmt::Debug + Send + 'static,
+        T: Bufferable,
     {
         assert!(sender.send(value).await.is_ok());
         assert_current_send_capacity(sender, base_expected, overflow_expected);
@@ -319,7 +318,7 @@ mod tests {
         send_value: T,
     ) -> Vec<T>
     where
-        T: fmt::Debug + Send + 'static,
+        T: Bufferable,
     {
         // We can likely replace this with `tokio_test`-related helpers to avoid the sleeping.
         let send_baton = Arc::new(Barrier::new(2));
@@ -356,7 +355,7 @@ mod tests {
 
     async fn drain_receiver<T>(sender: BufferSender<T>, receiver: BufferReceiver<T>) -> Vec<T>
     where
-        T: fmt::Debug + Send + 'static,
+        T: Bufferable,
     {
         drop(sender);
         let handle = tokio::spawn(async move {
