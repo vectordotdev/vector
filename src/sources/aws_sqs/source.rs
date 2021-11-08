@@ -151,7 +151,7 @@ async fn delete_messages(client: &SqsClient, receipts: &[String], queue_url: &st
     if !receipts.is_empty() {
         let mut batch = client.delete_message_batch().queue_url(queue_url);
 
-        for (id, receipt) in receipts.into_iter().enumerate() {
+        for (id, receipt) in receipts.iter().enumerate() {
             batch = batch.entries(
                 DeleteMessageBatchRequestEntry::builder()
                     .id(id.to_string())

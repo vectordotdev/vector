@@ -2,7 +2,7 @@ use crate::aws::auth::AwsAuthentication;
 use crate::aws::rusoto::AwsCredentialsProvider;
 use rusoto_core::Region;
 
-const AWS_DEFAULT_PROFILE: &'static str = "default";
+const AWS_DEFAULT_PROFILE: &str = "default";
 
 impl AwsAuthentication {
     pub fn build(
