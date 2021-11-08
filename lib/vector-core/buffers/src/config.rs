@@ -197,6 +197,17 @@ pub enum BufferType {
     },
 }
 
+impl BufferType {
+    fn when_full(&self) -> WhenFull {
+        match *self {
+            #[cfg(not(feature = "disk-buffer"))]
+            BufferType::Memory { when_full, .. } => when_full,
+            #[cfg(feature = "disk-buffer")]
+            BufferType::Memory { when_full, .. } | BufferType::Disk { when_full, .. } => when_full,
+        }
+    }
+}
+
 /// A buffer configuration.
 ///
 /// Buffers are compromised of stages(*) that form a buffer _topology_, with input items being
@@ -270,6 +281,11 @@ impl BufferConfig {
                 .ok_or_else(|| "stage cannot possibly be empty".to_string()),
             _ => Err("chained buffers are not yet supported".to_string()),
         }?;
+
+        // Overflow mode is also not supported yet.
+        if let WhenFull::Overflow = stage.when_full() {
+            return Err("overflow mode is not yet supported".to_string());
+        }
 
         let variant = match stage {
             BufferType::Memory {
