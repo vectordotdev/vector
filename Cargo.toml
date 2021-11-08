@@ -296,7 +296,7 @@ nix = "0.22.2"
 
 [build-dependencies]
 prost-build = { version = "0.8", optional = true }
-tonic-build = { version = "0.5", default-features = false, features = ["transport", "prost"], optional = true }
+tonic-build = { version = "0.6", default-features = false, features = ["transport", "prost"], optional = true }
 
 [dev-dependencies]
 approx = "0.5.0"
