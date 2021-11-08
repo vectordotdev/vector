@@ -1,6 +1,7 @@
 use super::sketch_parser::decode_ddsketch;
 use crate::{
     codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
+    common::datadog::{DatadogMetricType, DatadogSeriesMetric},
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
@@ -14,7 +15,6 @@ use crate::{
         HttpDecompressError,
     },
     serde::{default_decoding, default_framing_message_based},
-    sinks::datadog::metrics::{DatadogMetric, DatadogMetricType, DatadogRequest},
     sources::{
         self,
         util::{ErrorMessage, TcpError},
@@ -93,13 +93,13 @@ impl SourceConfig for DatadogAgentConfig {
         let listener = tls.bind(&self.address).await?;
         let log_service = source
             .clone()
-            .event_service(cx.acknowledgements, cx.out.clone());
+            .event_service(cx.acknowledgements.enabled, cx.out.clone());
         let series_v1_service = source
             .clone()
-            .series_v1_service(cx.acknowledgements, cx.out.clone());
+            .series_v1_service(cx.acknowledgements.enabled, cx.out.clone());
         let sketches_service = source
             .clone()
-            .sketches_service(cx.acknowledgements, cx.out.clone());
+            .sketches_service(cx.acknowledgements.enabled, cx.out.clone());
         let series_v2_service = source.series_v2_service();
 
         let shutdown = cx.shutdown;
@@ -153,6 +153,11 @@ struct DatadogAgentSource {
     log_schema_timestamp_key: &'static str,
     log_schema_source_type_key: &'static str,
     decoder: codecs::Decoder,
+}
+
+#[derive(Deserialize)]
+struct DatadogSeriesRequest {
+    series: Vec<DatadogSeriesMetric>,
 }
 
 impl DatadogAgentSource {
@@ -280,6 +285,7 @@ impl DatadogAgentSource {
     fn series_v2_service(self) -> BoxedFilter<(Response,)> {
         warp::post()
             // This should not happen anytime soon as the v2 series endpoint does not exist yet
+            // but the route exists in the agent codebase
             .and(path!("api" / "v2" / "series" / ..))
             .and_then(|| {
                 error!(message = "/api/v2/series route is not supported.");
@@ -307,8 +313,6 @@ impl DatadogAgentSource {
                       api_token: Option<String>,
                       query_params: ApiKeyQueryParams,
                       body: Bytes| {
-                    error!(message = "/api/beta/sketches route is not yet fully supported.");
-
                     let events = decode(&encoding_header, body).and_then(|body| {
                         self.decode_datadog_sketches(
                             body,
@@ -364,13 +368,12 @@ impl DatadogAgentSource {
             return Ok(Vec::new());
         }
 
-        let metrics: DatadogRequest<DatadogMetric> =
-            serde_json::from_slice(&body).map_err(|error| {
-                ErrorMessage::new(
-                    StatusCode::BAD_REQUEST,
-                    format!("Error parsing JSON: {:?}", error),
-                )
-            })?;
+        let metrics: DatadogSeriesRequest = serde_json::from_slice(&body).map_err(|error| {
+            ErrorMessage::new(
+                StatusCode::BAD_REQUEST,
+                format!("Error parsing JSON: {:?}", error),
+            )
+        })?;
 
         emit!(&DatadogAgentMetricDecoded {
             byte_size: body.len(),
@@ -491,7 +494,7 @@ fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMessag
     Ok(body)
 }
 
-fn into_vector_metric(dd_metric: DatadogMetric, api_key: Option<Arc<str>>) -> Vec<Event> {
+fn into_vector_metric(dd_metric: DatadogSeriesMetric, api_key: Option<Arc<str>>) -> Vec<Event> {
     let mut tags = BTreeMap::<String, String>::new();
     for tag in dd_metric.tags.clone().unwrap_or(vec![]) {
         let kv = tag.split_once(":").unwrap_or((&tag, ""));

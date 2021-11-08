@@ -11,14 +11,16 @@ use std::{
 use bytes::BufMut;
 use chrono::{DateTime, Utc};
 use prost::Message;
-use serde::Serialize;
 use snafu::{ResultExt, Snafu};
 use vector_core::{
     config::{log_schema, LogSchema},
     event::{metric::MetricSketch, Metric, MetricValue},
 };
 
-use crate::sinks::util::{encode_namespace, Compressor};
+use crate::{
+    common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
+    sinks::util::{encode_namespace, Compressor},
+};
 
 use super::config::{DatadogMetricsEndpoint, MAXIMUM_PAYLOAD_COMPRESSED_SIZ, MAXIMUM_PAYLOAD_SIZE};
 
@@ -85,26 +87,6 @@ impl FinishError {
         }
     }
 }
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-struct DatadogSeriesMetric {
-    metric: String,
-    r#type: DatadogMetricType,
-    interval: Option<i64>,
-    points: Vec<DatadogPoint<f64>>,
-    tags: Option<Vec<String>>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum DatadogMetricType {
-    Gauge,
-    Count,
-    Rate,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-struct DatadogPoint<T>(i64, T);
 
 struct EncoderState {
     writer: Compressor,
@@ -444,6 +426,9 @@ fn generate_series_metrics(
             interval,
             points: vec![DatadogPoint(ts, *value)],
             tags,
+            host: None,
+            source_type_name: None,
+            device: None,
         }],
         MetricValue::Set { values } => vec![DatadogSeriesMetric {
             metric: name,
@@ -451,6 +436,9 @@ fn generate_series_metrics(
             interval: None,
             points: vec![DatadogPoint(ts, values.len() as f64)],
             tags,
+            host: None,
+            source_type_name: None,
+            device: None,
         }],
         MetricValue::Gauge { value } => vec![DatadogSeriesMetric {
             metric: name,
@@ -458,6 +446,9 @@ fn generate_series_metrics(
             interval: None,
             points: vec![DatadogPoint(ts, *value)],
             tags,
+            host: None,
+            source_type_name: None,
+            device: None,
         }],
         MetricValue::AggregatedSummary {
             quantiles,
@@ -471,6 +462,9 @@ fn generate_series_metrics(
                     interval,
                     points: vec![DatadogPoint(ts, f64::from(*count))],
                     tags: tags.clone(),
+                    host: None,
+                    source_type_name: None,
+                    device: None,
                 },
                 DatadogSeriesMetric {
                     metric: format!("{}.sum", &name),
@@ -478,6 +472,9 @@ fn generate_series_metrics(
                     interval: None,
                     points: vec![DatadogPoint(ts, *sum)],
                     tags: tags.clone(),
+                    host: None,
+                    source_type_name: None,
+                    device: None,
                 },
             ];
 
@@ -488,6 +485,9 @@ fn generate_series_metrics(
                     interval: None,
                     points: vec![DatadogPoint(ts, quantile.value)],
                     tags: tags.clone(),
+                    host: None,
+                    source_type_name: None,
+                    device: None,
                 })
             }
             results
