@@ -30,6 +30,7 @@ SOAK_CAPTURE_DIR="${CAPTURE_DIR}/${SOAK_NAME}"
 
 pushd "${__dir}"
 ./boot_minikube.sh
+mkdir -p "${SOAK_CAPTURE_DIR}"
 minikube mount "${SOAK_CAPTURE_DIR}:/captures" &
 minikube cache add "${IMAGE}"
 MOUNT_PID=$!

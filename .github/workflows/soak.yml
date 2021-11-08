@@ -82,8 +82,8 @@ jobs:
       - name: Setup comparison variables
         id: comparison
         run: |
-          export COMPARISON_SHA=${{ github.sha }}
-          export COMPARISON_TAG="${{ github.sha }}-${{ github.sha }}"
+          export COMPARISON_SHA=${{ github.event.pull_request.head.sha }}
+          export COMPARISON_TAG="${{ github.event.pull_request.head.sha }}-${{ github.event.pull_request.head.sha }}"
 
           echo "comparison sha is: ${COMPARISON_SHA}"
           echo "comparison tag is: ${COMPARISON_TAG}"
@@ -98,7 +98,7 @@ jobs:
           export BASELINE_SHA=$(git rev-parse HEAD)
           popd
 
-          export BASELINE_TAG="${{ github.sha }}-${BASELINE_SHA}"
+          export BASELINE_TAG="${{ github.event.pull_request.head.sha }}-${BASELINE_SHA}"
           echo "baseline sha is: ${BASELINE_SHA}"
           echo "baseline tag is: ${BASELINE_TAG}"
 

@@ -25,7 +25,7 @@ pub(crate) mod aws_s3;
 pub(crate) mod aws_s3_sink;
 #[cfg(feature = "sinks-aws_sqs")]
 mod aws_sqs;
-#[cfg(feature = "sinks-azure_blob")]
+#[cfg(any(feature = "sinks-azure_blob", feature = "sinks-datadog_archives"))]
 pub(crate) mod azure_blob;
 mod batch;
 mod blackhole;
