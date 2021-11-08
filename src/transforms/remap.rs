@@ -6,14 +6,14 @@ use crate::{
     Result,
 };
 
-use futures::{Stream, StreamExt};
+use futures::{stream, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::PathBuf;
-use std::{future::ready, pin::Pin};
+use std::pin::Pin;
 use vector_core::transform::TaskTransform;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Terminate};
@@ -105,7 +105,10 @@ impl Remap {
         })
     }
 
-    fn transform_one(&mut self, event: Event) -> Option<Event> {
+    fn transform_one(&mut self, event: Event) -> impl Stream<Item = Event>
+    where
+        Self: 'static,
+    {
         // If a program can fail or abort at runtime, we need to clone the
         // original event and keep it around, to allow us to discard any
         // mutations made to the event while the VRL program runs, before it
@@ -137,7 +140,7 @@ impl Remap {
                 //     output.push(event)
                 // }
 
-                target.into_events().next()
+                stream::iter(target.into_events().collect::<Vec<_>>())
             }
             Err(Terminate::Abort(_)) => {
                 emit!(&RemapMappingAbort {
@@ -145,9 +148,9 @@ impl Remap {
                 });
 
                 if !self.drop_on_abort {
-                    Some(original_event.expect("event will be set"))
+                    stream::iter(vec![original_event.expect("event will be set")])
                 } else {
-                    None
+                    stream::iter(vec![])
                 }
             }
             Err(Terminate::Error(error)) => {
@@ -157,9 +160,9 @@ impl Remap {
                 });
 
                 if !self.drop_on_error {
-                    Some(original_event.expect("event will be set"))
+                    stream::iter(vec![original_event.expect("event will be set")])
                 } else {
-                    None
+                    stream::iter(vec![])
                 }
             }
         }
@@ -192,7 +195,7 @@ impl TaskTransform for Remap {
         Self: 'static,
     {
         let mut inner = self;
-        Box::pin(task.filter_map(move |v| ready(inner.transform_one(v))))
+        Box::pin(task.flat_map(move |v| inner.transform_one(v)))
     }
 }
 
