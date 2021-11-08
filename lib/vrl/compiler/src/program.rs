@@ -1,12 +1,13 @@
-use crate::Expression;
+use crate::expression::CompiledExpression;
 use std::iter::IntoIterator;
 use std::ops::Deref;
 
 #[derive(Debug, Clone)]
 pub struct Program {
-    pub(crate) expressions: Vec<Box<dyn Expression>>,
+    pub(crate) expressions: Vec<CompiledExpression>,
     pub(crate) fallible: bool,
     pub(crate) abortable: bool,
+    pub(crate) fanout: bool,
 }
 
 impl Program {
@@ -25,10 +26,19 @@ impl Program {
     pub fn can_abort(&self) -> bool {
         self.abortable
     }
+
+    /// Returns whether the program can fan-out an incoming event into
+    /// multiple events at runtime.
+    ///
+    /// This happens if the final target assignment (potentially) assigns
+    /// an array of elements.
+    pub fn can_fanout(&self) -> bool {
+        self.fanout
+    }
 }
 
 impl IntoIterator for Program {
-    type Item = Box<dyn Expression>;
+    type Item = CompiledExpression;
     type IntoIter = std::vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -37,7 +47,7 @@ impl IntoIterator for Program {
 }
 
 impl Deref for Program {
-    type Target = [Box<dyn Expression>];
+    type Target = [CompiledExpression];
 
     fn deref(&self) -> &Self::Target {
         &self.expressions

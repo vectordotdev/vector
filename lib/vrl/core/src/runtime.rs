@@ -1,4 +1,4 @@
-use crate::{state, Context, Program, Target, Value};
+use crate::{state, Context, Expression, Program, Target, Value};
 use compiler::ExpressionError;
 use lookup::LookupBuf;
 use shared::TimeZone;

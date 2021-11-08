@@ -115,6 +115,11 @@ impl Clone for Remap {
 
 impl BatchedFunctionTransform for Remap {
     fn transform(&mut self, output: &mut Vec<Event>, events: Vec<Event>) {
+        // If the program cannot fanout, we know the output events are
+        // similar to the input events, which in turn allows us to use
+        // a specialised Rayon parallel iterator implementation.
+        if self.program.can_fanout() {}
+
         let mut out = events
             .into_par_iter()
             .filter_map(|event| {

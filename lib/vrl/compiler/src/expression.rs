@@ -86,6 +86,32 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
 clone_trait_object!(Expression);
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct CompiledExpression {
+    pub(crate) type_def: TypeDef,
+    pub(crate) expression: Expr,
+}
+
+impl CompiledExpression {
+    pub fn type_def(&self) -> &TypeDef {
+        &self.type_def
+    }
+}
+
+impl Expression for CompiledExpression {
+    fn resolve(&self, ctx: &mut Context) -> Resolved {
+        self.expression.resolve(ctx)
+    }
+
+    fn as_value(&self) -> Option<Value> {
+        self.expression.as_value()
+    }
+
+    fn type_def(&self, _: &State) -> TypeDef {
+        self.type_def.clone()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Literal(Literal),
     Container(Container),

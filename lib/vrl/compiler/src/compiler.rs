@@ -1,5 +1,5 @@
 use crate::expression::*;
-use crate::{Function, Program, State, Value};
+use crate::{value, Function, Program, State, Value};
 use chrono::{TimeZone, Utc};
 use diagnostic::DiagnosticError;
 use ordered_float::NotNan;
@@ -28,27 +28,29 @@ impl<'a> Compiler<'a> {
     }
 
     pub(super) fn compile(mut self, ast: parser::Program) -> Result<Program, Errors> {
-        let expressions = self
-            .compile_root_exprs(ast)
-            .into_iter()
-            .map(|expr| Box::new(expr) as _)
-            .collect();
+        let expressions = self.compile_root_exprs(ast);
 
         if !self.errors.is_empty() {
             return Err(self.errors);
         }
 
+        let fanout = match self.state.target() {
+            None => false,
+            Some(t) => t.type_def.has_kind(value::Kind::Array),
+        };
+
         Ok(Program {
             expressions,
             fallible: self.fallible,
             abortable: self.abortable,
+            fanout,
         })
     }
 
     fn compile_root_exprs(
         &mut self,
         nodes: impl IntoIterator<Item = Node<ast::RootExpr>>,
-    ) -> Vec<Expr> {
+    ) -> Vec<CompiledExpression> {
         use ast::RootExpr::*;
 
         nodes
@@ -58,14 +60,19 @@ impl<'a> Compiler<'a> {
 
                 match node.into_inner() {
                     Expr(expr) => {
-                        let expr = self.compile_expr(expr);
-                        if expr.type_def(self.state).is_fallible() {
+                        let expression = self.compile_expr(expr);
+                        let type_def = expression.type_def(self.state);
+
+                        if type_def.is_fallible() {
                             use crate::expression::Error;
                             let err = Error::Fallible { span };
                             self.errors.push(Box::new(err));
                         }
 
-                        Some(expr)
+                        Some(CompiledExpression {
+                            expression,
+                            type_def,
+                        })
                     }
                     Error(err) => {
                         self.handle_parser_error(err);
