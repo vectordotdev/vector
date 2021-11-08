@@ -87,6 +87,9 @@ resource "kubernetes_deployment" "vector" {
           }
 
           resources {
+            # Because we do not have the ability to self-constrain vector's
+            # memory consumption we only make a request here on memory. This
+            # avoids vector crashing for want of a malloc.
             limits = {
               cpu    = var.vector_cpus
               memory = "512Mi"
