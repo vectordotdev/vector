@@ -2,16 +2,19 @@ use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, VrlTarget},
     internal_events::{RemapMappingAbort, RemapMappingError},
-    transforms::{FunctionTransform, Transform},
+    transforms::Transform,
     Result,
 };
 
+use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::PathBuf;
+use std::{future::ready, pin::Pin};
+use vector_core::transform::TaskTransform;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Terminate};
 
@@ -38,7 +41,7 @@ impl_generate_config_from_default!(RemapConfig);
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
     async fn build(&self, context: &TransformContext) -> Result<Transform> {
-        Remap::new(self.clone(), &context.enrichment_tables).map(Transform::function)
+        Remap::new(self.clone(), &context.enrichment_tables).map(Transform::task)
     }
 
     fn input_type(&self) -> DataType {
@@ -102,26 +105,7 @@ impl Remap {
         })
     }
 
-    #[cfg(test)]
-    const fn runtime(&self) -> &Runtime {
-        &self.runtime
-    }
-}
-
-impl Clone for Remap {
-    fn clone(&self) -> Self {
-        Self {
-            program: self.program.clone(),
-            runtime: Runtime::default(),
-            timezone: self.timezone,
-            drop_on_error: self.drop_on_error,
-            drop_on_abort: self.drop_on_abort,
-        }
-    }
-}
-
-impl FunctionTransform for Remap {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform_one(&mut self, event: Event) -> Option<Event> {
         // If a program can fail or abort at runtime, we need to clone the
         // original event and keep it around, to allow us to discard any
         // mutations made to the event while the VRL program runs, before it
@@ -148,9 +132,12 @@ impl FunctionTransform for Remap {
 
         match result {
             Ok(_) => {
-                for event in target.into_events() {
-                    output.push(event)
-                }
+                // TODO
+                // for event in target.into_events() {
+                //     output.push(event)
+                // }
+
+                target.into_events().next()
             }
             Err(Terminate::Abort(_)) => {
                 emit!(&RemapMappingAbort {
@@ -158,7 +145,9 @@ impl FunctionTransform for Remap {
                 });
 
                 if !self.drop_on_abort {
-                    output.push(original_event.expect("event will be set"))
+                    Some(original_event.expect("event will be set"))
+                } else {
+                    None
                 }
             }
             Err(Terminate::Error(error)) => {
@@ -168,10 +157,42 @@ impl FunctionTransform for Remap {
                 });
 
                 if !self.drop_on_error {
-                    output.push(original_event.expect("event will be set"))
+                    Some(original_event.expect("event will be set"))
+                } else {
+                    None
                 }
             }
         }
+    }
+
+    #[cfg(test)]
+    const fn runtime(&self) -> &Runtime {
+        &self.runtime
+    }
+}
+
+impl Clone for Remap {
+    fn clone(&self) -> Self {
+        Self {
+            program: self.program.clone(),
+            runtime: Runtime::default(),
+            timezone: self.timezone,
+            drop_on_error: self.drop_on_error,
+            drop_on_abort: self.drop_on_abort,
+        }
+    }
+}
+
+impl TaskTransform for Remap {
+    fn transform(
+        self: Box<Self>,
+        task: Pin<Box<dyn Stream<Item = Event> + Send>>,
+    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
+    where
+        Self: 'static,
+    {
+        let mut inner = self;
+        Box::pin(task.filter_map(move |v| ready(inner.transform_one(v))))
     }
 }
 
