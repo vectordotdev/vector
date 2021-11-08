@@ -19,6 +19,9 @@ on:
       - "docs/**"
       - "rfcs/**"
       - "website/**"
+  push:
+    branches-ignore:
+      - master
 
 jobs:
   cancel-previous:
