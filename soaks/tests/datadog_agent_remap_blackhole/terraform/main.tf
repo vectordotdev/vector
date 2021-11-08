@@ -41,10 +41,13 @@ module "vector" {
   test_name    = "datadog_agent_remap_blackhole"
   vector-toml  = file("${path.module}/vector.toml")
   namespace    = kubernetes_namespace.soak.metadata[0].name
+  vector_cpus = var.vector_cpus
+  depends_on = [module.monitoring]
 }
 module "http-gen" {
   source        = "../../../common/terraform/modules/lading_http_gen"
   type          = var.type
   http-gen-toml = file("${path.module}/http_gen.toml")
   namespace     = kubernetes_namespace.soak.metadata[0].name
+  depends_on = [module.monitoring, module.vector]
 }

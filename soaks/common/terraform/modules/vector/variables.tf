@@ -22,3 +22,8 @@ variable "namespace" {
   description = "The namespace in which to run"
   type        = string
 }
+
+variable "vector_cpus" {
+  description = "The total number of CPUs to give to vector"
+  type        = number
+}
