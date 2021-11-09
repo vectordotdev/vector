@@ -47,7 +47,7 @@ also come with downsides (listed below) that should always be borne in mind.
 Let's jump straight into an example of using VRL to modify some data. We'll
 create a simple topology consisting of three components:
 
-1. A [`generator`][docs.sources.generator] source produces random [Syslog][urls.syslog]
+1. A [`demo`][docs.sources.demo] source produces random [Syslog][urls.syslog]
    messages at a rate of 10 per second.
 2. A [`remap`][docs.transforms.remap] transform uses VRL to parse incoming Syslog lines
    into named fields (`severity`, `timestamp`, etc.).
@@ -58,7 +58,7 @@ This configuration defines that topology:
 
 ```toml title="vector.toml"
 [sources.logs]
-  type = "generator"
+  type = "demo"
   format = "syslog"
   interval = 0.1
 
@@ -195,7 +195,7 @@ using it only when truly necessary, for several reasons:
 [docs.lua]: /docs/reference/configuration/transforms/lua/
 [docs.setup.quickstart]: /docs/setup/quickstart/
 [docs.sinks.console]: /docs/reference/configuration/sinks/console/
-[docs.sources.generator]: /docs/reference/configuration/sources/generator/
+[docs.sources.demo]: /docs/reference/configuration/sources/demo/
 [docs.transforms.remap]: /docs/reference/configuration/transforms/remap/
 [docs.transforms]: /docs/reference/configuration/transforms/
 [docs.vrl.examples]: /docs/reference/vrl/examples/

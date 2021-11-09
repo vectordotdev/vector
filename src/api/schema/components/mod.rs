@@ -331,17 +331,17 @@ mod tests {
         vec![
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("gen1"),
-                component_type: "generator".to_string(),
+                component_type: "demo".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("gen2"),
-                component_type: "generator".to_string(),
+                component_type: "demo".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("gen3"),
-                component_type: "generator".to_string(),
+                component_type: "demo".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Transform(transform::Transform(transform::Data {
@@ -490,22 +490,22 @@ mod tests {
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("e"),
-                component_type: "generator".to_string(),
+                component_type: "demo".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("d"),
-                component_type: "generator".to_string(),
+                component_type: "demo".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("g"),
-                component_type: "generator".to_string(),
+                component_type: "demo".to_string(),
                 output_type: DataType::Metric,
             })),
             Component::Source(source::Source(source::Data {
                 component_key: ComponentKey::from("f"),
-                component_type: "generator".to_string(),
+                component_type: "demo".to_string(),
                 output_type: DataType::Metric,
             })),
         ];

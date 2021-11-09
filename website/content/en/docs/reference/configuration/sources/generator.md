@@ -1,9 +1,9 @@
 ---
-title: Generator
+title: Demo
 description: Generate fake events, which can be useful for testing, benchmarking, and demos
 kind: source
 layout: component
-tags: ["generator", "random", "fake", "component", "source"]
+tags: ["demo", "random", "fake", "component", "source"]
 ---
 
 {{/*

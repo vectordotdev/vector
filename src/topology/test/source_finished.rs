@@ -1,7 +1,7 @@
 use crate::{
     config::Config,
     sinks::console::{ConsoleSinkConfig, Encoding, Target},
-    sources::generator::GeneratorConfig,
+    sources::demo::DemoConfig,
     test_util::start_topology,
 };
 use tokio::time::{timeout, Duration};
@@ -9,8 +9,8 @@ use tokio::time::{timeout, Duration};
 #[tokio::test]
 async fn sources_finished() {
     let mut old_config = Config::builder();
-    let generator = GeneratorConfig::repeat(vec!["text".to_owned()], 1, 0.0);
-    old_config.add_source("in", generator);
+    let demo = DemoConfig::repeat(vec!["text".to_owned()], 1, 0.0);
+    old_config.add_source("in", demo);
     old_config.add_sink(
         "out",
         &["in"],

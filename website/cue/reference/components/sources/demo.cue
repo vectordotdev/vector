@@ -1,10 +1,12 @@
 package metadata
 
-components: sources: generator: {
-	title: "Generator"
+components: sources: demo: {
+	title: "Demo"
+
+	alias: "generator"
 
 	description: """
-		Generates fakes events, useful for testing, benchmarking, and demoing.
+		Generates fakes events useful for testing and demoing.
 		"""
 
 	classes: {

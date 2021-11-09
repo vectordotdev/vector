@@ -2,7 +2,7 @@ use crate::buffers::{BufferConfig, WhenFull};
 use crate::config::Config;
 use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
 use crate::sinks::prometheus::exporter::PrometheusExporterConfig;
-use crate::sources::generator::GeneratorConfig;
+use crate::sources::demo::DemoConfig;
 use crate::sources::splunk_hec::SplunkConfig;
 use crate::test_util::{next_addr, start_topology, temp_dir, wait_for_tcp};
 use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
@@ -108,7 +108,7 @@ async fn topology_old() {
 async fn topology_reuse_old_port_sink() {
     let address = next_addr();
 
-    let source = GeneratorConfig::repeat(vec!["msg".to_string()], usize::MAX, Some(0.001));
+    let source = DemoConfig::repeat(vec!["msg".to_string()], usize::MAX, Some(0.001));
     let transform = LogToMetricConfig {
         metrics: vec![MetricConfig::Gauge(GaugeConfig {
             field: "message".to_string(),
@@ -171,7 +171,7 @@ async fn topology_reuse_old_port_cross_dependecy() {
     let mut old_config = Config::builder();
     old_config.add_source(
         "in",
-        GeneratorConfig::repeat(vec!["msg".to_string()], usize::MAX, Some(0.001)),
+        DemoConfig::repeat(vec!["msg".to_string()], usize::MAX, Some(0.001)),
     );
     old_config.add_transform("trans", &[&"in"], transform.clone());
     old_config.add_sink(
@@ -217,7 +217,7 @@ async fn topology_disk_buffer_conflict() {
     old_config.global.data_dir = Some(data_dir);
     old_config.add_source(
         "in",
-        GeneratorConfig::repeat(vec!["msg".to_string()], usize::MAX, Some(0.001)),
+        DemoConfig::repeat(vec!["msg".to_string()], usize::MAX, Some(0.001)),
     );
     old_config.add_transform(
         "trans",

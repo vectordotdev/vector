@@ -1,5 +1,5 @@
 [sources.in]
-type = "generator"
+type = "demo"
 format = "json"
 interval = 2
 

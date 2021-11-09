@@ -8,7 +8,7 @@ const FAILING_HEALTHCHECK: &str = r#"
 data_dir = "${VECTOR_DATA_DIR}"
 
 [sources.in]
-    type = "generator"
+    type = "demo"
     lines = ["log"]
     format = "shuffle"
 

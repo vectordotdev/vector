@@ -1,4 +1,4 @@
-#![cfg(all(test, feature = "sources-generator"))]
+#![cfg(all(test, feature = "sources-demo"))]
 
 use super::controller::ControllerStatistics;
 use crate::{
@@ -12,7 +12,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    sources::generator::GeneratorConfig,
+    sources::demo::DemoConfig,
     test_util::{
         start_topology,
         stats::{HistogramStats, LevelTimeHistogram, TimeHistogram, WeightedSumStats},
@@ -407,9 +407,8 @@ async fn run_test(params: TestParams) -> TestResults {
     let cstats = Arc::clone(&test_config.controller_stats);
 
     let mut config = config::Config::builder();
-    let generator =
-        GeneratorConfig::repeat(vec!["line 1".into()], params.requests, params.interval);
-    config.add_source("in", generator);
+    let demo = DemoConfig::repeat(vec!["line 1".into()], params.requests, params.interval);
+    config.add_source("in", demo);
     config.add_sink("out", &["in"], test_config);
 
     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;

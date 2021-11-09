@@ -5,7 +5,7 @@ use k8s_test_framework::{lock, vector::Config as VectorConfig};
 const HELM_VALUES_DUMMY_TOPOLOGY: &str = indoc! {r#"
     sources:
       dummy:
-        type: "generator"
+        type: "demo"
         format: "shuffle"
         lines: ["Hello world"]
         interval: 60 # once a minute

@@ -161,17 +161,17 @@ mod tests {
         vec![
             Source(Data {
                 component_key: ComponentKey::from("gen1"),
-                component_type: "generator".to_string(),
+                component_type: "demo".to_string(),
                 output_type: DataType::Any,
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen2"),
-                component_type: "generator".to_string(),
+                component_type: "demo".to_string(),
                 output_type: DataType::Log,
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen3"),
-                component_type: "generator".to_string(),
+                component_type: "demo".to_string(),
                 output_type: DataType::Metric,
             }),
         ]
@@ -241,7 +241,7 @@ mod tests {
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen2"),
-                component_type: "generator".to_string(),
+                component_type: "demo".to_string(),
                 output_type: DataType::Log,
             }),
             Source(Data {
@@ -272,7 +272,7 @@ mod tests {
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen2"),
-                component_type: "generator".to_string(),
+                component_type: "demo".to_string(),
                 output_type: DataType::Log,
             }),
             Source(Data {
@@ -303,7 +303,7 @@ mod tests {
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen2"),
-                component_type: "generator".to_string(),
+                component_type: "demo".to_string(),
                 output_type: DataType::Log,
             }),
             Source(Data {
@@ -334,7 +334,7 @@ mod tests {
             }),
             Source(Data {
                 component_key: ComponentKey::from("gen2"),
-                component_type: "generator".to_string(),
+                component_type: "demo".to_string(),
                 output_type: DataType::Log,
             }),
             Source(Data {

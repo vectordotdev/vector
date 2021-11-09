@@ -10,6 +10,8 @@ pub mod aws_kinesis_firehose;
 pub mod aws_s3;
 #[cfg(any(feature = "sources-datadog_agent"))]
 pub mod datadog;
+#[cfg(feature = "sources-demo")]
+pub mod demo;
 #[cfg(all(unix, feature = "sources-dnstap"))]
 pub mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
@@ -22,8 +24,6 @@ pub mod exec;
 pub mod file;
 #[cfg(feature = "sources-fluent")]
 pub mod fluent;
-#[cfg(feature = "sources-generator")]
-pub mod generator;
 #[cfg(feature = "sources-heroku_logs")]
 pub mod heroku_logs;
 #[cfg(feature = "sources-host_metrics")]
