@@ -44,9 +44,12 @@ components: transforms: pipelines: {
 			warnings: []
 			type: object: options: {
 				order: {
-					common:      true
-					description: "A complete ordered list of how the pipelines will be chained."
-					required:    false
+					common: true
+					description: """
+						A complete ordered list of how the pipelines will be chained.
+						This field won't be used if the `parallel` mode is enabled.
+						"""
+					required: false
 					type: array: {
 						default: null
 						items: type: string: {
@@ -94,6 +97,22 @@ components: transforms: pipelines: {
 			}
 		}
 
+		mode: {
+			description: """
+				The mode used by the transforms. When using `serial`, every pipelines from the same type are chained using the `order` option.
+				When using the `parallel` mode, every pipelines will receive all the events and will be usable as an input using `pipeline-transform-id.logs.pipelines.pipeline-id` (same for the metrics).
+				"""
+			common:   true
+			required: false
+			warnings: []
+			type: string: {
+				default: "serial"
+				enum: {
+					serial:   "Each pipeline will be chained."
+					parallel: "Each pipeline will be treated in parallel and receive the same events."
+				}
+			}
+		}
 		logs:    _pipeline_group
 		metrics: _pipeline_group
 	}
