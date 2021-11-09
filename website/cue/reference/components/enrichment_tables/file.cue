@@ -97,7 +97,7 @@ components: enrichment_tables: file: {
 					* `float`
 					* `integer`
 					* `date`
-					* `datetime` (see the table below for formats)
+					* `timestamp` (see the table below for formats)
 
 					### Timestamp Formats
 
