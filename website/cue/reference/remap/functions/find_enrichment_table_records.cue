@@ -48,7 +48,7 @@ remap: functions: find_enrichment_table_records: {
 			description: """
 				A subset of fields from the enrichment table to return. If not
 				specified all fields are returned.
-		 """
+			"""
 			required: false
 			type: ["array"]
 		},
@@ -71,7 +71,7 @@ remap: functions: find_enrichment_table_records: {
 							{ "surname": "smith",
 							  "firstname": "John" },
 							case_sensitive: false)
-				"""#
+			"""#
 			return: true
 		},
 		{
@@ -81,7 +81,7 @@ remap: functions: find_enrichment_table_records: {
 							{ "surname": "Smith",
 							  "date_of_birth": { "from": t'1985-01-01',
 									   "to": t'1985-31-12'} })
-				"""#
+			"""#
 			return: true
 		},
 	]
