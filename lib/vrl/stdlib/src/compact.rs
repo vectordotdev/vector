@@ -33,7 +33,7 @@ impl Function for Compact {
                 required: false,
             },
             Parameter {
-                keyword: "map",
+                keyword: "object",
                 kind: kind::BOOLEAN,
                 required: false,
             },
@@ -75,7 +75,7 @@ impl Function for Compact {
         let recursive = arguments.optional("recursive");
         let null = arguments.optional("null");
         let string = arguments.optional("string");
-        let map = arguments.optional("map");
+        let object = arguments.optional("object");
         let array = arguments.optional("array");
         let nullish = arguments.optional("nullish");
 
@@ -84,7 +84,7 @@ impl Function for Compact {
             recursive,
             null,
             string,
-            map,
+            object,
             array,
             nullish,
         }))
@@ -97,7 +97,7 @@ struct CompactFn {
     recursive: Option<Box<dyn Expression>>,
     null: Option<Box<dyn Expression>>,
     string: Option<Box<dyn Expression>>,
-    map: Option<Box<dyn Expression>>,
+    object: Option<Box<dyn Expression>>,
     array: Option<Box<dyn Expression>>,
     nullish: Option<Box<dyn Expression>>,
 }
@@ -107,7 +107,7 @@ struct CompactOptions {
     recursive: bool,
     null: bool,
     string: bool,
-    map: bool,
+    object: bool,
     array: bool,
     nullish: bool,
 }
@@ -118,7 +118,7 @@ impl Default for CompactOptions {
             recursive: true,
             null: true,
             string: true,
-            map: true,
+            object: true,
             array: true,
             nullish: false,
         }
@@ -135,7 +135,7 @@ impl CompactOptions {
         match value {
             Value::Bytes(bytes) => self.string && bytes.len() == 0,
             Value::Null => self.null,
-            Value::Object(map) => self.map && map.is_empty(),
+            Value::Object(object) => self.object && object.is_empty(),
             Value::Array(array) => self.array && array.is_empty(),
             _ => false,
         }
@@ -160,7 +160,7 @@ impl Expression for CompactFn {
                 None => true,
             },
 
-            map: match &self.map {
+            object: match &self.object {
                 Some(expr) => expr.resolve(ctx)?.try_boolean()?,
                 None => true,
             },
@@ -177,7 +177,7 @@ impl Expression for CompactFn {
         };
 
         match self.value.resolve(ctx)? {
-            Value::Object(map) => Ok(Value::from(compact_map(map, &options))),
+            Value::Object(object) => Ok(Value::from(compact_object(object, &options))),
             Value::Array(arr) => Ok(Value::from(compact_array(arr, &options))),
             value => Err(value::Error::Expected {
                 got: value.kind(),
@@ -202,13 +202,17 @@ impl Expression for CompactFn {
 fn recurse_compact(value: Value, options: &CompactOptions) -> Value {
     match value {
         Value::Array(array) if options.recursive => Value::from(compact_array(array, options)),
-        Value::Object(map) if options.recursive => Value::from(compact_map(map, options)),
+        Value::Object(object) if options.recursive => Value::from(compact_object(object, options)),
         _ => value,
     }
 }
 
-fn compact_map(map: BTreeMap<String, Value>, options: &CompactOptions) -> BTreeMap<String, Value> {
-    map.into_iter()
+fn compact_object(
+    object: BTreeMap<String, Value>,
+    options: &CompactOptions,
+) -> BTreeMap<String, Value> {
+    object
+        .into_iter()
         .filter_map(|(key, value)| {
             let value = recurse_compact(value, options);
             if options.is_empty(&value) {
@@ -376,7 +380,7 @@ mod test {
         ];
 
         for (expected, original, options) in cases {
-            assert_eq!(expected, compact_map(original, &options))
+            assert_eq!(expected, compact_object(original, &options))
         }
     }
 
