@@ -19,6 +19,9 @@ mod config;
 pub use config::{BufferConfig, BufferType};
 #[cfg(feature = "disk-buffer")]
 pub mod disk;
+
+pub mod disk_v2;
+
 mod internal_events;
 #[cfg(test)]
 mod test;
