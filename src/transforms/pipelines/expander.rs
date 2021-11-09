@@ -20,6 +20,13 @@ impl ExpanderConfig {
             inner,
         }
     }
+
+    pub fn parallel(inner: IndexMap<String, Box<dyn TransformConfig>>, aggregates: bool) -> Self {
+        Self {
+            mode: ExpandType::Parallel { aggregates },
+            inner,
+        }
+    }
 }
 
 #[async_trait::async_trait]

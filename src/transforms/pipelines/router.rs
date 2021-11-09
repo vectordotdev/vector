@@ -41,20 +41,23 @@ pub struct EventRouterConfig {
     filter: EventType,
     // This inner field contains a list of pipelines that will be expanded.
     inner: Option<Box<dyn TransformConfig>>,
+    alias: bool,
 }
 
 impl EventRouterConfig {
-    pub fn log(inner: Box<dyn TransformConfig>) -> Self {
+    pub fn log(inner: Box<dyn TransformConfig>, alias: bool) -> Self {
         Self {
             filter: EventType::Log,
             inner: Some(inner),
+            alias,
         }
     }
 
-    pub fn metric(inner: Box<dyn TransformConfig>) -> Self {
+    pub fn metric(inner: Box<dyn TransformConfig>, alias: bool) -> Self {
         Self {
             filter: EventType::Metric,
             inner: Some(inner),
+            alias,
         }
     }
 }
@@ -77,8 +80,8 @@ impl TransformConfig for EventRouterConfig {
                     inner: self.filter.clone(),
                 }),
             );
-            res.insert("transforms".to_string(), inner.clone());
-            Ok(Some((res, ExpandType::Serial { alias: true })))
+            res.insert("pipelines".to_string(), inner.clone());
+            Ok(Some((res, ExpandType::Serial { alias: self.alias })))
         } else {
             Err("must specify at least one pipeline".into())
         }

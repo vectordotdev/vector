@@ -6,6 +6,7 @@
 /// [transforms.my_pipelines]
 /// type = "pipelines"
 /// inputs = ["syslog"]
+/// mode = "serial"
 ///
 /// [transforms.my_pipelines.logs]
 /// order = ["foo", "bar"]
@@ -56,6 +57,12 @@
 /// Each pipeline will then be expanded into a list of its transforms and at the end of each
 /// expansion, a `Noop` transform will be added to use the `pipeline` name as an alias
 /// (`my_pipelines.logs.transforms.foo`).
+///
+/// If we change the `mode` to `parallel`, then most of the aliases will be dropped so that you can
+/// target each pipeline as an input. In our example, if we switch to `parallel` mode, it won't be
+/// possible to target `my_pipelines` as an input. Instead, `my_pipelines.logs.pipelines.foo`,
+/// `my_pipelines.logs.pipelines.bar`, `my_pipelines.metrics.pipelines.hello` and
+/// `my_pipelines.metrics.world` will be exposed to be used as an input.
 mod expander;
 mod router;
 
@@ -131,8 +138,11 @@ impl EventTypeConfig {
     }
 
     /// Expands a group of pipelines into a series of pipelines.
-    /// They will then be expanded into a series of transforms.
-    fn serial(&self) -> Box<dyn TransformConfig> {
+    /// If the serial mode is used, they will then be expanded into a series of transforms and an
+    /// aggregating transform will be added.
+    /// If the parallel mode is used, they will then be expanded in parallel and no aggregating
+    /// transform will be added.
+    fn expand(&self, mode: &PipelineMode) -> Box<dyn TransformConfig> {
         let pipelines: IndexMap<String, Box<dyn TransformConfig>> = self
             .names()
             .into_iter()
@@ -143,13 +153,39 @@ impl EventTypeConfig {
             })
             .collect();
 
-        Box::new(expander::ExpanderConfig::serial(pipelines))
+        match mode {
+            PipelineMode::Serial => Box::new(expander::ExpanderConfig::serial(pipelines)),
+            PipelineMode::Parallel => {
+                Box::new(expander::ExpanderConfig::parallel(pipelines, false))
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PipelineMode {
+    Parallel,
+    Serial,
+}
+
+impl Default for PipelineMode {
+    fn default() -> Self {
+        Self::Serial
+    }
+}
+
+impl PipelineMode {
+    pub fn alias(&self) -> bool {
+        matches!(self, Self::Serial)
     }
 }
 
 /// The configuration of the pipelines transform itself.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct PipelinesConfig {
+    #[serde(default)]
+    mode: PipelineMode,
     #[serde(default)]
     logs: EventTypeConfig,
     #[serde(default)]
@@ -165,14 +201,20 @@ impl PipelinesConfig {
         if !self.logs.is_empty() {
             map.insert(
                 "logs".to_string(),
-                Box::new(router::EventRouterConfig::log(self.logs.serial())),
+                Box::new(router::EventRouterConfig::log(
+                    self.logs.expand(&self.mode),
+                    self.mode.alias(),
+                )),
             );
         }
 
         if !self.metrics.is_empty() {
             map.insert(
                 "metrics".to_string(),
-                Box::new(router::EventRouterConfig::metric(self.metrics.serial())),
+                Box::new(router::EventRouterConfig::metric(
+                    self.metrics.expand(&self.mode),
+                    self.mode.alias(),
+                )),
             );
         }
 
@@ -192,8 +234,11 @@ impl TransformConfig for PipelinesConfig {
     ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
         Ok(Some((
             self.parallel(),
-            // need to aggregate to be able to use the transform name as an input.
-            ExpandType::Parallel { aggregates: true },
+            // when using serial mode, we need to make a single endpoint, so we need to
+            // aggregate.
+            ExpandType::Parallel {
+                aggregates: self.mode.alias(),
+            },
         )))
     }
 
@@ -213,6 +258,8 @@ impl TransformConfig for PipelinesConfig {
 impl GenerateConfig for PipelinesConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc::indoc! {r#"
+            mode = "serial"
+
             [logs]
             order = ["foo", "bar"]
 
@@ -248,7 +295,7 @@ impl PipelinesConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::{GenerateConfig, PipelinesConfig};
+    use super::{GenerateConfig, PipelineMode, PipelinesConfig};
     use crate::config::{ComponentKey, TransformOuter};
     use indexmap::IndexMap;
 
@@ -269,7 +316,7 @@ mod tests {
     }
 
     #[test]
-    fn expanding() {
+    fn expanding_serial() {
         let config = PipelinesConfig::generate_config();
         let config: PipelinesConfig = config.try_into().unwrap();
         let outer = TransformOuter {
@@ -290,14 +337,50 @@ mod tests {
                 .collect::<Vec<String>>(),
             vec![
                 "foo.logs.filter",
-                "foo.logs.transforms.foo.0",
-                "foo.logs.transforms.foo.1",
-                "foo.logs.transforms.foo",
-                "foo.logs.transforms.bar.0",
-                "foo.logs.transforms.bar",
-                "foo.logs.transforms",
+                "foo.logs.pipelines.foo.0",
+                "foo.logs.pipelines.foo.1",
+                "foo.logs.pipelines.foo",
+                "foo.logs.pipelines.bar.0",
+                "foo.logs.pipelines.bar",
+                "foo.logs.pipelines",
                 "foo.logs",
                 "foo"
+            ],
+        );
+        let foo_logs = transforms
+            .get(&ComponentKey::global("foo.logs.pipelines"))
+            .unwrap();
+        assert_eq!(foo_logs.inputs.len(), 1);
+    }
+
+    #[test]
+    fn expanding_parallel() {
+        let config = PipelinesConfig::generate_config();
+        let mut config: PipelinesConfig = config.try_into().unwrap();
+        config.mode = PipelineMode::Parallel;
+        let outer = TransformOuter {
+            inputs: Vec::<String>::new(),
+            inner: Box::new(config),
+        };
+        let name = ComponentKey::global("foo");
+        let mut transforms = IndexMap::new();
+        let mut expansions = IndexMap::new();
+        outer
+            .expand(name, &mut transforms, &mut expansions)
+            .unwrap();
+        // assert_eq!(transforms.len(), 9);
+        assert_eq!(
+            transforms
+                .keys()
+                .map(|key| key.to_string())
+                .collect::<Vec<String>>(),
+            vec![
+                "foo.logs.filter",
+                "foo.logs.pipelines.foo.0",
+                "foo.logs.pipelines.foo.1",
+                "foo.logs.pipelines.foo",
+                "foo.logs.pipelines.bar.0",
+                "foo.logs.pipelines.bar",
             ],
         );
     }
