@@ -1,4 +1,3 @@
-use crate::buffers::Ackable;
 use crate::event::{EventFinalizers, EventStatus, Finalizable};
 use crate::kafka::KafkaStatisticsContext;
 use bytes::Bytes;
@@ -9,6 +8,7 @@ use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::util::Timeout;
 use std::task::{Context, Poll};
 use tower::Service;
+use vector_core::buffers::Ackable;
 use vector_core::internal_event::{BytesSent, EventsSent};
 use vector_core::stream::DriverResponse;
 

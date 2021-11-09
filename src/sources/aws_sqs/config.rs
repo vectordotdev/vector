@@ -60,7 +60,7 @@ impl SourceConfig for AwsSqsConfig {
                 decoder,
                 poll_secs: self.poll_secs,
                 concurrency: self.client_concurrency,
-                acknowledgements: cx.acknowledgements,
+                acknowledgements: cx.acknowledgements.enabled,
             }
             .run(cx.out, cx.shutdown),
         ))

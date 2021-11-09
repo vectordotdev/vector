@@ -1,4 +1,3 @@
-use crate::buffers::Acker;
 use crate::event::{Event, LogEvent};
 use crate::sinks::aws_kinesis_streams::request_builder::{KinesisRequest, KinesisRequestBuilder};
 use crate::sinks::aws_kinesis_streams::service::KinesisResponse;
@@ -8,6 +7,7 @@ use futures::StreamExt;
 use rand::random;
 use std::num::NonZeroUsize;
 use tower::util::BoxService;
+use vector_core::buffers::Acker;
 use vector_core::partition::NullPartitioner;
 use vector_core::stream::BatcherSettings;
 

@@ -58,16 +58,6 @@ components: sinks: loki: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -79,7 +69,6 @@ components: sinks: loki: {
 			required:    true
 			type: string: {
 				examples: ["http://localhost:3100"]
-				syntax: "literal"
 			}
 		}
 		auth: configuration._http_auth & {_args: {
@@ -94,7 +83,6 @@ components: sinks: loki: {
 				unique label keys and values.
 				"""
 			required: true
-			warnings: []
 			type: object: {
 				examples: [
 					{
@@ -127,9 +115,7 @@ components: sinks: loki: {
 				with those events.
 				"""
 			required: false
-			warnings: []
 			type: string: {
-				syntax:  "literal"
 				default: "drop"
 				enum: {
 					"drop":              "Drop the event, with a warning."
@@ -141,14 +127,12 @@ components: sinks: loki: {
 			common:      false
 			description: "If this is set to `true` then when labels are collected from events those fields will also get removed from the event."
 			required:    false
-			warnings: []
 			type: bool: default: false
 		}
 		remove_timestamp: {
 			common:      false
 			description: "If this is set to `true` then the timestamp will be removed from the event payload. Note the event timestamp will still be sent as metadata to Loki for indexing."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 		tenant_id: {
@@ -160,7 +144,6 @@ components: sinks: loki: {
 				You can read more about tenant id's [here](\(urls.loki_multi_tenancy)).
 				"""
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["some_tenant_id", "{{ event_field }}"]

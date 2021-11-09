@@ -3,6 +3,22 @@ pub use vector_core::internal_event::EventsReceived;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
+pub struct BytesReceived {
+    pub byte_size: usize,
+    pub protocol: &'static str,
+}
+
+impl InternalEvent for BytesReceived {
+    fn emit_logs(&self) {
+        trace!(message = "Bytes received.", byte_size = %self.byte_size, protocol = %self.protocol);
+    }
+
+    fn emit_metrics(&self) {
+        counter!("component_received_bytes_total", self.byte_size as u64, "protocol" => self.protocol);
+    }
+}
+
+#[derive(Debug)]
 pub struct HttpClientBytesReceived<'a> {
     pub byte_size: usize,
     pub protocol: &'a str,

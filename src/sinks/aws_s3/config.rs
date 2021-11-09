@@ -9,7 +9,6 @@ use crate::{
         s3_common::{
             self,
             config::{S3Options, S3RetryLogic},
-            partitioner::KeyPartitioner,
             service::S3Service,
         },
         util::{
@@ -26,6 +25,7 @@ use vector_core::sink::VectorSink;
 use crate::aws::rusoto::{AwsAuthentication, RegionOrEndpoint};
 
 use super::sink::S3RequestOptions;
+use crate::sinks::util::partitioner::KeyPartitioner;
 
 const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = BatchSettings::const_default()
     .bytes(10_000_000)

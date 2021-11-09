@@ -339,7 +339,7 @@ Here's a full end-to-end example of unit testing a metric through a transform:
 type = "remap"
 inputs = []
 source = '''
-env, err = get_env_var!("ENV")
+env, err = get_env_var("ENV")
 if err != null {
   log(err, level: "error")
 }

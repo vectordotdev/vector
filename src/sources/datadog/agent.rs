@@ -82,7 +82,7 @@ impl SourceConfig for DatadogAgentConfig {
 
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let listener = tls.bind(&self.address).await?;
-        let service = source.event_service(cx.acknowledgements, cx.out.clone());
+        let service = source.event_service(cx.acknowledgements.enabled, cx.out.clone());
 
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
@@ -166,13 +166,7 @@ impl DatadogAgentSource {
     ) -> Result<Response, Rejection> {
         match events {
             Ok(mut events) => {
-                let receiver = acknowledgements.then(|| {
-                    let (batch, receiver) = BatchNotifier::new_with_receiver();
-                    for event in &mut events {
-                        event.add_batch_notifier(Arc::clone(&batch));
-                    }
-                    receiver
-                });
+                let receiver = BatchNotifier::maybe_apply_to_events(acknowledgements, &mut events);
 
                 let mut events = futures::stream::iter(events).map(Ok);
                 out.send_all(&mut events)
@@ -434,7 +428,7 @@ mod tests {
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
         let mut context = SourceContext::new_test(sender);
-        context.acknowledgements = acknowledgements;
+        context.acknowledgements.enabled = acknowledgements;
         tokio::spawn(async move {
             DatadogAgentConfig {
                 address,
