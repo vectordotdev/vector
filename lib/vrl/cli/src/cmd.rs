@@ -2,14 +2,13 @@
 use super::repl;
 use super::Error;
 use shared::TimeZone;
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{self, Read};
 use std::iter::IntoIterator;
 use std::path::PathBuf;
-use std::rc::Rc;
 use structopt::StructOpt;
+use vrl::prelude::SharedValue;
 use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, Value};
 
 #[derive(Debug, StructOpt)]
@@ -58,20 +57,18 @@ impl Opts {
         }
     }
 
-    fn read_into_objects(&self) -> Result<Vec<Rc<RefCell<Value>>>, Error> {
+    fn read_into_objects(&self) -> Result<Vec<SharedValue>, Error> {
         let input = match self.input_file.as_ref() {
             Some(path) => read(File::open(path)?),
             None => read(io::stdin()),
         }?;
 
         match input.as_str() {
-            "" => Ok(vec![Rc::new(RefCell::new(Value::Object(
-                BTreeMap::default(),
-            )))]),
+            "" => Ok(vec![SharedValue::from(Value::Object(BTreeMap::default()))]),
             _ => input
                 .lines()
                 .map(|line| Ok(serde_to_vrl(serde_json::from_str(line)?)))
-                .collect::<Result<Vec<Rc<RefCell<Value>>>, Error>>(),
+                .collect::<Result<Vec<SharedValue>, Error>>(),
         }
     }
 
@@ -129,7 +126,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
     }
 }
 
-fn repl(objects: Vec<Rc<RefCell<Value>>>, timezone: &TimeZone) -> Result<(), Error> {
+fn repl(objects: Vec<SharedValue>, timezone: &TimeZone) -> Result<(), Error> {
     if cfg!(feature = "repl") {
         repl::run(objects, timezone);
         Ok(())
@@ -151,7 +148,7 @@ fn execute(
         .map_err(Error::Runtime)
 }
 
-fn serde_to_vrl(value: serde_json::Value) -> Rc<RefCell<Value>> {
+fn serde_to_vrl(value: serde_json::Value) -> SharedValue {
     let res = match value {
         serde_json::Value::Null => vrl::Value::Null,
         serde_json::Value::Object(v) => v
@@ -168,7 +165,7 @@ fn serde_to_vrl(value: serde_json::Value) -> Rc<RefCell<Value>> {
         }
     };
 
-    Rc::new(RefCell::new(res))
+    SharedValue::from(res)
 }
 
 fn read<R: Read>(mut reader: R) -> Result<String, Error> {
@@ -178,6 +175,6 @@ fn read<R: Read>(mut reader: R) -> Result<String, Error> {
     Ok(buffer)
 }
 
-fn default_objects() -> Vec<Rc<RefCell<Value>>> {
-    vec![Rc::new(RefCell::new(Value::Object(BTreeMap::new())))]
+fn default_objects() -> Vec<SharedValue> {
+    vec![SharedValue::from(Value::Object(BTreeMap::new()))]
 }

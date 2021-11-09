@@ -3,6 +3,7 @@ use crate::config::log_schema;
 use lookup::LookupBuf;
 use snafu::Snafu;
 use std::{cell::RefCell, collections::BTreeMap, convert::TryFrom, rc::Rc};
+use vrl_core::SharedValue;
 
 const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .timestamp, .kind, .tags";
 
@@ -20,7 +21,7 @@ const MAX_METRIC_PATH_DEPTH: usize = 3;
 pub enum VrlTarget {
     // `LogEvent` is essentially just a destructured `event::LogEvent`, but without the semantics
     // that `fields` must always be a `Map` variant.
-    LogEvent(Rc<RefCell<vrl_core::Value>>, EventMetadata),
+    LogEvent(SharedValue, EventMetadata),
     Metric(Metric),
 }
 
@@ -28,7 +29,7 @@ impl VrlTarget {
     pub fn new(event: &Event) -> Self {
         match event {
             Event::Log(event) => VrlTarget::LogEvent(
-                Rc::new(RefCell::new((&event.fields).into())),
+                SharedValue::from(vrl_core::Value::from(&event.fields)),
                 event.metadata.clone(),
             ),
             Event::Metric(_event) => todo!(), // VrlTarget::Metric(event),
@@ -52,11 +53,7 @@ impl VrlTarget {
 }
 
 impl vrl_core::Target for VrlTarget {
-    fn insert(
-        &mut self,
-        path: &LookupBuf,
-        value: Rc<RefCell<vrl_core::Value>>,
-    ) -> Result<(), String> {
+    fn insert(&mut self, path: &LookupBuf, value: SharedValue) -> Result<(), String> {
         match self {
             VrlTarget::LogEvent(ref mut log, _) => log
                 .insert(path, value)
@@ -132,14 +129,11 @@ impl vrl_core::Target for VrlTarget {
         }
     }
 
-    fn get(
-        &self,
-        path: &LookupBuf,
-    ) -> std::result::Result<Option<Rc<RefCell<vrl_core::Value>>>, String> {
+    fn get(&self, path: &LookupBuf) -> std::result::Result<Option<vrl_core::SharedValue>, String> {
         match self {
             VrlTarget::LogEvent(log, _) => log
                 .get(path)
-                .map(|val| val.map(|val| val.clone().into()))
+                .map(|val| val.map(|val| val.clone()))
                 .map_err(|err| err.to_string()),
             VrlTarget::Metric(metric) => {
                 todo!()
@@ -209,11 +203,7 @@ impl vrl_core::Target for VrlTarget {
         }
     }
 
-    fn remove(
-        &mut self,
-        path: &LookupBuf,
-        compact: bool,
-    ) -> Result<Option<Rc<RefCell<vrl_core::Value>>>, String> {
+    fn remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<SharedValue>, String> {
         match self {
             VrlTarget::LogEvent(ref mut log, _) => {
                 if path.is_root() {
@@ -276,7 +266,7 @@ impl vrl_core::Target for VrlTarget {
 //   * If an element is anything else, assign to the `message` key.
 // * If `.` is anything else, assign to the `message` key.
 fn value_into_log_events(
-    value: Rc<RefCell<vrl_core::Value>>,
+    value: SharedValue,
     metadata: EventMetadata,
 ) -> impl Iterator<Item = Event> {
     match &*value.borrow() {
@@ -375,7 +365,7 @@ mod test {
 
         for (value, segments, expect) in cases {
             let value: BTreeMap<String, Value> = value;
-            let target = VrlTarget::new(Event::Log(LogEvent::from(value)));
+            let target = VrlTarget::new(&Event::Log(LogEvent::from(value)));
             let path = LookupBuf::from_segments(segments);
 
             assert_eq!(vrl_core::Target::get(&target, &path), expect);
@@ -479,9 +469,9 @@ mod test {
 
         for (object, segments, value, expect, result) in cases {
             let object: BTreeMap<String, Value> = object;
-            let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)));
+            let mut target = VrlTarget::new(&Event::Log(LogEvent::from(object)));
             let expect = LogEvent::from(expect);
-            let value: vrl_core::Value = value;
+            let value: SharedValue = value;
             let path = LookupBuf::from_segments(segments);
 
             assert_eq!(
@@ -530,7 +520,7 @@ mod test {
                 btreemap! { "foo" => vec![0] },
                 vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
                 false,
-                Some(btreemap! { "foo" => Value::Array(vec![]) }.into()),
+                Some(btreemap! { "foo" => SharedValue::from(Value::Array(vec![])) }.into()),
             ),
             (
                 btreemap! { "foo" => vec![0] },
@@ -573,7 +563,7 @@ mod test {
         ];
 
         for (object, segments, compact, expect) in cases {
-            let mut target = VrlTarget::new(Event::Log(LogEvent::from(object)));
+            let mut target = VrlTarget::new(&Event::Log(LogEvent::from(object)));
             let path = LookupBuf::from_segments(segments);
             let removed = vrl_core::Target::get(&target, &path).unwrap();
 
@@ -594,25 +584,28 @@ mod test {
 
         let cases = vec![
             (
-                vrl_core::Value::from(btreemap! {"foo" => "bar"}),
+                SharedValue::from(vrl_core::Value::from(btreemap! {"foo" => "bar"})),
                 vec![btreemap! {"foo" => "bar"}],
             ),
-            (vrl_core::Value::from(1), vec![btreemap! {"message" => 1}]),
             (
-                vrl_core::Value::from("2"),
+                SharedValue::from(vrl_core::Value::from(1)),
+                vec![btreemap! {"message" => 1}],
+            ),
+            (
+                SharedValue::from(vrl_core::Value::from("2")),
                 vec![btreemap! {"message" => "2"}],
             ),
             (
-                vrl_core::Value::from(true),
+                SharedValue::from(vrl_core::Value::from(true)),
                 vec![btreemap! {"message" => true}],
             ),
             (
-                vrl_core::Value::from(vec![
+                SharedValue::from(vrl_core::Value::from(vec![
                     vrl_core::Value::from(1),
                     vrl_core::Value::from("2"),
                     vrl_core::Value::from(true),
                     vrl_core::Value::from(btreemap! {"foo" => "bar"}),
-                ]),
+                ])),
                 vec![
                     btreemap! {"message" => 1},
                     btreemap! {"message" => "2"},
@@ -625,7 +618,7 @@ mod test {
         for (value, expect) in cases {
             let metadata = EventMetadata::default();
             let mut target =
-                VrlTarget::new(Event::Log(LogEvent::new_with_metadata(metadata.clone())));
+                VrlTarget::new(&Event::Log(LogEvent::new_with_metadata(metadata.clone())));
 
             vrl_core::Target::insert(&mut target, &LookupBuf::root(), value).unwrap();
 
@@ -654,7 +647,7 @@ mod test {
         }))
         .with_timestamp(Some(Utc.ymd(2020, 12, 10).and_hms(12, 0, 0)));
 
-        let target = VrlTarget::new(Event::Metric(metric));
+        let target = VrlTarget::new(&Event::Metric(metric));
 
         assert_eq!(
             Ok(Some(
@@ -708,7 +701,7 @@ mod test {
             ("tags.thing", None, "footag".into(), true),
         ];
 
-        let mut target = VrlTarget::new(Event::Metric(metric));
+        let mut target = VrlTarget::new(&Event::Metric(metric));
 
         for (path, current, new, delete) in cases {
             let path = LookupBuf::from_str(path).unwrap();
@@ -743,7 +736,7 @@ mod test {
 
         let validpaths_set = vec![".name", ".namespace", ".timestamp", ".kind", ".tags"];
 
-        let mut target = VrlTarget::new(Event::Metric(metric));
+        let mut target = VrlTarget::new(&Event::Metric(metric));
 
         assert_eq!(
             Err(format!(

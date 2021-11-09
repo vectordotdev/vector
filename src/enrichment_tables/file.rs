@@ -197,7 +197,7 @@ pub struct File {
     config: FileConfig,
     timezone: TimeZone,
     last_modified: SystemTime,
-    data: Vec<Vec<Rc<RefCell<Value>>>>,
+    data: Vec<Vec<SharedValue>>,
     headers: Vec<String>,
     indexes: Vec<(
         Case,
@@ -229,7 +229,7 @@ impl File {
     }
 
     /// Does the given row match all the conditions specified?
-    fn row_equals(&self, case: Case, condition: &[Condition], row: &[Rc<RefCell<Value>>]) -> bool {
+    fn row_equals(&self, case: Case, condition: &[Condition], row: &[SharedValue]) -> bool {
         condition.iter().all(|condition| match condition {
             Condition::Equals { field, value } => match self.column_index(field) {
                 None => false,

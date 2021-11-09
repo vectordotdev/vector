@@ -142,10 +142,10 @@ impl Expression for FindEnrichmentTableRecordsFn {
                 self.index,
             )?
             .into_iter()
-            .map(|o| Rc::new(RefCell::new(Value::Object(o))))
+            .map(|o| SharedValue::from(Value::Object(o)))
             .collect();
 
-        Ok(Rc::new(RefCell::new(Value::Array(data))))
+        Ok(SharedValue::from(Value::Array(data)))
     }
 
     fn update_state(

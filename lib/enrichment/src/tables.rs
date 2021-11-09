@@ -33,9 +33,7 @@ use crate::Case;
 
 use super::{Condition, IndexHandle, Table};
 use arc_swap::ArcSwap;
-use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 /// A hashmap of name => implementation of an enrichment table.
@@ -203,7 +201,7 @@ impl TableSearch {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<BTreeMap<String, Rc<RefCell<vrl_core::Value>>>, String> {
+    ) -> Result<BTreeMap<String, vrl_core::SharedValue>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
@@ -225,7 +223,7 @@ impl TableSearch {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<Vec<BTreeMap<String, Rc<RefCell<vrl_core::Value>>>>, String> {
+    ) -> Result<Vec<BTreeMap<String, vrl_core::SharedValue>>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {

@@ -46,7 +46,7 @@ pub trait Table: DynClone {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<BTreeMap<String, Rc<RefCell<vrl_core::Value>>>, String>;
+    ) -> Result<BTreeMap<String, vrl_core::SharedValue>, String>;
 
     /// Search the enrichment table data with the given condition.
     /// All conditions must match (AND).
@@ -57,7 +57,7 @@ pub trait Table: DynClone {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<Vec<BTreeMap<String, Rc<RefCell<vrl_core::Value>>>>, String>;
+    ) -> Result<Vec<BTreeMap<String, vrl_core::SharedValue>>, String>;
 
     /// Hints to the enrichment table what data is going to be searched to allow it to index the
     /// data in advance.

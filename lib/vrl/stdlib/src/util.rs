@@ -1,5 +1,3 @@
-use std::{cell::RefCell, rc::Rc};
-
 /// Rounds the given number to the given precision.
 /// Takes a function parameter so the exact rounding function (ceil, floor or round)
 /// can be specified.

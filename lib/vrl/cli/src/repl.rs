@@ -10,9 +10,8 @@ use rustyline::validate::{self, ValidationResult, Validator};
 use rustyline::{Context, Editor, Helper};
 use shared::TimeZone;
 use std::borrow::Cow::{self, Borrowed, Owned};
-use std::cell::RefCell;
-use std::rc::Rc;
-use vrl::{diagnostic::Formatter, state, value, Runtime, Target, Value};
+use vrl::prelude::{shared_value, SharedValue};
+use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
 
 // Create a list of all possible error values for potential docs lookup
 lazy_static! {
@@ -40,7 +39,7 @@ const RESERVED_TERMS: &[&str] = &[
     "help docs",
 ];
 
-pub(crate) fn run(mut objects: Vec<Rc<RefCell<Value>>>, timezone: &TimeZone) {
+pub(crate) fn run(mut objects: Vec<SharedValue>, timezone: &TimeZone) {
     let mut index = 0;
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
     let error_docs_regex = Regex::new(r"^help\serror\s(\w{1,})$").unwrap();
@@ -79,7 +78,7 @@ pub(crate) fn run(mut objects: Vec<Rc<RefCell<Value>>>, timezone: &TimeZone) {
 
                         // add new object
                         if index == objects.len() {
-                            objects.push(Rc::new(RefCell::new(Value::Null)))
+                            objects.push(SharedValue::from(Value::Null))
                         }
 
                         "."
@@ -130,7 +129,7 @@ fn resolve(
     state: &mut state::Compiler,
     timezone: &TimeZone,
 ) -> Result<Value, String> {
-    let mut empty = Rc::new(RefCell::new(value!({})));
+    let mut empty = shared_value!({});
     let object = match object {
         None => &mut empty as &mut dyn Target,
         Some(object) => object,
@@ -245,7 +244,7 @@ impl Validator for Repl {
         let timezone = TimeZone::default();
         let mut compiler_state = state::Compiler::default();
         let mut rt = Runtime::new(state::Runtime::default());
-        let target: Option<&mut Rc<RefCell<Value>>> = None;
+        let target: Option<&mut SharedValue> = None;
 
         let result = match resolve(target, &mut rt, ctx.input(), &mut compiler_state, &timezone) {
             Err(error) => {

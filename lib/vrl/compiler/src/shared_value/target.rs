@@ -1,6 +1,5 @@
 use crate::{SharedValue, Target, Value};
 use lookup::{FieldBuf, LookupBuf, SegmentBuf};
-use std::collections::BTreeMap;
 use std::iter::Peekable;
 
 impl Target for SharedValue {
@@ -464,7 +463,6 @@ mod tests {
         ];
 
         for (mut target, segments, value, expect, result) in cases {
-            println!("Inserting at {:?}", segments);
             let path = LookupBuf::from_segments(segments);
 
             assert_eq!(Target::insert(&mut target, &path, value.clone()), result);

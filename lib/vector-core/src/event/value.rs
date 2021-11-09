@@ -12,6 +12,7 @@ use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
 use std::rc::Rc;
 use toml::value::Value as TomlValue;
+use vrl_core::SharedValue;
 
 #[derive(PartialOrd, Debug, Clone, Deserialize)]
 pub enum Value {
@@ -332,12 +333,12 @@ impl From<Value> for vrl_core::Value {
             Value::Boolean(v) => v.into(),
             Value::Map(v) => Object(
                 v.into_iter()
-                    .map(|(k, v)| (k, Rc::new(RefCell::new(v.into()))))
+                    .map(|(k, v)| (k, SharedValue::from(vrl_core::Value::from(v))))
                     .collect(),
             ),
             Value::Array(v) => Array(
                 v.into_iter()
-                    .map(|v| Rc::new(RefCell::new(v.into())))
+                    .map(|v| SharedValue::from(vrl_core::Value::from(v)))
                     .collect(),
             ),
             Value::Timestamp(v) => v.into(),
@@ -358,12 +359,12 @@ impl From<&Value> for vrl_core::Value {
             Value::Boolean(v) => (*v).into(),
             Value::Map(v) => Object(
                 v.iter()
-                    .map(|(k, v)| (k.clone(), Rc::new(RefCell::new(v.into()))))
+                    .map(|(k, v)| (k.clone(), SharedValue::from(vrl_core::Value::from(v))))
                     .collect(),
             ),
             Value::Array(v) => Array(
                 v.into_iter()
-                    .map(|v| Rc::new(RefCell::new(v.into())))
+                    .map(|v| SharedValue::from(vrl_core::Value::from(v)))
                     .collect(),
             ),
             Value::Timestamp(v) => (*v).into(),
