@@ -16,7 +16,9 @@ can be used to route events that fail processing down a separate pipeline.
 
 When either of `drop_on_error` or `drop_on_abort` is set to `true`, events that
 are dropped from the primary output stream due to either errors or aborts are
-written instead to a separate output called `dropped`.
+written instead to a separate output called `dropped`. Those events are written
+out to the `dropped` output in their original form, so no modifications that
+occurred before the error or abort will be visible.
 
 ## Example
 
@@ -37,7 +39,7 @@ Given a config of:
     'invalid message',
   ]
 
-[transforms.remap]
+[transforms.my_remap]
   type = "remap"
   inputs = ["in"]
   drop_on_error = true
@@ -50,33 +52,60 @@ Given a config of:
     .processed = true
   """
 
-[sinks.out]
+[sinks.foo]
   type = "console"
-  inputs = ["remap"]
+  inputs = ["my_remap"]
   encoding.codec = "json"
 
-[sinks.errors_out]
+[sinks.bar]
   type = "console"
-  inputs = ["remap.dropped"]
+  inputs = ["my_remap.dropped"]
   encoding.codec = "json"
 ```
 
-You would expect to see output like the following:
+You would expect to see output like the following (formatted for clarity):
 
 ```json
-{"foo":"bar","message":"valid message","processed":true,"timestamp":"2021-11-05T00:42:03.945157398Z"}
-{"foo":"bar","message":"valid message","processed":true,"timestamp":"2021-11-05T00:42:04.945155276Z"}
-{"message":"{ \"message\": \"valid message\", \"foo\": \"baz\"}","metadata":{"component":"remap","error":"aborted"},"timestamp":"2021-11-05T00:42:05.945588208Z"}
-{"foo":"bar","message":"valid message","processed":true,"timestamp":"2021-11-05T00:42:06.944919061Z"}
-{"message":"{ \"message\": \"valid message\", \"foo\": \"baz\"}","metadata":{"component":"remap","error":"aborted"},"timestamp":"2021-11-05T00:42:07.944824028Z"}
-{"message":"{ \"message\": \"valid message\", \"foo\": \"baz\"}","metadata":{"component":"remap","error":"aborted"},"timestamp":"2021-11-05T00:42:08.945446981Z"}
-{"message":"invalid message","metadata":{"component":"remap","error":"function call error for \"object\" at (9:39): function call error for \"parse_json\" at (17:38): unable to parse json: expected value at line 1 column 1"},"timestamp":"2021-11-05T00:42:09.945394161Z"}
-{"message":"{ \"message\": \"valid message\", \"foo\": \"baz\"}","metadata":{"component":"remap","error":"aborted"},"timestamp":"2021-11-05T00:42:10.945183635Z"}
-{"message":"invalid message","metadata":{"component":"remap","error":"function call error for \"object\" at (9:39): function call error for \"parse_json\" at (17:38): unable to parse json: expected value at line 1 column 1"},"timestamp":"2021-11-05T00:42:11.944980725Z"}
-{"message":"invalid message","metadata":{"component":"remap","error":"function call error for \"object\" at (9:39): function call error for \"parse_json\" at (17:38): unable to parse json: expected value at line 1 column 1"},"timestamp":"2021-11-05T00:42:12.944970623Z"}
-{"foo":"bar","message":"valid message","processed":true,"timestamp":"2021-11-05T00:42:13.945360616Z"}
+{
+  "foo": "bar",
+  "message": "valid message",
+  "processed": true,
+  "timestamp": "2021-11-09T16:11:47.330713806Z"
+}
+{
+  "foo": "bar",
+  "message": "valid message",
+  "processed": true,
+  "timestamp": "2021-11-09T16:11:48.330756592Z"
+}
+{
+  "message": "invalid message",
+  "metadata": {
+    "dropped": {
+      "component_id": "my_remap",
+      "component_type": "remap",
+      "component_kind": "transform",
+      "message": "function call error for \"object\" at (9:39): function call error for \"parse_json\" at (17:38): unable to parse json: expected value at line 1 column 1",
+      "reason": "error"
+    }
+  },
+  "timestamp": "2021-11-09T16:11:49.330157298Z"
+}
+{
+  "message": "{ \"message\": \"valid message\", \"foo\": \"baz\"}",
+  "metadata": {
+    "dropped": {
+      "component_id": "my_remap",
+      "component_type": "remap",
+      "component_kind": "transform",
+      "message": "aborted",
+      "reason": "abort"
+    }
+  },
+  "timestamp": "2021-11-09T16:11:50.329966720Z"
+}
 ```
 
-All of the events that were valid JSON were processed and output as JSON via the
-`out` console sink, while those that failed are written out in plain text via the
-`errors_out` console sink.
+All of the events that were valid JSON were processed and output via the `foo`
+console sink, while those that either errored or were aborted are written out in
+via the `bar` console sink with the relevant metadata added.

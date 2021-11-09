@@ -87,6 +87,20 @@ configuration: {
 							syntax: "literal"
 						}
 					}
+
+					metadata_key: {
+						common: true
+						description: """
+							Sets the event key to use for event metadata field (e.g. error or
+							abort annotations in the `remap` transform).
+							"""
+						required: false
+						type: string: {
+							default: "metadata"
+							examples: ["@metadata", "meta"]
+							syntax: "literal"
+						}
+					}
 				}
 			}
 		}

@@ -169,8 +169,13 @@ impl FallibleFunctionTransform for Remap {
                         log.insert(
                             log_schema().metadata_key(),
                             serde_json::json!({
-                                "error": error.to_string(),
-                                "component": self.component_key,
+                                "dropped": {
+                                    "reason": "abort",
+                                    "message": error.to_string(),
+                                    "component_id": self.component_key,
+                                    "component_type": "remap",
+                                    "component_kind": "transform",
+                                }
                             }),
                         );
                     }
@@ -191,8 +196,13 @@ impl FallibleFunctionTransform for Remap {
                         log.insert(
                             log_schema().metadata_key(),
                             serde_json::json!({
-                                "error": error.to_string(),
-                                "component": self.component_key,
+                                "dropped": {
+                                    "reason": "error",
+                                    "message": error.to_string(),
+                                    "component_id": self.component_key,
+                                    "component_type": "remap",
+                                    "component_kind": "transform",
+                                }
                             }),
                         );
                     }
