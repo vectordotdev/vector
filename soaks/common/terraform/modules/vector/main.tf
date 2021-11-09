@@ -92,7 +92,6 @@ resource "kubernetes_deployment" "vector" {
             # avoids vector crashing for want of a malloc.
             limits = {
               cpu    = var.vector_cpus
-              memory = "512Mi"
             }
             requests = {
               cpu    = var.vector_cpus
