@@ -30,6 +30,7 @@ module "vector" {
   test_name    = "syslog_log2metric_humio_metrics"
   vector-toml  = file("${path.module}/vector.toml")
   namespace    = kubernetes_namespace.soak.metadata[0].name
+  vector_cpus = var.vector_cpus
   depends_on   = [module.monitoring, module.http-blackhole]
 }
 module "http-blackhole" {

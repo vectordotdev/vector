@@ -41,6 +41,7 @@ module "vector" {
   test_name    = "datadog_agent_remap_datadog_logs"
   vector-toml  = file("${path.module}/vector.toml")
   namespace    = kubernetes_namespace.soak.metadata[0].name
+  vector_cpus = var.vector_cpus
   depends_on   = [module.monitoring, module.http-blackhole]
 }
 module "http-blackhole" {
