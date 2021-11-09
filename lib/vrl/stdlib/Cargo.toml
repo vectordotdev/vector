@@ -7,7 +7,7 @@ publish = false
 license = "MPL-2.0"
 
 [dependencies]
-vrl = { path = "../core" }
+vrl = { path = "../core", default-features = false }
 lookup_lib = {package = "lookup", path = "../../lookup" }
 datadog-search-syntax = { path = "../../datadog/search-syntax", optional = true }
 

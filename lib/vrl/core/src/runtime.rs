@@ -99,6 +99,7 @@ impl Runtime {
             .iter()
             .map(|expr| {
                 expr.resolve(&mut context).map_err(|err| match err {
+                    #[cfg(feature = "expr-abort")]
                     ExpressionError::Abort { .. } => Terminate::Abort(err),
                     err @ ExpressionError::Error { .. } => Terminate::Error(err),
                 })

@@ -3,6 +3,7 @@ use diagnostic::{DiagnosticError, Label, Note};
 use dyn_clone::{clone_trait_object, DynClone};
 use std::fmt;
 
+#[cfg(feature = "expr-abort")]
 mod abort;
 mod array;
 mod block;
@@ -24,6 +25,7 @@ pub(crate) mod literal;
 pub(crate) mod predicate;
 pub(crate) mod query;
 
+#[cfg(feature = "expr-abort")]
 pub use abort::Abort;
 pub use array::Array;
 pub use assignment::Assignment;
@@ -97,6 +99,7 @@ pub enum Expr {
     Variable(Variable),
     Noop(Noop),
     Unary(Unary),
+    #[cfg(feature = "expr-abort")]
     Abort(Abort),
 }
 
@@ -121,6 +124,7 @@ impl Expr {
             Variable(..) => "variable call",
             Noop(..) => "noop",
             Unary(..) => "unary operation",
+            #[cfg(feature = "expr-abort")]
             Abort(..) => "abort operation",
         }
     }
@@ -141,6 +145,7 @@ impl Expression for Expr {
             Variable(v) => v.resolve(ctx),
             Noop(v) => v.resolve(ctx),
             Unary(v) => v.resolve(ctx),
+            #[cfg(feature = "expr-abort")]
             Abort(v) => v.resolve(ctx),
         }
     }
@@ -159,6 +164,7 @@ impl Expression for Expr {
             Variable(v) => Expression::as_value(v),
             Noop(v) => Expression::as_value(v),
             Unary(v) => Expression::as_value(v),
+            #[cfg(feature = "expr-abort")]
             Abort(v) => Expression::as_value(v),
         }
     }
@@ -177,6 +183,7 @@ impl Expression for Expr {
             Variable(v) => v.type_def(state),
             Noop(v) => v.type_def(state),
             Unary(v) => v.type_def(state),
+            #[cfg(feature = "expr-abort")]
             Abort(v) => v.type_def(state),
         }
     }
@@ -197,6 +204,7 @@ impl fmt::Display for Expr {
             Variable(v) => v.fmt(f),
             Noop(v) => v.fmt(f),
             Unary(v) => v.fmt(f),
+            #[cfg(feature = "expr-abort")]
             Abort(v) => v.fmt(f),
         }
     }
@@ -264,6 +272,7 @@ impl From<Unary> for Expr {
     }
 }
 
+#[cfg(feature = "expr-abort")]
 impl From<Abort> for Expr {
     fn from(abort: Abort) -> Self {
         Expr::Abort(abort)
@@ -276,6 +285,9 @@ impl From<Abort> for Expr {
 pub enum Error {
     #[error("unhandled error")]
     Fallible { span: Span },
+
+    #[error("expression type unavailable")]
+    Missing { span: Span, feature: &'static str },
 }
 
 impl DiagnosticError for Error {
@@ -284,6 +296,7 @@ impl DiagnosticError for Error {
 
         match self {
             Fallible { .. } => 100,
+            Missing { .. } => 900,
         }
     }
 
@@ -295,6 +308,13 @@ impl DiagnosticError for Error {
                 Label::primary("expression can result in runtime error", span),
                 Label::context("handle the error case to ensure runtime success", span),
             ],
+            Missing { span, feature } => vec![
+                Label::primary("expression type is disabled in this version of vrl", span),
+                Label::context(
+                    format!("build vrl using the `{}` feature to enable it", feature),
+                    span,
+                ),
+            ],
         }
     }
 
@@ -303,6 +323,7 @@ impl DiagnosticError for Error {
 
         match self {
             Fallible { .. } => vec![Note::SeeErrorDocs],
+            Missing { .. } => vec![],
         }
     }
 }
@@ -311,9 +332,8 @@ impl DiagnosticError for Error {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ExpressionError {
-    Abort {
-        span: Span,
-    },
+    #[cfg(feature = "expr-abort")]
+    Abort { span: Span },
     Error {
         message: String,
         labels: Vec<Label>,
@@ -342,6 +362,7 @@ impl DiagnosticError for ExpressionError {
         use ExpressionError::*;
 
         match self {
+            #[cfg(feature = "expr-abort")]
             Abort { .. } => "aborted".to_owned(),
             Error { message, .. } => message.clone(),
         }
@@ -351,6 +372,7 @@ impl DiagnosticError for ExpressionError {
         use ExpressionError::*;
 
         match self {
+            #[cfg(feature = "expr-abort")]
             Abort { span } => {
                 vec![Label::primary("aborted", span)]
             }
@@ -362,6 +384,7 @@ impl DiagnosticError for ExpressionError {
         use ExpressionError::*;
 
         match self {
+            #[cfg(feature = "expr-abort")]
             Abort { .. } => vec![],
             Error { notes, .. } => notes.clone(),
         }

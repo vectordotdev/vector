@@ -10,9 +10,18 @@ license = "MPL-2.0"
 name = "vrl"
 path = "src/main.rs"
 
+[features]
+default = ["repl", "expressions"]
+repl = ["lazy_static", "prettytable-rs", "regex", "rustyline", "webbrowser"]
+expressions = [
+  "expr-abort",
+]
+expr-abort = ["vrl/expr-abort"]
+
+
 [dependencies]
 shared = { path = "../../shared", default-features = false }
-vrl = { path = "../core" }
+vrl = { path = "../core", default-features = false }
 bytes = "1.1.0"
 exitcode = "1"
 prettytable-rs = { version = "0.8", default-features = false, optional = true }
@@ -28,7 +37,3 @@ indoc = "1.0.3"
 [dependencies.stdlib]
 package = "vrl-stdlib"
 path = "../stdlib"
-
-[features]
-default = ["repl"]
-repl = ["lazy_static", "prettytable-rs", "regex", "rustyline", "webbrowser"]

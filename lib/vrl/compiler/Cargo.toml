@@ -5,9 +5,16 @@ authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2021"
 publish = false
 
+[features]
+default = ["expressions"]
+expressions = [
+  "expr-abort",
+]
+expr-abort = []
+
 [dependencies]
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
-parser = { package = "vrl-parser", path = "../parser" }
+parser = { package = "vrl-parser", path = "../parser", default-features = false }
 shared = { path = "../../shared", default-features = false, features = ["conversion"] }
 lookup = { path = "../../lookup" }
 

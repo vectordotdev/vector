@@ -1,5 +1,5 @@
 use crate::expression::*;
-use crate::{Function, Program, State, Value};
+use crate::{Function, Program, Span, State, Value};
 use chrono::{TimeZone, Utc};
 use diagnostic::DiagnosticError;
 use ordered_float::NotNan;
@@ -390,12 +390,25 @@ impl<'a> Compiler<'a> {
         })
     }
 
+    #[cfg(feature = "expr-abort")]
     fn compile_abort(&mut self, node: Node<()>) -> Abort {
         self.abortable = true;
         Abort::new(node.span())
     }
 
+    #[cfg(not(feature = "expr-abort"))]
+    fn compile_abort(&mut self, node: Node<()>) -> Noop {
+        self.handle_missing_feature_error(node.span(), "expr-abort")
+    }
+
     fn handle_parser_error(&mut self, error: parser::Error) {
         self.errors.push(Box::new(error))
+    }
+
+    #[allow(dead_code)]
+    fn handle_missing_feature_error(&mut self, span: Span, feature: &'static str) -> Noop {
+        self.errors.push(Box::new(Error::Missing { span, feature }));
+
+        Noop
     }
 }
