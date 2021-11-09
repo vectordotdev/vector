@@ -36,13 +36,13 @@ remap: functions: get_enrichment_table_record: {
 			type: ["string"]
 		},
 		{
-			name:        "condition"
+			name: "condition"
 			description: """
-			  The condition to search on. Since the condition is used at boot time
-			  to create indexes into the data, these conditions have to be statically
-			  defined.
-			"""
-			required:    true
+				  The condition to search on. Since the condition is used at boot time
+				  to create indexes into the data, these conditions have to be statically
+				  defined.
+				"""
+			required: true
 			type: ["object"]
 		},
 		{
