@@ -1,4 +1,3 @@
-use crate::buffers::Acker;
 use crate::sinks::util::adaptive_concurrency::{
     AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
 };
@@ -18,6 +17,7 @@ use tower::{
     util::BoxService,
     Service, ServiceBuilder,
 };
+use vector_core::buffers::Acker;
 
 mod concurrency;
 mod map;
@@ -314,13 +314,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        buffers::Acker,
-        sinks::util::{
-            retries::{RetryAction, RetryLogic},
-            sink::StdServiceLogic,
-            BatchSettings, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, VecBuffer,
-        },
+    use crate::sinks::util::{
+        retries::{RetryAction, RetryLogic},
+        sink::StdServiceLogic,
+        BatchSettings, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, VecBuffer,
     };
     use futures::{future, stream, FutureExt, SinkExt, StreamExt};
     use std::sync::{

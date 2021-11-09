@@ -1,7 +1,7 @@
 use futures::StreamExt;
 use std::num::NonZeroUsize;
+use vector_core::buffers::Acker;
 
-use crate::buffers::Acker;
 use crate::event::Event;
 use crate::sinks::aws_kinesis_firehose::request_builder::{KinesisRequest, KinesisRequestBuilder};
 use crate::sinks::aws_kinesis_firehose::service::KinesisResponse;
