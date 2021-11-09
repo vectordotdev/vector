@@ -75,7 +75,7 @@ impl Function for Compact {
         let recursive = arguments.optional("recursive");
         let null = arguments.optional("null");
         let string = arguments.optional("string");
-        let  object = arguments.optional("object");
+        let object = arguments.optional("object");
         let array = arguments.optional("array");
         let nullish = arguments.optional("nullish");
 
@@ -207,8 +207,12 @@ fn recurse_compact(value: Value, options: &CompactOptions) -> Value {
     }
 }
 
-fn compact_object(object: BTreeMap<String, Value>, options: &CompactOptions) -> BTreeMap<String, Value> {
-    object.into_iter()
+fn compact_object(
+    object: BTreeMap<String, Value>,
+    options: &CompactOptions,
+) -> BTreeMap<String, Value> {
+    object
+        .into_iter()
         .filter_map(|(key, value)| {
             let value = recurse_compact(value, options);
             if options.is_empty(&value) {
