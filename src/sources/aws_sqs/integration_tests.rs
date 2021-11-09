@@ -19,13 +19,6 @@ use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::timeout;
 
-// fn gen_queue_url(name: &str) -> String {
-//     format!(
-//         "https://sqs.us-east-1.amazonaws.com/123456789012/test-{}",
-//         name
-//     )
-// }
-
 fn gen_queue_name() -> String {
     random_string(10).to_lowercase()
 }

@@ -1,12 +1,10 @@
 use http::{uri::InvalidUri, Uri};
 use rusoto_core::{region::ParseRegionError, Region};
 
+pub use crate::aws::region::RegionOrEndpoint;
 use snafu::{ResultExt, Snafu};
 use std::convert::TryFrom;
 use std::str::FromStr;
-
-//TODO: backwards compat - use the type directly instead of from here
-pub use crate::aws::region::RegionOrEndpoint;
 
 #[derive(Debug, Snafu)]
 pub enum ParseError {
