@@ -24,8 +24,8 @@ use crate::{
 };
 use http::{
     header::{HeaderName, HeaderValue},
-    Request,
     uri::InvalidUri,
+    Request,
 };
 
 use rusoto_credential::{CredentialsError, ProvideAwsCredentials};
@@ -34,8 +34,8 @@ use serde::{Deserialize, Serialize};
 
 use snafu::{ResultExt, Snafu};
 
-use std::convert::TryFrom;
 use crate::aws::rusoto::{self, AwsAuthentication};
+use std::convert::TryFrom;
 
 use crate::event::{EventRef, LogEvent};
 // use crate::sinks::elasticsearch::ParseError::AwsCredentialsGenerateFailed;

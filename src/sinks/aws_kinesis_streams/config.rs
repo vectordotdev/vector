@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 
-use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext};
 use crate::aws::rusoto::{AwsAuthentication, RegionOrEndpoint};
+use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext};
 use crate::sinks::aws_kinesis_streams::service::KinesisService;
 use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
 use crate::sinks::util::{BatchConfig, BatchSettings, Compression, TowerRequestConfig};

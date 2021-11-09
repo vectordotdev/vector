@@ -28,9 +28,6 @@ pub enum AwsAuthentication {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
-    
-    
 
     #[derive(Serialize, Deserialize, Clone, Debug)]
     struct ComponentConfig {

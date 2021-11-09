@@ -37,6 +37,8 @@ pub mod internal_events;
 pub mod api;
 pub mod app;
 pub mod async_read;
+#[cfg(any(feature = "rusoto_core", feature = "aws-config"))]
+pub mod aws;
 #[cfg(feature = "codecs")]
 pub mod codecs;
 pub mod encoding_transcode;
@@ -52,8 +54,6 @@ pub mod list;
 pub(crate) mod pipeline;
 pub(crate) mod proto;
 pub mod providers;
-#[cfg(any(feature = "rusoto_core", feature = "aws-config"))]
-pub mod aws;
 pub mod serde;
 #[cfg(windows)]
 pub mod service;
@@ -86,7 +86,7 @@ pub mod vector_windows;
 
 pub use pipeline::Pipeline;
 
-pub use vector_core::{Error, event, mapping, metrics, Result};
+pub use vector_core::{event, mapping, metrics, Error, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]

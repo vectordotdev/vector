@@ -1,3 +1,4 @@
+use crate::aws::rusoto::{AwsAuthentication, RegionOrEndpoint};
 use crate::config::SinkContext;
 use crate::sinks::s3_common::sink::S3Sink;
 use crate::sinks::util::encoding::StandardEncodings;
@@ -5,16 +6,16 @@ use crate::sinks::util::BatchSettings;
 use crate::{
     config::{DataType, GenerateConfig, ProxyConfig, SinkConfig},
     sinks::{
-        Healthcheck,
         s3_common::{
             self,
             config::{S3Options, S3RetryLogic},
             service::S3Service,
         },
         util::{
-            BatchConfig, Compression, encoding::EncodingConfig, ServiceBuilderExt,
+            encoding::EncodingConfig, BatchConfig, Compression, ServiceBuilderExt,
             TowerRequestConfig,
         },
+        Healthcheck,
     },
 };
 use rusoto_s3::S3Client;
@@ -22,7 +23,6 @@ use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
 use tower::ServiceBuilder;
 use vector_core::sink::VectorSink;
-use crate::aws::rusoto::{AwsAuthentication, RegionOrEndpoint};
 
 use super::sink::S3RequestOptions;
 use crate::sinks::util::partitioner::KeyPartitioner;
