@@ -88,11 +88,11 @@ resource "kubernetes_deployment" "vector" {
 
           resources {
             limits = {
-              cpu    = "4"
+              cpu    = var.vector_cpus
               memory = "512Mi"
             }
             requests = {
-              cpu    = "4"
+              cpu    = var.vector_cpus
               memory = "512Mi"
             }
           }
