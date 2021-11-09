@@ -216,19 +216,13 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
-      - uses: actions/cache@v2
-        with:
-          key: ${{ needs.compute-soak-meta.outputs.baseline-tag }}-${{ matrix.target }}
-          path: |
-            /tmp/${{ github.event.number }}/${{ matrix.target }}
-
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
 
       - name: Run baseline experiment
         if: steps.cache-primes.outputs.cache-hit != 'true'
         run: |
-          mkdir -p /tmp/${{ github.event.number }}/${{ matrix.target }}/
+          mkdir -p /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
           ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
                                   --local-image "false" \
                                   --variant "baseline" \
@@ -236,13 +230,13 @@ jobs:
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --capture-dir /tmp/${{ github.event.number }}
+                                  --capture-dir /tmp/${{ github.event.number }}-${{ github.run_attempt }}
 
       - name: Upload timing captures
         uses: actions/upload-artifact@v1
         with:
-          name: ${{ github.event.number }}-captures
-          path: /tmp/${{ github.event.number }}
+          name: ${{ github.event.number }}-${{ github.run_attempt }}-captures
+          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}
 
   soak-comparison:
     name: Soak (${{ matrix.target }}) - comparison
@@ -252,19 +246,13 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
     steps:
-      - uses: actions/cache@v2
-        with:
-          key: ${{ needs.compute-soak-meta.outputs.comparison-tag }}-${{ matrix.target }}
-          path: |
-            /tmp/${{ github.event.number }}/${{ matrix.target }}
-
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
 
       - name: Run comparison experiment
         if: steps.cache-primes.outputs.cache-hit != 'true'
         run: |
-          mkdir -p /tmp/${{ github.event.number }}/${{ matrix.target }}/
+          mkdir -p /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
           ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
                                   --local-image "false" \
                                   --variant "comparison" \
@@ -272,13 +260,13 @@ jobs:
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --capture-dir /tmp/${{ github.event.number }}
+                                  --capture-dir /tmp/${{ github.event.number }}-${{ github.run_attempt }}
 
       - name: Upload timing captures
         uses: actions/upload-artifact@v1
         with:
-          name: ${{ github.event.number }}-captures
-          path: /tmp/${{ github.event.number }}
+          name: ${{ github.event.number }}-${{ github.run_attempt }}-captures
+          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}
 
   analyze-results:
     name: Soak analysis
@@ -295,20 +283,20 @@ jobs:
       - name: Download captures artifact
         uses: actions/download-artifact@v1
         with:
-          name: ${{ github.event.number }}-captures
+          name: ${{ github.event.number }}-${{ github.run_attempt }}-captures
 
       - name: Analyze captures
         run: |
-          ./soaks/bin/analyze_experiment.sh --capture-dir ${{ github.event.number }}-captures/ \
+          ./soaks/bin/analyze_experiment.sh --capture-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures/ \
                                             --baseline ${{ needs.compute-soak-meta.outputs.baseline-sha }} \
                                             --comparison ${{ needs.compute-soak-meta.outputs.comparison-sha }} \
-                                            --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} > /tmp/${{ github.event.number}}-${{ github.run_number }}-analysis
+                                            --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} > /tmp/${{ github.event.number}}-${{ github.run_attempt }}-analysis
 
       - name: Read analysis file
         id: read-analysis
         uses: juliangruber/read-file-action@v1
         with:
-          path: /tmp/${{ github.event.number }}-${{ github.run_number }}-analysis
+          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}-analysis
 
       - name: Post Results To PR
         uses: peter-evans/create-or-update-comment@v1
