@@ -1,6 +1,7 @@
 use crate::{
-    codecs::DecodingConfig,
+    codecs::{DecodingConfig, FramingConfig, ParserConfig},
     config::{DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
+    serde::{default_decoding, default_framing_message_based},
     tls::{MaybeTlsSettings, TlsConfig},
 };
 use futures::FutureExt;
@@ -19,8 +20,10 @@ pub struct AwsKinesisFirehoseConfig {
     access_key: Option<String>,
     tls: Option<TlsConfig>,
     record_compression: Option<Compression>,
-    #[serde(default)]
-    decoding: DecodingConfig,
+    #[serde(default = "default_framing_message_based")]
+    framing: Box<dyn FramingConfig>,
+    #[serde(default = "default_decoding")]
+    decoding: Box<dyn ParserConfig>,
 }
 
 #[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -47,10 +50,13 @@ impl fmt::Display for Compression {
 #[typetag::serde(name = "aws_kinesis_firehose")]
 impl SourceConfig for AwsKinesisFirehoseConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+
         let svc = filters::firehose(
             self.access_key.clone(),
             self.record_compression.unwrap_or_default(),
-            self.decoding.build()?,
+            decoder,
+            cx.acknowledgements.enabled,
             cx.out,
         );
 
@@ -94,7 +100,8 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
             access_key: None,
             tls: None,
             record_compression: None,
-            decoding: Default::default(),
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
         })
         .unwrap()
     }
@@ -104,8 +111,7 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
 mod tests {
     use super::*;
     use crate::{
-        codecs::BytesDecoderConfig,
-        event::Event,
+        event::{Event, EventStatus},
         log_event,
         test_util::{collect_ready, next_addr, wait_for_tcp},
         Pipeline,
@@ -113,13 +119,39 @@ mod tests {
     use bytes::Bytes;
     use chrono::{DateTime, SubsecRound, Utc};
     use flate2::read::GzEncoder;
-    use futures::channel::mpsc;
+    use futures::Stream;
     use pretty_assertions::assert_eq;
     use shared::assert_event_data_eq;
     use std::{
         io::{Cursor, Read},
         net::SocketAddr,
     };
+    use tokio::time::{sleep, Duration};
+
+    const SOURCE_ARN: &str = "arn:aws:firehose:us-east-1:111111111111:deliverystream/test";
+    const REQUEST_ID: &str = "e17265d6-97af-4938-982e-90d5614c4242";
+    // example CloudWatch Logs subscription event
+    const RECORD: &str = r#"
+            {
+                "messageType": "DATA_MESSAGE",
+                "owner": "071959437513",
+                "logGroup": "/jesse/test",
+                "logStream": "test",
+                "subscriptionFilters": ["Destination"],
+                "logEvents": [
+                    {
+                        "id": "35683658089614582423604394983260738922885519999578275840",
+                        "timestamp": 1600110569039,
+                        "message": "{\"bytes\":26780,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"157.130.216.193\",\"method\":\"PUT\",\"protocol\":\"HTTP/1.0\",\"referer\":\"https://www.principalcross-platform.io/markets/ubiquitous\",\"request\":\"/expedite/convergence\",\"source_type\":\"stdin\",\"status\":301,\"user-identifier\":\"-\"}"
+                    },
+                    {
+                        "id": "35683658089659183914001456229543810359430816722590236673",
+                        "timestamp": 1600110569041,
+                        "message": "{\"bytes\":17707,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"109.81.244.252\",\"method\":\"GET\",\"protocol\":\"HTTP/2.0\",\"referer\":\"http://www.investormission-critical.io/24/7/vortals\",\"request\":\"/scale/functionalities/optimize\",\"source_type\":\"stdin\",\"status\":502,\"user-identifier\":\"feeney1708\"}"
+                    }
+                ]
+            }
+        "#;
 
     #[test]
     fn generate_config() {
@@ -129,18 +161,24 @@ mod tests {
     async fn source(
         access_key: Option<String>,
         record_compression: Option<Compression>,
-    ) -> (mpsc::Receiver<Event>, SocketAddr) {
-        let (sender, recv) = Pipeline::new_test();
+        delivered: bool,
+    ) -> (impl Stream<Item = Event>, SocketAddr) {
+        use EventStatus::*;
+        let status = if delivered { Delivered } else { Failed };
+        let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
+        let mut cx = SourceContext::new_test(sender);
+        cx.acknowledgements.enabled = true;
         tokio::spawn(async move {
             AwsKinesisFirehoseConfig {
                 address,
                 tls: None,
                 access_key,
                 record_compression,
-                decoding: DecodingConfig::new(Some(Box::new(BytesDecoderConfig)), None),
+                framing: default_framing_message_based(),
+                decoding: default_decoding(),
             }
-            .build(SourceContext::new_test(sender))
+            .build(cx)
             .await
             .unwrap()
             .await
@@ -158,13 +196,11 @@ mod tests {
         timestamp: DateTime<Utc>,
         records: Vec<&[u8]>,
         key: Option<&str>,
-        request_id: &str,
-        source_arn: &str,
         gzip: bool,
         record_compression: Compression,
     ) -> reqwest::Result<reqwest::Response> {
         let request = models::FirehoseRequest {
-            request_id: request_id.to_string(),
+            request_id: REQUEST_ID.to_string(),
             timestamp,
             records: records
                 .into_iter()
@@ -182,8 +218,8 @@ mod tests {
                 "Root=1-5f5fbf1c-877c68cace58bea222ddbeec",
             )
             .header("x-amz-firehose-protocol-version", "1.0")
-            .header("x-amz-firehose-request-id", request_id.to_string())
-            .header("x-amz-firehose-source-arn", source_arn.to_string())
+            .header("x-amz-firehose-request-id", REQUEST_ID.to_string())
+            .header("x-amz-firehose-source-arn", SOURCE_ARN.to_string())
             .header("user-agent", "Amazon Kinesis Data Firehose Agent/1.0")
             .header("content-type", "application/json");
 
@@ -204,6 +240,21 @@ mod tests {
         }
 
         builder.send().await
+    }
+
+    async fn spawn_send(
+        address: SocketAddr,
+        timestamp: DateTime<Utc>,
+        records: Vec<&'static [u8]>,
+        key: Option<&'static str>,
+        gzip: bool,
+        record_compression: Compression,
+    ) -> tokio::task::JoinHandle<reqwest::Result<reqwest::Response>> {
+        let handle = tokio::spawn(async move {
+            send(address, timestamp, records, key, gzip, record_compression).await
+        });
+        sleep(Duration::from_millis(100)).await;
+        handle
     }
 
     /// Encodes record data to mach AWS's representation: base64 encoded with an additional
@@ -227,130 +278,104 @@ mod tests {
 
     #[tokio::test]
     async fn aws_kinesis_firehose_forwards_events() {
-        // example CloudWatch Logs subscription event
-        let record = r#"
-            {
-                "messageType": "DATA_MESSAGE",
-                "owner": "071959437513",
-                "logGroup": "/jesse/test",
-                "logStream": "test",
-                "subscriptionFilters": ["Destination"],
-                "logEvents": [
-                    {
-                        "id": "35683658089614582423604394983260738922885519999578275840",
-                        "timestamp": 1600110569039,
-                        "message": "{\"bytes\":26780,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"157.130.216.193\",\"method\":\"PUT\",\"protocol\":\"HTTP/1.0\",\"referer\":\"https://www.principalcross-platform.io/markets/ubiquitous\",\"request\":\"/expedite/convergence\",\"source_type\":\"stdin\",\"status\":301,\"user-identifier\":\"-\"}"
-                    },
-                    {
-                        "id": "35683658089659183914001456229543810359430816722590236673",
-                        "timestamp": 1600110569041,
-                        "message": "{\"bytes\":17707,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"109.81.244.252\",\"method\":\"GET\",\"protocol\":\"HTTP/2.0\",\"referer\":\"http://www.investormission-critical.io/24/7/vortals\",\"request\":\"/scale/functionalities/optimize\",\"source_type\":\"stdin\",\"status\":502,\"user-identifier\":\"feeney1708\"}"
-                    }
-                ]
-            }
-        "#.as_bytes();
-
         let gziped_record = {
             let mut buf = Vec::new();
-            let mut gz = GzEncoder::new(record, flate2::Compression::fast());
+            let mut gz = GzEncoder::new(RECORD.as_bytes(), flate2::Compression::fast());
             gz.read_to_end(&mut buf).unwrap();
             buf
         };
 
-        let cases = vec![
+        for (source_record_compression, record_compression, success, record, expected) in [
             (
                 Compression::Auto,
                 Compression::Gzip,
                 true,
-                record.to_owned(),
-                record.to_owned(),
+                RECORD.as_bytes(),
+                RECORD.as_bytes().to_owned(),
             ),
             (
                 Compression::Auto,
                 Compression::None,
                 true,
-                record.to_owned(),
-                record.to_owned(),
+                RECORD.as_bytes(),
+                RECORD.as_bytes().to_owned(),
             ),
             (
                 Compression::None,
                 Compression::Gzip,
                 true,
-                record.to_owned(),
+                RECORD.as_bytes(),
                 gziped_record,
             ),
             (
                 Compression::None,
                 Compression::None,
                 true,
-                record.to_owned(),
-                record.to_owned(),
+                RECORD.as_bytes(),
+                RECORD.as_bytes().to_owned(),
             ),
             (
                 Compression::Gzip,
                 Compression::Gzip,
                 true,
-                record.to_owned(),
-                record.to_owned(),
+                RECORD.as_bytes(),
+                RECORD.as_bytes().to_owned(),
             ),
             (
                 Compression::Gzip,
                 Compression::None,
                 false,
-                record.to_owned(),
-                record.to_owned(),
+                RECORD.as_bytes(),
+                RECORD.as_bytes().to_owned(),
             ),
             (
                 Compression::Gzip,
                 Compression::Gzip,
                 true,
-                Vec::new(),
+                "".as_bytes(),
                 Vec::new(),
             ),
-        ];
-
-        for (source_record_compression, record_compression, success, record, expected) in cases {
+        ] {
             println!(
                 "test case: ({}, {})",
-                &source_record_compression, &record_compression
+                source_record_compression, record_compression
             );
 
-            let (rx, addr) = source(None, Some(source_record_compression)).await;
+            let (rx, addr) = source(None, Some(source_record_compression), true).await;
 
-            let source_arn = "arn:aws:firehose:us-east-1:111111111111:deliverystream/test";
-            let request_id = "e17265d6-97af-4938-982e-90d5614c4242";
             let timestamp: DateTime<Utc> = Utc::now();
 
-            let res = send(
+            let res = spawn_send(
                 addr,
                 timestamp,
-                vec![&record],
+                vec![record],
                 None,
-                request_id,
-                source_arn,
                 false,
                 record_compression,
             )
-            .await
-            .unwrap();
+            .await;
 
             if success {
+                let events = collect_ready(rx).await;
+
+                let res = res.await.unwrap().unwrap();
                 assert_eq!(200, res.status().as_u16());
 
-                let events = collect_ready(rx).await;
                 assert_event_data_eq!(
                     events,
                     vec![log_event! {
+                        "source_type" => Bytes::from("aws_kinesis_firehose"),
                         "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
                         "message"=> Bytes::from(expected),
-                        "request_id" => request_id,
-                        "source_arn" => source_arn,
+                        "request_id" => REQUEST_ID,
+                        "source_arn" => SOURCE_ARN,
                     },]
                 );
 
                 let response: models::FirehoseResponse = res.json().await.unwrap();
-                assert_eq!(response.request_id, request_id);
+                assert_eq!(response.request_id, REQUEST_ID);
             } else {
+                let res = res.await.unwrap().unwrap();
                 assert_eq!(400, res.status().as_u16());
             }
         }
@@ -358,76 +383,48 @@ mod tests {
 
     #[tokio::test]
     async fn aws_kinesis_firehose_forwards_events_gzip_request() {
-        // example CloudWatch Logs subscription event
-        let record = r#"
-            {
-                "messageType": "DATA_MESSAGE",
-                "owner": "071959437513",
-                "logGroup": "/jesse/test",
-                "logStream": "test",
-                "subscriptionFilters": ["Destination"],
-                "logEvents": [
-                    {
-                        "id": "35683658089614582423604394983260738922885519999578275840",
-                        "timestamp": 1600110569039,
-                        "message": "{\"bytes\":26780,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"157.130.216.193\",\"method\":\"PUT\",\"protocol\":\"HTTP/1.0\",\"referer\":\"https://www.principalcross-platform.io/markets/ubiquitous\",\"request\":\"/expedite/convergence\",\"source_type\":\"stdin\",\"status\":301,\"user-identifier\":\"-\"}"
-                    },
-                    {
-                        "id": "35683658089659183914001456229543810359430816722590236673",
-                        "timestamp": 1600110569041,
-                        "message": "{\"bytes\":17707,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"109.81.244.252\",\"method\":\"GET\",\"protocol\":\"HTTP/2.0\",\"referer\":\"http://www.investormission-critical.io/24/7/vortals\",\"request\":\"/scale/functionalities/optimize\",\"source_type\":\"stdin\",\"status\":502,\"user-identifier\":\"feeney1708\"}"
-                    }
-                ]
-        }"#;
+        let (rx, addr) = source(None, None, true).await;
 
-        let (rx, addr) = source(None, None).await;
-
-        let source_arn = "arn:aws:firehose:us-east-1:111111111111:deliverystream/test";
-        let request_id = "e17265d6-97af-4938-982e-90d5614c4242";
         let timestamp: DateTime<Utc> = Utc::now();
 
-        let res = send(
+        let res = spawn_send(
             addr,
             timestamp,
-            vec![record.as_bytes()],
+            vec![RECORD.as_bytes()],
             None,
-            request_id,
-            source_arn,
             true,
             Compression::None,
         )
-        .await
-        .unwrap();
-        assert_eq!(200, res.status().as_u16());
+        .await;
 
         let events = collect_ready(rx).await;
+        let res = res.await.unwrap().unwrap();
+        assert_eq!(200, res.status().as_u16());
+
         assert_event_data_eq!(
             events,
             vec![log_event! {
+                "source_type" => Bytes::from("aws_kinesis_firehose"),
                 "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
-                "message"=> record,
-                "request_id" => request_id,
-                "source_arn" => source_arn,
+                "message"=> RECORD,
+                "request_id" => REQUEST_ID,
+                "source_arn" => SOURCE_ARN,
             },]
         );
 
         let response: models::FirehoseResponse = res.json().await.unwrap();
-        assert_eq!(response.request_id, request_id);
+        assert_eq!(response.request_id, REQUEST_ID);
     }
 
     #[tokio::test]
     async fn aws_kinesis_firehose_rejects_bad_access_key() {
-        let (_rx, addr) = source(Some("an access key".to_string()), None).await;
-
-        let request_id = "e17265d6-97af-4938-982e-90d5614c4242";
+        let (_rx, addr) = source(Some("an access key".to_string()), None, true).await;
 
         let res = send(
             addr,
             Utc::now(),
             vec![],
             Some("bad access key"),
-            request_id,
-            "",
             false,
             Compression::None,
         )
@@ -436,6 +433,44 @@ mod tests {
         assert_eq!(401, res.status().as_u16());
 
         let response: models::FirehoseResponse = res.json().await.unwrap();
-        assert_eq!(response.request_id, request_id);
+        assert_eq!(response.request_id, REQUEST_ID);
+    }
+
+    #[tokio::test]
+    async fn handles_acknowledgement_failure() {
+        let expected = RECORD.as_bytes().to_owned();
+
+        let (rx, addr) = source(None, Some(Compression::None), false).await;
+
+        let timestamp: DateTime<Utc> = Utc::now();
+
+        let res = spawn_send(
+            addr,
+            timestamp,
+            vec![RECORD.as_bytes()],
+            None,
+            false,
+            Compression::None,
+        )
+        .await;
+
+        let events = collect_ready(rx).await;
+
+        let res = res.await.unwrap().unwrap();
+        assert_eq!(406, res.status().as_u16());
+
+        assert_event_data_eq!(
+            events,
+            vec![log_event! {
+                "source_type" => Bytes::from("aws_kinesis_firehose"),
+                "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
+                "message"=> Bytes::from(expected),
+                "request_id" => REQUEST_ID,
+                "source_arn" => SOURCE_ARN,
+            },]
+        );
+
+        let response: models::FirehoseResponse = res.json().await.unwrap();
+        assert_eq!(response.request_id, REQUEST_ID);
     }
 }

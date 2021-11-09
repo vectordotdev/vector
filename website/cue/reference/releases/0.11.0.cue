@@ -9,8 +9,8 @@ releases: "0.11.0": {
 		first-class Kubernetes integration, we launched a number of
 		complementary features that make Vector a prime candidate
 		for collecting and processing your Kubernetes logs. Check
-		out the [highlights](#highlights) and [changelog](#changelog)
-		for more details.
+		out the [highlights](/releases/0.11.0#highlights) and
+		[changelog](/releases/0.11.0#changelog) for more details.
 		"""
 
 	whats_next: [

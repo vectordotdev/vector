@@ -1,7 +1,21 @@
-// ## skip check-events ##
-
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
+
+#[derive(Debug)]
+pub struct BytesReceived {
+    pub byte_size: usize,
+    pub protocol: &'static str,
+}
+
+impl InternalEvent for BytesReceived {
+    fn emit_logs(&self) {
+        trace!(message = "Bytes received.", byte_size = %self.byte_size, protocol = %self.protocol);
+    }
+
+    fn emit_metrics(&self) {
+        counter!("component_received_bytes_total", self.byte_size as u64, "protocol" => self.protocol);
+    }
+}
 
 #[derive(Debug)]
 pub struct EventsReceived {
@@ -25,39 +39,28 @@ impl InternalEvent for EventsReceived {
 }
 
 #[derive(Debug)]
-pub struct EventsSent {
-    pub count: usize,
-    pub byte_size: usize,
-}
-
-impl InternalEvent for EventsSent {
-    fn emit_logs(&self) {
-        trace!(message = "Events sent.", count = %self.count, byte_size = %self.byte_size);
-    }
-
-    fn emit_metrics(&self) {
-        if self.count > 0 {
-            counter!("events_out_total", self.count as u64);
-            counter!("component_sent_events_total", self.count as u64);
-            counter!("component_sent_event_bytes_total", self.byte_size as u64);
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct BytesSent<'a> {
+pub struct HttpClientBytesReceived<'a> {
     pub byte_size: usize,
     pub protocol: &'a str,
+    pub endpoint: &'a str,
 }
 
-impl<'a> InternalEvent for BytesSent<'a> {
+impl InternalEvent for HttpClientBytesReceived<'_> {
     fn emit_logs(&self) {
-        trace!(message = "Bytes sent.", byte_size = %self.byte_size, protocol = %self.protocol);
+        trace!(
+            message = "Bytes received.",
+            byte_size = %self.byte_size,
+            protocol = %self.protocol,
+            endpoint = %self.endpoint,
+        );
     }
 
     fn emit_metrics(&self) {
-        counter!("component_sent_bytes_total", self.byte_size as u64,
-                 "protocol" => self.protocol.to_string());
+        counter!(
+            "component_received_bytes_total", self.byte_size as u64,
+            "protocol" => self.protocol.to_owned(),
+            "endpoint" => self.endpoint.to_owned(),
+        );
     }
 }
 
@@ -83,6 +86,27 @@ impl<'a> InternalEvent for EndpointBytesSent<'a> {
             "component_sent_bytes_total", self.byte_size as u64,
             "protocol" => self.protocol.to_string(),
             "endpoint" => self.endpoint.to_string()
+        );
+    }
+}
+
+#[cfg(feature = "rusoto")]
+pub struct AwsBytesSent {
+    pub byte_size: usize,
+    pub region: rusoto_core::Region,
+}
+
+#[cfg(feature = "rusoto")]
+impl InternalEvent for AwsBytesSent {
+    fn emit_logs(&self) {
+        trace!(message = "Bytes sent.", byte_size = %self.byte_size, region = ?self.region);
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "component_sent_bytes_total", self.byte_size as u64,
+            "protocol" => "https",
+            "region" => self.region.name().to_owned(),
         );
     }
 }

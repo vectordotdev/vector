@@ -11,24 +11,30 @@ pub struct CharacterDelimitedDecoderConfig {
 }
 
 /// Options for building a `CharacterDelimitedCodec`.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct CharacterDelimitedDecoderOptions {
     /// The character that delimits byte sequences.
     delimiter: char,
     /// The maximum length of the byte buffer.
     ///
     /// This length does *not* include the trailing delimiter.
-    #[serde(default = "crate::serde::default_max_length")]
-    max_length: usize,
+    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
+    max_length: Option<usize>,
 }
 
 #[typetag::serde(name = "character_delimited")]
 impl FramingConfig for CharacterDelimitedDecoderConfig {
     fn build(&self) -> crate::Result<BoxedFramer> {
-        Ok(Box::new(CharacterDelimitedCodec::new_with_max_length(
-            self.character_delimited.delimiter,
-            self.character_delimited.max_length,
-        )))
+        if let Some(max_length) = self.character_delimited.max_length {
+            Ok(Box::new(CharacterDelimitedCodec::new_with_max_length(
+                self.character_delimited.delimiter,
+                max_length,
+            )))
+        } else {
+            Ok(Box::new(CharacterDelimitedCodec::new(
+                self.character_delimited.delimiter,
+            )))
+        }
     }
 }
 
@@ -48,10 +54,10 @@ pub struct CharacterDelimitedCodec {
 
 impl CharacterDelimitedCodec {
     /// Creates a `CharacterDelimitedCodec` with the specified delimiter.
-    pub fn new(delimiter: char) -> Self {
+    pub const fn new(delimiter: char) -> Self {
         CharacterDelimitedCodec {
             delimiter,
-            max_length: crate::serde::default_max_length(),
+            max_length: usize::MAX,
             is_discarding: false,
             next_index: 0,
         }
@@ -60,7 +66,7 @@ impl CharacterDelimitedCodec {
     /// Creates a `CharacterDelimitedCodec` with a maximum frame length limit.
     ///
     /// Any frames longer than `max_length` bytes will be discarded entirely.
-    pub fn new_with_max_length(delimiter: char, max_length: usize) -> Self {
+    pub const fn new_with_max_length(delimiter: char, max_length: usize) -> Self {
         CharacterDelimitedCodec {
             max_length,
             ..CharacterDelimitedCodec::new(delimiter)

@@ -18,6 +18,7 @@
 extern crate tracing;
 #[macro_use]
 extern crate derivative;
+extern crate vector_core;
 #[cfg(feature = "vrl-cli")]
 extern crate vrl_cli;
 
@@ -36,7 +37,6 @@ pub mod internal_events;
 pub mod api;
 pub mod app;
 pub mod async_read;
-pub mod buffers;
 #[cfg(feature = "codecs")]
 pub mod codecs;
 pub mod encoding_transcode;

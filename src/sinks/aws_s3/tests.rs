@@ -24,17 +24,18 @@ mod integration_tests {
     use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
 
     #[tokio::test]
-    async fn s3_insert_message_into() {
+    async fn s3_insert_message_into_with_flat_key_prefix() {
         let cx = SinkContext::new_test();
 
         let bucket = uuid::Uuid::new_v4().to_string();
 
         create_bucket(&bucket, false).await;
 
-        let config = config(&bucket, 1000000);
+        let mut config = config(&bucket, 1000000);
+        config.key_prefix = Some("test-prefix".to_string());
         let prefix = config.key_prefix.clone();
-        let client = config.create_client(&cx.globals.proxy).unwrap();
-        let sink = config.build_processor(client, cx).unwrap();
+        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let sink = config.build_processor(service, cx).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, 10);
         sink.run(events).await.unwrap();
@@ -44,6 +45,43 @@ mod integration_tests {
         assert_eq!(keys.len(), 1);
 
         let key = keys[0].clone();
+        let key_parts = key.split('/');
+        assert!(key_parts.count() == 1);
+        assert!(key.starts_with("test-prefix"));
+        assert!(key.ends_with(".log"));
+
+        let obj = get_object(&bucket, key).await;
+        assert_eq!(obj.content_encoding, Some("identity".to_string()));
+
+        let response_lines = get_lines(obj).await;
+        assert_eq!(lines, response_lines);
+    }
+
+    #[tokio::test]
+    async fn s3_insert_message_into_with_folder_key_prefix() {
+        let cx = SinkContext::new_test();
+
+        let bucket = uuid::Uuid::new_v4().to_string();
+
+        create_bucket(&bucket, false).await;
+
+        let mut config = config(&bucket, 1000000);
+        config.key_prefix = Some("test-prefix/".to_string());
+        let prefix = config.key_prefix.clone();
+        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let sink = config.build_processor(service, cx).unwrap();
+
+        let (lines, events, receiver) = make_events_batch(100, 10);
+        sink.run(events).await.unwrap();
+        assert_eq!(receiver.await, BatchStatus::Delivered);
+
+        let keys = get_keys(&bucket, prefix.unwrap()).await;
+        assert_eq!(keys.len(), 1);
+
+        let key = keys[0].clone();
+        let key_parts = key.split('/').collect::<Vec<_>>();
+        assert!(key_parts.len() == 2);
+        assert!(*key_parts.get(0).unwrap() == "test-prefix");
         assert!(key.ends_with(".log"));
 
         let obj = get_object(&bucket, key).await;
@@ -68,8 +106,8 @@ mod integration_tests {
             ..config(&bucket, 10)
         };
         let prefix = config.key_prefix.clone();
-        let client = config.create_client(&cx.globals.proxy).unwrap();
-        let sink = config.build_processor(client, cx).unwrap();
+        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let sink = config.build_processor(service, cx).unwrap();
 
         let (lines, _events) = random_lines_with_stream(100, 30, None);
 
@@ -127,8 +165,8 @@ mod integration_tests {
         };
 
         let prefix = config.key_prefix.clone();
-        let client = config.create_client(&cx.globals.proxy).unwrap();
-        let sink = config.build_processor(client, cx).unwrap();
+        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let sink = config.build_processor(service, cx).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, batch_size * batch_multiplier);
         sink.run(events).await.unwrap();
@@ -183,8 +221,8 @@ mod integration_tests {
 
         let config = config(&bucket, 1000000);
         let prefix = config.key_prefix.clone();
-        let client = config.create_client(&cx.globals.proxy).unwrap();
-        let sink = config.build_processor(client, cx).unwrap();
+        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let sink = config.build_processor(service, cx).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, 10);
         sink.run(events).await.unwrap();
@@ -215,8 +253,8 @@ mod integration_tests {
         // Break the bucket name
         config.bucket = format!("BREAK{}IT", config.bucket);
         let prefix = config.key_prefix.clone();
-        let client = config.create_client(&cx.globals.proxy).unwrap();
-        let sink = config.build_processor(client, cx).unwrap();
+        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let sink = config.build_processor(service, cx).unwrap();
 
         let (_lines, events, receiver) = make_events_batch(1, 1);
         sink.run(events).await.unwrap();
@@ -233,15 +271,19 @@ mod integration_tests {
         create_bucket(&bucket, false).await;
 
         let config = config(&bucket, 1);
-        let client = config.create_client(&ProxyConfig::from_env()).unwrap();
-        config.build_healthcheck(client).unwrap();
+        let service = config.create_service(&ProxyConfig::from_env()).unwrap();
+        config.build_healthcheck(service.client()).unwrap();
     }
 
     #[tokio::test]
     async fn s3_healthchecks_invalid_bucket() {
         let config = config("s3_healthchecks_invalid_bucket", 1);
-        let client = config.create_client(&ProxyConfig::from_env()).unwrap();
-        assert!(config.build_healthcheck(client).unwrap().await.is_err());
+        let service = config.create_service(&ProxyConfig::from_env()).unwrap();
+        assert!(config
+            .build_healthcheck(service.client())
+            .unwrap()
+            .await
+            .is_err());
     }
 
     fn client() -> S3Client {

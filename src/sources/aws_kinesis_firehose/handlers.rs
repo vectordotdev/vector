@@ -5,7 +5,7 @@ use crate::codecs;
 use crate::sources::util::TcpError;
 use crate::{
     config::log_schema,
-    event::Event,
+    event::{BatchStatus, Event},
     internal_events::{
         AwsKinesisFirehoseAutomaticRecordDecodeError, AwsKinesisFirehoseEventsReceived,
     },
@@ -16,8 +16,9 @@ use chrono::Utc;
 use flate2::read::MultiGzDecoder;
 use futures::{SinkExt, StreamExt, TryFutureExt};
 use snafu::{ResultExt, Snafu};
-use std::io::Read;
+use std::{io::Read, sync::Arc};
 use tokio_util::codec::FramedRead;
+use vector_core::event::BatchNotifier;
 use warp::reject;
 
 /// Publishes decoded events from the FirehoseRequest to the pipeline
@@ -27,6 +28,7 @@ pub async fn firehose(
     request: FirehoseRequest,
     compression: Compression,
     decoder: codecs::Decoder,
+    acknowledgements: bool,
     mut out: Pipeline,
 ) -> Result<impl warp::Reply, reject::Rejection> {
     for record in request.records {
@@ -45,11 +47,25 @@ pub async fn firehose(
                         byte_size
                     });
 
+                    let (batch, receiver) = acknowledgements
+                        .then(|| {
+                            let (batch, receiver) = BatchNotifier::new_with_receiver();
+                            (Some(batch), Some(receiver))
+                        })
+                        .unwrap_or((None, None));
+
                     for mut event in events {
+                        if let Some(batch) = &batch {
+                            event.add_batch_notifier(Arc::clone(batch));
+                        }
                         if let Event::Log(ref mut log) = event {
-                            log.insert(log_schema().timestamp_key(), request.timestamp);
-                            log.insert("request_id", request_id.to_string());
-                            log.insert("source_arn", source_arn.to_string());
+                            log.try_insert(
+                                log_schema().source_type_key(),
+                                Bytes::from("aws_kinesis_firehose"),
+                            );
+                            log.try_insert(log_schema().timestamp_key(), request.timestamp);
+                            log.try_insert_flat("request_id", request_id.to_string());
+                            log.try_insert_flat("source_arn", source_arn.to_string());
                         }
 
                         out.send(event)
@@ -65,6 +81,23 @@ pub async fn firehose(
                                 warp::reject::custom(error)
                             })
                             .await?;
+                    }
+
+                    drop(batch);
+                    if let Some(receiver) = receiver {
+                        match receiver.await {
+                            BatchStatus::Delivered => Ok(()),
+                            BatchStatus::Failed => {
+                                Err(warp::reject::custom(RequestError::DeliveryFailed {
+                                    request_id: request_id.clone(),
+                                }))
+                            }
+                            BatchStatus::Errored => {
+                                Err(warp::reject::custom(RequestError::DeliveryErrored {
+                                    request_id: request_id.clone(),
+                                }))
+                            }
+                        }?;
                     }
                 }
                 Some(Err(error)) => {

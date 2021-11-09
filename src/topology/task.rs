@@ -1,4 +1,3 @@
-use crate::buffers::{Acker, EventStream};
 use crate::config::{ComponentKey, ComponentScope};
 use futures::{future::BoxFuture, FutureExt};
 use pin_project::pin_project;
@@ -8,6 +7,9 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+use vector_core::buffers::Acker;
+
+use super::EventStream;
 
 pub enum TaskOutput {
     Source,

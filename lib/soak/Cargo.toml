@@ -1,0 +1,38 @@
+[package]
+name = "soak"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "observer"
+path = "src/bin/observer.rs"
+
+[dependencies]
+toml = "0.5"
+snafu = "0.6"
+http = "0.2"
+
+[dependencies.reqwest]
+version = "0.11"
+default-features = true
+features = ["json"]
+
+[dependencies.argh]
+version = "0.1"
+default-features = false
+features = []
+
+[dependencies.tokio]
+version = "1.13"
+default-features = false
+features = ["rt", "rt-multi-thread", "macros", "fs", "io-util", "io-std"]
+
+[dependencies.serde]
+version = "1.0"
+default-features = false
+features = ["derive", "std"]
+
+[dependencies.serde_json]
+version = "1.0"
+default-features = false
+features = ["std"]

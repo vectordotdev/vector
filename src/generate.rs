@@ -12,6 +12,7 @@ use std::{
 };
 use structopt::StructOpt;
 use toml::{map::Map, Value};
+use vector_core::buffers::BufferConfig;
 use vector_core::config::GlobalOptions;
 use vector_core::default_data_dir;
 
@@ -64,7 +65,7 @@ pub struct SinkOuter {
     #[serde(flatten)]
     pub inner: Value,
     pub healthcheck: SinkHealthcheckOptions,
-    pub buffer: crate::buffers::BufferConfig,
+    pub buffer: BufferConfig,
 }
 
 #[derive(Serialize)]
@@ -264,7 +265,7 @@ fn generate_example(
                             }
                         })
                         .unwrap_or_else(|| vec!["component-id".to_owned()]),
-                    buffer: crate::buffers::BufferConfig::default(),
+                    buffer: BufferConfig::default(),
                     healthcheck: SinkHealthcheckOptions::default(),
                     inner: example,
                 },
@@ -441,6 +442,12 @@ mod tests {
                 max_length = 102400
                 type = "stdin"
 
+                [sources.source0.decoding]
+                codec = "bytes"
+
+                [sources.source0.framing]
+                method = "newline_delimited"
+
                 [transforms.transform0]
                 inputs = ["source0"]
                 drop_field = true
@@ -474,6 +481,12 @@ mod tests {
                 max_length = 102400
                 type = "stdin"
 
+                [sources.source0.decoding]
+                codec = "bytes"
+
+                [sources.source0.framing]
+                method = "newline_delimited"
+
                 [transforms.transform0]
                 inputs = ["source0"]
                 drop_field = true
@@ -506,6 +519,12 @@ mod tests {
                 [sources.source0]
                 max_length = 102400
                 type = "stdin"
+
+                [sources.source0.decoding]
+                codec = "bytes"
+
+                [sources.source0.framing]
+                method = "newline_delimited"
 
                 [sinks.sink0]
                 inputs = ["source0"]

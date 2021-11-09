@@ -1,16 +1,19 @@
 use std::{fmt, future::Future, hash::Hash, num::NonZeroUsize, pin::Pin, sync::Arc};
 
-use futures_util::Stream;
+use futures_util::{stream::Map, Stream, StreamExt};
 use tower::Service;
+use vector_core::stream::DriverResponse;
 use vector_core::{
     buffers::{Ackable, Acker},
-    event::{EventStatus, Finalizable},
+    event::{Finalizable, Metric},
     partition::Partitioner,
     stream::{Batcher, BatcherSettings, ConcurrentMap, Driver, ExpirationQueue},
     ByteSizeOf,
 };
 
-use super::RequestBuilder;
+use super::{
+    buffer::metrics::MetricNormalize, IncrementalRequestBuilder, Normalizer, RequestBuilder,
+};
 
 impl<T: ?Sized> SinkBuilderExt for T where T: Stream {}
 
@@ -26,7 +29,7 @@ pub trait SinkBuilderExt: Stream {
         settings: BatcherSettings,
     ) -> Batcher<Self, P, ExpirationQueue<P::Key>>
     where
-        Self: Stream<Item = P::Item> + Sized + Unpin,
+        Self: Stream<Item = P::Item> + Sized,
         P: Partitioner + Unpin,
         P::Key: Eq + Hash + Clone,
         P::Item: ByteSizeOf,
@@ -92,6 +95,65 @@ pub trait SinkBuilderExt: Stream {
         })
     }
 
+    /// Constructs a [`Stream`] which transforms the input into a number of requests suitable for
+    /// sending to downstream services.
+    ///
+    /// Unlike `request_builder`, which depends on the `RequestBuilder` trait,
+    /// `incremental_request_builder` depends on the `IncrementalRequestBuilder` trait, which is
+    /// designed specifically for sinks that have more stringent requirements around the generated
+    /// requests.
+    ///
+    /// As an example, the normal `request_builder` doesn't allow for a batch of input events to be
+    /// split up: all events must be split at the beginning, encoded separately (and all together),
+    /// and the nreassembled into the request.  If the encoding of these events caused a payload to
+    /// be generated that was, say, too large, you would have to back out the operation entirely by
+    /// failing the batch.
+    ///
+    /// With `incremental_request_builder`, the builder is given all of the events in a single shot,
+    /// and can generate multiple payloads.  This is the maximally flexible approach to encoding,
+    /// but means that the trait doesn't provide any default methods like `RequestBuilder` does.
+    ///
+    /// Each input is transformed serially.
+    ///
+    /// Encoding and compression are handled internally, deferring to the builder at the necessary
+    /// checkpoints for adjusting the event before encoding/compression, as well as generating the
+    /// correct request object with the result of encoding/compressing the events.
+    fn incremental_request_builder<B>(
+        self,
+        mut builder: B,
+    ) -> Map<Self, Box<dyn FnMut(Self::Item) -> Vec<Result<B::Request, B::Error>> + Send + Sync>>
+    where
+        Self: Sized,
+        Self::Item: Send + 'static,
+        B: IncrementalRequestBuilder<<Self as Stream>::Item> + Send + Sync + 'static,
+        B::Error: Send,
+        B::Request: Send,
+    {
+        self.map(Box::new(move |input| {
+            builder
+                .encode_events_incremental(input)
+                .into_iter()
+                .map(|result| {
+                    result.map(|(metadata, payload)| builder.build_request(metadata, payload))
+                })
+                .collect()
+        }))
+    }
+
+    /// Normalizes a stream of [`Metric`] events with the provided normalizer.
+    ///
+    /// An implementation of [`MetricNormalize`] is used to either drop metrics which cannot be
+    /// supported by the sink, or to modify them.  Such modifications typically include converting
+    /// absolute metrics to incremental metrics by tracking the change over time for a particular
+    /// series, or emitting absolute metrics based on incremental updates.
+    fn normalized<N>(self) -> Normalizer<Self, N>
+    where
+        Self: Stream<Item = Metric> + Unpin + Sized,
+        N: MetricNormalize,
+    {
+        Normalizer::new(self)
+    }
+
     /// Creates a [`Driver`] that uses the configured event stream as the input to the given
     /// service.
     ///
@@ -108,7 +170,7 @@ pub trait SinkBuilderExt: Stream {
         Svc: Service<Self::Item>,
         Svc::Error: fmt::Debug + 'static,
         Svc::Future: Send + 'static,
-        Svc::Response: AsRef<EventStatus>,
+        Svc::Response: DriverResponse,
     {
         Driver::new(self, service, acker)
     }

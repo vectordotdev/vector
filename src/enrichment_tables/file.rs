@@ -37,22 +37,11 @@ struct FileC {
     encoding: Encoding,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-#[serde(rename_all = "snake_case")]
-enum SchemaType {
-    String,
-    Date,
-    DateTime,
-    Integer,
-    Float,
-    Boolean,
-}
-
 #[derive(Serialize, Deserialize, Default, Debug, Clone, PartialEq)]
 pub struct FileConfig {
     file: FileC,
     #[serde(default)]
-    schema: HashMap<String, SchemaType>,
+    schema: HashMap<String, String>,
 }
 
 const fn default_delimiter() -> char {
@@ -70,30 +59,50 @@ impl FileConfig {
         use chrono::TimeZone;
 
         Ok(match self.schema.get(column) {
-            Some(SchemaType::Date) => Value::Timestamp(
-                chrono::FixedOffset::east(0)
-                    .from_utc_datetime(
-                        &chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
+            Some(format) => {
+                let mut split = format.splitn(2, '|').map(|segment| segment.trim());
+
+                match (split.next(), split.next()) {
+                    (Some("date"), None) => Value::Timestamp(
+                        chrono::FixedOffset::east(0)
+                            .from_utc_datetime(
+                                &chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
+                                    .map_err(|_| {
+                                        format!(
+                                            "unable to parse date {} found in row {}",
+                                            value, row
+                                        )
+                                    })?
+                                    .and_hms(0, 0, 0),
+                            )
+                            .into(),
+                    ),
+                    (Some("date"), Some(format)) => Value::Timestamp(
+                        chrono::FixedOffset::east(0)
+                            .from_utc_datetime(
+                                &chrono::NaiveDate::parse_from_str(value, format)
+                                    .map_err(|_| {
+                                        format!(
+                                            "unable to parse date {} found in row {}",
+                                            value, row
+                                        )
+                                    })?
+                                    .and_hms(0, 0, 0),
+                            )
+                            .into(),
+                    ),
+                    _ => {
+                        let conversion =
+                            Conversion::parse(format, timezone).map_err(|err| err.to_string())?;
+                        conversion
+                            .convert(Bytes::copy_from_slice(value.as_bytes()))
                             .map_err(|_| {
-                                format!("unable to parse date {} found in row {}", value, row)
+                                format!("unable to parse {} found in row {}", value, row)
                             })?
-                            .and_hms(0, 0, 0),
-                    )
-                    .into(),
-            ),
-            Some(SchemaType::DateTime) => Conversion::Timestamp(timezone)
-                .convert(Bytes::copy_from_slice(value.as_bytes()))
-                .map_err(|_| format!("unable to parse datetime {} found in row {}", value, row))?,
-            Some(SchemaType::Integer) => Conversion::Integer
-                .convert(Bytes::copy_from_slice(value.as_bytes()))
-                .map_err(|_| format!("unable to parse integer {} found in row {}", value, row))?,
-            Some(SchemaType::Float) => Conversion::Boolean
-                .convert(Bytes::copy_from_slice(value.as_bytes()))
-                .map_err(|_| format!("unable to parse integer {} found in row {}", value, row))?,
-            Some(SchemaType::Boolean) => Conversion::Boolean
-                .convert(Bytes::copy_from_slice(value.as_bytes()))
-                .map_err(|_| format!("unable to parse integer {} found in row {}", value, row))?,
-            Some(SchemaType::String) | None => value.into(),
+                    }
+                }
+            }
+            None => value.into(),
         })
     }
 
@@ -519,6 +528,71 @@ mod tests {
     use super::*;
     use chrono::TimeZone;
     use shared::btreemap;
+
+    #[test]
+    fn parse_column() {
+        let mut schema = HashMap::new();
+        schema.insert("col1".to_string(), " string ".to_string());
+        schema.insert("col2".to_string(), " date ".to_string());
+        schema.insert("col3".to_string(), "date|%m/%d/%Y".to_string());
+        schema.insert("col3-spaces".to_string(), "date | %m %d %Y".to_string());
+        schema.insert("col4".to_string(), "timestamp|%+".to_string());
+        schema.insert("col4-spaces".to_string(), "timestamp | %+".to_string());
+        schema.insert("col5".to_string(), "int".to_string());
+        let config = FileConfig {
+            file: Default::default(),
+            schema,
+        };
+
+        assert_eq!(
+            Ok(Value::from("zork")),
+            config.parse_column(Default::default(), "col1", 1, "zork")
+        );
+
+        assert_eq!(
+            Ok(Value::from(chrono::Utc.ymd(2020, 3, 5).and_hms(0, 0, 0))),
+            config.parse_column(Default::default(), "col2", 1, "2020-03-05")
+        );
+
+        assert_eq!(
+            Ok(Value::from(chrono::Utc.ymd(2020, 3, 5).and_hms(0, 0, 0))),
+            config.parse_column(Default::default(), "col3", 1, "03/05/2020")
+        );
+
+        assert_eq!(
+            Ok(Value::from(chrono::Utc.ymd(2020, 3, 5).and_hms(0, 0, 0))),
+            config.parse_column(Default::default(), "col3-spaces", 1, "03 05 2020")
+        );
+
+        assert_eq!(
+            Ok(Value::from(
+                chrono::Utc.ymd(2001, 7, 7).and_hms_micro(15, 4, 0, 26490)
+            )),
+            config.parse_column(
+                Default::default(),
+                "col4",
+                1,
+                "2001-07-08T00:34:00.026490+09:30"
+            )
+        );
+
+        assert_eq!(
+            Ok(Value::from(
+                chrono::Utc.ymd(2001, 7, 7).and_hms_micro(15, 4, 0, 26490)
+            )),
+            config.parse_column(
+                Default::default(),
+                "col4-spaces",
+                1,
+                "2001-07-08T00:34:00.026490+09:30"
+            )
+        );
+
+        assert_eq!(
+            Ok(Value::from(42)),
+            config.parse_column(Default::default(), "col5", 1, "42")
+        );
+    }
 
     #[test]
     fn seahash() {

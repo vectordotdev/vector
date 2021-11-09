@@ -1,5 +1,6 @@
 #![deny(missing_docs)]
 
+use super::Event;
 use crate::ByteSizeOf;
 use atomig::{Atom, Atomic, Ordering};
 use futures::future::FutureExt;
@@ -110,6 +111,12 @@ impl EventFinalizers {
     }
 }
 
+impl Finalizable for EventFinalizers {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        mem::take(self)
+    }
+}
+
 /// An event finalizer is the shared data required to handle tracking
 /// the status of an event, and updating the status of a batch with that
 /// when the event is dropped.
@@ -212,6 +219,32 @@ impl BatchNotifier {
             notifier: Some(sender),
         };
         (Arc::new(notifier), BatchStatusReceiver(receiver))
+    }
+
+    /// Optionally call `new_with_receiver` and wrap the result in `Option`s
+    pub fn maybe_new_with_receiver(
+        enabled: bool,
+    ) -> (Option<Arc<Self>>, Option<BatchStatusReceiver>) {
+        if enabled {
+            let (batch, receiver) = Self::new_with_receiver();
+            (Some(batch), Some(receiver))
+        } else {
+            (None, None)
+        }
+    }
+
+    /// Apply a new batch notifier to a batch of events, and return the receiver.
+    pub fn maybe_apply_to_events(
+        enabled: bool,
+        events: &mut [Event],
+    ) -> Option<BatchStatusReceiver> {
+        enabled.then(|| {
+            let (batch, receiver) = Self::new_with_receiver();
+            for event in events {
+                event.add_batch_notifier(Arc::clone(&batch));
+            }
+            receiver
+        })
     }
 
     /// Update this notifier's status from the status of a finalized event.
@@ -335,6 +368,16 @@ pub trait Finalizable {
     /// when batching finalizable objects where all finalizations will be
     /// processed when the batch itself is processed.
     fn take_finalizers(&mut self) -> EventFinalizers;
+}
+
+impl<T: Finalizable> Finalizable for Vec<T> {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.iter_mut()
+            .fold(EventFinalizers::default(), |mut acc, x| {
+                acc.merge(x.take_finalizers());
+                acc
+            })
+    }
 }
 
 #[cfg(test)]

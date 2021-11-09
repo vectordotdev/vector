@@ -1,4 +1,5 @@
-use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
+use super::{GcpAuthConfig, GcpCredentials, Scope};
+use crate::sinks::gcs_common::config::healthcheck_response;
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::Event,
@@ -221,6 +222,7 @@ mod tests {
 #[cfg(feature = "gcp-pubsub-integration-tests")]
 mod integration_tests {
     use super::*;
+    use crate::test_util::components::{self, HTTP_SINK_TAGS};
     use crate::test_util::{random_events_with_stream, random_string, trace_init};
     use reqwest::{Client, Method, Response};
     use serde_json::{json, Value};
@@ -255,7 +257,7 @@ mod integration_tests {
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (input, events) = random_events_with_stream(100, 100, Some(batch));
-        sink.run(events).await.expect("Sending events failed");
+        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let response = pull_messages(&subscription, 1000).await;

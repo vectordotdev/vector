@@ -2,13 +2,12 @@ use super::service::LogApiRetry;
 use super::sink::{DatadogLogsJsonEncoding, LogSinkBuilder};
 use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
 use crate::http::HttpClient;
-use crate::sinks::datadog::logs::healthcheck::healthcheck;
 use crate::sinks::datadog::logs::service::LogApiService;
-use crate::sinks::datadog::Region;
+use crate::sinks::datadog::{get_api_validate_endpoint, healthcheck, Region};
 use crate::sinks::util::encoding::EncodingConfigFixed;
 use crate::sinks::util::service::ServiceBuilderExt;
+use crate::sinks::util::BatchSettings;
 use crate::sinks::util::{BatchConfig, Compression, TowerRequestConfig};
-use crate::sinks::util::{BatchSettings, Concurrency};
 use crate::sinks::{Healthcheck, VectorSink};
 use crate::tls::{MaybeTlsSettings, TlsConfig};
 use futures::FutureExt;
@@ -31,8 +30,6 @@ pub const BATCH_GOAL_BYTES: usize = 4_250_000;
 pub const BATCH_MAX_EVENTS: usize = 1_000;
 pub const BATCH_DEFAULT_TIMEOUT_SECS: u64 = 5;
 
-const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
-    TowerRequestConfig::new(Concurrency::Fixed(50)).rate_limit_num(250);
 const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = BatchSettings::const_default()
     .bytes(BATCH_GOAL_BYTES)
     .events(BATCH_MAX_EVENTS)
@@ -75,6 +72,8 @@ impl GenerateConfig for DatadogLogsConfig {
 }
 
 impl DatadogLogsConfig {
+    // TODO: We should probably hoist this type of base URI generation so that all DD sinks can
+    // utilize it, since it all follows the same pattern.
     fn get_uri(&self) -> http::Uri {
         let endpoint = self
             .endpoint
@@ -101,7 +100,7 @@ impl DatadogLogsConfig {
         cx: SinkContext,
     ) -> crate::Result<VectorSink> {
         let default_api_key: Arc<str> = Arc::from(self.default_api_key.clone().as_str());
-        let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
+        let request_limits = self.request.unwrap_with(&Default::default());
 
         // We forcefully cap the provided batch configuration to the size/log line limits imposed by
         // the Datadog Logs API, but we still allow them to be lowered if need be.
@@ -129,8 +128,9 @@ impl DatadogLogsConfig {
     }
 
     pub fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
-        let healthcheck = healthcheck(client, self.get_uri(), self.default_api_key.clone()).boxed();
-        Ok(healthcheck)
+        let validate_endpoint =
+            get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_ref(), self.region)?;
+        Ok(healthcheck(client, validate_endpoint, self.default_api_key.clone()).boxed())
     }
 
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {

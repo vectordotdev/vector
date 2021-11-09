@@ -2,7 +2,7 @@
 name = "k8s-e2e-tests"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@timber.io>"]
-edition = "2018"
+edition = "2021"
 description = "End-to-end tests of Vector in the Kubernetes environment"
 publish = false
 license = "MPL-2.0"
@@ -12,9 +12,9 @@ futures = "0.3"
 k8s-openapi = { version = "0.13.1", default-features = false, features = ["v1_16"] }
 k8s-test-framework = { version = "0.1", path = "../k8s-test-framework" }
 regex = "1"
-reqwest = { version = "0.11.5", features = ["json"] }
+reqwest = { version = "0.11.6", features = ["json"] }
 serde_json = "1"
-tokio = { version = "1.12.0", features = ["full"] }
+tokio = { version = "1.13.0", features = ["full"] }
 indoc = "1.0.3"
 env_logger = "0.9"
 tracing = { version = "0.1", features = ["log"] }

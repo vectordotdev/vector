@@ -3,13 +3,13 @@ use criterion::{criterion_group, Criterion, SamplingMode, Throughput};
 use futures::{future, stream, SinkExt, StreamExt};
 use std::{convert::Infallible, time::Duration};
 use vector::{
-    buffers::Acker,
     sinks::util::{
         batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
         BatchSink, Buffer, Compression, EncodedEvent, Partition, PartitionBatchSink,
     },
     test_util::{random_lines, runtime},
 };
+use vector_core::buffers::Acker;
 
 fn benchmark_batch(c: &mut Criterion) {
     let event_len: usize = 100;

@@ -42,16 +42,6 @@ components: sources: splunk_hec: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -66,10 +56,8 @@ components: sources: splunk_hec: {
 			common:      true
 			description: "The address to accept connections on."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "0.0.0.0:\(_port)"
-				syntax:  "literal"
 			}
 		}
 		token: {
@@ -80,19 +68,17 @@ components: sources: splunk_hec: {
 			type: string: {
 				default: null
 				examples: ["A94A8FE5CCB19BA61C4C08"]
-				syntax: "literal"
 			}
 		}
 		valid_tokens: {
 			common:      true
 			description: "If supplied, incoming requests must supply one of these tokens in the `Authorization` header, just as a client would if it was communicating with the Splunk HEC endpoint directly. If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated."
 			required:    false
-			warnings: []
 			type: array: {
 				default: null
+
 				items: type: string: {
 					examples: ["A94A8FE5CCB19BA61C4C08"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -112,9 +98,12 @@ components: sources: splunk_hec: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
-		http_request_errors_total:       components.sources.internal_metrics.output.metrics.http_request_errors_total
-		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
-		requests_received_total:         components.sources.internal_metrics.output.metrics.requests_received_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
+		http_request_errors_total:            components.sources.internal_metrics.output.metrics.http_request_errors_total
+		requests_received_total:              components.sources.internal_metrics.output.metrics.requests_received_total
 	}
 }

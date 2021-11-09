@@ -21,7 +21,10 @@ components: sources: datadog_agent: {
 
 	features: {
 		multiline: enabled: false
-		codecs: enabled:    true
+		codecs: {
+			enabled:         true
+			default_framing: "bytes"
+		}
 		receive: {
 			from: {
 				service: services.datadog_agent
@@ -44,16 +47,6 @@ components: sources: datadog_agent: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -82,7 +75,6 @@ components: sources: datadog_agent: {
 				required:    true
 				type: string: {
 					examples: ["Hi from erlang"]
-					syntax: "literal"
 				}
 			}
 			status: {
@@ -90,7 +82,6 @@ components: sources: datadog_agent: {
 				required:    true
 				type: string: {
 					examples: ["info"]
-					syntax: "literal"
 				}
 			}
 			timestamp: fields._current_timestamp
@@ -100,7 +91,6 @@ components: sources: datadog_agent: {
 				required:    true
 				type: string: {
 					examples: ["backend"]
-					syntax: "literal"
 				}
 			}
 			ddsource: {
@@ -108,7 +98,6 @@ components: sources: datadog_agent: {
 				required:    true
 				type: string: {
 					examples: ["java"]
-					syntax: "literal"
 				}
 			}
 			ddtags: {
@@ -116,7 +105,6 @@ components: sources: datadog_agent: {
 				required:    true
 				type: string: {
 					examples: ["env:prod,region:ap-east-1"]
-					syntax: "literal"
 				}
 			}
 		}

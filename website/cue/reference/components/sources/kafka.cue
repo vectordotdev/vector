@@ -16,7 +16,10 @@ components: sources: kafka: {
 			from: components._kafka.features.collect.from
 		}
 		multiline: enabled: false
-		codecs: enabled:    true
+		codecs: {
+			enabled:         true
+			default_framing: "bytes"
+		}
 	}
 
 	classes: {
@@ -44,11 +47,9 @@ components: sources: kafka: {
 				clarification.
 				"""
 			required:    false
-			warnings: []
 			type: string: {
 				default: "largest"
 				examples: ["smallest", "earliest", "beginning", "largest", "latest", "end", "error"]
-				syntax: "literal"
 			}
 		}
 		bootstrap_servers: components._kafka.configuration.bootstrap_servers
@@ -56,7 +57,6 @@ components: sources: kafka: {
 			common:      false
 			description: "The frequency that the consumer offsets are committed (written) to offset storage."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 5000
 				examples: [5000, 10000]
@@ -67,7 +67,6 @@ components: sources: kafka: {
 			common:      false
 			description: "Maximum time the broker may wait to fill the response."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 100
 				examples: [50, 100]
@@ -77,65 +76,53 @@ components: sources: kafka: {
 		group_id: {
 			description: "The consumer group name to be used to consume events from Kafka."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["consumer-group-name"]
-				syntax: "literal"
 			}
 		}
 		key_field: {
 			common:      true
 			description: "The log field name to use for the Kafka message key."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "message_key"
 				examples: ["message_key"]
-				syntax: "literal"
 			}
 		}
 		topic_key: {
 			common:      false
 			description: "The log field name to use for the Kafka topic."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "topic"
 				examples: ["topic"]
-				syntax: "literal"
 			}
 		}
 		partition_key: {
 			common:      false
 			description: "The log field name to use for the Kafka partition name."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "partition"
 				examples: ["partition"]
-				syntax: "literal"
 			}
 		}
 		offset_key: {
 			common:      false
 			description: "The log field name to use for the Kafka offset."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "offset"
 				examples: ["offset"]
-				syntax: "literal"
 			}
 		}
 		headers_key: {
 			common:      false
 			description: "The log field name to use for the Kafka headers."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "headers"
 				examples: ["headers"]
-				syntax: "literal"
 			}
 		}
 		librdkafka_options: components._kafka.configuration.librdkafka_options
@@ -143,7 +130,6 @@ components: sources: kafka: {
 			common:      false
 			description: "Options for SASL/SCRAM authentication support."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -151,40 +137,33 @@ components: sources: kafka: {
 						common:      true
 						description: "Enable SASL/SCRAM authentication to the remote (not supported on Windows at this time)."
 						required:    false
-						warnings: []
 						type: bool: default: null
 					}
 					mechanism: {
 						common:      true
 						description: "The Kafka SASL/SCRAM mechanisms."
 						required:    false
-						warnings: []
 						type: string: {
 							default: null
 							examples: ["SCRAM-SHA-256", "SCRAM-SHA-512"]
-							syntax: "literal"
 						}
 					}
 					password: {
 						common:      true
 						description: "The Kafka SASL/SCRAM authentication password."
 						required:    false
-						warnings: []
 						type: string: {
 							default: null
 							examples: ["password"]
-							syntax: "literal"
 						}
 					}
 					username: {
 						common:      true
 						description: "The Kafka SASL/SCRAM authentication username."
 						required:    false
-						warnings: []
 						type: string: {
 							default: null
 							examples: ["username"]
-							syntax: "literal"
 						}
 					}
 				}
@@ -194,7 +173,6 @@ components: sources: kafka: {
 			common:      false
 			description: "The Kafka session timeout in milliseconds."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 10000
 				examples: [5000, 10000]
@@ -205,10 +183,8 @@ components: sources: kafka: {
 		topics: {
 			description: "The Kafka topics names to read events from. Regex is supported if the topic begins with `^`."
 			required:    true
-			warnings: []
 			type: array: items: type: string: {
 				examples: ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"]
-				syntax: "literal"
 			}
 		}
 	}
@@ -221,7 +197,6 @@ components: sources: kafka: {
 				required:    true
 				type: string: {
 					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
-					syntax: "literal"
 				}
 			}
 			offset: {
@@ -237,7 +212,6 @@ components: sources: kafka: {
 				required:    true
 				type: string: {
 					examples: ["partition"]
-					syntax: "literal"
 				}
 			}
 			timestamp: fields._current_timestamp & {
@@ -248,7 +222,6 @@ components: sources: kafka: {
 				required:    true
 				type: string: {
 					examples: ["topic"]
-					syntax: "literal"
 				}
 			}
 		}

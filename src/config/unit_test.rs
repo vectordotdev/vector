@@ -57,6 +57,7 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
         transforms,
         tests: builder.tests,
         expansions,
+        ..Config::default()
     };
 
     for test in &config.tests {
@@ -575,6 +576,8 @@ async fn build_unit_test(
             "unit test must contain at least one of `outputs` or `no_outputs_from`.".to_owned(),
         );
     }
+
+    enrichment_tables.finish_load();
 
     if !errors.is_empty() {
         Err(errors)

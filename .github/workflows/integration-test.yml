@@ -78,7 +78,7 @@ jobs:
          - test: 'splunk'
          - test: 'dnstap'
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.4.0
       - run: make ci-sweep
       - uses: actions/cache@v2.1.4
         with:

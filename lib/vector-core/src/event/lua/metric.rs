@@ -1,5 +1,11 @@
 use super::util::{table_to_timestamp, timestamp_to_table};
-use crate::event::{metric, Metric, MetricKind, MetricValue, StatisticKind};
+use crate::{
+    event::{
+        metric::{self, MetricSketch},
+        Metric, MetricKind, MetricValue, StatisticKind,
+    },
+    metrics::AgentDDSketch,
+};
 use mlua::prelude::*;
 use std::collections::BTreeMap;
 
@@ -119,12 +125,32 @@ impl<'a> ToLua<'a> for Metric {
             } => {
                 let aggregated_summary = lua.create_table()?;
                 let values: Vec<_> = quantiles.iter().map(|q| q.value).collect();
-                let quantiles: Vec<_> = quantiles.into_iter().map(|q| q.upper_limit).collect();
+                let quantiles: Vec<_> = quantiles.into_iter().map(|q| q.quantile).collect();
                 aggregated_summary.raw_set("quantiles", quantiles)?;
                 aggregated_summary.raw_set("values", values)?;
                 aggregated_summary.raw_set("count", count)?;
                 aggregated_summary.raw_set("sum", sum)?;
                 tbl.raw_set("aggregated_summary", aggregated_summary)?;
+            }
+            MetricValue::Sketch { sketch } => {
+                let sketch_tbl = match sketch {
+                    MetricSketch::AgentDDSketch(ddsketch) => {
+                        let sketch_tbl = lua.create_table()?;
+                        sketch_tbl.raw_set("type", "ddsketch")?;
+                        sketch_tbl.raw_set("count", ddsketch.count())?;
+                        sketch_tbl.raw_set("min", ddsketch.min())?;
+                        sketch_tbl.raw_set("max", ddsketch.max())?;
+                        sketch_tbl.raw_set("sum", ddsketch.sum())?;
+                        sketch_tbl.raw_set("avg", ddsketch.avg())?;
+
+                        let bin_map = ddsketch.bin_map();
+                        sketch_tbl.raw_set("k", bin_map.keys)?;
+                        sketch_tbl.raw_set("n", bin_map.counts)?;
+                        sketch_tbl
+                    }
+                };
+
+                tbl.raw_set("sketch", sketch_tbl)?;
             }
         }
 
@@ -133,6 +159,7 @@ impl<'a> ToLua<'a> for Metric {
 }
 
 impl<'a> FromLua<'a> for Metric {
+    #[allow(clippy::too_many_lines)]
     fn from_lua(value: LuaValue<'a>, _: &'a Lua) -> LuaResult<Self> {
         let table = match &value {
             LuaValue::Table(table) => table,
@@ -195,6 +222,38 @@ impl<'a> FromLua<'a> for Metric {
                 quantiles: metric::zip_quantiles(quantiles, values),
                 count: aggregated_summary.raw_get("count")?,
                 sum: aggregated_summary.raw_get("sum")?,
+            }
+        } else if let Some(sketch) = table.raw_get::<_, Option<LuaTable>>("sketch")? {
+            let sketch_type: String = sketch.raw_get("type")?;
+            match sketch_type.as_str() {
+                "ddsketch" => {
+                    let count: u32 = sketch.raw_get("count")?;
+                    let min: f64 = sketch.raw_get("min")?;
+                    let max: f64 = sketch.raw_get("max")?;
+                    let sum: f64 = sketch.raw_get("sum")?;
+                    let avg: f64 = sketch.raw_get("avg")?;
+                    let k: Vec<i16> = sketch.raw_get("k")?;
+                    let n: Vec<u16> = sketch.raw_get("n")?;
+
+                    AgentDDSketch::from_raw(count, min, max, sum, avg, &k, &n)
+                        .map(|sketch| MetricValue::Sketch {
+                            sketch: MetricSketch::AgentDDSketch(sketch),
+                        })
+                        .ok_or(LuaError::FromLuaConversionError {
+                            from: value.type_name(),
+                            to: "Metric",
+                            message: Some(
+                                "Invalid structure for converting to AgentDDSketch".to_string(),
+                            ),
+                        })?
+                }
+                x => {
+                    return Err(LuaError::FromLuaConversionError {
+                        from: value.type_name(),
+                        to: "Metric",
+                        message: Some(format!("Invalid sketch type '{}' given", x)),
+                    })
+                }
             }
         } else {
             return Err(LuaError::FromLuaConversionError {

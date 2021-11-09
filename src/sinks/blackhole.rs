@@ -1,7 +1,5 @@
 use crate::{
-    buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    emit,
     internal_events::BlackholeEventReceived,
     sinks::util::StreamSink,
 };
@@ -20,8 +18,8 @@ use tokio::{
     sync::watch,
     time::{interval, sleep_until},
 };
-use vector_core::event::Event;
 use vector_core::ByteSizeOf;
+use vector_core::{buffers::Acker, event::Event};
 
 pub struct BlackholeSink {
     total_events: Arc<AtomicUsize>,

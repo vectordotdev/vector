@@ -8,8 +8,8 @@ mod integration_test {
     use crate::sinks::kafka::*;
     use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
     use crate::sinks::util::{BatchConfig, StreamSink};
+    use crate::test_util::components;
     use crate::{
-        buffers::Acker,
         kafka::{KafkaAuthConfig, KafkaSaslConfig, KafkaTlsConfig},
         test_util::{random_lines_with_stream, random_string, wait_for},
         tls::TlsOptions,
@@ -23,6 +23,7 @@ mod integration_test {
     };
     use std::collections::HashMap;
     use std::{collections::BTreeMap, future::ready, thread, time::Duration};
+    use vector_core::buffers::Acker;
     use vector_core::event::{BatchNotifier, BatchStatus};
 
     #[tokio::test]
@@ -268,7 +269,9 @@ mod integration_test {
                 .insert(headers_key.clone(), header_values);
             event
         });
+        components::init_test();
         sink.run(Box::pin(input_events)).await.unwrap();
+        components::SINK_TESTS.assert(&["protocol"]);
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         // read back everything from the beginning

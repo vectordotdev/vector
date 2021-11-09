@@ -25,22 +25,12 @@ components: transforms: key_value_parser: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: [
 			"""
 			\(key_value_parser._remap_deprecation_notice)
 
-			```vrl
+			```coffee
 			.message = parse_key_value(.message)
 			```
 			""",
@@ -58,7 +48,6 @@ components: transforms: key_value_parser: {
 			common:      true
 			description: "If `true` will drop the specified `field` after parsing."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 
@@ -66,11 +55,9 @@ components: transforms: key_value_parser: {
 			common:      true
 			description: "The log field containing key/value pairs to parse. Must be a `string` value."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child", "array[0]"]
-				syntax: "literal"
 			}
 		}
 
@@ -81,7 +68,6 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: "="
 				examples: [":", "="]
-				syntax: "literal"
 			}
 		}
 
@@ -102,7 +88,6 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: "[whitespace]"
 				examples: [",", ";", "|"]
-				syntax: "literal"
 			}
 		}
 
@@ -118,7 +103,6 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: null
 				examples: ["root_field", "parent.child"]
-				syntax: "literal"
 			}
 		}
 
@@ -132,7 +116,6 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: null
 				examples: ["<>", "{}"]
-				syntax: "literal"
 			}
 		}
 
@@ -146,7 +129,6 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: null
 				examples: ["<>", "{}"]
-				syntax: "literal"
 			}
 		}
 
