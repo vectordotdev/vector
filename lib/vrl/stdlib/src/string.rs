@@ -52,8 +52,10 @@ struct StringFn {
 
 impl Expression for StringFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        match self.value.resolve(ctx)? {
-            v @ Value::Bytes(_) => Ok(v),
+        let value = self.value.resolve(ctx)?;
+        let borrowed = value.borrow();
+        match &*borrowed {
+            Value::Bytes(_) => Ok(value.clone()),
             v => Err(format!(r#"expected "string", got {}"#, v.kind()).into()),
         }
     }

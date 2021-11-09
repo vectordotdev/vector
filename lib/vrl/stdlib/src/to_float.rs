@@ -107,15 +107,21 @@ impl Expression for ToFloatFn {
         use Value::*;
 
         let value = self.value.resolve(ctx)?;
+        let borrowed = value.borrow();
 
-        match value {
-            Float(_) => Ok(value),
-            Integer(v) => Ok((v as f64).into()),
-            Boolean(v) => Ok(NotNan::new(if v { 1.0 } else { 0.0 }).unwrap().into()),
-            Null => Ok(0.0.into()),
-            Timestamp(v) => Ok((v.timestamp_nanos() as f64 / 1_000_000_000_f64).into()),
+        match &*borrowed {
+            Float(_) => Ok(value.clone()),
+            Integer(v) => Ok(SharedValue::from(*v as f64)),
+            Boolean(v) => Ok(SharedValue::from(
+                NotNan::new(if *v { 1.0 } else { 0.0 }).unwrap(),
+            )),
+            Null => Ok(SharedValue::from(0.0)),
+            Timestamp(v) => Ok(SharedValue::from(
+                v.timestamp_nanos() as f64 / 1_000_000_000_f64,
+            )),
             Bytes(v) => Conversion::Float
-                .convert(v)
+                .convert::<Value>(v.clone())
+                .map(SharedValue::from)
                 .map_err(|e| e.to_string().into()),
             v => Err(format!(r#"unable to coerce {} into "float""#, v.kind()).into()),
         }

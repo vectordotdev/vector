@@ -40,7 +40,9 @@ struct StripAnsiEscapeCodesFn {
 
 impl Expression for StripAnsiEscapeCodesFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
+        let bytes = self.value.resolve(ctx)?;
+        let bytes = bytes.borrow();
+        let bytes = bytes.try_bytes()?;
 
         strip_ansi_escapes::strip(&bytes)
             .map(Bytes::from)

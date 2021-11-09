@@ -1,5 +1,8 @@
 use crate::{Expression, SharedValue, Value};
 use bytes::Bytes;
+use chrono::{DateTime, Utc};
+use ordered_float::NotNan;
+use std::collections::BTreeMap;
 use std::iter::FromIterator;
 use std::{borrow::Cow, cell::RefCell, rc::Rc};
 
@@ -64,6 +67,12 @@ impl From<usize> for SharedValue {
     }
 }
 
+impl From<NotNan<f64>> for SharedValue {
+    fn from(v: NotNan<f64>) -> Self {
+        SharedValue::from(Value::from(v))
+    }
+}
+
 impl From<f64> for SharedValue {
     fn from(v: f64) -> Self {
         SharedValue::from(Value::from(v))
@@ -108,6 +117,36 @@ impl From<String> for SharedValue {
 
 impl From<&str> for SharedValue {
     fn from(v: &str) -> Self {
+        SharedValue::from(Value::from(v))
+    }
+}
+
+impl From<regex::Regex> for SharedValue {
+    fn from(regex: regex::Regex) -> Self {
+        SharedValue::from(Value::from(regex))
+    }
+}
+
+impl From<DateTime<Utc>> for SharedValue {
+    fn from(v: DateTime<Utc>) -> Self {
+        SharedValue::from(Value::from(v))
+    }
+}
+
+impl<T: Into<Value>> From<Vec<T>> for SharedValue {
+    fn from(v: Vec<T>) -> Self {
+        SharedValue::from(Value::from(v))
+    }
+}
+
+impl From<Vec<SharedValue>> for SharedValue {
+    fn from(v: Vec<SharedValue>) -> Self {
+        SharedValue::from(Value::from(v))
+    }
+}
+
+impl From<BTreeMap<String, SharedValue>> for SharedValue {
+    fn from(v: BTreeMap<String, SharedValue>) -> Self {
         SharedValue::from(Value::from(v))
     }
 }

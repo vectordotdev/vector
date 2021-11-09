@@ -72,9 +72,16 @@ struct SliceFn {
 
 impl Expression for SliceFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let start = self.start.resolve(ctx)?.try_integer()?;
+        let start = self.start.resolve(ctx)?;
+        let start = start.borrow();
+        let start = start.try_integer()?;
+
         let end = match &self.end {
-            Some(expr) => Some(expr.resolve(ctx)?.try_integer()?),
+            Some(expr) => Some({
+                let end = expr.resolve(ctx)?;
+                let end = end.borrow();
+                end.try_integer()?
+            }),
             None => None,
         };
 
@@ -100,13 +107,22 @@ impl Expression for SliceFn {
             }
         };
 
-        match self.value.resolve(ctx)? {
+        let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
+
+        match &*value {
             Value::Bytes(v) => range(v.len() as i64)
                 .map(|range| v.slice(range))
-                .map(Value::from),
-            Value::Array(mut v) => range(v.len() as i64)
-                .map(|range| v.drain(range).collect::<Vec<_>>())
-                .map(Value::from),
+                .map(SharedValue::from),
+            Value::Array(v) => range(v.len() as i64)
+                .map(|range| {
+                    v.iter()
+                        .skip(range.start)
+                        .take(range.end - range.start)
+                        .cloned()
+                        .collect::<Vec<_>>()
+                })
+                .map(SharedValue::from),
             value => Err(value::Error::Expected {
                 got: value.kind(),
                 expected: Kind::Bytes | Kind::Array,

@@ -4,7 +4,7 @@
 #[macro_export]
 macro_rules! expr {
     ($($v:tt)*) => {{
-        let value = $crate::shared_value!($($v)*);
+        let value = $crate::value!($($v)*);
         value.into_expression()
     }};
 }
@@ -34,7 +34,7 @@ macro_rules! func_args {
         ::std::collections::HashMap::<&'static str, $crate::SharedValue>::default()
     );
     ($($k:tt: $v:expr),+ $(,)?) => {
-        vec![$((stringify!($k), $crate::SharedValue::from($crate::Value::from($v)))),+]
+        vec![$((stringify!($k), $crate::SharedValue::from($v))),+]
             .into_iter()
             .collect::<::std::collections::HashMap<&'static str, $crate::SharedValue>>()
     };
@@ -88,7 +88,7 @@ macro_rules! test_function {
             fn [<$name _ $case:snake:lower>]() {
                 $before
                 let mut compiler_state = $crate::state::Compiler::default();
-                let (expression, want) = $crate::__prep_bench_or_test!($func, compiler_state, $args, $(Ok($crate::SharedValue::from($crate::Value::from($ok))))? $(Err($err.to_owned()))?);
+                let (expression, want) = $crate::__prep_bench_or_test!($func, compiler_state, $args, $(Ok($crate::SharedValue::from($ok)))? $(Err($err.to_owned()))?);
                 match expression {
                     Ok(expression) => {
                         let mut runtime_state = $crate::state::Runtime::default();
@@ -158,24 +158,24 @@ macro_rules! type_def {
     };
 
     (object { $($key:expr => $value:expr,)+ }) => {
-        TypeDef::new().object::<&'static str, TypeDef>(btreemap! (
+        TypeDef::new().object::<&'static str, TypeDef>(shared::btreemap! (
             $($key => $value,)+
         ))
     };
 
     (array [ $($value:expr,)+ ]) => {
-        TypeDef::new().array_mapped::<(), TypeDef>(btreemap! (
+        TypeDef::new().array_mapped::<(), TypeDef>(shared::btreemap! (
             $(() => $value,)+
         ))
     };
 
     (array { $($idx:expr => $value:expr,)+ }) => {
-        TypeDef::new().array_mapped::<Index, TypeDef>(btreemap! (
+        TypeDef::new().array_mapped::<Index, TypeDef>(shared::btreemap! (
             $($idx => $value,)+
         ))
     };
 
     (array) => {
-        TypeDef::new().array_mapped::<i32, TypeDef>(btreemap! ())
+        TypeDef::new().array_mapped::<i32, TypeDef>(shared::btreemap! ())
     };
 }

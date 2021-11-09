@@ -281,7 +281,9 @@ impl SharedValue {
             Some(segment) => segment,
             None => {
                 // TODO, A swap may be the wrong thing here.
-                self.swap(&new); // return *self = new,
+                let mut ding = self.borrow_mut();
+                *ding = new.borrow().clone();
+                //self.swap(&new); // return *self = new,
                 return;
             }
         };

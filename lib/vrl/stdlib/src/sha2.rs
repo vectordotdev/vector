@@ -73,7 +73,9 @@ struct Sha2Fn {
 
 impl Expression for Sha2Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_bytes()?;
+        let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
+        let value = value.try_bytes()?;
 
         let hash = match self.variant.as_ref() {
             b"SHA-224" => encode::<Sha224>(&value),

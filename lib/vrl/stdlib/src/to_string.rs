@@ -99,13 +99,15 @@ impl Expression for ToStringFn {
         use chrono::SecondsFormat;
         use Value::*;
 
-        let value = match self.value.resolve(ctx)? {
-            v @ Bytes(_) => v,
-            Integer(v) => v.to_string().into(),
-            Float(v) => v.to_string().into(),
-            Boolean(v) => v.to_string().into(),
-            Timestamp(v) => v.to_rfc3339_opts(SecondsFormat::AutoSi, true).into(),
-            Null => "".into(),
+        let resolved = self.value.resolve(ctx)?;
+
+        let value = match &*resolved.borrow() {
+            Bytes(_) => resolved.clone(),
+            Integer(v) => SharedValue::from(v.to_string()),
+            Float(v) => SharedValue::from(v.to_string()),
+            Boolean(v) => SharedValue::from(v.to_string()),
+            Timestamp(v) => SharedValue::from(v.to_rfc3339_opts(SecondsFormat::AutoSi, true)),
+            Null => SharedValue::from(""),
             v => return Err(format!(r#"unable to coerce {} into "string""#, v.kind()).into()),
         };
 

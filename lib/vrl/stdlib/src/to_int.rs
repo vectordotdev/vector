@@ -107,16 +107,18 @@ impl Expression for ToIntFn {
         use Value::*;
 
         let value = self.value.resolve(ctx)?;
+        let borrowed = value.borrow();
 
-        match value {
-            Integer(_) => Ok(value),
-            Float(v) => Ok(Integer(v.into_inner() as i64)),
-            Boolean(v) => Ok(Integer(if v { 1 } else { 0 })),
-            Null => Ok(0.into()),
+        match &*borrowed {
+            Integer(_) => Ok(value.clone()),
+            Float(v) => Ok(SharedValue::from(Integer(v.into_inner() as i64))),
+            Boolean(v) => Ok(SharedValue::from(Integer(if *v { 1 } else { 0 }))),
+            Null => Ok(SharedValue::from(0)),
             Bytes(v) => Conversion::Integer
-                .convert(v)
+                .convert::<Value>(v.clone())
+                .map(SharedValue::from)
                 .map_err(|e| e.to_string().into()),
-            Timestamp(v) => Ok(v.timestamp().into()),
+            Timestamp(v) => Ok(SharedValue::from(v.timestamp())),
             v => Err(format!(r#"unable to coerce {} into "integer""#, v.kind()).into()),
         }
     }

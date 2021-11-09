@@ -90,31 +90,34 @@ impl Expression for TagTypesExternallyFn {
     }
 }
 
-fn tag_type_externally(value: Value) -> Value {
-    let (key, value) = match value {
-        value @ Value::Bytes(_) => (Some("string"), value),
-        value @ Value::Integer(_) => (Some("integer"), value),
-        value @ Value::Float(_) => (Some("float"), value),
-        value @ Value::Boolean(_) => (Some("boolean"), value),
+fn tag_type_externally(value: SharedValue) -> SharedValue {
+    let borrowed = value.borrow();
+    let (key, value) = match &*borrowed {
+        Value::Bytes(_) => (Some("string"), value.clone()),
+        Value::Integer(_) => (Some("integer"), value.clone()),
+        Value::Float(_) => (Some("float"), value.clone()),
+        Value::Boolean(_) => (Some("boolean"), value.clone()),
         Value::Object(object) => (
             None,
-            object
-                .into_iter()
-                .map(|(key, value)| (key, tag_type_externally(value)))
-                .collect::<BTreeMap<String, Value>>()
-                .into(),
+            SharedValue::from(
+                object
+                    .into_iter()
+                    .map(|(key, value)| (key.clone(), tag_type_externally(value.clone())))
+                    .collect::<BTreeMap<String, SharedValue>>(),
+            ),
         ),
         Value::Array(array) => (
             None,
-            array
-                .into_iter()
-                .map(tag_type_externally)
-                .collect::<Vec<_>>()
-                .into(),
+            SharedValue::from(
+                array
+                    .into_iter()
+                    .map(|value| tag_type_externally(value.clone()))
+                    .collect::<Vec<_>>(),
+            ),
         ),
-        value @ Value::Timestamp(_) => (Some("timestamp"), value),
-        value @ Value::Regex(_) => (Some("regex"), value),
-        Value::Null => (None, Value::Null),
+        Value::Timestamp(_) => (Some("timestamp"), value.clone()),
+        Value::Regex(_) => (Some("regex"), value.clone()),
+        Value::Null => (None, SharedValue::from(Value::Null)),
     };
 
     if let Some(key) = key {

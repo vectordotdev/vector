@@ -53,6 +53,7 @@ struct ToSyslogSeverityFn {
 impl Expression for ToSyslogSeverityFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let level = self.value.resolve(ctx)?;
+        let level = level.borrow();
         let level = level.try_bytes_utf8_lossy()?;
 
         // Severity levels: https://en.wikipedia.org/wiki/Syslog#Severity_level
@@ -68,7 +69,7 @@ impl Expression for ToSyslogSeverityFn {
             _ => return Err(format!("syslog level {} not valid", level).into()),
         };
 
-        Ok(severity.into())
+        Ok(SharedValue::from(severity))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
@@ -84,61 +85,61 @@ mod tests {
         to_level => ToSyslogSeverity;
 
         emergency {
-            args: func_args![value: value!("emerg")],
-            want: Ok(value!(0)),
+            args: func_args![value: shared_value!("emerg")],
+            want: Ok(shared_value!(0)),
             tdef: TypeDef::new().fallible().integer(),
         }
 
         alert {
-            args: func_args![value: value!("alert")],
-            want: Ok(value!(1)),
+            args: func_args![value: shared_value!("alert")],
+            want: Ok(shared_value!(1)),
             tdef: TypeDef::new().fallible().integer(),
         }
 
         critical {
-            args: func_args![value: value!("crit")],
-            want: Ok(value!(2)),
+            args: func_args![value: shared_value!("crit")],
+            want: Ok(shared_value!(2)),
             tdef: TypeDef::new().fallible().integer(),
         }
 
         error {
-            args: func_args![value: value!("err")],
-            want: Ok(value!(3)),
+            args: func_args![value: shared_value!("err")],
+            want: Ok(shared_value!(3)),
             tdef: TypeDef::new().fallible().integer(),
         }
 
         warning {
-            args: func_args![value: value!("warn")],
-            want: Ok(value!(4)),
+            args: func_args![value: shared_value!("warn")],
+            want: Ok(shared_value!(4)),
             tdef: TypeDef::new().fallible().integer(),
         }
 
         notice {
-            args: func_args![value: value!("notice")],
-            want: Ok(value!(5)),
+            args: func_args![value: shared_value!("notice")],
+            want: Ok(shared_value!(5)),
             tdef: TypeDef::new().fallible().integer(),
         }
 
         informational {
-            args: func_args![value: value!("info")],
-            want: Ok(value!(6)),
+            args: func_args![value: shared_value!("info")],
+            want: Ok(shared_value!(6)),
             tdef: TypeDef::new().fallible().integer(),
         }
 
         debug {
-            args: func_args![value: value!("debug")],
-            want: Ok(value!(7)),
+            args: func_args![value: shared_value!("debug")],
+            want: Ok(shared_value!(7)),
             tdef: TypeDef::new().fallible().integer(),
         }
 
         invalid_level_1 {
-            args: func_args![value: value!("oopsie")],
+            args: func_args![value: shared_value!("oopsie")],
             want: Err("syslog level oopsie not valid"),
             tdef: TypeDef::new().fallible().integer(),
         }
 
         invalid_level_2 {
-            args: func_args![value: value!("aww schucks")],
+            args: func_args![value: shared_value!("aww schucks")],
             want: Err("syslog level aww schucks not valid"),
             tdef: TypeDef::new().fallible().integer(),
         }

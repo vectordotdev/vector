@@ -45,9 +45,11 @@ pub(crate) struct UniqueFn {
 
 impl Expression for UniqueFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_array()?;
+        let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
+        let value = value.try_array()?;
 
-        let set: IndexSet<_> = value.into_iter().collect();
+        let set: IndexSet<_> = value.into_iter().cloned().collect();
 
         Ok(set.into_iter().collect())
     }
@@ -66,17 +68,17 @@ mod tests {
 
         default {
             args: func_args![
-                value: value!(["bar", "foo", "baz", "foo"]),
+                value: shared_value!(["bar", "foo", "baz", "foo"]),
             ],
-            want: Ok(value!(["bar", "foo", "baz"])),
+            want: Ok(shared_value!(["bar", "foo", "baz"])),
             tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
         }
 
         mixed_values {
             args: func_args![
-                value: value!(["foo", [1,2,3], "123abc", 1, true, [1,2,3], "foo", true, 1]),
+                value: shared_value!(["foo", [1,2,3], "123abc", 1, true, [1,2,3], "foo", true, 1]),
             ],
-            want: Ok(value!(["foo", [1,2,3], "123abc", 1, true])),
+            want: Ok(shared_value!(["foo", [1,2,3], "123abc", 1, true])),
             tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
         }
     ];

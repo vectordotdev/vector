@@ -76,27 +76,35 @@ pub(crate) struct SplitFn {
 impl Expression for SplitFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
         let string = value.try_bytes_utf8_lossy()?;
-        let limit = self.limit.resolve(ctx)?.try_integer()? as usize;
 
-        self.pattern.resolve(ctx).and_then(|pattern| match pattern {
-            Value::Regex(pattern) => Ok(pattern
-                .splitn(string.as_ref(), limit as usize)
-                .collect::<Vec<_>>()
-                .into()),
-            Value::Bytes(bytes) => {
-                let pattern = String::from_utf8_lossy(&bytes);
+        let limit = self.limit.resolve(ctx)?;
+        let limit = limit.borrow();
+        let limit = limit.try_integer()? as usize;
 
-                Ok(string
-                    .splitn(limit, pattern.as_ref())
+        self.pattern.resolve(ctx).and_then(|pattern| {
+            let pattern = pattern.borrow();
+
+            match &*pattern {
+                Value::Regex(pattern) => Ok(pattern
+                    .splitn(string.as_ref(), limit as usize)
                     .collect::<Vec<_>>()
-                    .into())
+                    .into()),
+                Value::Bytes(bytes) => {
+                    let pattern = String::from_utf8_lossy(&bytes);
+
+                    Ok(string
+                        .splitn(limit, pattern.as_ref())
+                        .collect::<Vec<_>>()
+                        .into())
+                }
+                value => Err(value::Error::Expected {
+                    got: value.kind(),
+                    expected: Kind::Regex | Kind::Bytes,
+                }
+                .into()),
             }
-            value => Err(value::Error::Expected {
-                got: value.kind(),
-                expected: Kind::Regex | Kind::Bytes,
-            }
-            .into()),
         })
     }
 

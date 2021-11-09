@@ -77,47 +77,55 @@ impl Expression for UnnestFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let path = self.path.path();
 
-        let value: Value;
-        let target: Box<&dyn Target> = match self.path.target() {
-            expression::Target::External => Box::new(ctx.target()) as Box<_>,
+        let value: SharedValue;
+        let root = match self.path.target() {
+            expression::Target::External => ctx
+                .target()
+                .get(&LookupBuf::root())?
+                .unwrap_or_else(|| SharedValue::from(Value::Null)),
             expression::Target::Internal(v) => {
                 let v = ctx
                     .state()
                     .variable(v.ident())
                     .unwrap_or(SharedValue::from(Value::Null));
-                Box::new(v as &dyn Target) as Box<_>
+                v.get(&LookupBuf::root())?
+                    .unwrap_or_else(|| SharedValue::from(Value::Null))
             }
             expression::Target::Container(expr) => {
                 value = expr.resolve(ctx)?;
-                Box::new(&value as &dyn Target) as Box<&dyn Target>
+
+                value
+                    .get(&LookupBuf::root())?
+                    .unwrap_or_else(|| SharedValue::from(Value::Null))
             }
             expression::Target::FunctionCall(expr) => {
                 value = expr.resolve(ctx)?;
-                Box::new(&value as &dyn Target) as Box<&dyn Target>
+                value
+                    .get(&LookupBuf::root())?
+                    .unwrap_or_else(|| SharedValue::from(Value::Null))
             }
         };
 
-        let root = target.get(&LookupBuf::root())?.unwrap_or(Value::Null);
-
         let values = root
+            .clone()
             .get_by_path(path)
-            .cloned()
             .ok_or(value::Error::Expected {
                 got: Kind::Null,
                 expected: Kind::Array,
-            })?
-            .try_array()?;
+            })?;
+        let values = values.borrow().clone();
+        let values = values.try_array()?;
 
         let events = values
-            .into_iter()
+            .iter()
             .map(|value| {
-                let mut event = root.clone();
-                event.insert_by_path(path, value);
+                let event = root.deep_clone();
+                event.clone().insert_by_path(path, value.clone());
                 event
             })
-            .collect::<Vec<_>>();
+            .collect();
 
-        Ok(Value::Array(events))
+        Ok(SharedValue::from(Value::Array(events)))
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -377,9 +385,9 @@ mod tests {
     fn unnest() {
         let cases = vec![
             (
-                value!({"hostname": "localhost", "events": [{"message": "hello"}, {"message": "world"}]}),
+                shared_value!({"hostname": "localhost", "events": [{"message": "hello"}, {"message": "world"}]}),
                 Ok(
-                    value!([{"hostname": "localhost", "events": {"message": "hello"}}, {"hostname": "localhost", "events": {"message": "world"}}]),
+                    shared_value!([{"hostname": "localhost", "events": {"message": "hello"}}, {"hostname": "localhost", "events": {"message": "world"}}]),
                 ),
                 UnnestFn::new("events"),
                 type_def! { array [
@@ -392,7 +400,7 @@ mod tests {
                 ] },
             ),
             (
-                value!({"hostname": "localhost", "events": [{"message": "hello"}, {"message": "world"}]}),
+                shared_value!({"hostname": "localhost", "events": [{"message": "hello"}, {"message": "world"}]}),
                 Err(r#"expected "array", got "null""#.to_owned()),
                 UnnestFn::new("unknown"),
                 type_def! { array [
@@ -407,7 +415,7 @@ mod tests {
                 ] },
             ),
             (
-                value!({"hostname": "localhost", "events": [{"message": "hello"}, {"message": "world"}]}),
+                shared_value!({"hostname": "localhost", "events": [{"message": "hello"}, {"message": "world"}]}),
                 Err(r#"expected "array", got "string""#.to_owned()),
                 UnnestFn::new("hostname"),
                 // The typedef in this case is not particularly important as we will have a compile

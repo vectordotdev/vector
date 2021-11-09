@@ -154,14 +154,16 @@ impl Expression for ToBoolFn {
         use Value::*;
 
         let value = self.value.resolve(ctx)?;
+        let borrowed = value.borrow();
 
-        match value {
-            Boolean(_) => Ok(value),
-            Integer(v) => Ok(Boolean(v != 0)),
-            Float(v) => Ok(Boolean(v != 0.0)),
-            Null => Ok(Boolean(false)),
+        match &*borrowed {
+            Boolean(_) => Ok(value.clone()),
+            Integer(v) => Ok(SharedValue::from(Boolean(*v != 0))),
+            Float(v) => Ok(SharedValue::from(Boolean(*v != 0.0))),
+            Null => Ok(SharedValue::from(Boolean(false))),
             Bytes(v) => Conversion::Boolean
-                .convert(v)
+                .convert::<Value>(v.clone())
+                .map(SharedValue::from)
                 .map_err(|e| e.to_string().into()),
             v => Err(format!(r#"unable to coerce {} into "boolean""#, v.kind()).into()),
         }

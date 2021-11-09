@@ -65,11 +65,19 @@ struct RoundFn {
 
 impl Expression for RoundFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let precision = self.precision.resolve(ctx)?.try_integer()?;
+        let precision = self.precision.resolve(ctx)?;
+        let precision = precision.borrow();
+        let precision = precision.try_integer()?;
 
-        match self.value.resolve(ctx)? {
-            Value::Float(f) => Ok(round_to_precision(f.into_inner(), precision, f64::round).into()),
-            value @ Value::Integer(_) => Ok(value),
+        let value = self.value.resolve(ctx)?;
+        let borrowed = value.borrow();
+        match &*borrowed {
+            Value::Float(f) => Ok(SharedValue::from(round_to_precision(
+                f.into_inner(),
+                precision,
+                f64::round,
+            ))),
+            Value::Integer(_) => Ok(value.clone()),
             value => Err(value::Error::Expected {
                 got: value.kind(),
                 expected: Kind::Float | Kind::Integer,

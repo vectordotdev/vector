@@ -46,9 +46,9 @@ struct ReverseDnsFn {
 
 impl Expression for ReverseDnsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let ip: IpAddr = self
-            .value
-            .resolve(ctx)?
+        let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
+        let ip: IpAddr = value
             .try_bytes_utf8_lossy()?
             .parse()
             .map_err(|err| format!("unable to parse IP address: {}", err))?;
@@ -72,25 +72,25 @@ mod tests {
         reverse_dns => ReverseDns;
 
         invalid_ip {
-            args: func_args![value: value!("999.999.999.999")],
+            args: func_args![value: shared_value!("999.999.999.999")],
             want: Err("unable to parse IP address: invalid IP address syntax"),
             tdef: TypeDef::new().fallible().bytes(),
         }
 
         google_ipv4 {
-            args: func_args![value: value!("8.8.8.8")],
-            want: Ok(value!("dns.google")),
+            args: func_args![value: shared_value!("8.8.8.8")],
+            want: Ok(shared_value!("dns.google")),
             tdef: TypeDef::new().fallible().bytes(),
         }
 
         google_ipv6 {
-            args: func_args![value: value!("2001:4860:4860::8844")],
-            want: Ok(value!("dns.google")),
+            args: func_args![value: shared_value!("2001:4860:4860::8844")],
+            want: Ok(shared_value!("dns.google")),
             tdef: TypeDef::new().fallible().bytes(),
         }
 
         invalid_type {
-            args: func_args![value: value!(1)],
+            args: func_args![value: shared_value!(1)],
             want: Err("expected \"string\", got \"integer\""),
             tdef: TypeDef::new().fallible().bytes(),
         }

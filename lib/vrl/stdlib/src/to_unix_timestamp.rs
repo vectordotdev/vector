@@ -121,7 +121,7 @@ struct ToUnixTimestampFn {
 
 impl Expression for ToUnixTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let ts = self.value.resolve(ctx)?.try_timestamp()?;
+        let ts = self.value.resolve(ctx)?.borrow().try_timestamp()?;
 
         let time = match self.unit {
             Unit::Seconds => ts.timestamp(),

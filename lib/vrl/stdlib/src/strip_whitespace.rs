@@ -56,6 +56,7 @@ struct StripWhitespaceFn {
 impl Expression for StripWhitespaceFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
 
         Ok(value.try_bytes_utf8_lossy()?.trim().into())
     }

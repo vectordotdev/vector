@@ -5,7 +5,7 @@ macro_rules! value {
     });
 
     ([$($v:tt),+ $(,)?]) => ({
-        let vec: Vec<$crate::SharedValue> = vec![$($crate::value!($v)),+];
+        let vec: Vec<$crate::SharedValue> = vec![$($crate::shared_value!($v)),+];
         $crate::Value::Array(vec)
     });
 
@@ -14,7 +14,7 @@ macro_rules! value {
     });
 
     ({$($($k1:literal)? $($k2:ident)?: $v:tt),+ $(,)?}) => ({
-        let map = vec![$((String::from($($k1)? $(stringify!($k2))?), $crate::value!($v))),+]
+        let map = vec![$((String::from($($k1)? $(stringify!($k2))?), $crate::shared_value!($v))),+]
             .into_iter()
             .collect::<::std::collections::BTreeMap<_, $crate::SharedValue>>();
 

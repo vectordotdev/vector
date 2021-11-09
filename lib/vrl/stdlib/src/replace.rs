@@ -89,14 +89,20 @@ struct ReplaceFn {
 impl Expression for ReplaceFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
         let value = value.try_bytes_utf8_lossy()?;
 
         let with_value = self.with.resolve(ctx)?;
+        let with_value = with_value.borrow();
         let with = with_value.try_bytes_utf8_lossy()?;
 
-        let count = self.count.resolve(ctx)?.try_integer()?;
+        let count = self.count.resolve(ctx)?;
+        let count = count.borrow();
+        let count = count.try_integer()?;
 
-        self.pattern.resolve(ctx).and_then(|pattern| match pattern {
+        let pattern = self.pattern.resolve(ctx)?;
+        let pattern = pattern.borrow();
+        match &*pattern {
             Value::Bytes(bytes) => {
                 let pattern = String::from_utf8_lossy(&bytes);
                 let replaced = match count {
@@ -105,16 +111,17 @@ impl Expression for ReplaceFn {
                     _ => value.into_owned(),
                 };
 
-                Ok(replaced.into())
+                Ok(SharedValue::from(replaced))
             }
             Value::Regex(regex) => {
                 let replaced = match count {
-                    i if i > 0 => regex
-                        .replacen(&value, i as usize, with.as_ref())
-                        .as_bytes()
-                        .into(),
-                    i if i < 0 => regex.replace_all(&value, with.as_ref()).as_bytes().into(),
-                    _ => value.into(),
+                    i if i > 0 => SharedValue::from(
+                        regex.replacen(&value, i as usize, with.as_ref()).as_bytes(),
+                    ),
+                    i if i < 0 => {
+                        SharedValue::from(regex.replace_all(&value, with.as_ref()).as_bytes())
+                    }
+                    _ => SharedValue::from(value),
                 };
 
                 Ok(replaced)
@@ -124,7 +131,7 @@ impl Expression for ReplaceFn {
                 expected: Kind::Regex | Kind::Bytes,
             }
             .into()),
-        })
+        }
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

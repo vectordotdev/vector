@@ -113,12 +113,14 @@ impl Expression for ToTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         use Value::*;
 
-        let value = match self.value.resolve(ctx)? {
-            v @ Timestamp(_) => v,
+        let resolved = self.value.resolve(ctx)?;
+
+        let value = match &*resolved.borrow() {
+            Timestamp(_) => resolved.clone(),
             Integer(v) => {
-                let t = Utc.timestamp_opt(v, 0).single();
+                let t = Utc.timestamp_opt(*v, 0).single();
                 match t {
-                    Some(time) => time.into(),
+                    Some(time) => SharedValue::from(time),
                     None => {
                         return Err(format!(r#"unable to coerce {} into "timestamp""#, v).into())
                     }
@@ -132,15 +134,17 @@ impl Expression for ToTimestampFn {
                     )
                     .single();
                 match t {
-                    Some(time) => time.into(),
+                    Some(time) => SharedValue::from(time),
                     None => {
                         return Err(format!(r#"unable to coerce {} into "timestamp""#, v).into())
                     }
                 }
             }
-            Bytes(v) => Conversion::Timestamp(TimeZone::Local)
-                .convert::<Value>(v)
-                .map_err(|err| err.to_string())?,
+            Bytes(v) => SharedValue::from(
+                Conversion::Timestamp(TimeZone::Local)
+                    .convert::<Value>(v.clone())
+                    .map_err(|err| err.to_string())?,
+            ),
             v => return Err(format!(r#"unable to coerce {} into "timestamp""#, v.kind()).into()),
         };
 
@@ -165,7 +169,7 @@ mod tests {
 
     #[test]
     fn out_of_range_integer() {
-        let mut object: Value = BTreeMap::new().into();
+        let mut object: SharedValue = SharedValue::from(Value::from(BTreeMap::new()));
         let mut runtime_state = vrl::state::Runtime::default();
         let tz = TimeZone::default();
         let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
@@ -178,7 +182,7 @@ mod tests {
 
     #[test]
     fn out_of_range_float() {
-        let mut object: Value = BTreeMap::new().into();
+        let mut object: SharedValue = SharedValue::from(Value::from(BTreeMap::new()));
         let mut runtime_state = vrl::state::Runtime::default();
         let tz = TimeZone::default();
         let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);

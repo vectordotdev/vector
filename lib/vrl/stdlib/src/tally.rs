@@ -45,24 +45,31 @@ pub(crate) struct TallyFn {
 
 impl Expression for TallyFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_array()?;
+        let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
+        let value = value.try_array()?;
 
         #[allow(clippy::mutable_key_type)] // false positive due to bytes::Bytes
         let mut map: HashMap<Bytes, usize> = HashMap::new();
         for value in value.into_iter() {
-            if let Value::Bytes(value) = value {
-                *map.entry(value).or_insert(0) += 1;
+            if let Value::Bytes(value) = &*value.borrow() {
+                *map.entry(value.clone()).or_insert(0) += 1;
             } else {
-                return Err(format!("all values must be strings, found: {:?}", value).into());
+                return Err(format!("all values must be strings, found: {}", value).into());
             }
         }
 
         let map: BTreeMap<_, _> = map
             .into_iter()
-            .map(|(k, v)| (String::from_utf8_lossy(&k).into_owned(), Value::from(v)))
+            .map(|(k, v)| {
+                (
+                    String::from_utf8_lossy(&k).into_owned(),
+                    SharedValue::from(v),
+                )
+            })
             .collect();
 
-        Ok(map.into())
+        Ok(SharedValue::from(map))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
@@ -91,7 +98,7 @@ mod tests {
             args: func_args![
                 value: value!(["foo", [1,2,3], "123abc", 1, true, [1,2,3], "foo", true, 1]),
             ],
-            want: Err("all values must be strings, found: Array([Integer(1), Integer(2), Integer(3)])"),
+            want: Err("all values must be strings, found: [1, 2, 3]"),
             tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::Integer }).fallible(),
         }
     ];

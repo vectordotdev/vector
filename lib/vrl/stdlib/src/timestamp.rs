@@ -52,8 +52,10 @@ struct TimestampFn {
 
 impl Expression for TimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        match self.value.resolve(ctx)? {
-            v @ Value::Timestamp(_) => Ok(v),
+        let resolved = self.value.resolve(ctx)?;
+        let borrowed = resolved.borrow();
+        match &*borrowed {
+            Value::Timestamp(_) => Ok(resolved.clone()),
             v => Err(format!(r#"expected "timestamp", got {}"#, v.kind()).into()),
         }
     }

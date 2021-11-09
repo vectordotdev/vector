@@ -106,16 +106,19 @@ pub struct SetFn {
 
 impl Expression for SetFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let path = match self.path.resolve(ctx)? {
+        let path = self.path.resolve(ctx)?;
+        let path = path.borrow();
+        let path = match &*path {
             Value::Array(segments) => {
                 let mut insert = LookupBuf::root();
 
                 for segment in segments {
-                    let segment = match segment {
+                    let segment = segment.borrow();
+                    let segment = match &*segment {
                         Value::Bytes(path) => {
                             SegmentBuf::Field(String::from_utf8_lossy(&path).into_owned().into())
                         }
-                        Value::Integer(index) => SegmentBuf::Index(index as isize),
+                        Value::Integer(index) => SegmentBuf::Index(*index as isize),
                         value => {
                             return Err(format!(
                                 r#"path segment must be either "string" or "integer", not {}"#,

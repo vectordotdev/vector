@@ -76,12 +76,12 @@ struct TruncateFn {
 impl Expression for TruncateFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let mut value = value.try_bytes_utf8_lossy()?.into_owned();
+        let mut value = value.borrow().try_bytes_utf8_lossy()?.into_owned();
 
-        let limit = self.limit.resolve(ctx)?.try_integer()?;
+        let limit = self.limit.resolve(ctx)?.borrow().try_integer()?;
         let limit = if limit < 0 { 0 } else { limit as usize };
 
-        let ellipsis = self.ellipsis.resolve(ctx)?.try_boolean()?;
+        let ellipsis = self.ellipsis.resolve(ctx)?.borrow().try_boolean()?;
 
         let pos = if let Some((pos, chr)) = value.char_indices().take(limit).last() {
             // char_indices gives us the starting position of the character at limit,
@@ -100,7 +100,7 @@ impl Expression for TruncateFn {
             }
         }
 
-        Ok(value.into())
+        Ok(SharedValue::from(Value::from(value)))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

@@ -35,9 +35,9 @@ impl Expression for UuidV4Fn {
         let mut buf = [0; 36];
         let uuid = uuid::Uuid::new_v4().to_hyphenated().encode_lower(&mut buf);
 
-        Ok(SharedValue::from(
-            Bytes::copy_from_slice(uuid.as_bytes()).into(),
-        ))
+        Ok(SharedValue::from(Value::from(Bytes::copy_from_slice(
+            uuid.as_bytes(),
+        ))))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
@@ -58,14 +58,15 @@ mod tests {
     #[test]
     fn uuid_v4() {
         let mut state = vrl::state::Runtime::default();
-        let mut object: Value = map![].into();
+        let mut object: SharedValue = SharedValue::from(Value::from(map![]));
         let tz = TimeZone::default();
         let mut ctx = Context::new(&mut object, &mut state, &tz);
         let value = UuidV4Fn.resolve(&mut ctx).unwrap();
+        let value = value.borrow();
 
-        assert!(matches!(&value, Value::Bytes(_)));
+        assert!(matches!(&*value, Value::Bytes(_)));
 
-        match value {
+        match &*value {
             Value::Bytes(val) => {
                 let val = String::from_utf8_lossy(&val);
                 uuid::Uuid::parse_str(&val).expect("valid UUID V4");

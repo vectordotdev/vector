@@ -130,16 +130,19 @@ pub struct RemoveFn {
 
 impl Expression for RemoveFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let path = match self.path.resolve(ctx)? {
+        let path = self.path.resolve(ctx)?;
+        let path = path.borrow();
+        let path = match &*path {
             Value::Array(path) => {
                 let mut lookup = LookupBuf::root();
 
                 for segment in path {
-                    let segment = match segment {
+                    let segment = segment.borrow();
+                    let segment = match &*segment {
                         Value::Bytes(field) => {
                             SegmentBuf::Field(String::from_utf8_lossy(&field).into_owned().into())
                         }
-                        Value::Integer(index) => SegmentBuf::Index(index as isize),
+                        Value::Integer(index) => SegmentBuf::Index(*index as isize),
                         value => {
                             return Err(format!(
                                 r#"path segment must be either "string" or "integer", not {}"#,
@@ -163,7 +166,9 @@ impl Expression for RemoveFn {
             }
         };
 
-        let compact = self.compact.resolve(ctx)?.try_boolean()?;
+        let compact = self.compact.resolve(ctx)?;
+        let compact = compact.borrow();
+        let compact = compact.try_boolean()?;
 
         let mut value = self.value.resolve(ctx)?;
         value.remove(&path, compact)?;
