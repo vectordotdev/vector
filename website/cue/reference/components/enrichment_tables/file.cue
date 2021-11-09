@@ -3,19 +3,19 @@ package metadata
 components: enrichment_tables: file: {
 	title: "File"
 	description: '''
-		Loads enrichment data from a CSV file.
+			Loads enrichment data from a CSV file.
 
-		For the lookup to be as performant as possible, the data is indexed according to the fields that are used
-		in the search. It should be noted that indexes can only be created for fields for which an exact match is
-		used in the condition. For range searches, an index is not used and the enrichment table drops back to a
-		sequential scan of the data. A sequential scan will not impact performance significantly provided there
-		are only a few possible rows returned by the exact matches in the condition. It is not recommended to
-		use a condition that only uses date range searches.
-	'''
+			For the lookup to be as performant as possible, the data is indexed according to the fields that are used
+			in the search. It should be noted that indexes can only be created for fields for which an exact match is
+			used in the condition. For range searches, an index is not used and the enrichment table drops back to a
+			sequential scan of the data. A sequential scan will not impact performance significantly provided there
+			are only a few possible rows returned by the exact matches in the condition. It is not recommended to
+			use a condition that only uses date range searches.
+		'''
 
 	classes: {
 		commonly_used: false
-		development: "beta"
+		development:   "beta"
 	}
 
 	support: {
@@ -38,8 +38,8 @@ components: enrichment_tables: file: {
 		file: {
 			path: {
 				description: "The path of the CSV file. Note, Vector needs read only permissions to access this file."
-				common: true
-				required: true
+				common:      true
+				required:    true
 				type: string: {
 					examples: [
 						"/data/info.csv",
@@ -50,29 +50,29 @@ components: enrichment_tables: file: {
 			encoding: {
 				type: {
 					description: "The encoding of the file. Currently, only CSV is supported."
-					required: true
+					required:    true
 					type: string: {
-						examples: [ "csv" ]
+						examples: [ "csv"]
 					}
 				}
 				delimiter: {
 					description: "The delimiter used to separate fields in each row of the CSV file."
-					required: false
-					default: ","
+					required:    false
+					default:     ","
 					type: string: {
-						examples: [ ":" ]
+						examples: [ ":"]
 					}
 				}
 				include_headers: {
 					description: '''
-						Set to true if the first row of the CSV file contains the headers for each column.
-						If false, there are no headers and the columns are referred to by their numerical
-						index.
-					'''
+							Set to true if the first row of the CSV file contains the headers for each column.
+							If false, there are no headers and the columns are referred to by their numerical
+							index.
+						'''
 					required: false
-					default: true
+					default:  true
 					type: boolean: {
-						examples: [ false ]
+						examples: [ false]
 					}
 				}
 			}
