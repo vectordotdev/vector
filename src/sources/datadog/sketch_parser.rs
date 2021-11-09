@@ -14,7 +14,7 @@ mod dd_proto {
     include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
 }
 
-use dd_proto::{sketch_payload, SketchPayload};
+use dd_proto::SketchPayload;
 
 pub(crate) fn decode_ddsketch(frame: Bytes, _: Option<Arc<str>>) -> Result<Vec<Event>> {
     let payload = SketchPayload::decode(frame)?;
@@ -37,7 +37,20 @@ pub(crate) fn decode_ddsketch(frame: Bytes, _: Option<Arc<str>>) -> Result<Vec<E
                 .dogsketches
                 .iter()
                 .map(|sketch| {
-                    let val = MetricValue::from(into_agentddsketch(sketch));
+                    let k: Vec<i16> = sketch.k.iter().map(|k| *k as i16).collect();
+                    let n: Vec<u16> = sketch.n.iter().map(|n| *n as u16).collect();
+                    let val = MetricValue::from(
+                        AgentDDSketch::from_raw(
+                            sketch.cnt as u32,
+                            sketch.min,
+                            sketch.max,
+                            sketch.sum,
+                            sketch.avg,
+                            &k,
+                            &n,
+                        )
+                        .unwrap_or(AgentDDSketch::with_agent_defaults()),
+                    );
                     Metric::new(sketch_series.metric.clone(), MetricKind::Absolute, val)
                         .with_tags(Some(tags.clone()))
                         .with_timestamp(Some(Utc.timestamp(sketch.ts, 0)))
@@ -46,11 +59,4 @@ pub(crate) fn decode_ddsketch(frame: Bytes, _: Option<Arc<str>>) -> Result<Vec<E
                 .collect::<Vec<Event>>()
         })
         .collect())
-}
-
-fn into_agentddsketch(s: &sketch_payload::sketch::Dogsketch) -> AgentDDSketch {
-    let k: Vec<i16> = s.k.iter().map(|k| *k as i16).collect();
-    let n: Vec<u16> = s.n.iter().map(|n| *n as u16).collect();
-    AgentDDSketch::from_raw(s.cnt as u32, s.min, s.max, s.sum, s.avg, &k, &n)
-        .unwrap_or(AgentDDSketch::with_agent_defaults())
 }
