@@ -222,6 +222,7 @@ jobs:
       - name: Run baseline experiment
         if: steps.cache-primes.outputs.cache-hit != 'true'
         run: |
+          rm -rf /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
           mkdir -p /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
           ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
                                   --local-image "false" \
@@ -252,6 +253,7 @@ jobs:
       - name: Run comparison experiment
         if: steps.cache-primes.outputs.cache-hit != 'true'
         run: |
+          rm -rf /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
           mkdir -p /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
           ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
                                   --local-image "false" \
