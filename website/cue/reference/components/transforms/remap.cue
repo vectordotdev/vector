@@ -14,7 +14,7 @@ components: transforms: "remap": {
 		default output stream and sent to the `dropped` output instead. For
 		a transform component named `foo`, this output can be accessed by specifying
 		`foo.dropped` as the input to another component. Events sent to this output
-		will be in their original form, omitted any partial modification that took
+		will be in their original form, omitting any partial modification that took
 		place before the error or abort.
 
 		Please refer to the [VRL reference](\(urls.vrl_reference)) when writing VRL scripts.
