@@ -16,7 +16,7 @@ mod dd_proto {
 
 use dd_proto::SketchPayload;
 
-pub(crate) fn decode_ddsketch(frame: Bytes, _: Option<Arc<str>>) -> Result<Vec<Event>> {
+pub(crate) fn decode_ddsketch(frame: Bytes, api_key: Option<Arc<str>>) -> Result<Vec<Event>> {
     let payload = SketchPayload::decode(frame)?;
     // payload.metadata is always empty for payload coming from dd agents
     Ok(payload
@@ -51,10 +51,15 @@ pub(crate) fn decode_ddsketch(frame: Bytes, _: Option<Arc<str>>) -> Result<Vec<E
                         )
                         .unwrap_or(AgentDDSketch::with_agent_defaults()),
                     );
-                    Metric::new(sketch_series.metric.clone(), MetricKind::Absolute, val)
+                    let mut metric = Metric::new(sketch_series.metric.clone(), MetricKind::Absolute, val)
                         .with_tags(Some(tags.clone()))
-                        .with_timestamp(Some(Utc.timestamp(sketch.ts, 0)))
-                        .into()
+                        .with_timestamp(Some(Utc.timestamp(sketch.ts, 0)));
+                    if let Some(k) = &api_key {
+                        metric
+                            .metadata_mut()
+                            .set_datadog_api_key(Some(Arc::clone(k)));
+                    }
+                    metric.into()
                 })
                 .collect::<Vec<Event>>()
         })

@@ -616,7 +616,10 @@ mod tests {
         codecs::{self, BytesCodec, BytesParser},
         common::datadog::{DatadogMetricType, DatadogPoint,DatadogSeriesMetric},
         config::{log_schema, SourceConfig, SourceContext},
-        event::{Event, EventStatus, metric::MetricKind, metric::MetricValue},
+        event::{
+            Event, EventStatus,
+            metric::{MetricKind, MetricSketch, MetricValue},
+        },
         serde::{default_decoding, default_framing_message_based},
         test_util::{next_addr, spawn_collect_n, trace_init, wait_for_tcp},
         Pipeline,
@@ -626,8 +629,14 @@ mod tests {
     use futures::Stream;
     use http::HeaderMap;
     use pretty_assertions::assert_eq;
+    use prost::Message;
     use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
     use std::net::SocketAddr;
+    use std::str;
+
+    mod dd_proto {
+        include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
+    }
 
     impl Arbitrary for LogMsg {
         fn arbitrary(g: &mut Gen) -> Self {
@@ -1143,7 +1152,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn decode_metrics() {
+    async fn decode_series_endpoints() {
         trace_init();
         let (rx, addr) = source(EventStatus::Delivered, true, true).await;
 
@@ -1256,6 +1265,88 @@ mod tests {
 
             assert_eq!(
                 &events[3].metadata().datadog_api_key().as_ref().unwrap()[..],
+                "12345678abcdefgh12345678abcdefgh"
+            );
+        }
+    }
+
+
+    #[tokio::test]
+    async fn decode_sketches() {
+        trace_init();
+        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "dd-api-key",
+            "12345678abcdefgh12345678abcdefgh".parse().unwrap(),
+        );
+
+        let mut buf = Vec::new();
+        let sketch = dd_proto::sketch_payload::Sketch {
+            metric: "dd_sketch".to_string(),
+            tags: vec!["foo:bar".to_string(), "foobar".to_string()],
+            host: "a_host".to_string(),
+            distributions: Vec::new(),
+            dogsketches: vec![dd_proto::sketch_payload::sketch::Dogsketch {
+                ts: 1542182950,
+                cnt: 2,
+                min: 16.0,
+                max: 31.0,
+                avg: 23.5,
+                sum: 74.0,
+                k: vec![1517, 1559],
+                n: vec![1, 1],
+            }],
+        };
+
+        let sketch_payload = dd_proto::SketchPayload {
+            metadata: None,
+            sketches: vec![sketch],
+        };
+
+        sketch_payload.encode(&mut buf).unwrap();
+
+        let events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        addr,
+                        unsafe {str::from_utf8_unchecked(&buf)},
+                        headers,
+                        "/api/beta/sketches"
+                    )
+                    .await
+                );
+            },
+            rx,
+            1,
+        )
+        .await;
+
+        {
+            let metric = events[0].as_metric();
+            assert_eq!(metric.name(), "dd_sketch");
+            assert_eq!(metric.timestamp(), Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10)));
+            assert_eq!(metric.kind(), MetricKind::Absolute);
+            assert_eq!(metric.tags().unwrap()["host"], "a_host".to_string());
+            assert_eq!(metric.tags().unwrap()["foo"], "bar".to_string());
+            assert_eq!(metric.tags().unwrap()["foobar"], "".to_string());
+
+            let s = &*metric.value();
+            assert!(matches!(s, MetricValue::Sketch { .. }));
+            if let MetricValue::Sketch { sketch: MetricSketch::AgentDDSketch(ddsketch) } = s {
+                assert_eq!(ddsketch.bins().len(), 2);
+                assert_eq!(ddsketch.count(), 2);
+                assert_eq!(ddsketch.min(), Some(16.0));
+                assert_eq!(ddsketch.max(), Some(31.0));
+                assert_eq!(ddsketch.sum(), Some(74.0));
+                assert_eq!(ddsketch.avg(), Some(23.5));
+            }
+
+            assert_eq!(
+                &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
                 "12345678abcdefgh12345678abcdefgh"
             );
         }
