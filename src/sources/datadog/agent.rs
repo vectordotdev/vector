@@ -496,7 +496,7 @@ fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMessag
 
 fn into_vector_metric(dd_metric: DatadogSeriesMetric, api_key: Option<Arc<str>>) -> Vec<Event> {
     let mut tags = BTreeMap::<String, String>::new();
-    for tag in dd_metric.tags.clone().unwrap_or(vec![]) {
+    for tag in dd_metric.tags.clone().unwrap_or_default() {
         let kv = tag.split_once(":").unwrap_or((&tag, ""));
         tags.insert(kv.0.trim().into(), kv.1.trim().into());
     }
@@ -1191,7 +1191,7 @@ mod tests {
                     metric: "dd_count".to_string(),
                     r#type: DatadogMetricType::Count,
                     interval: None,
-                    points: vec![DatadogPoint(1542182955, 16777216.0)],
+                    points: vec![DatadogPoint(1542182955, 16777216_f64)],
                     tags: Some(vec!["foobar".to_string()]),
                     host: Some("a_host".to_string()),
                     source_type_name: None,
@@ -1260,7 +1260,7 @@ mod tests {
             assert_eq!(
                 *metric.value(),
                 MetricValue::Counter {
-                    value: 3.14 * (10 as f64)
+                    value: 3.14 * (10_f64)
                 }
             );
             assert_eq!(
@@ -1281,7 +1281,12 @@ mod tests {
                 Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 15))
             );
             assert_eq!(metric.kind(), MetricKind::Incremental);
-            assert_eq!(*metric.value(), MetricValue::Counter { value: 16777216.0 });
+            assert_eq!(
+                *metric.value(),
+                MetricValue::Counter {
+                    value: 16777216_f64
+                }
+            );
             assert_eq!(metric.tags().unwrap()["host"], "a_host".to_string());
             assert_eq!(metric.tags().unwrap()["foobar"], "".to_string());
 

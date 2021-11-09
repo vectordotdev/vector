@@ -26,7 +26,7 @@ pub(crate) fn decode_ddsketch(frame: Bytes, api_key: Option<Arc<str>>) -> Result
             // sketch_series.distributions is also always empty from payload coming from dd agents
             let mut tags = BTreeMap::<String, String>::new();
             for tag in &sketch_series.tags {
-                let kv = tag.split_once(":").unwrap_or((&tag, ""));
+                let kv = tag.split_once(":").unwrap_or((tag, ""));
                 tags.insert(kv.0.trim().into(), kv.1.trim().into());
             }
             tags.insert(
@@ -49,7 +49,7 @@ pub(crate) fn decode_ddsketch(frame: Bytes, api_key: Option<Arc<str>>) -> Result
                             &k,
                             &n,
                         )
-                        .unwrap_or(AgentDDSketch::with_agent_defaults()),
+                        .unwrap_or_else(AgentDDSketch::with_agent_defaults),
                     );
                     let mut metric =
                         Metric::new(sketch_series.metric.clone(), MetricKind::Absolute, val)
