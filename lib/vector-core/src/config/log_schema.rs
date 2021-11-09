@@ -141,6 +141,13 @@ impl LogSchema {
             } else {
                 self.set_timestamp_key(other.timestamp_key().to_string());
             }
+            if self.source_type_key() != LOG_SCHEMA_DEFAULT.source_type_key()
+                && self.source_type_key() != other.source_type_key()
+            {
+                errors.push("conflicting values for 'log_schema.source_type_key' found".to_owned());
+            } else {
+                self.set_source_type_key(other.source_type_key().to_string());
+            }
         }
 
         if errors.is_empty() {
