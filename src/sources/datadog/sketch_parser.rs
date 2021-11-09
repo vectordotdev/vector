@@ -18,12 +18,12 @@ use dd_proto::SketchPayload;
 
 pub(crate) fn decode_ddsketch(frame: Bytes, _: Option<Arc<str>>) -> Result<Vec<Event>> {
     let payload = SketchPayload::decode(frame)?;
-    // Note: payload.metadata is always empty (as per pkg/metrics/sketch_series.go l 145)
+    // payload.metadata is always empty for payload coming from dd agents
     Ok(payload
         .sketches
         .iter()
         .flat_map(|sketch_series| {
-            // s.distributions is also always empty from payload coming from dd agents
+            // sketch_series.distributions is also always empty from payload coming from dd agents
             let mut tags = BTreeMap::<String, String>::new();
             for tag in &sketch_series.tags {
                 let kv = tag.split_once(":").unwrap_or((&tag, ""));
