@@ -1,65 +1,170 @@
-use std::time::{Duration, Instant};
+use std::{sync::{Arc, atomic::{AtomicUsize, Ordering}}, time::{Duration, Instant}};
 
 use buffers::disk_v2::Buffer;
 use hdrhistogram::Histogram;
-use lading_common::{
-    block::{chunk_bytes, construct_block_cache},
-    payload,
-};
+use lading_common::{block::{Block, chunk_bytes, construct_block_cache}, payload};
+use tokio::{select, sync::oneshot, time};
 
-#[tokio::main]
-async fn main() {
-    let (mut writer, _reader) = Buffer::from_path("/tmp/mmap-testing")
-        .await
-        .expect("failed to open buffer");
-
+fn generate_block_cache() -> Vec<Block> {
     // Generate a 256MB block cache of small JSON messages.  This gives us pre-built messages that
     // are slightly varied in size, and differing in contained data, up to 256MB total.  Now we can
     // better simulate actual transactions with the speed of pre-computing the records.
     let mut rng = rand::thread_rng();
     let labels = vec![("target".to_string(), "disk_v2".to_string())];
     let block_chunks = chunk_bytes(&mut rng, 256_000_000, &[512, 768, 1024, 2048]);
-    println!("generated {} block chunks", block_chunks.len());
-    let block_cache = construct_block_cache(&payload::Json::default(), &block_chunks, &labels);
-    let mut records = block_cache.iter().cycle();
+    construct_block_cache(&payload::Json::default(), &block_chunks, &labels)
+}
 
+#[tokio::main]
+async fn main() {
+    // Generate our block cache, which ensures the writer spends as little time as possible actually
+    // generating the data that it writes to the buffer.
+    let block_cache = generate_block_cache();
+    println!("[disk_v2 init] generated block cache of 256MB ({} blocks)", block_cache.len());
+
+
+    // Set up our target record count, write batch size, progress counters, etc.
+    let transaction_count = 250_000;
+    let transaction_size = 100;
+
+    let write_position = Arc::new(AtomicUsize::new(0));
+    let read_position = Arc::new(AtomicUsize::new(0));
+    let bytes_written = Arc::new(AtomicUsize::new(0));
+    let bytes_read = Arc::new(AtomicUsize::new(0));
+    
+    let writer_position = Arc::clone(&write_position);
+    let reader_position = Arc::clone(&read_position);
+    let writer_bytes_written = Arc::clone(&bytes_written);
+    let reader_bytes_read = Arc::clone(&bytes_read);
+
+    // Now create the writer and reader and their associated tasks.
     let start = Instant::now();
-    let mut tx_histo = Histogram::<u64>::new(2).expect("should not fail");
+    let (mut writer, mut reader) = Buffer::from_path("/tmp/mmap-testing")
+        .await
+        .expect("failed to open buffer");
 
-    for i in 0..1_000_000 {
-        let tx_start = Instant::now();
-        let mut tx = writer.transaction();
-        for _ in 0..100 {
-            let record = records.next().expect("should never be empty");
-            tx.write(&record.bytes)
-                .await
-                .expect("failed to write record");
+    let (writer_tx, mut writer_rx) = oneshot::channel();
+    let _ = tokio::spawn(async move {
+        let mut tx_histo = Histogram::<u64>::new(3).expect("should not fail");
+        let mut records = block_cache.iter().cycle();
+
+        for _ in 0..transaction_count {
+            let tx_start = Instant::now();
+
+            let mut tx_bytes_total = 0;
+            let mut tx = writer.transaction();
+            for _ in 0..transaction_size {
+                let record = records.next().expect("should never be empty");
+                tx_bytes_total += record.bytes.len();
+                tx.write(&record.bytes)
+                    .await
+                    .expect("failed to write record");
+            }
+            tx.commit().await.expect("failed to commit transaction");
+
+            let elapsed = tx_start.elapsed().as_nanos() as u64;
+            tx_histo.record(elapsed).expect("should not fail");
+   
+            writer_position.fetch_add(transaction_size, Ordering::Relaxed);
+            writer_bytes_written.fetch_add(tx_bytes_total, Ordering::Relaxed);
         }
-        tx.commit().await.expect("failed to commit transaction");
-        let elapsed = tx_start.elapsed().as_nanos() as u64;
 
-        tx_histo.record(elapsed).expect("should not fail");
+        let _ = writer_tx.send(tx_histo);
+    });
 
-        if i % 1000 == 0 {
-            println!("{:?}: at txn {}", start.elapsed(), i);
+    let (reader_tx, mut reader_rx) = oneshot::channel();
+    let _ = tokio::spawn(async move {
+        let mut rx_histo = Histogram::<u64>::new(3).expect("should not fail");
+
+        let total_records_expected = transaction_count * transaction_size;
+
+        for _ in 0..total_records_expected {
+            let rx_start = Instant::now();
+            
+            let (_record_id, record_buf) = reader.next().await
+                .expect("read should not fail");
+
+            let elapsed = rx_start.elapsed().as_nanos() as u64;
+            rx_histo.record(elapsed).expect("should not fail");
+   
+            reader_position.fetch_add(1, Ordering::Relaxed);
+            reader_bytes_read.fetch_add(record_buf.len(), Ordering::Relaxed);
+        }
+
+        let _ = reader_tx.send(rx_histo);
+    });
+
+    // Now let the tasks run, occasionally emitting metrics about their progress, while waiting for
+    // them to complete.
+    let mut progress_interval = time::interval(Duration::from_secs(1));
+    let mut writer_histo = None;
+    let mut reader_histo = None;
+
+    loop {
+        select! {
+            histo = &mut writer_rx => match histo {
+                Ok(histo) => {
+                    writer_histo = Some(histo);
+                    println!("[disk_v2 writer] {:?}: finished", start.elapsed());
+                },
+                Err(_) => panic!("[disk_v2 writer] task failed unexpectedly!"),
+            },
+            histo = &mut reader_rx => match histo {
+                Ok(histo) => {
+                    reader_histo = Some(histo);
+                    println!("[disk_v2 reader] {:?}: finished", start.elapsed());
+                },
+                Err(_) => panic!("[disk_v2 reader] task failed unexpectedly!"),
+            },
+            _ = progress_interval.tick(), if writer_histo.is_none() && reader_histo.is_none() => {
+                let elapsed = start.elapsed();
+                let write_pos = write_position.load(Ordering::Relaxed);
+                let read_pos = read_position.load(Ordering::Relaxed);
+                let write_bytes = bytes_written.load(Ordering::Relaxed);
+                let read_bytes = bytes_read.load(Ordering::Relaxed);
+
+                println!("[disk_v2 writer] {:?}: position = {}, bytes written = {}", elapsed, write_pos, write_bytes);
+                println!("[disk_v2 reader] {:?}: position = {}, bytes reader = {}", elapsed, read_pos, read_bytes);
+            },
+            else => break,
         }
     }
 
-    println!("summary:");
-
+    // Now dump out all of our summary statistics.
     let total_time = start.elapsed();
-    let rps = writer.total_records() as f64 / total_time.as_secs_f64();
+    let write_bytes = bytes_written.load(Ordering::Relaxed);
+    let read_bytes = bytes_read.load(Ordering::Relaxed);
 
-    println!("  -> total time: {:?}", total_time);
+    println!("[disk_v2] writer and reader done: {} bytes written and {} bytes read in {:?}",
+        write_bytes, read_bytes, total_time);
+
+    println!("[disk_v2] writer summary:");
+
+    let writer_histo = writer_histo.unwrap();
+    let rps = write_position.load(Ordering::Relaxed) as f64 / total_time.as_secs_f64();
+
     println!("  -> records per second: {}", rps as u64);
-
     println!("  -> tx latency histo:");
-    println!("       q=min -> {:?}", nanos_to_dur(tx_histo.min()));
-    for q in &[0.25, 0.5, 0.9, 0.95, 0.99, 0.999] {
-        let latency = tx_histo.value_at_quantile(*q);
+    println!("       q=min -> {:?}", nanos_to_dur(writer_histo.min()));
+    for q in &[0.25, 0.5, 0.9, 0.95, 0.99, 0.999, 0.9999] {
+        let latency = writer_histo.value_at_quantile(*q);
         println!("       q={} -> {:?}", q, nanos_to_dur(latency));
     }
-    println!("       q=max -> {:?}", nanos_to_dur(tx_histo.max()));
+    println!("       q=max -> {:?}", nanos_to_dur(writer_histo.max()));
+
+    println!("[disk_v2] reader summary:");
+
+    let reader_histo = reader_histo.unwrap();
+    let rps = read_position.load(Ordering::Relaxed) as f64 / total_time.as_secs_f64();
+
+    println!("  -> records per second: {}", rps as u64);
+    println!("  -> rx latency histo:");
+    println!("       q=min -> {:?}", nanos_to_dur(reader_histo.min()));
+    for q in &[0.25, 0.5, 0.9, 0.95, 0.99, 0.999, 0.9999] {
+        let latency = reader_histo.value_at_quantile(*q);
+        println!("       q={} -> {:?}", q, nanos_to_dur(latency));
+    }
+    println!("       q=max -> {:?}", nanos_to_dur(reader_histo.max()));
 }
 
 fn nanos_to_dur(nanos: u64) -> Duration {

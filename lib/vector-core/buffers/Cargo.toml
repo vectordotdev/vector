@@ -19,7 +19,7 @@ parking_lot = { version = "0.11.2", default-features = false }
 pin-project = { version = "1.0.8", default-features = false }
 serde = { version = "1.0.130", default-features = false, features = ["derive"] }
 snafu = { version = "0.6.10", default-features = false, features = ["std"] }
-tokio = { version = "1.13.0", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync"] }
+tokio = { version = "1.13.0", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync", "fs", "io-util"] }
 tokio-stream = { version = "0.1", default-features = false, features = ["sync"] }
 tokio-util = { version = "0.6", default-features = false }
 tracing = { version = "0.1.29", default-features = false }
@@ -38,7 +38,6 @@ metrics-util = { version = "0.10.1", default-features = false }
 metrics-tracing-context = { version = "0.8.1", default-features = false }
 serde_yaml = { version = "0.8", default-features = false }
 tracing-subscriber = { version = "0.2.25", default-features = false, features = ["registry"] }
-tokio = { version = "1.13.0", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync", "fs"] }
 
 [features]
 disk-buffer = ["db-key", "leveldb"]

@@ -74,11 +74,7 @@ use bytes::{Bytes, BytesMut};
 use crc32fast::Hasher;
 use crossbeam_utils::atomic::AtomicCell;
 use memmap2::{MmapMut, MmapOptions};
-use tokio::{
-    fs::{File, OpenOptions},
-    io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter},
-    sync::{Mutex, Notify},
-};
+use tokio::{fs::{self, File, OpenOptions}, io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufReader, BufWriter}, sync::{Mutex, Notify}};
 
 const LEDGER_FILE_SIZE: usize = 36;
 // We don't want data files to be bigger than 128MB, but we might end up overshooting slightly.
@@ -107,18 +103,22 @@ struct LedgerState {
 impl Default for LedgerState {
     fn default() -> Self {
         Self {
+            total_records: Default::default(),
+            total_buffer_size: Default::default(),
             // First record written is always 1, so that our defualt of 0 for
             // `reader_last_record_id` ensures we start up in a state of "alright, waiting to read
             // record #1 next".
             writer_next_record_id: 1.into(),
-            ..Default::default()
+            writer_current_data_file_id: Default::default(),
+            reader_current_data_file_id: Default::default(),
+            reader_last_record_id: Default::default(),
         }
     }
 }
 
 impl LedgerState {
     pub fn get_next_writer_record_id(&self) -> u64 {
-        self.writer_next_record_id.fetch_add(1, Ordering::Acquire)
+        self.writer_next_record_id.fetch_add(1, Ordering::AcqRel)
     }
 
     pub fn get_last_reader_record_id(&self) -> u64 {
@@ -129,25 +129,33 @@ impl LedgerState {
         self.reader_last_record_id.fetch_add(1, Ordering::AcqRel);
     }
 
-    /// Gets the current write file ID.
-    pub fn current_writer_file_id(&self) -> u16 {
+    /// Gets the current writer file ID.
+    pub fn get_current_writer_file_id(&self) -> u16 {
         self.writer_current_data_file_id.load(Ordering::Acquire)
     }
 
-    /// Increments the current writer file ID.
-    ///
-    /// Returns the previous writer file ID.
-    pub fn increment_writer_file_id(&self) -> u16 {
+    /// Gets the next writer file ID.
+    pub fn get_next_writer_file_id(&self) -> u16 {
         self.writer_current_data_file_id
-            .fetch_add(1, Ordering::AcqRel)
+            .load(Ordering::Acquire)
+            .wrapping_add(1)
+    }
+
+    /// Increments the current writer file ID.
+    pub fn increment_writer_file_id(&self) {
+        self.writer_current_data_file_id
+            .fetch_add(1, Ordering::AcqRel);
+    }
+
+    /// Gets the current reader file ID.
+    pub fn get_current_reader_file_id(&self) -> u16 {
+        self.reader_current_data_file_id.load(Ordering::Acquire)
     }
 
     /// Increments the current reader file ID.
-    ///
-    /// Returns the previous reader file ID.
-    pub fn increment_reader_file_id(&self) -> u16 {
+    pub fn increment_reader_file_id(&self) {
         self.reader_current_data_file_id
-            .fetch_add(1, Ordering::AcqRel)
+            .fetch_add(1, Ordering::AcqRel);
     }
 
     pub fn serialize_to(&self, dst: &mut [u8]) {
@@ -252,32 +260,20 @@ struct Ledger {
 }
 
 impl Ledger {
-    pub fn allocate_record_id(&self) -> u64 {
-        self.state.get_next_writer_record_id()
+    pub fn state(&self) -> &LedgerState {
+        &self.state
     }
 
-    pub fn get_last_reader_record_id(&self) -> u64 {
-        self.state.get_last_reader_record_id()
+    pub fn get_current_reader_data_file_path(&self) -> PathBuf {
+        self.get_data_file_path(self.state.get_current_reader_file_id())
     }
 
-    pub fn increment_last_reader_record_id(&self) {
-        self.state.increment_last_reader_record_id()
+    pub fn get_current_writer_data_file_path(&self) -> PathBuf {
+        self.get_data_file_path(self.state.get_current_writer_file_id())
     }
 
-    pub fn get_writer_current_data_file_path(&self) -> PathBuf {
-        self.get_data_file_path(self.state.current_writer_file_id())
-    }
-
-    pub fn increment_writer_file_id(&self) -> u16 {
-        self.state.increment_writer_file_id()
-    }
-
-    pub fn get_reader_current_data_file_path(&self) -> PathBuf {
-        self.get_data_file_path(
-            self.state
-                .reader_current_data_file_id
-                .load(Ordering::Acquire),
-        )
+    pub fn get_next_writer_data_file_path(&self) -> PathBuf {
+        self.get_data_file_path(self.state.get_next_writer_file_id())
     }
 
     pub fn get_data_file_path(&self, file_id: u16) -> PathBuf {
@@ -367,7 +363,14 @@ impl Ledger {
             .create(true)
             .open(&ledger_path)
             .await?;
-        let _ = ledger_handle.set_len(LEDGER_FILE_SIZE as u64).await?;
+
+        // If we're creating the ledger for the first time, ensure the file is the right size.
+        let ledger_metadata = ledger_handle.metadata().await?;
+        let ledger_len = ledger_metadata.len();
+        let is_ledger_new = ledger_len == 0;
+        if is_ledger_new {
+            let _ = ledger_handle.set_len(LEDGER_FILE_SIZE as u64).await?;
+        }
 
         let ledger_handle = ledger_handle.into_std().await;
         let ledger_mmap = unsafe { MmapOptions::new().map_mut(&ledger_handle)? };
@@ -375,13 +378,18 @@ impl Ledger {
             data_dir: data_dir.as_ref().to_owned(),
             ledger_mmap: Mutex::new(ledger_mmap),
             state: LedgerState::default(),
-            reader_notify: Notify::const_new(),
-            writer_notify: Notify::const_new(),
+            reader_notify: Notify::new(),
+            writer_notify: Notify::new(),
             last_flush: AtomicCell::new(Instant::now()),
             flush_interval,
         };
 
-        let _ = ledger.read_from_disk().await?;
+        // Don't load the ledger from disk if we just created it, otherwise we'll override the
+        // default ledger state by deserializing from a bunch of zeroes.
+        if !is_ledger_new {
+            let _ = ledger.read_from_disk().await?;
+        }
+
         Ok(ledger)
     }
 }
@@ -411,12 +419,19 @@ impl WriteState {
     pub async fn ensure_ready_for_write(&mut self) -> io::Result<()> {
         // If our data file is already open, and it has room left, then we're good here.  Otherwise,
         // flush everything and reset ourselves so that we can open the next data file for writing.
+        let mut should_open_next = false;
         if self.data_file.is_some() {
             if self.can_write() {
                 return Ok(());
             } else {
-                // Increment our writer information and flush our current data file/ledger.
-                self.ledger.increment_writer_file_id();
+                // Our current data file is full, so we need to open a new one.  Signal to the loop
+                // that we we want to try and open the next file, and not the current file,
+                // essentially to avoid marking the writer as already having moved on to the next
+                // file before we're sure it isn't already an existing file on disk waiting to be
+                // read.
+                //
+                // We still flush ourselves to disk, etc, to make sure all of the data is there.
+                should_open_next = true;
                 let _ = self.flush().await?;
 
                 self.reset();
@@ -439,7 +454,11 @@ impl WriteState {
             // we explicitly wait for the reader to signal that it has made writer-relevant
             // progress: in other words, that it has fully read and deleted a data file, in case we
             // were waiting for that to happen.
-            let data_file_path = self.ledger.get_writer_current_data_file_path();
+            let data_file_path = if should_open_next {
+                self.ledger.get_next_writer_data_file_path()
+            } else {
+                self.ledger.get_current_writer_data_file_path()
+            };
             let maybe_data_file = OpenOptions::new()
                 .append(true)
                 .create_new(true)
@@ -477,7 +496,7 @@ impl WriteState {
                         }
                     }
                     // Legitimate I/O error with the operation, bubble this up.
-                    ek => return Err(e),
+                    _ => return Err(e),
                 },
             };
 
@@ -489,6 +508,13 @@ impl WriteState {
 
                     self.data_file = Some(BufWriter::new(data_file));
                     self.data_file_size = data_file_size;
+
+                    // If we opened the "next" data file, we need to increment the current writer
+                    // file ID now to signal that the writer has moved on.
+                    if should_open_next {
+                        self.ledger.state().increment_writer_file_id();
+                    }
+
                     return Ok(());
                 }
                 // The file is still present and waiting for a reader to finish reading it in order
@@ -501,11 +527,17 @@ impl WriteState {
     pub async fn write_record(&mut self, record_buf: &[u8]) -> io::Result<()> {
         let _ = self.ensure_ready_for_write().await?;
 
-        let record_id = self.ledger.allocate_record_id().to_be_bytes();
+        let record_id = self
+            .ledger
+            .state()
+            .get_next_writer_record_id();
+        println!("writing record with id {}", record_id);
+
+        let record_id = record_id.to_be_bytes();
         let record_checksum = self
             .generate_checksum(&record_id[..], record_buf)
             .to_be_bytes();
-        let record_length = record_buf.len().to_be_bytes();
+        let record_length = (record_buf.len() as u32).to_be_bytes();
 
         // Write our record header and data.
         let data_file = self.data_file.as_mut().expect("data file should be open");
@@ -518,6 +550,7 @@ impl WriteState {
         let bytes_written =
             record_buf.len() + record_checksum.len() + record_length.len() + record_id.len();
         self.track_write(bytes_written as u64);
+        self.ledger.notify_writer_waiters();
 
         Ok(())
     }
@@ -628,7 +661,6 @@ pub struct Reader {
     ledger: Arc<Ledger>,
     data_file: Option<BufReader<File>>,
     last_reader_record_id: u64,
-    buf: BytesMut,
     checksummer: Hasher,
 }
 
@@ -638,28 +670,42 @@ impl Reader {
             ledger,
             data_file: None,
             last_reader_record_id: 0,
-            buf: BytesMut::with_capacity(8192),
             checksummer: Hasher::new(),
         }
     }
 
     fn increment_last_reader_record_id(&mut self) {
         self.last_reader_record_id += 1;
-        self.ledger.increment_last_reader_record_id();
+        self.ledger.state().increment_last_reader_record_id();
     }
 
-    async fn try_read_atleast(&mut self, n: usize) -> io::Result<Option<BytesMut>> {
+    async fn roll_to_next_data_file(&mut self) -> io::Result<()> {
+        // We have to delete the current data file, and then increment our reader file ID.
+        self.data_file = None;
+
+        let data_file_path = self.ledger.get_current_reader_data_file_path();
+        let _ = fs::remove_file(&data_file_path).await?;
+
+        self.ledger.state().increment_reader_file_id();
+        self.ledger.notify_reader_waiters();
+
+        // Now ensure that we can open the file (or wait for it to exist so we can open) before
+        // returning.
+        self.ensure_ready_for_read().await
+    }
+
+    async fn try_read_atleast(&mut self, n: usize, buf: &mut BytesMut) -> io::Result<Option<BytesMut>> {
         // If our buffer already has enough bytes to fulfill the request, we remove those from the
         // buffer and hand them, back to the caller.
-        if self.buf.len() >= n {
-            return Ok(Some(self.buf.split_to(n)));
+        if buf.len() >= n {
+            return Ok(Some(buf.split_to(n)));
         }
 
         // Make sure our buffer is big enough to hold `n`.  We assume that `n` doesn't not change
         // overall until it is fulfilled, so we only reserve enough bytes such that the capacity of
         // the buffer is at least `n`.
-        if self.buf.capacity() < n {
-            self.buf.reserve(n - self.buf.len());
+        if buf.capacity() < n {
+            buf.reserve(n - buf.len());
         }
 
         // Issue a read to try and fill our buffer.
@@ -667,11 +713,12 @@ impl Reader {
             .data_file
             .as_mut()
             .expect("data file must be initialized");
-        let _ = data_file.read_buf(&mut self.buf).await?;
+        let _ = data_file.get_mut().read_buf(buf).await?;
+        println!("read data file file cursor pos: {}", data_file.get_mut().stream_position().await?);
 
         // Try one more time to see if we can fulfill the request after reading.
-        if self.buf.len() >= n {
-            Ok(Some(self.buf.split_to(n)))
+        if buf.len() >= n {
+            Ok(Some(buf.split_to(n)))
         } else {
             Ok(None)
         }
@@ -682,7 +729,7 @@ impl Reader {
         // we'll simply wait for the writer to signal to us that progress has been made, which
         // implies a data file existing.
         loop {
-            let data_file_path = self.ledger.get_reader_current_data_file_path();
+            let data_file_path = self.ledger.get_current_reader_data_file_path();
             let data_file = match File::open(&data_file_path).await {
                 Ok(data_file) => data_file,
                 Err(e) => match e.kind() {
@@ -691,7 +738,7 @@ impl Reader {
                         continue;
                     }
                     // This is a valid I/O error, so bubble that back up.
-                    ek => return Err(e),
+                    _ => return Err(e),
                 },
             };
 
@@ -718,7 +765,7 @@ impl Reader {
         // also rely on it to reset the data file before trying to read, and we _also_ rely on it to
         // update `self.last_reader_record_id`, so basically... just keep reading records until we
         // get to the one we left off with last time.
-        let last_reader_record_id = self.ledger.get_last_reader_record_id();
+        let last_reader_record_id = self.ledger.state().get_last_reader_record_id();
         while self.last_reader_record_id < last_reader_record_id {
             let _ = self.next().await?;
         }
@@ -727,10 +774,17 @@ impl Reader {
     }
 
     pub async fn next(&mut self) -> io::Result<(u64, Bytes)> {
+        //println!("entered next");
+
         // - try and open current reader file described by ledger
         // -- if doesnt exist yet, just wait until signalled to try again
         let _ = self.ensure_ready_for_read().await?;
 
+        //println!("data file supposedly ready");
+
+        let mut buf = BytesMut::with_capacity(8192);
+
+        #[derive(Debug)]
         struct Header {
             checksum: u32,
             len: u32,
@@ -753,28 +807,83 @@ impl Reader {
         // data, but just using it for consistency at this point.
         let mut state = State::NeedHeader;
         loop {
-            let (next_state, wait) = match state {
-                State::NeedHeader => match self
-                    .try_read_atleast(DATA_FILE_RECORD_HEADER_SIZE as usize)
-                    .await?
-                {
-                    Some(buf) => {
-                        let checksum = u32::from_be_bytes(buf[0..4].try_into().unwrap());
-                        let len = u32::from_be_bytes(buf[4..8].try_into().unwrap());
-                        let id = u64::from_be_bytes(buf[8..16].try_into().unwrap());
+            //println!("loop start");
 
-                        let header = Header { checksum, len, id };
-                        (State::NeedPayload(header), false)
+            let (next_state, wait) = match state {
+                State::NeedHeader => {
+                    //println!("needheader start");
+                    match self.try_read_atleast(DATA_FILE_RECORD_HEADER_SIZE as usize, &mut buf).await? {
+                        Some(buf) => {
+                            println!("got header buf: {:02x?}", &buf[..]);
+
+                            let checksum = u32::from_be_bytes(buf[0..4].try_into().unwrap());
+                            let len = u32::from_be_bytes(buf[4..8].try_into().unwrap());
+                            let id = u64::from_be_bytes(buf[8..16].try_into().unwrap());
+
+                            let header = Header { checksum, len, id };
+                            //println!("header: {:?}", header);
+                            (State::NeedPayload(header), false)
+                        }
+                        None => {
+                            //println!("header read got no buf");
+
+                            // Two possible scenarios here: we're still waiting on the data to be
+                            // written, or the data file is actually complete and the writer has moved
+                            // on to the next file.
+                            //
+                            // We shouldn't ever get here in other states because we don't split writes
+                            // over multiple files.
+                            //
+                            // The trick is that a writer file ID that's ahead or behind uour reader
+                            // file ID means the writer is _not_ currently writing to our file anymore,
+                            // so that EOF is actually EOF and we should move on.
+                            //
+                            // Theoretically, if our constants were set up such that only a single data
+                            // file could be allocated, then this logic would fail, because the file IDs
+                            // would never change.
+                            //
+                            // TODO: Make sure there are always at least two data files, or figure out a
+                            // better heuristic to use to distinguish a file from being actively written
+                            // to or not.
+                            let current_writer_file_id =
+                                self.ledger.state().get_current_writer_file_id();
+                            let current_reader_file_id =
+                                self.ledger.state().get_current_reader_file_id();
+                            let should_wait = if current_reader_file_id != current_writer_file_id {
+                                println!("hit actual EOF, rolling over (writer = {}, reader = {})",
+                                    current_writer_file_id, current_reader_file_id);
+                                // We've reached the actual end of this data file, so it's time to roll
+                                // to the next one.  We do that by hand here, once, to avoid having to
+                                // check every time we iterate on the loop.
+                                let _ = self.roll_to_next_data_file().await?;
+                                false
+                            } else {
+                                //println!("waiting for writer to write more");
+                                true
+                            };
+
+                            (State::NeedHeader, should_wait)
+                        }
                     }
-                    None => (State::NeedHeader, true),
                 },
                 State::NeedPayload(header) => {
-                    match self.try_read_atleast(header.len as usize).await? {
-                        Some(buf) => (State::NeedChecksumVerify(header, buf), false),
-                        None => (State::NeedPayload(header), true),
+                    //println!("needpayload start, trying for {} bytes", header.len);
+                    if header.len > 16000 {
+                        panic!("invalid len");
+                    }
+                    match self.try_read_atleast(header.len as usize, &mut buf).await? {
+                        Some(buf) => {
+                            //println!("got payload body, {} bytes", buf.len());
+                            (State::NeedChecksumVerify(header, buf), false)
+                        },
+                        None => {
+                            //println!("payload read got no buf");
+                            (State::NeedPayload(header), true)
+                        },
                     }
                 }
                 State::NeedChecksumVerify(header, payload) => {
+                    //println!("needchecksumverify start");
                     let mut checksummer = self.checksummer.clone();
                     checksummer.reset();
 
@@ -804,6 +913,7 @@ impl Reader {
                     self.increment_last_reader_record_id();
 
                     if checksum == header.checksum {
+                        //println!("checksum matched");
                         // update our last read record id for this record.
                         //
                         // TODO: should we emit a warning when we read a non-sequential record ID?
@@ -813,14 +923,15 @@ impl Reader {
                         //
                         // crude panic for now
                         if self.last_reader_record_id != header.id {
-                            panic!(
-                                "non-monotonic/sequential record ID: last => {}, currrent => {}",
+                            println!(
+                                "non-monotonic/sequential record ID: last => {}, current => {}",
                                 self.last_reader_record_id, header.id
                             );
                         }
 
                         (State::Verified(header, payload), false)
                     } else {
+                        //println!("checksum did not match");
                         // we should probably emit an error here to track corrupted records, but for
                         // the moment.  additionally, we may want to return an error per corrupted
                         // record.
@@ -829,12 +940,18 @@ impl Reader {
                         (State::NeedHeader, false)
                     }
                 }
-                State::Verified(header, payload) => return Ok((header.id, payload.freeze())),
+                State::Verified(header, payload) => {
+                    //println!("verified start");
+                    //println!("buffer: {:?}", payload);
+                    return Ok((header.id, payload.freeze()))
+                },
             };
 
             state = next_state;
             if wait {
+                //println!("waiting for writer");
                 self.ledger.wait_for_writer().await;
+                //println!("writer wait passed");
             }
         }
     }
