@@ -47,10 +47,10 @@ remap: functions: get_enrichment_table_record: {
 		},
 		{
 			name: "select"
-			description: '''
-					A subset of fields from the enrichment table to return. If not
-					specified all fields are returned.
-				'''
+			description: """
+						A subset of fields from the enrichment table to return. If not
+						specified all fields are returned.
+				"""
 			required: false
 			type: ["array"]
 		},
