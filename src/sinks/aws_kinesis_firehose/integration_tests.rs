@@ -2,8 +2,8 @@
 #![cfg(test)]
 
 use super::*;
+use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::config::{SinkConfig, SinkContext};
-use crate::rusoto::{AwsAuthentication, RegionOrEndpoint};
 use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
 use crate::sinks::util::{BatchConfig, Compression, TowerRequestConfig};
 use crate::test_util::components;
