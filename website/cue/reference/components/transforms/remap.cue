@@ -29,16 +29,6 @@ components: transforms: "remap": {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -78,11 +68,10 @@ components: transforms: "remap": {
 			common:      true
 			required:    false
 			type: string: {
+				default: null
 				examples: [
 					"./my/program.vrl",
 				]
-				syntax:  "literal"
-				default: null
 			}
 		}
 		drop_on_error: {

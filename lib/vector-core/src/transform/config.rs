@@ -9,10 +9,18 @@ pub enum DataType {
     Metric,
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 pub enum ExpandType {
-    Parallel,
-    Serial,
+    /// Chain components together one after another. Components will be named according
+    /// to this order (e.g. component_name.0 and so on). If alias is set to true,
+    /// then a Noop transform will be added as the last component and given the raw
+    /// component_name identifier so that it can be used as an input for other components.
+    Parallel { aggregates: bool },
+    /// This ways of expanding will take all the components and chain then in order.
+    /// The first node will be renamed `component_name.0` and so on.
+    /// If `alias` is set to `true, then a `Noop` transform will be added as the
+    /// last component and named `component_name` so that it can be used as an input.
+    Serial { alias: bool },
 }
 
 #[cfg(feature = "vrl")]

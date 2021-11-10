@@ -1,8 +1,7 @@
 use crate::expiring_hash_map::ExpiringHashMap;
 use crate::{
-    buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::Event,
+    event::{Event, EventStatus, Finalizable},
     internal_events::{FileBytesSent, FileOpen, TemplateRenderingFailed},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -20,6 +19,7 @@ use futures::{
 };
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
+use vector_core::buffers::Acker;
 use vector_core::internal_event::EventsSent;
 use vector_core::ByteSizeOf;
 
@@ -250,7 +250,7 @@ impl FileSink {
         Ok(())
     }
 
-    async fn process_event(&mut self, event: Event) {
+    async fn process_event(&mut self, mut event: Event) {
         let path = match self.partition_event(&event) {
             Some(path) => path,
             None => {
@@ -258,6 +258,7 @@ impl FileSink {
                 // file.
                 // This is already logged at `partition_event`, so
                 // here we just skip the event.
+                event.metadata().update_status(EventStatus::Errored);
                 return;
             }
         };
@@ -277,6 +278,7 @@ impl FileSink {
                     // Maybe other events will work though! Just log
                     // the error and skip this event.
                     error!(message = "Unable to open the file.", path = ?path, %error);
+                    event.metadata().update_status(EventStatus::Errored);
                     return;
                 }
             };
@@ -292,8 +294,10 @@ impl FileSink {
 
         trace!(message = "Writing an event to file.", path = ?path);
         let event_size = event.size_of();
+        let finalizers = event.take_finalizers();
         match write_event_to_file(file, event, &self.encoding).await {
             Ok(byte_size) => {
+                finalizers.update_status(EventStatus::Delivered);
                 emit!(&EventsSent {
                     count: 1,
                     byte_size: event_size,
@@ -303,7 +307,10 @@ impl FileSink {
                     file: String::from_utf8_lossy(&path),
                 });
             }
-            Err(error) => error!(message = "Failed to write file.", path = ?path, %error),
+            Err(error) => {
+                finalizers.update_status(EventStatus::Errored);
+                error!(message = "Failed to write file.", path = ?path, %error);
+            }
         }
     }
 }

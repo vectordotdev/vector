@@ -19,16 +19,6 @@ components: transforms: sample: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -45,11 +35,9 @@ components: transforms: sample: {
 				`key_field`, events will be count rated.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["message"]
-				syntax: "literal"
 			}
 		}
 		exclude: {
@@ -58,7 +46,6 @@ components: transforms: sample: {
 				The set of logical conditions to exclude events from sampling.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				default: null
 				examples: [
@@ -73,7 +60,6 @@ components: transforms: sample: {
 				`rate = 10` means 1 out of every 10 events will be forwarded and the rest will be dropped.
 				"""
 			required: true
-			warnings: []
 			type: uint: {
 				examples: [10]
 				unit: null

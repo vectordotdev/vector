@@ -1,5 +1,4 @@
 use crate::{
-    buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     internal_events::PulsarEncodeEventFailed,
@@ -17,6 +16,7 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+use vector_core::buffers::Acker;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
