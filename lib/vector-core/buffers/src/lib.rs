@@ -15,6 +15,8 @@ extern crate tracing;
 mod acker;
 mod buffer_usage_data;
 pub mod bytes;
+mod config;
+pub use config::{BufferConfig, BufferType};
 #[cfg(feature = "disk-buffer")]
 pub mod disk;
 mod internal_events;
@@ -27,18 +29,20 @@ use crate::buffer_usage_data::BufferUsageData;
 use crate::bytes::{DecodeBytes, EncodeBytes};
 pub use acker::{Ackable, Acker};
 use core_common::byte_size_of::ByteSizeOf;
-use futures::StreamExt;
-use futures::{channel::mpsc, Sink, SinkExt, Stream};
+use futures::{channel::mpsc, Sink, SinkExt};
+use futures::{Stream, StreamExt};
 use pin_project::pin_project;
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use tracing::Span;
 pub use variant::*;
+
+pub type BufferStream<T> = Box<dyn Stream<Item = T> + Unpin + Send>;
 
 /// Build a new buffer based on the passed `Variant`
 ///
@@ -47,21 +51,12 @@ pub use variant::*;
 /// This function will fail only when creating a new disk buffer. Because of
 /// legacy reasons the error is not a type but a `String`.
 #[allow(clippy::needless_pass_by_value)]
-pub fn build<'a, T>(
+pub fn build<T>(
     variant: Variant,
     span: Span,
-) -> Result<
-    (
-        BufferInputCloner<T>,
-        Box<dyn Stream<Item = T> + 'a + Unpin + Send>,
-        Acker,
-    ),
-    String,
->
+) -> Result<(BufferInputCloner<T>, BufferStream<T>, Acker), String>
 where
-    T: 'a + ByteSizeOf + Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
-    <T as EncodeBytes<T>>::Error: Debug,
-    <T as DecodeBytes<T>>::Error: Debug + Display,
+    T: Bufferable + Clone,
 {
     match variant {
         #[cfg(feature = "disk-buffer")]
@@ -133,6 +128,20 @@ impl Arbitrary for WhenFull {
     }
 }
 
+/// An item that can be buffered.
+///
+/// This supertrait serves as the base trait for any item that can be pushed into a buffer.
+pub trait Bufferable:
+    ByteSizeOf + EncodeBytes<Self> + DecodeBytes<Self> + Send + Sync + Unpin + Sized + 'static
+{
+}
+
+// Blanket implementation for anything that is already bufferable.
+impl<T> Bufferable for T where
+    T: ByteSizeOf + EncodeBytes<Self> + DecodeBytes<Self> + Send + Sync + Unpin + Sized + 'static
+{
+}
+
 // Clippy warns that the `Disk` variant below is much larger than the
 // `Memory` variant (currently 233 vs 25 bytes) and recommends boxing
 // the large fields to reduce the total size.
@@ -140,23 +149,19 @@ impl Arbitrary for WhenFull {
 #[derive(Clone)]
 pub enum BufferInputCloner<T>
 where
-    T: ByteSizeOf + Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
-    <T as EncodeBytes<T>>::Error: Debug,
-    <T as DecodeBytes<T>>::Error: Debug,
+    T: Bufferable + Clone,
 {
     Memory(mpsc::Sender<T>, WhenFull, Option<Arc<BufferUsageData>>),
     #[cfg(feature = "disk-buffer")]
     Disk(disk::Writer<T>, WhenFull, Arc<BufferUsageData>),
 }
 
-impl<'a, T> BufferInputCloner<T>
+impl<T> BufferInputCloner<T>
 where
-    T: 'a + ByteSizeOf + Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
-    <T as EncodeBytes<T>>::Error: Debug,
-    <T as DecodeBytes<T>>::Error: Debug + Display,
+    T: Bufferable + Clone,
 {
     #[must_use]
-    pub fn get(&self) -> Box<dyn Sink<T, Error = ()> + 'a + Send + Unpin> {
+    pub fn get(&self) -> Box<dyn Sink<T, Error = ()> + Send + Unpin> {
         match self {
             BufferInputCloner::Memory(tx, when_full, buffer_usage_data) => {
                 let inner = tx

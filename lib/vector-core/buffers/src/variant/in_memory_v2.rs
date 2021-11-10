@@ -1,7 +1,10 @@
 use tokio::sync::mpsc::channel;
 use tokio_stream::wrappers::ReceiverStream;
 
-use crate::topology::{builder::IntoBuffer, poll_sender::PollSender};
+use crate::{
+    topology::{builder::IntoBuffer, poll_sender::PollSender},
+    Bufferable,
+};
 
 pub struct MemoryBuffer {
     capacity: usize,
@@ -15,7 +18,7 @@ impl MemoryBuffer {
 
 impl<T> IntoBuffer<T> for MemoryBuffer
 where
-    T: Send + 'static,
+    T: Bufferable,
 {
     fn into_buffer_parts(self) -> (PollSender<T>, ReceiverStream<T>) {
         let (tx, rx) = channel(self.capacity);

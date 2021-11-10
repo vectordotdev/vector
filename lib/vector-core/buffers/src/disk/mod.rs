@@ -1,10 +1,9 @@
 use crate::buffer_usage_data::BufferUsageData;
-use crate::bytes::{DecodeBytes, EncodeBytes};
-use futures::{Sink, Stream};
+use crate::{BufferStream, Bufferable};
+use futures::Sink;
 use pin_project::pin_project;
 use snafu::Snafu;
 use std::fmt::Debug;
-use std::fmt::Display;
 use std::sync::Arc;
 use std::{
     io,
@@ -37,9 +36,7 @@ pub enum DataDirError {
 #[derive(Clone)]
 pub struct Writer<T>
 where
-    T: Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
-    <T as EncodeBytes<T>>::Error: Debug,
-    <T as DecodeBytes<T>>::Error: Debug,
+    T: Bufferable + Clone,
 {
     #[pin]
     inner: leveldb_buffer::Writer<T>,
@@ -47,9 +44,7 @@ where
 
 impl<T> Sink<T> for Writer<T>
 where
-    T: Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
-    <T as EncodeBytes<T>>::Error: Debug,
-    <T as DecodeBytes<T>>::Error: Debug + Display,
+    T: Bufferable + Clone,
 {
     type Error = ();
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -75,23 +70,14 @@ where
 ///
 /// This function will fail with [`DataDirError`] if the directory does not exist at
 /// `data_dir`, if permissions are not sufficient etc.
-pub fn open<'a, T>(
+pub fn open<T>(
     data_dir: &Path,
     name: &str,
     max_size: usize,
     buffer_usage_data: Arc<BufferUsageData>,
-) -> Result<
-    (
-        Writer<T>,
-        Box<dyn Stream<Item = T> + 'a + Unpin + Send>,
-        super::Acker,
-    ),
-    DataDirError,
->
+) -> Result<(Writer<T>, BufferStream<T>, super::Acker), DataDirError>
 where
-    T: 'a + Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
-    <T as EncodeBytes<T>>::Error: Debug,
-    <T as DecodeBytes<T>>::Error: Debug + Display,
+    T: Bufferable + Clone,
 {
     let path = data_dir.join(name);
 

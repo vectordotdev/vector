@@ -1,5 +1,4 @@
 use crate::{
-    buffers::Acker,
     config::SinkContext,
     event::Event,
     internal_events::{
@@ -23,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{path::PathBuf, pin::Pin, sync::Arc, time::Duration};
 use tokio::{net::UnixStream, time::sleep};
-use vector_core::ByteSizeOf;
+use vector_core::{buffers::Acker, ByteSizeOf};
 
 #[derive(Debug, Snafu)]
 pub enum UnixError {

@@ -1,7 +1,4 @@
-use crate::{
-    buffers::Acker,
-    internal_events::{SocketEventsSent, SocketMode},
-};
+use crate::internal_events::{SocketEventsSent, SocketMode};
 use bytes::Bytes;
 use futures::{ready, Sink};
 use pin_project::{pin_project, pinned_drop};
@@ -13,6 +10,7 @@ use std::{
 };
 use tokio::io::AsyncWrite;
 use tokio_util::codec::{BytesCodec, FramedWrite};
+use vector_core::buffers::Acker;
 
 const MAX_PENDING_ITEMS: usize = 1_000;
 

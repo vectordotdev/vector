@@ -1,6 +1,6 @@
 /// This pipelines transform is a bit complex and needs a simple example.
 ///
-/// If we take the following example in consideration
+/// If we consider the following example:
 ///
 /// ```toml
 /// [transforms.my_pipelines]
@@ -56,9 +56,11 @@
 /// Each pipeline will then be expanded into a list of its transforms and at the end of each
 /// expansion, a `Noop` transform will be added to use the `pipeline` name as an alias
 /// (`my_pipelines.logs.transforms.foo`).
+mod bypass;
 mod expander;
 mod router;
 
+use crate::conditions::AnyCondition;
 use crate::config::{
     DataType, ExpandType, GenerateConfig, TransformConfig, TransformContext, TransformDescription,
 };
@@ -70,11 +72,12 @@ inventory::submit! {
     TransformDescription::new::<PipelinesConfig>("pipelines")
 }
 
-/// This represents the configuration of a single pipeline,
-/// not the pipelines transform itself.
+/// This represents the configuration of a single pipeline, not the pipelines transform
+/// itself, which can contain multiple individual pipelines
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct PipelineConfig {
     name: String,
+    filter: Option<AnyCondition>,
     transforms: Vec<Box<dyn TransformConfig>>,
 }
 
@@ -93,14 +96,18 @@ impl Clone for PipelineConfig {
 impl PipelineConfig {
     /// Expands a single pipeline into a series of its transforms.
     fn serial(&self) -> Box<dyn TransformConfig> {
-        let pipelines: IndexMap<String, Box<dyn TransformConfig>> = self
+        let transforms: IndexMap<String, Box<dyn TransformConfig>> = self
             .transforms
             .iter()
             .enumerate()
             .map(|(index, config)| (index.to_string(), config.clone()))
             .collect();
-
-        Box::new(expander::ExpanderConfig::serial(pipelines))
+        let transforms = Box::new(expander::ExpanderConfig::serial(transforms));
+        if let Some(ref filter) = self.filter {
+            Box::new(bypass::BypassConfig::new(filter.clone(), transforms))
+        } else {
+            transforms
+        }
     }
 }
 
@@ -219,6 +226,10 @@ impl GenerateConfig for PipelinesConfig {
             [logs.pipelines.foo]
             name = "foo pipeline"
 
+            [logs.pipelines.foo.filter]
+            type = "datadog_search"
+            source = "source:s3"
+
             [[logs.pipelines.foo.transforms]]
             type = "filter"
             condition = ""
@@ -282,7 +293,6 @@ mod tests {
         outer
             .expand(name, &mut transforms, &mut expansions)
             .unwrap();
-        assert_eq!(transforms.len(), 9);
         assert_eq!(
             transforms
                 .keys()
@@ -290,8 +300,12 @@ mod tests {
                 .collect::<Vec<String>>(),
             vec![
                 "foo.logs.filter",
-                "foo.logs.transforms.foo.0",
-                "foo.logs.transforms.foo.1",
+                "foo.logs.transforms.foo.truthy.filter",
+                "foo.logs.transforms.foo.truthy.transforms.0",
+                "foo.logs.transforms.foo.truthy.transforms.1",
+                "foo.logs.transforms.foo.truthy.transforms",
+                "foo.logs.transforms.foo.truthy",
+                "foo.logs.transforms.foo.falsy",
                 "foo.logs.transforms.foo",
                 "foo.logs.transforms.bar.0",
                 "foo.logs.transforms.bar",

@@ -1,7 +1,6 @@
 use super::SinkBuildError;
 use crate::udp;
 use crate::{
-    buffers::Acker,
     config::SinkContext,
     dns,
     event::Event,
@@ -26,6 +25,7 @@ use std::{
     time::Duration,
 };
 use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
+use vector_core::buffers::Acker;
 
 #[derive(Debug, Snafu)]
 pub enum UdpError {

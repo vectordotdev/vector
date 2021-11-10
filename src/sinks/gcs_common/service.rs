@@ -1,4 +1,3 @@
-use crate::buffers::Ackable;
 use crate::event::{EventFinalizers, EventStatus, Finalizable};
 use crate::http::{HttpClient, HttpError};
 use crate::sinks::gcp::GcpCredentials;
@@ -11,6 +10,7 @@ use http::{
 use hyper::Body;
 use std::task::Poll;
 use tower::Service;
+use vector_core::buffers::Ackable;
 use vector_core::internal_event::EventsSent;
 use vector_core::stream::DriverResponse;
 
