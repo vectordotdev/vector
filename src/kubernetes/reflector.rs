@@ -359,7 +359,7 @@ mod tests {
         drop(reflector);
     }
 
-    // Test the properties of the normal  execution flow.
+    // Test the properties of the normal execution flow.
     #[tokio::test]
     async fn flow_test() {
         trace_init();
@@ -367,7 +367,7 @@ mod tests {
         let invocations = vec![
             (
                 vec![],
-                None,
+                Some("0".to_owned()),
                 ExpInvRes::Stream(vec![
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid0", "10"))),
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid1", "15"))),
@@ -419,7 +419,7 @@ mod tests {
         let invocations = vec![
             (
                 vec![],
-                None,
+                Some("0".to_owned()),
                 ExpInvRes::Stream(vec![
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid0", "10"))),
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid1", "15"))),
@@ -460,7 +460,7 @@ mod tests {
         let invocations = vec![
             (
                 vec![],
-                None,
+                Some("0".to_owned()),
                 ExpInvRes::Stream(vec![
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid0", "10"))),
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid1", "15"))),
@@ -499,7 +499,7 @@ mod tests {
         let invocations = vec![
             (
                 vec![],
-                None,
+                Some("0".to_owned()),
                 ExpInvRes::Stream(vec![
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid0", "10"))),
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid1", "15"))),
@@ -543,7 +543,7 @@ mod tests {
         let invocations = vec![
             (
                 vec![],
-                None,
+                Some("0".to_owned()),
                 ExpInvRes::Stream(vec![
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid0", "10"))),
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid1", "15"))),
@@ -584,7 +584,7 @@ mod tests {
         let invocations = vec![
             (
                 vec![],
-                None,
+                Some("0".to_owned()),
                 ExpInvRes::Stream(vec![
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid0", "10"))),
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid1", "15"))),
@@ -681,7 +681,7 @@ mod tests {
                     field_selector: Some("fields".to_owned()),
                     label_selector: Some("labels".to_owned()),
                     pretty: None,
-                    resource_version: None,
+                    resource_version: Some("0".to_owned()),
                     timeout_seconds: Some(290),
                 }
             );
@@ -1084,7 +1084,7 @@ mod tests {
         // Prepare reflector.
         let pause_between_requests = Duration::from_secs(60 * 60); // 1 hour
         let mut reflector =
-            Reflector::new(watcher, state_writer, None, None, pause_between_requests);
+            Reflector::new(watcher, state_writer, None, Some("0".to_owned()), pause_between_requests);
 
         // Run test logic.
         let logic = tokio::spawn(async move {
