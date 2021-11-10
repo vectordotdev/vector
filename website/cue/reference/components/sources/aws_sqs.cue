@@ -3,24 +3,19 @@ package metadata
 components: sources: aws_sqs: components._aws & {
 	title: "AWS SQS"
 
-//	features: {
-//		collect: {
-//			checkpoint: enabled: false
-//			tls: {
-//				enabled:                true
-//				can_enable:             true
-//				can_verify_certificate: false
-//				can_verify_hostname:    false
-//				enabled_default:        false
-//			}
-//			from: components._kafka.features.collect.from
-//		}
-//		multiline: enabled: false
-//		codecs: {
-//			enabled:         true
-//			default_framing: "bytes"
-//		}
-//	}
+	features: {
+		collect: {
+			tls: enabled:        false
+			checkpoint: enabled: false
+			proxy: enabled:      true
+			from: service:       services.aws_sqs
+		}
+		multiline: enabled: false
+		codecs: {
+			enabled:         true
+			default_framing: "bytes"
+		}
+	}
 
 	classes: {
 		commonly_used: true
@@ -103,23 +98,23 @@ components: sources: aws_sqs: components._aws & {
 	}
 
 	telemetry: metrics: {
-		events_failed_total:                  components.sources.internal_metrics.output.metrics.events_failed_total
-		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
-		consumer_offset_updates_failed_total: components.sources.internal_metrics.output.metrics.consumer_offset_updates_failed_total
-		kafka_queue_messages:                 components.sources.internal_metrics.output.metrics.kafka_queue_messages
-		kafka_queue_messages_bytes:           components.sources.internal_metrics.output.metrics.kafka_queue_messages_bytes
-		kafka_requests_total:                 components.sources.internal_metrics.output.metrics.kafka_requests_total
-		kafka_requests_bytes_total:           components.sources.internal_metrics.output.metrics.kafka_requests_bytes_total
-		kafka_responses_total:                components.sources.internal_metrics.output.metrics.kafka_responses_total
-		kafka_responses_bytes_total:          components.sources.internal_metrics.output.metrics.kafka_responses_bytes_total
-		kafka_produced_messages_total:        components.sources.internal_metrics.output.metrics.kafka_produced_messages_total
-		kafka_produced_messages_bytes_total:  components.sources.internal_metrics.output.metrics.kafka_produced_messages_bytes_total
-		kafka_consumed_messages_total:        components.sources.internal_metrics.output.metrics.kafka_consumed_messages_total
-		kafka_consumed_messages_bytes_total:  components.sources.internal_metrics.output.metrics.kafka_consumed_messages_bytes_total
-		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		sqs_delete_failed_total:              components.sources.internal_metrics.output.metrics.sqs_message_delete_failed_total
 	}
 
-	how_it_works: components._kafka.how_it_works
+	how_it_works: {
+		aws_sqs: {
+			title: "AWS SQS"
+			body:  """
+				The `aws_sqs` source receives messages from [AWS SQS](https://aws.amazon.com/sqs/)
+				(Simple Queue Service). This is a highly scaleable / durable queueing system with
+				at-least-once queuing semantics. Messages are received in batches (up to 10 at a time),
+				and then deleted in batches (again up to 10). Messages are either deleted immediately
+				after receiving, or after it has been fully processed by the sinks, depending on the
+				`acknowledgements` setting.
+				"""
+		}
+	}
 }
