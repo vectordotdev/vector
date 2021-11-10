@@ -6,7 +6,7 @@
 /// [transforms.my_pipelines]
 /// type = "pipelines"
 /// inputs = ["syslog"]
-/// mode = "serial"
+/// mode = "linear"
 ///
 /// [transforms.my_pipelines.logs]
 /// order = ["foo", "bar"]
@@ -154,10 +154,8 @@ impl EventTypeConfig {
             .collect();
 
         match mode {
-            PipelineMode::Serial => Box::new(expander::ExpanderConfig::serial(pipelines)),
-            PipelineMode::Parallel => {
-                Box::new(expander::ExpanderConfig::parallel(pipelines, false))
-            }
+            PipelineMode::Linear => Box::new(expander::ExpanderConfig::serial(pipelines)),
+            PipelineMode::Route => Box::new(expander::ExpanderConfig::parallel(pipelines, false)),
         }
     }
 }
@@ -165,19 +163,19 @@ impl EventTypeConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum PipelineMode {
-    Parallel,
-    Serial,
+    Route,
+    Linear,
 }
 
 impl Default for PipelineMode {
     fn default() -> Self {
-        Self::Serial
+        Self::Linear
     }
 }
 
 impl PipelineMode {
     pub const fn alias(&self) -> bool {
-        matches!(self, Self::Serial)
+        matches!(self, Self::Linear)
     }
 }
 
@@ -258,7 +256,7 @@ impl TransformConfig for PipelinesConfig {
 impl GenerateConfig for PipelinesConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc::indoc! {r#"
-            mode = "serial"
+            mode = "linear"
 
             [logs]
             order = ["foo", "bar"]
@@ -357,7 +355,7 @@ mod tests {
     fn expanding_parallel() {
         let config = PipelinesConfig::generate_config();
         let mut config: PipelinesConfig = config.try_into().unwrap();
-        config.mode = PipelineMode::Parallel;
+        config.mode = PipelineMode::Route;
         let outer = TransformOuter {
             inputs: Vec::<String>::new(),
             inner: Box::new(config),
