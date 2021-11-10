@@ -23,7 +23,6 @@
 mod tests;
 
 mod config;
-mod healthcheck;
 mod service;
 mod sink;
 

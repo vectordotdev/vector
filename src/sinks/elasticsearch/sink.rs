@@ -2,9 +2,9 @@ use crate::event::{Event, LogEvent};
 use crate::sinks::util::{Compression, SinkBuilderExt, StreamSink};
 use futures::stream::BoxStream;
 use std::num::NonZeroUsize;
+use vector_core::buffers::Acker;
 use vector_core::partition::NullPartitioner;
 
-use crate::buffers::Acker;
 use crate::event::Value;
 use crate::sinks::elasticsearch::encoder::ProcessedEvent;
 use crate::sinks::elasticsearch::request_builder::ElasticsearchRequestBuilder;

@@ -1,6 +1,6 @@
 use crate::{
     async_read::VecAsyncReadExt,
-    codecs, emit,
+    codecs,
     event::Event,
     internal_events::{ConnectionOpen, OpenGauge, UnixSocketError, UnixSocketFileDeleteError},
     shutdown::ShutdownSignal,

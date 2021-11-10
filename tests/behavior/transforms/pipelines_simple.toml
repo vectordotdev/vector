@@ -1,0 +1,57 @@
+[sources.pipelines_syslog]
+type = "generator"
+format = "syslog"
+
+[transforms.pipelines_gate]
+type = "remap"
+inputs = ["pipelines_syslog"]
+source = ""
+
+[transforms.pipelines_processing]
+type = "pipelines"
+inputs = ["pipelines_gate"]
+
+[transforms.pipelines_processing.logs]
+order = [
+  "foo",
+  "bar"
+]
+
+[transforms.pipelines_processing.logs.pipelines.foo]
+name = "foo"
+
+[[transforms.pipelines_processing.logs.pipelines.foo.transforms]]
+type = "remap"
+source = ". |= parse_syslog!(.message)"
+
+[[transforms.pipelines_processing.logs.pipelines.foo.transforms]]
+type = "remap"
+source = ".went_through_foo = true"
+
+[transforms.pipelines_processing.logs.pipelines.bar]
+name = "bar"
+
+[[transforms.pipelines_processing.logs.pipelines.bar.transforms]]
+type = "remap"
+source = ".went_through_bar = true"
+
+[sinks.pipelines_console]
+type = "console"
+inputs = ["pipelines_processing"]
+encoding.codec = "json"
+target = "stdout"
+
+[[tests]]
+name = "through logs"
+
+[tests.input]
+insert_at = "pipelines_gate"
+value = "hello world"
+
+[[tests.outputs]]
+extract_from = "pipelines_processing"
+
+[[tests.outputs.conditions]]
+type = "check_fields"
+"went_through_bar.equals" = true
+"went_through_foo.equals" = true

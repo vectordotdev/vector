@@ -6,8 +6,6 @@ use std::io::Write;
 
 pub mod compression;
 pub mod json;
-#[cfg(feature = "sinks-loki")]
-pub mod loki;
 pub mod metrics;
 pub mod partition;
 pub mod vec;
@@ -131,16 +129,14 @@ impl Batch for Buffer {
 #[cfg(test)]
 mod test {
     use super::{Buffer, Compression};
-    use crate::{
-        buffers::Acker,
-        sinks::util::{BatchSettings, BatchSink, EncodedEvent},
-    };
+    use crate::sinks::util::{BatchSettings, BatchSink, EncodedEvent};
     use futures::{future, stream, SinkExt, StreamExt};
     use std::{
         io::Read,
         sync::{Arc, Mutex},
     };
     use tokio::time::Duration;
+    use vector_core::buffers::Acker;
 
     #[tokio::test]
     async fn gzip() {

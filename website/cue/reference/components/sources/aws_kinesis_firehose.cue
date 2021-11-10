@@ -41,16 +41,6 @@ components: sources: aws_kinesis_firehose: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: [
 			"""
 				AWS Kinesis Firehose can only deliver data over HTTP. You will need
@@ -73,7 +63,6 @@ components: sources: aws_kinesis_firehose: {
 			required:    true
 			type: string: {
 				examples: ["0.0.0.0:443", "localhost:443"]
-				syntax: "literal"
 			}
 		}
 		access_key: {
@@ -85,12 +74,12 @@ components: sources: aws_kinesis_firehose: {
 				all requests as authenticated.
 				"""
 			required: false
-			type: "string": {
+			type: string: {
 				default: null
 				examples: ["A94A8FE5CCB19BA61C4C08"]
-				syntax: "literal"
 			}
 		}
+		acknowledgements: configuration._acknowledgements
 		record_compression: {
 			common:      true
 			description: """
@@ -120,7 +109,6 @@ components: sources: aws_kinesis_firehose: {
 					gzip: "GZIP format."
 					none: "Uncompressed."
 				}
-				syntax: "literal"
 			}
 		}
 	}
@@ -135,7 +123,6 @@ components: sources: aws_kinesis_firehose: {
 					required:    true
 					type: string: {
 						examples: ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
-						syntax: "literal"
 					}
 				}
 				request_id: {
@@ -143,7 +130,6 @@ components: sources: aws_kinesis_firehose: {
 					required:    true
 					type: string: {
 						examples: ["ed1d787c-b9e2-4631-92dc-8e7c9d26d804"]
-						syntax: "literal"
 					}
 				}
 				source_arn: {
@@ -151,7 +137,6 @@ components: sources: aws_kinesis_firehose: {
 					required:    true
 					type: string: {
 						examples: ["arn:aws:firehose:us-east-1:111111111111:deliverystream/test"]
-						syntax: "literal"
 					}
 				}
 			}

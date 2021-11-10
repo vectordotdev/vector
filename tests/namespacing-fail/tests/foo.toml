@@ -1,0 +1,8 @@
+name = "foo"
+[input]
+  insert_at = "demo"
+  type = "log"
+  [input.log_fields]
+    "message" = "foo"
+[[outputs]]
+  extract_from = "demo"

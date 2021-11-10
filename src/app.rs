@@ -51,31 +51,36 @@ impl Application {
     pub fn prepare_from_opts(opts: Opts) -> Result<Self, exitcode::ExitCode> {
         openssl_probe::init_ssl_cert_env_vars();
 
-        let level = std::env::var("LOG").unwrap_or_else(|_| match opts.log_level() {
-            "off" => "off".to_owned(),
-            #[cfg(feature = "tokio-console")]
-            level => [
-                format!("vector={}", level),
-                format!("codec={}", level),
-                format!("vrl={}", level),
-                format!("file_source={}", level),
-                "tower_limit=trace".to_owned(),
-                "runtime=trace".to_owned(),
-                "tokio=trace".to_owned(),
-                format!("rdkafka={}", level),
-            ]
-            .join(","),
-            #[cfg(not(feature = "tokio-console"))]
-            level => [
-                format!("vector={}", level),
-                format!("codec={}", level),
-                format!("vrl={}", level),
-                format!("file_source={}", level),
-                "tower_limit=trace".to_owned(),
-                format!("rdkafka={}", level),
-            ]
-            .join(","),
-        });
+        let level = std::env::var("VECTOR_LOG")
+            .or_else(|_| {
+                warn!(message = "Use of $LOG is deprecated. Please use $VECTOR_LOG instead.");
+                std::env::var("LOG")
+            })
+            .unwrap_or_else(|_| match opts.log_level() {
+                "off" => "off".to_owned(),
+                #[cfg(feature = "tokio-console")]
+                level => [
+                    format!("vector={}", level),
+                    format!("codec={}", level),
+                    format!("vrl={}", level),
+                    format!("file_source={}", level),
+                    "tower_limit=trace".to_owned(),
+                    "runtime=trace".to_owned(),
+                    "tokio=trace".to_owned(),
+                    format!("rdkafka={}", level),
+                ]
+                .join(","),
+                #[cfg(not(feature = "tokio-console"))]
+                level => [
+                    format!("vector={}", level),
+                    format!("codec={}", level),
+                    format!("vrl={}", level),
+                    format!("file_source={}", level),
+                    "tower_limit=trace".to_owned(),
+                    format!("rdkafka={}", level),
+                ]
+                .join(","),
+            });
 
         let root_opts = opts.root;
 

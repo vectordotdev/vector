@@ -48,7 +48,7 @@ impl Model for OnDisk {
                 }
                 Progress::Advanced
             }
-            WhenFull::Block => {
+            WhenFull::Block | WhenFull::Overflow => {
                 if self.is_full() {
                     Progress::Blocked(item)
                 } else {

@@ -41,7 +41,7 @@ outline these rules to guide new component development and ongoing maintenance.
 
 This specification addresses _direct_ component development and does not cover
 aspects that components inherit "for free". For example, this specification does
-not cover gloal context, such as `component_id`, that all components receive in
+not cover global context, such as `component_id`, that all components receive in
 their telemetry by nature of being a Vector compoent.
 
 ## How to read this document
@@ -57,14 +57,14 @@ follow the following guidelines.
 
 ### Source and sink naming
 
-* MUST only contain ASCII alphanumeric, lowercase, and underscores
-* MUST be a noun named after the protocol or service that the component integrates with
-* MAY be suffixed with the event type, `logs`, `metrics`, or `traces` (e.g., `kubernetes_logs`, `apache_metrics`)
+* MUST only contain ASCII alphanumeric, lowercase, and underscores.
+* MUST be a noun named after the protocol or service that the component integrates with.
+* MAY be suffixed with the event type, `logs`, `metrics`, or `traces` (e.g., `kubernetes_logs`, `apache_metrics`).
 
 ### Transform naming
 
-* MUST only contain ASCII alphanumeric, lowercase, and underscores
-* MUST be a verb describing the broad purpose of the transform (e.g., `route`, `sample`, `delegate`)
+* MUST only contain ASCII alphanumeric, lowercase, and underscores.
+* MUST be a verb describing the broad purpose of the transform (e.g., `route`, `sample`, `delegate`).
 
 ## Configuration
 
@@ -105,7 +105,7 @@ There is leeway in the implementation of these events:
 * Events MAY be augmented with additional component-specific context. For
   example, the `socket` source adds a `mode` attribute as additional context.
 * The naming of the events MAY deviate to satisfy implementation. For example,
-  the `socket` source may rename the `EventRecevied` event to
+  the `socket` source may rename the `EventReceived` event to
   `SocketEventReceived` to add additional socket specific context.
 * Components MAY emit events for batches of Vector events for performance
   reasons, but the resulting telemetry state MUST be equivalent to emitting
@@ -114,8 +114,9 @@ There is leeway in the implementation of these events:
 
 #### BytesReceived
 
-*Sources* MUST emit a `BytesReceived` event immediately after receiving bytes
-from the upstream source and before the creation of a Vector event.
+*Sources* MUST emit a `BytesReceived` event immediately after receiving
+and (optionally) filtering bytes from the upstream source and before the
+creation of a Vector event.
 
 * Properties
   * `byte_size`
@@ -136,7 +137,7 @@ from the upstream source and before the creation of a Vector event.
   * MUST log a `Bytes received.` message at the `trace` level with the
     defined properties as key-value pairs. It MUST NOT be rate limited.
 
-#### EventsRecevied
+#### EventsReceived
 
 *All components* MUST emit an `EventsReceived` event immediately after creating
 or receiving one or more Vector events.

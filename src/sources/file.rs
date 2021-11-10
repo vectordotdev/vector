@@ -233,7 +233,7 @@ impl SourceConfig for FileConfig {
             data_dir,
             cx.shutdown,
             cx.out,
-            cx.acknowledgements,
+            cx.acknowledgements.enabled,
         ))
     }
 
