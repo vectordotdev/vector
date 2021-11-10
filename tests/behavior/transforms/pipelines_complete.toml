@@ -21,7 +21,7 @@ order = [
 [transforms.processing.logs.pipelines.aws_s3_access_logs]
 name = "AWS S3 access logs"
 filter.type = "datadog_search"
-filter.condition = "source:s3"
+filter.source = "source:s3"
 
 # Processor 1: Grok Parser: Parsing S3 Access Logs
 [[transforms.processing.logs.pipelines.aws_s3_access_logs.transforms]]
@@ -107,7 +107,7 @@ schema_set_status(.http.status_category)
 [transforms.processing.logs.pipelines.sudo]
 name = "Sudo"
 filter.type = "datadog_search"
-filter.condition = "source:s3"
+filter.source = "source:s3"
 
 [[transforms.processing.logs.pipelines.sudo.transforms]]
 type = "remap"
