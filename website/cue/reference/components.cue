@@ -37,9 +37,7 @@ components: {
 			service_providers: [string, ...string] | *[]
 		}
 
-		if Args.kind != "enrichment_table" {
-			stateful: bool
-		}
+		stateful: bool
 	}
 
 	#Component: {

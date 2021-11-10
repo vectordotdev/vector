@@ -16,6 +16,7 @@ components: enrichment_tables: file: {
 	classes: {
 		commonly_used: false
 		development:   "beta"
+		stateful:      false
 	}
 
 	support: {
