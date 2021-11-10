@@ -489,7 +489,6 @@ fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMessag
     }
     emit!(&DatadogAgentRequestReceived {
         byte_size: body.len(),
-        count: 1,
     });
     Ok(body)
 }

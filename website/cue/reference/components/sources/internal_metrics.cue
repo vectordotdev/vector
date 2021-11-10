@@ -594,6 +594,18 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		datadog_logs_received_in_total: {
+			description:       "Number of Datadog logs received."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		datadog_metrics_received_in_total: {
+			description:       "Number of Datadog metrics received."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		kafka_queue_messages: {
 			description:       "Current number of messages in producer queues."
 			type:              "gauge"
