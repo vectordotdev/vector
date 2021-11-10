@@ -192,7 +192,7 @@ inventory::submit! {
 }
 
 inventory::submit! {
-    TransformDescription::new::<DemoConfig>("generator")
+    SourceDescription::new::<DemoConfig>("generator")
 }
 
 impl_generate_config_from_default!(DemoConfig);

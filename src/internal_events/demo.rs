@@ -1,9 +1,9 @@
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct GeneratorEventProcessed;
+pub struct DemoEventProcessed;
 
-impl InternalEvent for GeneratorEventProcessed {
+impl InternalEvent for DemoEventProcessed {
     fn emit_logs(&self) {
         trace!(message = "Received one event.");
     }
