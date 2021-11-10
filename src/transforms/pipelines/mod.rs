@@ -176,7 +176,7 @@ impl Default for PipelineMode {
 }
 
 impl PipelineMode {
-    pub fn alias(&self) -> bool {
+    pub const fn alias(&self) -> bool {
         matches!(self, Self::Serial)
     }
 }
