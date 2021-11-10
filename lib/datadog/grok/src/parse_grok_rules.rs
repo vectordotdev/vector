@@ -169,7 +169,7 @@ fn parse_grok_rule(
 ) -> Result<ParsedGrokRule, Error> {
     lazy_static! {
         static ref GROK_PATTERN_RE: onig::Regex =
-            onig::Regex::new(r#"%\{([^"\}]|(?<!\+)"(\\"|[^"])*(?<!\+)")+\}"#).unwrap();
+            onig::Regex::new(r#"%\{([^"\}]|(?<!\+)"(\\"|[^"])*(?<!\\)")+\}"#).unwrap();
     }
     // find all patterns %{}
     let raw_grok_patterns = GROK_PATTERN_RE
@@ -320,11 +320,13 @@ fn purify_grok_pattern(
             || pattern.match_fn.name == "boolean" =>
         {
             // these patterns will be converted to named capture groups e.g. (?<http.status_code>[0-9]{3})
-            res.push_str("(?<");
             if let Some(destination) = &pattern.destination {
+                res.push_str("(?<");
                 res.push_str(destination.path.to_string().as_str());
+                res.push('>');
+            } else {
+                res.push_str("(?:"); // non-capturing group
             }
-            res.push('>');
             res.push_str(resolves_match_function(&mut filters, pattern)?.as_str());
             res.push(')');
         }

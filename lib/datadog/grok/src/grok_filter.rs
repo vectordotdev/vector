@@ -27,6 +27,7 @@ pub enum GrokFilter {
     Lowercase,
     Uppercase,
     Json,
+    Noop, // temporary stub for non-supported filters
 }
 
 impl TryFrom<&Function> for GrokFilter {
@@ -65,7 +66,8 @@ impl TryFrom<&Function> for GrokFilter {
                     }
                 })
                 .ok_or_else(|| GrokStaticError::InvalidFunctionArguments(f.name.clone())),
-            _ => Err(GrokStaticError::UnknownFilter(f.name.clone())),
+            // _ => Err(GrokStaticError::UnknownFilter(f.name.clone())),
+            _ => Ok(GrokFilter::Noop),
         }
     }
 }
@@ -276,5 +278,6 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
                 value.to_string(),
             )),
         },
+        GrokFilter::Noop => Ok(value.to_owned()),
     }
 }
