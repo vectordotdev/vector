@@ -1083,8 +1083,13 @@ mod tests {
 
         // Prepare reflector.
         let pause_between_requests = Duration::from_secs(60 * 60); // 1 hour
-        let mut reflector =
-            Reflector::new(watcher, state_writer, None, Some("0".to_owned()), pause_between_requests);
+        let mut reflector = Reflector::new(
+            watcher,
+            state_writer,
+            None,
+            Some("0".to_owned()),
+            pause_between_requests,
+        );
 
         // Run test logic.
         let logic = tokio::spawn(async move {
