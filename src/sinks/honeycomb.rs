@@ -25,11 +25,15 @@ pub struct HoneycombConfig {
     dataset: String,
 
     #[serde(default)]
-    batch: BatchConfig,
+    batch: BatchConfig<HoneycombBatchDefaultBatchSettings>,
 
     #[serde(default)]
     request: TowerRequestConfig,
 }
+
+struct HoneycombBatchDefaultBatchSettings;
+
+// impl with defaults
 
 inventory::submit! {
     SinkDescription::new::<HoneycombConfig>("honeycomb")
@@ -53,16 +57,19 @@ impl SinkConfig for HoneycombConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-        let batch_settings = BatchSettings::default()
-            .bytes(100_000)
-            .timeout(1)
-            .parse_config(self.batch)?;
+        //let batch_settings = BatchSettings::default()
+        //.bytes(100_000)
+        //.timeout(1)
+        //.parse_config(self.batch)?;
+        let batch_settings = self.batch.build()?;
+
+        let buffer = JsonArrayBuffer::new(batch_settings.size)?;
 
         let client = HttpClient::new(None, cx.proxy())?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
-            JsonArrayBuffer::new(batch_settings.size),
+            buffer,
             request_settings,
             batch_settings.timeout,
             client.clone(),

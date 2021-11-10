@@ -32,8 +32,8 @@ where
     type Output = PartitionInnerBuffer<T::Output, K>;
 
     fn get_settings_defaults(
-        config: BatchConfig,
-        defaults: BatchSettings<Self>,
+        config: BatchConfig<D>,
+        //defaults: BatchSettings<Self>,
     ) -> Result<BatchSettings<Self>, BatchError> {
         Ok(T::get_settings_defaults(config, defaults.into())?.into())
     }

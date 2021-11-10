@@ -27,13 +27,23 @@ use vector_core::sink::VectorSink;
 use super::sink::S3RequestOptions;
 use crate::sinks::util::partitioner::KeyPartitioner;
 
-const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = BatchSettings::const_default()
-    .bytes(10_000_000)
-    .timeout(300);
+//const DEFAULT_BATCH_SETTINGS: BatchSettings<()> =
+//BatchSettings::with_bytes(10_000_000, std::time::Duration::from_secs(300));
 
-const DEFAULT_KEY_PREFIX: &str = "date=%F/";
-const DEFAULT_FILENAME_TIME_FORMAT: &str = "%s";
-const DEFAULT_FILENAME_APPEND_UUID: bool = true;
+//const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = BatchSettings::new(
+//BatchSettings::Event(1000),
+//BatchSettings::Bytes(10_000_000),
+//std::time::Duration::from_secs(300),
+//);
+
+#[derive(Copy, Clone)]
+pub struct AwsS3BatchConfig;
+
+impl BatchConfigSettings for AwsS3BatchConfig {
+    const MAX_EVENTS: Option<usize> = None;
+    const MAX_BYTES: Option<usize> = 10_000_000;
+    const TIMEOUT: Duration = Duration::from_secs(300);
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -52,6 +62,7 @@ pub struct S3SinkConfig {
     pub compression: Compression,
     #[serde(default)]
     pub batch: BatchConfig,
+    //pub batch: BatchConfig<AwsS3BatchConfig>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     // Deprecated name. Moved to auth.

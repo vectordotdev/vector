@@ -8,6 +8,9 @@ use std::num::NonZeroUsize;
 use std::time::Duration;
 use vector_core::stream::BatcherSettings;
 
+// * Provide sensible sink default 10 MB with 1s timeout. Don't allow chaining builder methods on
+//   that.
+
 #[derive(Debug, Snafu, PartialEq)]
 pub enum BatchError {
     #[snafu(display("This sink does not allow setting `max_bytes`"))]
@@ -18,14 +21,40 @@ pub enum BatchError {
     InvalidMaxEvents,
 }
 
+trait SinkBatchSettings {
+    const MAX_EVENTS: Option<usize>;
+    const MAX_BYTES: Option<usize>;
+    const TIMEOUT: Duration;
+}
+
+pub struct DefaultSinkBatchSettings;
+
+impl SinkBatchSettings for DefaultSinkBatchSettings {
+    const MAX_EVENTS: Option<usize> = None;
+    const MAX_BYTES: Option<usize> = 10_000_000;
+    const TIMEOUT: Duration = Duration::from_secs(1);
+}
+
+struct Complete;
+struct Incomplete;
+
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
-pub struct BatchConfig {
+pub struct BatchConfig<D: SinkBatchSettings, S = Incomplete> {
     pub max_bytes: Option<usize>,
     pub max_events: Option<usize>,
     pub timeout_secs: Option<u64>,
+
+    _defaults: PhantomData<D>,
+    _state: PhantomData<S>,
 }
 
-impl BatchConfig {
+impl<D> BatchConfig<D, Incomplete> {
+    pub fn build() -> Result<BatchConfig<D, Complete>, _> {
+        // take defaults, merge in Self
+    }
+}
+
+impl<D> BatchConfig<D, Complete> {
     pub const fn disallow_max_bytes(&self) -> Result<Self, BatchError> {
         // Sinks that used `max_size` for an event count cannot count
         // bytes, so err if `max_bytes` is set.
