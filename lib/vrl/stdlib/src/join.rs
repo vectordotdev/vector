@@ -53,20 +53,29 @@ struct JoinFn {
 
 impl Expression for JoinFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let array = self.value.resolve(ctx)?.try_array()?;
+        let array = self.value.resolve(ctx)?;
+        let array = array.borrow();
+        let array = array.try_array()?;
 
         let string_vec = array
             .iter()
-            .map(|s| s.try_bytes_utf8_lossy().map_err(Into::into))
-            .collect::<Result<Vec<Cow<'_, str>>>>()
+            .map(|s| {
+                let s = s.borrow();
+                s.try_bytes_utf8_lossy()
+                    .map(|s| s.to_string())
+                    .map_err(Into::into)
+            })
+            .collect::<Result<Vec<String>>>()
             .map_err(|_| "all array items must be strings")?;
 
         let separator: String = self
             .separator
             .as_ref()
             .map(|s| {
-                s.resolve(ctx)
-                    .and_then(|v| Value::try_bytes(v).map_err(Into::into))
+                s.resolve(ctx).and_then(|v| {
+                    let v = v.borrow();
+                    Value::try_bytes(&*v).map_err(Into::into)
+                })
             })
             .transpose()?
             .map(|s| String::from_utf8_lossy(&s).to_string())
@@ -74,7 +83,7 @@ impl Expression for JoinFn {
 
         let joined = string_vec.join(&separator);
 
-        Ok(Value::from(joined))
+        Ok(SharedValue::from(joined))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

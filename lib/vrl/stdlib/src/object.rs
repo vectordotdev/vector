@@ -52,8 +52,10 @@ struct ObjectFn {
 
 impl Expression for ObjectFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        match self.value.resolve(ctx)? {
-            v @ Value::Object(_) => Ok(v),
+        let value = self.value.resolve(ctx)?;
+        let borrowed = value.borrow();
+        match &*borrowed {
+            Value::Object(_) => Ok(value.clone()),
             v => Err(format!(r#"expected "object", got {}"#, v.kind()).into()),
         }
     }

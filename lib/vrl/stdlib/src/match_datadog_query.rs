@@ -51,6 +51,7 @@ impl Function for MatchDatadogQuery {
         let query_value = arguments.required_literal("query")?.to_value();
 
         // Query should always be a string.
+        let query_value = query_value.borrow();
         let query = query_value
             .try_bytes_utf8_lossy()
             .expect("datadog search query not bytes");
@@ -87,9 +88,8 @@ struct MatchDatadogQueryFn {
 
 impl Expression for MatchDatadogQueryFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_object()?;
-
-        Ok(matches_vrl_object(&self.node, &Value::Object(value)).into())
+        let value = self.value.resolve(ctx)?;
+        Ok(matches_vrl_object(&self.node, &value).into())
     }
 
     fn type_def(&self, _state: &state::Compiler) -> TypeDef {
@@ -102,7 +102,7 @@ fn type_def() -> TypeDef {
 }
 
 /// Match the parsed node against the provided VRL `Value`, per the query type.
-fn matches_vrl_object(node: &QueryNode, obj: &Value) -> bool {
+fn matches_vrl_object(node: &QueryNode, obj: &SharedValue) -> bool {
     match node {
         QueryNode::MatchNoDocs => false,
         QueryNode::MatchAllDocs => true,
@@ -138,34 +138,39 @@ fn matches_vrl_object(node: &QueryNode, obj: &Value) -> bool {
 }
 
 /// Returns true if the field exists. Also takes a `Value` to match against tag types.
-fn exists<T: AsRef<str>>(attr: T, obj: &Value) -> bool {
-    each_field(attr, obj, |field, value| match field {
-        // Tags need to check the element value.
-        Field::Tag(tag) => match value {
-            Value::Array(v) => v.iter().any(|v| {
-                let str_value = string_value(v);
+fn exists<T: AsRef<str>>(attr: T, obj: &SharedValue) -> bool {
+    each_field(attr, obj, |field, value| {
+        let value = value.borrow();
+        match field {
+            // Tags need to check the element value.
+            Field::Tag(tag) => match &*value {
+                Value::Array(v) => v.iter().any(|v| {
+                    let v = v.borrow();
+                    let str_value = string_value(&*v);
 
-                // The tag matches using either 'key' or 'key:value' syntax.
-                str_value == tag || str_value.starts_with(&format!("{}:", tag))
-            }),
-            _ => false,
-        },
-        // Literal field 'tags' needs to be compared by key.
-        Field::Reserved(f) if f == "tags" => match value {
-            Value::Array(v) => v.iter().any(|v| v == obj),
-            _ => false,
-        },
-        // Other field types have already resolved at this point, so just return true.
-        _ => true,
+                    // The tag matches using either 'key' or 'key:value' syntax.
+                    str_value == tag || str_value.starts_with(&format!("{}:", tag))
+                }),
+                _ => false,
+            },
+            // Literal field 'tags' needs to be compared by key.
+            Field::Reserved(f) if f == "tags" => match &*value {
+                Value::Array(v) => v.iter().any(|v| v == obj),
+                _ => false,
+            },
+            // Other field types have already resolved at this point, so just return true.
+            _ => true,
+        }
     })
 }
 
 /// Returns true if the provided VRL `Value` matches the `to_match` string.
-fn equals<T: AsRef<str>>(attr: T, obj: &Value, to_match: &str) -> bool {
+fn equals<T: AsRef<str>>(attr: T, obj: &SharedValue, to_match: &str) -> bool {
     each_field(attr, obj, |field, value| {
+        let value = value.borrow();
         match field {
             // Default fields are compared by word boundary.
-            Field::Default(_) => match value {
+            Field::Default(_) => match &*value {
                 Value::Bytes(val) => {
                     let re = word_regex(to_match);
                     re.is_match(&String::from_utf8_lossy(val))
@@ -173,21 +178,23 @@ fn equals<T: AsRef<str>>(attr: T, obj: &Value, to_match: &str) -> bool {
                 _ => false,
             },
             // A literal "tags" field should match by key.
-            Field::Reserved(f) if f == "tags" => match value {
+            Field::Reserved(f) if f == "tags" => match &*value {
                 Value::Array(v) => {
-                    v.contains(&Value::Bytes(Bytes::copy_from_slice(to_match.as_bytes())))
+                    let value = Value::Bytes(Bytes::copy_from_slice(to_match.as_bytes()));
+                    v.iter().any(|v| &*v.borrow() == &value)
                 }
                 _ => false,
             },
             // Individual tags are compared by element key:value.
-            Field::Tag(tag) => match value {
+            Field::Tag(tag) => match &*value {
                 Value::Array(v) => {
-                    v.contains(&Value::Bytes(format!("{}:{}", tag, to_match).into()))
+                    let value = Value::Bytes(format!("{}:{}", tag, to_match).into());
+                    v.iter().any(|v| &*v.borrow() == &value)
                 }
                 _ => false,
             },
             // Everything else is matched by string equality.
-            _ => string_value(value) == to_match,
+            _ => string_value(&*value) == to_match,
         }
     })
 }
@@ -195,13 +202,14 @@ fn equals<T: AsRef<str>>(attr: T, obj: &Value, to_match: &str) -> bool {
 /// Returns true if the `Value` matches the `ComparisonValue`, using the `Comparison` operator.
 fn compare(
     field: &Field,
-    value: &Value,
+    value: &SharedValue,
     comparator: &Comparison,
     comparison_value: &ComparisonValue,
 ) -> bool {
+    let value = value.borrow();
     // Helper for comparing string types.
     let compare_string = || {
-        let lhs = string_value(value).into_owned();
+        let lhs = string_value(&*value).into_owned();
         let rhs = comparison_value.to_string();
 
         match comparator {
@@ -214,7 +222,7 @@ fn compare(
 
     match field {
         // Facets are compared numerically if the value is numeric, or as strings otherwise.
-        Field::Facet(_) => match (value, comparison_value) {
+        Field::Facet(_) => match (&*value, comparison_value) {
             // Integers.
             (Value::Integer(lhs), ComparisonValue::Integer(rhs)) => match comparator {
                 Comparison::Lt => lhs < rhs,
@@ -234,7 +242,7 @@ fn compare(
             }
             // Where the rhs is a string ref, the lhs is coerced into a string.
             (_, ComparisonValue::String(rhs)) => {
-                let lhs = string_value(value).into_owned();
+                let lhs = string_value(&*value).into_owned();
 
                 match comparator {
                     Comparison::Lt => &lhs < rhs,
@@ -247,20 +255,23 @@ fn compare(
             _ => compare_string(),
         },
         // Tag values need extracting by "key:value" to be compared.
-        Field::Tag(_) => match value {
-            Value::Array(v) => v.iter().any(|v| match string_value(v).split_once(":") {
-                Some((_, lhs)) => {
-                    let comparison_value = comparison_value.to_string();
-                    let rhs = comparison_value.as_str();
+        Field::Tag(_) => match &*value {
+            Value::Array(v) => v.iter().any(|v| {
+                let v = v.borrow();
+                match string_value(&*v).split_once(":") {
+                    Some((_, lhs)) => {
+                        let comparison_value = comparison_value.to_string();
+                        let rhs = comparison_value.as_str();
 
-                    match comparator {
-                        Comparison::Lt => lhs < rhs,
-                        Comparison::Lte => lhs <= rhs,
-                        Comparison::Gt => lhs > rhs,
-                        Comparison::Gte => lhs >= rhs,
+                        match comparator {
+                            Comparison::Lt => lhs < rhs,
+                            Comparison::Lte => lhs <= rhs,
+                            Comparison::Gt => lhs > rhs,
+                            Comparison::Gte => lhs >= rhs,
+                        }
                     }
+                    _ => false,
                 }
-                _ => false,
             }),
             _ => false,
         },
@@ -272,7 +283,7 @@ fn compare(
 /// Compares the field path as numeric or string depending on the field type.
 fn match_compare<T: AsRef<str>>(
     attr: T,
-    obj: &Value,
+    obj: &SharedValue,
     comparator: &Comparison,
     comparison_value: &ComparisonValue,
 ) -> bool {
@@ -310,42 +321,52 @@ fn wildcard_regex(to_match: &str) -> Regex {
 }
 
 /// Returns true if the provided `Value` matches the prefix.
-fn match_wildcard_with_prefix<T: AsRef<str>>(attr: T, obj: &Value, prefix: &str) -> bool {
-    each_field(attr, obj, |field, value| match field {
-        // Default fields are matched by word boundary.
-        Field::Default(_) => {
-            let re = word_regex(&format!("{}*", prefix));
-            re.is_match(&string_value(value))
+fn match_wildcard_with_prefix<T: AsRef<str>>(attr: T, obj: &SharedValue, prefix: &str) -> bool {
+    each_field(attr, obj, |field, value| {
+        let value = value.borrow();
+        match field {
+            // Default fields are matched by word boundary.
+            Field::Default(_) => {
+                let re = word_regex(&format!("{}*", prefix));
+                re.is_match(&string_value(&*value))
+            }
+            // Tags are recursed until a match is found.
+            Field::Tag(tag) => match &*value {
+                Value::Array(v) => v.iter().any(|v| {
+                    let v = v.borrow();
+                    string_value(&*v).starts_with(&format!("{}:{}", tag, prefix))
+                }),
+                _ => false,
+            },
+            // All other field types are compared by complete value.
+            _ => string_value(&*value).starts_with(prefix),
         }
-        // Tags are recursed until a match is found.
-        Field::Tag(tag) => match value {
-            Value::Array(v) => v
-                .iter()
-                .any(|v| string_value(v).starts_with(&format!("{}:{}", tag, prefix))),
-            _ => false,
-        },
-        // All other field types are compared by complete value.
-        _ => string_value(value).starts_with(prefix),
     })
 }
 
 /// Returns true if the provided `Value` matches the arbitrary wildcard.
-fn match_wildcard<T: AsRef<str>>(attr: T, obj: &Value, wildcard: &str) -> bool {
+fn match_wildcard<T: AsRef<str>>(attr: T, obj: &SharedValue, wildcard: &str) -> bool {
     each_field(attr, obj, |field, value| match field {
         Field::Default(_) => {
             let re = word_regex(wildcard);
-            re.is_match(&string_value(value))
+            let value = value.borrow();
+            re.is_match(&string_value(&*value))
         }
-        Field::Tag(tag) => match value {
-            Value::Array(v) => v.iter().any(|v| {
-                let re = wildcard_regex(&format!("{}:{}", tag, wildcard));
-                re.is_match(&string_value(v))
-            }),
-            _ => false,
-        },
+        Field::Tag(tag) => {
+            let value = value.borrow();
+            match &*value {
+                Value::Array(v) => v.iter().any(|v| {
+                    let re = wildcard_regex(&format!("{}:{}", tag, wildcard));
+                    let v = v.borrow();
+                    re.is_match(&string_value(&*v))
+                }),
+                _ => false,
+            }
+        }
         _ => {
             let re = wildcard_regex(wildcard);
-            re.is_match(&string_value(value))
+            let value = value.borrow();
+            re.is_match(&string_value(&*value))
         }
     })
 }
@@ -353,7 +374,7 @@ fn match_wildcard<T: AsRef<str>>(attr: T, obj: &Value, wildcard: &str) -> bool {
 /// Returns true if the provided `Value` matches on the lower and upper bound.
 fn range<T: AsRef<str> + Copy>(
     attr: T,
-    obj: &Value,
+    obj: &SharedValue,
     lower: &ComparisonValue,
     lower_inclusive: bool,
     upper: &ComparisonValue,
@@ -407,8 +428,8 @@ fn range<T: AsRef<str> + Copy>(
 /// provided `value_fn`.
 fn each_field<T: AsRef<str>>(
     attr: T,
-    obj: &Value,
-    value_fn: impl Fn(Field, &Value) -> bool,
+    obj: &SharedValue,
+    value_fn: impl Fn(Field, &SharedValue) -> bool,
 ) -> bool {
     normalize_fields(attr).into_iter().any(|field| {
         // Look up the field. For tags, this will literally be "tags". For all other
@@ -419,13 +440,13 @@ fn each_field<T: AsRef<str>>(
         };
 
         // Get the value by path, or return early with `false` if it doesn't exist.
-        let value = match obj.get_by_path(&path) {
+        let value = match obj.clone().get_by_path(&path) {
             Some(v) => v,
             _ => return false,
         };
 
         // Provide the field and value to the callback.
-        value_fn(field, value)
+        value_fn(field, &value)
     })
 }
 

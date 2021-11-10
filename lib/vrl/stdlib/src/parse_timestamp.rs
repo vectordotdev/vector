@@ -54,17 +54,19 @@ struct ParseTimestampFn {
 impl Expression for ParseTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
+        let borrowed = value.borrow();
 
-        match value {
+        match &*borrowed {
             Value::Bytes(v) => {
                 let bytes = self.format.resolve(ctx)?;
+                let bytes = bytes.borrow();
                 let format = bytes.try_bytes_utf8_lossy()?;
                 Conversion::parse(format!("timestamp|{}", format), ctx.timezone().to_owned())
                     .map_err(|e| format!("{}", e))?
-                    .convert(v)
+                    .convert(v.clone())
                     .map_err(|e| e.to_string().into())
             }
-            Value::Timestamp(_) => Ok(value),
+            Value::Timestamp(_) => Ok(value.clone()),
             _ => Err("unable to convert value to timestamp".into()),
         }
     }
@@ -91,7 +93,7 @@ mod tests {
                     .with_timezone(&Utc),
                 format:"%d/%m/%Y:%H:%M:%S %z"
             ],
-            want: Ok(value!(
+            want: Ok(shared_value!(
                 DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
                     .unwrap()
                     .with_timezone(&Utc)
@@ -105,7 +107,7 @@ mod tests {
                 value: "16/10/2019:12:00:00 +0000",
                 format: "%d/%m/%Y:%H:%M:%S %z"
             ],
-            want: Ok(value!(
+            want: Ok(shared_value!(
                 DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
                     .unwrap()
                     .with_timezone(&Utc)

@@ -49,7 +49,9 @@ struct ParseQueryStringFn {
 
 impl Expression for ParseQueryStringFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
+        let bytes = self.value.resolve(ctx)?;
+        let bytes = bytes.borrow();
+        let bytes = bytes.try_bytes()?;
 
         let mut query_string = bytes.as_ref();
         if !query_string.is_empty() && query_string[0] == b'?' {
@@ -62,19 +64,23 @@ impl Expression for ParseQueryStringFn {
             let value = value.as_ref();
             result
                 .entry(k.into_owned())
-                .and_modify(|v| {
-                    match v {
+                .and_modify(|v: &mut SharedValue| {
+                    let mut v = v.borrow_mut();
+                    match &mut *v {
                         Value::Array(v) => {
                             v.push(value.into());
                         }
                         v => {
-                            *v = Value::Array(vec![v.to_owned(), value.into()]);
+                            *v = Value::Array(vec![
+                                SharedValue::from(v.to_owned()),
+                                SharedValue::from(value),
+                            ]);
                         }
                     };
                 })
-                .or_insert_with(|| value.into());
+                .or_insert_with(|| SharedValue::from(value));
         }
-        Ok(result.into())
+        Ok(SharedValue::from(result))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

@@ -156,3 +156,15 @@ impl FromIterator<SharedValue> for SharedValue {
         SharedValue::from(Value::Array(iter.into_iter().collect::<Vec<_>>()))
     }
 }
+
+impl FromIterator<(String, SharedValue)> for SharedValue {
+    fn from_iter<I: IntoIterator<Item = (String, SharedValue)>>(iter: I) -> Self {
+        SharedValue::from(Value::from_iter(iter))
+    }
+}
+
+impl<T: Into<Value>> From<Option<T>> for SharedValue {
+    fn from(v: Option<T>) -> Self {
+        SharedValue::from(Value::from(v))
+    }
+}

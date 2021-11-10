@@ -59,7 +59,9 @@ struct PushFn {
 
 impl Expression for PushFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let mut list = self.value.resolve(ctx)?.try_array()?;
+        let list = self.value.resolve(ctx)?;
+        let list = list.borrow();
+        let mut list = list.try_array()?.to_vec();
         let item = self.item.resolve(ctx)?;
 
         list.push(item);

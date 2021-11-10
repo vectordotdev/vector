@@ -58,8 +58,9 @@ impl Expression for LengthFn {
         use Value::*;
 
         let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
 
-        match value {
+        match &*value {
             Array(v) => Ok(v.len().into()),
             Object(v) => Ok(v.len().into()),
             Bytes(v) => Ok(v.len().into()),

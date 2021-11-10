@@ -65,6 +65,7 @@ struct ParseRubyHashFn {
 impl Expression for ParseRubyHashFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
         let input = value.try_bytes_utf8_lossy()?;
         parse(&input)
     }
@@ -138,8 +139,8 @@ fn parse_boolean<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str,
     alt((parse_true, parse_false))(input)
 }
 
-fn parse_nil<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Value, E> {
-    value(Value::Null, tag("nil"))(input)
+fn parse_nil<'a, E: ParseError<&'a str>>(input: &'a str) -> IResult<&'a str, SharedValue, E> {
+    value(SharedValue::from(Value::Null), tag("nil"))(input)
 }
 
 fn parse_bytes<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Bytes, E> {
@@ -192,7 +193,7 @@ fn parse_key<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str,
     ))(input)
 }
 
-fn parse_array<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Value, E> {
+fn parse_array<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str, SharedValue, E> {
     context(
         "array",
         map(
@@ -203,14 +204,14 @@ fn parse_array<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a st
                     preceded(sp, char(']')),
                 )),
             ),
-            Value::Array,
+            |a| SharedValue::from(Value::Array(a)),
         ),
     )(input)
 }
 
 fn parse_key_value<'a, E: HashParseError<&'a str>>(
     input: &'a str,
-) -> IResult<&'a str, (String, Value), E> {
+) -> IResult<&'a str, (String, SharedValue), E> {
     separated_pair(
         preceded(sp, parse_key),
         cut(preceded(sp, alt((tag(":"), tag("=>"))))),
@@ -218,7 +219,7 @@ fn parse_key_value<'a, E: HashParseError<&'a str>>(
     )(input)
 }
 
-fn parse_hash<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Value, E> {
+fn parse_hash<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str, SharedValue, E> {
     context(
         "map",
         map(
@@ -232,26 +233,28 @@ fn parse_hash<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str
                     preceded(sp, char('}')),
                 )),
             ),
-            Value::Object,
+            |o| SharedValue::from(Value::Object(o)),
         ),
     )(input)
 }
 
-fn parse_value<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str, Value, E> {
+fn parse_value<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a str, SharedValue, E> {
     preceded(
         sp,
         alt((
             parse_nil,
             parse_hash,
             parse_array,
-            map(parse_bytes, Value::Bytes),
-            map(double, |value| Value::Float(NotNan::new(value).unwrap())),
-            map(parse_boolean, Value::Boolean),
+            map(parse_bytes, |b| SharedValue::from(Value::Bytes(b))),
+            map(double, |value| {
+                SharedValue::from(Value::Float(NotNan::new(value).unwrap()))
+            }),
+            map(parse_boolean, |b| SharedValue::from(Value::Boolean(b))),
         )),
     )(input)
 }
 
-fn parse(input: &str) -> Result<Value> {
+fn parse(input: &str) -> Result<SharedValue> {
     let result = parse_hash(input)
         .map_err(|err| match err {
             nom::Err::Error(err) | nom::Err::Failure(err) => {
@@ -292,13 +295,16 @@ mod tests {
         )
         .unwrap();
         assert!(result.is_object());
+        let result = result.borrow();
         let result = result.as_object().unwrap();
         assert!(result.get("hello").unwrap().is_bytes());
         assert!(result.get("number").unwrap().is_float());
         assert!(result.get("float").unwrap().is_float());
         assert!(result.get("array").unwrap().is_array());
         assert!(result.get("object").unwrap().is_object());
-        let child = result.get("object").unwrap().as_object().unwrap();
+        let result = result.get("object").unwrap();
+        let result = result.borrow();
+        let child = result.as_object().unwrap();
         assert!(child.get("nope").unwrap().is_null());
     }
 
@@ -306,6 +312,7 @@ mod tests {
     fn test_parse_arrow_object_key_number() {
         let result = parse(r#"{ 42 => "hello world" }"#).unwrap();
         assert!(result.is_object());
+        let result = result.borrow();
         let result = result.as_object().unwrap();
         assert!(result.get("42").unwrap().is_bytes());
     }
@@ -316,6 +323,7 @@ mod tests {
             parse(r#"{ :colon => "hello world", :"double" => "quote", :'simple' => "quote" }"#)
                 .unwrap();
         assert!(result.is_object());
+        let result = result.borrow();
         let result = result.as_object().unwrap();
         assert!(result.get(":colon").unwrap().is_bytes());
         assert!(result.get(":double").unwrap().is_bytes());
@@ -326,6 +334,7 @@ mod tests {
     fn test_parse_arrow_object_key_underscore() {
         let result = parse(r#"{ :with_underscore => "hello world" }"#).unwrap();
         assert!(result.is_object());
+        let result = result.borrow();
         let result = result.as_object().unwrap();
         assert!(result.get(":with_underscore").unwrap().is_bytes());
     }
@@ -334,33 +343,37 @@ mod tests {
     fn test_parse_colon_object_double_quote() {
         let result = parse(r#"{ "hello": "world" }"#).unwrap();
         assert!(result.is_object());
+        let result = result.borrow();
         let result = result.as_object().unwrap();
         let value = result.get("hello").unwrap();
-        assert_eq!(value, &Value::Bytes("world".into()));
+        assert_eq!(*value.borrow(), Value::Bytes("world".into()));
     }
 
     #[test]
     fn test_parse_colon_object_single_quote() {
         let result = parse(r#"{ 'hello': 'world' }"#).unwrap();
         assert!(result.is_object());
+        let result = result.borrow();
         let result = result.as_object().unwrap();
         let value = result.get("hello").unwrap();
-        assert_eq!(value, &Value::Bytes("world".into()));
+        assert_eq!(*value.borrow(), Value::Bytes("world".into()));
     }
 
     #[test]
     fn test_parse_colon_object_no_quote() {
         let result = parse(r#"{ hello: "world" }"#).unwrap();
         assert!(result.is_object());
+        let result = result.borrow();
         let result = result.as_object().unwrap();
         let value = result.get("hello").unwrap();
-        assert_eq!(value, &Value::Bytes("world".into()));
+        assert_eq!(*value.borrow(), Value::Bytes("world".into()));
     }
 
     #[test]
     fn test_parse_dash() {
         let result = parse(r#"{ "with-dash" => "foo" }"#).unwrap();
         assert!(result.is_object());
+        let result = result.borrow();
         let result = result.as_object().unwrap();
         assert!(result.get("with-dash").unwrap().is_bytes());
     }
@@ -369,15 +382,20 @@ mod tests {
     fn test_parse_quote() {
         let result = parse(r#"{ "with'quote" => "and\"double\"quote" }"#).unwrap();
         assert!(result.is_object());
+        let result = result.borrow();
         let result = result.as_object().unwrap();
         let value = result.get("with'quote").unwrap();
-        assert_eq!(value, &Value::Bytes("and\\\"double\\\"quote".into()));
+        assert_eq!(
+            *value.borrow(),
+            Value::Bytes("and\\\"double\\\"quote".into())
+        );
     }
 
     #[test]
     fn test_parse_weird_format() {
         let result = parse(r#"{:hello=>"world",'number'=>42,"weird"=>'format\'here'}"#).unwrap();
         assert!(result.is_object());
+        let result = result.borrow();
         let result = result.as_object().unwrap();
         assert!(result.get(":hello").unwrap().is_bytes());
         assert!(result.get("number").unwrap().is_float());
@@ -392,7 +410,7 @@ mod tests {
         parse_ruby_hash => ParseRubyHash;
 
         complete {
-            args: func_args![value: value!(r#"{ "test" => "value", "testNum" => 0.2, "testObj" => { "testBool" => true } }"#)],
+            args: func_args![value: shared_value!(r#"{ "test" => "value", "testNum" => 0.2, "testObj" => { "testBool" => true } }"#)],
             want: Ok(value!({
                 test: "value",
                 testNum: 0.2,

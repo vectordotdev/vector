@@ -90,13 +90,13 @@ fn time_format_for_format(format: &[u8]) -> String {
     }
 }
 
-fn rename_referrer(mut value: Value) -> Value {
+fn rename_referrer(mut value: Value) -> SharedValue {
     if let Some(obj) = value.as_object_mut() {
         if let Some(referer) = obj.remove("referrer") {
             obj.insert("referer".into(), referer);
         }
     }
-    value
+    SharedValue::from(value)
 }
 
 #[derive(Debug, Clone)]
@@ -109,13 +109,15 @@ struct ParseNginxLogFn {
 impl Expression for ParseNginxLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
+        let bytes = bytes.borrow();
         let message = bytes.try_bytes_utf8_lossy()?;
         let timestamp_format = match &self.timestamp_format {
             None => time_format_for_format(self.format.as_ref()),
-            Some(timestamp_format) => timestamp_format
-                .resolve(ctx)?
-                .try_bytes_utf8_lossy()?
-                .to_string(),
+            Some(timestamp_format) => {
+                let format = timestamp_format.resolve(ctx)?;
+                let format = format.borrow();
+                format.try_bytes_utf8_lossy()?.to_string()
+            }
         };
 
         let regex = regex_for_format(self.format.as_ref());

@@ -93,9 +93,9 @@ impl Function for ParseGrok {
     ) -> Compiled {
         let value = arguments.required("value");
 
-        let pattern = arguments
-            .required_literal("pattern")?
-            .to_value()
+        let pattern = arguments.required_literal("pattern")?.to_value();
+        let pattern = pattern.borrow();
+        let pattern = pattern
             .try_bytes_utf8_lossy()
             .expect("grok pattern not bytes")
             .into_owned();
@@ -130,6 +130,7 @@ struct ParseGrokFn {
 impl Expression for ParseGrokFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
         let bytes = value.try_bytes_utf8_lossy()?;
         let remove_empty = self.remove_empty.resolve(ctx)?.try_boolean()?;
 
@@ -139,11 +140,11 @@ impl Expression for ParseGrokFn {
 
                 for (name, value) in matches.iter() {
                     if !remove_empty || !value.is_empty() {
-                        result.insert(name.to_string(), Value::from(value));
+                        result.insert(name.to_string(), SharedValue::from(value));
                     }
                 }
 
-                Ok(Value::from(result))
+                Ok(SharedValue::from(result))
             }
             None => Err("unable to parse input with grok pattern".into()),
         }
@@ -194,7 +195,7 @@ mod test {
         parsed {
             args: func_args![ value: "2020-10-02T23:22:12.223222Z info Hello world",
                               pattern: "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"],
-            want: Ok(Value::from(btreemap! {
+            want: Ok(SharedValue::from(btreemap! {
                 "timestamp" => "2020-10-02T23:22:12.223222Z",
                 "level" => "info",
                 "message" => "Hello world",
@@ -207,7 +208,7 @@ mod test {
         parsed2 {
             args: func_args![ value: "2020-10-02T23:22:12.223222Z",
                               pattern: "(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:level})"],
-            want: Ok(Value::from(btreemap! {
+            want: Ok(SharedValue::from(btreemap! {
                 "timestamp" => "2020-10-02T23:22:12.223222Z",
                 "level" => "",
             })),
@@ -221,7 +222,7 @@ mod test {
                               pattern: "(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:levell)",
                               remove_empty: true,
             ],
-            want: Ok(Value::from(
+            want: Ok(SharedValue::from(
                 btreemap! { "timestamp" => "2020-10-02T23:22:12.223222Z" },
             )),
             tdef: TypeDef::new().fallible().object::<(), Kind>(map! {

@@ -140,8 +140,8 @@ fn capture_value(
     value: &str,
     timestamp_format: &str,
     timezone: &TimeZone,
-) -> std::result::Result<Value, String> {
-    Ok(match name {
+) -> std::result::Result<SharedValue, String> {
+    Ok(SharedValue::from(match name {
         "timestamp" => Value::Timestamp(parse_time(value, timestamp_format, timezone)?),
         "status" | "size" | "pid" | "tid" | "cid" | "port" => Value::Integer(
             value
@@ -149,7 +149,7 @@ fn capture_value(
                 .map_err(|_| format!("failed parsing {}", name))?,
         ),
         _ => Value::Bytes(value.to_owned().into()),
-    })
+    }))
 }
 
 /// Extracts the log fields from the regex and adds them to a `Value::Object`.
@@ -171,6 +171,6 @@ pub fn log_fields(
                 })
             })
         })
-        .collect::<std::result::Result<BTreeMap<String, Value>, String>>()?
+        .collect::<std::result::Result<BTreeMap<String, SharedValue>, String>>()?
         .into())
 }

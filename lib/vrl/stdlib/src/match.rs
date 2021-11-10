@@ -60,9 +60,12 @@ pub(crate) struct MatchFn {
 impl Expression for MatchFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
         let string = value.try_bytes_utf8_lossy()?;
 
-        let pattern = self.pattern.resolve(ctx)?.try_regex()?;
+        let pattern = self.pattern.resolve(ctx)?;
+        let pattern = pattern.borrow();
+        let pattern = pattern.try_regex()?;
 
         Ok(pattern.is_match(&string).into())
     }

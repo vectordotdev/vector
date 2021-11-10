@@ -144,6 +144,7 @@ struct ParseXmlFn {
 impl Expression for ParseXmlFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
         let string = value.try_bytes_utf8_lossy()?;
 
         let trim = match &self.trim {
@@ -157,12 +158,20 @@ impl Expression for ParseXmlFn {
         };
 
         let attr_prefix = match &self.attr_prefix {
-            Some(expr) => Cow::from(expr.resolve(ctx)?.try_bytes_utf8_lossy()?.into_owned()),
+            Some(expr) => {
+                let value = expr.resolve(ctx)?;
+                let value = value.borrow();
+                Cow::from(value.try_bytes_utf8_lossy()?.into_owned())
+            }
             None => Cow::from("@"),
         };
 
         let text_key = match &self.text_key {
-            Some(expr) => Cow::from(expr.resolve(ctx)?.try_bytes_utf8_lossy()?.into_owned()),
+            Some(expr) => {
+                let value = expr.resolve(ctx)?;
+                let value = value.borrow();
+                Cow::from(value.try_bytes_utf8_lossy()?.into_owned())
+            }
             None => Cow::from("text"),
         };
 
@@ -222,10 +231,10 @@ fn type_def() -> TypeDef {
 }
 
 /// Process an XML node, and return a VRL `Value`.
-fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
+fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> SharedValue {
     // Helper to recurse over a `Node`s children, and build an object.
-    let recurse = |node: Node| -> BTreeMap<String, Value> {
-        let mut map = BTreeMap::new();
+    let recurse = |node: Node| -> BTreeMap<String, SharedValue> {
+        let mut map: BTreeMap<String, SharedValue> = BTreeMap::new();
 
         for n in node.children().into_iter().filter(|n| !n.is_comment()) {
             // Use the default tag name if blank.
@@ -244,12 +253,12 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
                     let v = entry.get_mut();
 
                     // Push a value onto the existing array, or wrap in a `Value::Array`.
-                    match v {
-                        Value::Array(v) => v.push(value),
+                    match &mut *v.borrow_mut() {
+                        Value::Array(ref mut v) => v.push(value),
                         v => {
                             let prev = std::mem::replace(v, Value::Array(Vec::with_capacity(2)));
                             if let Value::Array(v) = v {
-                                v.extend_from_slice(&[prev, value]);
+                                v.extend_from_slice(&[SharedValue::from(prev), value]);
                             }
                         }
                     };
@@ -264,7 +273,7 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
     };
 
     match node.node_type() {
-        NodeType::Root => Value::Object(recurse(node)),
+        NodeType::Root => SharedValue::from(Value::Object(recurse(node))),
 
         NodeType::Element => {
             let mut map = BTreeMap::new();
@@ -283,10 +292,10 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
                 // If the map isn't empty, *always* recurse to expand default keys.
                 (_, false) => {
                     map.extend(recurse(node));
-                    Value::Object(map)
+                    SharedValue::from(Value::Object(map))
                 }
                 // If a text key should be used, always recurse.
-                (true, true) => Value::Object(recurse(node)),
+                (true, true) => SharedValue::from(Value::Object(recurse(node))),
                 // Otherwise, check the node count to determine what to do.
                 _ => match node.children().count() {
                     // For a single node, 'flatten' the object if necessary.
@@ -303,17 +312,17 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
                             let mut map = BTreeMap::new();
                             map.insert(
                                 node.tag_name().name().to_string(),
-                                Value::Object(recurse(node)),
+                                SharedValue::from(Value::Object(recurse(node))),
                             );
 
-                            Value::Object(map)
+                            SharedValue::from(Value::Object(map))
                         } else {
                             // Otherwise, 'flatten' the object by continuing processing.
                             process_node(node, config)
                         }
                     }
                     // For 2+ nodes, expand.
-                    _ => Value::Object(recurse(node)),
+                    _ => SharedValue::from(Value::Object(recurse(node))),
                 },
             }
         }
@@ -323,8 +332,8 @@ fn process_node<'a>(node: Node, config: &ParseXmlConfig<'a>) -> Value {
 }
 
 /// Process a text node, and return the correct `Value` type based on config.
-fn process_text<'a>(text: &'a str, config: &ParseXmlConfig<'a>) -> Value {
-    match text {
+fn process_text<'a>(text: &'a str, config: &ParseXmlConfig<'a>) -> SharedValue {
+    SharedValue::from(match text {
         // Parse nulls.
         "" | "null" if config.parse_null => Value::Null,
         // Parse bools.
@@ -347,7 +356,7 @@ fn process_text<'a>(text: &'a str, config: &ParseXmlConfig<'a>) -> Value {
             // Fall back to string.
             text.into()
         }
-    }
+    })
 }
 
 fn trim_xml(xml: &str) -> Cow<str> {

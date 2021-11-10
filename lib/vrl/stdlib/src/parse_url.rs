@@ -89,6 +89,7 @@ struct ParseUrlFn {
 impl Expression for ParseUrlFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
         let string = value.try_bytes_utf8_lossy()?;
 
         let default_known_ports = self.default_known_ports.resolve(ctx)?.try_boolean()?;
@@ -103,8 +104,8 @@ impl Expression for ParseUrlFn {
     }
 }
 
-fn url_to_value(url: Url, default_known_ports: bool) -> Value {
-    let mut map = BTreeMap::<&str, Value>::new();
+fn url_to_value(url: Url, default_known_ports: bool) -> SharedValue {
+    let mut map = BTreeMap::<&str, SharedValue>::new();
 
     map.insert("scheme", url.scheme().to_owned().into());
     map.insert("username", url.username().to_owned().into());
@@ -130,13 +131,13 @@ fn url_to_value(url: Url, default_known_ports: bool) -> Value {
         url.query_pairs()
             .into_owned()
             .map(|(k, v)| (k, v.into()))
-            .collect::<BTreeMap<String, Value>>()
+            .collect::<BTreeMap<String, SharedValue>>()
             .into(),
     );
 
     map.into_iter()
         .map(|(k, v)| (k.to_owned(), v))
-        .collect::<Value>()
+        .collect::<SharedValue>()
 }
 
 fn type_def() -> BTreeMap<&'static str, TypeDef> {
@@ -162,8 +163,8 @@ mod tests {
         parse_url => ParseUrl;
 
         https {
-            args: func_args![value: value!("https://vector.dev")],
-            want: Ok(value!({
+            args: func_args![value: shared_value!("https://vector.dev")],
+            want: Ok(shared_value!({
                 fragment: (),
                 host: "vector.dev",
                 password: "",
@@ -177,8 +178,8 @@ mod tests {
         }
 
         default_port_specified {
-            args: func_args![value: value!("https://vector.dev:443")],
-            want: Ok(value!({
+            args: func_args![value: shared_value!("https://vector.dev:443")],
+            want: Ok(shared_value!({
                 fragment: (),
                 host: "vector.dev",
                 password: "",
@@ -192,8 +193,8 @@ mod tests {
         }
 
         default_port {
-            args: func_args![value: value!("https://vector.dev"), default_known_ports: true],
-            want: Ok(value!({
+            args: func_args![value: shared_value!("https://vector.dev"), default_known_ports: true],
+            want: Ok(shared_value!({
                 fragment: (),
                 host: "vector.dev",
                 password: "",

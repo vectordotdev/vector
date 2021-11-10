@@ -71,10 +71,12 @@ struct ParseKlogFn {
 
 impl Expression for ParseKlogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
+        let bytes = self.value.resolve(ctx)?;
+        let bytes = bytes.borrow();
+        let bytes = bytes.try_bytes()?;
         let message = String::from_utf8_lossy(&bytes);
 
-        let mut log: BTreeMap<String, Value> = BTreeMap::new();
+        let mut log: BTreeMap<String, SharedValue> = BTreeMap::new();
 
         let captures = REGEX_KLOG
             .captures(&message)
@@ -89,7 +91,10 @@ impl Expression for ParseKlogFn {
                 _ => Err(format!(r#"unrecognized log level "{}""#, level)),
             }?;
 
-            log.insert("level".into(), Value::Bytes(level.to_owned().into()));
+            log.insert(
+                "level".into(),
+                SharedValue::from(Value::Bytes(level.to_owned().into())),
+            );
         }
 
         if let Some(timestamp) = captures.name("timestamp").map(|capture| capture.as_str()) {
@@ -97,35 +102,43 @@ impl Expression for ParseKlogFn {
             let year = resolve_year(month);
             log.insert(
                 "timestamp".into(),
-                Value::Timestamp(
+                SharedValue::from(Value::Timestamp(
                     Utc.datetime_from_str(&format!("{}{}", year, timestamp), "%Y%m%d %H:%M:%S%.f")
                         .map_err(|error| {
                             format!(r#"failed parsing timestamp {}: {}"#, timestamp, error)
                         })?,
-                ),
+                )),
             );
         }
 
         if let Some(id) = captures.name("id").map(|capture| capture.as_str()) {
             log.insert(
                 "id".into(),
-                Value::Integer(id.parse().map_err(|_| "failed parsing id")?),
+                SharedValue::from(Value::Integer(id.parse().map_err(|_| "failed parsing id")?)),
             );
         }
 
         if let Some(file) = captures.name("file").map(|capture| capture.as_str()) {
-            log.insert("file".into(), Value::Bytes(file.to_owned().into()));
+            log.insert(
+                "file".into(),
+                SharedValue::from(Value::Bytes(file.to_owned().into())),
+            );
         }
 
         if let Some(line) = captures.name("line").map(|capture| capture.as_str()) {
             log.insert(
                 "line".into(),
-                Value::Integer(line.parse().map_err(|_| "failed parsing line")?),
+                SharedValue::from(Value::Integer(
+                    line.parse().map_err(|_| "failed parsing line")?,
+                )),
             );
         }
 
         if let Some(message) = captures.name("message").map(|capture| capture.as_str()) {
-            log.insert("message".into(), Value::Bytes(message.to_owned().into()));
+            log.insert(
+                "message".into(),
+                SharedValue::from(Value::Bytes(message.to_owned().into())),
+            );
         }
 
         Ok(log.into())

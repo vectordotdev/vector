@@ -1,5 +1,3 @@
-use std::{cell::RefCell, rc::Rc};
-
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -99,7 +97,7 @@ impl Expression for ParseJsonFn {
         let value = serde_json::from_slice::<'_, Value>(&bytes)
             .map_err(|e| format!("unable to parse json: {}", e))?;
 
-        Ok(Rc::new(RefCell::new(value)))
+        Ok(SharedValue::from(value))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

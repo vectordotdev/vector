@@ -144,12 +144,13 @@ impl Function for ParseUserAgent {
 struct ParseUserAgentFn {
     value: Box<dyn Expression>,
     mode: Mode,
-    parser: Arc<dyn Fn(&str) -> Value + Send + Sync>,
+    parser: Arc<dyn Fn(&str) -> SharedValue + Send + Sync>,
 }
 
 impl Expression for ParseUserAgentFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
         let string = value.try_bytes_utf8_lossy()?;
 
         Ok((self.parser)(&string))
@@ -272,13 +273,12 @@ struct UserAgent {
 }
 
 impl UserAgent {
-    fn partial_schema(self) -> Value {
+    fn partial_schema(self) -> SharedValue {
         let Self {
             browser,
             os,
             device,
         } = self;
-
         IntoIterator::into_iter([
             ("browser", browser.partial_schema()),
             ("os", os.partial_schema()),
@@ -288,7 +288,7 @@ impl UserAgent {
         .collect()
     }
 
-    fn full_schema(self) -> Value {
+    fn full_schema(self) -> SharedValue {
         let Self {
             browser,
             os,
@@ -323,7 +323,7 @@ struct Browser {
 }
 
 impl Browser {
-    fn partial_schema(self) -> Value {
+    fn partial_schema(self) -> SharedValue {
         let Self {
             family, version, ..
         } = self;
@@ -331,7 +331,7 @@ impl Browser {
         into_value([("family", family), ("version", version)])
     }
 
-    fn full_schema(self) -> Value {
+    fn full_schema(self) -> SharedValue {
         let Self {
             family,
             version,
@@ -371,7 +371,7 @@ struct Os {
 }
 
 impl Os {
-    fn partial_schema(self) -> Value {
+    fn partial_schema(self) -> SharedValue {
         let Self {
             family, version, ..
         } = self;
@@ -379,7 +379,7 @@ impl Os {
         into_value([("family", family), ("version", version)])
     }
 
-    fn full_schema(self) -> Value {
+    fn full_schema(self) -> SharedValue {
         let Self {
             family,
             version,
@@ -420,13 +420,13 @@ struct Device {
 }
 
 impl Device {
-    fn partial_schema(self) -> Value {
+    fn partial_schema(self) -> SharedValue {
         let Self { category, .. } = self;
 
         into_value([("category", category)])
     }
 
-    fn full_schema(self) -> Value {
+    fn full_schema(self) -> SharedValue {
         let Self {
             category,
             family,
@@ -452,12 +452,14 @@ impl Device {
     }
 }
 
-fn into_value<'a>(iter: impl IntoIterator<Item = (&'a str, Option<String>)>) -> Value {
+fn into_value<'a>(iter: impl IntoIterator<Item = (&'a str, Option<String>)>) -> SharedValue {
     iter.into_iter()
         .map(|(name, value)| {
             (
                 name.to_string(),
-                value.map(|s| s.into()).unwrap_or(Value::Null),
+                value
+                    .map(|s| s.into())
+                    .unwrap_or(SharedValue::from(Value::Null)),
             )
         })
         .collect()
@@ -545,13 +547,13 @@ mod tests {
 
         parses {
             args: func_args![ value: r#"Mozilla/4.0 (compatible; MSIE 7.66; Windows NT 5.1; SV1)"# ],
-            want: Ok(value!({ browser: { family: "Internet Explorer", version: "7.66" }, device: { category: "pc" }, os: { family: "Windows XP", version: "NT 5.1" } })),
+            want: Ok(shared_value!({ browser: { family: "Internet Explorer", version: "7.66" }, device: { category: "pc" }, os: { family: "Windows XP", version: "NT 5.1" } })),
             tdef: Mode::Fast.type_def(),
         }
 
         unknown_user_agent {
             args: func_args![ value: r#"w3m/0.3"#, mode: "enriched"],
-            want: Ok(value!({ browser: { family: null, major: null, minor: null, patch: null, version: null }, device: { brand: null, category: null, family: null, model: null }, os: { family: null, major: null, minor: null, patch: null, patch_minor: null, version: null } })),
+            want: Ok(shared_value!({ browser: { family: null, major: null, minor: null, patch: null, version: null }, device: { brand: null, category: null, family: null, model: null }, os: { family: null, major: null, minor: null, patch: null, patch_minor: null, version: null } })),
             tdef: Mode::Enriched.type_def(),
         }
     ];

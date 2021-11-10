@@ -501,10 +501,9 @@ impl From<BTreeMap<String, SharedValue>> for Value {
     }
 }
 
-impl FromIterator<(String, Value)> for Value {
-    fn from_iter<I: IntoIterator<Item = (String, Value)>>(iter: I) -> Self {
-        //Value::Object(iter.into_iter().collect::<BTreeMap<_, _>>())
-        todo!()
+impl FromIterator<(String, SharedValue)> for Value {
+    fn from_iter<I: IntoIterator<Item = (String, SharedValue)>>(iter: I) -> Self {
+        Value::Object(iter.into_iter().collect::<BTreeMap<_, _>>())
     }
 }
 

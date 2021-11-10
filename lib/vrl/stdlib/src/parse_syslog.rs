@@ -61,6 +61,7 @@ pub(crate) struct ParseSyslogFn {
 impl Expression for ParseSyslogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
         let message = value.try_bytes_utf8_lossy()?;
 
         let timezone = match ctx.timezone() {
@@ -70,7 +71,7 @@ impl Expression for ParseSyslogFn {
         let parsed =
             syslog_loose::parse_message_with_year_exact_tz(&message, resolve_year, timezone)?;
 
-        Ok(message_to_value(parsed))
+        Ok(SharedValue::from(message_to_value(parsed)))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
@@ -126,7 +127,7 @@ fn message_to_value(message: Message<&str>) -> Value {
     }
 
     if let Some(procid) = message.procid {
-        let value: Value = match procid {
+        let value: SharedValue = match procid {
             ProcId::PID(pid) => pid.into(),
             ProcId::Name(name) => name.to_string().into(),
         };

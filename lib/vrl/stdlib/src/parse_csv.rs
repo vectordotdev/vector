@@ -52,8 +52,12 @@ struct ParseCsvFn {
 
 impl Expression for ParseCsvFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let csv_string = self.value.resolve(ctx)?.try_bytes()?;
-        let delimiter = self.delimiter.resolve(ctx)?.try_bytes()?;
+        let csv_string = self.value.resolve(ctx)?;
+        let csv_string = csv_string.borrow();
+        let csv_string = csv_string.try_bytes()?;
+        let delimiter = self.delimiter.resolve(ctx)?;
+        let delimiter = delimiter.borrow();
+        let delimiter = delimiter.try_bytes()?;
         if delimiter.len() != 1 {
             return Err("delimiter must be a single character".into());
         }

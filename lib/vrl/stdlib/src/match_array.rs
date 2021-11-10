@@ -70,17 +70,24 @@ pub(crate) struct MatchArrayFn {
 
 impl Expression for MatchArrayFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let list = self.value.resolve(ctx)?.try_array()?;
-        let pattern = self.pattern.resolve(ctx)?.try_regex()?;
+        let list = self.value.resolve(ctx)?;
+        let list = list.borrow();
+        let list = list.try_array()?;
+        let pattern = self.pattern.resolve(ctx)?;
+        let pattern = pattern.borrow();
+        let pattern = pattern.try_regex()?;
 
         let all = match &self.all {
             Some(expr) => expr.resolve(ctx)?.try_boolean()?,
             None => false,
         };
 
-        let matcher = |i: &Value| match i.try_bytes_utf8_lossy() {
-            Ok(v) => pattern.is_match(&v),
-            _ => false,
+        let matcher = |i: &SharedValue| {
+            let i = i.borrow();
+            match i.try_bytes_utf8_lossy() {
+                Ok(v) => pattern.is_match(&v),
+                _ => false,
+            }
         };
 
         let included = if all {

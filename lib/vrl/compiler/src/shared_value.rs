@@ -1,3 +1,5 @@
+use crate::value::error::Error;
+use std::borrow::Cow;
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 
@@ -33,8 +35,8 @@ impl SharedValue {
         self.0.borrow_mut()
     }
 
-    pub fn replace(&self, value: Value) {
-        self.0.replace(value);
+    pub fn replace(&self, value: Value) -> Value {
+        self.0.replace(value)
     }
 
     pub fn swap(&self, value: &Self) {
@@ -58,5 +60,51 @@ impl SharedValue {
             ),
             value => value.clone(),
         })
+    }
+
+    pub fn try_integer(&self) -> Result<i64, crate::value::error::Error> {
+        let value = self.borrow();
+        value.try_integer()
+    }
+
+    pub fn try_boolean(&self) -> Result<bool, crate::value::error::Error> {
+        let value = self.borrow();
+        value.try_boolean()
+    }
+
+    pub fn is_object(&self) -> bool {
+        self.borrow().is_object()
+    }
+
+    pub fn is_timestamp(&self) -> bool {
+        self.borrow().is_timestamp()
+    }
+
+    pub fn is_boolean(&self) -> bool {
+        self.borrow().is_boolean()
+    }
+
+    pub fn is_bytes(&self) -> bool {
+        self.borrow().is_bytes()
+    }
+
+    pub fn is_float(&self) -> bool {
+        self.borrow().is_float()
+    }
+
+    pub fn is_integer(&self) -> bool {
+        self.borrow().is_integer()
+    }
+
+    pub fn is_null(&self) -> bool {
+        self.borrow().is_null()
+    }
+
+    pub fn is_regex(&self) -> bool {
+        self.borrow().is_regex()
+    }
+
+    pub fn is_array(&self) -> bool {
+        self.borrow().is_array()
     }
 }

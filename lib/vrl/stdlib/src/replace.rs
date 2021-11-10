@@ -91,14 +91,10 @@ impl Expression for ReplaceFn {
         let value = self.value.resolve(ctx)?;
         let value = value.borrow();
         let value = value.try_bytes_utf8_lossy()?;
-
         let with_value = self.with.resolve(ctx)?;
         let with_value = with_value.borrow();
         let with = with_value.try_bytes_utf8_lossy()?;
-
-        let count = self.count.resolve(ctx)?;
-        let count = count.borrow();
-        let count = count.try_integer()?;
+        let count = self.count.resolve(ctx)?.try_integer()?;
 
         let pattern = self.pattern.resolve(ctx)?;
         let pattern = pattern.borrow();

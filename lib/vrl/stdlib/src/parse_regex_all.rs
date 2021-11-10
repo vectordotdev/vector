@@ -89,7 +89,9 @@ pub(crate) struct ParseRegexAllFn {
 
 impl Expression for ParseRegexAllFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
+        let bytes = self.value.resolve(ctx)?;
+        let bytes = bytes.borrow();
+        let bytes = bytes.try_bytes()?;
         let value = String::from_utf8_lossy(&bytes);
         let numeric_groups = self.numeric_groups.resolve(ctx)?.try_boolean()?;
 
@@ -99,7 +101,7 @@ impl Expression for ParseRegexAllFn {
             .map(|capture| {
                 util::capture_regex_to_map(&self.pattern, capture, numeric_groups).into()
             })
-            .collect::<Vec<Value>>()
+            .collect::<Vec<SharedValue>>()
             .into())
     }
 

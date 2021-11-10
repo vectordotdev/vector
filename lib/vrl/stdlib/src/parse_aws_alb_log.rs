@@ -60,9 +60,11 @@ impl ParseAwsAlbLogFn {
 
 impl Expression for ParseAwsAlbLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
+        let bytes = self.value.resolve(ctx)?;
+        let bytes = bytes.borrow();
+        let bytes = bytes.try_bytes()?;
 
-        parse_log(&String::from_utf8_lossy(&bytes))
+        parse_log(&String::from_utf8_lossy(&bytes)).map(SharedValue::from)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
@@ -130,8 +132,8 @@ fn parse_log(mut input: &str) -> Result<Value> {
             log.insert(
                 $name.into(),
                 match get_value!($name, $parser).into() {
-                    Value::Bytes(bytes) if bytes == "-" => Value::Null,
-                    value => value,
+                    Value::Bytes(bytes) if bytes == "-" => SharedValue::from(Value::Null),
+                    value => SharedValue::from(value),
                 },
             )
         };
@@ -164,8 +166,8 @@ fn parse_log(mut input: &str) -> Result<Value> {
     log.insert(
         "request_method".to_owned(),
         match iter.next().unwrap().into() {
-            Value::Bytes(bytes) if bytes == "-" => Value::Null,
-            value => value,
+            Value::Bytes(bytes) if bytes == "-" => SharedValue::from(Value::Null),
+            value => SharedValue::from(value),
         },
     ); // split always have at least 1 item
     match iter.next() {
@@ -174,8 +176,8 @@ fn parse_log(mut input: &str) -> Result<Value> {
             log.insert(
                 "request_protocol".to_owned(),
                 match iter.next().unwrap().into() {
-                    Value::Bytes(bytes) if bytes == "-" => Value::Null,
-                    value => value,
+                    Value::Bytes(bytes) if bytes == "-" => SharedValue::from(Value::Null),
+                    value => SharedValue::from(value),
                 },
             ); // same as previous one
             match iter.next() {

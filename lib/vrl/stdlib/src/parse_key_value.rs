@@ -173,12 +173,15 @@ pub(crate) struct ParseKeyValueFn {
 impl Expression for ParseKeyValueFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
         let bytes = value.try_bytes_utf8_lossy()?;
 
         let value = self.key_value_delimiter.resolve(ctx)?;
+        let value = value.borrow();
         let key_value_delimiter = value.try_bytes_utf8_lossy()?;
 
         let value = self.field_delimiter.resolve(ctx)?;
+        let value = value.borrow();
         let field_delimiter = value.try_bytes_utf8_lossy()?;
 
         let standalone_key = self.standalone_key.resolve(ctx)?.try_boolean()?;
@@ -191,7 +194,7 @@ impl Expression for ParseKeyValueFn {
             standalone_key,
         )?;
 
-        Ok(Value::from_iter(values))
+        Ok(SharedValue::from_iter(values))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
@@ -207,7 +210,7 @@ fn parse<'a>(
     field_delimiter: &'a str,
     whitespace: Whitespace,
     standalone_key: bool,
-) -> Result<Vec<(String, Value)>> {
+) -> Result<Vec<(String, SharedValue)>> {
     let (rest, result) = parse_line(
         input,
         key_value_delimiter,
@@ -237,7 +240,7 @@ fn parse_line<'a>(
     field_delimiter: &'a str,
     whitespace: Whitespace,
     standalone_key: bool,
-) -> IResult<&'a str, Vec<(String, Value)>, VerboseError<&'a str>> {
+) -> IResult<&'a str, Vec<(String, SharedValue)>, VerboseError<&'a str>> {
     separated_list1(
         parse_field_delimiter(field_delimiter),
         parse_key_value(
@@ -272,7 +275,7 @@ fn parse_key_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     field_delimiter: &'a str,
     whitespace: Whitespace,
     standalone_key: bool,
-) -> impl Fn(&'a str) -> IResult<&'a str, (String, Value), E> {
+) -> impl Fn(&'a str) -> IResult<&'a str, (String, SharedValue), E> {
     move |input| {
         map(
             |input| match whitespace {
@@ -297,11 +300,11 @@ fn parse_key_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
                     parse_value(field_delimiter),
                 ))(input),
             },
-            |(field, sep, value): (&str, Vec<&str>, Value)| {
+            |(field, sep, value): (&str, Vec<&str>, SharedValue)| {
                 if sep.len() == 1 {
                     (field.to_string(), value)
                 } else {
-                    (field.to_string(), value!(true))
+                    (field.to_string(), shared_value!(true))
                 }
             },
         )(input)
@@ -366,7 +369,7 @@ fn parse_undelimited<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 ///
 fn parse_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     field_delimiter: &'a str,
-) -> impl Fn(&'a str) -> IResult<&'a str, Value, E> {
+) -> impl Fn(&'a str) -> IResult<&'a str, SharedValue, E> {
     move |input| {
         map(
             alt((
@@ -487,7 +490,7 @@ mod test {
         assert_eq!(
             Ok(vec![
                 ("foo".to_string(), "bar".into()),
-                ("foobar".to_string(), value!(true))
+                ("foobar".to_string(), shared_value!(true))
             ]),
             parse("foo:bar ,   foobar   ", ":", ",", Whitespace::Lenient, true)
         );
@@ -498,9 +501,9 @@ mod test {
         assert_eq!(
             Ok(vec![
                 ("foo".to_string(), "bar".into()),
-                ("foobar".to_string(), value!(true)),
+                ("foobar".to_string(), shared_value!(true)),
                 ("bar".to_string(), "baz".into()),
-                ("barfoo".to_string(), value!(true)),
+                ("barfoo".to_string(), shared_value!(true)),
             ]),
             parse(
                 "foo=bar foobar bar=baz barfoo",
@@ -516,11 +519,11 @@ mod test {
     fn test_only_standalone_key() {
         assert_eq!(
             Ok(vec![
-                ("foo".to_string(), value!(true)),
-                ("bar".to_string(), value!(true)),
-                ("foobar".to_string(), value!(true)),
-                ("baz".to_string(), value!(true)),
-                ("barfoo".to_string(), value!(true)),
+                ("foo".to_string(), shared_value!(true)),
+                ("bar".to_string(), shared_value!(true)),
+                ("foobar".to_string(), shared_value!(true)),
+                ("baz".to_string(), shared_value!(true)),
+                ("barfoo".to_string(), shared_value!(true)),
             ]),
             parse(
                 "foo bar foobar baz barfoo",
@@ -535,7 +538,7 @@ mod test {
     #[test]
     fn test_parse_single_standalone_key() {
         assert_eq!(
-            Ok(vec![("foobar".to_string(), value!(true))]),
+            Ok(vec![("foobar".to_string(), shared_value!(true))]),
             parse("foobar", ":", ",", Whitespace::Lenient, true)
         );
     }
@@ -545,7 +548,7 @@ mod test {
         assert_eq!(
             Ok(vec![
                 ("foo".to_string(), "bar".into()),
-                ("foobar".to_string(), value!(true))
+                ("foobar".to_string(), shared_value!(true))
             ]),
             parse("foo:bar ,   foobar   ", ":", ",", Whitespace::Strict, true)
         );
@@ -645,19 +648,19 @@ mod test {
             args: func_args! [
                 value: r#"at=info method=GET path=/ host=myapp.herokuapp.com request_id=8601b555-6a83-4c12-8269-97c8e32cdb22 fwd="204.204.204.204" dyno=web.1 connect=1ms service=18ms status=200 bytes=13 tls_version=tls1.1 protocol=http"#,
             ],
-            want: Ok(value!({at: "info",
-                             method: "GET",
-                             path: "/",
-                             host: "myapp.herokuapp.com",
-                             request_id: "8601b555-6a83-4c12-8269-97c8e32cdb22",
-                             fwd: "204.204.204.204",
-                             dyno: "web.1",
-                             connect: "1ms",
-                             service: "18ms",
-                             status: "200",
-                             bytes: "13",
-                             tls_version: "tls1.1",
-                             protocol: "http"})),
+            want: Ok(shared_value!({at: "info",
+                                    method: "GET",
+                                    path: "/",
+                                    host: "myapp.herokuapp.com",
+                                    request_id: "8601b555-6a83-4c12-8269-97c8e32cdb22",
+                                    fwd: "204.204.204.204",
+                                    dyno: "web.1",
+                                    connect: "1ms",
+                                    service: "18ms",
+                                    status: "200",
+                                    bytes: "13",
+                                    tls_version: "tls1.1",
+                                    protocol: "http"})),
             tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
                 (): Kind::all()
             }),
@@ -667,11 +670,11 @@ mod test {
             args: func_args! [
                 value: r#"level=info msg="Stopping all fetchers" tag=stopping_fetchers id=ConsumerFetcherManager-1382721708341 module=kafka.consumer.ConsumerFetcherManager"#
             ],
-            want: Ok(value!({level: "info",
-                             msg: "Stopping all fetchers",
-                             tag: "stopping_fetchers",
-                             id: "ConsumerFetcherManager-1382721708341",
-                             module: "kafka.consumer.ConsumerFetcherManager"})),
+            want: Ok(shared_value!({level: "info",
+                                    msg: "Stopping all fetchers",
+                                    tag: "stopping_fetchers",
+                                    id: "ConsumerFetcherManager-1382721708341",
+                                    module: "kafka.consumer.ConsumerFetcherManager"})),
             tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
                 (): Kind::all()
             }),
@@ -682,16 +685,16 @@ mod test {
             args: func_args! [
                 value: r#"SerialNum=100018002000001906146520 GenTime="2019-10-24 14:25:03" SrcIP=10.10.254.2 DstIP=10.10.254.7 Protocol=UDP SrcPort=137 DstPort=137 PolicyID=3 Action=PERMIT Content="Session Backout""#
             ],
-            want: Ok(value!({SerialNum: "100018002000001906146520",
-                             GenTime: "2019-10-24 14:25:03",
-                             SrcIP: "10.10.254.2",
-                             DstIP: "10.10.254.7",
-                             Protocol: "UDP",
-                             SrcPort: "137",
-                             DstPort: "137",
-                             PolicyID: "3",
-                             Action: "PERMIT",
-                             Content: "Session Backout"})),
+            want: Ok(shared_value!({SerialNum: "100018002000001906146520",
+                                    GenTime: "2019-10-24 14:25:03",
+                                    SrcIP: "10.10.254.2",
+                                    DstIP: "10.10.254.7",
+                                    Protocol: "UDP",
+                                    SrcPort: "137",
+                                    DstPort: "137",
+                                    PolicyID: "3",
+                                    Action: "PERMIT",
+                                    Content: "Session Backout"})),
             tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
                 (): Kind::all()
             }),
@@ -702,9 +705,9 @@ mod test {
                 value: r#"foo= bar= tar=data"#,
                 whitespace: "strict"
             ],
-            want: Ok(value!({foo: "",
-                             bar: "",
-                             tar: "data"})),
+            want: Ok(shared_value!({foo: "",
+                                    bar: "",
+                                    tar: "data"})),
             tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
                 (): Kind::all()
             }),
@@ -715,8 +718,8 @@ mod test {
                 value: r#""zork one" : "zoog\"zink\"zork"        nonk          : nink"#,
                 key_value_delimiter: ":",
             ],
-            want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
-                             nonk: "nink"})),
+            want: Ok(shared_value!({"zork one": r#"zoog\"zink\"zork"#,
+                                    nonk: "nink"})),
             tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
                 (): Kind::all()
             }),
@@ -728,8 +731,8 @@ mod test {
                 key_value_delimiter: ":",
                 field_delimiter: ",",
             ],
-            want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
-                             nonk: "nink"})),
+            want: Ok(shared_value!({"zork one": r#"zoog\"zink\"zork"#,
+                                    nonk: "nink"})),
             tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
                 (): Kind::all()
             }),
@@ -741,8 +744,8 @@ mod test {
                 key_value_delimiter: ":",
                 field_delimiter: ",",
             ],
-            want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
-                             nonk: "nink"})),
+            want: Ok(shared_value!({"zork one": r#"zoog\"zink\"zork"#,
+                                    nonk: "nink"})),
             tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
                 (): Kind::all()
             }),
@@ -754,8 +757,8 @@ mod test {
                 key_value_delimiter: "--",
                 field_delimiter: "||",
             ],
-            want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
-                             nonk: "nink"})),
+            want: Ok(shared_value!({"zork one": r#"zoog\"zink\"zork"#,
+                                    nonk: "nink"})),
             tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
                 (): Kind::all()
             }),
@@ -784,8 +787,8 @@ mod test {
                 key_value_delimiter: ":",
                 field_delimiter: ",",
             ],
-            want: Ok(value!({zork: r#"zoog"#,
-                             nonk: "nink norgle: noog"})),
+            want: Ok(shared_value!({zork: r#"zoog"#,
+                                    nonk: "nink norgle: noog"})),
             tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
                 (): Kind::all()
             }),
@@ -799,8 +802,8 @@ mod test {
                 key_value_delimiter: ":",
                 field_delimiter: ",",
             ],
-            want: Ok(value!({zork: "zoog",
-                             nonk: r#""nink" norgle: noog"#})),
+            want: Ok(shared_value!({zork: "zoog",
+                                    nonk: r#""nink" norgle: noog"#})),
             tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
                 (): Kind::all()
             }),
@@ -812,8 +815,8 @@ mod test {
                 key_value_delimiter: ":",
                 field_delimiter: "\n",
             ],
-            want: Ok(value!({"To": "tom",
-                             "test": "\"tom\" test"})),
+            want: Ok(shared_value!({"To": "tom",
+                                    "test": "\"tom\" test"})),
             tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
                 (): Kind::all()
             }),
@@ -825,8 +828,8 @@ mod test {
                 key_value_delimiter: ":",
                 field_delimiter: "\n",
             ],
-            want: Ok(value!({"To": "tom",
-                             "test": "tom test"})),
+            want: Ok(shared_value!({"To": "tom",
+                                    "test": "tom test"})),
             tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
                 (): Kind::all()
             }),

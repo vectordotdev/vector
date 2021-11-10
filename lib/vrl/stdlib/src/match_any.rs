@@ -57,6 +57,7 @@ impl Function for MatchAny {
                     expr,
                 })?;
 
+            let value = value.borrow();
             let re = value
                 .try_regex()
                 .map_err(|e| Box::new(e) as Box<dyn DiagnosticError>)?;
@@ -78,6 +79,7 @@ struct MatchAnyFn {
 impl Expression for MatchAnyFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
         let bytes = value.try_bytes()?;
 
         Ok(self.regex_set.is_match(&bytes).into())
@@ -100,21 +102,21 @@ mod tests {
         yes {
             args: func_args![value: "foobar",
                              patterns: Value::Array(vec![
-                                 Value::Regex(Regex::new("foo").unwrap().into()),
-                                 Value::Regex(Regex::new("bar").unwrap().into()),
-                                 Value::Regex(Regex::new("baz").unwrap().into()),
+                                 SharedValue::from(Value::Regex(Regex::new("foo").unwrap().into())),
+                                 SharedValue::from(Value::Regex(Regex::new("bar").unwrap().into())),
+                                 SharedValue::from(Value::Regex(Regex::new("baz").unwrap().into())),
                              ])],
-            want: Ok(value!(true)),
+            want: Ok(shared_value!(true)),
             tdef: TypeDef::new().infallible().boolean(),
         }
 
         no {
             args: func_args![value: "foo 2 bar",
                              patterns: Value::Array(vec![
-                                 Value::Regex(Regex::new("baz|quux").unwrap().into()),
-                                 Value::Regex(Regex::new("foobar").unwrap().into()),
+                                 SharedValue::from(Value::Regex(Regex::new("baz|quux").unwrap().into())),
+                                 SharedValue::from(Value::Regex(Regex::new("foobar").unwrap().into())),
                              ])],
-            want: Ok(value!(false)),
+            want: Ok(shared_value!(false)),
             tdef: TypeDef::new().infallible().boolean(),
         }
     ];

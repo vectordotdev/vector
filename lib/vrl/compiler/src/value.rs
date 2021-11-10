@@ -1,6 +1,6 @@
 mod arithmetic;
 mod convert;
-mod error;
+pub mod error;
 pub mod kind;
 mod r#macro;
 mod path;

@@ -104,30 +104,31 @@ struct RedactFn {
     redactor: Redactor,
 }
 
-fn redact(value: Value, filters: &[Filter], redactor: &Redactor) -> Value {
-    match value {
+fn redact(value: SharedValue, filters: &[Filter], redactor: &Redactor) -> SharedValue {
+    let borrowed = value.borrow();
+    match &*borrowed {
         Value::Bytes(bytes) => {
             let input = String::from_utf8_lossy(&bytes);
             let output = filters.iter().fold(input, |input, filter| {
                 filter.redact(&input, redactor).into_owned().into()
             });
-            Value::Bytes(output.into_owned().into())
+            SharedValue::from(Value::Bytes(output.into_owned().into()))
         }
         Value::Array(values) => {
             let values = values
                 .into_iter()
-                .map(|value| redact(value, filters, redactor))
+                .map(|value| redact(value.clone(), filters, redactor))
                 .collect();
-            Value::Array(values)
+            SharedValue::from(Value::Array(values))
         }
         Value::Object(map) => {
             let map = map
                 .into_iter()
-                .map(|(key, value)| (key, redact(value, filters, redactor)))
+                .map(|(key, value)| (key.clone(), redact(value.clone(), filters, redactor)))
                 .collect();
-            Value::Object(map)
+            SharedValue::from(Value::Object(map))
         }
-        _ => value,
+        _ => value.clone(),
     }
 }
 
@@ -158,16 +159,19 @@ enum Pattern {
     String(String),
 }
 
-impl TryFrom<Value> for Filter {
+impl TryFrom<SharedValue> for Filter {
     type Error = &'static str;
 
-    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
-        match value {
+    fn try_from(value: SharedValue) -> std::result::Result<Self, Self::Error> {
+        let borrowed = value.borrow();
+        match &*borrowed {
             Value::Object(object) => {
-                let r#type = match object
+                let r#type = object
                     .get("type")
-                    .ok_or("filters specified as objects must have type paramater")?
-                {
+                    .ok_or("filters specified as objects must have type paramater")?;
+                let r#type = r#type.borrow();
+
+                let r#type = match &*r#type {
                     Value::Bytes(bytes) => Ok(bytes.clone()),
                     _ => Err("type key in filters must be a string"),
                 }?;
@@ -175,18 +179,25 @@ impl TryFrom<Value> for Filter {
                 match r#type.as_ref() {
                     b"us_social_security_number" => Ok(Filter::UsSocialSecurityNumber),
                     b"pattern" => {
-                        let patterns = match object
+                        let patterns = object
                             .get("patterns")
-                            .ok_or("pattern filter must have `patterns` specified")?
-                        {
+                            .ok_or("pattern filter must have `patterns` specified")?;
+                        let patterns = patterns.borrow();
+
+                        let patterns = match &*patterns {
                             Value::Array(array) => Ok(array
                                 .iter()
-                                .map(|value| match value {
-                                    Value::Regex(regex) => Ok(Pattern::Regex((**regex).clone())),
-                                    Value::Bytes(bytes) => Ok(Pattern::String(
-                                        String::from_utf8_lossy(bytes).into_owned(),
-                                    )),
-                                    _ => Err("`patterns` must be regular expressions"),
+                                .map(|value| {
+                                    let value = value.borrow();
+                                    match &*value {
+                                        Value::Regex(regex) => {
+                                            Ok(Pattern::Regex((**regex).clone()))
+                                        }
+                                        Value::Bytes(bytes) => Ok(Pattern::String(
+                                            String::from_utf8_lossy(bytes).into_owned(),
+                                        )),
+                                        _ => Err("`patterns` must be regular expressions"),
+                                    }
                                 })
                                 .collect::<std::result::Result<Vec<_>, _>>()?),
                             _ => Err("`patterns` must be array of regular expression literals"),
@@ -201,7 +212,7 @@ impl TryFrom<Value> for Filter {
                 b"us_social_security_number" => Ok(Filter::UsSocialSecurityNumber),
                 _ => Err("unknown filter name"),
             },
-            Value::Regex(regex) => Ok(Filter::Pattern(vec![Pattern::Regex((*regex).clone())])),
+            Value::Regex(regex) => Ok(Filter::Pattern(vec![Pattern::Regex((**regex).clone())])),
             _ => Err("unknown literal for filter, must be a regex, filter name, or object"),
         }
     }

@@ -47,9 +47,10 @@ struct ParseTokensFn {
 impl Expression for ParseTokensFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
         let string = value.try_bytes_utf8_lossy()?;
 
-        let tokens: Value = tokenize::parse(&string)
+        let tokens: SharedValue = tokenize::parse(&string)
             .into_iter()
             .map(|token| match token {
                 "" | "-" => Value::Null,

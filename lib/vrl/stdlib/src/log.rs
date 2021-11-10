@@ -109,7 +109,7 @@ impl Expression for LogFn {
             }
         }
 
-        Ok(Value::Null)
+        Ok(SharedValue::from(Value::Null))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

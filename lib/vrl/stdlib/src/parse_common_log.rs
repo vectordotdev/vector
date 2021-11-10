@@ -71,13 +71,15 @@ struct ParseCommonLogFn {
 impl Expression for ParseCommonLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
+        let bytes = bytes.borrow();
         let message = bytes.try_bytes_utf8_lossy()?;
         let timestamp_format = match &self.timestamp_format {
             None => "%d/%b/%Y:%T %z".to_owned(),
-            Some(timestamp_format) => timestamp_format
-                .resolve(ctx)?
-                .try_bytes_utf8_lossy()?
-                .to_string(),
+            Some(timestamp_format) => {
+                let timestamp_format = timestamp_format.resolve(ctx)?;
+                let timestamp_format = timestamp_format.borrow();
+                timestamp_format.try_bytes_utf8_lossy()?.to_string()
+            }
         };
 
         let captures = log_util::REGEX_APACHE_COMMON_LOG
@@ -90,6 +92,7 @@ impl Expression for ParseCommonLogFn {
             &timestamp_format,
             ctx.timezone(),
         )
+        .map(SharedValue::from)
         .map_err(Into::into)
     }
 

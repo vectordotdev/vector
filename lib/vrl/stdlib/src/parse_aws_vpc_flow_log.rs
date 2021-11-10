@@ -88,15 +88,20 @@ impl ParseAwsVpcFlowLogFn {
 
 impl Expression for ParseAwsVpcFlowLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
+        let bytes = self.value.resolve(ctx)?;
+        let bytes = bytes.borrow();
+        let bytes = bytes.try_bytes()?;
         let input = String::from_utf8_lossy(&bytes);
 
         if let Some(expr) = &self.format {
-            let bytes = expr.resolve(ctx)?.try_bytes()?;
+            let bytes = expr.resolve(ctx)?;
+            let bytes = bytes.borrow();
+            let bytes = bytes.try_bytes()?;
             parse_log(&input, Some(&String::from_utf8_lossy(&bytes)))
         } else {
             parse_log(&input, None)
         }
+        .map(SharedValue::from)
         .map_err(Into::into)
     }
 
@@ -155,7 +160,7 @@ macro_rules! create_match {
         match $key {
             $($name => {
                 let value = match $value {
-                    "-" => Value::Null,
+                    "-" => SharedValue::from(Value::Null),
                     value => $transform($name, value)?.into(),
                 };
                 if $log.insert($name.into(), value).is_some() {

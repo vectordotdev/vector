@@ -84,11 +84,15 @@ struct ParseDurationFn {
 
 impl Expression for ParseDurationFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
+        let bytes = self.value.resolve(ctx)?;
+        let bytes = bytes.borrow();
+        let bytes = bytes.try_bytes()?;
         let value = String::from_utf8_lossy(&bytes);
 
         let conversion_factor = {
-            let bytes = self.unit.resolve(ctx)?.try_bytes()?;
+            let bytes = self.unit.resolve(ctx)?;
+            let bytes = bytes.borrow();
+            let bytes = bytes.try_bytes()?;
             let string = String::from_utf8_lossy(&bytes);
 
             UNITS

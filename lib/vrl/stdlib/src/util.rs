@@ -23,11 +23,11 @@ pub(crate) fn capture_regex_to_map(
     regex: &regex::Regex,
     capture: regex::Captures,
     numeric_groups: bool,
-) -> std::collections::BTreeMap<String, Rc<RefCell<vrl::Value>>> {
+) -> std::collections::BTreeMap<String, vrl::SharedValue> {
     let names = regex.capture_names().flatten().map(|name| {
         (
             name.to_owned(),
-            Rc::new(RefCell::new(capture.name(name).map(|s| s.as_str()).into())),
+            vrl::SharedValue::from(capture.name(name).map(|s| s.as_str())),
         )
     });
 
@@ -36,7 +36,7 @@ pub(crate) fn capture_regex_to_map(
             .iter()
             .flatten()
             .enumerate()
-            .map(|(idx, c)| (idx.to_string(), Rc::new(RefCell::new(c.as_str().into()))));
+            .map(|(idx, c)| (idx.to_string(), vrl::SharedValue::from(c.as_str())));
 
         indexed.chain(names).collect()
     } else {

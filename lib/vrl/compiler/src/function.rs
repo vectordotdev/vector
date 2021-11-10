@@ -329,7 +329,7 @@ pub enum Error {
     #[error(r#"invalid argument"#)]
     InvalidArgument {
         keyword: &'static str,
-        value: Value,
+        value: SharedValue,
         error: &'static str,
     },
 }

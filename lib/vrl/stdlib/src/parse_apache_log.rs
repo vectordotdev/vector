@@ -90,13 +90,15 @@ struct ParseApacheLogFn {
 impl Expression for ParseApacheLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
+        let bytes = bytes.borrow();
         let message = bytes.try_bytes_utf8_lossy()?;
         let timestamp_format = match &self.timestamp_format {
             None => "%d/%b/%Y:%T %z".to_owned(),
-            Some(timestamp_format) => timestamp_format
-                .resolve(ctx)?
-                .try_bytes_utf8_lossy()?
-                .to_string(),
+            Some(timestamp_format) => {
+                let format = timestamp_format.resolve(ctx)?;
+                let format = format.borrow();
+                format.try_bytes_utf8_lossy()?.to_string()
+            }
         };
 
         let regex = match self.format.as_ref() {
@@ -111,6 +113,7 @@ impl Expression for ParseApacheLogFn {
             .ok_or("failed parsing common log line")?;
 
         log_util::log_fields(regex, &captures, &timestamp_format, ctx.timezone())
+            .map(SharedValue::from)
             .map_err(Into::into)
     }
 

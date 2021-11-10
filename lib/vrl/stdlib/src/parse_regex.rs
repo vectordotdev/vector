@@ -1,6 +1,4 @@
 use regex::Regex;
-use std::cell::RefCell;
-use std::rc::Rc;
 use vrl::prelude::*;
 
 use crate::util;
@@ -103,7 +101,7 @@ impl Expression for ParseRegexFn {
             .map(|capture| util::capture_regex_to_map(&self.pattern, capture, numeric_groups))
             .ok_or("could not find any pattern matches")?;
 
-        Ok(Rc::new(RefCell::new(parsed.into())))
+        Ok(SharedValue::from(parsed))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
