@@ -33,7 +33,7 @@ type         = "file"
 include      = ["/var/log/apache2/*.log"]    # supports globbing
 ignore_older = 86400                         # 1 day
 
-# Structure and parse via Timber's Remap Language
+# Structure and parse via Vector's Remap Language
 [transforms.apache_parser]
 inputs = ["apache_logs"]
 type   = "remap"
