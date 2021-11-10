@@ -61,7 +61,7 @@ mod tests {
         self,
         api::{self, Server},
         config::{self, Config, Format},
-        internal_events::{emit, DemoEventProcessed, Heartbeat},
+        internal_events::{emit, DemoLogsEventProcessed, Heartbeat},
         test_util::{next_addr, retry_until},
     };
     use vector_api_client::{
@@ -176,12 +176,12 @@ mod tests {
     }
 
     // Emits fake generate events every 10ms until the returned shutdown falls out of scope
-    fn emit_fake_demo_events() -> oneshot::Sender<()> {
+    fn emit_fake_demo_logs_events() -> oneshot::Sender<()> {
         let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
         tokio::spawn(async move {
             IntervalStream::new(tokio::time::interval(Duration::from_millis(10)))
                 .take_until(shutdown_rx)
-                .for_each(|_| async { emit(DemoEventProcessed) })
+                .for_each(|_| async { emit(DemoLogsEventProcessed) })
                 .await
         });
 
@@ -251,7 +251,7 @@ mod tests {
         interval: i64,
     ) {
         // Emit events for the duration of the test
-        let _shutdown = emit_fake_demo_events();
+        let _shutdown = emit_fake_demo_logs_events();
 
         let subscription = client.processed_events_total_subscription(interval);
 
@@ -464,7 +464,7 @@ mod tests {
     }
 
     #[test]
-    /// Tests for events processed metrics, using fake demo events
+    /// Tests for events processed metrics, using fake demo_logs events
     fn api_graphql_event_processed_total_metrics() {
         metrics_test("tests::api_graphql_event_processed_total_metrics", async {
             let server = start_server();
@@ -501,7 +501,7 @@ mod tests {
                       enabled = true
 
                     [sources.processed_events_total_batch_source]
-                      type = "demo"
+                      type = "demo_logs"
                       format = "shuffle"
                       lines = ["Random line", "And another"]
                       interval = 0.01
@@ -550,7 +550,7 @@ mod tests {
                       enabled = true
 
                     [sources.events_out_total_batch_source]
-                      type = "demo"
+                      type = "demo_logs"
                       format = "shuffle"
                       lines = ["Random line", "And another"]
                       interval = 0.01
@@ -600,7 +600,7 @@ mod tests {
                       enabled = true
 
                     [sources.processed_bytes_total_batch_source]
-                      type = "demo"
+                      type = "demo_logs"
                       format = "shuffle"
                       lines = ["Random line", "And another"]
                       interval = 0.1
@@ -642,7 +642,7 @@ mod tests {
                   enabled = true
 
                 [sources.component_added_source_1]
-                  type = "demo"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["Random line", "And another"]
                   interval = 0.1
@@ -688,13 +688,13 @@ mod tests {
                   enabled = true
 
                 [sources.component_added_source_1]
-                  type = "demo"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["Random line", "And another"]
                   interval = 0.1
 
                 [sources.component_added_source_2]
-                  type = "demo"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["3rd line", "4th line"]
                   interval = 0.1
@@ -724,13 +724,13 @@ mod tests {
                   enabled = true
 
                 [sources.component_removed_source_1]
-                  type = "demo"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["Random line", "And another"]
                   interval = 0.1
 
                 [sources.component_removed_source_2]
-                  type = "demo"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["3rd line", "4th line"]
                   interval = 0.1
@@ -777,7 +777,7 @@ mod tests {
                   enabled = true
 
                 [sources.component_removed_source_1]
-                  type = "demo"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["Random line", "And another"]
                   interval = 0.1
@@ -806,7 +806,7 @@ mod tests {
                   enabled = true
 
                 [sources.error_gen]
-                  type = "demo"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["Random line", "And another"]
                   batch_interval = 0.1
@@ -860,7 +860,7 @@ mod tests {
                   enabled = true
 
                 [sources.error_gen]
-                  type = "demo"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["Random line", "And another"]
                   batch_interval = 0.1
@@ -975,7 +975,7 @@ mod tests {
                   enabled = true
 
                 [sources.gen1]
-                  type = "demo"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["Random line", "And another"]
                   interval = 0.1
@@ -1012,25 +1012,25 @@ mod tests {
                   enabled = true
 
                 [sources.gen1]
-                  type = "demo"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["1"]
                   interval = 0.1
 
                 [sources.gen2]
-                  type = "demo"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["2"]
                   interval = 0.1
 
                 [sources.gen3]
-                  type = "demo"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["3"]
                   interval = 0.1
 
                 [sources.gen4]
-                  type = "demo"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["4"]
                   interval = 0.1

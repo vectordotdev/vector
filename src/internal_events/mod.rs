@@ -47,8 +47,8 @@ mod datadog_metrics;
 mod decoder;
 #[cfg(feature = "transforms-dedupe")]
 mod dedupe;
-#[cfg(feature = "sources-demo")]
-mod demo;
+#[cfg(feature = "sources-demo_logs")]
+mod demo_logs;
 #[cfg(feature = "sources-dnstap")]
 mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
@@ -197,8 +197,8 @@ pub use self::datadog_metrics::*;
 pub use self::decoder::*;
 #[cfg(feature = "transforms-dedupe")]
 pub(crate) use self::dedupe::*;
-#[cfg(feature = "sources-demo")]
-pub use self::demo::*;
+#[cfg(feature = "sources-demo_logs")]
+pub use self::demo_logs::*;
 #[cfg(feature = "sources-dnstap")]
 pub(crate) use self::dnstap::*;
 #[cfg(feature = "sources-docker_logs")]

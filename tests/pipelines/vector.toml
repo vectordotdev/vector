@@ -1,5 +1,5 @@
 [sources.in]
-type = "demo"
+type = "demo_logs"
 format = "json"
 interval = 2
 

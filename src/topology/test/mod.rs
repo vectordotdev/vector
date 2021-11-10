@@ -6,14 +6,14 @@
 ))]
 mod transient_state;
 
-#[cfg(all(test, feature = "sinks-console", feature = "sources-demo"))]
+#[cfg(all(test, feature = "sinks-console", feature = "sources-demo_logs"))]
 mod source_finished;
 
 #[cfg(all(
     test,
     feature = "sinks-console",
     feature = "sources-splunk_hec",
-    feature = "sources-demo",
+    feature = "sources-demo_logs",
     feature = "sinks-prometheus",
     feature = "transforms-log_to_metric",
     feature = "sinks-socket",

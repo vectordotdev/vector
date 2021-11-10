@@ -232,7 +232,7 @@ Name | Description
 | `sources-aws_kinesis_firehose`                       | Enables building the [`aws_kinesis_firehose` source](/docs/reference/configuration/sources/aws_kinesis_firehose)
 | `sources-docker_logs`                                | Enables building the [`docker_logs` source](/docs/reference/configuration/sources/docker_logs). Requires `unix` feature to be also enabled for support of Unix domain sockets.
 | `sources-file`                                       | Enables building the [`file` source](/docs/reference/configuration/sources/file).
-| `sources-demo`                                  | Enables building the [`demo` source](/docs/reference/configuration/sources/demo)
+| `sources-demo_logs`                                  | Enables building the [`demo_logs` source](/docs/reference/configuration/sources/demo_logs)
 | `sources-host_metrics`                               | Enables building the [`host_metrics` source](/docs/reference/configuration/sources/host_metrics)
 | `sources-http`                                       | Enables building the [`http` source](/docs/reference/configuration/sources/http)
 | `sources-journald`                                   | Enables building the [`journald` source](/docs/reference/configuration/sources/journald)

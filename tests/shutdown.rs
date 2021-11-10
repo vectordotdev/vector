@@ -211,7 +211,7 @@ fn configuration_path_recomputed() {
         dir.join("conf1.toml"),
         &source_config(
             r#"
-        type = "demo"
+        type = "demo_logs"
         format = "shuffle"
         interval = 1.0 # optional, no default
         lines = ["foo", "bar"]"#,
@@ -312,10 +312,10 @@ fn timely_shutdown_file() {
 }
 
 #[test]
-fn timely_shutdown_demo() {
+fn timely_shutdown_demo_logs() {
     test_timely_shutdown(source_vector(
         r#"
-    type = "demo"
+    type = "demo_logs"
     format = "shuffle"
     interval = 1.0 # optional, no default
     lines = ["foo", "bar"]"#,

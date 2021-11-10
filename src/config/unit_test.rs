@@ -1497,7 +1497,7 @@ mod tests {
     async fn type_inconsistency_while_expanding_transform() {
         let config: ConfigBuilder = toml::from_str(indoc! {r#"
             [sources.input]
-              type = "demo"
+              type = "demo_logs"
               format = "shuffle"
               lines = ["one", "two"]
               count = 5
@@ -1541,7 +1541,7 @@ mod tests {
     async fn invalid_name_in_expanded_transform() {
         let config: ConfigBuilder = toml::from_str(indoc! {r#"
             [sources.input]
-              type = "demo"
+              type = "demo_logs"
               format = "shuffle"
               lines = ["one", "two"]
               count = 5

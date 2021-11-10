@@ -1,7 +1,7 @@
 package metadata
 
-components: sources: demo: {
-	title: "Demo"
+components: sources: demo_logs: {
+	title: "Demo Logs"
 
 	alias: "generator"
 
