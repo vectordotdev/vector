@@ -38,19 +38,19 @@ remap: functions: get_enrichment_table_record: {
 		{
 			name: "condition"
 			description: """
-				  The condition to search on. Since the condition is used at boot time
-				  to create indexes into the data, these conditions have to be statically
-				  defined.
-			"""
+					  The condition to search on. Since the condition is used at boot time
+					  to create indexes into the data, these conditions have to be statically
+					  defined.
+				"""
 			required: true
 			type: ["object"]
 		},
 		{
 			name: "select"
 			description: '''
-				A subset of fields from the enrichment table to return. If not
-				specified all fields are returned.
-			'''
+					A subset of fields from the enrichment table to return. If not
+					specified all fields are returned.
+				'''
 			required: false
 			type: ["array"]
 		},
@@ -71,21 +71,21 @@ remap: functions: get_enrichment_table_record: {
 		{
 			title: "Exact match"
 			source: #"""
-			      get_enrichment_table_record("csvfile",
-						       { "surname": "smith",
-							"firstname": "John" },
-						       case_sensitive: false)
-			"""#
+				      get_enrichment_table_record("csvfile",
+							       { "surname": "smith",
+								"firstname": "John" },
+							       case_sensitive: false)
+				"""#
 			return: true
 		},
 		{
 			title: "Date range search"
 			source: #"""
-							      get_enrichment_table_record("csvfile",
-										       { "surname": "Smith",
-											"date_of_birth": { "from": t'1985-01-01',
-													 "to": t'1985-31-12'} })
-			"""#
+								      get_enrichment_table_record("csvfile",
+											       { "surname": "Smith",
+												"date_of_birth": { "from": t'1985-01-01',
+														 "to": t'1985-31-12'} })
+				"""#
 			return: true
 		},
 	]

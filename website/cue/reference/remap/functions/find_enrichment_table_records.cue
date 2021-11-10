@@ -46,9 +46,9 @@ remap: functions: find_enrichment_table_records: {
 		{
 			name: "select"
 			description: """
-				A subset of fields from the enrichment table to return. If not
-				specified all fields are returned.
-			"""
+					A subset of fields from the enrichment table to return. If not
+					specified all fields are returned.
+				"""
 			required: false
 			type: ["array"]
 		},
@@ -67,21 +67,21 @@ remap: functions: find_enrichment_table_records: {
 		{
 			title: "Exact match"
 			source: #"""
-			      find_enrichment_table_records("csvfile",
-							{ "surname": "smith",
-							  "firstname": "John" },
-							case_sensitive: false)
-			"""#
+				      find_enrichment_table_records("csvfile",
+								{ "surname": "smith",
+								  "firstname": "John" },
+								case_sensitive: false)
+				"""#
 			return: true
 		},
 		{
 			title: "Date range search"
 			source: #"""
-			      find_enrichment_table_records("csvfile",
-							{ "surname": "Smith",
-							  "date_of_birth": { "from": t'1985-01-01',
-									   "to": t'1985-31-12'} })
-			"""#
+				      find_enrichment_table_records("csvfile",
+								{ "surname": "Smith",
+								  "date_of_birth": { "from": t'1985-01-01',
+										   "to": t'1985-31-12'} })
+				"""#
 			return: true
 		},
 	]
