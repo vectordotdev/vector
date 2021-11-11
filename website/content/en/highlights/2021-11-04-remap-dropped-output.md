@@ -14,11 +14,12 @@ badges:
 Vector 0.18 introduces a new `dropped` output to the `remap` transform. This
 can be used to route events that fail processing down a separate pipeline.
 
-When either of `drop_on_error` or `drop_on_abort` is set to `true`, events that
-are dropped from the primary output stream due to either errors or aborts are
-written instead to a separate output called `dropped`. Those events are written
-out to the `dropped` output in their original form, so no modifications that
-occurred before the error or abort will be visible.
+When either of `drop_on_error` or `drop_on_abort` is set to `true` and the new
+`reroute_dropped` config is also set to `true`, events that are dropped from the
+primary output stream due to either errors or aborts are written instead to
+a separate output called `dropped`. Those events are written out to the
+`dropped` output in their original form, so no modifications that occurred
+before the error or abort will be visible.
 
 ## Example
 
@@ -44,6 +45,7 @@ Given a config of:
   inputs = ["in"]
   drop_on_error = true
   drop_on_abort = true
+  reroute_dropped = true
   source = """
     . |= object!(parse_json!(.message))
     if .foo == "baz" {

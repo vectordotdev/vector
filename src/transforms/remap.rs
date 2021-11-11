@@ -29,6 +29,7 @@ pub struct RemapConfig {
     pub drop_on_error: bool,
     #[serde(default = "crate::serde::default_true")]
     pub drop_on_abort: bool,
+    pub reroute_dropped: bool,
 }
 
 inventory::submit! {
@@ -69,6 +70,7 @@ pub struct Remap {
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
+    reroute_dropped: bool,
 }
 
 impl Remap {
@@ -105,6 +107,7 @@ impl Remap {
             timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
+            reroute_dropped: config.reroute_dropped,
         })
     }
 
@@ -155,22 +158,28 @@ impl Clone for Remap {
             timezone: self.timezone,
             drop_on_error: self.drop_on_error,
             drop_on_abort: self.drop_on_abort,
+            reroute_dropped: self.reroute_dropped,
         }
     }
 }
 
 impl FallibleFunctionTransform for Remap {
     fn transform(&mut self, output: &mut Vec<Event>, err_output: &mut Vec<Event>, event: Event) {
-        // If a program can fail or abort at runtime, we need to clone the
-        // original event and keep it around, to allow us to discard any
-        // mutations made to the event while the VRL program runs, before it
-        // failed or aborted.
+        // If a program can fail or abort at runtime and we know that we will still need to forward
+        // the event in that case (either to the main output or `dropped`, depending on the
+        // config), we need to clone the original event and keep it around, to allow us to discard
+        // any mutations made to the event while the VRL program runs, before it failed or aborted.
         //
-        // The `drop_on_{error, abort}` transform config allows operators to
-        // ignore events if their failed/aborted, in which case we can skip the
-        // cloning, since any mutations made by VRL will be ignored regardless.
-        #[allow(clippy::if_same_then_else)]
-        let original_event = if self.program.can_fail() || self.program.can_abort() {
+        // The `drop_on_{error, abort}` transform config allows operators to remove events from the
+        // main output if they're failed or aborted, in which case we can skip the cloning, since
+        // any mutations made by VRL will be ignored regardless. If they hav configured
+        // `reroute_dropped`, however, we still need to do the clone to ensure that we can forward
+        // the event to the `dropped` output.
+        let forward_on_error = !self.drop_on_error || self.reroute_dropped;
+        let forward_on_abort = !self.drop_on_abort || self.reroute_dropped;
+        let original_event = if (self.program.can_fail() && forward_on_error)
+            || (self.program.can_abort() && forward_on_abort)
+        {
             Some(event.clone())
         } else {
             None
@@ -196,7 +205,7 @@ impl FallibleFunctionTransform for Remap {
 
                 if !self.drop_on_abort {
                     output.push(original_event.expect("event will be set"))
-                } else {
+                } else if self.reroute_dropped {
                     let mut event = original_event.expect("event will be set");
                     self.annotate_dropped(&mut event, "abort", error);
                     err_output.push(event)
@@ -210,7 +219,7 @@ impl FallibleFunctionTransform for Remap {
 
                 if !self.drop_on_error {
                     output.push(original_event.expect("event will be set"))
-                } else {
+                } else if self.reroute_dropped {
                     let mut event = original_event.expect("event will be set");
                     self.annotate_dropped(&mut event, "error", error);
                     err_output.push(event)
@@ -296,6 +305,7 @@ mod tests {
             timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
+            ..Default::default()
         };
         let mut tform = Remap::new(conf, &Default::default()).unwrap();
         assert!(tform.runtime().is_empty());
@@ -345,6 +355,7 @@ mod tests {
             timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
+            ..Default::default()
         };
         let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
@@ -380,6 +391,7 @@ mod tests {
             timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
+            ..Default::default()
         };
         let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
@@ -411,6 +423,7 @@ mod tests {
             timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: false,
+            ..Default::default()
         };
         let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
@@ -439,6 +452,7 @@ mod tests {
             timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
+            ..Default::default()
         };
         let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
@@ -462,6 +476,7 @@ mod tests {
             timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: false,
+            ..Default::default()
         };
         let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
@@ -490,6 +505,7 @@ mod tests {
             timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: false,
+            ..Default::default()
         };
         let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
@@ -518,6 +534,7 @@ mod tests {
             timezone: TimeZone::default(),
             drop_on_error: false,
             drop_on_abort: true,
+            ..Default::default()
         };
         let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
@@ -545,6 +562,7 @@ mod tests {
             timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: false,
+            ..Default::default()
         };
         let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
@@ -620,10 +638,10 @@ mod tests {
                     }}
                 }}
             "#}),
-            file: None,
-            timezone: TimeZone::default(),
             drop_on_error: true,
             drop_on_abort: true,
+            reroute_dropped: true,
+            ..Default::default()
         };
         let mut context = TransformContext::default();
         context.key = Some(ComponentKey::from("remapper"));
