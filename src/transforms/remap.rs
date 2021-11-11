@@ -16,6 +16,7 @@ use std::io::{self, Read};
 use std::path::PathBuf;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Terminate};
+use vrl_compiler::ExpressionError;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -111,6 +112,39 @@ impl Remap {
     const fn runtime(&self) -> &Runtime {
         &self.runtime
     }
+
+    fn annotate_dropped(&self, event: &mut Event, reason: &str, error: ExpressionError) {
+        match event {
+            Event::Log(ref mut log) => {
+                log.insert(
+                    log_schema().metadata_key(),
+                    serde_json::json!({
+                        "dropped": {
+                            "reason": reason,
+                            "message": error.to_string(),
+                            "component_id": self.component_key,
+                            "component_type": "remap",
+                            "component_kind": "transform",
+                        }
+                    }),
+                );
+            }
+            Event::Metric(ref mut metric) => {
+                let m = log_schema().metadata_key();
+                metric.insert_tag(format!("{}.dropped.reason", m), reason.into());
+                metric.insert_tag(format!("{}.dropped.message", m), error.to_string());
+                metric.insert_tag(
+                    "dropped.component_id".into(),
+                    self.component_key
+                        .as_ref()
+                        .map(ToString::to_string)
+                        .unwrap_or_else(String::new),
+                );
+                metric.insert_tag(format!("{}.dropped.component_type", m), "remap".into());
+                metric.insert_tag(format!("{}.dropped.component_kind", m), "transform".into());
+            }
+        }
+    }
 }
 
 impl Clone for Remap {
@@ -164,22 +198,9 @@ impl FallibleFunctionTransform for Remap {
                 if !self.drop_on_abort {
                     output.push(original_event.expect("event will be set"))
                 } else {
-                    let mut erred_event = original_event.expect("event will be set");
-                    if let Event::Log(ref mut log) = &mut erred_event {
-                        log.insert(
-                            log_schema().metadata_key(),
-                            serde_json::json!({
-                                "dropped": {
-                                    "reason": "abort",
-                                    "message": error.to_string(),
-                                    "component_id": self.component_key,
-                                    "component_type": "remap",
-                                    "component_kind": "transform",
-                                }
-                            }),
-                        );
-                    }
-                    err_output.push(erred_event)
+                    let mut event = original_event.expect("event will be set");
+                    self.annotate_dropped(&mut event, "abort", error);
+                    err_output.push(event)
                 }
             }
             Err(Terminate::Error(error)) => {
@@ -191,22 +212,9 @@ impl FallibleFunctionTransform for Remap {
                 if !self.drop_on_error {
                     output.push(original_event.expect("event will be set"))
                 } else {
-                    let mut erred_event = original_event.expect("event will be set");
-                    if let Event::Log(ref mut log) = &mut erred_event {
-                        log.insert(
-                            log_schema().metadata_key(),
-                            serde_json::json!({
-                                "dropped": {
-                                    "reason": "error",
-                                    "message": error.to_string(),
-                                    "component_id": self.component_key,
-                                    "component_type": "remap",
-                                    "component_kind": "transform",
-                                }
-                            }),
-                        );
-                    }
-                    err_output.push(erred_event)
+                    let mut event = original_event.expect("event will be set");
+                    self.annotate_dropped(&mut event, "error", error);
+                    err_output.push(event)
                 }
             }
         }
