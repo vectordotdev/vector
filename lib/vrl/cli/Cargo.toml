@@ -15,10 +15,12 @@ default = ["repl", "expressions"]
 repl = ["lazy_static", "prettytable-rs", "regex", "rustyline", "webbrowser"]
 expressions = [
   "expr-abort",
+  "expr-if_statement",
   "expr-op",
   "expr-unary",
 ]
 expr-abort = ["vrl/expr-abort"]
+expr-if_statement = ["vrl/expr-if_statement"]
 expr-op = ["vrl/expr-op"]
 expr-unary = ["vrl/expr-unary"]
 

@@ -159,6 +159,7 @@ impl<'a> Compiler<'a> {
         Object::new(exprs)
     }
 
+    #[cfg(feature = "expr-if_statement")]
     fn compile_if_statement(&mut self, node: Node<ast::IfStatement>) -> IfStatement {
         let ast::IfStatement {
             predicate,
@@ -184,6 +185,14 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    #[cfg(not(feature = "expr-if_statement"))]
+    fn compile_if_statement(&mut self, node: Node<ast::IfStatement>) -> Noop {
+        self.handle_missing_feature_error(node.span(), "expr-if_statement");
+
+        Noop
+    }
+
+    #[cfg(feature = "expr-if_statement")]
     fn compile_predicate(&mut self, node: Node<ast::Predicate>) -> predicate::Result {
         use ast::Predicate::*;
 

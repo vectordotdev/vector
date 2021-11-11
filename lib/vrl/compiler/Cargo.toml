@@ -9,10 +9,12 @@ publish = false
 default = ["expressions"]
 expressions = [
   "expr-abort",
+  "expr-if_statement",
   "expr-op",
   "expr-unary",
 ]
 expr-abort = []
+expr-if_statement = []
 expr-op = []
 expr-unary = []
 
