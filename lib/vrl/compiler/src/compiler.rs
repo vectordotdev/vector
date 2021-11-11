@@ -9,6 +9,7 @@ use std::convert::TryFrom;
 pub type Errors = Vec<Box<dyn DiagnosticError>>;
 
 pub struct Compiler<'a> {
+    #[allow(dead_code)]
     fns: &'a [Box<dyn Function>],
     state: &'a mut State,
     errors: Errors,
@@ -359,6 +360,7 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    #[cfg(feature = "expr-function_call")]
     fn compile_function_call(&mut self, node: Node<ast::FunctionCall>) -> FunctionCall {
         let call_span = node.span();
         let ast::FunctionCall {
@@ -390,6 +392,13 @@ impl<'a> Compiler<'a> {
         })
     }
 
+    #[cfg(not(feature = "expr-function_call"))]
+    fn compile_function_call(&mut self, node: Node<ast::FunctionCall>) -> Noop {
+        self.handle_missing_feature_error(node.span(), "expr-function_call");
+        Noop
+    }
+
+    #[cfg(feature = "expr-function_call")]
     fn compile_function_argument(&mut self, node: Node<ast::FunctionArgument>) -> FunctionArgument {
         let ast::FunctionArgument { ident, expr } = node.into_inner();
         let expr = Node::new(expr.span(), self.compile_expr(expr));

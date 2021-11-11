@@ -246,10 +246,12 @@ impl ArgumentList {
         Ok(required(self.optional_array(keyword)?))
     }
 
+    #[cfg(feature = "expr-function_call")]
     pub(crate) fn keywords(&self) -> Vec<&'static str> {
         self.0.keys().copied().collect::<Vec<_>>()
     }
 
+    #[cfg(feature = "expr-function_call")]
     pub(crate) fn insert(&mut self, k: &'static str, v: Expr) {
         self.0.insert(k, v);
     }

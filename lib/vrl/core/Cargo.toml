@@ -9,11 +9,13 @@ publish = false
 default = ["expressions"]
 expressions = [
   "expr-abort",
+  "expr-function_call",
   "expr-if_statement",
   "expr-op",
   "expr-unary",
 ]
 expr-abort = ["compiler/expr-abort"]
+expr-function_call = ["compiler/expr-function_call"]
 expr-if_statement = ["compiler/expr-if_statement"]
 expr-op = ["compiler/expr-op"]
 expr-unary = ["compiler/expr-unary"]

@@ -1,6 +1,6 @@
 use crate::expression::Expr;
 use crate::parser::{Ident, Node};
-use crate::{Parameter, Span};
+use crate::Parameter;
 use std::fmt;
 use std::ops::Deref;
 
@@ -12,6 +12,7 @@ pub struct FunctionArgument {
 }
 
 impl FunctionArgument {
+    #[cfg(feature = "expr-function_call")]
     pub(crate) fn new(ident: Option<Node<Ident>>, expr: Node<Expr>) -> Self {
         Self {
             ident,
@@ -20,11 +21,13 @@ impl FunctionArgument {
         }
     }
 
+    #[cfg(feature = "expr-function_call")]
     pub(crate) fn keyword(&self) -> Option<&str> {
         self.ident.as_ref().map(|node| node.as_ref().as_ref())
     }
 
-    pub(crate) fn keyword_span(&self) -> Option<Span> {
+    #[cfg(feature = "expr-function_call")]
+    pub(crate) fn keyword_span(&self) -> Option<crate::Span> {
         self.ident.as_ref().map(|node| node.span())
     }
 
