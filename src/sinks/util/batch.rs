@@ -21,6 +21,10 @@ pub enum BatchError {
     InvalidMaxEvents,
     #[snafu(display("`timeout_secs` must be greater than zero"))]
     InvalidTimeout,
+    #[snafu(display("provided `max_bytes` exceeds the maximum limit of {}", limit))]
+    MaxBytesExceeded { limit: usize },
+    #[snafu(display("provided `max_events` exceeds the maximum limit of {}", limit))]
+    MaxEventsExceeded { limit: usize },
 }
 
 pub trait SinkBatchSettings {
@@ -155,30 +159,18 @@ impl<D: SinkBatchSettings> BatchConfig<D, Merged> {
         }
     }
 
-    pub fn limit_max_bytes(self, limit: usize) -> Self {
-        if let Some(n) = self.max_bytes {
-            if n > limit {
-                return Self {
-                    max_bytes: Some(limit),
-                    ..self
-                };
-            }
+    pub fn limit_max_bytes(self, limit: usize) -> Result<Self, BatchError> {
+        match self.max_bytes {
+            Some(n) if n > limit => Err(BatchError::MaxBytesExceeded { limit }),
+            _ => Ok(self),
         }
-
-        self
     }
 
-    pub fn limit_max_events(self, limit: usize) -> Self {
-        if let Some(n) = self.max_events {
-            if n > limit {
-                return Self {
-                    max_events: Some(limit),
-                    ..self
-                };
-            }
+    pub fn limit_max_events(self, limit: usize) -> Result<Self, BatchError> {
+        match self.max_events {
+            Some(n) if n > limit => Err(BatchError::MaxEventsExceeded { limit }),
+            _ => Ok(self),
         }
-
-        self
     }
 
     pub fn into_batch_settings<T: Batch>(self) -> Result<BatchSettings<T>, BatchError> {

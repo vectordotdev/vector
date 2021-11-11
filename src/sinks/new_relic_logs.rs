@@ -141,7 +141,7 @@ impl NewRelicLogsConfig {
             NewRelicLogsRegion::Eu => Uri::from_static("https://log-api.eu.newrelic.com/log/v1"),
         };
 
-        let batch_settings = self.batch.validate()?.limit_max_bytes(MAX_PAYLOAD_SIZE);
+        let batch_settings = self.batch.validate()?.limit_max_bytes(MAX_PAYLOAD_SIZE)?;
 
         let tower = TowerRequestConfig { ..self.request };
 

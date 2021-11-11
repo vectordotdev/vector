@@ -92,7 +92,7 @@ impl SinkConfig for PubsubConfig {
         let batch_settings = self
             .batch
             .validate()?
-            .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)
+            .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)?
             .into_batch_settings()?;
         let request_settings = self.request.unwrap_with(&Default::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;

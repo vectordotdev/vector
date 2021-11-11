@@ -32,7 +32,7 @@ pub const MAX_PAYLOAD_EVENTS: usize = 500;
 pub struct KinesisFirehoseDefaultBatchSettings;
 
 impl SinkBatchSettings for KinesisFirehoseDefaultBatchSettings {
-    const MAX_EVENTS: Option<usize> = Some(500);
+    const MAX_EVENTS: Option<usize> = Some(MAX_PAYLOAD_EVENTS);
     const MAX_BYTES: Option<usize> = Some(MAX_PAYLOAD_SIZE);
     const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
 }
@@ -101,8 +101,8 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
         let batch_settings = self
             .batch
             .validate()?
-            .limit_max_bytes(MAX_PAYLOAD_SIZE)
-            .limit_max_events(MAX_PAYLOAD_EVENTS)
+            .limit_max_bytes(MAX_PAYLOAD_SIZE)?
+            .limit_max_events(MAX_PAYLOAD_EVENTS)?
             .into_batcher_settings()?;
 
         let request_limits = self.request.unwrap_with(&TowerRequestConfig::default());

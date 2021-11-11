@@ -75,7 +75,7 @@ inventory::submit! {
 impl_generate_config_from_default!(AzureMonitorLogsConfig);
 
 /// Max number of bytes in request body
-const MAX_BATCH_SIZE_MB: u64 = 30;
+const MAX_BATCH_SIZE: usize = 30 * 1024 * 1024;
 /// API endpoint for submitting logs
 const RESOURCE: &str = "/api/logs";
 /// JSON content type of logs
@@ -91,13 +91,11 @@ const API_VERSION: &str = "2016-04-01";
 #[typetag::serde(name = "azure_monitor_logs")]
 impl SinkConfig for AzureMonitorLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let batch_settings =
-            self.batch
-                .validate()?
-                .limit_max_bytes(bytesize::mb(MAX_BATCH_SIZE_MB).try_into().expect(
-                    "the max batch size should never exceed `usize` on platforms we support",
-                ))
-                .into_batch_settings()?;
+        let batch_settings = self
+            .batch
+            .validate()?
+            .limit_max_bytes(MAX_BATCH_SIZE)?
+            .into_batch_settings()?;
 
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(Some(tls_settings), &cx.proxy)?;

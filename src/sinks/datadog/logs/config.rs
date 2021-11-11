@@ -113,8 +113,8 @@ impl DatadogLogsConfig {
         let batch = self
             .batch
             .validate()?
-            .limit_max_bytes(BATCH_GOAL_BYTES)
-            .limit_max_events(BATCH_MAX_EVENTS)
+            .limit_max_bytes(BATCH_GOAL_BYTES)?
+            .limit_max_events(BATCH_MAX_EVENTS)?
             .into_batcher_settings()?;
 
         let service = ServiceBuilder::new()

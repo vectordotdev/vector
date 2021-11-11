@@ -116,7 +116,7 @@ impl SinkConfig for StackdriverConfig {
         let batch = self
             .batch
             .validate()?
-            .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)
+            .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)?
             .into_batch_settings()?;
         let request = self.request.unwrap_with(&TowerRequestConfig {
             rate_limit_num: Some(1000),

@@ -6,6 +6,7 @@ use crate::rusoto::RegionOrEndpoint;
 use crate::sinks::aws_kinesis_firehose::config::{
     KinesisFirehoseDefaultBatchSettings, MAX_PAYLOAD_EVENTS, MAX_PAYLOAD_SIZE,
 };
+use crate::sinks::util::batch::BatchError;
 use crate::sinks::util::encoding::EncodingConfig;
 use crate::sinks::util::encoding::StandardEncodings;
 use crate::sinks::util::{BatchConfig, Compression};
@@ -34,7 +35,13 @@ async fn check_batch_size() {
 
     let cx = SinkContext::new_test();
     let res = config.build(cx).await;
-    assert!(res.is_ok());
+
+    assert_eq!(
+        res.err().and_then(|e| e.downcast::<BatchError>().ok()),
+        Some(Box::new(BatchError::MaxBytesExceeded {
+            limit: MAX_PAYLOAD_SIZE
+        }))
+    );
 }
 
 #[tokio::test]
@@ -55,5 +62,11 @@ async fn check_batch_events() {
 
     let cx = SinkContext::new_test();
     let res = config.build(cx).await;
-    assert!(res.is_ok());
+
+    assert_eq!(
+        res.err().and_then(|e| e.downcast::<BatchError>().ok()),
+        Some(Box::new(BatchError::MaxEventsExceeded {
+            limit: MAX_PAYLOAD_EVENTS
+        }))
+    );
 }
