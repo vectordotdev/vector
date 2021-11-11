@@ -36,7 +36,7 @@ configuration: {
 			required: false
 			type: object: options: {
 				file: {
-					required: true
+					required:    true
 					description: "Configuration options for the file that provides the enrichment table."
 					type: object: options: {
 						path: {
@@ -45,9 +45,9 @@ configuration: {
 								supported.
 								"""
 							warnings: [
-								"In order to be used by Vector, the enrichment table file needs read-only permissions."
+								"In order to be used by Vector, the enrichment table file needs read-only permissions.",
 							]
-							required:    true
+							required: true
 							type: string: {
 								examples: [
 									"/data/info.csv",
@@ -58,23 +58,23 @@ configuration: {
 
 						encoding: {
 							description: "Configuration options for the encoding of the enrichment table's file."
-							required: true
+							required:    true
 							type: object: options: {
 								type: {
 									description: """
 										The encoding of the file. Currently, only [CSV](\(urls.csv)) is supported.
 										"""
-									required: false
-									common: true
+									required:    false
+									common:      true
 									type: string: default: "csv"
 								}
 
 								delimiter: {
 									description: "The delimiter used to separate fields in each row of the CSV file."
-									common: false
+									common:      false
 									required:    false
 									type: string: {
-										default:     ","
+										default: ","
 										examples: [ ":"]
 									}
 								}
@@ -88,7 +88,7 @@ configuration: {
 										by their numerical index.
 										"""
 									required: false
-									common: false
+									common:   false
 									type: bool: default: true
 								}
 							}
@@ -135,8 +135,8 @@ configuration: {
 
 								**Note**: the examples in this table are for 54 seconds after 2:37 am on December 1st, 2020 in Pacific Standard Time.
 								"""
-							required: false
-							common: true
+							required:    false
+							common:      true
 							type: object: {
 								examples: [
 									{
