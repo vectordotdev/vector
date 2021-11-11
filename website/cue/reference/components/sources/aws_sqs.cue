@@ -62,16 +62,16 @@ components: sources: aws_sqs: components._aws & {
 				unit:    "seconds"
 			}
 		}
-		client_concurrency: {
-			common: true
-			description: "How many clients are receiving / acking SQS messages. Increasing may allow higher throughput."
-			required: false
-			warnings: []
-			type: uint: {
-				default: "1 per CPU core"
-				unit: "# of clients"
-			}
-		}
+//		client_concurrency: {
+//			common: true
+//			description: "How many clients are receiving / acking SQS messages. Increasing may allow higher throughput. Note: the default is 1 / CPU core"
+//			required: false
+//			warnings: []
+//			type: uint: {
+//				default: 1
+//				unit: "# of clients"
+//			}
+//		}
 		queue_url: {
 			description: "The URL of the SQS queue to receive bucket notifications from."
 			required:    true
@@ -101,7 +101,7 @@ components: sources: aws_sqs: components._aws & {
 		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
 		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		sqs_delete_failed_total:              components.sources.internal_metrics.output.metrics.sqs_message_delete_failed_total
+		sqs_message_delete_failed_total:      components.sources.internal_metrics.output.metrics.sqs_message_delete_failed_total
 	}
 
 	how_it_works: {
