@@ -169,6 +169,7 @@ urls: {
 	encoding_charset_labels:                                  "https://encoding.spec.whatwg.org/#concept-encoding-get"
 	encoding_standard:                                        "https://encoding.spec.whatwg.org/"
 	endler_dev:                                               "https://endler.dev/"
+	enrichment_tables_concept:                                "/docs/reference/glossary/#enrichment-tables"
 	eof:                                                      "\(wikipedia)/wiki/End-of-file#EOF_character"
 	etsy:                                                     "https://www.etsy.com"
 	event_proto:                                              "\(vector_repo)/blob/master/lib/vector-core/proto/event.proto"

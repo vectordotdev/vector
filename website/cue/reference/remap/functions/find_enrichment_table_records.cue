@@ -1,44 +1,26 @@
 package metadata
 
 remap: functions: find_enrichment_table_records: {
-	category: "Enrichment"
+	category:    "Enrichment"
 	description: """
-		Searches an enrichment table for rows that match the given condition.
+		Searches an [enrichment table](\(urls.enrichment_tables_concept)) for rows that match the
+		provided condition.
 
-		The condition is specified as an object of field to value. The
-		given fields are searched with the enrichment table to find the
-		rows that match the given values. All fields must match.
-
-		There are currently two forms of search criteria:
-
-		1.  An exact match search. The given field must match the value
-		exactly (case sensitivity can be specified with a separate parameter
-		to the function.
-		An exact match search can use an index directly into the dataset so this
-		search should be cheap.
-
-		2. Date range search. The given field must be greater than or
-		equal to the `from` date and less than or equal to the `to` date.
-		It is worth noting that a date range search involves sequentially scanning
-		through the rows that have been located via any exact match criteria. This
-		can be an expensive operation if there are a large number of rows returned
-		by any exact match criteria. It is not recommended that the criteria only
-		involves date ranges unless the enrichment dataset is very small.
+		\(remap._enrichment_table_explainer)
 		"""
 
 	arguments: [
 		{
 			name:        "table"
-			description: "The enrichment table to search."
+			description: "The [enrichment table](\(urls.enrichment_tables_concept)) to search."
 			required:    true
 			type: ["string"]
 		},
 		{
 			name: "condition"
 			description: """
-				  The condition to search on. Since the condition is used at boot time
-				  to create indexes into the data, these conditions have to be statically
-				  defined.
+				The condition to search on. Since the condition is used at boot time to create
+				indices into the data, these conditions must be statically defined.
 				"""
 			required: true
 			type: ["object"]
@@ -46,15 +28,15 @@ remap: functions: find_enrichment_table_records: {
 		{
 			name: "select"
 			description: """
-					A subset of fields from the enrichment table to return. If not
-					specified all fields are returned.
+				A subset of fields from the enrichment table to return. If not specified,
+				all fields are returned.
 				"""
 			required: false
 			type: ["array"]
 		},
 		{
 			name:        "case_sensitive"
-			description: "Should text fields match case exactly."
+			description: "Whether text fields need to match cases exactly."
 			required:    false
 			type: ["boolean"]
 			default: true
@@ -67,20 +49,26 @@ remap: functions: find_enrichment_table_records: {
 		{
 			title: "Exact match"
 			source: #"""
-				      find_enrichment_table_records("csvfile",
-								{ "surname": "smith",
-								  "firstname": "John" },
-								case_sensitive: false)
+				find_enrichment_table_records("csvfile",
+				  {
+					"surname": "smith",
+					"firstname": "John"
+				  },
+				  case_sensitive: false)
 				"""#
 			return: true
 		},
 		{
 			title: "Date range search"
 			source: #"""
-				      find_enrichment_table_records("csvfile",
-								{ "surname": "Smith",
-								  "date_of_birth": { "from": t'1985-01-01',
-										   "to": t'1985-31-12'} })
+				find_enrichment_table_records("csvfile",
+				  {
+					"surname": "Smith",
+					"date_of_birth": {
+					  "from": t'1985-01-01',
+					  "to": t'1985-31-12'
+					}
+				  })
 				"""#
 			return: true
 		},
