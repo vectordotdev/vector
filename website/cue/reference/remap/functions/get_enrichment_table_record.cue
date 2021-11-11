@@ -60,7 +60,6 @@ remap: functions: get_enrichment_table_record: {
 				  },
 				  case_sensitive: false)
 				"""#
-			return: true
 			return: {"id": 2, "firstname": "Fred", "surname": "Smith"}
 		},
 		{
