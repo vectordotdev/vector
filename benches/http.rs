@@ -8,7 +8,7 @@ use std::net::SocketAddr;
 use tokio::runtime::Runtime;
 use vector::{
     config, sinks,
-    sinks::util::Compression,
+    sinks::util::{BatchConfig, Compression},
     sources,
     test_util::{next_addr, random_lines, runtime, send_lines, start_topology, wait_for_tcp},
     Error,

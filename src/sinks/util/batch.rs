@@ -31,15 +31,15 @@ pub trait SinkBatchSettings {
     const MAX_EVENTS: Option<usize>;
     const MAX_BYTES: Option<usize>;
 
-    // Per Nathan, once Rust 1.57 hits, implementations of this trait can do the following:
+    // Per Nathan, once Rust 1.57 hits, we can add a helper method, such as the following, that
+    // implementations can use to avoid the gross `unsafe` approach:
     //
     // const fn non_zero(val: u64) -> NonZeroU64 {
-    // match NonZeroU64::new(val) {
-    //    Some(x) => x,
-    //    None => panic!("Value must be non-zero!")
+    //     match NonZeroU64::new(val) {
+    //         Some(x) => x,
+    //         None => panic!("Value must be non-zero!")
+    //     }
     // }
-    //
-    // instead of the current `unsafe { NonZeroU64::new_unchecked(..) }` approach.
     const TIMEOUT_SECS: NonZeroU64;
 }
 
@@ -100,7 +100,9 @@ pub struct BatchConfig<D: SinkBatchSettings, S = Unmerged> {
     pub max_events: Option<usize>,
     pub timeout_secs: Option<u64>,
 
+    #[serde(skip)]
     _d: PhantomData<D>,
+    #[serde(skip)]
     _s: PhantomData<S>,
 }
 
