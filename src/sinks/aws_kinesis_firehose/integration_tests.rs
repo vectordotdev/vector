@@ -37,7 +37,7 @@ async fn firehose_put_records() {
 
     let config = KinesisFirehoseSinkConfig {
         stream_name: stream.clone(),
-        region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
+        region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
         encoding: EncodingConfig::from(StandardEncodings::Json), // required for ES destination w/ localstack
         compression: Compression::None,
         batch: BatchConfig {
