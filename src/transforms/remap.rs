@@ -643,20 +643,22 @@ mod tests {
             reroute_dropped: true,
             ..Default::default()
         };
-        let mut context = TransformContext::default();
-        context.key = Some(ComponentKey::from("remapper"));
+        let context = TransformContext {
+            key: Some(ComponentKey::from("remapper")),
+            ..Default::default()
+        };
         let mut tform = Remap::new(conf, &context).unwrap();
 
         let output = transform_one_fallible(&mut tform, happy).unwrap();
         let log = output.as_log();
         assert_eq!(log["hello"], "world".into());
         assert_eq!(log["foo"], "bar".into());
-        assert_eq!(log.contains("metadata"), false);
+        assert!(!log.contains("metadata"));
 
         let output = transform_one_fallible(&mut tform, abort).unwrap_err();
         let log = output.as_log();
         assert_eq!(log["hello"], "goodbye".into());
-        assert_eq!(log.contains("foo"), false);
+        assert!(!log.contains("foo"));
         assert_eq!(
             log["metadata"],
             serde_json::json!({
@@ -675,7 +677,7 @@ mod tests {
         let output = transform_one_fallible(&mut tform, error).unwrap_err();
         let log = output.as_log();
         assert_eq!(log["hello"], 42.into());
-        assert_eq!(log.contains("foo"), false);
+        assert!(!log.contains("foo"));
         assert_eq!(
             log["metadata"],
             serde_json::json!({
