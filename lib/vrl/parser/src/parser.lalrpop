@@ -253,9 +253,9 @@ Assignment: Node<Assignment> = {
     Sp<AssignmentInfallible>,
 };
 
-AssignmentOp: AssignmentOp = {
-    "=" => AssignmentOp::Assign,
-    "|=" => AssignmentOp::Merge,
+AssignmentOp: Node<AssignmentOp> = {
+    Sp<"="> => Node::new(<>.span(), AssignmentOp::Assign),
+    Sp<"|="> => Node::new(<>.span(), AssignmentOp::Merge),
 }
 
 AssignmentSingle: Assignment = {

@@ -742,13 +742,13 @@ impl FromStr for Opcode {
 pub enum Assignment {
     Single {
         target: Node<AssignmentTarget>,
-        op: AssignmentOp,
+        op: Node<AssignmentOp>,
         expr: Box<Node<Expr>>,
     },
     Infallible {
         ok: Node<AssignmentTarget>,
         err: Node<AssignmentTarget>,
-        op: AssignmentOp,
+        op: Node<AssignmentOp>,
         expr: Box<Node<Expr>>,
     },
     // TODO

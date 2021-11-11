@@ -197,6 +197,7 @@ impl<'a> Compiler<'a> {
         Predicate::new(Node::new(span, Block::new(exprs)), self.state)
     }
 
+    #[cfg(feature = "expr-op")]
     fn compile_op(&mut self, node: Node<ast::Op>) -> Op {
         let op = node.into_inner();
         let ast::Op(lhs, opcode, rhs) = op;
@@ -213,12 +214,23 @@ impl<'a> Compiler<'a> {
         })
     }
 
+    #[cfg(not(feature = "expr-op"))]
+    fn compile_op(&mut self, node: Node<ast::Op>) -> Noop {
+        let ast::Op(_, opcode, _) = node.into_inner();
+
+        self.handle_missing_feature_error(opcode.span(), "expr-op");
+
+        Noop
+    }
+
     /// Rewrites the ast for `a |= b` to be `a = a | b`.
+    #[cfg(feature = "expr-op")]
     fn rewrite_to_merge(
         &mut self,
-        span: diagnostic::Span,
+        span: Span,
         target: &Node<ast::AssignmentTarget>,
         expr: Box<Node<ast::Expr>>,
+        _: Span,
     ) -> Box<Node<Expr>> {
         Box::new(Node::new(
             span,
@@ -233,6 +245,19 @@ impl<'a> Compiler<'a> {
         ))
     }
 
+    #[cfg(not(feature = "expr-op"))]
+    fn rewrite_to_merge(
+        &mut self,
+        span: Span,
+        _: &Node<ast::AssignmentTarget>,
+        _: Box<Node<ast::Expr>>,
+        op_span: Span,
+    ) -> Box<Node<Expr>> {
+        self.handle_missing_feature_error(op_span, "expr-op");
+
+        Box::new(Node::new(span, Noop.into()))
+    }
+
     fn compile_assignment(&mut self, node: Node<ast::Assignment>) -> Assignment {
         use assignment::Variant;
         use ast::Assignment::*;
@@ -243,6 +268,7 @@ impl<'a> Compiler<'a> {
         let node = match assignment {
             Single { target, op, expr } => {
                 let span = expr.span();
+                let (op_span, op) = op.take();
 
                 match op {
                     AssignmentOp::Assign => {
@@ -252,13 +278,14 @@ impl<'a> Compiler<'a> {
                         Node::new(span, Variant::Single { target, expr })
                     }
                     AssignmentOp::Merge => {
-                        let expr = self.rewrite_to_merge(span, &target, expr);
+                        let expr = self.rewrite_to_merge(span, &target, expr, op_span);
                         Node::new(span, Variant::Single { target, expr })
                     }
                 }
             }
             Infallible { ok, err, op, expr } => {
                 let span = expr.span();
+                let (op_span, op) = op.take();
 
                 match op {
                     AssignmentOp::Assign => {
@@ -273,7 +300,7 @@ impl<'a> Compiler<'a> {
                         Node::new(span, node)
                     }
                     AssignmentOp::Merge => {
-                        let expr = self.rewrite_to_merge(span, &ok, expr);
+                        let expr = self.rewrite_to_merge(span, &ok, expr, op_span);
                         let node = Variant::Infallible {
                             ok,
                             err,

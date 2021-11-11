@@ -9,9 +9,11 @@ publish = false
 default = ["expressions"]
 expressions = [
   "expr-abort",
+  "expr-op",
   "expr-unary",
 ]
 expr-abort = []
+expr-op = []
 expr-unary = []
 
 [dependencies]
