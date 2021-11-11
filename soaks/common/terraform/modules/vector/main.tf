@@ -17,7 +17,6 @@ resource "kubernetes_service" "vector" {
   spec {
     selector = {
       type      = var.type
-      soak_test = kubernetes_deployment.vector.metadata.0.labels.soak_test
     }
     session_affinity = "ClientIP"
     port {
