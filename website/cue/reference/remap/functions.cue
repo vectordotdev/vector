@@ -65,9 +65,9 @@ remap: {
 		There are currently two forms of search criteria:
 
 		1. **Exact match search**. The given field must match the value exactly. Case sensitivity
-		   can be specified using the [`case_sensitive`](#case_sensitive) argument. An exact match
-		   search can use an index directly into the dataset, which should make this search
-		   fairly "cheap" from a performance perspective.
+		   can be specified using the `case_sensitive` argument. An exact match search can use an
+		   index directly into the dataset, which should make this search fairly "cheap" from a
+		   performance perspective.
 
 		2. **Date range search**. The given field must be greater than or equal to the `from` date
 		   and less than or equal to the `to` date. Note that a date range search involves
