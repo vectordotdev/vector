@@ -52,11 +52,12 @@ remap: functions: find_enrichment_table_records: {
 				find_enrichment_table_records!("test",
 				  {
 					"surname": "smith",
-					"firstname": "John"
 				  },
 				  case_sensitive: false)
 				"""#
-			return: [{"id": 1, "firstname": "Bob", "surname": "Smith"}]
+			return: [{"id": 1, "firstname": "Bob", "surname": "Smith"},
+				 {"id": 2, "firstname": "Fred", "surname": "Smith"}
+			        ]
 		},
 		{
 			title: "Date range search"
@@ -66,11 +67,13 @@ remap: functions: find_enrichment_table_records: {
 					"surname": "Smith",
 					"date_of_birth": {
 					  "from": t'1985-01-01T00:00:00Z',
-					  "to": t'1985-31-12T00:00:00Z'
+					  "to": t'1985-12-31T00:00:00Z'
 					}
 				  })
 				"""#
-			return: []
+			return: [{"id": 1, "firstname": "Bob", "surname": "Smith"},
+				 {"id": 2, "firstname": "Fred", "surname": "Smith"}
+			        ]
 		},
 	]
 }
