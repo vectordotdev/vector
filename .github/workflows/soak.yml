@@ -112,7 +112,7 @@ jobs:
         id: system
         run: |
           export SOAK_CPUS="7"
-          export SOAK_MEMORY="24g"
+          export SOAK_MEMORY="30g"
           export VECTOR_CPUS="4"
 
           echo "soak cpus total: ${SOAK_CPUS}"

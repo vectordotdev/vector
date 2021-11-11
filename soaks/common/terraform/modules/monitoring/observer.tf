@@ -52,7 +52,7 @@ resource "kubernetes_deployment" "observer" {
 
           volume_mount {
             mount_path = "/captures"
-            name = "captures"
+            name       = "captures"
           }
 
           volume_mount {
