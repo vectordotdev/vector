@@ -201,14 +201,14 @@ impl<D: SinkBatchSettings> BatchConfig<D, Merged> {
     pub fn into_batcher_settings(self) -> Result<BatcherSettings, BatchError> {
         let max_bytes = self
             .max_bytes
-            .map(|n| if n == 0 { usize::MAX } else { n })
             .and_then(NonZeroUsize::new)
+            .or_else(|| NonZeroUsize::new(usize::MAX))
             .expect("`max_bytes` should already be validated");
 
         let max_events = self
             .max_events
-            .map(|n| if n == 0 { usize::MAX } else { n })
             .and_then(NonZeroUsize::new)
+            .or_else(|| NonZeroUsize::new(usize::MAX))
             .expect("`max_bytes` should already be validated");
 
         // This is unfortunate since we technically have already made sure this isn't possible in
