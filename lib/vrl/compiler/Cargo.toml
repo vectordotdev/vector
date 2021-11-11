@@ -9,8 +9,10 @@ publish = false
 default = ["expressions"]
 expressions = [
   "expr-abort",
+  "expr-unary",
 ]
 expr-abort = []
+expr-unary = []
 
 [dependencies]
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }

@@ -9,8 +9,10 @@ publish = false
 default = ["expressions"]
 expressions = [
   "expr-abort",
+  "expr-unary",
 ]
 expr-abort = ["compiler/expr-abort"]
+expr-unary = ["compiler/expr-unary"]
 
 [dependencies]
 compiler = { package = "vrl-compiler", path = "../compiler", default-features = false }
