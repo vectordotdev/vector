@@ -26,6 +26,16 @@ pub enum BatchError {
 pub trait SinkBatchSettings {
     const MAX_EVENTS: Option<usize>;
     const MAX_BYTES: Option<usize>;
+
+    // Per Nathan, once Rust 1.57 hits, implementations of this trait can do the following:
+    //
+    // const fn non_zero(val: u64) -> NonZeroU64 {
+    // match NonZeroU64::new(val) {
+    //    Some(x) => x,
+    //    None => panic!("Value must be non-zero!")
+    // }
+    //
+    // instead of the current `unsafe { NonZeroU64::new_unchecked(..) }` approach.
     const TIMEOUT_SECS: NonZeroU64;
 }
 

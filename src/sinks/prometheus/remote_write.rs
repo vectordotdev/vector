@@ -11,7 +11,7 @@ use crate::{
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::HttpRetryLogic,
             EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
-            RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig,
+            RealtimeEventBasedDefaultBatchSettings, TowerRequestConfig,
         },
     },
     template::Template,
@@ -46,7 +46,7 @@ pub struct RemoteWriteConfig {
     pub quantiles: Vec<f64>,
 
     #[serde(default)]
-    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+    pub batch: BatchConfig<RealtimeEventBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
 

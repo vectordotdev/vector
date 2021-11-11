@@ -48,7 +48,6 @@ pub struct S3SinkConfig {
     pub compression: Compression,
     #[serde(default)]
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
-    //pub batch: BatchConfig<AwsS3BatchConfig>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     // Deprecated name. Moved to auth.

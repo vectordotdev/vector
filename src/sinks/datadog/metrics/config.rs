@@ -35,7 +35,7 @@ const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
 // conservative, though, we use 100K here.  This will also get a little more tricky when it comes to
 // distributions and sketches, but we're going to have to implement incremental encoding to handle
 // "we've exceeded our maximum payload size, split this batch" scenarios anyways.
-pub const MAXIMUM_PAYLOAD_COMPRESSED_SIZ: usize = 3_200_000;
+pub const MAXIMUM_PAYLOAD_COMPRESSED_SIZE: usize = 3_200_000;
 pub const MAXIMUM_PAYLOAD_SIZE: usize = 62_914_560;
 
 #[derive(Clone, Copy, Debug, Default)]

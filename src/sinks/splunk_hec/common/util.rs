@@ -21,7 +21,7 @@ pub struct SplunkHecDefaultBatchSettings;
 
 impl SinkBatchSettings for SplunkHecDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = None;
-    const MAX_BYTES: Option<usize> = Some(4_096_000);
+    const MAX_BYTES: Option<usize> = Some(1_000_000);
     const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
 }
 
