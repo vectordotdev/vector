@@ -73,7 +73,7 @@ components: sources: aws_sqs: components._aws & {
 //			}
 //		}
 		queue_url: {
-			description: "The URL of the SQS queue to receive bucket notifications from."
+			description: "The URL of the SQS queue to receive events from."
 			required:    true
 			warnings: []
 			type: string: {
@@ -93,6 +93,9 @@ components: sources: aws_sqs: components._aws & {
 					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
 					syntax: "literal"
 				}
+			}
+			timestamp: fields._current_timestamp & {
+				description: "The time this message was sent to SQS."
 			}
 		}
 	}
