@@ -33,6 +33,6 @@ impl<'a> InternalEvent for SqsMessageDeleteError<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("sqs_delete_failed_total", 1);
+        counter!("sqs_message_delete_failed_total", 1);
     }
 }
