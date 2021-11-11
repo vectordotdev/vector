@@ -38,7 +38,6 @@ module "vector" {
   source       = "../../../common/terraform/modules/vector"
   type         = var.type
   vector_image = var.vector_image
-  test_name    = "datadog_agent_remap_datadog_logs"
   vector-toml  = file("${path.module}/vector.toml")
   namespace    = kubernetes_namespace.soak.metadata[0].name
   vector_cpus  = var.vector_cpus

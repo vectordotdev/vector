@@ -41,7 +41,6 @@ resource "kubernetes_deployment" "vector" {
     namespace = var.namespace
     labels = {
       type      = var.type
-      soak_test = var.test_name
     }
   }
 
@@ -51,7 +50,6 @@ resource "kubernetes_deployment" "vector" {
     selector {
       match_labels = {
         type      = var.type
-        soak_test = var.test_name
       }
     }
 
@@ -59,7 +57,6 @@ resource "kubernetes_deployment" "vector" {
       metadata {
         labels = {
           type      = var.type
-          soak_test = var.test_name
         }
         annotations = {
           "prometheus.io/scrape" = true
