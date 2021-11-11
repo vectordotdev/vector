@@ -132,9 +132,8 @@ impl Remap {
             Event::Metric(ref mut metric) => {
                 let m = log_schema().metadata_key();
                 metric.insert_tag(format!("{}.dropped.reason", m), reason.into());
-                metric.insert_tag(format!("{}.dropped.message", m), error.to_string());
                 metric.insert_tag(
-                    "dropped.component_id".into(),
+                    format!("{}.dropped.component_id", m),
                     self.component_key
                         .as_ref()
                         .map(ToString::to_string)
@@ -567,5 +566,189 @@ mod tests {
                 }))
             )
         );
+    }
+
+    #[test]
+    fn check_remap_branching() {
+        let happy = Event::try_from(serde_json::json!({"hello": "world"})).unwrap();
+        let abort = Event::try_from(serde_json::json!({"hello": "goodbye"})).unwrap();
+        let error = Event::try_from(serde_json::json!({"hello": 42})).unwrap();
+
+        let happy_metric = {
+            let mut metric = Metric::new(
+                "counter",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            );
+            metric.insert_tag("hello".into(), "world".into());
+            Event::Metric(metric)
+        };
+
+        let abort_metric = {
+            let mut metric = Metric::new(
+                "counter",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            );
+            metric.insert_tag("hello".into(), "goodbye".into());
+            Event::Metric(metric)
+        };
+
+        let error_metric = {
+            let mut metric = Metric::new(
+                "counter",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            );
+            metric.insert_tag("not_hello".into(), "oops".into());
+            Event::Metric(metric)
+        };
+
+        let conf = RemapConfig {
+            source: Some(formatdoc! {r#"
+                if exists(.tags) {{
+                    # metrics
+                    .tags.foo = "bar"
+                    if string!(.tags.hello) == "goodbye" {{
+                      abort
+                    }}
+                }} else {{
+                    # logs
+                    .foo = "bar"
+                    if string!(.hello) == "goodbye" {{
+                      abort
+                    }}
+                }}
+            "#}),
+            file: None,
+            timezone: TimeZone::default(),
+            drop_on_error: true,
+            drop_on_abort: true,
+        };
+        let mut context = TransformContext::default();
+        context.key = Some(ComponentKey::from("remapper"));
+        let mut tform = Remap::new(conf, &context).unwrap();
+
+        let output = transform_one_fallible(&mut tform, happy).unwrap();
+        let log = output.as_log();
+        assert_eq!(log["hello"], "world".into());
+        assert_eq!(log["foo"], "bar".into());
+        assert_eq!(log.contains("metadata"), false);
+
+        let output = transform_one_fallible(&mut tform, abort).unwrap_err();
+        let log = output.as_log();
+        assert_eq!(log["hello"], "goodbye".into());
+        assert_eq!(log.contains("foo"), false);
+        assert_eq!(
+            log["metadata"],
+            serde_json::json!({
+                "dropped": {
+                    "reason": "abort",
+                    "message": "aborted",
+                    "component_id": "remapper",
+                    "component_type": "remap",
+                    "component_kind": "transform",
+                }
+            })
+            .try_into()
+            .unwrap()
+        );
+
+        let output = transform_one_fallible(&mut tform, error).unwrap_err();
+        let log = output.as_log();
+        assert_eq!(log["hello"], 42.into());
+        assert_eq!(log.contains("foo"), false);
+        assert_eq!(
+            log["metadata"],
+            serde_json::json!({
+                "dropped": {
+                    "reason": "error",
+                    "message": "function call error for \"string\" at (160:175): expected \"string\", got \"integer\"",
+                    "component_id": "remapper",
+                    "component_type": "remap",
+                    "component_kind": "transform",
+                }
+            })
+            .try_into()
+            .unwrap()
+        );
+
+        let output = transform_one_fallible(&mut tform, happy_metric).unwrap();
+        pretty_assertions::assert_eq!(
+            output,
+            Event::Metric(
+                Metric::new(
+                    "counter",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 1.0 },
+                )
+                .with_tags(Some({
+                    let mut tags = BTreeMap::new();
+                    tags.insert("hello".into(), "world".into());
+                    tags.insert("foo".into(), "bar".into());
+                    tags
+                }))
+            )
+        );
+
+        let output = transform_one_fallible(&mut tform, abort_metric).unwrap_err();
+        pretty_assertions::assert_eq!(
+            output,
+            Event::Metric(
+                Metric::new(
+                    "counter",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 1.0 },
+                )
+                .with_tags(Some({
+                    let mut tags = BTreeMap::new();
+                    tags.insert("hello".into(), "goodbye".into());
+                    tags.insert("metadata.dropped.reason".into(), "abort".into());
+                    tags.insert("metadata.dropped.component_id".into(), "remapper".into());
+                    tags.insert("metadata.dropped.component_type".into(), "remap".into());
+                    tags.insert("metadata.dropped.component_kind".into(), "transform".into());
+                    tags
+                }))
+            )
+        );
+
+        let output = transform_one_fallible(&mut tform, error_metric).unwrap_err();
+        pretty_assertions::assert_eq!(
+            output,
+            Event::Metric(
+                Metric::new(
+                    "counter",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 1.0 },
+                )
+                .with_tags(Some({
+                    let mut tags = BTreeMap::new();
+                    tags.insert("not_hello".into(), "oops".into());
+                    tags.insert("metadata.dropped.reason".into(), "error".into());
+                    tags.insert("metadata.dropped.component_id".into(), "remapper".into());
+                    tags.insert("metadata.dropped.component_type".into(), "remap".into());
+                    tags.insert("metadata.dropped.component_kind".into(), "transform".into());
+                    tags
+                }))
+            )
+        );
+    }
+
+    fn transform_one_fallible(
+        ft: &mut dyn FallibleFunctionTransform,
+        event: Event,
+    ) -> std::result::Result<Event, Event> {
+        let mut buf = Vec::with_capacity(1);
+        let mut err_buf = Vec::with_capacity(1);
+
+        ft.transform(&mut buf, &mut err_buf, event);
+
+        assert!(buf.len() < 2);
+        assert!(err_buf.len() < 2);
+        match (buf.pop(), err_buf.pop()) {
+            (Some(good), None) => Ok(good),
+            (None, Some(bad)) => Err(bad),
+            (a, b) => panic!("expected output xor error output, got {:?} and {:?}", a, b),
+        }
     }
 }
