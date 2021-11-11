@@ -15,8 +15,8 @@ use std::fs::File;
 use std::io::{self, Read};
 use std::path::PathBuf;
 use vrl::diagnostic::Formatter;
+use vrl::prelude::ExpressionError;
 use vrl::{Program, Runtime, Terminate};
-use vrl_compiler::ExpressionError;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
