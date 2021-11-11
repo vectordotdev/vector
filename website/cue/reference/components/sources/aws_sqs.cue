@@ -39,8 +39,8 @@ components: sources: aws_sqs: components._aws & {
 		}
 		requirements: [
 			"""
-				The AWS SQS source requires an SQS queue.
-			""",
+					The AWS SQS source requires an SQS queue.
+				""",
 		]
 		warnings: []
 		notices: []
@@ -62,16 +62,16 @@ components: sources: aws_sqs: components._aws & {
 				unit:    "seconds"
 			}
 		}
-//		client_concurrency: {
-//			common: true
-//			description: "How many clients are receiving / acking SQS messages. Increasing may allow higher throughput. Note: the default is 1 / CPU core"
-//			required: false
-//			warnings: []
-//			type: uint: {
-//				default: 1
-//				unit: "# of clients"
-//			}
-//		}
+		//  client_concurrency: {
+		//   common: true
+		//   description: "How many clients are receiving / acking SQS messages. Increasing may allow higher throughput. Note: the default is 1 / CPU core"
+		//   required: false
+		//   warnings: []
+		//   type: uint: {
+		//    default: 1
+		//    unit: "# of clients"
+		//   }
+		//  }
 		queue_url: {
 			description: "The URL of the SQS queue to receive events from."
 			required:    true
@@ -110,7 +110,7 @@ components: sources: aws_sqs: components._aws & {
 	how_it_works: {
 		aws_sqs: {
 			title: "AWS SQS"
-			body:  """
+			body: """
 				The `aws_sqs` source receives messages from [AWS SQS](https://aws.amazon.com/sqs/)
 				(Simple Queue Service). This is a highly scaleable / durable queueing system with
 				at-least-once queuing semantics. Messages are received in batches (up to 10 at a time),
