@@ -49,28 +49,28 @@ remap: functions: find_enrichment_table_records: {
 		{
 			title: "Exact match"
 			source: #"""
-				find_enrichment_table_records("csvfile",
+				find_enrichment_table_records!("test",
 				  {
 					"surname": "smith",
 					"firstname": "John"
 				  },
 				  case_sensitive: false)
 				"""#
-			return: true
+			return: [{"id": 1, "firstname": "Bob", "surname": "Smith"}]
 		},
 		{
 			title: "Date range search"
 			source: #"""
-				find_enrichment_table_records("csvfile",
+				find_enrichment_table_records!("test",
 				  {
 					"surname": "Smith",
 					"date_of_birth": {
-					  "from": t'1985-01-01',
-					  "to": t'1985-31-12'
+					  "from": t'1985-01-01T00:00:00Z',
+					  "to": t'1985-31-12T00:00:00Z'
 					}
 				  })
 				"""#
-			return: true
+			return: []
 		},
 	]
 }
