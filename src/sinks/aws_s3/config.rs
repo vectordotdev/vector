@@ -1,7 +1,7 @@
 use crate::config::SinkContext;
 use crate::sinks::s3_common::sink::S3Sink;
 use crate::sinks::util::encoding::StandardEncodings;
-use crate::sinks::util::BatchSettings;
+use crate::sinks::util::BulkSizeBasedDefaultBatchSettings;
 use crate::{
     config::{DataType, GenerateConfig, ProxyConfig, SinkConfig},
     rusoto::{AwsAuthentication, RegionOrEndpoint},
@@ -27,23 +27,9 @@ use vector_core::sink::VectorSink;
 use super::sink::S3RequestOptions;
 use crate::sinks::util::partitioner::KeyPartitioner;
 
-//const DEFAULT_BATCH_SETTINGS: BatchSettings<()> =
-//BatchSettings::with_bytes(10_000_000, std::time::Duration::from_secs(300));
-
-//const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = BatchSettings::new(
-//BatchSettings::Event(1000),
-//BatchSettings::Bytes(10_000_000),
-//std::time::Duration::from_secs(300),
-//);
-
-#[derive(Copy, Clone)]
-pub struct AwsS3BatchConfig;
-
-impl BatchConfigSettings for AwsS3BatchConfig {
-    const MAX_EVENTS: Option<usize> = None;
-    const MAX_BYTES: Option<usize> = 10_000_000;
-    const TIMEOUT: Duration = Duration::from_secs(300);
-}
+const DEFAULT_KEY_PREFIX: &str = "date=%F/";
+const DEFAULT_FILENAME_TIME_FORMAT: &str = "%s";
+const DEFAULT_FILENAME_APPEND_UUID: bool = true;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -61,7 +47,7 @@ pub struct S3SinkConfig {
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
     //pub batch: BatchConfig<AwsS3BatchConfig>,
     #[serde(default)]
     pub request: TowerRequestConfig,
@@ -127,9 +113,7 @@ impl S3SinkConfig {
             .service(service);
 
         // Configure our partitioning/batching.
-        let batch_settings = DEFAULT_BATCH_SETTINGS
-            .parse_config(self.batch)?
-            .into_batcher_settings()?;
+        let batch_settings = self.batch.into_batcher_settings()?;
         let key_prefix = self
             .key_prefix
             .as_ref()

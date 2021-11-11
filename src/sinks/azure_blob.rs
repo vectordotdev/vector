@@ -21,8 +21,8 @@ use crate::{
         },
         util::{
             encoding::EncodingConfig, encoding::StandardEncodings, partitioner::KeyPartitioner,
-            BatchConfig, BatchSettings, Compression, RequestBuilder, ServiceBuilderExt,
-            TowerRequestConfig,
+            BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder,
+            ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -41,7 +41,7 @@ pub struct AzureBlobSinkConfig {
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
 }
@@ -91,12 +91,6 @@ impl SinkConfig for AzureBlobSinkConfig {
 const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
     TowerRequestConfig::const_default().rate_limit_num(250);
 
-const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = {
-    BatchSettings::const_default()
-        .bytes(10_000_000)
-        .timeout(300)
-};
-
 const DEFAULT_KEY_PREFIX: &str = "blob/%F/";
 const DEFAULT_FILENAME_TIME_FORMAT: &str = "%s";
 const DEFAULT_FILENAME_APPEND_UUID: bool = true;
@@ -113,9 +107,7 @@ impl AzureBlobSinkConfig {
             .service(AzureBlobService::new(client));
 
         // Configure our partitioning/batching.
-        let batcher_settings = DEFAULT_BATCH_SETTINGS
-            .parse_config(self.batch)?
-            .into_batcher_settings()?;
+        let batcher_settings = self.batch.into_batcher_settings()?;
 
         let blob_time_format = self
             .blob_time_format

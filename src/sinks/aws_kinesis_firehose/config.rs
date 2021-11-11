@@ -1,3 +1,5 @@
+use std::num::NonZeroU64;
+
 use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext};
 use crate::rusoto;
 use crate::rusoto::{AwsAuthentication, RegionOrEndpoint};
@@ -7,7 +9,7 @@ use crate::sinks::aws_kinesis_firehose::sink::KinesisSink;
 use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
 use crate::sinks::util::retries::RetryLogic;
 use crate::sinks::util::{
-    BatchConfig, BatchSettings, Compression, ServiceBuilderExt, TowerRequestConfig,
+    BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
 };
 use futures::FutureExt;
 use rusoto_core::RusotoError;
@@ -26,6 +28,15 @@ use tower::ServiceBuilder;
 pub const MAX_PAYLOAD_SIZE: usize = 1024 * 1024 * 4;
 pub const MAX_PAYLOAD_EVENTS: usize = 500;
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct KinesisFirehoseDefaultBatchSettings;
+
+impl SinkBatchSettings for KinesisFirehoseDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(500);
+    const MAX_BYTES: Option<usize> = Some(MAX_PAYLOAD_SIZE);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct KinesisFirehoseSinkConfig {
@@ -36,7 +47,7 @@ pub struct KinesisFirehoseSinkConfig {
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<KinesisFirehoseDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     // Deprecated name. Moved to auth.
@@ -87,19 +98,11 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
         let client = self.create_client(&cx.proxy)?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
 
-        if self.batch.max_bytes.unwrap_or_default() > MAX_PAYLOAD_SIZE {
-            return Err(Box::new(BuildError::BatchMaxSize));
-        }
-
-        if self.batch.max_events.unwrap_or_default() > MAX_PAYLOAD_EVENTS {
-            return Err(Box::new(BuildError::BatchMaxEvents));
-        }
-
-        let batch_settings = BatchSettings::<()>::default()
-            .bytes(4_000_000)
-            .events(500)
-            .timeout(1)
-            .parse_config(self.batch)?
+        let batch_settings = self
+            .batch
+            .validate()?
+            .limit_max_bytes(MAX_PAYLOAD_SIZE)
+            .limit_max_events(MAX_PAYLOAD_EVENTS)
             .into_batcher_settings()?;
 
         let request_limits = self.request.unwrap_with(&TowerRequestConfig::default());

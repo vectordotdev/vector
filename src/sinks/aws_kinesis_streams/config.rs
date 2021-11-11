@@ -1,10 +1,11 @@
 use std::convert::TryInto;
+use std::num::NonZeroU64;
 
 use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext};
 use crate::rusoto::{AwsAuthentication, RegionOrEndpoint};
 use crate::sinks::aws_kinesis_streams::service::KinesisService;
 use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
-use crate::sinks::util::{BatchConfig, BatchSettings, Compression, TowerRequestConfig};
+use crate::sinks::util::{BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig};
 use futures::FutureExt;
 use rusoto_core::RusotoError;
 use rusoto_kinesis::{DescribeStreamInput, Kinesis, KinesisClient, PutRecordsError};
@@ -35,6 +36,15 @@ enum HealthcheckError {
     NoMatchingStreamName { stream_name: String },
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct KinesisDefaultBatchSettings;
+
+impl SinkBatchSettings for KinesisDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(500);
+    const MAX_BYTES: Option<usize> = Some(5_000_000);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct KinesisSinkConfig {
@@ -46,7 +56,7 @@ pub struct KinesisSinkConfig {
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<KinesisDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     // Deprecated name. Moved to auth.
@@ -96,12 +106,7 @@ impl SinkConfig for KinesisSinkConfig {
         let client = self.create_client(&cx.proxy)?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
 
-        let batch_settings = BatchSettings::<()>::default()
-            .bytes(5_000_000)
-            .events(500)
-            .timeout(1)
-            .parse_config(self.batch)?
-            .into_batcher_settings()?;
+        let batch_settings = self.batch.into_batcher_settings()?;
 
         let request_limits = self.request.unwrap_with(&TowerRequestConfig::default());
 

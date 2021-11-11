@@ -1,16 +1,20 @@
+use std::num::NonZeroU64;
+
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     http::HttpClient,
     sinks::util::{
         http::{BatchedHttpSink, HttpSink},
-        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
+        BatchConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
     },
 };
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+
+use super::util::SinkBatchSettings;
 
 lazy_static::lazy_static! {
     static ref HOST: Uri = Uri::from_static("https://api.honeycomb.io/1/batch");
@@ -25,15 +29,20 @@ pub struct HoneycombConfig {
     dataset: String,
 
     #[serde(default)]
-    batch: BatchConfig<HoneycombBatchDefaultBatchSettings>,
+    batch: BatchConfig<HoneycombDefaultBatchSettings>,
 
     #[serde(default)]
     request: TowerRequestConfig,
 }
 
-struct HoneycombBatchDefaultBatchSettings;
+#[derive(Clone, Copy, Debug, Default)]
+struct HoneycombDefaultBatchSettings;
 
-// impl with defaults
+impl SinkBatchSettings for HoneycombDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = None;
+    const MAX_BYTES: Option<usize> = Some(100_000);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+}
 
 inventory::submit! {
     SinkDescription::new::<HoneycombConfig>("honeycomb")
@@ -57,13 +66,9 @@ impl SinkConfig for HoneycombConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-        //let batch_settings = BatchSettings::default()
-        //.bytes(100_000)
-        //.timeout(1)
-        //.parse_config(self.batch)?;
-        let batch_settings = self.batch.build()?;
+        let batch_settings = self.batch.into_batch_settings()?;
 
-        let buffer = JsonArrayBuffer::new(batch_settings.size)?;
+        let buffer = JsonArrayBuffer::new(batch_settings.size);
 
         let client = HttpClient::new(None, cx.proxy())?;
 

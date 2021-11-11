@@ -4,7 +4,10 @@ use crate::{
         DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, TransformConfig,
         TransformContext,
     },
-    sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
+    sinks::{
+        splunk_hec::common::SplunkHecDefaultBatchSettings,
+        util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
+    },
     sinks::{Healthcheck, VectorSink},
     template::Template,
     tls::TlsOptions,
@@ -39,7 +42,7 @@ pub struct HumioMetricsConfig {
     #[serde(default)]
     request: TowerRequestConfig,
     #[serde(default)]
-    batch: BatchConfig,
+    batch: BatchConfig<SplunkHecDefaultBatchSettings>,
     tls: Option<TlsOptions>,
     // The above settings are copied from HumioLogsConfig. In theory we should do below:
     //

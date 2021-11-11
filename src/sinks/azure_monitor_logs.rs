@@ -6,13 +6,12 @@ use crate::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpSink},
-            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
+            BatchConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
     tls::{TlsOptions, TlsSettings},
 };
-use bytesize::ByteSize;
 use futures::{FutureExt, SinkExt};
 use http::{
     header, header::HeaderMap, header::HeaderName, header::HeaderValue, Request, StatusCode, Uri,
@@ -23,6 +22,8 @@ use openssl::{base64, hash, pkey, sign};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+
+use super::util::batch::RealtimeSizeBasedDefaultBatchSettings;
 
 fn default_host() -> String {
     "ods.opinsights.azure.com".into()
@@ -43,7 +44,7 @@ pub struct AzureMonitorLogsConfig {
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
@@ -90,21 +91,11 @@ const API_VERSION: &str = "2016-04-01";
 #[typetag::serde(name = "azure_monitor_logs")]
 impl SinkConfig for AzureMonitorLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let batch_settings = BatchSettings::default()
-            .bytes(5_000_000)
-            .timeout(1)
-            .parse_config(self.batch)?;
-
-        let batch_bytes = batch_settings.size.bytes as u64;
-
-        if batch_bytes > bytesize::mb(MAX_BATCH_SIZE_MB) {
-            return Err(format!(
-                "provided batch size is too big for Azure Monitor: {}, max is {}",
-                ByteSize::b(batch_bytes),
-                ByteSize::mb(MAX_BATCH_SIZE_MB)
-            )
-            .into());
-        }
+        let batch_settings = self
+            .batch
+            .validate()?
+            .limit_max_bytes(bytesize::mb(MAX_BATCH_SIZE_MB).try_into().unwrap())
+            .into_batch_settings()?;
 
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(Some(tls_settings), &cx.proxy)?;

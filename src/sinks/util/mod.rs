@@ -29,7 +29,11 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::borrow::Cow;
 
-pub use batch::{Batch, BatchConfig, BatchSettings, BatchSize, PushResult};
+pub use batch::{
+    Batch, BatchConfig, BatchSettings, BatchSize, BulkSizeBasedDefaultBatchSettings, Merged,
+    NoDefaultsBatchSettings, PushResult, RealtimeEventBasedDefaultBatchSettings,
+    RealtimeSizeBasedDefaultBatchSettings, SinkBatchSettings, Unmerged,
+};
 pub use buffer::json::{BoxedRawValue, JsonArrayBuffer};
 pub use buffer::partition::Partition;
 pub use buffer::vec::{EncodedLength, VecBuffer};

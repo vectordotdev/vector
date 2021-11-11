@@ -4,7 +4,7 @@ use super::*;
 use crate::config::{SinkConfig, SinkContext};
 use crate::rusoto::RegionOrEndpoint;
 use crate::sinks::aws_kinesis_firehose::config::{
-    BuildError, MAX_PAYLOAD_EVENTS, MAX_PAYLOAD_SIZE,
+    KinesisFirehoseDefaultBatchSettings, MAX_PAYLOAD_EVENTS, MAX_PAYLOAD_SIZE,
 };
 use crate::sinks::util::encoding::EncodingConfig;
 use crate::sinks::util::encoding::StandardEncodings;
@@ -17,15 +17,16 @@ fn generate_config() {
 
 #[tokio::test]
 async fn check_batch_size() {
+    // Sink builder should limit the batch size to the upper bound.
+    let mut batch = BatchConfig::<KinesisFirehoseDefaultBatchSettings>::default();
+    batch.max_bytes = Some(MAX_PAYLOAD_SIZE + 1);
+
     let config = KinesisFirehoseSinkConfig {
         stream_name: String::from("test"),
         region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
         encoding: EncodingConfig::from(StandardEncodings::Json),
         compression: Compression::None,
-        batch: BatchConfig {
-            max_bytes: Some(MAX_PAYLOAD_SIZE + 1),
-            ..Default::default()
-        },
+        batch,
         request: Default::default(),
         assume_role: None,
         auth: Default::default(),
@@ -33,24 +34,20 @@ async fn check_batch_size() {
 
     let cx = SinkContext::new_test();
     let res = config.build(cx).await;
-
-    assert_eq!(
-        res.err().and_then(|e| e.downcast::<BuildError>().ok()),
-        Some(Box::new(BuildError::BatchMaxSize))
-    );
+    assert!(res.is_ok());
 }
 
 #[tokio::test]
 async fn check_batch_events() {
+    let mut batch = BatchConfig::<KinesisFirehoseDefaultBatchSettings>::default();
+    batch.max_events = Some(MAX_PAYLOAD_EVENTS + 1);
+
     let config = KinesisFirehoseSinkConfig {
         stream_name: String::from("test"),
         region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
         encoding: EncodingConfig::from(StandardEncodings::Json),
         compression: Compression::None,
-        batch: BatchConfig {
-            max_events: Some(MAX_PAYLOAD_EVENTS + 1),
-            ..Default::default()
-        },
+        batch,
         request: Default::default(),
         assume_role: None,
         auth: Default::default(),
@@ -58,9 +55,5 @@ async fn check_batch_events() {
 
     let cx = SinkContext::new_test();
     let res = config.build(cx).await;
-
-    assert_eq!(
-        res.err().and_then(|e| e.downcast::<BuildError>().ok()),
-        Some(Box::new(BuildError::BatchMaxEvents))
-    );
+    assert!(res.is_ok());
 }

@@ -8,7 +8,7 @@ use crate::{
     internal_events::TemplateRenderingFailed,
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
-        batch::{BatchConfig, BatchSettings},
+        batch::BatchConfig,
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
         Compression, EncodedEvent, EncodedLength, PartitionBatchSink, PartitionBuffer,
@@ -29,6 +29,7 @@ use std::{
     collections::HashMap,
     convert::TryInto,
     fmt,
+    num::NonZeroU64,
     task::{Context, Poll},
 };
 use tokio::sync::oneshot;
@@ -40,6 +41,8 @@ use tower::{
     Service, ServiceBuilder, ServiceExt,
 };
 use vector_core::ByteSizeOf;
+
+use super::util::SinkBatchSettings;
 
 // Estimated maximum size of InputLogEvent with an empty message
 const EVENT_SIZE_OVERHEAD: usize = 50;
@@ -73,7 +76,7 @@ pub struct CloudwatchLogsSinkConfig {
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<CloudwatchLogsDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     // Deprecated name. Moved to auth.
@@ -84,6 +87,15 @@ pub struct CloudwatchLogsSinkConfig {
 
 inventory::submit! {
     SinkDescription::new::<CloudwatchLogsSinkConfig>("aws_cloudwatch_logs")
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CloudwatchLogsDefaultBatchSettings;
+
+impl SinkBatchSettings for CloudwatchLogsDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(10_000);
+    const MAX_BYTES: Option<usize> = Some(1_048_576);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
 }
 
 impl GenerateConfig for CloudwatchLogsSinkConfig {
@@ -175,11 +187,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let batch = BatchSettings::default()
-            .bytes(1_048_576)
-            .events(10_000)
-            .timeout(1)
-            .parse_config(self.batch)?;
+        let batch_settings = self.batch.into_batch_settings()?;
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
 
         let log_group = self.group_name.clone();
@@ -192,8 +200,8 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         );
 
         let encoding = self.encoding.clone();
-        let buffer = PartitionBuffer::new(VecBuffer::new(batch.size));
-        let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
+        let buffer = PartitionBuffer::new(VecBuffer::new(batch_settings.size));
+        let sink = PartitionBatchSink::new(svc, buffer, batch_settings.timeout, cx.acker())
             .sink_map_err(|error| error!(message = "Fatal cloudwatchlogs sink error.", %error))
             .with_flat_map(move |event| {
                 stream::iter(partition_encode(event, &encoding, &log_group, &log_stream)).map(Ok)
@@ -1113,6 +1121,9 @@ mod integration_tests {
         let stream_name = gen_name();
         let group_name = gen_name();
 
+        let mut batch = BatchConfig::default();
+        batch.max_events = Some(2);
+
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from(stream_name.as_str()).unwrap(),
             group_name: Template::try_from(group_name.as_str()).unwrap(),
@@ -1121,10 +1132,7 @@ mod integration_tests {
             create_missing_group: None,
             create_missing_stream: None,
             compression: Default::default(),
-            batch: BatchConfig {
-                max_events: Some(2),
-                ..Default::default()
-            },
+            batch,
             request: Default::default(),
             assume_role: None,
             auth: Default::default(),

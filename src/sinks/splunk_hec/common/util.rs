@@ -1,7 +1,13 @@
+use std::num::NonZeroU64;
+
 use crate::{
     http::HttpClient,
     internal_events::TemplateRenderingFailed,
-    sinks::{self, util::Compression, UriParseError},
+    sinks::{
+        self,
+        util::{Compression, SinkBatchSettings},
+        UriParseError,
+    },
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
@@ -9,6 +15,15 @@ use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use snafu::{ResultExt, Snafu};
 use vector_core::{config::proxy::ProxyConfig, event::EventRef};
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SplunkHecDefaultBatchSettings;
+
+impl SinkBatchSettings for SplunkHecDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = None;
+    const MAX_BYTES: Option<usize> = Some(4_096_000);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+}
 
 #[derive(Debug, Snafu)]
 pub enum HealthcheckError {

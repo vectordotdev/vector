@@ -6,7 +6,7 @@ use crate::{
     },
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
-        batch::{BatchConfig, BatchSettings},
+        batch::BatchConfig,
         buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
         retries::RetryLogic,
         Compression, EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
@@ -23,15 +23,27 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     convert::TryInto,
+    num::NonZeroU64,
     task::{Context, Poll},
 };
 use tower::Service;
 use vector_core::ByteSizeOf;
 
+use super::util::SinkBatchSettings;
+
 #[derive(Clone)]
 pub struct CloudWatchMetricsSvc {
     client: CloudWatchClient,
     config: CloudWatchMetricsSinkConfig,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CloudWatchMetricsDefaultBatchSettings;
+
+impl SinkBatchSettings for CloudWatchMetricsDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(20);
+    const MAX_BYTES: Option<usize> = None;
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -44,7 +56,7 @@ pub struct CloudWatchMetricsSinkConfig {
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<CloudWatchMetricsDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     // Deprecated name. Moved to auth.
@@ -126,10 +138,7 @@ impl CloudWatchMetricsSvc {
         cx: SinkContext,
     ) -> crate::Result<super::VectorSink> {
         let default_namespace = config.default_namespace.clone();
-        let batch = BatchSettings::default()
-            .events(20)
-            .timeout(1)
-            .parse_config(config.batch)?;
+        let batch = config.batch.into_batch_settings()?;
         let request = config.request.unwrap_with(&TowerRequestConfig {
             timeout_secs: Some(30),
             rate_limit_num: Some(150),

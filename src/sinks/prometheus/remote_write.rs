@@ -7,11 +7,11 @@ use crate::{
     sinks::{
         self,
         util::{
-            batch::{BatchConfig, BatchSettings},
+            batch::BatchConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::HttpRetryLogic,
             EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
-            TowerRequestConfig,
+            RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig,
         },
     },
     template::Template,
@@ -46,7 +46,7 @@ pub struct RemoteWriteConfig {
     pub quantiles: Vec<f64>,
 
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
 
@@ -73,10 +73,7 @@ impl SinkConfig for RemoteWriteConfig {
     ) -> crate::Result<(sinks::VectorSink, sinks::Healthcheck)> {
         let endpoint = self.endpoint.parse::<Uri>().context(sinks::UriParseError)?;
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let batch = BatchSettings::default()
-            .events(1_000)
-            .timeout(1)
-            .parse_config(self.batch)?;
+        let batch = self.batch.into_batch_settings()?;
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let buckets = self.buckets.clone();
         let quantiles = self.quantiles.clone();

@@ -20,6 +20,9 @@ const USERNAME: &str = "admin";
 const PASSWORD: &str = "password";
 
 async fn config() -> HecMetricsSinkConfig {
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(10);
+
     HecMetricsSinkConfig {
         default_namespace: None,
         token: get_token().await,
@@ -29,10 +32,7 @@ async fn config() -> HecMetricsSinkConfig {
         sourcetype: None,
         source: None,
         compression: Compression::None,
-        batch: BatchConfig {
-            max_events: Some(10),
-            ..Default::default()
-        },
+        batch,
         request: TowerRequestConfig::default(),
         tls: None,
     }

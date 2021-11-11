@@ -388,11 +388,14 @@ mod tests {
             })
         };
 
-        let batch = BatchSettings::default().bytes(9999).events(10);
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.bytes = 9999;
+        batch_settings.size.events = 10;
+
         let mut sink = settings.partition_sink(
             RetryAlways,
             svc,
-            PartitionBuffer::new(VecBuffer::new(batch.size)),
+            PartitionBuffer::new(VecBuffer::new(batch_settings.size)),
             TIMEOUT,
             acker,
             StdServiceLogic::default(),

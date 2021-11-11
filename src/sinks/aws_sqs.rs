@@ -9,7 +9,7 @@ use crate::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
         sink::{self, Response},
-        BatchSettings, EncodedEvent, EncodedLength, TowerRequestConfig, VecBuffer,
+        BatchConfig, EncodedEvent, EncodedLength, TowerRequestConfig, VecBuffer,
     },
     template::{Template, TemplateParseError},
 };
@@ -23,11 +23,14 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
     convert::{TryFrom, TryInto},
+    num::NonZeroU64,
     task::{Context, Poll},
 };
 use tower::Service;
 use tracing_futures::Instrument;
 use vector_core::ByteSizeOf;
+
+use super::util::SinkBatchSettings;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -53,6 +56,15 @@ enum HealthcheckError {
 pub struct SqsSink {
     client: SqsClient,
     queue_url: String,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SqsSinkDefaultBatchSettings;
+
+impl SinkBatchSettings for SqsSinkDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(1);
+    const MAX_BYTES: Option<usize> = Some(262_144);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -148,7 +160,8 @@ impl SqsSink {
         // Currently we do not use batching, so this mostly for future. Also implement `Service` is simpler than `Sink`.
         // https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-batch-api-actions.html
         // Up to 10 events, not more than 256KB as total size.
-        let batch = BatchSettings::default().events(1).bytes(262_144);
+        let batch: BatchConfig<SqsSinkDefaultBatchSettings> = BatchConfig::default();
+        let batch_settings = batch.into_batch_settings()?;
 
         let request = config.request.unwrap_with(&TowerRequestConfig {
             timeout_secs: Some(30),
@@ -176,8 +189,8 @@ impl SqsSink {
             .batch_sink(
                 SqsRetryLogic,
                 sqs,
-                VecBuffer::new(batch.size),
-                batch.timeout,
+                VecBuffer::new(batch_settings.size),
+                batch_settings.timeout,
                 cx.acker(),
                 sink::StdServiceLogic::default(),
             )
