@@ -23,7 +23,7 @@ configuration: {
 		}
 
 		enrichment_tables: {
-			common: false
+			common:      false
 			description: """
 				Configuration options for an [enrichment table](\(urls.enrichment_tables_concept)) to be used in a
 				[`remap`](\(urls.vector_remap_transform)) transform. Currently, only [CSV](\(urls.csv)) files are
@@ -36,7 +36,7 @@ configuration: {
 				significantly provided that there are only a few possible rows returned by the exact matches in the
 				condition. We don't recommend using a condition that uses only date range searches.
 				"""
-			required: false
+			required:    false
 			type: object: options: {
 				file: {
 					required:    true
