@@ -22,6 +22,141 @@ configuration: {
 			}
 		}
 
+		enrichment_tables: {
+			common: false
+			description: """
+				Loads enrichment data from a CSV file.
+				For the lookup to be as performant as possible, the data is indexed according to the fields that are used
+				in the search. It should be noted that indexes can only be created for fields for which an exact match is
+				used in the condition. For range searches, an index is not used and the enrichment table drops back to a
+				sequential scan of the data. A sequential scan will not impact performance significantly provided there
+				are only a few possible rows returned by the exact matches in the condition. It is not recommended to
+				use a condition that only uses date range searches.
+				"""
+			required: false
+			type: object: options: {
+				file: {
+					required: true
+					description: "Configuration options for the file that provides the enrichment table."
+					type: object: options: {
+						path: {
+							description: """
+								The path of the enrichment table file. Currently, only [CSV](\(urls.csv)) files are
+								supported.
+								"""
+							warnings: [
+								"In order to be used by Vector, the enrichment table file needs read-only permissions."
+							]
+							required:    true
+							type: string: {
+								examples: [
+									"/data/info.csv",
+									"./info.csv",
+								]
+							}
+						}
+
+						encoding: {
+							description: "Configuration options for the encoding of the enrichment table's file."
+							required: true
+							type: object: options: {
+								type: {
+									description: """
+										The encoding of the file. Currently, only [CSV](\(urls.csv)) is supported.
+										"""
+									required: false
+									common: true
+									type: string: default: "csv"
+								}
+
+								delimiter: {
+									description: "The delimiter used to separate fields in each row of the CSV file."
+									common: false
+									required:    false
+									type: string: {
+										default:     ","
+										examples: [ ":"]
+									}
+								}
+
+								include_headers: {
+									description: """
+										Set `include_headers` to `true` if the first row of the CSV file contains the
+										headers for each column. This is the default behavior.
+
+										If you set it to `false`, there are no headers and the columns are referred to
+										by their numerical index.
+										"""
+									required: false
+									common: false
+									type: bool: default: true
+								}
+							}
+						}
+
+						schema: {
+							description: """
+								Key-value pairs representing mapped log field names and types. This is used to
+								coerce log fields from strings into their proper types. The available types are
+								listed in the **Types** list below.
+
+								Timestamp coercions need to be prefaced with `timestamp|`, for example
+								`\"timestamp|%F\"`. Timestamp specifiers can use either of the following:
+
+								1. One of the built-in-formats listed in the **Timestamp Formats** table below.
+								2. The [time format specifiers](\(urls.chrono_time_formats)) from Rust's
+								`chrono` library.
+
+								### Types
+
+								* `bool`
+								* `string`
+								* `float`
+								* `integer`
+								* `date`
+								* `timestamp` (see the table below for formats)
+
+								### Timestamp Formats
+
+								Format | Description | Example
+								:------|:------------|:-------
+								`%F %T` | `YYYY-MM-DD HH:MM:SS` | `2020-12-01 02:37:54`
+								`%v %T` | `DD-Mmm-YYYY HH:MM:SS` | `01-Dec-2020 02:37:54`
+								`%FT%T` | [ISO 8601](\(urls.iso_8601))\\[RFC 3339](\(urls.rfc_3339)) format without time zone | `2020-12-01T02:37:54`
+								`%a, %d %b %Y %T` | [RFC 822](\(urls.rfc_822))/[2822](\(urls.rfc_2822)) without time zone | `Tue, 01 Dec 2020 02:37:54`
+								`%a %d %b %T %Y` | [`date`](\(urls.date)) command output without time zone | `Tue 01 Dec 02:37:54 2020`
+								`%a %b %e %T %Y` | [ctime](\(urls.ctime)) format | `Tue Dec  1 02:37:54 2020`
+								`%s` | [UNIX](\(urls.unix_timestamp)) timestamp | `1606790274`
+								`%FT%TZ` | [ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) UTC | `2020-12-01T09:37:54Z`
+								`%+` | [ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) UTC with time zone | `2020-12-01T02:37:54-07:00`
+								`%a %d %b %T %Z %Y` | [`date`](\(urls.date)) command output with time zone | `Tue 01 Dec 02:37:54 PST 2020`
+								`%a %d %b %T %z %Y`| [`date`](\(urls.date)) command output with numeric time zone | `Tue 01 Dec 02:37:54 -0700 2020`
+								`%a %d %b %T %#z %Y` | [`date`](\(urls.date)) command output with numeric time zone (minutes can be missing or present) | `Tue 01 Dec 02:37:54 -07 2020`
+
+								**Note**: the examples in this table are for 54 seconds after 2:37 am on December 1st, 2020 in Pacific Standard Time.
+								"""
+							required: false
+							common: true
+							type: object: {
+								examples: [
+									{
+										status:            "int"
+										duration:          "float"
+										success:           "bool"
+										timestamp_iso8601: "timestamp|%F"
+										timestamp_custom:  "timestamp|%a %b %e %T %Y"
+										timestamp_unix:    "timestamp|%F %T"
+									},
+								]
+
+								options: {}
+							}
+						}
+					}
+				}
+			}
+		}
+
 		log_schema: {
 			common: false
 			description: """

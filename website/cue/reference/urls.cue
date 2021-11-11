@@ -108,6 +108,7 @@ urls: {
 	crc:                                                      "\(wikipedia)/wiki/Cyclic_redundancy_check"
 	ctime:                                                    "https://www.cplusplus.com/reference/ctime"
 	cue:                                                      "https://cuelang.org/"
+	csv: "\(wikipedia)/wiki/Comma-separated_values"
 	dag:                                                      "\(wikipedia)/wiki/Directed_acyclic_graph"
 	datadog:                                                  "https://www.datadoghq.com"
 	datadog_agent:                                            "https://docs.datadoghq.com/agent/"
