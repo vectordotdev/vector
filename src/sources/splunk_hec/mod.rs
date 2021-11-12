@@ -1,14 +1,7 @@
-use crate::{
-    config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
-    event::{Event, LogEvent, Value},
-    internal_events::{
+use crate::{Pipeline, config::{AcknowledgementsConfig, DataType, Resource, SourceConfig, SourceContext, SourceDescription, log_schema}, event::{Event, LogEvent, Value}, internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
         SplunkHecRequestReceived,
-    },
-    sources::splunk_hec::splunk_response::HecResponseMetadata,
-    tls::{MaybeTlsSettings, TlsConfig},
-    Pipeline,
-};
+    }, sources::splunk_hec::splunk_response::HecResponseMetadata, tls::{MaybeTlsSettings, TlsConfig}};
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
@@ -17,17 +10,15 @@ use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::{de::Read as JsonRead, json, Deserializer, Value as JsonValue};
 use snafu::Snafu;
-use std::{
-    collections::HashMap,
-    future,
-    io::Read,
-    net::{Ipv4Addr, SocketAddr},
-};
+use tokio::sync::RwLock;
+use std::{collections::HashMap, future, io::Read, net::{Ipv4Addr, SocketAddr}, sync::Arc};
 use vector_core::ByteSizeOf;
 
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
-use self::splunk_response::{HecCode, HecResponse};
+use self::{acknowledgements::{Channel, HecAcknowledgementsConfig}, splunk_response::{HecCode, HecResponse}};
+
+mod acknowledgements;
 
 // Event fields unique to splunk_hec source
 pub const CHANNEL: &str = "splunk_channel";
@@ -47,6 +38,8 @@ pub struct SplunkConfig {
     /// A list of tokens to accept. Omit this to accept any token
     valid_tokens: Option<Vec<String>>,
     tls: Option<TlsConfig>,
+    /// Splunk HEC indexer acknowledgement settings
+    indexer_acknowledgements: HecAcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -72,6 +65,7 @@ impl Default for SplunkConfig {
             token: None,
             valid_tokens: None,
             tls: None,
+            indexer_acknowledgements: Default::default(),
         }
     }
 }
@@ -85,7 +79,7 @@ fn default_socket_address() -> SocketAddr {
 impl SourceConfig for SplunkConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
-        let source = SplunkSource::new(self, tls.http_protocol_name());
+        let source = SplunkSource::new(self, tls.http_protocol_name(), cx.acknowledgements.clone());
 
         let event_service = source.event_service(cx.out.clone());
         let raw_service = source.raw_service(cx.out);
@@ -145,24 +139,39 @@ impl SourceConfig for SplunkConfig {
     }
 }
 
+type ChannelInfo = Arc<RwLock<HashMap<String, Channel>>>;
+
 /// Shared data for responding to requests.
 struct SplunkSource {
     valid_credentials: Vec<String>,
     protocol: &'static str,
+    indexer_acknowledgements: HecAcknowledgementsConfig,
+    channels: Option<ChannelInfo>,
 }
 
 impl SplunkSource {
-    fn new(config: &SplunkConfig, protocol: &'static str) -> Self {
+    fn new(config: &SplunkConfig, protocol: &'static str, acknowledgements: AcknowledgementsConfig) -> Self {
         let valid_tokens = config
             .valid_tokens
             .iter()
             .flatten()
             .chain(config.token.iter());
+        
+        // if using acknowledgements, create a structure to map channel ID to channel info
+        let channels = if acknowledgements.enabled {
+            Some(Arc::new(RwLock::new(HashMap::new())))
+        } else {
+            None
+        };
+
+        // the SplunkSource stores channels and indexer acknowledgement configuration
         SplunkSource {
             valid_credentials: valid_tokens
                 .map(|token| format!("Splunk {}", token))
                 .collect(),
             protocol,
+            indexer_acknowledgements: config.indexer_acknowledgements.clone(),
+            channels,
         }
     }
 
@@ -176,6 +185,21 @@ impl SplunkSource {
             .map(|header: Option<String>, query_param| header.or(query_param));
 
         let protocol = self.protocol;
+        let channels = self.channels.clone();
+        let indexer_acknowledgements = self.indexer_acknowledgements.clone();
+        // The event service handles requests to the services/collector/event | services/collector/event/1.0 paths
+        //
+        // It processes the following pieces of data from the request
+        // authorization token: self.authorization()
+        // splunk channel: splunk_channel
+        // remote address for "host" metadata: warp::addr::remote
+        // forwarded for address for "host" metadata (takes precedent): warp::header::"x-forwarded-for"
+        // gzip compression: self.gzip()
+        // body content in bytes: warp::body::bytes()
+        // path of the request: warp::path::full()
+        // 
+        // This data is used to create events that are then sent to other vector components downstream
+        // We naively reply with a success. We want to reply with a success that includes an ackId.
         warp::post()
             .and(path!("event").or(path!("event" / "1.0")))
             .and(self.authorization())
@@ -202,7 +226,13 @@ impl SplunkSource {
                         http_path: path.as_str(),
                         protocol,
                     });
+                    let channels = channels.clone();
                     async move {
+                        // todo: channels.is_some() should beindexer_acknowledgements.is_enabled()
+                        if channels.is_some() && channel.is_none() {
+                            return Err(Rejection::from(ApiError::MissingChannel));
+                        }
+                        
                         let reader: Box<dyn Read + Send> = if gzip {
                             Box::new(MultiGzDecoder::new(body.reader()))
                         } else {
@@ -211,22 +241,46 @@ impl SplunkSource {
 
                         let events = stream::iter(EventIterator::new(
                             Deserializer::from_reader(reader).into_iter::<JsonValue>(),
-                            channel,
+                            channel.clone(),
                             remote,
                             xff,
                         ));
 
-                        // `fn send_all` can be used once https://github.com/rust-lang/futures-rs/issues/2402
-                        // is resolved.
                         let res = events.forward(&mut out).await;
 
                         out.flush().await?;
 
-                        res
+                        let ack_id = match (channels.clone(), channel) {
+                            (Some(channel_lock), Some(channel_id)) => {
+                                let mut channels = channel_lock.write().await;
+                                match channels.get_mut(&channel_id) {
+                                    Some(channel_info) => {
+                                        Some(channel_info.get_ack_id())
+                                    },
+                                    None => {
+                                        let mut new_channel = Channel::new(indexer_acknowledgements.max_pending_acks_per_channel.clone());
+                                        let ack_id = new_channel.get_ack_id();
+                                        channels.insert(channel_id, new_channel);
+                                        Some(ack_id)
+                                    },
+                                }
+                            },
+                            _ => None
+                        };
+
+                        res.map(|_| {ack_id})
                     }
                 },
             )
-            .map(finish_ok)
+            .map(|maybe_ack_id| {
+                println!("{:?}", maybe_ack_id);
+                if let Some(ack_id) = maybe_ack_id {
+                    let body = HecResponse::new(HecCode::Success).with_metadata(HecResponseMetadata::AckId(ack_id));
+                    response_json(StatusCode::OK, &body)
+                } else {
+                    response_json(StatusCode::OK, &*splunk_response::SUCCESS)
+                }
+            })
             .boxed()
     }
 
