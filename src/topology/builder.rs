@@ -186,17 +186,18 @@ pub async fn build_pieces(
         source_tasks.insert(key.clone(), server);
     }
 
-    let context = TransformContext {
-        globals: config.global.clone(),
-        enrichment_tables: enrichment_tables.clone(),
-    };
-
     // Build transforms
     for (key, transform) in config
         .transforms
         .iter()
         .filter(|(key, _)| diff.transforms.contains_new(key))
     {
+        let context = TransformContext {
+            key: Some(key.clone()),
+            globals: config.global.clone(),
+            enrichment_tables: enrichment_tables.clone(),
+        };
+
         let trans_inputs = &transform.inputs;
 
         let typetag = transform.inner.transform_type();

@@ -493,15 +493,16 @@ async fn build_unit_test(
 
     errors.extend(tables_errors);
 
-    let context = TransformContext {
-        globals: config.global.clone(),
-        enrichment_tables: enrichment_tables.clone(),
-    };
-
     // Build reduced transforms.
     let mut transforms: IndexMap<ComponentKey, UnitTestTransform> = IndexMap::new();
     for (id, transform_config) in &config.transforms {
         if let Some(outputs) = transform_outputs.remove(id) {
+            let context = TransformContext {
+                key: Some(id.clone()),
+                globals: config.global.clone(),
+                enrichment_tables: enrichment_tables.clone(),
+            };
+
             match transform_config.inner.build(&context).await {
                 Ok(transform) => {
                     transforms.insert(
