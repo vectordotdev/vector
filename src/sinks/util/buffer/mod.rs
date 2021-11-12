@@ -143,8 +143,8 @@ mod test {
         });
 
         let mut batch_settings = BatchSettings::default();
-        batch_settings.size.bytes = 9999;
-        batch_settings.size.events = 6;
+        batch_settings.size.bytes = 100_000;
+        batch_settings.size.events = 1_000;
         batch_settings.timeout = Duration::from_secs(0);
 
         let buffered = BatchSink::new(
