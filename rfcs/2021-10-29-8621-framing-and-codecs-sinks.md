@@ -16,7 +16,7 @@ The codec work is very interweaved with the ongoing [schema work](https://github
 
 We want to hand over the reshaping responsibilities to the schema, and provide a transition layer to support existing reshaping capabilities of sinks until schema mappers are implemented.
 
-Another related current work is `StandardEncoding` which has been introduced in [#9215](https://github.com/vectordotdev/vector/pull/9215). It provides a consistent set of codec implementations aims and therefore aligns with our goals. However, it does not separate the reshaping responsibilities.
+Another related change is `StandardEncodings` which was introduced in [#9215](https://github.com/vectordotdev/vector/pull/9215). It provides a consistent implementation of common codecs, and therefore aligns with our goals. However, it does not separate the reshaping responsibilities.
 
 ## Scope
 
