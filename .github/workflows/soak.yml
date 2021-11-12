@@ -298,8 +298,6 @@ jobs:
           # soak test (containing both comparison/baseline files)
 
           pushd ${{ github.event.number }}-${{ github.run_attempt }}-captures
-          echo "Before script"
-          ls -R
           for dir in ./*; do
           	if [[ $dir == *-comparison ]]
           	then
@@ -314,8 +312,6 @@ jobs:
           	  rm -rf $dir
           	fi
           done
-          echo "After script"
-          ls -R
           popd
           ./soaks/bin/analyze_experiment.sh --capture-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures \
                                             --baseline ${{ needs.compute-soak-meta.outputs.baseline-sha }} \
