@@ -20,8 +20,9 @@ enable it to process data faster.
 
 Out of scope are:
 
-- improvements to the build time of Vrl (mainly caused by lalrpop).
-- changes to improve the functionality of Vrl.
+- improvements to the build time of VRL (mainly caused by lalrpop).
+- changes to improve the functionality of VRL.
+- Using a bytecode VM to execute VRL (this will come in a followup PR).
 
 ## Pain
 
@@ -221,18 +222,24 @@ Downsides to moving Vrl to use reference counting:
 
 ## Alternatives
 
-This RFC lists a number of improvements that can be made to Vrl, we could do
-all or just some of them. Each of the changes will need to be done with a big
-focus on how much of an improvement is actually possible with each technique.
-Only then will we be able to judge if the extra code complexity is worth the
-improvement.
 
-If we don't do any, Vrl will continue to be a bottleneck. It is also possible
-that Vrl will continue to be a bottleneck after these changes, but hopefully
-just not as significant.
+### References
+
+This RFC proposes using Reference Counted Values. However it is possible that
+we can use pure references. This would save the overhead of having to maintain
+a reference count using `Rc`. The data would be owned by the `Target`.  The
+signature for `get` would become:
+
+```rust
+    fn get(&'a self, path: &LookupBuf) -> Result<Option<&'a Value>, String>;
+```
+
+In theory, this change would be more performant than reference counting. However,
+the extra lifetimes could cause sufficient problems as to make this solution
+unworkable.  We need to work on a spike to see what issues may arise from this
+approach before determining the way forward.
 
 ## Outstanding Questions
-
 
 ## Plan Of Attack
 
@@ -241,6 +248,8 @@ after the RFC is approved:
 
 - [ ] Submit a PR with spike-level code _roughly_ demonstrating the change for
       referencing counting. See [here](https://github.com/vectordotdev/vector/pull/9785).
+- [ ] Submit a PR with spike-level code _roughly_ demonstrating the change for
+      references.
 - [ ] Optimise the relevant stdlib functions.
 
 
