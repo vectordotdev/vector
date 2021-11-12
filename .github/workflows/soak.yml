@@ -236,8 +236,8 @@ jobs:
       - name: Upload timing captures
         uses: actions/upload-artifact@v1
         with:
-          name: ${{ github.event.number }}-${{ github.run_attempt }}-captures
-          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}
+          name: ${{ github.event.number }}-${{ github.run_attempt }}-${{ matrix.target }}-baseline
+          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/baseline.captures
 
   soak-comparison:
     name: Soak (${{ matrix.target }}) - comparison
@@ -267,14 +267,15 @@ jobs:
       - name: Upload timing captures
         uses: actions/upload-artifact@v1
         with:
-          name: ${{ github.event.number }}-${{ github.run_attempt }}-captures
-          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}
+          name: ${{ github.event.number }}-${{ github.run_attempt }}-${{ matrix.target }}-comparison
+          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/comparison.captures
 
   analyze-results:
     name: Soak analysis
     if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-20.04
     needs: [compute-soak-meta, soak-baseline, soak-comparison]
+
     steps:
       - name: Install 'miller'
         run: sudo apt-get install -y miller
@@ -285,7 +286,11 @@ jobs:
       - name: Download captures artifact
         uses: actions/download-artifact@v1
         with:
-          name: ${{ github.event.number }}-${{ github.run_attempt }}-captures
+          path: .
+
+      - name: Display structure of downloaded files
+        run: ls -R
+        working-directory: .
 
       - name: Analyze captures
         run: |
