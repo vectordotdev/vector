@@ -139,7 +139,7 @@ components: {
 	}
 
 	// `#ComponentKind` represent the kind of component.
-	#ComponentKind: "sink" | "source" | "transform" | "enrichment_table"
+	#ComponentKind: "sink" | "source" | "transform"
 
 	#Components: [Type=string]: #Component & {
 		type: Type
