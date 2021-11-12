@@ -55,8 +55,8 @@ remap: functions: get_enrichment_table_record: {
 			source: #"""
 				get_enrichment_table_record!("test",
 				  {
-					"surname": "bob",
-					"firstname": "John"
+				    "surname": "bob",
+				    "firstname": "John"
 				  },
 				  case_sensitive: false)
 				"""#
@@ -67,11 +67,11 @@ remap: functions: get_enrichment_table_record: {
 			source: #"""
 				get_enrichment_table_record!("test",
 				  {
-					"surname": "Smith",
-					"date_of_birth": {
-					  "from": t'1985-01-01T00:00:00Z',
-					  "to": t'1985-12-31T00:00:00Z'
-					}
+				    "surname": "Smith",
+				    "date_of_birth": {
+				      "from": t'1985-01-01T00:00:00Z',
+				      "to": t'1985-12-31T00:00:00Z'
+				    }
 				  })
 				"""#
 			return: {"id": 1, "firstname": "Bob", "surname": "Smith"}
