@@ -294,6 +294,22 @@ jobs:
 
       - name: Analyze captures
         run: |
+          # convert the individual artifacts into a folder for each
+          # soak test (containing both comparison/baseline files)
+          for dir in ./*; do
+          	if [[ $dir == *-comparison ]]
+          	then
+          	  soak_dir=${dir%"-comparison"}
+          	  mkdir -p $soak_dir
+          	  cp $dir/comparison.captures $soak_dir/comparison.captures
+          	  rm -rf $dir
+          	else
+          	  soak_dir=${dir%"-baseline"}
+          	  mkdir -p $soak_dir
+          	  cp $dir/baseline.captures $soak_dir/baseline.captures
+          	  rm -rf $dir
+          	fi
+          done
           ./soaks/bin/analyze_experiment.sh --capture-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures \
                                             --baseline ${{ needs.compute-soak-meta.outputs.baseline-sha }} \
                                             --comparison ${{ needs.compute-soak-meta.outputs.comparison-sha }} \
