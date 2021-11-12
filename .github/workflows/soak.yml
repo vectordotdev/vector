@@ -298,15 +298,19 @@ jobs:
           # soak test (containing both comparison/baseline files)
 
           pushd ${{ github.event.number }}-${{ github.run_attempt }}-captures
+          prefix="./${{ github.event.number }}-${{ github.run_attempt }}-"
+          echo "Prefix: $prefix"
           for dir in ./*; do
           	if [[ $dir == *-comparison ]]
           	then
           	  soak_dir=${dir%"-comparison"}
+          	  soak_dir="./${soak_dir#$prefix}"
           	  mkdir -p $soak_dir
           	  cp $dir/comparison.captures $soak_dir/comparison.captures
           	  rm -rf $dir
           	else
           	  soak_dir=${dir%"-baseline"}
+          	  soak_dir="./${soak_dir#$prefix}"
           	  mkdir -p $soak_dir
           	  cp $dir/baseline.captures $soak_dir/baseline.captures
           	  rm -rf $dir
