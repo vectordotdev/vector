@@ -153,14 +153,18 @@ struct TestConfig {
 #[typetag::serialize(name = "test")]
 impl SinkConfig for TestConfig {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), crate::Error> {
-        let batch = BatchSettings::default().events(1).bytes(9999).timeout(9999);
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.bytes = 9999;
+        batch_settings.size.events = 1;
+        batch_settings.timeout = Duration::from_secs(9999);
+
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let sink = request
             .batch_sink(
                 TestRetryLogic,
                 TestSink::new(self),
-                VecBuffer::new(batch.size),
-                batch.timeout,
+                VecBuffer::new(batch_settings.size),
+                batch_settings.timeout,
                 cx.acker(),
                 sink::StdServiceLogic::default(),
             )

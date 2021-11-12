@@ -6,7 +6,8 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink, RequestConfig},
-        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
+        BatchConfig, Buffer, Compression, RealtimeSizeBasedDefaultBatchSettings,
+        TowerRequestConfig, UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
 };
@@ -48,7 +49,7 @@ pub struct HttpSinkConfig {
     pub compression: Compression,
     pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: RequestConfig,
     pub tls: Option<TlsOptions>,
@@ -138,10 +139,7 @@ impl SinkConfig for HttpSinkConfig {
         config.request.add_old_option(config.headers.take());
         validate_headers(&config.request.headers, &config.auth)?;
 
-        let batch = BatchSettings::default()
-            .bytes(10_000_000)
-            .timeout(1)
-            .parse_config(config.batch)?;
+        let batch = config.batch.into_batch_settings()?;
         let request = config
             .request
             .tower

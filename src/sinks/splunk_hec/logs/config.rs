@@ -10,10 +10,11 @@ use crate::{
             build_healthcheck, create_client, host_key,
             retry::HecRetryLogic,
             service::{HecService, HttpRequestBuilder},
+            SplunkHecDefaultBatchSettings,
         },
         util::{
-            encoding::EncodingConfig, BatchConfig, BatchSettings, Buffer, Compression,
-            ServiceBuilderExt, TowerRequestConfig,
+            encoding::EncodingConfig, BatchConfig, Compression, ServiceBuilderExt,
+            TowerRequestConfig,
         },
         Healthcheck,
     },
@@ -43,7 +44,7 @@ pub struct HecSinkLogsConfig {
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<SplunkHecDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
@@ -111,11 +112,7 @@ impl HecSinkLogsConfig {
             .settings(request_settings, HecRetryLogic)
             .service(HecService::new(client, http_request_builder));
 
-        let batch_settings = BatchSettings::<Buffer>::default()
-            .bytes(1_000_000)
-            .timeout(1)
-            .parse_config(self.batch)?
-            .into_batcher_settings()?;
+        let batch_settings = self.batch.into_batcher_settings()?;
 
         let sink = HecLogsSink {
             service,

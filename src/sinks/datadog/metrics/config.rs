@@ -1,11 +1,13 @@
+use std::num::NonZeroU64;
+
 use crate::{
     config::{DataType, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
         datadog::{get_api_validate_endpoint, get_base_domain, healthcheck, Region},
         util::{
-            batch::{BatchConfig, BatchSettings},
-            Concurrency, ServiceBuilderExt, TowerRequestConfig,
+            batch::BatchConfig, Concurrency, ServiceBuilderExt, SinkBatchSettings,
+            TowerRequestConfig,
         },
         Healthcheck, UriParseError, VectorSink,
     },
@@ -33,11 +35,17 @@ const DEFAULT_REQUEST_LIMITS: TowerRequestConfig =
 // conservative, though, we use 100K here.  This will also get a little more tricky when it comes to
 // distributions and sketches, but we're going to have to implement incremental encoding to handle
 // "we've exceeded our maximum payload size, split this batch" scenarios anyways.
-const DEFAULT_BATCH_SETTINGS: BatchSettings<()> =
-    BatchSettings::const_default().events(100000).timeout(2);
-
-pub const MAXIMUM_PAYLOAD_COMPRESSED_SIZ: usize = 3_200_000;
+pub const MAXIMUM_PAYLOAD_COMPRESSED_SIZE: usize = 3_200_000;
 pub const MAXIMUM_PAYLOAD_SIZE: usize = 62_914_560;
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct DatadogMetricsDefaultBatchSettings;
+
+impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(100_000);
+    const MAX_BYTES: Option<usize> = None;
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(2) };
+}
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -100,7 +108,7 @@ pub struct DatadogMetricsConfig {
     #[serde(alias = "api_key")]
     default_api_key: String,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<DatadogMetricsDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
 }
@@ -181,9 +189,7 @@ impl DatadogMetricsConfig {
     }
 
     fn build_sink(&self, client: HttpClient, cx: SinkContext) -> crate::Result<VectorSink> {
-        let batcher_settings = DEFAULT_BATCH_SETTINGS
-            .parse_config(self.batch)?
-            .into_batcher_settings()?;
+        let batcher_settings = self.batch.into_batcher_settings()?;
 
         let request_limits = self.request.unwrap_with(&DEFAULT_REQUEST_LIMITS);
         let endpoint_configuration = self.generate_metrics_endpoint_configuration()?;
