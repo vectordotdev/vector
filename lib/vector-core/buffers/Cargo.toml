@@ -38,6 +38,7 @@ metrics-util = { version = "0.10.1", default-features = false }
 metrics-tracing-context = { version = "0.8.1", default-features = false }
 serde_yaml = { version = "0.8", default-features = false }
 tracing-subscriber = { version = "0.2.25", default-features = false, features = ["registry"] }
+human_bytes = "0.3.0"
 
 [features]
 disk-buffer = ["db-key", "leveldb"]

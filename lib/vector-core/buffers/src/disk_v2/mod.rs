@@ -59,6 +59,7 @@
 //! open more than 4096 files (2TB max buffer size / 256MB max data file size) total, so that we can
 //! avoid needing an array/bitmap/etc tracking which files are in use.
 
+use core::slice;
 use std::{
     convert::TryInto,
     io::{self, ErrorKind},
@@ -70,11 +71,15 @@ use std::{
     time::{Duration, Instant},
 };
 
-use bytes::{Bytes, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut};
 use crc32fast::Hasher;
 use crossbeam_utils::atomic::AtomicCell;
 use memmap2::{MmapMut, MmapOptions};
-use tokio::{fs::{self, File, OpenOptions}, io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufReader, BufWriter}, sync::{Mutex, Notify}};
+use tokio::{
+    fs::{self, File, OpenOptions},
+    io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufReader, BufWriter},
+    sync::{Mutex, Notify},
+};
 
 const LEDGER_FILE_SIZE: usize = 36;
 // We don't want data files to be bigger than 128MB, but we might end up overshooting slightly.
@@ -118,6 +123,10 @@ impl Default for LedgerState {
 
 impl LedgerState {
     pub fn get_next_writer_record_id(&self) -> u64 {
+        self.writer_next_record_id.load(Ordering::Acquire)
+    }
+
+    pub fn acquire_next_writer_record_id(&self) -> u64 {
         self.writer_next_record_id.fetch_add(1, Ordering::AcqRel)
     }
 
@@ -125,8 +134,8 @@ impl LedgerState {
         self.reader_last_record_id.load(Ordering::Acquire)
     }
 
-    pub fn increment_last_reader_record_id(&self) {
-        self.reader_last_record_id.fetch_add(1, Ordering::AcqRel);
+    pub fn set_last_reader_record_id(&self, id: u64) {
+        self.reader_last_record_id.store(id, Ordering::Release);
     }
 
     /// Gets the current writer file ID.
@@ -512,6 +521,7 @@ impl WriteState {
                     // If we opened the "next" data file, we need to increment the current writer
                     // file ID now to signal that the writer has moved on.
                     if should_open_next {
+                        //println!("rolled over to new file for writer");
                         self.ledger.state().increment_writer_file_id();
                     }
 
@@ -527,11 +537,8 @@ impl WriteState {
     pub async fn write_record(&mut self, record_buf: &[u8]) -> io::Result<()> {
         let _ = self.ensure_ready_for_write().await?;
 
-        let record_id = self
-            .ledger
-            .state()
-            .get_next_writer_record_id();
-        println!("writing record with id {}", record_id);
+        let record_id = self.ledger.state().acquire_next_writer_record_id();
+        //println!("writing record with id {}", record_id);
 
         let record_id = record_id.to_be_bytes();
         let record_checksum = self
@@ -566,6 +573,12 @@ impl WriteState {
     }
 
     pub async fn maybe_flush(&mut self) -> io::Result<()> {
+        // We always flush the `BufWriter` when this is called, but we don't always flush to disk or
+        // flush the ledger.
+        if let Some(data_file) = self.data_file.as_mut() {
+            let _ = data_file.flush().await?;
+        }
+
         if self.ledger.should_flush() {
             self.flush().await
         } else {
@@ -660,23 +673,23 @@ impl Writer {
 pub struct Reader {
     ledger: Arc<Ledger>,
     data_file: Option<BufReader<File>>,
+    buf: BytesMut,
+    buf_pos: usize,
     last_reader_record_id: u64,
     checksummer: Hasher,
 }
 
 impl Reader {
     fn new(ledger: Arc<Ledger>) -> Self {
+        let last_reader_record_id = ledger.state().get_last_reader_record_id();
         Reader {
             ledger,
             data_file: None,
-            last_reader_record_id: 0,
+            buf: BytesMut::with_capacity(8192),
+            buf_pos: 0,
+            last_reader_record_id,
             checksummer: Hasher::new(),
         }
-    }
-
-    fn increment_last_reader_record_id(&mut self) {
-        self.last_reader_record_id += 1;
-        self.ledger.state().increment_last_reader_record_id();
     }
 
     async fn roll_to_next_data_file(&mut self) -> io::Result<()> {
@@ -694,18 +707,36 @@ impl Reader {
         self.ensure_ready_for_read().await
     }
 
-    async fn try_read_atleast(&mut self, n: usize, buf: &mut BytesMut) -> io::Result<Option<BytesMut>> {
+    fn reset_buf(&mut self) {
+        self.buf.clear();
+        self.buf_pos = 0;
+    }
+
+    async fn try_read_exact(&mut self, n: usize) -> io::Result<Option<&[u8]>> {
+        //println!("      try_read_exact: [start] n={}, buf_len={}, buf_pos={}",
+        //    n, self.buf.len(), self.buf_pos);
+
         // If our buffer already has enough bytes to fulfill the request, we remove those from the
         // buffer and hand them, back to the caller.
-        if buf.len() >= n {
-            return Ok(Some(buf.split_to(n)));
+        //
+        // TODO: we probably don't actually need this if we switch to using `read_exact`
+        if self.buf.len() - self.buf_pos >= n {
+            let start = self.buf_pos;
+            self.buf_pos += n;
+
+            //println!("      try_read_exact: [fulfilled] n={}, buf_len={}, old buf_pos={} new buf_pos={}",
+            //    n, self.buf.len(), start, self.buf_pos);
+
+            return Ok(Some(&self.buf[start..self.buf_pos]));
         }
 
-        // Make sure our buffer is big enough to hold `n`.  We assume that `n` doesn't not change
-        // overall until it is fulfilled, so we only reserve enough bytes such that the capacity of
-        // the buffer is at least `n`.
-        if buf.capacity() < n {
-            buf.reserve(n - buf.len());
+        // Make sure our buffer is big enough to hold `n` overall.  We might have a partial read
+        // that contributes to fulfilling a read of `n`, so figure out what the buffer has, versus
+        // how much capacity we have, versus how many bytes we want.
+        let needed = n - (self.buf.len() - self.buf_pos);
+        // TODO: do we need to adjust the check here?
+        if self.buf.capacity() < needed {
+            self.buf.reserve(needed);
         }
 
         // Issue a read to try and fill our buffer.
@@ -713,18 +744,37 @@ impl Reader {
             .data_file
             .as_mut()
             .expect("data file must be initialized");
-        let _ = data_file.get_mut().read_buf(buf).await?;
-        println!("read data file file cursor pos: {}", data_file.get_mut().stream_position().await?);
+
+        let chunk = self.buf.chunk_mut();
+        let dst_len = std::cmp::min(chunk.len(), needed);
+        let dst = unsafe { slice::from_raw_parts_mut(chunk.as_mut_ptr(), dst_len) };
+        let read_n = data_file.read(dst).await?;
+        unsafe {
+            self.buf.advance_mut(read_n);
+        }
 
         // Try one more time to see if we can fulfill the request after reading.
-        if buf.len() >= n {
-            Ok(Some(buf.split_to(n)))
+        if self.buf.len() - self.buf_pos >= n {
+            let start = self.buf_pos;
+            self.buf_pos += n;
+
+            //println!("      try_read_exact: [fulfilled after read] n={}, buf_len={}, old buf_pos={} new buf_pos={}",
+            //    n, self.buf.len(), start, self.buf_pos);
+
+            Ok(Some(&self.buf[start..self.buf_pos]))
         } else {
+            //println!("      try_read_exact: [not ready yet] (n={}, avail={})",
+            //    n, self.buf.len() - self.buf_pos);
             Ok(None)
         }
     }
 
     pub async fn ensure_ready_for_read(&mut self) -> io::Result<()> {
+        // We have nothing to do if we already have a data file open.
+        if self.data_file.is_some() {
+            return Ok(());
+        }
+
         // Try to open the current reader data file.  This might not _yet_ exist, in which case
         // we'll simply wait for the writer to signal to us that progress has been made, which
         // implies a data file existing.
@@ -774,15 +824,9 @@ impl Reader {
     }
 
     pub async fn next(&mut self) -> io::Result<(u64, Bytes)> {
-        //println!("entered next");
+        //println!("next: start");
 
-        // - try and open current reader file described by ledger
-        // -- if doesnt exist yet, just wait until signalled to try again
         let _ = self.ensure_ready_for_read().await?;
-
-        //println!("data file supposedly ready");
-
-        let mut buf = BytesMut::with_capacity(8192);
 
         #[derive(Debug)]
         struct Header {
@@ -794,8 +838,8 @@ impl Reader {
         enum State {
             NeedHeader,
             NeedPayload(Header),
-            NeedChecksumVerify(Header, BytesMut),
-            Verified(Header, BytesMut),
+            NeedChecksumVerify(Header, Bytes),
+            Verified(Header, Bytes),
         }
 
         // Everything here is predicated on the idea that the file will return EOF when we try to
@@ -805,16 +849,22 @@ impl Reader {
         // TODO: In fact, we don't even really need to use the `File`/`BufReader` from `tokio`,
         // because we're explicitly waiting for wake-ups from the writer when there's not enough
         // data, but just using it for consistency at this point.
+        self.reset_buf();
         let mut state = State::NeedHeader;
         loop {
-            //println!("loop start");
+            //println!("  loop start");
+            let current_writer_file_id = self.ledger.state().get_current_writer_file_id();
+            let current_reader_file_id = self.ledger.state().get_current_reader_file_id();
 
             let (next_state, wait) = match state {
                 State::NeedHeader => {
-                    //println!("needheader start");
-                    match self.try_read_atleast(DATA_FILE_RECORD_HEADER_SIZE as usize, &mut buf).await? {
+                    //println!("    needheader start");
+                    match self
+                        .try_read_exact(DATA_FILE_RECORD_HEADER_SIZE as usize)
+                        .await?
+                    {
                         Some(buf) => {
-                            println!("got header buf: {:02x?}", &buf[..]);
+                            //println!("      got header buf: {:02x?}", &buf[..]);
 
                             let checksum = u32::from_be_bytes(buf[0..4].try_into().unwrap());
                             let len = u32::from_be_bytes(buf[4..8].try_into().unwrap());
@@ -825,7 +875,7 @@ impl Reader {
                             (State::NeedPayload(header), false)
                         }
                         None => {
-                            //println!("header read got no buf");
+                            //println!("      header read got no buf");
 
                             // Two possible scenarios here: we're still waiting on the data to be
                             // written, or the data file is actually complete and the writer has moved
@@ -845,17 +895,16 @@ impl Reader {
                             // TODO: Make sure there are always at least two data files, or figure out a
                             // better heuristic to use to distinguish a file from being actively written
                             // to or not.
-                            let current_writer_file_id =
-                                self.ledger.state().get_current_writer_file_id();
-                            let current_reader_file_id =
-                                self.ledger.state().get_current_reader_file_id();
                             let should_wait = if current_reader_file_id != current_writer_file_id {
-                                println!("hit actual EOF, rolling over (writer = {}, reader = {})",
-                                    current_writer_file_id, current_reader_file_id);
-                                // We've reached the actual end of this data file, so it's time to roll
-                                // to the next one.  We do that by hand here, once, to avoid having to
-                                // check every time we iterate on the loop.
-                                let _ = self.roll_to_next_data_file().await?;
+                                if self.buf.len() == 0 {
+                                    //println!("hit actual EOF, rolling over (writer = {}, reader = {})",
+                                    //    current_writer_file_id, current_reader_file_id);
+                                    // We've reached the actual end of this data file, so it's time to roll
+                                    // to the next one.  We do that by hand here, once, to avoid having to
+                                    // check every time we iterate on the loop.
+                                    let _ = self.roll_to_next_data_file().await?;
+                                }
+
                                 false
                             } else {
                                 //println!("waiting for writer to write more");
@@ -865,25 +914,29 @@ impl Reader {
                             (State::NeedHeader, should_wait)
                         }
                     }
-                },
+                }
                 State::NeedPayload(header) => {
-                    //println!("needpayload start, trying for {} bytes", header.len);
+                    //println!("    needpayload start, trying for {} bytes", header.len);
                     if header.len > 16000 {
+                        println!("header: {:?}", header);
                         panic!("invalid len");
                     }
-                    match self.try_read_atleast(header.len as usize, &mut buf).await? {
+                    match self.try_read_exact(header.len as usize).await? {
                         Some(buf) => {
-                            //println!("got payload body, {} bytes", buf.len());
-                            (State::NeedChecksumVerify(header, buf), false)
-                        },
+                            //println!("      got payload body, {} bytes", buf.len());
+                            (
+                                State::NeedChecksumVerify(header, Bytes::copy_from_slice(buf)),
+                                false,
+                            )
+                        }
                         None => {
-                            //println!("payload read got no buf");
+                            //println!("      payload read got no buf");
                             (State::NeedPayload(header), true)
-                        },
+                        }
                     }
                 }
                 State::NeedChecksumVerify(header, payload) => {
-                    //println!("needchecksumverify start");
+                    //println!("    needchecksumverify start");
                     let mut checksummer = self.checksummer.clone();
                     checksummer.reset();
 
@@ -892,66 +945,82 @@ impl Reader {
                     checksummer.update(&payload);
 
                     let checksum = checksummer.finalize();
-
-                    // TODO: we need to figure out the right logic for updating the last read
-                    // record ID.
-                    //
-                    // ideally, we'd always be setting `last_reader_record_id` to the ID we got
-                    // from the record itself, even though, realistically, we could just increment
-                    // by one since record IDs should always be monotonic with no gaps.
-                    //
-                    // if the record checksum is invalid, our ID might also be invalid, so that
-                    // becomes risky, and we just increment by one directly.
-                    //
-                    // if the checksum is valid, we could do the same thing, but it seems like we
-                    // ought to actually check to make sure that `last_reader_record_id` + 1 ==
-                    // `header.id`, since this would tell us if there were record ID gaps,
-                    // indicating some real weirdness with the writer.
-                    //
-                    // for now, just increment by one and do a crude check, if the checksum is
-                    // valid, to make sure the id we just got now equals `last_reader_record_id`.
-                    self.increment_last_reader_record_id();
-
                     if checksum == header.checksum {
-                        //println!("checksum matched");
-                        // update our last read record id for this record.
-                        //
-                        // TODO: should we emit a warning when we read a non-sequential record ID?
-                        // we always increment the ID in the "checksum didn't match" path so it
-                        // should always be valid, and we could actually just increment it instead
-                        // of even having
-                        //
-                        // crude panic for now
-                        if self.last_reader_record_id != header.id {
-                            println!(
-                                "non-monotonic/sequential record ID: last => {}, current => {}",
-                                self.last_reader_record_id, header.id
-                            );
+                        //println!("      checksum matched");
+                        let previous_last_reader_record_id = self.last_reader_record_id;
+                        let current_last_reader_record_id = header.id;
+                        self.last_reader_record_id = current_last_reader_record_id;
+
+                        // TODO: should this be saturating or should we check and throw if the
+                        // previous value was greater than the current?
+                        let id_delta =
+                            current_last_reader_record_id - previous_last_reader_record_id;
+                        match id_delta {
+                            // IDs should always move forward by one.
+                            0 => panic!("delta should always be one or more"),
+                            // Normal read.
+                            1 => self.ledger.state().set_last_reader_record_id(header.id),
+                            n => {
+                                // We've skipped records, likely due to detecting and invalid
+                                // checksum and skipping the rest of that file.  Now that we've
+                                // successfully read another record, and since IDs are sequential,
+                                // we can determine how many records were skipped and emit that as
+                                // an event.
+                                //
+                                // If `n` is equal to `current_last_reader_record_id`, that means
+                                // the process restarted and we're seeking to the last record that
+                                // we marked ourselves as having read, so no issues.
+                                if n != current_last_reader_record_id {
+                                    println!(
+                                        "      skipped records; last => {}, current => {}",
+                                        current_last_reader_record_id, self.last_reader_record_id
+                                    );
+
+                                    let corrupted_events = id_delta - 1;
+                                    //TODO: emit error here
+                                }
+                            }
                         }
 
                         (State::Verified(header, payload), false)
                     } else {
-                        //println!("checksum did not match");
+                        println!("      checksum did not match");
                         // we should probably emit an error here to track corrupted records, but for
                         // the moment.  additionally, we may want to return an error per corrupted
                         // record.
+                        //
+                        // TODO: what we probably need to do here is actually forcefully change over
+                        // to the next file.  Bruce brought this up that if we're doing append-only
+                        // w/ checksums, and we have a failed checksum, we can't be sure that the
+                        // payload length we got is correct, so we lack the ability to confidently
+                        // try to skip to the start of the next record
                         //
                         // for now, though, we'll simply reset our state and try to read the next record.
                         (State::NeedHeader, false)
                     }
                 }
                 State::Verified(header, payload) => {
-                    //println!("verified start");
-                    //println!("buffer: {:?}", payload);
-                    return Ok((header.id, payload.freeze()))
-                },
+                    //println!("    verified start");
+                    //println!("      buffer: {:?}", payload);
+                    return Ok((header.id, payload));
+                }
             };
 
             state = next_state;
-            if wait {
-                //println!("waiting for writer");
-                self.ledger.wait_for_writer().await;
-                //println!("writer wait passed");
+            // We don't internally loop when trying to read the header vs payload, so we assert here
+            // that we're in the same file before waiting.  If the writer had moved on, that would
+            // imply that the current file we're reading is complete and flushed to disk, so any
+            // wait we might have needed to do before is no longer pertinent... we just got a
+            // partial read and need to immediately try again.
+            if wait && current_writer_file_id == current_reader_file_id {
+                // However, if we are on the same file that the writer is currently on, we have
+                // to wait if we've caught up to the last record written by the writer.
+                let last_written_record_id = self.ledger.state().get_next_writer_record_id();
+                if self.last_reader_record_id + 1 == last_written_record_id {
+                    println!("  waiting for writer");
+                    self.ledger.wait_for_writer().await;
+                    println!("  writer wait passed");
+                }
             }
         }
     }

@@ -865,6 +865,7 @@ dependencies = [
  "db-key",
  "futures 0.3.17",
  "hdrhistogram",
+ "human_bytes",
  "lading_common",
  "leveldb",
  "memmap2",
@@ -2924,6 +2925,12 @@ name = "httpdate"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6456b8a6c8f33fee7d958fcd1b60d55b11940a79e63ae87013e6d22e26034440"
+
+[[package]]
+name = "human_bytes"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc178557b4a227ff4d9c51fbbf17f29607c32a96be106c97bb8499e075db0de2"
 
 [[package]]
 name = "humantime"
