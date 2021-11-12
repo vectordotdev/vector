@@ -22,6 +22,105 @@ configuration: {
 			}
 		}
 
+		enrichment_tables: {
+			common:      false
+			description: """
+				Configuration options for an [enrichment table](\(urls.enrichment_tables_concept)) to be used in a
+				[`remap`](\(urls.vector_remap_transform)) transform. Currently, only [CSV](\(urls.csv)) files are
+				supported.
+
+				For the lookup in the enrichment tables to be as performant as possible, the data is indexed according
+				to the fields that are used in the search. Note that indices can only be created for fields for which an
+				exact match is used in the condition. For range searches, an index isn't used and the enrichment table
+				drops back to a sequential scan of the data. A sequential scan shouldn't impact performance
+				significantly provided that there are only a few possible rows returned by the exact matches in the
+				condition. We don't recommend using a condition that uses only date range searches.
+				"""
+			required:    false
+			type: object: options: {
+				file: {
+					required:    true
+					description: "Configuration options for the file that provides the enrichment table."
+					type: object: options: {
+						path: {
+							description: """
+								The path of the enrichment table file. Currently, only [CSV](\(urls.csv)) files are
+								supported.
+								"""
+							warnings: [
+								"In order to be used by Vector, you need to assign read access to the enrichment table file.",
+							]
+							required: true
+							type: string: {
+								examples: [
+									"/data/info.csv",
+									"./info.csv",
+								]
+							}
+						}
+
+						encoding: {
+							description: "Configuration options for the encoding of the enrichment table's file."
+							required:    true
+							type: object: options: {
+								type: {
+									description: """
+										The encoding of the file. Currently, only [CSV](\(urls.csv)) is supported.
+										"""
+									required:    false
+									common:      true
+									type: string: default: "csv"
+								}
+
+								delimiter: {
+									description: "The delimiter used to separate fields in each row of the CSV file."
+									common:      false
+									required:    false
+									type: string: {
+										default: ","
+										examples: [ ":"]
+									}
+								}
+
+								include_headers: {
+									description: """
+										Set `include_headers` to `true` if the first row of the CSV file contains the
+										headers for each column. This is the default behavior.
+
+										If you set it to `false`, there are no headers and the columns are referred to
+										by their numerical index.
+										"""
+									required: false
+									common:   false
+									type: bool: default: true
+								}
+							}
+						}
+
+						schema: {
+							description: _coercing_fields
+							required:    false
+							common:      true
+							type: object: {
+								examples: [
+									{
+										status:            "int"
+										duration:          "float"
+										success:           "bool"
+										timestamp_iso8601: "timestamp|%F"
+										timestamp_custom:  "timestamp|%a %b %e %T %Y"
+										timestamp_unix:    "timestamp|%F %T"
+									},
+								]
+
+								options: {}
+							}
+						}
+					}
+				}
+			}
+		}
+
 		log_schema: {
 			common: false
 			description: """
