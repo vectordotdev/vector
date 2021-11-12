@@ -48,7 +48,7 @@ configuration: {
 								supported.
 								"""
 							warnings: [
-								"In order to be used by Vector, the enrichment table file needs read-only permissions.",
+								"In order to be used by Vector, you need to assign read access to the enrichment table file.",
 							]
 							required: true
 							type: string: {
