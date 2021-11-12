@@ -576,7 +576,6 @@ mod integration_tests {
             ..config
         };
 
-
         let sink = config.to_sink();
         sink.run(input).await.expect("Failed to run sink");
 
@@ -712,7 +711,9 @@ mod integration_tests {
     ) -> (Vec<String>, usize, impl Stream<Item = Event>) {
         let key = count / groups;
         let lines = random_lines(len).take(count).collect::<Vec<_>>();
-        let (size, events) = lines.clone().into_iter()
+        let (size, events) = lines
+            .clone()
+            .into_iter()
             .enumerate()
             .map(move |(i, line)| {
                 let mut log = LogEvent::from(line);
