@@ -1,6 +1,6 @@
 use super::BulkAction;
+use crate::aws::rusoto::AwsAuthentication;
 use crate::event::{LogEvent, Metric, MetricKind, MetricValue, Value};
-use crate::rusoto::AwsAuthentication;
 use crate::sinks::elasticsearch::sink::process_log;
 use crate::sinks::elasticsearch::{
     DataStreamConfig, ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig,

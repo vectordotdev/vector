@@ -1,8 +1,8 @@
 #[cfg(feature = "aws-s3-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    use crate::aws::rusoto::RegionOrEndpoint;
     use crate::config::SinkContext;
-    use crate::rusoto::RegionOrEndpoint;
     use crate::sinks::aws_s3::S3SinkConfig;
     use crate::sinks::s3_common::config::S3Options;
     use crate::sinks::util::encoding::StandardEncodings;

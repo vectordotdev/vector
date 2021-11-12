@@ -1,12 +1,12 @@
 mod request;
 
+use crate::aws::rusoto::{self, AwsAuthentication, RegionOrEndpoint};
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
     },
     event::{Event, LogEvent, Value},
     internal_events::TemplateRenderingFailed,
-    rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
         batch::BatchConfig,
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -687,10 +687,8 @@ impl From<RusotoError<DescribeLogStreamsError>> for CloudwatchError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        event::{Event, Value},
-        rusoto::RegionOrEndpoint,
-    };
+    use crate::aws::rusoto::RegionOrEndpoint;
+    use crate::event::{Event, Value};
     use std::collections::HashMap;
     use std::convert::{TryFrom, TryInto};
 
@@ -795,7 +793,7 @@ mod tests {
 
     fn svc(config: CloudwatchLogsSinkConfig) -> CloudwatchLogsSvc {
         let config = CloudwatchLogsSinkConfig {
-            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000"),
             ..config
         };
         let key = CloudwatchKey {
@@ -867,9 +865,9 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
+    use crate::aws::rusoto::RegionOrEndpoint;
     use crate::{
         config::{ProxyConfig, SinkConfig, SinkContext},
-        rusoto::RegionOrEndpoint,
         test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
     };
     use futures::{stream, SinkExt, StreamExt};
@@ -890,7 +888,7 @@ mod integration_tests {
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from(stream_name.as_str()).unwrap(),
             group_name: Template::try_from(GROUP_NAME).unwrap(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000"),
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
@@ -937,7 +935,7 @@ mod integration_tests {
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from(stream_name.as_str()).unwrap(),
             group_name: Template::try_from(GROUP_NAME).unwrap(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000"),
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
@@ -1003,7 +1001,7 @@ mod integration_tests {
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from(stream_name.as_str()).unwrap(),
             group_name: Template::try_from(GROUP_NAME).unwrap(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000"),
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
@@ -1075,7 +1073,7 @@ mod integration_tests {
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from(stream_name.as_str()).unwrap(),
             group_name: Template::try_from(group_name.as_str()).unwrap(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000"),
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
@@ -1127,7 +1125,7 @@ mod integration_tests {
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from(stream_name.as_str()).unwrap(),
             group_name: Template::try_from(group_name.as_str()).unwrap(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000"),
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
@@ -1175,7 +1173,7 @@ mod integration_tests {
         let config = CloudwatchLogsSinkConfig {
             group_name: Template::try_from(GROUP_NAME).unwrap(),
             stream_name: Template::try_from(format!("{}-{{{{key}}}}", stream_name)).unwrap(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000"),
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,
@@ -1261,7 +1259,7 @@ mod integration_tests {
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from("test-stream").unwrap(),
             group_name: Template::try_from(GROUP_NAME).unwrap(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:6000".into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:6000"),
             encoding: Encoding::Text.into(),
             create_missing_group: None,
             create_missing_stream: None,

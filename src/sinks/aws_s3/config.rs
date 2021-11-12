@@ -1,10 +1,10 @@
+use crate::aws::rusoto::{AwsAuthentication, RegionOrEndpoint};
 use crate::config::SinkContext;
 use crate::sinks::s3_common::sink::S3Sink;
 use crate::sinks::util::encoding::StandardEncodings;
 use crate::sinks::util::BulkSizeBasedDefaultBatchSettings;
 use crate::{
     config::{DataType, GenerateConfig, ProxyConfig, SinkConfig},
-    rusoto::{AwsAuthentication, RegionOrEndpoint},
     sinks::{
         s3_common::{
             self,

@@ -1,8 +1,8 @@
 #![cfg(test)]
 
 use super::*;
+use crate::aws::RegionOrEndpoint;
 use crate::config::{SinkConfig, SinkContext};
-use crate::rusoto::RegionOrEndpoint;
 use crate::sinks::aws_kinesis_firehose::config::{
     KinesisFirehoseDefaultBatchSettings, MAX_PAYLOAD_EVENTS, MAX_PAYLOAD_SIZE,
 };
@@ -24,7 +24,7 @@ async fn check_batch_size() {
 
     let config = KinesisFirehoseSinkConfig {
         stream_name: String::from("test"),
-        region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
+        region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
         encoding: EncodingConfig::from(StandardEncodings::Json),
         compression: Compression::None,
         batch,
@@ -51,7 +51,7 @@ async fn check_batch_events() {
 
     let config = KinesisFirehoseSinkConfig {
         stream_name: String::from("test"),
-        region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
+        region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
         encoding: EncodingConfig::from(StandardEncodings::Json),
         compression: Compression::None,
         batch,

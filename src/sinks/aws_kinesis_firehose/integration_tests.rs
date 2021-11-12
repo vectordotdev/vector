@@ -2,8 +2,8 @@
 #![cfg(test)]
 
 use super::*;
+use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::config::{SinkConfig, SinkContext};
-use crate::rusoto::{AwsAuthentication, RegionOrEndpoint};
 use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
 use crate::sinks::util::{BatchConfig, Compression, TowerRequestConfig};
 use crate::test_util::components;
@@ -40,7 +40,7 @@ async fn firehose_put_records() {
 
     let config = KinesisFirehoseSinkConfig {
         stream_name: stream.clone(),
-        region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
+        region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
         encoding: EncodingConfig::from(StandardEncodings::Json), // required for ES destination w/ localstack
         compression: Compression::None,
         batch,

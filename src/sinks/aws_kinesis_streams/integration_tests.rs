@@ -2,13 +2,13 @@
 #![cfg(test)]
 
 use super::*;
+use crate::aws::rusoto::RegionOrEndpoint;
 use crate::config::SinkConfig;
 use crate::sinks::util::encoding::StandardEncodings;
 use crate::sinks::util::{BatchConfig, Compression};
 use crate::test_util::components;
 use crate::{
     config::SinkContext,
-    rusoto::RegionOrEndpoint,
     test_util::{random_lines_with_stream, random_string},
 };
 use rusoto_core::Region;
@@ -33,7 +33,7 @@ async fn kinesis_put_records() {
     let config = KinesisSinkConfig {
         stream_name: stream.clone(),
         partition_key_field: None,
-        region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
+        region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
         encoding: StandardEncodings::Text.into(),
         compression: Compression::None,
         batch,
