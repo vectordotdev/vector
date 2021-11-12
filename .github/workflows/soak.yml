@@ -294,7 +294,7 @@ jobs:
 
       - name: Analyze captures
         run: |
-          ./soaks/bin/analyze_experiment.sh --capture-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures/ \
+          ./soaks/bin/analyze_experiment.sh --capture-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures \
                                             --baseline ${{ needs.compute-soak-meta.outputs.baseline-sha }} \
                                             --comparison ${{ needs.compute-soak-meta.outputs.comparison-sha }} \
                                             --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} > /tmp/${{ github.event.number}}-${{ github.run_attempt }}-analysis
