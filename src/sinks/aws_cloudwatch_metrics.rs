@@ -1,10 +1,11 @@
+use crate::aws::auth::AwsAuthentication;
+use crate::aws::rusoto::{self, RegionOrEndpoint};
 use crate::{
     config::{DataType, ProxyConfig, SinkConfig, SinkContext, SinkDescription},
     event::{
         metric::{Metric, MetricValue},
         Event,
     },
-    rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
         batch::{BatchConfig, BatchSettings},
         buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},

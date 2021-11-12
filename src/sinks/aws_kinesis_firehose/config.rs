@@ -1,6 +1,5 @@
+use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext};
-use crate::rusoto;
-use crate::rusoto::{AwsAuthentication, RegionOrEndpoint};
 use crate::sinks::aws_kinesis_firehose::request_builder::KinesisRequestBuilder;
 use crate::sinks::aws_kinesis_firehose::service::{KinesisResponse, KinesisService};
 use crate::sinks::aws_kinesis_firehose::sink::KinesisSink;
@@ -17,6 +16,7 @@ use rusoto_firehose::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::aws::rusoto;
 use crate::sinks::{Healthcheck, VectorSink};
 use snafu::Snafu;
 use tower::ServiceBuilder;

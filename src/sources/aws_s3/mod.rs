@@ -1,8 +1,9 @@
 use super::util::MultilineConfig;
+use crate::aws::auth::AwsAuthentication;
+use crate::aws::rusoto::{self, RegionOrEndpoint};
 use crate::{
     config::{DataType, ProxyConfig, SourceConfig, SourceContext, SourceDescription},
     line_agg,
-    rusoto::{self, AwsAuthentication, RegionOrEndpoint},
 };
 use async_compression::tokio::bufread;
 use futures::{stream, stream::StreamExt};
@@ -294,10 +295,10 @@ mod test {
 #[cfg(test)]
 mod integration_tests {
     use super::{sqs, AwsS3Config, Compression, Strategy};
+    use crate::aws::rusoto::RegionOrEndpoint;
     use crate::{
         config::{SourceConfig, SourceContext},
         line_agg,
-        rusoto::RegionOrEndpoint,
         sources::util::MultilineConfig,
         test_util::{
             collect_n, lines_from_gzip_file, lines_from_zst_file, random_lines, trace_init,

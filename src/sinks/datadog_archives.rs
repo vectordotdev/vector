@@ -29,11 +29,14 @@ use super::util::{
     BatchSettings, Compression, RequestBuilder,
 };
 use crate::{
+    aws::{AwsAuthentication, RegionOrEndpoint},
+    http::HttpClient,
+    serde::to_string,
+};
+
+use crate::{
     config::GenerateConfig,
     config::{DataType, SinkConfig, SinkContext},
-    http::HttpClient,
-    rusoto::{AwsAuthentication, RegionOrEndpoint},
-    serde::to_string,
     sinks::{
         azure_common::{
             self,

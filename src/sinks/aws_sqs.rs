@@ -1,10 +1,10 @@
+use crate::aws::rusoto::{self, AwsAuthentication, RegionOrEndpoint};
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
     },
     event::Event,
     internal_events::{AwsSqsEventSent, TemplateRenderingFailed},
-    rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
@@ -394,7 +394,7 @@ mod integration_tests {
 
         let config = SqsSinkConfig {
             queue_url: queue_url.clone(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
             encoding: Encoding::Text.into(),
             message_group_id: None,
             message_deduplication_id: None,
