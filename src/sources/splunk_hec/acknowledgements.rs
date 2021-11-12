@@ -41,6 +41,11 @@ impl Channel {
         self.last_used_timestamp = SystemTime::now();
         self.ack_info.get_ack_id()
     }
+
+    pub fn get_acks_status(&mut self, acks: Vec<u64>) -> HashMap<u64, bool> {
+        self.last_used_timestamp = SystemTime::now();
+        self.ack_info.get_acks_status(acks)
+    }
 }
 
 pub struct HecAckInfo {
@@ -75,4 +80,19 @@ impl HecAckInfo {
         }
         ack_id
     }
+
+    fn get_acks_status(&self, acks: Vec<u64>) -> HashMap<u64, bool> {
+        acks.iter().map(|ack_id| (*ack_id, self.ack_ids_ack_status.contains(*ack_id))).collect()
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct HecAckStatusRequest {
+    pub acks: Vec<u64>,
+}
+
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct HecAckStatusResponse {
+    pub acks: HashMap<u64, bool>,
 }

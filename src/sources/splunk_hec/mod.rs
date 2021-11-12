@@ -1,7 +1,10 @@
-use crate::{Pipeline, config::{AcknowledgementsConfig, DataType, Resource, SourceConfig, SourceContext, SourceDescription, log_schema}, event::{Event, LogEvent, Value}, internal_events::{
+use crate::{Pipeline, config::{
+        log_schema, AcknowledgementsConfig, DataType, Resource, SourceConfig, SourceContext,
+        SourceDescription,
+    }, event::{Event, LogEvent, Value}, internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
         SplunkHecRequestReceived,
-    }, sources::splunk_hec::splunk_response::HecResponseMetadata, tls::{MaybeTlsSettings, TlsConfig}};
+    }, sources::splunk_hec::{acknowledgements::{HecAckStatusRequest, HecAckStatusResponse}, splunk_response::HecResponseMetadata}, tls::{MaybeTlsSettings, TlsConfig}};
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
@@ -10,13 +13,22 @@ use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::{de::Read as JsonRead, json, Deserializer, Value as JsonValue};
 use snafu::Snafu;
+use std::{
+    collections::HashMap,
+    future,
+    io::Read,
+    net::{Ipv4Addr, SocketAddr},
+    sync::Arc,
+};
 use tokio::sync::RwLock;
-use std::{collections::HashMap, future, io::Read, net::{Ipv4Addr, SocketAddr}, sync::Arc};
 use vector_core::ByteSizeOf;
 
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
-use self::{acknowledgements::{Channel, HecAcknowledgementsConfig}, splunk_response::{HecCode, HecResponse}};
+use self::{
+    acknowledgements::{Channel, HecAcknowledgementsConfig},
+    splunk_response::{HecCode, HecResponse},
+};
 
 mod acknowledgements;
 
@@ -150,13 +162,17 @@ struct SplunkSource {
 }
 
 impl SplunkSource {
-    fn new(config: &SplunkConfig, protocol: &'static str, acknowledgements: AcknowledgementsConfig) -> Self {
+    fn new(
+        config: &SplunkConfig,
+        protocol: &'static str,
+        acknowledgements: AcknowledgementsConfig,
+    ) -> Self {
         let valid_tokens = config
             .valid_tokens
             .iter()
             .flatten()
             .chain(config.token.iter());
-        
+
         // if using acknowledgements, create a structure to map channel ID to channel info
         let channels = if acknowledgements.enabled {
             Some(Arc::new(RwLock::new(HashMap::new())))
@@ -187,7 +203,7 @@ impl SplunkSource {
         let protocol = self.protocol;
         let channels = self.channels.clone();
         let indexer_acknowledgements = self.indexer_acknowledgements.clone();
-        
+
         warp::post()
             .and(path!("event").or(path!("event" / "1.0")))
             .and(self.authorization())
@@ -199,7 +215,6 @@ impl SplunkSource {
             .and(warp::path::full())
             .and_then(
                 move |_,
-                      _,
                       channel: Option<String>,
                       remote: Option<SocketAddr>,
                       xff: Option<String>,
@@ -220,7 +235,7 @@ impl SplunkSource {
                         if channels.is_some() && channel.is_none() {
                             return Err(Rejection::from(ApiError::MissingChannel));
                         }
-                        
+
                         let reader: Box<dyn Read + Send> = if gzip {
                             Box::new(MultiGzDecoder::new(body.reader()))
                         } else {
@@ -242,27 +257,30 @@ impl SplunkSource {
                             (Some(channel_lock), Some(channel_id)) => {
                                 let mut channels = channel_lock.write().await;
                                 match channels.get_mut(&channel_id) {
-                                    Some(channel_info) => {
-                                        Some(channel_info.get_ack_id())
-                                    },
+                                    Some(channel_info) => Some(channel_info.get_ack_id()),
                                     None => {
-                                        let mut new_channel = Channel::new(indexer_acknowledgements.max_pending_acks_per_channel.clone());
+                                        let mut new_channel = Channel::new(
+                                            indexer_acknowledgements
+                                                .max_pending_acks_per_channel
+                                                .clone(),
+                                        );
                                         let ack_id = new_channel.get_ack_id();
                                         channels.insert(channel_id, new_channel);
                                         Some(ack_id)
-                                    },
+                                    }
                                 }
-                            },
-                            _ => None
+                            }
+                            _ => None,
                         };
 
-                        res.map(|_| {ack_id})
+                        res.map(|_| ack_id)
                     }
                 },
             )
             .map(|maybe_ack_id| {
                 if let Some(ack_id) = maybe_ack_id {
-                    let body = HecResponse::new(HecCode::Success).with_metadata(HecResponseMetadata::AckId(ack_id));
+                    let body = HecResponse::new(HecCode::Success)
+                        .with_metadata(HecResponseMetadata::AckId(ack_id));
                     response_json(StatusCode::OK, &body)
                 } else {
                     response_json(StatusCode::OK, &*splunk_response::SUCCESS)
@@ -298,7 +316,6 @@ impl SplunkSource {
             .and(warp::path::full())
             .and_then(
                 move |_,
-                      _,
                       channel: String,
                       remote: Option<SocketAddr>,
                       xff: Option<String>,
@@ -313,7 +330,8 @@ impl SplunkSource {
                     });
                     let channels = channels.clone();
                     async move {
-                        let event = future::ready(raw_event(body, gzip, channel.clone(), remote, xff));
+                        let event =
+                            future::ready(raw_event(body, gzip, channel.clone(), remote, xff));
                         let res = futures::stream::once(event)
                             .forward(
                                 out.sink_map_err(|_| Rejection::from(ApiError::ServerShutdown)),
@@ -325,26 +343,29 @@ impl SplunkSource {
                             Some(channel_lock) => {
                                 let mut channels = channel_lock.write().await;
                                 match channels.get_mut(&channel_id) {
-                                    Some(channel_info) => {
-                                        Some(channel_info.get_ack_id())
-                                    },
+                                    Some(channel_info) => Some(channel_info.get_ack_id()),
                                     None => {
-                                        let mut new_channel = Channel::new(indexer_acknowledgements.max_pending_acks_per_channel.clone());
+                                        let mut new_channel = Channel::new(
+                                            indexer_acknowledgements
+                                                .max_pending_acks_per_channel
+                                                .clone(),
+                                        );
                                         let ack_id = new_channel.get_ack_id();
                                         channels.insert(channel_id, new_channel);
                                         Some(ack_id)
-                                    },
+                                    }
                                 }
-                            },
-                            _ => None
+                            }
+                            _ => None,
                         };
-                        res.map(|_| {ack_id})
+                        res.map(|_| ack_id)
                     }
                 },
             )
             .map(|maybe_ack_id| {
                 if let Some(ack_id) = maybe_ack_id {
-                    let body = HecResponse::new(HecCode::Success).with_metadata(HecResponseMetadata::AckId(ack_id));
+                    let body = HecResponse::new(HecCode::Success)
+                        .with_metadata(HecResponseMetadata::AckId(ack_id));
                     response_json(StatusCode::OK, &body)
                 } else {
                     response_json(StatusCode::OK, &*splunk_response::SUCCESS)
@@ -377,13 +398,41 @@ impl SplunkSource {
     }
 
     fn ack_service(&self) -> BoxedFilter<(Response,)> {
+        let splunk_channel_query_param = warp::query::<HashMap<String, String>>()
+            .map(|qs: HashMap<String, String>| qs.get("channel").map(|v| v.to_owned()));
+        let splunk_channel_header = warp::header::optional::<String>("x-splunk-request-channel");
+
+        let splunk_channel = splunk_channel_header
+            .and(splunk_channel_query_param)
+            .and_then(|header: Option<String>, query_param| async move {
+                header
+                    .or(query_param)
+                    .ok_or_else(|| Rejection::from(ApiError::MissingChannel))
+            });
+
+        let channels = self.channels.clone();
         warp::post()
             .and(path!("ack"))
             .and(self.authorization())
+            .and(splunk_channel)
             .and(warp::body::json())
-            .map(|_, body: JsonValue| {
-                println!("{:?}", body);
-                warp::reply().into_response()
+            .and_then(move |channel_id: String, body: HecAckStatusRequest| {
+                let channels = channels.clone();
+                async move {
+                    if let Some(channels_lock) = channels {
+                        let mut channels = channels_lock.write().await;
+                        let channel = channels.get_mut(&channel_id);
+                        // todo: test Splunk behavior for ack query when channel does not exist
+                        match channel {
+                            Some(channel) => Ok(warp::reply::json(&HecAckStatusResponse {
+                                acks: channel.get_acks_status(body.acks),
+                            }).into_response()),
+                            None => Err(Rejection::from(ApiError::BadRequest)),
+                        }
+                    } else {
+                        Err(Rejection::from(ApiError::BadRequest))
+                    }
+                }
             })
             .boxed()
     }
@@ -406,7 +455,7 @@ impl SplunkSource {
     }
 
     /// Authorize request
-    fn authorization(&self) -> BoxedFilter<((),)> {
+    fn authorization(&self) -> BoxedFilter<()> {
         let valid_credentials = self.valid_credentials.clone();
         warp::header::optional("Authorization")
             .and_then(move |token: Option<String>| {
@@ -420,6 +469,7 @@ impl SplunkSource {
                     }
                 }
             })
+            .untuple_one()
             .boxed()
     }
 
