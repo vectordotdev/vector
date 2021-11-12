@@ -222,6 +222,26 @@ impl SourceConfig for DemoLogsConfig {
     }
 }
 
+// Add a compatibility alias to avoid breaking existing configs
+#[derive(Deserialize, Serialize, Debug, Clone)]
+struct DemoLogsCompatConfig(DemoLogsConfig);
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "generator")]
+impl SourceConfig for DemoLogsCompatConfig {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        self.0.build(cx).await
+    }
+
+    fn output_type(&self) -> DataType {
+        self.0.output_type()
+    }
+
+    fn source_type(&self) -> &'static str {
+        self.0.source_type()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
