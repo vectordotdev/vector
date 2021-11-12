@@ -187,19 +187,7 @@ impl SplunkSource {
         let protocol = self.protocol;
         let channels = self.channels.clone();
         let indexer_acknowledgements = self.indexer_acknowledgements.clone();
-        // The event service handles requests to the services/collector/event | services/collector/event/1.0 paths
-        //
-        // It processes the following pieces of data from the request
-        // authorization token: self.authorization()
-        // splunk channel: splunk_channel
-        // remote address for "host" metadata: warp::addr::remote
-        // forwarded for address for "host" metadata (takes precedent): warp::header::"x-forwarded-for"
-        // gzip compression: self.gzip()
-        // body content in bytes: warp::body::bytes()
-        // path of the request: warp::path::full()
-        // 
-        // This data is used to create events that are then sent to other vector components downstream
-        // We naively reply with a success. We want to reply with a success that includes an ackId.
+        
         warp::post()
             .and(path!("event").or(path!("event" / "1.0")))
             .and(self.authorization())
@@ -250,7 +238,7 @@ impl SplunkSource {
 
                         out.flush().await?;
 
-                        let ack_id = match (channels.clone(), channel) {
+                        let ack_id = match (channels, channel) {
                             (Some(channel_lock), Some(channel_id)) => {
                                 let mut channels = channel_lock.write().await;
                                 match channels.get_mut(&channel_id) {
@@ -273,7 +261,6 @@ impl SplunkSource {
                 },
             )
             .map(|maybe_ack_id| {
-                println!("{:?}", maybe_ack_id);
                 if let Some(ack_id) = maybe_ack_id {
                     let body = HecResponse::new(HecCode::Success).with_metadata(HecResponseMetadata::AckId(ack_id));
                     response_json(StatusCode::OK, &body)
@@ -298,6 +285,8 @@ impl SplunkSource {
             });
 
         let protocol = self.protocol;
+        let channels = self.channels.clone();
+        let indexer_acknowledgements = self.indexer_acknowledgements.clone();
         warp::post()
             .and(path!("raw" / "1.0").or(path!("raw")))
             .and(self.authorization())
@@ -322,18 +311,45 @@ impl SplunkSource {
                         http_path: path.as_str(),
                         protocol,
                     });
+                    let channels = channels.clone();
                     async move {
-                        let event = future::ready(raw_event(body, gzip, channel, remote, xff));
-                        futures::stream::once(event)
+                        let event = future::ready(raw_event(body, gzip, channel.clone(), remote, xff));
+                        let res = futures::stream::once(event)
                             .forward(
                                 out.sink_map_err(|_| Rejection::from(ApiError::ServerShutdown)),
                             )
                             .map_ok(|_| ())
-                            .await
+                            .await;
+                        let channel_id = channel;
+                        let ack_id = match channels.clone() {
+                            Some(channel_lock) => {
+                                let mut channels = channel_lock.write().await;
+                                match channels.get_mut(&channel_id) {
+                                    Some(channel_info) => {
+                                        Some(channel_info.get_ack_id())
+                                    },
+                                    None => {
+                                        let mut new_channel = Channel::new(indexer_acknowledgements.max_pending_acks_per_channel.clone());
+                                        let ack_id = new_channel.get_ack_id();
+                                        channels.insert(channel_id, new_channel);
+                                        Some(ack_id)
+                                    },
+                                }
+                            },
+                            _ => None
+                        };
+                        res.map(|_| {ack_id})
                     }
                 },
             )
-            .map(finish_ok)
+            .map(|maybe_ack_id| {
+                if let Some(ack_id) = maybe_ack_id {
+                    let body = HecResponse::new(HecCode::Success).with_metadata(HecResponseMetadata::AckId(ack_id));
+                    response_json(StatusCode::OK, &body)
+                } else {
+                    response_json(StatusCode::OK, &*splunk_response::SUCCESS)
+                }
+            })
             .boxed()
     }
 
