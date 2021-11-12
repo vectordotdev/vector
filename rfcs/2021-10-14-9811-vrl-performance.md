@@ -142,100 +142,6 @@ Some changes will need to be made:
 Initial experiments roughly showed a reduction from 1m20s to 1m02s to push
 100,000 records through Vector using reference counting.
 
-### Bytecode VM
-
-Vrl compiles to an AST that is then walked during resolution. Each node in that
-tree is boxed and stored in disparate regions of memory. As a result walking
-the tree means that the CPU caches must be constantly swapped.
-
-Instead we can create a bytecode VM to store the execution of the Vrl program.
-
-Bytecode is essentially a big enum of instructions:
-
-```rust
-#[derive(FromPrimitive, ToPrimitive, Copy, Clone, Debug, PartialEq, Eq)]
-pub enum OpCode {
-    Return = 255,
-    Constant,
-    Negate,
-    Add,
-    Subtract,
-    Multiply,
-    Divide,
-    Print,
-    Not,
-    Greater,
-    GreaterEqual,
-    Less,
-    LessEqual,
-    NotEqual,
-    Equal,
-    Pop,
-    JumpIfFalse,
-    Jump,
-    SetPath,
-    GetPath,
-    Call,
-    ...
-}
-```
-
-The Vm is a struct comprising of the following fields:
-
-```rust
-#[derive(Clone, Debug, Default)]
-pub struct Vm {
-    instructions: Vec<usize>,
-    values: Vec<Literal>,
-    targets: Vec<Variable>,
-    stack: Vec<Value>,
-    ip: usize,
-}
-```
-
-- instructions
-
-The instructions field is a `Vec` of `OpCode` cast to a usize. The reason for
-the cast is because not all instructions are `OpCode`. For example the
-instructions `[.., Constant, 12, ..]` when evaluated will load the constant
-stored in the `values` `Vec` that is found in position 12 onto the stack.
-
-- values
-
-A list of constant values found in the program. Since the bytecode only
-contains integers any actual values must be stored here. This also allows
-literals to be deduped.
-
-- targets
-
-A list of paths used in the program, similar to `values`.
-
-- stack
-
-The Vm is a stack based Vm. Every expression that is evaluated pushes the
-result on the stack. Every operation pulls the values it uses from the stack.
-
-- ip
-
-The instruction pointer points to the next instruction to evaluate.
-
-With each node of the AST compiled down to just a few bytes and all
-instructions held in contiguous memory evaluation of the program should be able
-to take full advantage of the CPU cache which should result in much faster
-execution.
-
-
-#### Calling functions
-
-Calling functions in the stdlib will be a case of evaluating each parameter
-with the results pushed onto the stack.
-
-Since Vrl allows for named parameters and optional parameters, the compiler
-will need to ensure the bytecode evaluates each parameter in a specific order
-(likely the order declared in the function). Bytecode will need to be emmitted
-for parameters that are not specified in the Vrl script to add a default value
-to the stack.
-
 ### Flow analysis
 
 One of the expensive operations is path lookup.
@@ -283,16 +189,6 @@ allocated up front.
 This is probably not ready yet until this PR for `BTreeMap` lands.
 https://github.com/rust-lang/rust/pull/77438
 
-
-### Optimization
-
-With the code as a single dimension array of Bytecode, it could be possible to
-scan the code for patterns and reorganise the Bytecode so it can run in a more
-optimal way.
-
-A lot more thought and research needs to go into this before we can consider
-implementing these changes.
-
 ### Optimizing stdlib functions
 
 There is a small number of functions in the stdlib that follow a pattern of
@@ -323,28 +219,6 @@ Downsides to moving Vrl to use reference counting:
 - Using `RefCell` does move the borrow checking to the runtime. Without compile
   time checks the chances of a panic are much higher.
 
-Downsides to using a Vm:
-
-- The code is much more complex. With an AST that we walk it is fairly apparent
-  what the code will be doing at any point. With a Vm, this is not the case, it
-  is harder to look at the instructions in the Vm and follow back to what part
-  of the Vrl code is being evaluated. We will need to write some extensive
-  debugging tools to allow for decent introspection into the Vm.
-- We lose a lot of safety that we get from the Rust compiler. There will need
-  to be significant fuzz testing to ensure that the code runs correctly under
-  all circumstances.
-- Currently each stdlib function is responsible for evaluating their own
-  parameters. This allows parameters to be lazily evaluated. Most likely with a
-  Vm, the parameters will need to be evaluated up front and the stack passed
-  into the function. This could impact performance.
-
-## Prior Art
-
-- Goscript - An implementation of Go using a bytecode Vm,
-  https://github.com/oxfeeefeee/goscript
-
-- CPython - https://github.com/python/cpython
-
 ## Alternatives
 
 This RFC lists a number of improvements that can be made to Vrl, we could do
@@ -367,8 +241,6 @@ after the RFC is approved:
 
 - [ ] Submit a PR with spike-level code _roughly_ demonstrating the change for
       referencing counting. See [here](https://github.com/vectordotdev/vector/pull/9785).
-- [ ] Submit a PR with spike-level code _roughly_ demonstrating the change for
-      the VM.
 - [ ] Optimise the relevant stdlib functions.
 
 
