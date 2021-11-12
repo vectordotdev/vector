@@ -4,7 +4,7 @@ This RFC discusses changes to apply framing and encoding across sinks in a consi
 
 ## Context
 
-In the context of sinks, we refer with _encoding_ to serializing an event to bytes and with _framing_ to the process of wrapping one or multiple serialized events into a bounded message that can be sent as payload to a sink.
+In the context of sinks, we refer to _encoding_ as serializing an event to bytes, and to _framing_ as the process of wrapping one or more serialized events into a bounded message that can be used as the payload for a request sent by a sink.
 
 Currently, most sinks include the common `EncodingConfig<T>` in their config. It takes a generic argument where enums specify which encodings they support. However, the actual encoding logic is reimplemented by each sink individually, rather than falling back to a shared inventory of codec implementations. This leads to unnecessary drift in their feature set and behavior.
 
