@@ -447,7 +447,7 @@ mod integration_tests {
                 .await
                 .unwrap_err()
                 .to_string(),
-            "Container: other-container-name not found"
+            "Container: \"other-container-name\" not found"
         );
     }
 
@@ -561,21 +561,23 @@ mod integration_tests {
 
     #[tokio::test]
     async fn azure_blob_rotate_files_after_the_buffer_size_is_reached() {
+        let groups = 3;
+        let (lines, size, input) = random_lines_with_stream_with_group_key(100, 30, groups);
+        let size_per_group = (size / groups) + 10;
+
         let blob_prefix = String::from("lines-rotate/into/blob/");
-        let config = AzureBlobSinkConfig::new_emulator().await;
+        let mut config = AzureBlobSinkConfig::new_emulator().await;
+        config.batch.max_bytes = Some(size_per_group);
+
         let config = AzureBlobSinkConfig {
             blob_prefix: Some(blob_prefix.clone() + "{{key}}"),
             blob_append_uuid: Some(false),
-            batch: BatchConfig {
-                max_bytes: Some(1010),
-                ..config.batch
-            },
+            batch: config.batch,
             ..config
         };
-        let sink = config.to_sink();
-        let groups = 3;
-        let (lines, input) = random_lines_with_stream_with_group_key(100, 30, groups);
 
+
+        let sink = config.to_sink();
         sink.run(input).await.expect("Failed to run sink");
 
         let blobs = config.list_blobs(blob_prefix.as_str()).await;
@@ -707,16 +709,23 @@ mod integration_tests {
         len: usize,
         count: usize,
         groups: usize,
-    ) -> (Vec<String>, impl Stream<Item = Event>) {
+    ) -> (Vec<String>, usize, impl Stream<Item = Event>) {
         let key = count / groups;
         let lines = random_lines(len).take(count).collect::<Vec<_>>();
-        let events = lines.clone().into_iter().enumerate().map(move |(i, line)| {
-            let mut log = LogEvent::from(line);
-            let i = ((i / key) + 1) as i32;
-            log.insert("key", i);
-            log.into()
-        });
+        let (size, events) = lines.clone().into_iter()
+            .enumerate()
+            .map(move |(i, line)| {
+                let mut log = LogEvent::from(line);
+                let i = ((i / key) + 1) as i32;
+                log.insert("key", i);
+                Event::from(log)
+            })
+            .fold((0, Vec::new()), |(mut size, mut events), event| {
+                size += event.size_of();
+                events.push(event);
+                (size, events)
+            });
 
-        (lines, stream::iter(events))
+        (lines, size, stream::iter(events))
     }
 }
