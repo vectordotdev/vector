@@ -38,7 +38,6 @@ module "vector" {
   source       = "../../../common/terraform/modules/vector"
   type         = var.type
   vector_image = var.vector_image
-  test_name    = "syslog_regex_logs2metric_ddmetrics"
   vector-toml  = file("${path.module}/vector.toml")
   namespace    = kubernetes_namespace.soak.metadata[0].name
   vector_cpus  = var.vector_cpus

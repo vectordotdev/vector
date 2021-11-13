@@ -17,7 +17,6 @@ resource "kubernetes_service" "vector" {
   spec {
     selector = {
       type      = var.type
-      soak_test = kubernetes_deployment.vector.metadata.0.labels.soak_test
     }
     session_affinity = "ClientIP"
     port {
@@ -41,7 +40,6 @@ resource "kubernetes_deployment" "vector" {
     namespace = var.namespace
     labels = {
       type      = var.type
-      soak_test = var.test_name
     }
   }
 
@@ -51,7 +49,6 @@ resource "kubernetes_deployment" "vector" {
     selector {
       match_labels = {
         type      = var.type
-        soak_test = var.test_name
       }
     }
 
@@ -59,7 +56,6 @@ resource "kubernetes_deployment" "vector" {
       metadata {
         labels = {
           type      = var.type
-          soak_test = var.test_name
         }
         annotations = {
           "prometheus.io/scrape" = true

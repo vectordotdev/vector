@@ -8,11 +8,6 @@ variable "vector_image" {
   type        = string
 }
 
-variable "test_name" {
-  description = "The name of the soak test"
-  type        = string
-}
-
 variable "vector-toml" {
   description = "The rendered vector.toml for this test"
   type        = string
