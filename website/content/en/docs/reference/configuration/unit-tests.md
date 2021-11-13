@@ -284,6 +284,53 @@ test conditions using a special configuration-based system. `check_fields` is no
 strongly recommend converting any existing `check_fields` tests to `vrl` conditions.
 {{< /danger >}}
 
+#### Asserting no output
+
+In some cases, you may need to assert that _no_ event is output by a transform. You can specify
+this at the root level of a specific test's configuration using the `no_outputs_from` parameter,
+which takes a list of transform names. Here's an example:
+
+```toml
+[[tests]]
+name = "Ensure no output"
+no_outputs_from = ["log_filter", "metric_filter"]
+```
+
+In this test configuration, Vector would expect that the `log_filter` and `metric_filter` transforms
+dont't output _any_ events.
+
+Some examples of use cases for `no_outputs_from`:
+
+* When testing a [`filter`][filter] transform, you may want to assert that the [input](#input) event
+  is filtered out
+* When testing a [`remap`][remap] transform, you may need to assert that VRL's [`abort`][abort]
+  function is called when the supplied [VRL] program handles the input event
+
+Below is a full example of using `no_outputs_from` in a Vector unit test:
+
+```toml
+[transforms.log_filter]
+type = "filter"
+inputs = ["log_source"]
+condition = '.env == "staging"'
+
+[[tests]]
+name = "Log filtered out"
+no_outputs_from = ["log_filter"]
+
+[[tests.inputs]]
+type = "log"
+insert_at = "log_filter"
+
+[tests.inputs.log_fields]
+message = "success"
+env = "production"
+```
+
+This unit test passes because the `env` field of the input event has a value of `production`, which
+fails the `.env == "staging"` filtering condition, which dictates that no event is output by the
+filter in this case.
+
 ### Event types
 
 There are currently two event types that you can unit test in Vector:
