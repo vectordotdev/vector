@@ -312,10 +312,10 @@ Below is a full example of using `no_outputs_from` in a Vector unit test:
 [transforms.log_filter]
 type = "filter"
 inputs = ["log_source"]
-condition = '.env == "staging"'
+condition = '.env == "production"'
 
 [[tests]]
-name = "Log filtered out"
+name = "Filter out non-production events"
 no_outputs_from = ["log_filter"]
 
 [[tests.inputs]]
@@ -324,12 +324,15 @@ insert_at = "log_filter"
 
 [tests.inputs.log_fields]
 message = "success"
-env = "production"
+code = 202
+endpoint = "/transactions"
+method = "POST"
+env = "staging"
 ```
 
-This unit test passes because the `env` field of the input event has a value of `production`, which
-fails the `.env == "staging"` filtering condition; because the condition fails, no event is output
-by the filter in this case.
+This unit test passes because the `env` field of the input event has a value of `staging`, which
+fails the `.env == "production"` filtering condition; because the condition fails, no event is
+output by the `log_filter` transform in this case.
 
 ### Event types
 
