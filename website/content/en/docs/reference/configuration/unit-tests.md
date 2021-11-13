@@ -301,8 +301,8 @@ dont't output _any_ events.
 
 Some examples of use cases for `no_outputs_from`:
 
-* When testing a [`filter`][filter] transform, you may want to assert that the [input](#input) event
-  is filtered out
+* When testing a [`filter`][filter] transform, you may want to assert that the [input](#inputs)
+  event is filtered out
 * When testing a [`remap`][remap] transform, you may need to assert that VRL's [`abort`][abort]
   function is called when the supplied [VRL] program handles the input event
 
