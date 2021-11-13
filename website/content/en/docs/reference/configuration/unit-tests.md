@@ -328,7 +328,7 @@ env = "production"
 ```
 
 This unit test passes because the `env` field of the input event has a value of `production`, which
-fails the `.env == "staging"` filtering condition. Because the condition fails, no event is output
+fails the `.env == "staging"` filtering condition; because the condition fails, no event is output
 by the filter in this case.
 
 ### Event types
