@@ -2,7 +2,7 @@
 //! writes the result out to disk. It replaces curl-in-a-loop in our soak infra.
 use argh::FromArgs;
 use reqwest::Url;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::io::Read;
 use std::time::Duration;
@@ -35,8 +35,8 @@ pub struct Config {
     pub experiment_name: String,
     /// The vector ID associated with the experiment
     pub vector_id: String,
-    /// The query to make of the experiment
-    pub query: String,
+    /// The queries to make of the experiment
+    pub queries: Vec<String>,
     /// The file to record captures into
     pub capture_path: String,
 }
@@ -51,6 +51,22 @@ enum Error {
     Io { error: std::io::Error },
     #[snafu(display("Could not parse float: {}", error))]
     ParseFloat { error: std::num::ParseFloatError },
+    #[snafu(display("Could not serialize output: {}", error))]
+    Json { error: serde_json::Error },
+}
+
+#[derive(Debug, Serialize)]
+pub struct Query<'a> {
+    query: &'a str,
+    value: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Output<'a> {
+    experiment: &'a str,
+    vector_id: &'a str,
+    time: f64,
+    queries: Vec<Query<'a>>,
 }
 
 impl From<reqwest::Error> for Error {
@@ -74,6 +90,12 @@ impl From<std::io::Error> for Error {
 impl From<std::num::ParseFloatError> for Error {
     fn from(error: std::num::ParseFloatError) -> Self {
         Self::ParseFloat { error }
+    }
+}
+
+impl From<serde_json::Error> for Error {
+    fn from(error: serde_json::Error) -> Self {
+        Self::Json { error }
     }
 }
 
@@ -115,24 +137,24 @@ struct Worker {
     url: Url,
     vector_id: String,
     experiment_name: String,
-    query: String,
+    queries: Vec<String>,
     startup_delay: u64,
     capture_path: String,
 }
 
 impl Worker {
     fn new(config: Config) -> Self {
-        let url = format!(
-            "{}/api/v1/query?query={}",
-            config.prometheus,
-            config.query.clone()
-        );
+        let queries = Vec::new();
+        for query in config.queries {
+            let url = format!("{}/api/v1/query?query={}", config.prometheus, query);
+            queries.push(url);
+        }
 
         Self {
             url: url.parse::<Url>().unwrap(),
             vector_id: config.vector_id,
             experiment_name: config.experiment_name,
-            query: config.query,
+            queries,
             startup_delay: config.startup_delay_seconds,
             capture_path: config.capture_path,
         }
@@ -165,14 +187,17 @@ impl Worker {
             if !body.data.result.is_empty() {
                 let time = body.data.result[0].value.time;
                 let value = body.data.result[0].value.value.parse::<f64>()?;
-                file.write_all(
-                    format!(
-                        "{}\t{}\t{}\t{}\t{}\n",
-                        &self.experiment_name, &self.vector_id, time, &self.query, value,
-                    )
-                    .as_bytes(),
-                )
-                .await?;
+                let output = serde_json::to_string(&Output {
+                    experiment: &self.experiment_name,
+                    vector_id: &self.vector_id,
+                    time,
+                    queries: vec![Query {
+                        query: &self.query,
+                        value,
+                    }],
+                })?;
+                file.write_all(output.as_bytes()).await?;
+                file.write_all(b"\n").await?;
                 file.flush().await?;
             } else {
                 error!("failed to request body: {:?}", body.data);
