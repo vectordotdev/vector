@@ -1,4 +1,3 @@
-use std::num::NonZeroU64;
 use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext};
 use crate::sinks::aws_kinesis_firehose::request_builder::KinesisRequestBuilder;
@@ -16,6 +15,7 @@ use rusoto_firehose::{
     KinesisFirehoseClient, PutRecordBatchError,
 };
 use serde::{Deserialize, Serialize};
+use std::num::NonZeroU64;
 
 use crate::aws::rusoto;
 use crate::sinks::{Healthcheck, VectorSink};
