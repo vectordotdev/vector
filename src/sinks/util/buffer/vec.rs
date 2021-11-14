@@ -1,6 +1,4 @@
-use super::{
-    err_event_too_large, Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult,
-};
+use super::{err_event_too_large, Batch, BatchSize, PushResult};
 use bytes::Bytes;
 
 pub trait EncodedLength {
@@ -31,13 +29,6 @@ impl<T> VecBuffer<T> {
 impl<T: EncodedLength> Batch for VecBuffer<T> {
     type Input = T;
     type Output = Vec<T>;
-
-    fn get_settings_defaults(
-        config: BatchConfig,
-        defaults: BatchSettings<Self>,
-    ) -> Result<BatchSettings<Self>, BatchError> {
-        Ok(config.get_settings_or_default(defaults))
-    }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         let new_bytes = self.bytes + item.encoded_length();
@@ -90,8 +81,10 @@ mod tests {
 
     #[test]
     fn obeys_max_events() {
-        let settings = BatchSettings::default().events(2).size;
-        let mut buffer = VecBuffer::new(settings);
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.events = 2;
+
+        let mut buffer = VecBuffer::new(batch_settings.size);
         let data = "dummy".to_string();
 
         assert!(buffer.is_empty());
@@ -114,8 +107,11 @@ mod tests {
 
     #[test]
     fn obeys_max_bytes() {
-        let settings = BatchSettings::default().events(99).bytes(22).size;
-        let mut buffer = VecBuffer::new(settings);
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.bytes = 22;
+        batch_settings.size.events = 99;
+
+        let mut buffer = VecBuffer::new(batch_settings.size);
         let data = "some bytes".to_string();
 
         assert!(buffer.is_empty());

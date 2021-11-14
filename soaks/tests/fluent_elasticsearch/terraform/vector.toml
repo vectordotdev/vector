@@ -1,0 +1,34 @@
+data_dir = "/var/lib/vector"
+
+##
+## Sources
+##
+
+[sources.internal_metrics]
+type = "internal_metrics"
+
+[sources.fluent]
+type = "fluent"
+address = "0.0.0.0:8282"
+
+##
+## Transforms
+##
+
+##
+## Sinks
+##
+
+[sinks.prometheus]
+type = "prometheus_exporter"
+inputs = ["internal_metrics"]
+address = "0.0.0.0:9090"
+
+[sinks.elasticsearch]
+type = "elasticsearch"
+inputs = [ "fluent"]
+endpoint = "http://http-blackhole:8080"
+index = "vector-%F"
+mode = "normal"
+pipeline = "pipeline-name"
+compression = "none"

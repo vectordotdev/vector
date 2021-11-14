@@ -11,7 +11,7 @@ use crate::{
             encode_namespace,
             encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpSink},
-            BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
+            BatchConfig, Buffer, Compression, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -21,7 +21,19 @@ use futures::SinkExt;
 use http::{Request, Uri};
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    num::NonZeroU64,
+};
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct InfluxDbLogsDefaultBatchSettings;
+
+impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = None;
+    const MAX_BYTES: Option<usize> = Some(1_000_000);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -40,7 +52,7 @@ pub struct InfluxDbLogsConfig {
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<InfluxDbLogsDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
@@ -94,10 +106,7 @@ impl SinkConfig for InfluxDbLogsConfig {
         let client = HttpClient::new(tls_settings, cx.proxy())?;
         let healthcheck = self.healthcheck(client.clone())?;
 
-        let batch = BatchSettings::default()
-            .bytes(1_000_000)
-            .timeout(1)
-            .parse_config(self.batch)?;
+        let batch = self.batch.into_batch_settings()?;
         let request = self.request.unwrap_with(&TowerRequestConfig {
             retry_attempts: Some(5),
             ..Default::default()
