@@ -1,6 +1,10 @@
-use chrono::{DateTime, FixedOffset, Offset, Utc};
-use chrono_tz::Tz;
+use crate::parse_grok::Error as GrokRuntimeError;
+use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime, Offset, TimeZone, Utc};
+use chrono_tz::{Tz, UTC};
 use peeking_take_while::PeekableExt;
+use regex::Regex;
+use std::fmt::Formatter;
+use vrl_compiler::Value;
 
 /// converts Joda time format to strptime format
 pub fn convert_time_format(format: &str) -> std::result::Result<String, String> {
@@ -86,7 +90,7 @@ pub struct RegexResult {
     pub tz_captured: bool,
 }
 
-pub fn parse_timezone(tz: &str) -> Result<FixedOffset, String> {
+fn parse_timezone(tz: &str) -> Result<FixedOffset, String> {
     let tz = match tz {
         "GMT" | "UTC" | "UT" | "Z" => FixedOffset::east(0),
         _ if tz.starts_with('+') || tz.starts_with('-') => parse_offset(tz)?,
@@ -207,4 +211,146 @@ pub fn time_format_to_regex(
         with_tz,
         tz_captured,
     })
+}
+
+pub fn apply_date_filter(value: &Value, filter: &DateFilter) -> Result<Value, GrokRuntimeError> {
+    match value {
+        Value::Bytes(bytes) => {
+            let value = String::from_utf8_lossy(bytes);
+            match &filter.regex_with_tz {
+                Some(re) => {
+                    let tz = re
+                        .captures(&value)
+                        .ok_or_else(|| {
+                            GrokRuntimeError::FailedToApplyFilter(
+                                filter.to_string(),
+                                value.to_string(),
+                            )
+                        })?
+                        .name("tz")
+                        .expect("this regex should always contain tz group")
+                        .as_str();
+                    let tz: Tz = tz.parse().map_err(|error| {
+                        error!(message = "Error parsing tz", tz = %tz, % error);
+                        GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string())
+                    })?;
+                    let naive_date = NaiveDateTime::parse_from_str(&value, &filter.strp_format).map_err(|error|
+                        {
+                            error!(message = "Error parsing date", value = %value, format = %filter.strp_format, % error);
+                            GrokRuntimeError::FailedToApplyFilter(
+                                filter.to_string(),
+                                value.to_string(),
+                            )
+                        })?;
+                    let dt = tz
+                        .from_local_datetime(&naive_date)
+                        .single()
+                        .ok_or_else(|| {
+                            GrokRuntimeError::FailedToApplyFilter(
+                                filter.to_string(),
+                                value.to_string(),
+                            )
+                        })?;
+                    Ok(Utc
+                        .from_utc_datetime(&dt.naive_utc())
+                        .timestamp_millis()
+                        .into())
+                }
+                None => {
+                    if filter.tz_aware {
+                        // parse as a tz-aware complete date/time
+                        Ok(DateTime::parse_from_str(&value, &filter.strp_format)
+                            .map_err(|error| {
+                                error!(message = "Error parsing date", date = %value, % error);
+                                GrokRuntimeError::FailedToApplyFilter(
+                                    filter.to_string(),
+                                    value.to_string(),
+                                )
+                            })?
+                            .timestamp_millis()
+                            .into())
+                    } else if let Ok(dt) =
+                        NaiveDateTime::parse_from_str(&value, &filter.strp_format)
+                    {
+                        // try parsing as a naive datetime
+                        if let Some(tz) = &filter.target_tz {
+                            let tzs = parse_timezone(tz).map_err(|error| {
+                                error!(message = "Error parsing tz", tz = %tz, % error);
+                                GrokRuntimeError::FailedToApplyFilter(
+                                    filter.to_string(),
+                                    value.to_string(),
+                                )
+                            })?;
+                            let dt = tzs.from_local_datetime(&dt).single().ok_or_else(|| {
+                                GrokRuntimeError::FailedToApplyFilter(
+                                    filter.to_string(),
+                                    value.to_string(),
+                                )
+                            })?;
+                            Ok(Utc
+                                .from_utc_datetime(&dt.naive_utc())
+                                .timestamp_millis()
+                                .into())
+                        } else {
+                            Ok(dt.timestamp_millis().into())
+                        }
+                    } else if let Ok(nt) = NaiveTime::parse_from_str(&value, &filter.strp_format) {
+                        // try parsing as a naive time
+                        Ok(NaiveDateTime::new(NaiveDate::from_ymd(1970, 1, 1), nt)
+                            .timestamp_millis()
+                            .into())
+                    } else {
+                        // try parsing as a naive date
+                        let nd = NaiveDate::parse_from_str(&value, &filter.strp_format).map_err(
+                            |error| {
+                                error!(message = "Error parsing date", date = %value, % error);
+                                GrokRuntimeError::FailedToApplyFilter(
+                                    filter.to_string(),
+                                    value.to_string(),
+                                )
+                            },
+                        )?;
+                        Ok(UTC
+                            .from_local_datetime(&NaiveDateTime::new(
+                                nd,
+                                NaiveTime::from_hms(0, 0, 0),
+                            ))
+                            .single()
+                            .ok_or_else(|| {
+                                GrokRuntimeError::FailedToApplyFilter(
+                                    filter.to_string(),
+                                    value.to_string(),
+                                )
+                            })?
+                            .timestamp_millis()
+                            .into())
+                    }
+                }
+            }
+        }
+        _ => Err(GrokRuntimeError::FailedToApplyFilter(
+            filter.to_string(),
+            value.to_string(),
+        )),
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DateFilter {
+    // an original date format used for debugging purposes
+    pub original_format: String,
+    // strp time format used to parse the date
+    pub strp_format: String,
+    // whether the format is naive or timezone-aware
+    pub tz_aware: bool,
+    // an optional regex, which is used only when we need to extract a TZ name(always contains "tz" capture)
+    pub regex_with_tz: Option<Regex>,
+    // an optional target TZ name
+    pub target_tz: Option<String>,
+}
+
+impl std::fmt::Display for DateFilter {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "date(\"{}\")", self.original_format)
+    }
 }

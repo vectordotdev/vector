@@ -5,6 +5,7 @@ use lazy_static::lazy_static;
 
 use lookup::LookupBuf;
 
+use crate::matchers::date::DateFilter;
 use crate::{
     ast::{self, Destination, GrokPattern},
     grok_filter::GrokFilter,
@@ -396,9 +397,9 @@ fn resolves_match_function(
                         let format = String::from_utf8_lossy(b);
                         let result = date::time_format_to_regex(&format, true)
                             .map_err(|_e| Error::InvalidFunctionArguments(match_fn.name.clone()))?;
-                        let mut tz_regex_opt = None;
+                        let mut regext_opt = None;
                         if result.tz_captured {
-                            tz_regex_opt = Some(Regex::new(&result.regex).map_err(|error| {
+                            regext_opt = Some(Regex::new(&result.regex).map_err(|error| {
                                     error!(message = "Error compiling regex", regex = %result.regex, %error);
                                     Error::InvalidFunctionArguments(match_fn.name.clone())
                                 })?);
@@ -407,14 +408,19 @@ fn resolves_match_function(
                                 error!(message = "Error compiling regex", regex = %result.regex, %error);
                                 Error::InvalidFunctionArguments(match_fn.name.clone())
                             })?;
-                        let mut tz = None;
+                        let mut target_tz = None;
                         if args.len() > 1 {
                             if let ast::FunctionArgument::Arg(Value::Bytes(b)) = &args[1] {
-                                tz = Some(String::from_utf8_lossy(b).to_string());
+                                target_tz = Some(String::from_utf8_lossy(b).to_string());
                             }
                         }
-                        let filter =
-                            GrokFilter::Date(strp_format, tz_regex_opt, tz, result.with_tz);
+                        let filter = GrokFilter::Date(DateFilter {
+                            original_format: format.to_string(),
+                            strp_format,
+                            regex_with_tz: regext_opt,
+                            target_tz,
+                            tz_aware: result.with_tz,
+                        });
                         let result =
                             date::time_format_to_regex(&format, false).map_err(|error| {
                                 error!(message = "Invalid time format", format = %format, %error);
