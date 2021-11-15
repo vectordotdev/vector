@@ -951,23 +951,18 @@ fn response_json(code: StatusCode, body: impl Serialize) -> Response {
 #[cfg(test)]
 mod tests {
     use super::{acknowledgements::HecAcknowledgementsConfig, parse_timestamp, SplunkConfig};
-    use crate::{
-        config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
-        event::Event,
-        sinks::{
+    use crate::{Pipeline, config::{AcknowledgementsConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, log_schema}, event::Event, sinks::{
             splunk_hec::logs::{config::HecSinkLogsConfig, encoder::HecLogsEncoder},
             util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
             Healthcheck, VectorSink,
-        },
-        test_util::{
+        }, test_util::{
             collect_n,
             components::{self, HTTP_PUSH_SOURCE_TAGS, SOURCE_TESTS},
             next_addr, wait_for_tcp,
-        },
-        Pipeline,
-    };
+        }};
     use chrono::{TimeZone, Utc};
     use futures::{channel::mpsc, stream, StreamExt};
+    use reqwest::{RequestBuilder, Response};
     use std::{future::ready, net::SocketAddr};
 
     #[test]
@@ -992,6 +987,8 @@ mod tests {
         let address = next_addr();
         let valid_tokens =
             valid_tokens.map(|tokens| tokens.iter().map(|&token| String::from(token)).collect());
+        let mut cx = SourceContext::new_test(sender);
+        cx.acknowledgements = AcknowledgementsConfig::from(true);
         tokio::spawn(async move {
             SplunkConfig {
                 address,
@@ -1000,7 +997,7 @@ mod tests {
                 tls: None,
                 indexer_acknowledgements: HecAcknowledgementsConfig::default(),
             }
-            .build(SourceContext::new_test(sender))
+            .build(cx)
             .await
             .unwrap()
             .await
@@ -1085,13 +1082,13 @@ mod tests {
         send_with(address, api, message, TOKEN, &options).await
     }
 
-    async fn send_with<'a>(
+    fn build_request(
         address: SocketAddr,
         api: &str,
         message: &str,
         token: &str,
         opts: &SendWithOpts<'_>,
-    ) -> u16 {
+    ) -> RequestBuilder {
         let mut b = reqwest::Client::new()
             .post(&format!("http://{}/{}", address, api))
             .header("Authorization", format!("Splunk {}", token));
@@ -1110,11 +1107,28 @@ mod tests {
         };
 
         b.body(message.to_owned())
-            .send()
-            .await
-            .unwrap()
-            .status()
-            .as_u16()
+    }
+
+    async fn send_with<'a>(
+        address: SocketAddr,
+        api: &str,
+        message: &str,
+        token: &str,
+        opts: &SendWithOpts<'_>,
+    ) -> u16 {
+        let b = build_request(address, api, message, token, opts);
+        b.send().await.unwrap().status().as_u16()
+    }
+
+    async fn send_with_response<'a>(
+        address: SocketAddr,
+        api: &str,
+        message: &str,
+        token: &str,
+        opts: &SendWithOpts<'_>,
+    ) -> Response {
+        let b = build_request(address, api, message, token, opts);
+        b.send().await.unwrap()
     }
 
     #[tokio::test]
@@ -1551,5 +1565,21 @@ mod tests {
         SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
         assert_eq!(event.as_log()[log_schema().message_key()], message.into());
         assert!(event.as_log().get(log_schema().host_key()).is_none());
+    }
+
+    #[tokio::test]
+    async fn ack_service_query_pending_ack_ids() {
+        let message = r#" {"acks":[0]} "#;
+        let (source, address) = source().await;
+
+        let opts = SendWithOpts {
+            channel: Some(Channel::Header("guid")),
+            forwarded_for: None,
+        };
+
+        assert_eq!(
+            200,
+            send_with(address, "services/collector/ack", message, TOKEN, &opts).await
+        );
     }
 }
