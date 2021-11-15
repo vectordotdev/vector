@@ -46,7 +46,7 @@ window = 60
 
 If you any feedback, let us know on our [Discord chat][] or [Twitter][].
 
-['throttle']:https://master.vector.dev/docs/reference/configuration/transforms/throttle/
-[VRL condition]:https://vector.dev/docs/reference/vrl/#example-filtering-events
+['throttle']: /docs/reference/configuration/transforms/throttle/
+[VRL condition]:/docs/reference/vrl/#example-filtering-events
 [Discord chat]:https://discord.com/invite/dX3bdkF
 [Twitter]:https://twitter.com/vectordotdev
