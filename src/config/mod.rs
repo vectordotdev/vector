@@ -1146,3 +1146,42 @@ mod resource_tests {
         .is_err());
     }
 }
+
+#[cfg(all(
+    test,
+    feature = "sources-stdin",
+    feature = "sinks-console",
+    feature = "transforms-pipelines",
+    feature = "transforms-filter"
+))]
+mod pipelines_tests {
+    use super::{load_from_str, Format};
+    use indoc::indoc;
+
+    #[test]
+    fn should_fail_with_order_pipelines() {
+        assert!(load_from_str(
+            indoc! {r#"
+                [sources.in]
+                  type = "stdin"
+
+                [transforms.processing]
+                  type = "pipelines"
+
+                  [transforms.processing.logs.order]
+                    name = "should fail"
+
+                    [[transforms.processing.logs.order.transforms]]
+                      type = "filter"
+                      condition = ""
+
+                [sinks.out]
+                  type = "console"
+                  inputs = ["processing"]
+                  encoding = "json"
+            "#},
+            Some(Format::Toml),
+        )
+        .is_err());
+    }
+}
