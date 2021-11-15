@@ -1,7 +1,7 @@
 ---
 date: "2021-11-16"
 title: "Event `throttle` transform released"
-description: "A guide that addresses the new event throttle transform"
+description: "A guide to using the new `throttle` transform"
 authors: ["barieom"]
 pr_numbers: []
 release: "0.18.0"
