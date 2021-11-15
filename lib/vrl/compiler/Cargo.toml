@@ -11,8 +11,6 @@ parser = { package = "vrl-parser", path = "../parser" }
 shared = { path = "../../shared", default-features = false, features = ["conversion"] }
 lookup = { path = "../../lookup" }
 
-num-derive = "0.3.3"
-num-traits = "0.2.14"
 bitflags = "1"
 bytes = "1.1.0"
 chrono = "0.4"

@@ -1,9 +1,4 @@
-use crate::{
-    expression::{assignment::Target, Literal},
-    Context, Function, Value,
-};
-use num_derive::{FromPrimitive, ToPrimitive};
-use num_traits::{FromPrimitive, ToPrimitive};
+use crate::{expression::Literal, Context, Function, Value};
 use std::collections::{BTreeMap, HashMap};
 
 macro_rules! binary_op {
@@ -21,9 +16,9 @@ macro_rules! binary_op {
     }};
 }
 
-#[derive(FromPrimitive, ToPrimitive, Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum OpCode {
-    Return = 255,
+    Return,
     DefineGlobal,
     GetGlobal,
     SetGlobal,
@@ -53,6 +48,12 @@ pub enum OpCode {
     CreateObject,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Instruction {
+    OpCode(OpCode),
+    Primitive(usize),
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Variable {
     Internal,
@@ -61,7 +62,7 @@ pub enum Variable {
 
 #[derive(Clone, Debug, Default)]
 pub struct Vm {
-    instructions: Vec<usize>,
+    instructions: Vec<Instruction>,
     globals: HashMap<String, Value>,
     values: Vec<Literal>,
     targets: Vec<Variable>,
@@ -80,20 +81,23 @@ impl Vm {
     }
 
     pub fn write_chunk(&mut self, code: OpCode) {
-        self.instructions
-            .push(ToPrimitive::to_usize(&code).unwrap());
+        self.instructions.push(Instruction::OpCode(code));
     }
 
-    pub fn write_chunk_at(&mut self, pos: usize, code: usize) {
-        self.instructions[pos] = code;
+    pub fn write_chunk_at(&mut self, pos: usize, code: OpCode) {
+        self.instructions[pos] = Instruction::OpCode(code);
     }
 
-    pub fn instructions(&self) -> &Vec<usize> {
+    pub fn instructions(&self) -> &Vec<Instruction> {
         &self.instructions
     }
 
     pub fn write_primitive(&mut self, code: usize) {
-        self.instructions.push(code);
+        self.instructions.push(Instruction::Primitive(code));
+    }
+
+    pub fn write_primitive_at(&mut self, pos: usize, code: usize) {
+        self.instructions[pos] = Instruction::Primitive(code);
     }
 
     pub fn stack_mut(&mut self) -> &mut Vec<Value> {
@@ -103,13 +107,19 @@ impl Vm {
     fn next(&mut self) -> OpCode {
         let byte = self.instructions[self.ip];
         self.ip += 1;
-        FromPrimitive::from_usize(byte).unwrap()
+        match byte {
+            Instruction::OpCode(opcode) => opcode,
+            _ => panic!("Expecting opcode"),
+        }
     }
 
     fn next_primitive(&mut self) -> usize {
         let byte = self.instructions[self.ip];
         self.ip += 1;
-        byte
+        match byte {
+            Instruction::Primitive(primitive) => primitive,
+            _ => panic!("Expecting primitive"),
+        }
     }
 
     pub fn get_constant(&self, constant: &str) -> Option<usize> {
@@ -139,12 +149,9 @@ impl Vm {
         self.instructions
             .iter()
             .enumerate()
-            .map(|(idx, inst)| {
-                let opcode: Option<OpCode> = FromPrimitive::from_usize(*inst);
-                match opcode {
-                    Some(inst) => format!("{:04}: {:?}", idx, inst),
-                    None => format!("{:04}: {}", idx, inst),
-                }
+            .map(|(idx, inst)| match inst {
+                Instruction::OpCode(opcode) => format!("{:04}: {:?}", idx, opcode),
+                Instruction::Primitive(primitive) => format!("{:04}: {}", idx, primitive),
             })
             .collect()
     }
@@ -160,7 +167,7 @@ impl Vm {
 
     pub fn patch_jump(&mut self, offset: usize) {
         let jump = self.instructions.len() - offset - 1;
-        self.write_chunk_at(offset, jump);
+        self.write_primitive_at(offset, jump);
     }
 
     /// Resets the VM back to it's original state.
