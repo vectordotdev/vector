@@ -20,7 +20,7 @@ pub fn parse_grok_pattern(input: &str) -> Result<GrokPattern, &str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::FunctionArgument;
+    use crate::ast::{Destination, Function, FunctionArgument};
 
     use lookup::{LookupBuf, SegmentBuf};
     use vrl_compiler::Value;
@@ -63,5 +63,32 @@ mod tests {
                 _ => panic!("failed to parse arguments"),
             };
         }
+    }
+
+    #[test]
+    fn empty_field() {
+        let input = r#"%{data:}"#;
+        let parsed = parse_grok_pattern(input).unwrap_or_else(|error| {
+            panic!("Problem parsing grok: {:?}", error);
+        });
+        assert_eq!(parsed.destination, None);
+    }
+
+    #[test]
+    fn empty_field_with_filter() {
+        let input = r#"%{data::json}"#;
+        let parsed = parse_grok_pattern(input).unwrap_or_else(|error| {
+            panic!("Problem parsing grok: {:?}", error);
+        });
+        assert_eq!(
+            parsed.destination,
+            Some(Destination {
+                path: LookupBuf::root(),
+                filter_fn: Some(Function {
+                    name: "json".to_string(),
+                    args: None,
+                })
+            })
+        );
     }
 }
