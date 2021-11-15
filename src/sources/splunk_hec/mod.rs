@@ -99,11 +99,8 @@ fn default_socket_address() -> SocketAddr {
 #[async_trait::async_trait]
 #[typetag::serde(name = "splunk_hec")]
 impl SourceConfig for SplunkConfig {
-    // super::Source is a BoxFuture that returns a Result<(), ()>
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        // Get TLS settings for use in an HTTPS connection
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
-        // Initialize a struct that can then create various warp services (route handlers) needed for this source
         let source = SplunkSource::new(
             self,
             tls.http_protocol_name(),
@@ -111,14 +108,12 @@ impl SourceConfig for SplunkConfig {
             cx.shutdown.clone().shared(),
         );
 
-        // Create warp services
         let event_service = source.event_service(cx.out.clone());
         let raw_service = source.raw_service(cx.out);
         let health_service = source.health_service();
         let ack_service = source.ack_service();
         let options = SplunkSource::options();
 
-        // Line up the warp services behind a general path filter
         let services = path!("services" / "collector" / ..)
             .and(
                 warp::path::full()
