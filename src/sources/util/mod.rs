@@ -1,7 +1,11 @@
 #[cfg(any(feature = "sources-http"))]
 mod body_decoding;
 mod encoding_config;
-#[cfg(any(feature = "sources-file", feature = "sources-kafka", feature = "sources-splunk_hec"))]
+#[cfg(any(
+    feature = "sources-file",
+    feature = "sources-kafka",
+    feature = "sources-splunk_hec"
+))]
 pub mod finalizer;
 #[cfg(all(unix, feature = "sources-dnstap"))]
 pub mod framestream;

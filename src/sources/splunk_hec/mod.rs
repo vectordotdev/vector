@@ -1,10 +1,21 @@
-use crate::{Pipeline, config::{
+use crate::shutdown::ShutdownSignal;
+use crate::{
+    config::{
         log_schema, AcknowledgementsConfig, DataType, Resource, SourceConfig, SourceContext,
         SourceDescription,
-    }, event::{Event, LogEvent, Value}, internal_events::{
+    },
+    event::{Event, LogEvent, Value},
+    internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
         SplunkHecRequestReceived,
-    }, sources::splunk_hec::{acknowledgements::{HecAckStatusRequest, HecAckStatusResponse, IndexerAcknowledgement}, splunk_response::HecResponseMetadata}, tls::{MaybeTlsSettings, TlsConfig}};
+    },
+    sources::splunk_hec::{
+        acknowledgements::{HecAckStatusRequest, HecAckStatusResponse, IndexerAcknowledgement},
+        splunk_response::HecResponseMetadata,
+    },
+    tls::{MaybeTlsSettings, TlsConfig},
+    Pipeline,
+};
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
@@ -20,13 +31,12 @@ use std::{
     net::{Ipv4Addr, SocketAddr},
     sync::Arc,
 };
-use vector_core::{ByteSizeOf, event::{BatchNotifier}};
-use crate::shutdown::ShutdownSignal;
+use vector_core::{event::BatchNotifier, ByteSizeOf};
 
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
 use self::{
-    acknowledgements::{HecAcknowledgementsConfig},
+    acknowledgements::HecAcknowledgementsConfig,
     splunk_response::{HecCode, HecResponse},
 };
 
@@ -94,7 +104,12 @@ impl SourceConfig for SplunkConfig {
         // Get TLS settings for use in an HTTPS connection
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         // Initialize a struct that can then create various warp services (route handlers) needed for this source
-        let source = SplunkSource::new(self, tls.http_protocol_name(), cx.acknowledgements.clone(), cx.shutdown.clone().shared());
+        let source = SplunkSource::new(
+            self,
+            tls.http_protocol_name(),
+            cx.acknowledgements.clone(),
+            cx.shutdown.clone().shared(),
+        );
 
         // Create warp services
         let event_service = source.event_service(cx.out.clone());
@@ -177,7 +192,10 @@ impl SplunkSource {
             .chain(config.token.iter());
 
         let idx_ack = acknowledgements.enabled.then(|| {
-            Arc::new(IndexerAcknowledgement::new(config.indexer_acknowledgements.clone(), shutdown))
+            Arc::new(IndexerAcknowledgement::new(
+                config.indexer_acknowledgements.clone(),
+                shutdown,
+            ))
         });
 
         SplunkSource {
@@ -239,7 +257,8 @@ impl SplunkSource {
                             Box::new(body.reader())
                         };
 
-                        let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(idx_ack.is_some());
+                        let (batch, receiver) =
+                            BatchNotifier::maybe_new_with_receiver(idx_ack.is_some());
                         let mut events = stream::iter(EventIterator::new(
                             Deserializer::from_reader(reader).into_iter::<JsonValue>(),
                             channel.clone(),
@@ -254,7 +273,7 @@ impl SplunkSource {
                                     Ok(ack_id) => Some(ack_id),
                                     Err(rej) => return Err(rej),
                                 }
-                            },
+                            }
                             _ => None,
                         };
                         out.send_all(&mut events).await?;
@@ -299,7 +318,8 @@ impl SplunkSource {
                       gzip: bool,
                       body: Bytes,
                       path: warp::path::FullPath| {
-                    let mut out = out.clone()
+                    let mut out = out
+                        .clone()
                         .sink_map_err(|_| Rejection::from(ApiError::ServerShutdown));
                     let idx_ack = idx_ack.clone();
                     emit!(&HttpBytesReceived {
@@ -309,16 +329,16 @@ impl SplunkSource {
                     });
 
                     async move {
-                        let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(idx_ack.is_some());
-                        let event =
-                            raw_event(body, gzip, channel_id.clone(), remote, xff, batch)?;
+                        let (batch, receiver) =
+                            BatchNotifier::maybe_new_with_receiver(idx_ack.is_some());
+                        let event = raw_event(body, gzip, channel_id.clone(), remote, xff, batch)?;
                         let maybe_ack_id = match (idx_ack, receiver) {
                             (Some(idx_ack), Some(receiver)) => {
                                 match idx_ack.get_ack_id_from_channel(channel_id, receiver).await {
                                     Ok(ack_id) => Some(ack_id),
                                     Err(rej) => return Err(rej),
                                 }
-                            },
+                            }
                             _ => None,
                         };
                         out.send(event).await?;
@@ -377,9 +397,10 @@ impl SplunkSource {
                 async move {
                     if let Some(idx_ack) = idx_ack {
                         let ack_statuses = idx_ack.get_acks_status(channel_id, &body.acks).await?;
-                        Ok(warp::reply::json(&HecAckStatusResponse {
-                            acks: ack_statuses,
-                        }).into_response())
+                        Ok(
+                            warp::reply::json(&HecAckStatusResponse { acks: ack_statuses })
+                                .into_response(),
+                        )
                     } else {
                         Err(Rejection::from(ApiError::BadRequest))
                     }
@@ -865,8 +886,8 @@ mod splunk_response {
 
 fn finish_ok(maybe_ack_id: Option<u64>) -> Response {
     if let Some(ack_id) = maybe_ack_id {
-        let body = HecResponse::new(HecCode::Success)
-            .with_metadata(HecResponseMetadata::AckId(ack_id));
+        let body =
+            HecResponse::new(HecCode::Success).with_metadata(HecResponseMetadata::AckId(ack_id));
         response_json(StatusCode::OK, &body)
     } else {
         response_json(StatusCode::OK, &*splunk_response::SUCCESS)
@@ -934,7 +955,7 @@ fn response_json(code: StatusCode, body: impl Serialize) -> Response {
 #[cfg(feature = "sinks-splunk_hec")]
 #[cfg(test)]
 mod tests {
-    use super::{SplunkConfig, acknowledgements::HecAcknowledgementsConfig, parse_timestamp};
+    use super::{acknowledgements::HecAcknowledgementsConfig, parse_timestamp, SplunkConfig};
     use crate::{
         config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
         event::Event,
