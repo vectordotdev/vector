@@ -315,11 +315,10 @@ mod integration_tests {
     async fn s3_process_message() {
         trace_init();
 
-        let key = uuid::Uuid::new_v4().to_string();
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
         test_event(
-            key,
+            None,
             None,
             None,
             None,
@@ -338,7 +337,7 @@ mod integration_tests {
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
         test_event(
-            key,
+            Some(key),
             None,
             None,
             None,
@@ -355,7 +354,6 @@ mod integration_tests {
 
         trace_init();
 
-        let key = uuid::Uuid::new_v4().to_string();
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
         let mut gz = flate2::read::GzEncoder::new(
@@ -365,7 +363,7 @@ mod integration_tests {
         let mut buffer = Vec::new();
         gz.read_to_end(&mut buffer).unwrap();
 
-        test_event(key, Some("gzip"), None, None, buffer, logs, Delivered).await;
+        test_event(None, Some("gzip"), None, None, buffer, logs, Delivered).await;
     }
 
     #[tokio::test]
@@ -374,7 +372,6 @@ mod integration_tests {
 
         trace_init();
 
-        let key = uuid::Uuid::new_v4().to_string();
         let logs = lines_from_gzip_file("tests/data/multipart-gzip.log.gz");
 
         let buffer = {
@@ -385,7 +382,7 @@ mod integration_tests {
             data
         };
 
-        test_event(key, Some("gzip"), None, None, buffer, logs, Delivered).await;
+        test_event(None, Some("gzip"), None, None, buffer, logs, Delivered).await;
     }
 
     #[tokio::test]
@@ -394,7 +391,6 @@ mod integration_tests {
 
         trace_init();
 
-        let key = uuid::Uuid::new_v4().to_string();
         let logs = lines_from_zst_file("tests/data/multipart-zst.log.zst");
 
         let buffer = {
@@ -405,21 +401,20 @@ mod integration_tests {
             data
         };
 
-        test_event(key, Some("zstd"), None, None, buffer, logs, Delivered).await;
+        test_event(None, Some("zstd"), None, None, buffer, logs, Delivered).await;
     }
 
     #[tokio::test]
     async fn s3_process_message_multiline() {
         trace_init();
 
-        let key = uuid::Uuid::new_v4().to_string();
         let logs: Vec<String> = vec!["abc", "def", "geh"]
             .into_iter()
             .map(ToOwned::to_owned)
             .collect();
 
         test_event(
-            key,
+            None,
             None,
             None,
             Some(MultilineConfig {
@@ -439,11 +434,10 @@ mod integration_tests {
     async fn handles_errored_status() {
         trace_init();
 
-        let key = uuid::Uuid::new_v4().to_string();
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
         test_event(
-            key,
+            None,
             None,
             None,
             None,
@@ -458,11 +452,10 @@ mod integration_tests {
     async fn handles_failed_status() {
         trace_init();
 
-        let key = uuid::Uuid::new_v4().to_string();
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
         test_event(
-            key,
+            None,
             None,
             None,
             None,
@@ -492,7 +485,7 @@ mod integration_tests {
 
     // puts an object and asserts that the logs it gets back match
     async fn test_event(
-        key: String,
+        key: Option<String>,
         content_encoding: Option<&str>,
         content_type: Option<&str>,
         multiline: Option<MultilineConfig>,
@@ -500,6 +493,8 @@ mod integration_tests {
         expected_lines: Vec<String>,
         status: EventStatus,
     ) {
+        let key = key.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+
         let s3 = s3_client();
         let sqs = sqs_client();
 
