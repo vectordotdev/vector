@@ -99,6 +99,19 @@
       {{ end }}
       {{ end }}
     </div>
+      <div class="mt-8">
+        <div class="lg:grid lg:grid-cols-3 gap-8">
+          <div class="col-span-2">
+            <div class="prose">
+              {{ partial "heading.html" (dict "text" (print "Download Version " $version) "level" 2) }}
+            </div>
+      
+            <div class="mt-2 border px-4 py-3 lg:px-6 lg:py-4 rounded-md dark:border-gray-700">
+              {{ partial "download/download-matrix.html" (dict "version" $version) }}
+            </div>
+          </div>
+        </div>
+      </div>
   </div>
 </div>
 {{ end }}
