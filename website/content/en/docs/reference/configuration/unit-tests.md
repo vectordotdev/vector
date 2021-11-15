@@ -303,8 +303,8 @@ Some examples of use cases for `no_outputs_from`:
 
 * When testing a [`filter`][filter] transform, you may want to assert that the [input](#inputs)
   event is filtered out
-* When testing a [`remap`][remap] transform, you may need to assert that VRL's [`abort`][abort]
-  function is called when the supplied [VRL] program handles the input event
+* When testing a [`remap`][remap] transform, you may need to assert that VRL's `abort` function is
+  called when the supplied [VRL] program handles the input event
 
 Below is a full example of using `no_outputs_from` in a Vector unit test:
 
@@ -556,6 +556,7 @@ given that the `add_host_metadata` transform isn't included here:
 assert!(!exists(.tags.host), "host tag included")
 ```
 
+[abort]: /docs/reference/vrl/functions/#abort
 [assert]: /docs/reference/vrl/functions/#assert
 [assert_eq]: /docs/reference/vrl/functions/#assert_eq
 [assertions]: /docs/reference/vrl#assertions
