@@ -11,6 +11,12 @@ use crate::sinks::util::retries::RetryLogic;
 use crate::proto::vector as proto;
 use crate::sinks::vector::v2::service::VectorService;
 use crate::sinks::vector::v2::sink::VectorSink;
+use serde::{Serialize, Deserialize};
+use snafu::Snafu;
+use crate::sinks::vector::v2::VectorSinkError;
+use tower::ServiceBuilder;
+use crate::Error;
+
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -24,17 +30,7 @@ pub struct VectorConfig {
     tls: Option<TlsConfig>,
 }
 
-#[derive(Debug, Snafu)]
-pub enum Error {
-    #[snafu(display("Request failed: {}", source))]
-    Request { source: tonic::Status },
 
-    #[snafu(display("Vector source unhealthy"))]
-    Health,
-
-    #[snafu(display("URL has no host."))]
-    NoHost,
-}
 
 impl GenerateConfig for VectorConfig {
     fn generate_config() -> toml::Value {
@@ -80,7 +76,7 @@ impl VectorConfig {
             acker: cx.acker()
         };
 
-        Ok((VectorSink::Stream(Box::new(sink)), Box::pin(healthcheck)))
+        Ok((VectorSinkType::Stream(Box::new(sink)), Box::pin(healthcheck)))
     }
 
     pub(super) const fn input_type(&self) -> DataType {
@@ -104,7 +100,7 @@ async fn healthcheck(mut service: VectorService, options: SinkHealthcheckOptions
         return Ok(());
     }
 
-    let request = service.inner.health_check(proto::HealthCheckRequest {});
+    let request = service.client.health_check(proto::HealthCheckRequest {});
 
     if let Ok(response) = request.await {
         let status = proto::ServingStatus::from_i32(response.into_inner().status);
@@ -114,7 +110,7 @@ async fn healthcheck(mut service: VectorService, options: SinkHealthcheckOptions
         }
     }
 
-    Err(Box::new(Error::Health))
+    Err(Box::new(VectorSinkError::Health))
 }
 
 /// grpc doesn't like an address without a scheme, so we default to http or https if one isn't
@@ -187,7 +183,7 @@ impl RetryLogic for VectorGrpcRetryLogic {
         use tonic::Code::*;
 
         match err {
-            Error::Request { source } => !matches!(
+            VectorSinkError::Request { source } => !matches!(
                 source.code(),
                 // List taken from
                 //
