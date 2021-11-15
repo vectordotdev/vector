@@ -51,7 +51,7 @@ async fn main() {
 
     // Now create the writer and reader and their associated tasks.
     let start = Instant::now();
-    let (mut writer, mut reader) = Buffer::from_path("/tmp/mmap-testing")
+    let (mut writer, mut reader) = Buffer::from_path("/tmp/vector/disk-v2-testing")
         .await
         .expect("failed to open buffer");
 
@@ -128,9 +128,9 @@ async fn main() {
                 Err(_) => panic!("[disk_v2 reader] task failed unexpectedly!"),
             },
             _ = progress_interval.tick(), if writer_result.is_none() || reader_result.is_none() => {
-                //if let Some((writer, _)) = writer_result.as_mut() {
-                //    writer.maybe_flush().await.expect("failed to flush");
-                //}
+                if let Some((writer, _)) = writer_result.as_mut() {
+                    writer.maybe_flush().await.expect("failed to flush");
+                }
 
                 let elapsed = start.elapsed();
                 let write_pos = write_position.load(Ordering::Relaxed);
@@ -149,6 +149,7 @@ async fn main() {
     let total_time = start.elapsed();
     let write_bytes = bytes_written.load(Ordering::Relaxed);
     let read_bytes = bytes_read.load(Ordering::Relaxed);
+    assert_eq!(write_bytes, read_bytes);
 
     println!(
         "[disk_v2] writer and reader done: {} total records ({}) written and read in {:?}",

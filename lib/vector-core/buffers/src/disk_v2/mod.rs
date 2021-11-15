@@ -77,7 +77,7 @@ use crossbeam_utils::atomic::AtomicCell;
 use memmap2::{MmapMut, MmapOptions};
 use tokio::{
     fs::{self, File, OpenOptions},
-    io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufReader, BufWriter},
+    io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter},
     sync::{Mutex, Notify},
 };
 
@@ -976,7 +976,7 @@ impl Reader {
                                         current_last_reader_record_id, self.last_reader_record_id
                                     );
 
-                                    let corrupted_events = id_delta - 1;
+                                    let _corrupted_events = id_delta - 1;
                                     //TODO: emit error here
                                 }
                             }
@@ -1017,9 +1017,9 @@ impl Reader {
                 // to wait if we've caught up to the last record written by the writer.
                 let last_written_record_id = self.ledger.state().get_next_writer_record_id();
                 if self.last_reader_record_id + 1 == last_written_record_id {
-                    println!("  waiting for writer");
+                    //println!("  waiting for writer");
                     self.ledger.wait_for_writer().await;
-                    println!("  writer wait passed");
+                    //println!("  writer wait passed");
                 }
             }
         }
