@@ -29,13 +29,8 @@ Vector team member will find this document useful.
          1. [Test harness](#test-harness)
 1. [Next steps](#next-steps)
 1. [Legal](#legal)
-   1. [DCO](#dco)
-      1. [Trivial changes](#trivial-changes)
+   1. [CLA](#contributor-license-agreement)
    1. [Granted rights and copyright assignment](#granted-rights-and-copyright-assignment)
-   1. [FAQ](#faq)
-      1. [Why a DCO instead of a CLA?](#why-a-dco-instead-of-a-cla)
-      1. [If I’m contributing while an employee, do I still need my employer to sign something?](#if-i%E2%80%99m-contributing-while-an-employee-do-i-still-need-my-employer-to-sign-something)
-      1. [What if I forgot to sign my commits?](#what-if-i-forgot-to-sign-my-commits)
 
 <!-- /MarkdownTOC -->
 
@@ -88,25 +83,6 @@ descriptive of your changes.
 Please ensure your commits are small and focused; they should tell a story of
 your change. This helps reviewers to follow your changes, especially for more
 complex changes.
-
-#### Signing-off
-
-Your commits must include a [DCO](https://developercertificate.org/) signature.
-This is simpler than it sounds; it just means that all of your commits
-must contain:
-
-```text
-Signed-off-by: Joe Smith <joe.smith@email.com>
-```
-
-Git makes this easy by adding the `-s` or `--signoff` flags when you commit:
-
-```bash
-git commit -sm 'My commit message'
-```
-
-We also included a `make signoff` target that handles this for you if
-you forget.
 
 ### Github Pull Requests
 
@@ -230,14 +206,9 @@ that you own your contributions and can use them for other purposes.
 
 The full text of the CLA can be found at [https://cla.datadoghq.com/vectordotdev/vector](https://cla.datadoghq.com/vectordotdev/vector).
 
-#### Trivial changes
-
-Trivial changes, such as spelling fixes, do not need to be signed.
-
 ### Granted rights and copyright assignment
 
-This is covered by the DCO. Contributions are covered by the DCO and do not
-require a CLA.
+This is covered by the CLA.
 
 [urls.create_branch]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-and-deleting-branches-within-your-repository
 [urls.existing_issues]: https://github.com/timberio/vector/issues
