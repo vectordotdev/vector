@@ -10,7 +10,7 @@ badges:
   type: new feature
 ---
 
-# A new `trottle` transform 
+# A new `throttle` transform 
 
 
 We've released a new `throttle` transform that provides a user the ability to throttle the throughput of specific event streams.
