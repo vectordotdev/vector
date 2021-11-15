@@ -75,7 +75,7 @@ impl SourceConfig for AwsS3Config {
             Strategy::Sqs => Ok(Box::pin(
                 self.create_sqs_ingestor(multiline_config, &cx.proxy)
                     .await?
-                    .run(cx.out, cx.shutdown),
+                    .run(cx),
             )),
         }
     }
@@ -298,6 +298,7 @@ mod integration_tests {
     use crate::aws::rusoto::RegionOrEndpoint;
     use crate::{
         config::{SourceConfig, SourceContext},
+        event::EventStatus::{self, *},
         line_agg,
         sources::util::MultilineConfig,
         test_util::{
@@ -317,7 +318,16 @@ mod integration_tests {
         let key = uuid::Uuid::new_v4().to_string();
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
-        test_event(key, None, None, None, logs.join("\n").into_bytes(), logs).await;
+        test_event(
+            key,
+            None,
+            None,
+            None,
+            logs.join("\n").into_bytes(),
+            logs,
+            Delivered,
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -327,7 +337,16 @@ mod integration_tests {
         let key = format!("special:{}", uuid::Uuid::new_v4().to_string());
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
-        test_event(key, None, None, None, logs.join("\n").into_bytes(), logs).await;
+        test_event(
+            key,
+            None,
+            None,
+            None,
+            logs.join("\n").into_bytes(),
+            logs,
+            Delivered,
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -346,7 +365,7 @@ mod integration_tests {
         let mut buffer = Vec::new();
         gz.read_to_end(&mut buffer).unwrap();
 
-        test_event(key, Some("gzip"), None, None, buffer, logs).await;
+        test_event(key, Some("gzip"), None, None, buffer, logs, Delivered).await;
     }
 
     #[tokio::test]
@@ -366,7 +385,7 @@ mod integration_tests {
             data
         };
 
-        test_event(key, Some("gzip"), None, None, buffer, logs).await;
+        test_event(key, Some("gzip"), None, None, buffer, logs, Delivered).await;
     }
 
     #[tokio::test]
@@ -386,7 +405,7 @@ mod integration_tests {
             data
         };
 
-        test_event(key, Some("zstd"), None, None, buffer, logs).await;
+        test_event(key, Some("zstd"), None, None, buffer, logs, Delivered).await;
     }
 
     #[tokio::test]
@@ -411,6 +430,45 @@ mod integration_tests {
             }),
             logs.join("\n").into_bytes(),
             vec!["abc\ndef\ngeh".to_owned()],
+            Delivered,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn handles_errored_status() {
+        trace_init();
+
+        let key = uuid::Uuid::new_v4().to_string();
+        let logs: Vec<String> = random_lines(100).take(10).collect();
+
+        test_event(
+            key,
+            None,
+            None,
+            None,
+            logs.join("\n").into_bytes(),
+            logs,
+            Errored,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn handles_failed_status() {
+        trace_init();
+
+        let key = uuid::Uuid::new_v4().to_string();
+        let logs: Vec<String> = random_lines(100).take(10).collect();
+
+        test_event(
+            key,
+            None,
+            None,
+            None,
+            logs.join("\n").into_bytes(),
+            logs,
+            Failed,
         )
         .await;
     }
@@ -424,6 +482,8 @@ mod integration_tests {
             sqs: Some(sqs::Config {
                 queue_url: queue_url.to_string(),
                 poll_secs: 1,
+                visibility_timeout_secs: 0,
+                client_concurrency: 1,
                 ..Default::default()
             }),
             ..Default::default()
@@ -438,6 +498,7 @@ mod integration_tests {
         multiline: Option<MultilineConfig>,
         payload: Vec<u8>,
         expected_lines: Vec<String>,
+        status: EventStatus,
     ) {
         let s3 = s3_client();
         let sqs = sqs_client();
@@ -448,8 +509,8 @@ mod integration_tests {
         let config = config(&queue, multiline);
 
         s3.put_object(PutObjectRequest {
-            bucket: bucket.to_owned(),
-            key: key.to_owned(),
+            bucket: bucket.clone(),
+            key: key.clone(),
             body: Some(rusoto_core::ByteStream::from(payload)),
             content_type: content_type.map(|t| t.to_owned()),
             content_encoding: content_encoding.map(|t| t.to_owned()),
@@ -458,15 +519,13 @@ mod integration_tests {
         .await
         .expect("Could not put object");
 
-        let (tx, rx) = Pipeline::new_test();
-        tokio::spawn(async move {
-            config
-                .build(SourceContext::new_test(tx))
-                .await
-                .unwrap()
-                .await
-                .unwrap()
-        });
+        assert_eq!(count_messages(&sqs, &queue).await, 1);
+
+        let (tx, rx) = Pipeline::new_test_finalize(status);
+        let mut cx = SourceContext::new_test(tx);
+        cx.acknowledgements.enabled = true;
+        let source = config.build(cx).await.unwrap();
+        tokio::spawn(async move { source.await.unwrap() });
 
         let events = collect_n(rx, expected_lines.len()).await;
 
@@ -480,6 +539,14 @@ mod integration_tests {
             assert_eq!(log["object"], key.clone().into());
             assert_eq!(log["region"], "us-east-1".into());
         }
+
+        // Make sure the SQS message is deleted
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        let expected_messages = match status {
+            Errored => 1,
+            _ => 0,
+        };
+        assert_eq!(count_messages(&sqs, &queue).await, expected_messages);
     }
 
     /// creates a new SQS queue
@@ -499,6 +566,21 @@ mod integration_tests {
             .expect("Could not create queue");
 
         res.queue_url.expect("no queue url")
+    }
+
+    /// count the number of messages in a SQS queue
+    async fn count_messages(client: &SqsClient, queue: &str) -> usize {
+        client
+            .receive_message(rusoto_sqs::ReceiveMessageRequest {
+                queue_url: queue.into(),
+                visibility_timeout: Some(0),
+                ..Default::default()
+            })
+            .await
+            .unwrap()
+            .messages
+            .map(|messages| messages.len())
+            .unwrap_or(0)
     }
 
     /// creates a new bucket with notifications to given SQS queue
