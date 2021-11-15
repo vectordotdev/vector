@@ -8,21 +8,20 @@ use crate::{Pipeline, config::{
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
-use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{stream, FutureExt, SinkExt, TryFutureExt};
 use futures_util::future::Shared;
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
-use serde_json::{de::Read as JsonRead, json, Deserializer, Value as JsonValue};
+use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
 use snafu::Snafu;
 use std::{
     collections::HashMap,
-    future,
     io::Read,
     net::{Ipv4Addr, SocketAddr},
     sync::Arc,
 };
 use tokio::sync::RwLock;
-use vector_core::{ByteSizeOf, event::{BatchNotifier, BatchStatusReceiver}};
+use vector_core::{ByteSizeOf, event::{BatchNotifier}};
 use crate::shutdown::ShutdownSignal;
 
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
@@ -158,18 +157,6 @@ impl SourceConfig for SplunkConfig {
     }
 }
 
-type ChannelInfo = Arc<RwLock<HashMap<String, Channel>>>;
-
-async fn handle_batch_status(channels: ChannelInfo, ack_id: u64, receiver: BatchStatusReceiver) -> Result<(), Rejection> {
-    println!("awaiting the receiver");
-    match receiver.await {
-        vector_core::event::BatchStatus::Delivered => println!("delivered {:?}", ack_id),
-        vector_core::event::BatchStatus::Errored => println!("errored {:?}", ack_id),
-        vector_core::event::BatchStatus::Failed => println!("failed {:?}", ack_id),
-    };
-    Ok(())
-}
-
 /// Shared data for responding to requests.
 struct SplunkSource {
     valid_credentials: Vec<String>,
@@ -245,7 +232,6 @@ impl SplunkSource {
                     });
 
                     async move {
-                        // if channels.is_some() && channel.is_none() {
                         if idx_ack.is_some() && channel.is_none() {
                             return Err(Rejection::from(ApiError::MissingChannel));
                         }
@@ -269,7 +255,7 @@ impl SplunkSource {
                         // Generate an ack Id to assign to this request
                         let maybe_ack_id = match (idx_ack, receiver, channel) {
                             (Some(idx_ack), Some(receiver), Some(channel_id)) => {
-                                match idx_ack.get_channel(channel_id).await {
+                                match idx_ack.create_or_get_channel(channel_id).await {
                                     Ok(channel) => Some(channel.get_ack_id(receiver)),
                                     Err(rej) => return Err(rej),
                                 }
@@ -282,6 +268,7 @@ impl SplunkSource {
                 },
             )
             .map(|maybe_ack_id| {
+                // todo: clean up this repeated logic
                 if let Some(ack_id) = maybe_ack_id {
                     let body = HecResponse::new(HecCode::Success)
                         .with_metadata(HecResponseMetadata::AckId(ack_id));
@@ -342,7 +329,7 @@ impl SplunkSource {
                         out.send(event).await?;
                         let maybe_ack_id = match (idx_ack, receiver) {
                             (Some(idx_ack), Some(receiver)) => {
-                                match idx_ack.get_channel(channel_id).await {
+                                match idx_ack.create_or_get_channel(channel_id).await {
                                     Ok(channel) => Some(channel.get_ack_id(receiver)),
                                     Err(rej) => return Err(rej),
                                 }
@@ -411,10 +398,10 @@ impl SplunkSource {
                 let idx_ack = idx_ack.clone();
                 async move {
                     if let Some(idx_ack) = idx_ack {
-                        match idx_ack.get_channel(channel_id).await {
+                        match idx_ack.create_or_get_channel(channel_id).await {
                             // todo: test Splunk behavior for ack query when channel does not exist
                             Ok(channel) => {
-                                let ack_statuses = channel.get_acks_status(body.acks);
+                                let ack_statuses = channel.get_acks_status(&body.acks);
                                 Ok(warp::reply::json(&HecAckStatusResponse {
                                     acks: ack_statuses,
                                 }).into_response())
@@ -904,9 +891,9 @@ mod splunk_response {
     }
 }
 
-fn finish_ok(_: ()) -> Response {
-    response_json(StatusCode::OK, &*splunk_response::SUCCESS)
-}
+// fn finish_ok(_: ()) -> Response {
+//     response_json(StatusCode::OK, &*splunk_response::SUCCESS)
+// }
 
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
     if let Some(&error) = rejection.find::<ApiError>() {
@@ -969,7 +956,7 @@ fn response_json(code: StatusCode, body: impl Serialize) -> Response {
 #[cfg(feature = "sinks-splunk_hec")]
 #[cfg(test)]
 mod tests {
-    use super::{parse_timestamp, SplunkConfig};
+    use super::{SplunkConfig, acknowledgements::HecAcknowledgementsConfig, parse_timestamp};
     use crate::{
         config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
         event::Event,
@@ -1017,6 +1004,7 @@ mod tests {
                 token,
                 valid_tokens,
                 tls: None,
+                indexer_acknowledgements: HecAcknowledgementsConfig::default(),
             }
             .build(SourceContext::new_test(sender))
             .await
