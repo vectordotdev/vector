@@ -428,7 +428,7 @@ sources-logs = [
   "sources-exec",
   "sources-file",
   "sources-fluent",
-  "sources-generator",
+  "sources-demo_logs",
   "sources-heroku_logs",
   "sources-http",
   "sources-internal_logs",
@@ -469,7 +469,7 @@ sources-eventstoredb_metrics = []
 sources-exec = ["codecs"]
 sources-file = ["file-source"]
 sources-fluent = ["base64", "listenfd", "tokio-util/net", "rmpv", "rmp-serde", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "serde_bytes", "codecs"]
-sources-generator = ["fakedata", "codecs"]
+sources-demo_logs = ["fakedata", "codecs"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "codecs"]
 sources-host_metrics = ["heim"]
 sources-http = ["sources-utils-http", "codecs", "sources-utils-http-query"]
@@ -763,7 +763,7 @@ dnstap-integration-tests = ["sources-dnstap"]
 
 disable-resolv-conf = []
 shutdown-tests = ["rdkafka", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-log_to_metric", "transforms-lua", "unix"]
-cli-tests = ["sinks-blackhole", "sinks-socket", "sources-generator", "sources-file"]
+cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
 
 # grouping together features for benchmarks
 # excluing API client due to running out of memory during linking in Github Actions
