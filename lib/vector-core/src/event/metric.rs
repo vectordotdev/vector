@@ -550,11 +550,17 @@ impl Metric {
                 }
             }
         };
+        let mut labels = MetricTags::new();
 
-        let labels = key
-            .labels()
-            .map(|label| (String::from(label.key()), String::from(label.value())))
-            .collect::<MetricTags>();
+        key.labels().for_each(|label| {
+            let k = String::from(label.key());
+            let v = if let Some(old_v) = labels.get(&k) {
+                format!("{}.{}", label.value(), old_v)
+            } else {
+                String::from(label.value())
+            };
+            labels.insert(k, v);
+        });
 
         Self::new(key.name().to_string(), MetricKind::Absolute, value)
             .with_namespace(Some("vector"))

@@ -101,6 +101,7 @@ impl TaskTransform for Compound {
         Self: 'static,
     {
         let mut task = task;
+        let mut idx = 0;
         for t in self.transforms {
             task = filter_event_type(Box::pin(task), t.1);
             match t.0 {
@@ -110,7 +111,14 @@ impl TaskTransform for Compound {
                 Transform::Function(mut t) => {
                     task = Box::pin(task.flat_map(move |v| {
                         let mut output = Vec::<Event>::new();
-                        t.transform(&mut output, v);
+                        error_span!(
+                            "compound_inner_transform",
+                            component_id = %idx,
+                            component_name = %idx,
+                        )
+                        .in_scope(|| {
+                            t.transform(&mut output, v);
+                        });
                         stream::iter(output)
                     }));
                 }
@@ -118,7 +126,14 @@ impl TaskTransform for Compound {
                     task = Box::pin(task.flat_map(move |v| {
                         let mut output = Vec::<Event>::new();
                         let mut errors = Vec::<Event>::new();
-                        t.transform(&mut output, &mut errors, v);
+                        error_span!(
+                            "compound_inner_transform",
+                            component_id = %idx,
+                            component_name = %idx,
+                        )
+                        .in_scope(|| {
+                            t.transform(&mut output, &mut errors, v);
+                        });
                         emit!(&CompoundErrorEvents {
                             count: errors.len(),
                         });
@@ -126,6 +141,7 @@ impl TaskTransform for Compound {
                     }));
                 }
             }
+            idx += 1;
         }
         task
     }
