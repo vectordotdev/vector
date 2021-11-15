@@ -69,7 +69,7 @@ components: sources: aws_sqs: components._aws & {
 			warnings: []
 			type: uint: {
 				default: 1
-				unit:    "# of clients"
+				unit:    "concurrency"
 			}
 		}
 		queue_url: {
