@@ -85,7 +85,7 @@ query {
       node {
         componentId
         metrics {
-          # Total events that the source has sent out.
+          # Total events that the transform has sent out.
           sentEventsTotal {
             sentEventsTotal
           }
