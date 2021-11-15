@@ -101,8 +101,7 @@ impl TaskTransform for Compound {
         Self: 'static,
     {
         let mut task = task;
-        let mut idx = 0;
-        for t in self.transforms {
+        for (idx, t) in self.transforms.into_iter().enumerate() {
             task = filter_event_type(Box::pin(task), t.1);
             match t.0 {
                 Transform::Task(t) => {
@@ -141,7 +140,6 @@ impl TaskTransform for Compound {
                     }));
                 }
             }
-            idx += 1;
         }
         task
     }
