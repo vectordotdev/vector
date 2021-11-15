@@ -10,7 +10,7 @@ badges:
   type: breaking change
 ---
 
-## Event trottle transform released
+## New `throttle` transform released
 
 
 We've released a new transform that provides a user the ability to control the throughput of specific event streams.
