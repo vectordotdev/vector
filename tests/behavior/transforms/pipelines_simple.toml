@@ -17,21 +17,21 @@ order = [
   "bar"
 ]
 
-[transforms.pipelines_processing.logs.pipelines.foo]
+[transforms.pipelines_processing.logs.foo]
 name = "foo"
 
-[[transforms.pipelines_processing.logs.pipelines.foo.transforms]]
+[[transforms.pipelines_processing.logs.foo.transforms]]
 type = "remap"
 source = ". |= parse_syslog!(.message)"
 
-[[transforms.pipelines_processing.logs.pipelines.foo.transforms]]
+[[transforms.pipelines_processing.logs.foo.transforms]]
 type = "remap"
 source = ".went_through_foo = true"
 
-[transforms.pipelines_processing.logs.pipelines.bar]
+[transforms.pipelines_processing.logs.bar]
 name = "bar"
 
-[[transforms.pipelines_processing.logs.pipelines.bar.transforms]]
+[[transforms.pipelines_processing.logs.bar.transforms]]
 type = "remap"
 source = ".went_through_bar = true"
 

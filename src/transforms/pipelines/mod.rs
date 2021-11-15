@@ -106,10 +106,10 @@ impl PipelineConfig {
 
 /// This represent an ordered list of pipelines depending on the event type.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct EventTypeConfig {
     #[serde(default)]
     order: Option<Vec<String>>,
+    #[serde(flatten)]
     pipelines: IndexMap<String, PipelineConfig>,
 }
 
@@ -216,21 +216,21 @@ impl GenerateConfig for PipelinesConfig {
             [logs]
             order = ["foo", "bar"]
 
-            [logs.pipelines.foo]
+            [logs.foo]
             name = "foo pipeline"
 
-            [[logs.pipelines.foo.transforms]]
+            [[logs.foo.transforms]]
             type = "filter"
             condition = ""
 
-            [[logs.pipelines.foo.transforms]]
+            [[logs.foo.transforms]]
             type = "filter"
             condition = ""
 
-            [logs.pipelines.bar]
+            [logs.bar]
             name = "bar pipeline"
 
-            [[logs.pipelines.bar.transforms]]
+            [[logs.bar.transforms]]
             type = "filter"
             condition = ""
         "#})
