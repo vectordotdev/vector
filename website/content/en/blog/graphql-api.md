@@ -36,7 +36,8 @@ Try our new [**GraphQL public playground
 today**](https://playground.vector.dev:8686/playground), which enables you to
 execute queries against a live Vector instance that we host and manage:
 
-![Vector GraphQL API Public Playground](/img/blog/vector-api-public-playground.png)
+![Vector GraphQL API Public
+Playground](/img/blog/vector-api-public-playground.png)
 
 Here are a few queries you can try:
 
@@ -57,20 +58,53 @@ subscription {
 ### Get configured topology + metrics
 
 Get sources, transforms, and sinks configured by
-[`vector.toml`](https://vector.dev/docs/setup/configuration/), along with total
-events, bytes, and errors processed per component:
+[`vector.toml`](https://vector.dev/docs/setup/configuration/), along with
+metrics such as the number of events or bytes processed by the component:
 
 ```graphql
 query {
-  components {
-    __typename
-    componentId
-    processedEventsTotal {
-      processedEventsTotal
+  # Get the first 5 sources.
+  sources(first: 5) {
+    # See https://relay.dev/graphql/connections.htm
+    edges {
+      node {
+        componentId
+        metrics {
+          # Total events that the source has received.
+          receivedEventsTotal {
+            receivedEventsTotal
+          }
+        }
+      }
     }
-    ... on Sink {
-      processedBytesTotal {
-        processedBytesTotal
+  }
+
+  # Get transforms (defaults to the first 10 when a limit isn't specified)
+  transforms {
+    edges {
+      node {
+        componentId
+        metrics {
+          # Total events that the source has sent out.
+          sentEventsTotal {
+            sentEventsTotal
+          }
+        }
+      }
+    }
+  }
+
+  # Get the last 3 sinks.
+  sinks(last: 3) {
+    edges {
+      node {
+        componentId
+        metrics {
+          # Total bytes processed by this sink.
+          processedBytesTotal {
+            processedBytesTotal
+          }
+        }
       }
     }
   }
@@ -189,10 +223,10 @@ On Linux, Windows and macOS, you'll get an interface like this:
 
 ![Vector top](/img/blog/vector-top.png)
 
-This will display your configured components and metrics, updating
-every second (pass a millisecond `--interval` to adjust). If you run Vector in
-[watch mode](https://vector.dev/docs/reference/cli/#vector_watch_config), it'll
-even pick up topology changes automatically.
+This will display your configured components and metrics, updating every second
+(pass a millisecond `--interval` to adjust). If you run Vector in [watch
+mode](https://vector.dev/docs/reference/cli/#vector_watch_config), it'll even
+pick up topology changes automatically.
 
 I'll be telling you more about `vector top` soon in a dedicated blog post.
 
