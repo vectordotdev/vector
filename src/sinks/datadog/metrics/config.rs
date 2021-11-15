@@ -42,9 +42,9 @@ pub const MAXIMUM_PAYLOAD_SIZE: usize = 62_914_560;
 pub struct DatadogMetricsDefaultBatchSettings;
 
 impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
-    const MAX_EVENTS: Option<usize> = Some(100_000);
+    const MAX_EVENTS: Option<usize> = Some(20);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(2) };
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
 }
 
 #[derive(Debug, Snafu)]

@@ -19,7 +19,7 @@ components: sinks: honeycomb: {
 			batch: {
 				enabled:      true
 				common:       false
-				max_bytes:    5242880
+				max_bytes:    100_000
 				timeout_secs: 1
 			}
 			compression: enabled: false
