@@ -17,15 +17,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BypassConfig {
     condition: AnyCondition,
-    children: Box<dyn TransformConfig>,
+    inner: Box<dyn TransformConfig>,
 }
 
 impl BypassConfig {
-    pub fn new(condition: AnyCondition, children: Box<dyn TransformConfig>) -> Self {
-        Self {
-            condition,
-            children,
-        }
+    pub fn new(condition: AnyCondition, inner: Box<dyn TransformConfig>) -> Self {
+        Self { condition, inner }
     }
 
     fn truthy_path(&self) -> Box<dyn TransformConfig> {
@@ -34,7 +31,7 @@ impl BypassConfig {
             "filter".to_string(),
             Box::new(FilterConfig::from(self.condition.clone())),
         );
-        result.insert("transforms".to_string(), self.children.clone());
+        result.insert("transforms".to_string(), self.inner.clone());
         Box::new(ExpanderConfig::serial(result))
     }
 
