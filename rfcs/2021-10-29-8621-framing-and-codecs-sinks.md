@@ -99,28 +99,28 @@ Overview for the current state of sinks regarding encoding:
 |`aws_s3`| `EncodingConfig<StandardEncodings { Text, Json, Ndjson }>` | Uses util::{RequestBuilder, Encoder, Compressor}. `Text` reads `message_key()`
 |`aws_sqs`| `EncodingConfig<Encoding { Text, Json }>` | Enveloped in EncodedEvent<SendMessageEntry>. `Text` reads `message_key()`
 |`azure_blob`| `EncodingConfig<Encoding { Ndjson, Text }>` | Enveloped in EncodedEvent<PartitionInnerBuffer>. `Text` reads `message_key()`
-|`azure_monitor_logs`| `EncodingConfigWithDefault<Encoding { Default }>` | Reshapes events only, without encoding
+|`azure_monitor_logs`| `EncodingConfigWithDefault<Encoding { Default }>` | Reshapes events only, without encoding. Enveloped in HTTP request
 |`blackhole`| -/-
-|`clickhouse`| `EncodingConfigWithDefault<Encoding { Default }>` | Reshapes events only, without encoding
+|`clickhouse`| `EncodingConfigWithDefault<Encoding { Default }>` | Reshapes events only, without encoding. Enveloped in HTTP request
 |`console`| `EncodingConfig<Encoding { Text, Json }>` | `Text` reads `message_key()`
 |`datadog`| `EncodingConfigFixed<DatadogLogsJsonEncoding>` | Doesn't provide options to encode the event payload separately from the protocol
-|`datadog_archives`|
-|`elasticsearch`|
+|`datadog_archives`| -/- | Uses custom `DatadogArchivesEncoding`, which has a field `inner: StandardEncodings` which is not user-configurable
+|`elasticsearch`| `EncodingConfigFixed<ElasticSearchEncoder>` | Doesn't reshape using `EncodingConfig`. Reshapes event internally and implements custom `ElasticSearchEncoder` to serialize for the Elasticsearch protocol
 |`file`| `EncodingConfig<Encoding { Text, Ndjson }>` | `Text` reads `message_key()`
-|`gcp`|
-|`honeycomb`|
-|`http`| `EncodingConfig<Encoding { Text, Ndjson, Json }>` | Enveloped in HTTP request. Request-level compression. Sets headers depending on encoding config
-|`humio`|
-|`influxdb`|
+|`gcp`| `EncodingConfig<StandardEncodings>` | Enveloped in HTTP request via `sinks::util::request_builder::RequestBuild`. Sets HTTP request header depending on encoding config
+|`honeycomb`| -/- | Embeds event as JSON under a `data` key. Enveloped in HTTP request
+|`http`| `EncodingConfig<Encoding { Text, Ndjson, Json }>` | Uses reshaping. Enveloped in HTTP request. Request-level compression. Sets HTTP request header depending on encoding config
+|`humio`| `EncodingConfig<Encoding { Json, Text }>` | Wrapper, see `splunk_hec` for more information
+|`influxdb`| `EncodingConfigWithDefault<Encoding { Default }>` | Reshapes event only using the encoding config. Encoding (for the protocol envelope) itself is done via another internal function `influx_line_protocol`
 |`kafka`| `EncodingConfig<StandardEncodings { Text, Json, Ndjson }>` | Doesn't reshape, uses `Encoder<Event>` for `StandardEncodings` in `encode_input`, enveloped in `KafkaRequest`
-|`logdna`|
-|`loki`|
-|`nats`|
-|`new_relic_logs`|
-|`papertrail`|
-|`pulsar`|
-|`redis`|
-|`sematext`|
+|`logdna`| `EncodingConfigWithDefault<Encoding { Default }>` | Reshapes event only using the encoding config. Builds a message by manually picking fields from the event. Enveloped in HTTP request
+|`loki`| `EncodingConfig<Encoding { Json, Text, Logfmt }>` | Uses reshaping. `Text` reads `message_key()`, `Logfmt` build a key-value string. Sink has config to preprocess event by adding/removing label fields and timestamp. Enveloped in HTTP request
+|`nats`| `EncodingConfig<Encoding { Text, Json }>` | Uses reshaping. `Text` reads `message_key()`
+|`new_relic_logs`| `EncodingConfigWithDefault<Encoding { Json }>` | Defers to HTTP sink, uses encoding config to reshape only and convert to JSON
+|`papertrail`| `EncodingConfig<Encoding { Text, Json }>` | Uses reshaping. `Text` reads `message_key()`. Serializes event using syslog and sends buffer via TCP
+|`pulsar`| `EncodingConfig<Encoding { Text, Json, Avro }>` | Uses reshaping. `Text` reads `message_key()`, `Avro` expects another dedicated key for the serialization schema. Serialized buffer is sent to Pulsar producer
+|`redis`| `EncodingConfig<Encoding { Text, Json }>` | Uses reshaping. `Text` reads `message_key()`. Encoded message is serialized to buffer
+|`sematext`| `EncodingConfigFixed<ElasticSearchEncoder>` | Wrapper, see `elasticsearch` for more information
 |`socket`| `EncodingConfig<Encoding { Text, Json }>` | `Text` reads `message_key()`
-|`splunk_hec`|
-|`vector`|
+|`splunk_hec`| `EncodingConfig<HecLogsEncoder { Json, Text }>` | Uses reshaping capabilities, encoding is mainly used to create a message according to the Splunk HEC protocol. There is no separate control over encoding the payload itself
+|`vector`| -/-
