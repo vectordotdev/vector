@@ -72,6 +72,10 @@ pub struct HostMetricsConfig {
     collectors: Option<Vec<Collector>>,
     #[serde(default)]
     namespace: Namespace,
+    #[serde(skip)]
+    version: Option<String>,
+    #[serde(skip)]
+    configuration_key: Option<String>,
 
     #[cfg(target_os = "linux")]
     #[serde(default)]
@@ -116,6 +120,21 @@ impl SourceConfig for HostMetricsConfig {
 }
 
 impl HostMetricsConfig {
+    /// Return a host metrics config with enterprise reporting defaults.
+    pub fn enterprise(version: impl Into<String>, configuration_key: impl Into<String>) -> Self {
+        Self {
+            namespace: Namespace(Some("pipelines".to_owned())),
+            version: Some(version.into()),
+            configuration_key: Some(configuration_key.into()),
+            ..Self::default()
+        }
+    }
+
+    /// Set the interval to collect internal metrics.
+    pub fn scrape_interval_secs(&mut self, value: u64) {
+        self.scrape_interval_secs = value;
+    }
+
     async fn run(self, out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
         let mut out =
             out.sink_map_err(|error| error!(message = "Error sending host metrics.", %error));
@@ -164,6 +183,9 @@ impl HostMetrics {
 
     async fn capture_metrics(&self) -> impl Iterator<Item = Event> {
         let hostname = crate::get_hostname();
+        let version = self.config.version.clone();
+        let configuration_key = self.config.configuration_key.clone();
+
         let mut metrics = Vec::new();
         #[cfg(target_os = "linux")]
         if self.config.has_collector(Collector::CGroups) {
@@ -194,6 +216,16 @@ impl HostMetrics {
         if let Ok(hostname) = &hostname {
             for metric in &mut metrics {
                 metric.insert_tag("host".into(), hostname.into());
+            }
+        }
+        if let Some(version) = &version {
+            for metric in &mut metrics {
+                metric.insert_tag("version".to_owned(), version.clone());
+            }
+        }
+        if let Some(configuration_key) = &configuration_key {
+            for metric in &mut metrics {
+                metric.insert_tag("configuration_key".to_owned(), configuration_key.clone());
             }
         }
         emit!(&HostMetricsEventReceived {

@@ -19,7 +19,7 @@ components: sinks: logdna: {
 			batch: {
 				enabled:      true
 				common:       false
-				max_bytes:    10490000
+				max_bytes:    10_000_000
 				timeout_secs: 1
 			}
 			compression: enabled: false
@@ -48,16 +48,6 @@ components: sinks: logdna: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -67,32 +57,26 @@ components: sinks: logdna: {
 		api_key: {
 			description: "The Ingestion API key."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["${LOGDNA_API_KEY}", "ef8d5de700e7989468166c40fc8a0ccd"]
-				syntax: "literal"
 			}
 		}
 		default_app: {
 			common:      false
 			description: "The default app that will be set for events that do not contain a `file` or `app` field."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "vector"
 				examples: ["vector", "myapp"]
-				syntax: "literal"
 			}
 		}
 		default_env: {
 			common:      false
 			description: "The default environment that will be set for events that do not contain an `env` field."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "production"
 				examples: ["staging", "production"]
-				syntax: "literal"
 			}
 		}
 		endpoint: {
@@ -102,50 +86,41 @@ components: sinks: logdna: {
 			type: string: {
 				default: "https://logs.logdna.com/logs/ingest"
 				examples: ["http://127.0.0.1", "http://example.com"]
-				syntax: "literal"
 			}
 		}
 		hostname: {
 			description: "The hostname that will be attached to each batch of events."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["${HOSTNAME}", "my-local-machine"]
-				syntax: "literal"
 			}
 		}
 		ip: {
 			common:      false
 			description: "The IP address that will be attached to each batch of events."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["0.0.0.0"]
-				syntax: "literal"
 			}
 		}
 		mac: {
 			common:      false
 			description: "The mac address that will be attached to each batch of events."
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["my-mac-address"]
-				syntax: "literal"
 			}
 		}
 		tags: {
 			common:      false
 			description: "The tags that will be attached to each batch of events."
 			required:    false
-			warnings: []
 			type: array: {
 				default: null
 				items: type: string: {
 					examples: ["tag1", "tag2"]
-					syntax: "literal"
 				}
 			}
 		}

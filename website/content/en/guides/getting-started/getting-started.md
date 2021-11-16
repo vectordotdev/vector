@@ -91,7 +91,7 @@ configuration now:
 
 ```toml title="vector.toml"
 [sources.generate_syslog]
-  type = "generator"
+  type = "demo_logs"
   format = "syslog"
   count = 100
 
@@ -109,7 +109,7 @@ configuration now:
   encoding.codec = "json"
 ```
 
-The first component uses the [`generator` source][docs.sources.generator]. The `generator` source creates sample
+The first component uses the [`demo_logs` source][docs.sources.demo_logs]. The `demo_logs` source creates sample
 log data that can allow you to simulate different types of events in various formats.
 
 > But, but you said "real" observability data? We choose generated data because it's hard for us to know what
@@ -122,8 +122,8 @@ a simple language called [Vector Remap Language][docs.vrl] that allows you to pa
 decorate your event data as it passes through Vector. Using `remap`, you can turn static events into informational
 data that can help you ask and answer questions about your environment's state.
 
-You can see we've added the `sources.generated_syslog` component. The `format` option tells the generator what
-type of logs to emit, here `syslog`, and the `count` option tells the generator how many lines to emit, here 100.
+You can see we've added the `sources.generated_syslog` component. The `format` option tells the `demo_logs` source what
+type of logs to emit, here `syslog`, and the `count` option tells the `demo_logs` source how many lines to emit, here 100.
 
 In our second component, `transforms.remap_syslog`, we've specified an `inputs` option of `generate_syslog`, which
 means it will receive events from our `generate_syslog` source. We've also specified the type of transform: `remap`.
@@ -172,15 +172,17 @@ check out:
 
 * All of Vector's [sources][docs.sources], [transforms][docs.transforms], and [sinks][docs.sinks].
 * The [Vector Remap Language][docs.vrl], the heart of data processing in Vector.
+* More details on [component configuration][docs.configuration] in Vector.
 * Finally, [deploying Vector][docs.deployment] to launch Vector in your production environment.
 
 [docs.deployment]: /docs/setup/deployment/
 [docs.installation]: /docs/setup/installation/
 [docs.setup.configuration]: /docs/setup/configuration/
+[docs.configuration]: /docs/reference/configuration/
 [docs.sinks]: /docs/reference/configuration/sinks/
 [docs.sinks.console]: /docs/reference/configuration/sinks/console/
 [docs.sources]: /docs/reference/configuration/sources/
-[docs.sources.generator]: /docs/reference/configuration/sources/generator/
+[docs.sources.demo_logs]: /docs/reference/configuration/sources/demo_logs/
 [docs.sources.stdin]: /docs/reference/configuration/sources/stdin/
 [docs.transforms.remap]: /docs/reference/configuration/transforms/remap/
 [docs.transforms]: /docs/reference/configuration/transforms/

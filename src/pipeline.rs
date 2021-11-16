@@ -1,10 +1,11 @@
-use crate::{internal_events::EventsSent, transforms::FunctionTransform};
+use crate::transforms::FunctionTransform;
 use futures::{channel::mpsc, task::Poll, Sink};
 #[cfg(test)]
 use futures::{Stream, StreamExt};
 use std::{collections::VecDeque, fmt, pin::Pin, task::Context};
 #[cfg(test)]
 use vector_core::event::EventStatus;
+use vector_core::internal_event::EventsSent;
 use vector_core::{event::Event, ByteSizeOf};
 
 #[derive(Debug)]

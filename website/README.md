@@ -40,6 +40,8 @@ All of the CUE sources for the site are in the [`cue`](./cue) directory. Wheneve
 
 There's a variety of helper commands available for working with CUE. Run `make cue-help` for CLI docs.
 
+> Having trouble with CUE? See [CUE pro tips](#cue-pro-tips) below for some pointers.
+
 ### JavaScript
 
 For the most part, vector.dev uses the [Alpine] framework for interactive functionality. If you see directives like `x-show`, `x-data`, `@click`, and `:class` in HTML templates, those are Alpine directives. Alpine was chosen over jQuery and other frameworks for the sake of maintainability. Alpine directives live inside your HTML rather than in separate JavaScript files, which enables you to see how a component behaves without referring to an external `.js` file.
@@ -161,6 +163,46 @@ When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site
 
 * Tailwind's [typography] plugin is used to render text throughout the site. It's a decent library in general but is also rather buggy, with some rendering glitches in things like lists and tables that we've tried to compensate for in the `extend.typography` block in the [Tailwind config](./tailwind.config.js), but it will take some time to iron all of these issues out.
 
+## CUE pro tips
+
+[CUE] can be tricky, tripping up even the most seasoned veterans of the language. Below are some tips that might help you get over the hump with whatever CUE logic you're trying to add to the Vector docs.
+
+### One step at a time
+
+We generally advise writing CUE in an incremental way. If you add a lot of new CUE logic and _then_ validate what you've added, the likelihood of encountering inscrutable errors and having little insight into where specifically you went wrong is quite high. Instead, add and then validate little bits at a time. Tools like [`watchexec`][watchexec] can help with this. Here's an example command (run here in the `website` directory):
+
+```shell
+watchexec "make cue-build"
+```
+
+This runs the CUE build every time you save a change to your CUE sources. The feedback loop is typically 2-5 seconds.
+
+### Watch your indentation
+
+Good:
+
+```cue
+description: """
+    Here is a long string...
+    """
+```
+
+Bad:
+
+```cue
+description: """
+        Here is a long string...
+    """
+```
+
+Also bad:
+
+```cue
+description: """
+    Here is a long string...
+        """
+```
+
 [algolia]: https://algolia.com
 [aliases]: https://gohugo.io/content-management/urls
 [alpine]: https://alpinejs.dev
@@ -193,4 +235,5 @@ When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site
 [typography]: https://github.com/tailwindlabs/tailwindcss-typography
 [vector]: https://vector.dev
 [vrl]: https://vrl.dev
+[watchexec]: https://github.com/watchexec/watchexec
 [yarn]: https://yarnpkg.com

@@ -114,8 +114,9 @@ There is leeway in the implementation of these events:
 
 #### BytesReceived
 
-*Sources* MUST emit a `BytesReceived` event immediately after receiving bytes
-from the upstream source and before the creation of a Vector event.
+*Sources* MUST emit a `BytesReceived` event immediately after receiving
+and (optionally) filtering bytes from the upstream source and before the
+creation of a Vector event.
 
 * Properties
   * `byte_size`
@@ -136,7 +137,7 @@ from the upstream source and before the creation of a Vector event.
   * MUST log a `Bytes received.` message at the `trace` level with the
     defined properties as key-value pairs. It MUST NOT be rate limited.
 
-#### EventsRecevied
+#### EventsReceived
 
 *All components* MUST emit an `EventsReceived` event immediately after creating
 or receiving one or more Vector events.

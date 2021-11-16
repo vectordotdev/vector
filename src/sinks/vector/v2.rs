@@ -1,34 +1,42 @@
 use crate::{
     config::{DataType, GenerateConfig, Resource, SinkContext, SinkHealthcheckOptions},
     event::{proto::EventWrapper, Event},
+    internal_events::EndpointBytesSent,
     proto::vector as proto,
     sinks::util::{
-        retries::RetryLogic, BatchConfig, BatchSettings, BatchSink, EncodedEvent, EncodedLength,
+        retries::RetryLogic, uri, BatchConfig, BatchSink, EncodedEvent, EncodedLength,
         ServiceBuilderExt, TowerRequestConfig, VecBuffer,
     },
-    sinks::{Healthcheck, VectorSink},
+    sinks::{util::batch::RealtimeEventBasedDefaultBatchSettings, Healthcheck, VectorSink},
     tls::{tls_connector_builder, MaybeTlsSettings, TlsConfig},
 };
 use futures::{future::BoxFuture, stream, SinkExt, StreamExt, TryFutureExt};
 use http::uri::Uri;
 use hyper::client::HttpConnector;
 use hyper_openssl::HttpsConnector;
+use hyper_proxy::ProxyConnector;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::task::{Context, Poll};
 use tonic::{body::BoxBody, IntoRequest};
 use tower::ServiceBuilder;
+use vector_core::config::proxy::ProxyConfig;
 use vector_core::ByteSizeOf;
 
-type Client = proto::Client<HyperSvc>;
+#[derive(Clone, Debug)]
+struct Client {
+    inner: proto::Client<HyperSvc>,
+    protocol: String,
+    endpoint: String,
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
     address: String,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<RealtimeEventBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(default)]
@@ -86,7 +94,8 @@ fn with_default_scheme(address: &str, tls: bool) -> crate::Result<Uri> {
 
 fn new_client(
     tls_settings: &MaybeTlsSettings,
-) -> crate::Result<hyper::Client<HttpsConnector<HttpConnector>, BoxBody>> {
+    proxy_config: &ProxyConfig,
+) -> crate::Result<hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>> {
     let mut http = HttpConnector::new();
     http.enforce_http(false);
 
@@ -102,13 +111,16 @@ fn new_client(
         Ok(())
     });
 
-    Ok(hyper::Client::builder().http2_only(true).build(https))
+    let mut proxy = ProxyConnector::new(https).unwrap();
+    proxy_config.configure(&mut proxy)?;
+
+    Ok(hyper::Client::builder().http2_only(true).build(proxy))
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct HyperSvc {
     uri: Uri,
-    client: hyper::Client<HttpsConnector<HttpConnector>, BoxBody>,
+    client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
 }
 
 impl tower::Service<hyper::Request<BoxBody>> for HyperSvc {
@@ -139,7 +151,7 @@ impl VectorConfig {
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
         let uri = with_default_scheme(&self.address, tls.is_tls())?;
 
-        let client = new_client(&tls)?;
+        let client = new_client(&tls, cx.proxy())?;
 
         let healthcheck_uri = cx
             .healthcheck
@@ -147,18 +159,12 @@ impl VectorConfig {
             .clone()
             .map(|uri| uri.uri)
             .unwrap_or_else(|| uri.clone());
-        let healthcheck_client = proto::Client::new(HyperSvc {
-            uri: healthcheck_uri,
-            client: client.clone(),
-        });
+        let healthcheck_client = Client::new(client.clone(), healthcheck_uri);
 
         let healthcheck = healthcheck(healthcheck_client, cx.healthcheck.clone());
-        let client = proto::Client::new(HyperSvc { uri, client });
+        let client = Client::new(client, uri);
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
-        let batch = BatchSettings::default()
-            .events(1000)
-            .timeout(1)
-            .parse_config(self.batch)?;
+        let batch = self.batch.into_batch_settings()?;
 
         let svc = ServiceBuilder::new()
             .settings(request, VectorGrpcRetryLogic)
@@ -191,7 +197,7 @@ async fn healthcheck(mut client: Client, options: SinkHealthcheckOptions) -> cra
         return Ok(());
     }
 
-    let request = client.health_check(proto::HealthCheckRequest {});
+    let request = client.inner.health_check(proto::HealthCheckRequest {});
 
     if let Ok(response) = request.await {
         let status = proto::ServingStatus::from_i32(response.into_inner().status);
@@ -202,6 +208,21 @@ async fn healthcheck(mut client: Client, options: SinkHealthcheckOptions) -> cra
     }
 
     Err(Box::new(Error::Health))
+}
+
+impl Client {
+    fn new(
+        client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
+        uri: Uri,
+    ) -> Self {
+        let (protocol, endpoint) = uri::protocol_endpoint(uri.clone());
+        let inner = proto::Client::new(HyperSvc { uri, client });
+        Self {
+            inner,
+            protocol,
+            endpoint,
+        }
+    }
 }
 
 impl tower::Service<Vec<EventWrapper>> for Client {
@@ -222,10 +243,18 @@ impl tower::Service<Vec<EventWrapper>> for Client {
         let mut client = self.clone();
 
         let request = proto::PushEventsRequest { events };
+        let byte_size = request.encoded_len();
         let future = async move {
             client
+                .inner
                 .push_events(request.into_request())
-                .map_ok(|_| ())
+                .map_ok(|_response| {
+                    emit!(&EndpointBytesSent {
+                        byte_size,
+                        protocol: &client.protocol,
+                        endpoint: &client.endpoint,
+                    });
+                })
                 .map_err(|source| Error::Request { source })
                 .await
         };
@@ -299,7 +328,7 @@ mod tests {
     use crate::{
         config::SinkContext,
         sinks::util::test::build_test_server_generic,
-        test_util::{next_addr, random_lines_with_stream},
+        test_util::{components, next_addr, random_lines_with_stream},
     };
     use bytes::{BufMut, Bytes, BytesMut};
     use futures::{channel::mpsc, StreamExt};
@@ -326,6 +355,7 @@ mod tests {
 
         let cx = SinkContext::new_test();
 
+        components::init_test();
         let (sink, _) = config.build(cx).await.unwrap();
         let (rx, trigger, server) = build_test_server_generic(in_addr, move || {
             hyper::Response::builder()
@@ -344,6 +374,7 @@ mod tests {
         drop(trigger);
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+        components::SINK_TESTS.assert(&components::HTTP_SINK_TAGS);
 
         let output_lines = get_received(rx, |parts| {
             assert_eq!(Method::POST, parts.method);

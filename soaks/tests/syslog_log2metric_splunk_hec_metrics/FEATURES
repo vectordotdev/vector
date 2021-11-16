@@ -1,0 +1,1 @@
+FEATURES="sources-internal_metrics,sinks-prometheus,sources-syslog,transforms-remap,transforms-log_to_metric,sinks-splunk_hec"

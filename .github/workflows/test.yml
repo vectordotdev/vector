@@ -42,7 +42,7 @@ jobs:
         cue: ${{ steps.filter.outputs.cue }}
         markdown: ${{ steps.filter.outputs.markdown }}
       steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
       - uses: dorny/paths-filter@v2
         id: filter
         with:
@@ -91,7 +91,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
       - uses: actions/cache@v2.1.6
         name: Cache Cargo registry + index
         with:
@@ -127,7 +127,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
       - run: make ci-sweep
       - uses: actions/cache@v2.1.6
         name: Cache Cargo registry + index
@@ -177,7 +177,7 @@ jobs:
     # This helps us avoid adopting dependencies that aren't compatible with other architectures.
     if: ${{ needs.changes.outputs.dependencies == 'true' }}
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
       - run: make ci-sweep
       - uses: actions/cache@v2.1.6
         name: Cache Cargo registry + index
@@ -218,7 +218,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
       - uses: actions/cache@v2.1.6
         name: Cache Cargo registry + index
         with:
@@ -244,7 +244,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
       - run: choco install llvm
       - run: .\scripts\environment\bootstrap-windows-2019.ps1
       # We always make sure to stop any previous sccache process before starting it fresh, that
@@ -268,7 +268,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true' }}
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       # We always make sure to stop any previous sccache process before starting it fresh, that
@@ -292,7 +292,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
@@ -317,7 +317,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
@@ -342,7 +342,7 @@ jobs:
     container: timberio/ci_image
     needs: changes
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v2.4.0
         with:
           # check-version needs tags
           fetch-depth: 0 # fetch everything

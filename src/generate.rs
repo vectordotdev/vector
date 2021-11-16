@@ -12,6 +12,7 @@ use std::{
 };
 use structopt::StructOpt;
 use toml::{map::Map, Value};
+use vector_core::buffers::BufferConfig;
 use vector_core::config::GlobalOptions;
 use vector_core::default_data_dir;
 
@@ -64,7 +65,7 @@ pub struct SinkOuter {
     #[serde(flatten)]
     pub inner: Value,
     pub healthcheck: SinkHealthcheckOptions,
-    pub buffer: crate::buffers::BufferConfig,
+    pub buffer: BufferConfig,
 }
 
 #[derive(Serialize)]
@@ -264,7 +265,7 @@ fn generate_example(
                             }
                         })
                         .unwrap_or_else(|| vec!["component-id".to_owned()]),
-                    buffer: crate::buffers::BufferConfig::default(),
+                    buffer: BufferConfig::default(),
                     healthcheck: SinkHealthcheckOptions::default(),
                     inner: example,
                 },

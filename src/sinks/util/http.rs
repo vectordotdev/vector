@@ -1,22 +1,22 @@
 use super::{
     retries::{RetryAction, RetryLogic},
     sink::{self, ServiceLogic},
-    Batch, ElementCount, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink,
+    uri, Batch, ElementCount, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink,
     TowerRequestConfig, TowerRequestSettings,
 };
 use crate::{
-    buffers::Acker,
     event::Event,
     http::{HttpClient, HttpError},
     internal_events::EndpointBytesSent,
 };
 use bytes::{Buf, Bytes};
 use futures::{future::BoxFuture, ready, Sink};
-use http::{uri::PathAndQuery, uri::Scheme, StatusCode, Uri};
+use http::StatusCode;
 use hyper::{body, Body};
 use indexmap::IndexMap;
 use pin_project::pin_project;
 use serde::{Deserialize, Serialize};
+use std::marker::PhantomData;
 use std::{
     fmt,
     future::Future,
@@ -27,7 +27,7 @@ use std::{
     time::Duration,
 };
 use tower::Service;
-use vector_core::ByteSizeOf;
+use vector_core::{buffers::Acker, ByteSizeOf};
 
 #[async_trait::async_trait]
 pub trait HttpSink: Send + Sync + 'static {
@@ -401,25 +401,14 @@ where
             let request = request_builder(body).await?;
             let byte_size = request.body().len();
             let request = request.map(Body::from);
-
-            // Simplify the URI in the request to remove the "query" portion.
-            let mut parts = request.uri().clone().into_parts();
-            parts.path_and_query = parts.path_and_query.map(|pq| {
-                pq.path()
-                    .parse::<PathAndQuery>()
-                    .unwrap_or_else(|_| unreachable!())
-            });
-            let scheme = parts.scheme.clone();
-            let endpoint = Uri::from_parts(parts)
-                .unwrap_or_else(|_| unreachable!())
-                .to_string();
+            let (protocol, endpoint) = uri::protocol_endpoint(request.uri().clone());
 
             let response = http_client.call(request).await?;
 
             if response.status().is_success() {
                 emit!(&EndpointBytesSent {
                     byte_size,
-                    protocol: scheme.unwrap_or(Scheme::HTTP).as_str(),
+                    protocol: &protocol,
                     endpoint: &endpoint
                 });
             }
@@ -472,13 +461,73 @@ impl RetryLogic for HttpRetryLogic {
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
-            _ if status.is_server_error() => RetryAction::Retry(format!(
-                "{}: {}",
-                status,
-                String::from_utf8_lossy(response.body())
-            )),
+            _ if status.is_server_error() => RetryAction::Retry(
+                format!("{}: {}", status, String::from_utf8_lossy(response.body())).into(),
+            ),
             _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("response status: {}", status)),
+            _ => RetryAction::DontRetry(format!("response status: {}", status).into()),
+        }
+    }
+}
+
+/// A more generic version of `HttpRetryLogic` that accepts anything that can be converted
+/// to a status code
+#[derive(Debug)]
+pub struct HttpStatusRetryLogic<F, T> {
+    func: F,
+    request: PhantomData<T>,
+}
+
+impl<F, T> HttpStatusRetryLogic<F, T>
+where
+    F: Fn(&T) -> StatusCode + Clone + Send + Sync + 'static,
+    T: Send + Sync + 'static,
+{
+    pub fn new(func: F) -> HttpStatusRetryLogic<F, T> {
+        HttpStatusRetryLogic {
+            func,
+            request: PhantomData,
+        }
+    }
+}
+
+impl<F, T> RetryLogic for HttpStatusRetryLogic<F, T>
+where
+    F: Fn(&T) -> StatusCode + Clone + Send + Sync + 'static,
+    T: Send + Sync + 'static,
+{
+    type Error = HttpError;
+    type Response = T;
+
+    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
+        true
+    }
+
+    fn should_retry_response(&self, response: &T) -> RetryAction {
+        let status = (self.func)(response);
+
+        match status {
+            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
+            StatusCode::NOT_IMPLEMENTED => {
+                RetryAction::DontRetry("endpoint not implemented".into())
+            }
+            _ if status.is_server_error() => {
+                RetryAction::Retry(format!("Http Status: {}", status).into())
+            }
+            _ if status.is_success() => RetryAction::Successful,
+            _ => RetryAction::DontRetry(format!("Http status: {}", status).into()),
+        }
+    }
+}
+
+impl<F, T> Clone for HttpStatusRetryLogic<F, T>
+where
+    F: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            func: self.func.clone(),
+            request: PhantomData,
         }
     }
 }

@@ -5,7 +5,6 @@ use crate::topology::{
     TaskHandle, WatchRx, WatchTx,
 };
 use crate::{
-    buffers,
     config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, OutputId, Resource},
     event::Event,
     shutdown::SourceShutdownCoordinator,
@@ -22,10 +21,11 @@ use tokio::{
     time::{interval, sleep_until, Duration, Instant},
 };
 use tracing::Instrument;
+use vector_core::buffers::BufferInputCloner;
 
 #[allow(dead_code)]
 pub struct RunningTopology {
-    inputs: HashMap<ComponentKey, buffers::BufferInputCloner<Event>>,
+    inputs: HashMap<ComponentKey, BufferInputCloner<Event>>,
     outputs: HashMap<OutputId, ControlChannel>,
     source_tasks: HashMap<ComponentKey, TaskHandle>,
     tasks: HashMap<ComponentKey, TaskHandle>,

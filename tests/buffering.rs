@@ -28,7 +28,7 @@ fn test_buffering() {
 
     let data_dir = tempdir().unwrap();
     let data_dir = data_dir.path().to_path_buf();
-    trace!(message = "Test data dir", ?data_dir);
+    trace!(message = "Test data dir.", ?data_dir);
 
     let num_events: usize = 10;
     let line_length = 100;
