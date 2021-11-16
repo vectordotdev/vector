@@ -1,14 +1,28 @@
 #[cfg(feature = "disk-buffer")]
 use std::path::PathBuf;
-use std::{io::copy, str::FromStr, sync::{Arc, atomic::{AtomicUsize, Ordering}}, time::{Duration, Instant}};
+use std::{
+    io::copy,
+    str::FromStr,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    time::{Duration, Instant},
+};
 
-use buffers::{Variant, WhenFull, bytes::{DecodeBytes, EncodeBytes}};
+use buffers::{
+    bytes::{DecodeBytes, EncodeBytes},
+    Variant, WhenFull,
+};
 use bytes::{Buf, BufMut};
 use core_common::byte_size_of::ByteSizeOf;
 use futures::{SinkExt, StreamExt};
 use hdrhistogram::Histogram;
 use human_bytes::human_bytes;
-use lading_common::{block::{Block, chunk_bytes, construct_block_cache}, payload};
+use lading_common::{
+    block::{chunk_bytes, construct_block_cache, Block},
+    payload,
+};
 use tokio::{select, sync::oneshot, time};
 use tracing::Span;
 
@@ -87,8 +101,7 @@ async fn main() {
     let start = Instant::now();
     let variant = Variant::Disk {
         id: "disk-v1".to_owned(),
-        data_dir: PathBuf::from_str("/tmp/vector/disk-v1-testing")
-            .expect("path should be valid"),
+        data_dir: PathBuf::from_str("/tmp/vector/disk-v1-testing").expect("path should be valid"),
         // We don't limit disk size, because we just want to see how fast it can complete the writes/reads.
         max_size: usize::MAX,
         when_full: WhenFull::Block,
@@ -132,7 +145,7 @@ async fn main() {
             let tx_start = Instant::now();
 
             let record = records.next().expect("should never be empty");
-            let tx_bytes = record.bytes.len(); 
+            let tx_bytes = record.bytes.len();
             if let Err(_) = writer.send(RecordWrapper(record.bytes.clone())).await {
                 panic!("failed to write record");
             }

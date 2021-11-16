@@ -36,7 +36,7 @@ async fn main() {
     );
 
     // Set up our target record count, write batch size, progress counters, etc.
-    let transaction_count = 30_000;
+    let transaction_count = 300_000;
     let transaction_size = 100;
 
     let write_position = Arc::new(AtomicUsize::new(0));
