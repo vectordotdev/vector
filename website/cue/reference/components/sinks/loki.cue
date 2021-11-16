@@ -19,8 +19,8 @@ components: sinks: loki: {
 			batch: {
 				enabled:      true
 				common:       false
-				max_bytes:    102400
-				max_events:   100000
+				max_bytes:    10_000_000
+				max_events:   100_000
 				timeout_secs: 1
 			}
 			compression: enabled: false
