@@ -11,7 +11,7 @@ use crate::{
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::HttpRetryLogic,
             EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
-            RealtimeEventBasedDefaultBatchSettings, TowerRequestConfig,
+            SinkBatchSettings, TowerRequestConfig,
         },
     },
     template::Template,
@@ -23,6 +23,7 @@ use http::Uri;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use std::num::NonZeroU64;
 use std::task;
 use tower::ServiceBuilder;
 use vector_core::ByteSizeOf;
