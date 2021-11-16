@@ -59,11 +59,11 @@ impl TransformConfig for PipelineFilterConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Any
+        self.inner.input_type()
     }
 
     fn output_type(&self) -> DataType {
-        DataType::Any
+        self.inner.output_type()
     }
 
     fn transform_type(&self) -> &'static str {
