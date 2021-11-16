@@ -66,7 +66,7 @@ pub trait FramingConfig: Debug + DynClone + Send + Sync {
 }
 ```
 
-These can be build to form an `Encoder`:
+These can be built and combined to form an `Encoder`:
 
 ```rust
 /// An encoder that can encode structured events to byte messages.
