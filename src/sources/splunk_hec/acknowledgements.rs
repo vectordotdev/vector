@@ -174,7 +174,7 @@ impl Channel {
             if ack_ids_status.len() > max_pending_acks_per_channel {
                 match ack_ids_status.min() {
                     Some(min) => ack_ids_status.remove(min),
-                    // max pending acks per channel is guaranteed to be >= 1, 
+                    // max pending acks per channel is guaranteed to be >= 1,
                     // thus there must be at least one ack id available to remove
                     None => unreachable!(),
                 };
