@@ -22,10 +22,10 @@ use super::ApiError;
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(default)]
 pub struct HecAcknowledgementsConfig {
-    max_number_of_ack_channels: NonZeroU64,
+    pub max_number_of_ack_channels: NonZeroU64,
     pub max_pending_acks_per_channel: NonZeroU64,
-    ack_idle_cleanup: bool,
-    max_idle_time: NonZeroU64,
+    pub ack_idle_cleanup: bool,
+    pub max_idle_time: NonZeroU64,
 }
 
 impl Default for HecAcknowledgementsConfig {
@@ -48,6 +48,7 @@ pub struct IndexerAcknowledgement {
 
 impl IndexerAcknowledgement {
     pub fn new(config: HecAcknowledgementsConfig, shutdown: Shared<ShutdownSignal>) -> Self {
+        println!("config: {:?}", config);
         let channels: Arc<RwLock<HashMap<String, Arc<Channel>>>> =
             Arc::new(RwLock::new(HashMap::new()));
         let max_idle_time = u64::from(config.max_idle_time);
@@ -93,17 +94,17 @@ impl IndexerAcknowledgement {
         }
         drop(channels);
 
-        // Create the channel if it does not exist
-        let channel = Arc::new(Channel::new(
-            self.max_pending_acks_per_channel,
-            self.shutdown.clone(),
-        ));
         let mut channels = self.channels.write().await;
         if channels.len() < self.max_number_of_ack_channels as usize {
+            // Create the channel if it does not exist
+            let channel = Arc::new(Channel::new(
+                self.max_pending_acks_per_channel,
+                self.shutdown.clone(),
+            ));
             channels.insert(id, Arc::clone(&channel));
             Ok(channel)
         } else {
-            Err(Rejection::from(ApiError::BadRequest))
+            Err(Rejection::from(ApiError::ServiceUnavailable))
         }
     }
 

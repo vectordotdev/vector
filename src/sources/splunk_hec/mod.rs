@@ -37,7 +37,7 @@ use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filte
 
 use self::{
     acknowledgements::HecAcknowledgementsConfig,
-    splunk_response::{HecCode, HecResponse},
+    splunk_response::{HecResponse, HecStatusCode},
 };
 
 mod acknowledgements;
@@ -271,8 +271,10 @@ impl SplunkSource {
                             }
                             _ => None,
                         };
-                        out.send_all(&mut events).await?;
-                        Ok(maybe_ack_id)
+                        let res = out.send_all(&mut events).await;
+
+                        out.flush().await?;
+                        res.map(|_| maybe_ack_id)
                     }
                 },
             )
@@ -281,25 +283,13 @@ impl SplunkSource {
     }
 
     fn raw_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
-        let splunk_channel_query_param = warp::query::<HashMap<String, String>>()
-            .map(|qs: HashMap<String, String>| qs.get("channel").map(|v| v.to_owned()));
-        let splunk_channel_header = warp::header::optional::<String>("x-splunk-request-channel");
-
-        let splunk_channel = splunk_channel_header
-            .and(splunk_channel_query_param)
-            .and_then(|header: Option<String>, query_param| async move {
-                header
-                    .or(query_param)
-                    .ok_or_else(|| Rejection::from(ApiError::MissingChannel))
-            });
-
         let protocol = self.protocol;
         let idx_ack = self.idx_ack.clone();
 
         warp::post()
             .and(path!("raw" / "1.0").or(path!("raw")))
             .and(self.authorization())
-            .and(splunk_channel)
+            .and(SplunkSource::required_channel())
             .and(warp::addr::remote())
             .and(warp::header::optional::<String>("X-Forwarded-For"))
             .and(self.gzip())
@@ -369,23 +359,11 @@ impl SplunkSource {
     }
 
     fn ack_service(&self) -> BoxedFilter<(Response,)> {
-        let splunk_channel_query_param = warp::query::<HashMap<String, String>>()
-            .map(|qs: HashMap<String, String>| qs.get("channel").map(|v| v.to_owned()));
-        let splunk_channel_header = warp::header::optional::<String>("x-splunk-request-channel");
-
-        let splunk_channel = splunk_channel_header
-            .and(splunk_channel_query_param)
-            .and_then(|header: Option<String>, query_param| async move {
-                header
-                    .or(query_param)
-                    .ok_or_else(|| Rejection::from(ApiError::MissingChannel))
-            });
-
         let idx_ack = self.idx_ack.clone();
         warp::post()
             .and(path!("ack"))
             .and(self.authorization())
-            .and(splunk_channel)
+            .and(SplunkSource::required_channel())
             .and(warp::body::json())
             .and_then(move |channel_id: String, body: HecAckStatusRequest| {
                 let idx_ack = idx_ack.clone();
@@ -397,7 +375,7 @@ impl SplunkSource {
                                 .into_response(),
                         )
                     } else {
-                        Err(Rejection::from(ApiError::BadRequest))
+                        Err(Rejection::from(ApiError::AckIsDisabled))
                     }
                 }
             })
@@ -449,6 +427,21 @@ impl SplunkSource {
                     Some(_) => Err(Rejection::from(ApiError::UnsupportedEncoding)),
                     None => Ok(false),
                 }
+            })
+            .boxed()
+    }
+
+    fn required_channel() -> BoxedFilter<(String,)> {
+        let splunk_channel_query_param = warp::query::<HashMap<String, String>>()
+            .map(|qs: HashMap<String, String>| qs.get("channel").map(|v| v.to_owned()));
+        let splunk_channel_header = warp::header::optional::<String>("x-splunk-request-channel");
+
+        splunk_channel_header
+            .and(splunk_channel_query_param)
+            .and_then(|header: Option<String>, query_param| async move {
+                header
+                    .or(query_param)
+                    .ok_or_else(|| Rejection::from(ApiError::MissingChannel))
             })
             .boxed()
     }
@@ -792,27 +785,30 @@ pub(crate) enum ApiError {
     EmptyEventField { event: usize },
     MissingEventField { event: usize },
     BadRequest,
+    ServiceUnavailable,
+    AckIsDisabled,
 }
 
 impl warp::reject::Reject for ApiError {}
 
 /// Cached bodies for common responses
 mod splunk_response {
-    use bytes::Bytes;
     use lazy_static::lazy_static;
     use serde::Serialize;
-    use serde_json::{json, Value};
-    pub enum HecCode {
+
+    // https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/TroubleshootHTTPEventCollector#Possible_error_codes
+    pub enum HecStatusCode {
         Success = 0,
-        MissingCredentials = 2,
+        TokenIsRequired = 2,
         InvalidAuthorization = 3,
         NoData = 5,
         InvalidDataFormat = 6,
         InternalServerError = 8,
-        ServerIsShuttingDown = 9,
+        ServerIsBusy = 9,
         DataChannelIsMissing = 10,
         EventFieldIsRequired = 12,
         EventFieldCannotBeBlank = 13,
+        AckIsDisabled = 14,
     }
 
     #[derive(Serialize)]
@@ -832,18 +828,19 @@ mod splunk_response {
     }
 
     impl HecResponse {
-        pub fn new(code: HecCode) -> Self {
+        pub fn new(code: HecStatusCode) -> Self {
             let text = match code {
-                HecCode::Success => "Success",
-                HecCode::MissingCredentials => "Token is required",
-                HecCode::InvalidAuthorization => "Invalid authorization",
-                HecCode::NoData => "No data",
-                HecCode::InvalidDataFormat => "Invalid data format",
-                HecCode::InternalServerError => "Internal server error",
-                HecCode::ServerIsShuttingDown => "Server is shutting down",
-                HecCode::DataChannelIsMissing => "Data channel is missing",
-                HecCode::EventFieldIsRequired => "Event field is required",
-                HecCode::EventFieldCannotBeBlank => "Event field cannot be blank",
+                HecStatusCode::Success => "Success",
+                HecStatusCode::TokenIsRequired => "Token is required",
+                HecStatusCode::InvalidAuthorization => "Invalid authorization",
+                HecStatusCode::NoData => "No data",
+                HecStatusCode::InvalidDataFormat => "Invalid data format",
+                HecStatusCode::InternalServerError => "Internal server error",
+                HecStatusCode::DataChannelIsMissing => "Data channel is missing",
+                HecStatusCode::EventFieldIsRequired => "Event field is required",
+                HecStatusCode::EventFieldCannotBeBlank => "Event field cannot be blank",
+                HecStatusCode::ServerIsBusy => "Server is busy",
+                HecStatusCode::AckIsDisabled => "Ack is disabled",
             };
 
             Self {
@@ -859,30 +856,27 @@ mod splunk_response {
         }
     }
 
-    fn json_to_bytes(value: Value) -> Bytes {
-        serde_json::to_string(&value).unwrap().into()
-    }
-
     lazy_static! {
         pub static ref INVALID_AUTHORIZATION: HecResponse =
-            HecResponse::new(HecCode::InvalidAuthorization);
-        pub static ref MISSING_CREDENTIALS: HecResponse =
-            HecResponse::new(HecCode::MissingCredentials);
-        pub static ref NO_DATA: HecResponse = HecResponse::new(HecCode::NoData);
-        pub static ref SUCCESS: HecResponse = HecResponse::new(HecCode::Success);
-        pub static ref SERVER_ERROR: HecResponse = HecResponse::new(HecCode::InternalServerError);
-        pub static ref SERVER_SHUTDOWN: HecResponse =
-            HecResponse::new(HecCode::ServerIsShuttingDown);
-        pub static ref NO_CHANNEL: HecResponse = HecResponse::new(HecCode::DataChannelIsMissing);
-        pub static ref UNSUPPORTED_MEDIA_TYPE: Bytes =
-            json_to_bytes(json!({"text":"unsupported content encoding"}));
+            HecResponse::new(HecStatusCode::InvalidAuthorization);
+        pub static ref TOKEN_IS_REQUIRED: HecResponse =
+            HecResponse::new(HecStatusCode::TokenIsRequired);
+        pub static ref NO_DATA: HecResponse = HecResponse::new(HecStatusCode::NoData);
+        pub static ref SUCCESS: HecResponse = HecResponse::new(HecStatusCode::Success);
+        pub static ref SERVER_ERROR: HecResponse =
+            HecResponse::new(HecStatusCode::InternalServerError);
+        pub static ref SERVER_IS_BUSY: HecResponse = HecResponse::new(HecStatusCode::ServerIsBusy);
+        pub static ref NO_CHANNEL: HecResponse =
+            HecResponse::new(HecStatusCode::DataChannelIsMissing);
+        pub static ref ACK_IS_DISABLED: HecResponse =
+            HecResponse::new(HecStatusCode::AckIsDisabled);
     }
 }
 
 fn finish_ok(maybe_ack_id: Option<u64>) -> Response {
     if let Some(ack_id) = maybe_ack_id {
-        let body =
-            HecResponse::new(HecCode::Success).with_metadata(HecResponseMetadata::AckId(ack_id));
+        let body = HecResponse::new(HecStatusCode::Success)
+            .with_metadata(HecResponseMetadata::AckId(ack_id));
         response_json(StatusCode::OK, &body)
     } else {
         response_json(StatusCode::OK, &*splunk_response::SUCCESS)
@@ -895,40 +889,41 @@ async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
         Ok((match error {
             ApiError::MissingAuthorization => response_json(
                 StatusCode::UNAUTHORIZED,
-                &*splunk_response::MISSING_CREDENTIALS,
+                &*splunk_response::TOKEN_IS_REQUIRED,
             ),
             ApiError::InvalidAuthorization => response_json(
                 StatusCode::UNAUTHORIZED,
                 &*splunk_response::INVALID_AUTHORIZATION,
             ),
-            ApiError::UnsupportedEncoding => response_json(
-                StatusCode::UNSUPPORTED_MEDIA_TYPE,
-                splunk_response::UNSUPPORTED_MEDIA_TYPE.as_ref(),
-            ),
+            ApiError::UnsupportedEncoding => empty_response(StatusCode::UNSUPPORTED_MEDIA_TYPE),
             ApiError::MissingChannel => {
                 response_json(StatusCode::BAD_REQUEST, &*splunk_response::NO_CHANNEL)
             }
             ApiError::NoData => response_json(StatusCode::BAD_REQUEST, &*splunk_response::NO_DATA),
-            ApiError::ServerShutdown => response_json(
-                StatusCode::SERVICE_UNAVAILABLE,
-                &*splunk_response::SERVER_SHUTDOWN,
-            ),
+            ApiError::ServerShutdown => empty_response(StatusCode::SERVICE_UNAVAILABLE),
             ApiError::InvalidDataFormat { event } => response_json(
                 StatusCode::BAD_REQUEST,
-                HecResponse::new(HecCode::InvalidDataFormat)
+                HecResponse::new(HecStatusCode::InvalidDataFormat)
                     .with_metadata(HecResponseMetadata::InvalidEventNumber(event)),
             ),
             ApiError::EmptyEventField { event } => response_json(
                 StatusCode::BAD_REQUEST,
-                HecResponse::new(HecCode::EventFieldCannotBeBlank)
+                HecResponse::new(HecStatusCode::EventFieldCannotBeBlank)
                     .with_metadata(HecResponseMetadata::InvalidEventNumber(event)),
             ),
             ApiError::MissingEventField { event } => response_json(
                 StatusCode::BAD_REQUEST,
-                HecResponse::new(HecCode::EventFieldIsRequired)
+                HecResponse::new(HecStatusCode::EventFieldIsRequired)
                     .with_metadata(HecResponseMetadata::InvalidEventNumber(event)),
             ),
             ApiError::BadRequest => empty_response(StatusCode::BAD_REQUEST),
+            ApiError::ServiceUnavailable => response_json(
+                StatusCode::SERVICE_UNAVAILABLE,
+                &*splunk_response::SERVER_IS_BUSY,
+            ),
+            ApiError::AckIsDisabled => {
+                response_json(StatusCode::BAD_REQUEST, &*splunk_response::ACK_IS_DISABLED)
+            }
         },))
     } else {
         Err(rejection)
@@ -951,19 +946,32 @@ fn response_json(code: StatusCode, body: impl Serialize) -> Response {
 #[cfg(test)]
 mod tests {
     use super::{acknowledgements::HecAcknowledgementsConfig, parse_timestamp, SplunkConfig};
-    use crate::{Pipeline, config::{AcknowledgementsConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, log_schema}, event::Event, sinks::{
+    use crate::{
+        config::{
+            log_schema, AcknowledgementsConfig, SinkConfig, SinkContext, SourceConfig,
+            SourceContext,
+        },
+        event::Event,
+        sinks::{
             splunk_hec::logs::{config::HecSinkLogsConfig, encoder::HecLogsEncoder},
             util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
             Healthcheck, VectorSink,
-        }, test_util::{
+        },
+        sources::splunk_hec::acknowledgements::{HecAckStatusRequest, HecAckStatusResponse},
+        test_util::{
             collect_n,
             components::{self, HTTP_PUSH_SOURCE_TAGS, SOURCE_TESTS},
             next_addr, wait_for_tcp,
-        }};
+        },
+        Pipeline,
+    };
     use chrono::{TimeZone, Utc};
-    use futures::{channel::mpsc, stream, StreamExt};
+    use futures::{stream, StreamExt};
+    use futures_util::Stream;
     use reqwest::{RequestBuilder, Response};
-    use std::{future::ready, net::SocketAddr};
+    use serde::Deserialize;
+    use std::{future::ready, net::SocketAddr, num::NonZeroU64};
+    use vector_core::event::EventStatus;
 
     #[test]
     fn generate_config() {
@@ -974,28 +982,32 @@ mod tests {
     const TOKEN: &str = "token";
     const VALID_TOKENS: &[&str; 2] = &[TOKEN, "secondary-token"];
 
-    async fn source() -> (mpsc::Receiver<Event>, SocketAddr) {
-        source_with(Some(TOKEN.to_owned()), None).await
+    async fn source(
+        acknowledgements: Option<HecAcknowledgementsConfig>,
+    ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
+        source_with(Some(TOKEN.to_owned()), None, acknowledgements).await
     }
 
     async fn source_with(
         token: Option<String>,
         valid_tokens: Option<&[&str]>,
-    ) -> (mpsc::Receiver<Event>, SocketAddr) {
+        acknowledgements: Option<HecAcknowledgementsConfig>,
+    ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
         components::init_test();
-        let (sender, recv) = Pipeline::new_test();
+        let (sender, recv) = Pipeline::new_test_finalize(EventStatus::Delivered);
         let address = next_addr();
         let valid_tokens =
             valid_tokens.map(|tokens| tokens.iter().map(|&token| String::from(token)).collect());
         let mut cx = SourceContext::new_test(sender);
-        cx.acknowledgements = AcknowledgementsConfig::from(true);
+        cx.acknowledgements = AcknowledgementsConfig::from(acknowledgements.is_some());
         tokio::spawn(async move {
             SplunkConfig {
                 address,
                 token,
                 valid_tokens,
                 tls: None,
-                indexer_acknowledgements: HecAcknowledgementsConfig::default(),
+                indexer_acknowledgements: acknowledgements
+                    .unwrap_or(HecAcknowledgementsConfig::default()),
             }
             .build(cx)
             .await
@@ -1034,8 +1046,9 @@ mod tests {
     async fn start(
         encoding: impl Into<EncodingConfig<HecLogsEncoder>>,
         compression: Compression,
-    ) -> (VectorSink, mpsc::Receiver<Event>) {
-        let (source, address) = source().await;
+        acknowledgements: Option<HecAcknowledgementsConfig>,
+    ) -> (VectorSink, impl Stream<Item = Event> + Unpin) {
+        let (source, address) = source(acknowledgements).await;
         let (sink, health) = sink(address, encoding, compression).await;
         assert!(health.await.is_ok());
         (sink, source)
@@ -1044,7 +1057,7 @@ mod tests {
     async fn channel_n(
         messages: Vec<impl Into<Event> + Send + 'static>,
         sink: VectorSink,
-        source: mpsc::Receiver<Event>,
+        source: impl Stream<Item = Event> + Unpin,
     ) -> Vec<Event> {
         let n = messages.len();
 
@@ -1134,7 +1147,7 @@ mod tests {
     #[tokio::test]
     async fn no_compression_text_event() {
         let message = "gzip_text_event";
-        let (sink, source) = start(HecLogsEncoder::Text, Compression::None).await;
+        let (sink, source) = start(HecLogsEncoder::Text, Compression::None, None).await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
@@ -1149,7 +1162,7 @@ mod tests {
     #[tokio::test]
     async fn one_simple_text_event() {
         let message = "one_simple_text_event";
-        let (sink, source) = start(HecLogsEncoder::Text, Compression::gzip_default()).await;
+        let (sink, source) = start(HecLogsEncoder::Text, Compression::gzip_default(), None).await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
@@ -1164,7 +1177,7 @@ mod tests {
     #[tokio::test]
     async fn multiple_simple_text_event() {
         let n = 200;
-        let (sink, source) = start(HecLogsEncoder::Text, Compression::None).await;
+        let (sink, source) = start(HecLogsEncoder::Text, Compression::None, None).await;
 
         let messages = (0..n)
             .map(|i| format!("multiple_simple_text_event_{}", i))
@@ -1184,7 +1197,7 @@ mod tests {
     #[tokio::test]
     async fn one_simple_json_event() {
         let message = "one_simple_json_event";
-        let (sink, source) = start(HecLogsEncoder::Json, Compression::gzip_default()).await;
+        let (sink, source) = start(HecLogsEncoder::Json, Compression::gzip_default(), None).await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
@@ -1199,7 +1212,7 @@ mod tests {
     #[tokio::test]
     async fn multiple_simple_json_event() {
         let n = 200;
-        let (sink, source) = start(HecLogsEncoder::Json, Compression::gzip_default()).await;
+        let (sink, source) = start(HecLogsEncoder::Json, Compression::gzip_default(), None).await;
 
         let messages = (0..n)
             .map(|i| format!("multiple_simple_json_event{}", i))
@@ -1218,7 +1231,7 @@ mod tests {
 
     #[tokio::test]
     async fn json_event() {
-        let (sink, source) = start(HecLogsEncoder::Json, Compression::gzip_default()).await;
+        let (sink, source) = start(HecLogsEncoder::Json, Compression::gzip_default(), None).await;
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("greeting", "hello");
@@ -1237,7 +1250,7 @@ mod tests {
 
     #[tokio::test]
     async fn line_to_message() {
-        let (sink, source) = start(HecLogsEncoder::Json, Compression::gzip_default()).await;
+        let (sink, source) = start(HecLogsEncoder::Json, Compression::gzip_default(), None).await;
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("line", "hello");
@@ -1250,7 +1263,7 @@ mod tests {
     #[tokio::test]
     async fn raw() {
         let message = "raw";
-        let (source, address) = source().await;
+        let (source, address) = source(None).await;
 
         assert_eq!(200, post(address, "services/collector/raw", message).await);
 
@@ -1268,7 +1281,7 @@ mod tests {
     #[tokio::test]
     async fn channel_header() {
         let message = "raw";
-        let (source, address) = source().await;
+        let (source, address) = source(None).await;
 
         let opts = SendWithOpts {
             channel: Some(Channel::Header("guid")),
@@ -1288,7 +1301,7 @@ mod tests {
     #[tokio::test]
     async fn xff_header_raw() {
         let message = "raw";
-        let (source, address) = source().await;
+        let (source, address) = source(None).await;
 
         let opts = SendWithOpts {
             channel: Some(Channel::Header("guid")),
@@ -1309,7 +1322,7 @@ mod tests {
     #[tokio::test]
     async fn xff_header_event_with_host_field() {
         let message = r#"{"event":"first", "host": "10.1.0.2"}"#;
-        let (source, address) = source().await;
+        let (source, address) = source(None).await;
 
         let opts = SendWithOpts {
             channel: Some(Channel::Header("guid")),
@@ -1330,7 +1343,7 @@ mod tests {
     #[tokio::test]
     async fn xff_header_event_without_host_field() {
         let message = r#"{"event":"first", "color": "blue"}"#;
-        let (source, address) = source().await;
+        let (source, address) = source(None).await;
 
         let opts = SendWithOpts {
             channel: Some(Channel::Header("guid")),
@@ -1350,7 +1363,7 @@ mod tests {
     #[tokio::test]
     async fn channel_query_param() {
         let message = "raw";
-        let (source, address) = source().await;
+        let (source, address) = source(None).await;
 
         let opts = SendWithOpts {
             channel: Some(Channel::QueryParam("guid")),
@@ -1369,14 +1382,14 @@ mod tests {
 
     #[tokio::test]
     async fn no_data() {
-        let (_source, address) = source().await;
+        let (_source, address) = source(None).await;
 
         assert_eq!(400, post(address, "services/collector/event", "").await);
     }
 
     #[tokio::test]
     async fn invalid_token() {
-        let (_source, address) = source().await;
+        let (_source, address) = source(None).await;
         let opts = SendWithOpts {
             channel: Some(Channel::Header("channel")),
             forwarded_for: None,
@@ -1391,7 +1404,7 @@ mod tests {
     #[tokio::test]
     async fn secondary_token() {
         let message = r#"{"event":"first", "color": "blue"}"#;
-        let (_source, address) = source_with(None, Some(VALID_TOKENS)).await;
+        let (_source, address) = source_with(None, Some(VALID_TOKENS), None).await;
         let options = SendWithOpts {
             channel: None,
             forwarded_for: None,
@@ -1414,7 +1427,7 @@ mod tests {
     #[tokio::test]
     async fn no_authorization() {
         let message = "no_authorization";
-        let (source, address) = source_with(None, None).await;
+        let (source, address) = source_with(None, None, None).await;
         let (sink, health) = sink(address, HecLogsEncoder::Text, Compression::gzip_default()).await;
         assert!(health.await.is_ok());
 
@@ -1427,12 +1440,13 @@ mod tests {
     #[tokio::test]
     async fn partial() {
         let message = r#"{"event":"first"}{"event":"second""#;
-        let (source, address) = source().await;
+        let (source, address) = source(None).await;
 
         assert_eq!(
             400,
             post(address, "services/collector/event", message).await
         );
+        println!("400 err");
 
         let event = collect_n(source, 1).await.remove(0);
         SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
@@ -1449,7 +1463,7 @@ mod tests {
         let message = r#"
 {"event":"first"}
         "#;
-        let (source, address) = source().await;
+        let (source, address) = source(None).await;
 
         assert_eq!(
             200,
@@ -1469,7 +1483,7 @@ mod tests {
     #[tokio::test]
     async fn handles_spaces() {
         let message = r#" {"event":"first"} "#;
-        let (source, address) = source().await;
+        let (source, address) = source(None).await;
 
         assert_eq!(
             200,
@@ -1489,7 +1503,7 @@ mod tests {
     #[tokio::test]
     async fn default() {
         let message = r#"{"event":"first","source":"main"}{"event":"second"}{"event":"third","source":"secondary"}"#;
-        let (source, address) = source().await;
+        let (source, address) = source(None).await;
 
         assert_eq!(
             200,
@@ -1558,7 +1572,7 @@ mod tests {
     #[tokio::test]
     async fn host_test() {
         let message = "for the host";
-        let (sink, source) = start(HecLogsEncoder::Text, Compression::gzip_default()).await;
+        let (sink, source) = start(HecLogsEncoder::Text, Compression::gzip_default(), None).await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
@@ -1567,10 +1581,276 @@ mod tests {
         assert!(event.as_log().get(log_schema().host_key()).is_none());
     }
 
+    #[derive(Deserialize)]
+    struct HecAckEventResponse {
+        text: String,
+        code: u8,
+        #[serde(rename = "ackId")]
+        ack_id: u64,
+    }
+
     #[tokio::test]
-    async fn ack_service_query_pending_ack_ids() {
+    async fn ack_json_event() {
+        let (source, address) = source(Some(HecAcknowledgementsConfig::default())).await;
+        let event_message = r#"{"event":"first", "color": "blue"}{"event":"second"}"#;
+        let opts = SendWithOpts {
+            channel: Some(Channel::Header("guid")),
+            forwarded_for: None,
+        };
+        let event_res = send_with_response(
+            address,
+            "services/collector/event",
+            event_message,
+            TOKEN,
+            &opts,
+        )
+        .await
+        .json::<HecAckEventResponse>()
+        .await
+        .unwrap();
+        assert_eq!("Success", event_res.text.as_str());
+        assert_eq!(0, event_res.code);
+        let _ = collect_n(source, 1).await;
+
+        let ack_message = serde_json::to_string(&HecAckStatusRequest {
+            acks: vec![event_res.ack_id],
+        })
+        .unwrap();
+        let ack_res = send_with_response(
+            address,
+            "services/collector/ack",
+            ack_message.as_str(),
+            TOKEN,
+            &opts,
+        )
+        .await
+        .json::<HecAckStatusResponse>()
+        .await
+        .unwrap();
+        assert!(ack_res.acks.get(&event_res.ack_id).unwrap());
+    }
+
+    #[tokio::test]
+    async fn ack_raw_event() {
+        let (source, address) = source(Some(HecAcknowledgementsConfig::default())).await;
+        let event_message = "raw event message";
+        let opts = SendWithOpts {
+            channel: Some(Channel::Header("guid")),
+            forwarded_for: None,
+        };
+        let event_res = send_with_response(
+            address,
+            "services/collector/raw",
+            event_message,
+            TOKEN,
+            &opts,
+        )
+        .await
+        .json::<HecAckEventResponse>()
+        .await
+        .unwrap();
+        assert_eq!("Success", event_res.text.as_str());
+        assert_eq!(0, event_res.code);
+        let _ = collect_n(source, 1).await;
+
+        let ack_message = serde_json::to_string(&HecAckStatusRequest {
+            acks: vec![event_res.ack_id],
+        })
+        .unwrap();
+        let ack_res = send_with_response(
+            address,
+            "services/collector/ack",
+            ack_message.as_str(),
+            TOKEN,
+            &opts,
+        )
+        .await
+        .json::<HecAckStatusResponse>()
+        .await
+        .unwrap();
+        assert!(ack_res.acks.get(&event_res.ack_id).unwrap());
+    }
+
+    #[tokio::test]
+    async fn ack_repeat_ack_query() {
+        let (source, address) = source(Some(HecAcknowledgementsConfig::default())).await;
+        let event_message = "raw event message";
+        let opts = SendWithOpts {
+            channel: Some(Channel::Header("guid")),
+            forwarded_for: None,
+        };
+        let event_res = send_with_response(
+            address,
+            "services/collector/raw",
+            event_message,
+            TOKEN,
+            &opts,
+        )
+        .await
+        .json::<HecAckEventResponse>()
+        .await
+        .unwrap();
+        let _ = collect_n(source, 1).await;
+
+        let ack_message = serde_json::to_string(&HecAckStatusRequest {
+            acks: vec![event_res.ack_id],
+        })
+        .unwrap();
+        let ack_res = send_with_response(
+            address,
+            "services/collector/ack",
+            ack_message.as_str(),
+            TOKEN,
+            &opts,
+        )
+        .await
+        .json::<HecAckStatusResponse>()
+        .await
+        .unwrap();
+        assert!(ack_res.acks.get(&event_res.ack_id).unwrap());
+
+        let ack_res = send_with_response(
+            address,
+            "services/collector/ack",
+            ack_message.as_str(),
+            TOKEN,
+            &opts,
+        )
+        .await
+        .json::<HecAckStatusResponse>()
+        .await
+        .unwrap();
+        assert!(!ack_res.acks.get(&event_res.ack_id).unwrap());
+    }
+
+    #[tokio::test]
+    async fn ack_exceed_max_number_of_ack_channels() {
+        let ack_config = HecAcknowledgementsConfig {
+            max_number_of_ack_channels: NonZeroU64::new(1).unwrap(),
+            ..Default::default()
+        };
+
+        let (_source, address) = source(Some(ack_config)).await;
+        let mut opts = SendWithOpts {
+            channel: Some(Channel::Header("guid")),
+            forwarded_for: None,
+        };
+        assert_eq!(
+            200,
+            send_with(address, "services/collector/raw", "message", TOKEN, &opts).await
+        );
+
+        opts.channel = Some(Channel::Header("other-guid"));
+        assert_eq!(
+            503,
+            send_with(address, "services/collector/raw", "message", TOKEN, &opts).await
+        );
+        assert_eq!(
+            503,
+            send_with(
+                address,
+                "services/collector/event",
+                r#"{"event":"first"}"#,
+                TOKEN,
+                &opts
+            )
+            .await
+        );
+    }
+
+    #[tokio::test]
+    async fn ack_exceed_max_pending_acks_per_channel() {
+        let ack_config = HecAcknowledgementsConfig {
+            max_pending_acks_per_channel: NonZeroU64::new(1).unwrap(),
+            ..Default::default()
+        };
+
+        let (source, address) = source(Some(ack_config)).await;
+        let opts = SendWithOpts {
+            channel: Some(Channel::Header("guid")),
+            forwarded_for: None,
+        };
+        for _ in 0..5 {
+            send_with(
+                address,
+                "services/collector/event",
+                r#"{"event":"first"}"#,
+                TOKEN,
+                &opts,
+            )
+            .await;
+        }
+        for _ in 0..5 {
+            send_with(address, "services/collector/raw", "message", TOKEN, &opts).await;
+        }
+        let event_res = send_with_response(
+            address,
+            "services/collector/event",
+            r#"{"event":"this will be acked"}"#,
+            TOKEN,
+            &opts,
+        )
+        .await
+        .json::<HecAckEventResponse>()
+        .await
+        .unwrap();
+        let _ = collect_n(source, 11).await;
+
+        let ack_message_dropped = serde_json::to_string(&HecAckStatusRequest {
+            acks: (0..10).collect::<Vec<u64>>(),
+        })
+        .unwrap();
+        let ack_res = send_with_response(
+            address,
+            "services/collector/ack",
+            ack_message_dropped.as_str(),
+            TOKEN,
+            &opts,
+        )
+        .await
+        .json::<HecAckStatusResponse>()
+        .await
+        .unwrap();
+        assert!(!ack_res.acks.values().all(|ack_status| *ack_status));
+
+        let ack_message_acked = serde_json::to_string(&HecAckStatusRequest {
+            acks: vec![event_res.ack_id],
+        })
+        .unwrap();
+        let ack_res = send_with_response(
+            address,
+            "services/collector/ack",
+            ack_message_acked.as_str(),
+            TOKEN,
+            &opts,
+        )
+        .await
+        .json::<HecAckStatusResponse>()
+        .await
+        .unwrap();
+        assert!(ack_res.acks.get(&event_res.ack_id).unwrap());
+    }
+
+    #[tokio::test]
+    async fn event_service_acknowledgements_enabled_channel_required() {
+        let message = r#"{"event":"first", "color": "blue"}"#;
+        let (_, address) = source(Some(HecAcknowledgementsConfig::default())).await;
+
+        let opts = SendWithOpts {
+            channel: None,
+            forwarded_for: None,
+        };
+
+        assert_eq!(
+            400,
+            send_with(address, "services/collector/event", message, TOKEN, &opts).await
+        );
+    }
+
+    #[tokio::test]
+    async fn ack_service_acknowledgements_disabled() {
         let message = r#" {"acks":[0]} "#;
-        let (source, address) = source().await;
+        let (_, address) = source(None).await;
 
         let opts = SendWithOpts {
             channel: Some(Channel::Header("guid")),
@@ -1578,7 +1858,7 @@ mod tests {
         };
 
         assert_eq!(
-            200,
+            400,
             send_with(address, "services/collector/ack", message, TOKEN, &opts).await
         );
     }
