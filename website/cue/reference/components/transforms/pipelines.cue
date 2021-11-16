@@ -64,39 +64,6 @@ components: transforms: pipelines: {
 			}
 		}
 
-		_pipeline_filter: {
-			description: """
-				A condition to filter the events that will be processed by the pipeline. If the conditions is not satisfied,
-				the event will be forwarded to the next pipeline.
-
-				The filter uses the same format than the conditions used for [unit testing](\(urls.vector_unit_tests)).
-				"""
-			common:      true
-			required:    false
-			warnings: []
-			type: object: options: {
-				type: {
-					description: "Type of condition resolver that will be used."
-					required:    true
-					type: string: {
-						default: null
-						enum: {
-							vrl: "[Vector Remap Language](\(urls.vrl_reference))."
-						}
-					}
-				}
-				source: {
-					description: "The [VRL](\(urls.vrl_expressions)) condition to evaluate."
-					required:    true
-					type: string: {
-						default: null
-						syntax:  "literal"
-						examples: ['contains(.message, "substring") ?? false']
-					}
-				}
-			}
-		}
-
 		_pipeline_configuration: {
 			description: """
 				Any valid transform configuration. See [transforms documentation](\(urls.vector_transforms))
@@ -107,23 +74,36 @@ components: transforms: pipelines: {
 			type: object: options: {
 				name: {
 					description: "Name of the pipeline"
-					warnings: []
-					required: false
-					common:   true
+					required:    false
+					common:      true
+					type: string: default: null
+				}
+
+				filter: {
+					description: """
+						A condition to filter the events that will be processed by the pipeline. If the conditions is not satisfied,
+						the event will be forwarded to the next pipeline.
+
+						The filter uses the same format than the conditions used for [unit testing](\(urls.vector_unit_tests)).
+						"""
+					required:    false
+					common:      true
 					type: string: {
-						default: null
-						syntax:  "literal"
+						default: "vrl"
+
+						enum: {
+							vrl: "[Vector Remap Language](\(urls.vrl_reference))."
+						}
 					}
 				}
-				filter: _pipeline_filter
+
 				transforms: {
 					description: """
 						Any list of valid transform configurations. See [transforms documentation](\(urls.vector_transforms))
 						for the list of available transforms and their configuration.
 						"""
 					required:    true
-					warnings: []
-					type: array: items: type: object: {}
+					type: array: items: type: object: options: {}
 				}
 			}
 		}
