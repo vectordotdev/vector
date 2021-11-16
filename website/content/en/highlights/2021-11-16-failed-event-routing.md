@@ -2,7 +2,7 @@
 date: "2021-11-16"
 title: "Failed event routing feature released"
 description: "A guide for using the new pipelines functionality"
-authors: ["barieom"]
+authors: ["barieom", "lukesteensen"]
 pr_numbers: []
 release: "0.18.0"
 hide_on_release_notes: false
@@ -56,7 +56,7 @@ As an example, the `dropped` output can be used if you want to capture events th
   encoding.codec = "json"
 ``` 
 
-This would emit the following output
+This would emit the following output:
 ``` 
   {
   "foo": "bar",
