@@ -22,6 +22,7 @@ use super::ApiError;
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(default)]
 pub struct HecAcknowledgementsConfig {
+    pub max_pending_acks: NonZeroU64,
     pub max_number_of_ack_channels: NonZeroU64,
     pub max_pending_acks_per_channel: NonZeroU64,
     pub ack_idle_cleanup: bool,
@@ -31,6 +32,7 @@ pub struct HecAcknowledgementsConfig {
 impl Default for HecAcknowledgementsConfig {
     fn default() -> Self {
         Self {
+            max_pending_acks: NonZeroU64::new(10_000_000).unwrap(),
             max_number_of_ack_channels: NonZeroU64::new(1_000_000).unwrap(),
             max_pending_acks_per_channel: NonZeroU64::new(1_000_000).unwrap(),
             ack_idle_cleanup: false,
@@ -40,19 +42,20 @@ impl Default for HecAcknowledgementsConfig {
 }
 
 pub struct IndexerAcknowledgement {
+    max_pending_acks: u64,
     max_pending_acks_per_channel: u64,
     max_number_of_ack_channels: u64,
     channels: Arc<RwLock<HashMap<String, Arc<Channel>>>>,
     shutdown: Shared<ShutdownSignal>,
+    total_pending_acks: AtomicU64,
 }
 
 impl IndexerAcknowledgement {
     pub fn new(config: HecAcknowledgementsConfig, shutdown: Shared<ShutdownSignal>) -> Self {
-        println!("config: {:?}", config);
         let channels: Arc<RwLock<HashMap<String, Arc<Channel>>>> =
             Arc::new(RwLock::new(HashMap::new()));
         let max_idle_time = u64::from(config.max_idle_time);
-        let idle_task_channels = channels.clone();
+        let idle_task_channels = Arc::clone(&channels);
 
         if config.ack_idle_cleanup {
             tokio::spawn(async move {
@@ -79,10 +82,12 @@ impl IndexerAcknowledgement {
         }
 
         Self {
+            max_pending_acks: u64::from(config.max_pending_acks),
             max_pending_acks_per_channel: u64::from(config.max_pending_acks_per_channel),
             max_number_of_ack_channels: u64::from(config.max_number_of_ack_channels),
             channels,
             shutdown,
+            total_pending_acks: AtomicU64::new(0),
         }
     }
 
@@ -115,17 +120,40 @@ impl IndexerAcknowledgement {
         batch_rx: BatchStatusReceiver,
     ) -> Result<u64, Rejection> {
         let channel = self.create_or_get_channel(channel_id).await?;
-        Ok(channel.get_ack_id(batch_rx))
+        let ack_id = channel.get_ack_id(batch_rx);
+        let total_pending_acks = self.total_pending_acks.fetch_add(1, Ordering::Relaxed) + 1;
+        if total_pending_acks > self.max_pending_acks {
+            self.total_pending_acks.fetch_sub(
+                self.drop_oldest_pending_ack_per_channel().await,
+                Ordering::Relaxed,
+            );
+        }
+        Ok(ack_id)
     }
 
     /// Gets the requested ack id statuses from a specified channel, creating the channel if it does not exist
-    pub async fn get_acks_status(
+    pub async fn get_acks_status_from_channel(
         &self,
         channel_id: String,
-        ack_ids: &Vec<u64>,
+        ack_ids: &[u64],
     ) -> Result<HashMap<u64, bool>, Rejection> {
         let channel = self.create_or_get_channel(channel_id).await?;
-        Ok(channel.get_acks_status(ack_ids))
+        let acks_status = channel.get_acks_status(ack_ids);
+        let dropped_ack_count = acks_status.values().filter(|status| **status).count();
+        self.total_pending_acks
+            .fetch_sub(dropped_ack_count as u64, Ordering::Relaxed);
+        Ok(acks_status)
+    }
+
+    /// Drops the oldest ack id (if one exists) from each channel
+    async fn drop_oldest_pending_ack_per_channel(&self) -> u64 {
+        let channels = self.channels.write().await;
+        let dropped_count = channels
+            .iter()
+            .filter(|(_, channel)| channel.drop_oldest_pending_ack())
+            .count();
+        println!("drop count: {:?}", dropped_count);
+        dropped_count as u64
     }
 }
 
@@ -139,13 +167,15 @@ pub struct Channel {
 impl Channel {
     fn new(max_pending_acks_per_channel: u64, shutdown: Shared<ShutdownSignal>) -> Self {
         let ack_ids_status = Arc::new(Mutex::new(RoaringTreemap::new()));
-        let finalizer_ack_ids_status = ack_ids_status.clone();
+        let finalizer_ack_ids_status = Arc::clone(&ack_ids_status);
         let ack_event_finalizer = Arc::new(OrderedFinalizer::new(shutdown, move |ack_id: u64| {
             let mut ack_ids_status = finalizer_ack_ids_status.lock().unwrap();
             ack_ids_status.insert(ack_id);
             if ack_ids_status.len() > max_pending_acks_per_channel {
                 match ack_ids_status.min() {
                     Some(min) => ack_ids_status.remove(min),
+                    // max pending acks per channel is guaranteed to be >= 1, 
+                    // thus there must be at least one ack id available to remove
                     None => unreachable!(),
                 };
             };
@@ -171,7 +201,7 @@ impl Channel {
         ack_id
     }
 
-    fn get_acks_status(&self, acks: &Vec<u64>) -> HashMap<u64, bool> {
+    fn get_acks_status(&self, acks: &[u64]) -> HashMap<u64, bool> {
         {
             let mut last_used_timestamp = self.last_used_timestamp.lock().unwrap();
             *last_used_timestamp = Instant::now();
@@ -184,7 +214,15 @@ impl Channel {
 
     fn get_last_used(&self) -> Instant {
         let last_used_timestamp = self.last_used_timestamp.lock().unwrap();
-        last_used_timestamp.clone()
+        *last_used_timestamp
+    }
+
+    fn drop_oldest_pending_ack(&self) -> bool {
+        let mut ack_ids_status = self.ack_ids_status.lock().unwrap();
+        match ack_ids_status.min() {
+            Some(ack_id) => ack_ids_status.remove(ack_id),
+            None => false,
+        }
     }
 }
 
@@ -225,7 +263,7 @@ mod tests {
             let (_tx, batch_rx) = BatchNotifier::new_with_receiver();
             assert_eq!(*expected_ack_id, channel.get_ack_id(batch_rx));
         }
-        // Allow the ack finalizer task to run
+        // Let the ack finalizer task run
         sleep(time::Duration::from_secs(1)).await;
         assert!(channel
             .get_acks_status(&expected_ack_ids)
@@ -244,7 +282,7 @@ mod tests {
             let (_tx, batch_rx) = BatchNotifier::new_with_receiver();
             assert_eq!(*expected_ack_id, channel.get_ack_id(batch_rx));
         }
-        // Allow the ack finalizer task to run
+        // Let the ack finalizer task run
         sleep(time::Duration::from_secs(1)).await;
         assert!(channel
             .get_acks_status(&expected_ack_ids)
@@ -272,14 +310,58 @@ mod tests {
             let (_tx, batch_rx) = BatchNotifier::new_with_receiver();
             assert_eq!(*ack_id, channel.get_ack_id(batch_rx));
         }
-        // Allow the ack finalizer task to run
+        // Let the ack finalizer task run
         sleep(time::Duration::from_secs(1)).await;
+        // The first 10 pending ack ids are dropped
         assert!(!channel
             .get_acks_status(&dropped_pending_ack_ids)
             .values()
             .all(|status| *status));
+        // The second 10 pending ack ids can be queried
         assert!(channel
             .get_acks_status(&expected_ack_ids)
+            .values()
+            .all(|status| *status));
+    }
+
+    #[tokio::test]
+    async fn test_indexer_ack_exceed_max_pending_acks() {
+        let shutdown = ShutdownSignal::noop().shared();
+        let config = HecAcknowledgementsConfig {
+            max_pending_acks: NonZeroU64::new(10).unwrap(),
+            ..Default::default()
+        };
+        let idx_ack = IndexerAcknowledgement::new(config, shutdown);
+        let channel = String::from("channel-id");
+
+        let dropped_pending_ack_ids: Vec<u64> = (0..10).collect();
+        let expected_ack_ids: Vec<u64> = (10..20).collect();
+
+        for ack_id in dropped_pending_ack_ids
+            .iter()
+            .chain(expected_ack_ids.iter())
+        {
+            let (_tx, batch_rx) = BatchNotifier::new_with_receiver();
+            assert_eq!(
+                *ack_id,
+                idx_ack
+                    .get_ack_id_from_channel(channel.clone(), batch_rx)
+                    .await
+                    .unwrap()
+            );
+            sleep(time::Duration::from_millis(100)).await;
+        }
+        sleep(time::Duration::from_secs(1)).await;
+        assert!(!idx_ack
+            .get_acks_status_from_channel(channel.clone(), &dropped_pending_ack_ids)
+            .await
+            .unwrap()
+            .values()
+            .all(|status| *status));
+        assert!(idx_ack
+            .get_acks_status_from_channel(channel, &expected_ack_ids)
+            .await
+            .unwrap()
             .values()
             .all(|status| *status));
     }
@@ -353,27 +435,32 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_indexer_ack_channel_idle_does_not_expire_active() {
+    async fn test_indexer_ack_channel_active_does_not_expire() {
         let shutdown = ShutdownSignal::noop().shared();
         let config = HecAcknowledgementsConfig {
             ack_idle_cleanup: true,
-            max_idle_time: NonZeroU64::new(1).unwrap(),
+            max_idle_time: NonZeroU64::new(2).unwrap(),
             ..Default::default()
         };
         let idx_ack = IndexerAcknowledgement::new(config, shutdown);
+        let channel = String::from("channel-id");
         let expected_ack_ids: Vec<u64> = (0..10).collect();
 
-        let channel = idx_ack
-            .create_or_get_channel(String::from("channel-id-1"))
-            .await
-            .unwrap();
         for expected_ack_id in &expected_ack_ids {
             let (_tx, batch_rx) = BatchNotifier::new_with_receiver();
-            assert_eq!(*expected_ack_id, channel.get_ack_id(batch_rx));
+            assert_eq!(
+                *expected_ack_id,
+                idx_ack
+                    .get_ack_id_from_channel(channel.clone(), batch_rx)
+                    .await
+                    .unwrap()
+            );
         }
         sleep(time::Duration::from_secs(2)).await;
-        assert!(channel
-            .get_acks_status(&expected_ack_ids)
+        assert!(idx_ack
+            .get_acks_status_from_channel(channel.clone(), &expected_ack_ids)
+            .await
+            .unwrap()
             .values()
             .all(|status| *status));
     }

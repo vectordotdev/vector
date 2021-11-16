@@ -104,7 +104,7 @@ impl SourceConfig for SplunkConfig {
         let source = SplunkSource::new(
             self,
             tls.http_protocol_name(),
-            cx.acknowledgements.clone(),
+            cx.acknowledgements,
             cx.shutdown.clone().shared(),
         );
 
@@ -369,7 +369,9 @@ impl SplunkSource {
                 let idx_ack = idx_ack.clone();
                 async move {
                     if let Some(idx_ack) = idx_ack {
-                        let ack_statuses = idx_ack.get_acks_status(channel_id, &body.acks).await?;
+                        let ack_statuses = idx_ack
+                            .get_acks_status_from_channel(channel_id, &body.acks)
+                            .await?;
                         Ok(
                             warp::reply::json(&HecAckStatusResponse { acks: ack_statuses })
                                 .into_response(),
@@ -591,7 +593,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
             de.extract(log, &mut json);
         }
         if let Some(batch) = self.batch.clone() {
-            event.add_batch_notifier(batch.clone());
+            event.add_batch_notifier(batch);
         }
 
         emit!(&EventsReceived {
@@ -828,7 +830,7 @@ mod splunk_response {
     }
 
     impl HecResponse {
-        pub fn new(code: HecStatusCode) -> Self {
+        pub const fn new(code: HecStatusCode) -> Self {
             let text = match code {
                 HecStatusCode::Success => "Success",
                 HecStatusCode::TokenIsRequired => "Token is required",
@@ -850,7 +852,7 @@ mod splunk_response {
             }
         }
 
-        pub fn with_metadata(mut self, metadata: HecResponseMetadata) -> Self {
+        pub const fn with_metadata(mut self, metadata: HecResponseMetadata) -> Self {
             self.metadata = Some(metadata);
             self
         }
@@ -1006,8 +1008,7 @@ mod tests {
                 token,
                 valid_tokens,
                 tls: None,
-                indexer_acknowledgements: acknowledgements
-                    .unwrap_or(HecAcknowledgementsConfig::default()),
+                indexer_acknowledgements: acknowledgements.unwrap_or_default(),
             }
             .build(cx)
             .await
