@@ -19,6 +19,8 @@ order = [
 
 [transforms.pipelines_processing.logs.pipelines.foo]
 name = "foo"
+filter.type = "vrl"
+filter.source = """contains(.message, "hello", case_sensitive: false) ?? false"""
 
 [[transforms.pipelines_processing.logs.pipelines.foo.transforms]]
 type = "remap"
@@ -55,3 +57,17 @@ extract_from = "pipelines_processing"
 type = "check_fields"
 "went_through_bar.equals" = true
 "went_through_foo.equals" = true
+
+[[tests]]
+name = "filtered log"
+
+[tests.input]
+insert_at = "pipelines_gate"
+value = "bonjour le monde"
+
+[[tests.outputs]]
+extract_from = "pipelines_processing"
+
+[[tests.outputs.conditions]]
+type = "check_fields"
+"went_through_bar.equals" = true
