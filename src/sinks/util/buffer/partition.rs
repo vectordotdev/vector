@@ -1,4 +1,6 @@
-use super::super::batch::{Batch, BatchConfig, BatchError, BatchSettings, PushResult};
+use crate::sinks::util::{Merged, SinkBatchSettings};
+
+use super::super::batch::{Batch, BatchConfig, BatchError, PushResult};
 use super::super::ElementCount;
 use vector_core::ByteSizeOf;
 
@@ -31,11 +33,10 @@ where
     type Input = PartitionInnerBuffer<T::Input, K>;
     type Output = PartitionInnerBuffer<T::Output, K>;
 
-    fn get_settings_defaults(
-        config: BatchConfig,
-        defaults: BatchSettings<Self>,
-    ) -> Result<BatchSettings<Self>, BatchError> {
-        Ok(T::get_settings_defaults(config, defaults.into())?.into())
+    fn get_settings_defaults<D: SinkBatchSettings>(
+        config: BatchConfig<D, Merged>,
+    ) -> Result<BatchConfig<D, Merged>, BatchError> {
+        T::get_settings_defaults(config)
     }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {

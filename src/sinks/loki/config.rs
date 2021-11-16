@@ -3,7 +3,9 @@ use super::sink::LokiSink;
 use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
 use crate::http::{Auth, HttpClient, MaybeAuth};
 use crate::sinks::util::encoding::EncodingConfig;
-use crate::sinks::util::{BatchConfig, TowerRequestConfig, UriSerde};
+use crate::sinks::util::{
+    BatchConfig, RealtimeEventBasedDefaultBatchSettings, TowerRequestConfig, UriSerde,
+};
 use crate::sinks::VectorSink;
 use crate::template::Template;
 use crate::tls::{TlsOptions, TlsSettings};
@@ -33,7 +35,7 @@ pub struct LokiConfig {
     pub request: TowerRequestConfig,
 
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<RealtimeEventBasedDefaultBatchSettings>,
 
     pub tls: Option<TlsOptions>,
 }

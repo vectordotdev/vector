@@ -1,7 +1,7 @@
 use super::Region;
 use crate::sinks::elasticsearch::ElasticSearchEncoder;
 use crate::sinks::util::encoding::EncodingConfigFixed;
-use crate::sinks::util::StreamSink;
+use crate::sinks::util::{RealtimeSizeBasedDefaultBatchSettings, StreamSink};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
@@ -32,7 +32,7 @@ pub struct SematextLogsConfig {
     request: TowerRequestConfig,
 
     #[serde(default)]
-    batch: BatchConfig,
+    batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 }
 
 inventory::submit! {

@@ -4,10 +4,10 @@ use crate::{
     internal_events::EndpointBytesSent,
     proto::vector as proto,
     sinks::util::{
-        retries::RetryLogic, uri, BatchConfig, BatchSettings, BatchSink, EncodedEvent,
-        EncodedLength, ServiceBuilderExt, TowerRequestConfig, VecBuffer,
+        retries::RetryLogic, uri, BatchConfig, BatchSink, EncodedEvent, EncodedLength,
+        ServiceBuilderExt, TowerRequestConfig, VecBuffer,
     },
-    sinks::{Healthcheck, VectorSink},
+    sinks::{util::batch::RealtimeEventBasedDefaultBatchSettings, Healthcheck, VectorSink},
     tls::{tls_connector_builder, MaybeTlsSettings, TlsConfig},
 };
 use futures::{future::BoxFuture, stream, SinkExt, StreamExt, TryFutureExt};
@@ -36,7 +36,7 @@ struct Client {
 pub struct VectorConfig {
     address: String,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<RealtimeEventBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(default)]
@@ -164,10 +164,7 @@ impl VectorConfig {
         let healthcheck = healthcheck(healthcheck_client, cx.healthcheck.clone());
         let client = Client::new(client, uri);
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
-        let batch = BatchSettings::default()
-            .events(1000)
-            .timeout(1)
-            .parse_config(self.batch)?;
+        let batch = self.batch.into_batch_settings()?;
 
         let svc = ServiceBuilder::new()
             .settings(request, VectorGrpcRetryLogic)

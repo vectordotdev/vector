@@ -68,6 +68,9 @@ async fn config(
     encoding: impl Into<EncodingConfig<HecLogsEncoder>>,
     indexed_fields: Vec<String>,
 ) -> HecSinkLogsConfig {
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(5);
+
     HecSinkLogsConfig {
         token: get_token().await,
         endpoint: "http://localhost:8088/".into(),
@@ -78,10 +81,7 @@ async fn config(
         source: None,
         encoding: encoding.into(),
         compression: Compression::None,
-        batch: BatchConfig {
-            max_events: Some(5),
-            ..Default::default()
-        },
+        batch,
         request: TowerRequestConfig::default(),
         tls: None,
     }

@@ -1,7 +1,7 @@
 use crate::{
     codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
-    internal_events::GeneratorEventProcessed,
+    internal_events::DemoLogsEventProcessed,
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util::TcpError,
@@ -21,7 +21,7 @@ use tokio_util::codec::FramedRead;
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(default)]
-pub struct GeneratorConfig {
+pub struct DemoLogsConfig {
     #[serde(alias = "batch_interval")]
     #[derivative(Default(value = "default_interval()"))]
     interval: f64,
@@ -44,9 +44,9 @@ const fn default_count() -> usize {
 }
 
 #[derive(Debug, PartialEq, Snafu)]
-pub enum GeneratorConfigError {
+pub enum DemoLogsConfigError {
     #[snafu(display("A non-empty list of lines is required for the shuffle format"))]
-    ShuffleGeneratorItemsEmpty,
+    ShuffleDemoLogsItemsEmpty,
 }
 
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
@@ -70,7 +70,7 @@ pub enum OutputFormat {
 
 impl OutputFormat {
     fn generate_line(&self, n: usize) -> String {
-        emit!(&GeneratorEventProcessed);
+        emit!(&DemoLogsEventProcessed);
 
         match self {
             Self::Shuffle {
@@ -97,11 +97,11 @@ impl OutputFormat {
     }
 
     // Ensures that the `lines` list is non-empty if `Shuffle` is chosen
-    pub(self) fn validate(&self) -> Result<(), GeneratorConfigError> {
+    pub(self) fn validate(&self) -> Result<(), DemoLogsConfigError> {
         match self {
             Self::Shuffle { lines, .. } => {
                 if lines.is_empty() {
-                    Err(GeneratorConfigError::ShuffleGeneratorItemsEmpty)
+                    Err(DemoLogsConfigError::ShuffleDemoLogsItemsEmpty)
                 } else {
                     Ok(())
                 }
@@ -111,7 +111,7 @@ impl OutputFormat {
     }
 }
 
-impl GeneratorConfig {
+impl DemoLogsConfig {
     #[allow(dead_code)] // to make check-component-features pass
     pub fn repeat(lines: Vec<String>, count: usize, interval: f64) -> Self {
         Self {
@@ -127,7 +127,7 @@ impl GeneratorConfig {
     }
 }
 
-async fn generator_source(
+async fn demo_logs_source(
     interval: f64,
     count: usize,
     format: OutputFormat,
@@ -163,7 +163,7 @@ async fn generator_source(
                     for mut event in events {
                         let log = event.as_mut_log();
 
-                        log.try_insert(log_schema().source_type_key(), Bytes::from("generator"));
+                        log.try_insert(log_schema().source_type_key(), Bytes::from("demo_logs"));
                         log.try_insert(log_schema().timestamp_key(), now);
 
                         out.send(event)
@@ -188,18 +188,22 @@ async fn generator_source(
 }
 
 inventory::submit! {
-    SourceDescription::new::<GeneratorConfig>("generator")
+    SourceDescription::new::<DemoLogsConfig>("demo_logs")
 }
 
-impl_generate_config_from_default!(GeneratorConfig);
+inventory::submit! {
+    SourceDescription::new::<DemoLogsConfig>("generator")
+}
+
+impl_generate_config_from_default!(DemoLogsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "generator")]
-impl SourceConfig for GeneratorConfig {
+#[typetag::serde(name = "demo_logs")]
+impl SourceConfig for DemoLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         self.format.validate()?;
         let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
-        Ok(Box::pin(generator_source(
+        Ok(Box::pin(demo_logs_source(
             self.interval,
             self.count,
             self.format.clone(),
@@ -214,7 +218,27 @@ impl SourceConfig for GeneratorConfig {
     }
 
     fn source_type(&self) -> &'static str {
-        "generator"
+        "demo_logs"
+    }
+}
+
+// Add a compatibility alias to avoid breaking existing configs
+#[derive(Deserialize, Serialize, Debug, Clone)]
+struct DemoLogsCompatConfig(DemoLogsConfig);
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "generator")]
+impl SourceConfig for DemoLogsCompatConfig {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        self.0.build(cx).await
+    }
+
+    fn output_type(&self) -> DataType {
+        self.0.output_type()
+    }
+
+    fn source_type(&self) -> &'static str {
+        self.0.source_type()
     }
 }
 
@@ -227,16 +251,16 @@ mod tests {
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<GeneratorConfig>();
+        crate::test_util::test_generate_config::<DemoLogsConfig>();
     }
 
     async fn runit(config: &str) -> mpsc::Receiver<Event> {
         let (tx, rx) = Pipeline::new_test();
-        let config: GeneratorConfig = toml::from_str(config).unwrap();
+        let config: DemoLogsConfig = toml::from_str(config).unwrap();
         let decoder = DecodingConfig::new(default_framing_message_based(), default_decoding())
             .build()
             .unwrap();
-        generator_source(
+        demo_logs_source(
             config.interval,
             config.count,
             config.format,
@@ -253,22 +277,22 @@ mod tests {
     fn config_shuffle_lines_not_empty() {
         let empty_lines: Vec<String> = Vec::new();
 
-        let errant_config = GeneratorConfig {
+        let errant_config = DemoLogsConfig {
             format: OutputFormat::Shuffle {
                 sequence: false,
                 lines: empty_lines,
             },
-            ..GeneratorConfig::default()
+            ..DemoLogsConfig::default()
         };
 
         assert_eq!(
             errant_config.format.validate(),
-            Err(GeneratorConfigError::ShuffleGeneratorItemsEmpty)
+            Err(DemoLogsConfigError::ShuffleDemoLogsItemsEmpty)
         );
     }
 
     #[tokio::test]
-    async fn shuffle_generator_copies_lines() {
+    async fn shuffle_demo_logs_copies_lines() {
         let message_key = log_schema().message_key();
         let mut rx = runit(
             r#"format = "shuffle"
@@ -293,7 +317,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn shuffle_generator_limits_count() {
+    async fn shuffle_demo_logs_limits_count() {
         let mut rx = runit(
             r#"format = "shuffle"
                lines = ["one", "two"]
@@ -308,7 +332,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn shuffle_generator_adds_sequence() {
+    async fn shuffle_demo_logs_adds_sequence() {
         let message_key = log_schema().message_key();
         let mut rx = runit(
             r#"format = "shuffle"
@@ -332,7 +356,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn shuffle_generator_obeys_interval() {
+    async fn shuffle_demo_logs_obeys_interval() {
         let start = Instant::now();
         let mut rx = runit(
             r#"format = "shuffle"

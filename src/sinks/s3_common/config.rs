@@ -1,7 +1,7 @@
 use super::service::S3Service;
+use crate::aws::rusoto;
+use crate::aws::rusoto::{AwsAuthentication, RegionOrEndpoint};
 use crate::config::ProxyConfig;
-use crate::rusoto;
-use crate::rusoto::{AwsAuthentication, RegionOrEndpoint};
 use crate::sinks::util::retries::RetryLogic;
 use crate::sinks::Healthcheck;
 use futures::FutureExt;

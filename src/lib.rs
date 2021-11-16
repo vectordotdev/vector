@@ -37,6 +37,8 @@ pub mod internal_events;
 pub mod api;
 pub mod app;
 pub mod async_read;
+#[cfg(any(feature = "rusoto_core", feature = "aws-config"))]
+pub mod aws;
 #[cfg(feature = "codecs")]
 pub mod codecs;
 pub mod encoding_transcode;
@@ -52,8 +54,6 @@ pub mod list;
 pub(crate) mod pipeline;
 pub(crate) mod proto;
 pub mod providers;
-#[cfg(feature = "rusoto_core")]
-pub mod rusoto;
 pub mod serde;
 #[cfg(windows)]
 pub mod service;

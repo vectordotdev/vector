@@ -222,7 +222,7 @@ jobs:
       - name: Run baseline experiment
         if: steps.cache-primes.outputs.cache-hit != 'true'
         run: |
-          rm -rf /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
+          rm -rf /tmp/${{ github.event.number }}-${{ github.run_attempt }}/
           mkdir -p /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
           ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
                                   --local-image "false" \
@@ -236,8 +236,8 @@ jobs:
       - name: Upload timing captures
         uses: actions/upload-artifact@v1
         with:
-          name: ${{ github.event.number }}-${{ github.run_attempt }}-captures
-          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}
+          name: ${{ github.event.number }}-${{ github.run_attempt }}-${{ matrix.target }}-baseline
+          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/baseline.captures
 
   soak-comparison:
     name: Soak (${{ matrix.target }}) - comparison
@@ -253,7 +253,7 @@ jobs:
       - name: Run comparison experiment
         if: steps.cache-primes.outputs.cache-hit != 'true'
         run: |
-          rm -rf /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
+          rm -rf /tmp/${{ github.event.number }}-${{ github.run_attempt }}/
           mkdir -p /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
           ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
                                   --local-image "false" \
@@ -267,14 +267,15 @@ jobs:
       - name: Upload timing captures
         uses: actions/upload-artifact@v1
         with:
-          name: ${{ github.event.number }}-${{ github.run_attempt }}-captures
-          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}
+          name: ${{ github.event.number }}-${{ github.run_attempt }}-${{ matrix.target }}-comparison
+          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/comparison.captures
 
   analyze-results:
     name: Soak analysis
     if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-20.04
     needs: [compute-soak-meta, soak-baseline, soak-comparison]
+
     steps:
       - name: Install 'miller'
         run: sudo apt-get install -y miller
@@ -283,13 +284,40 @@ jobs:
         uses: actions/checkout@v2.4.0
 
       - name: Download captures artifact
-        uses: actions/download-artifact@v1
+        uses: actions/download-artifact@v2
         with:
-          name: ${{ github.event.number }}-${{ github.run_attempt }}-captures
+          path: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
+
+      - name: Display structure of downloaded files
+        run: ls -R
+        working-directory: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
 
       - name: Analyze captures
         run: |
-          ./soaks/bin/analyze_experiment.sh --capture-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures/ \
+          # convert the individual artifacts into a folder for each
+          # soak test (containing both comparison/baseline files)
+
+          pushd ${{ github.event.number }}-${{ github.run_attempt }}-captures
+          prefix="./${{ github.event.number }}-${{ github.run_attempt }}-"
+          echo "Prefix: $prefix"
+          for dir in ./*; do
+          	if [[ $dir == *-comparison ]]
+          	then
+          	  soak_dir=${dir%"-comparison"}
+          	  soak_dir="./${soak_dir#$prefix}"
+          	  mkdir -p $soak_dir
+          	  cp $dir/comparison.captures $soak_dir/comparison.captures
+          	  rm -rf $dir
+          	else
+          	  soak_dir=${dir%"-baseline"}
+          	  soak_dir="./${soak_dir#$prefix}"
+          	  mkdir -p $soak_dir
+          	  cp $dir/baseline.captures $soak_dir/baseline.captures
+          	  rm -rf $dir
+          	fi
+          done
+          popd
+          ./soaks/bin/analyze_experiment.sh --capture-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures \
                                             --baseline ${{ needs.compute-soak-meta.outputs.baseline-sha }} \
                                             --comparison ${{ needs.compute-soak-meta.outputs.comparison-sha }} \
                                             --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} > /tmp/${{ github.event.number}}-${{ github.run_attempt }}-analysis
