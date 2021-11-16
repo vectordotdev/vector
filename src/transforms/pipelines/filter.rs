@@ -8,19 +8,19 @@ use serde::{Deserialize, Serialize};
 
 /// This transform is made to do the following trick
 ///
-/// ```
+/// ```text
 ///                                 +--> filter (if condition) --> ..transforms --+
 /// event -- (expand in parallel) --+                                             +--> next pipe
 ///                                 +--> filter (if !condition) ------------------+
 /// ```
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct BypassConfig {
+pub struct PipelineFilterConfig {
     condition: AnyCondition,
     inner: Box<dyn TransformConfig>,
 }
 
-impl BypassConfig {
+impl PipelineFilterConfig {
     pub fn new(condition: AnyCondition, inner: Box<dyn TransformConfig>) -> Self {
         Self { condition, inner }
     }
@@ -43,8 +43,8 @@ impl BypassConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "pipeline_bypass")]
-impl TransformConfig for BypassConfig {
+#[typetag::serde(name = "pipeline_filter")]
+impl TransformConfig for PipelineFilterConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Err("this transform must be expanded".into())
     }
@@ -67,6 +67,6 @@ impl TransformConfig for BypassConfig {
     }
 
     fn transform_type(&self) -> &'static str {
-        "pipeline_bypass"
+        "pipeline_filter"
     }
 }

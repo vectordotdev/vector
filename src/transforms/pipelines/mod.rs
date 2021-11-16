@@ -56,8 +56,8 @@
 /// Each pipeline will then be expanded into a list of its transforms and at the end of each
 /// expansion, a `Noop` transform will be added to use the `pipeline` name as an alias
 /// (`my_pipelines.logs.transforms.foo`).
-mod bypass;
 mod expander;
+mod filter;
 mod router;
 
 use crate::conditions::AnyCondition;
@@ -104,7 +104,10 @@ impl PipelineConfig {
             .collect();
         let transforms = Box::new(expander::ExpanderConfig::serial(transforms));
         if let Some(ref filter) = self.filter {
-            Box::new(bypass::BypassConfig::new(filter.clone(), transforms))
+            Box::new(filter::PipelineFilterConfig::new(
+                filter.clone(),
+                transforms,
+            ))
         } else {
             transforms
         }
