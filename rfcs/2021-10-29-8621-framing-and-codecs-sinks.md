@@ -84,6 +84,7 @@ Incremental steps to execute this change. These will be converted to issues afte
 
 - [ ] Implementation of support structures (`Encoder`, `SerializerConfig`, `FramingConfig`)
 - [ ] Implementation of selected `encoders`/`framers` (e.g. `JSON` and `newline_delimited`)
+- [ ] Implementation of compatibility layer for legacy reshaping via `EncodingConfiguration::apply_rules`
 - [ ] Example integration with first sink, e.g. `socket` or `http` which benefit most from generic encoding/framing options
 - [ ] Subsequent PRs for each integration to a sink
 
