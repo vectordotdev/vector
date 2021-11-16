@@ -96,9 +96,9 @@ Overview for the current state of sinks regarding encoding:
 |`aws_cloudwatch_logs`| `EncodingConfig<Encoding { Text, Json }>` | ✔︎ | Enveloped in `rusoto_logs::InputLogEvent`. `Text` reads message_key()
 |`aws_kinesis_firehose`| `EncodingConfig<Encoding { Text, Json }>` | ✔︎ | Enveloped in `rusoto_firehose::Record` that serializes to base64. `Text` reads `message_key()` | -
 |`aws_kinesis_streams`| `EncodingConfig<Encoding { Text, Json }>` | ✔︎ | Enveloped in `rusoto_kinesis::PutRecordsRequestEntry`. `Text` reads `message_key()`
-|`aws_s3`| `EncodingConfig<StandardEncodings { Text, Json, Ndjson }>` | ✔︎ | Uses util::{RequestBuilder, Encoder, Compressor}. `Text` reads `message_key()`
-|`aws_sqs`| `EncodingConfig<Encoding { Text, Json }>` | ✔︎ | Enveloped in EncodedEvent<SendMessageEntry>. `Text` reads `message_key()`
-|`azure_blob`| `EncodingConfig<Encoding { Ndjson, Text }>` | ✔︎ | Enveloped in EncodedEvent<PartitionInnerBuffer>. `Text` reads `message_key()`
+|`aws_s3`| `EncodingConfig<StandardEncodings { Text, Json, Ndjson }>` | ✔︎ | Uses `util::{RequestBuilder, Encoder, Compressor}`. `Text` reads `message_key()`
+|`aws_sqs`| `EncodingConfig<Encoding { Text, Json }>` | ✔︎ | Enveloped in `EncodedEvent<SendMessageEntry>`. `Text` reads `message_key()`
+|`azure_blob`| `EncodingConfig<Encoding { Ndjson, Text }>` | ✔︎ | Enveloped in `EncodedEvent<PartitionInnerBuffer>`. `Text` reads `message_key()`
 |`azure_monitor_logs`| `EncodingConfigWithDefault<Encoding { Default }>` | ✔︎ | Serializes to JSON. Enveloped in HTTP request
 |`blackhole`| - | - | -
 |`clickhouse`| `EncodingConfigWithDefault<Encoding { Default }>` | ✔︎ | Serializes to JSON. Enveloped in HTTP request
