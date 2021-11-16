@@ -1,4 +1,3 @@
-2021-11-16-implicit-namespacing.md
 ---
 date: "2021-11-16"
 title: "Automatic namespacing for config files"
