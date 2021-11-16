@@ -265,7 +265,11 @@ components: sources: kubernetes_logs: {
 		}
 		delay_deletion_ms: {
 			common:      false
-			description: "Delay between receiving a `DELETE` event and removing any related metadata Vector has stored. This controls how quickly Vector will remove metadata for resources that have been removed from Kubernetes, a longer delay will allow Vector to continue processing and enriching logs after the source Pod has been deleted."
+			description: """
+				Delay between receiving a `DELETE` event and removing any related metadata Vector has stored. This controls how quickly Vector will remove
+				metadata for resources that have been removed from Kubernetes, a longer delay will allow Vector to continue processing and enriching logs after the source Pod has been deleted.
+				If Vector tries to process logs from a Pod which has already had it's metadata removed from the local cache, it will fail to enrich the event with metadata and log a warning.
+				"""
 			required:    false
 			type: uint: {
 				default: 60_000
