@@ -1,5 +1,5 @@
 ---
-date: "2021-11-16"
+date: "2021-11-18"
 title: "Event `throttle` transform released"
 description: "A guide to using the new `throttle` transform"
 authors: ["barieom"]
@@ -10,22 +10,40 @@ badges:
   type: new feature
 ---
 
-We've released a new `throttle` transform that provides a user the ability to throttle the throughput of specific event streams.
+We've released a new `throttle` transform that provides a user the ability to
+throttle the throughput of specific event streams.
 
-Large spikes in data volume can frequently overwhelm a service, which is especially common in log data. Previously, users lacked the necessary tooling to control throughput, such as setting a limit for users and user groups utilizing Vector, which not only can cause spike in costs, but also negatively impact downstream services due to the increased load.
+Large spikes in the volume of observability data can have undesirable impacts
+including increased costs for sink destinations that price based on volume or
+accidentally overwhelming internally deployed services like Loki.
 
-The [`throttle`][throttle] transform enables you to rate limit specific subsets of your event stream to limit load on downstream services or enforce quotas on users. You can utilize the `throttle` transform to enforce rate limits on number of events and exclude events based on a [VRL condition] to avoid dropping critical logs.
+To protect yourself from these effects, we've added a new [`throttle`][throttle]
+transform to Vector.  The [`throttle`][throttle] transform enables you to rate
+limit specific subsets of your event stream to limit load on downstream services
+or enforce quotas on specific services (identified by fields on the log event).
+You can also exclude events based on a [VRL condition] to avoid dropping
+critical logs.
 
-To ensure that each bucket's throughput averages out to the `threshold` per `window`, rate limiting spreads load across the configured `window`. The rate limiter will allow up to threshold number of events through and drop any further events for that particular bucket when the rate limiter is at capacity.
+To ensure that each bucket's throughput averages out to the `threshold` per
+`window`, rate limiting spreads load across the configured `window` (configured
+by `window_secs`). The rate limiter will allow up to threshold number of events
+through and drop any further events for that particular bucket when the rate
+limiter is at capacity.
 
-A rate limiter is created with a maximum number of cells equal to the `threshold`, with cells replenishing at a rate of `window` divided by `threshold`. For example, a `window` of 60 with a `threshold` of 10 replenishes a cell every 6 seconds and allows a burst of up to 10 events.
+A rate limiter is created with a maximum number of cells equal to the
+`threshold`, with cells replenishing at a rate of `window` divided by
+`threshold`. For example, a `window` of 60 with a `threshold` of 10 replenishes
+a cell every 6 seconds and allows a burst of up to 10 events.
 
-As a simple example:
+See the following simple example.
 
-Given these incoming events:
+Given these incoming log events:
 
 ```json
-[{"log":{"host":"host-1.hostname.com","message":"First message","timestamp":"2020-10-07T12:33:21.223543Z"}},{"log":{"host":"host-1.hostname.com","message":"Second message","timestamp":"2020-10-07T12:33:21.223543Z"}}]
+[
+  {"host":"host-1.hostname.com","message":"First message","timestamp":"2020-10-07T12:33:21.223543Z"},
+  {"host":"host-1.hostname.com","message":"Second message","timestamp":"2020-10-07T12:33:21.223543Z"}
+]
 ```
 
 ...and this configuration...
@@ -35,14 +53,16 @@ Given these incoming events:
 type = "throttle"
 inputs = [ "my-source-or-transform-id" ]
 threshold = 1
-window = 60
+window_secs = 60
 ```
 
 ...only one event will be allowed through:
 
 ```
-[{"log":{"host":"host-1.hostname.com","message":"First message","timestamp":"2020-10-07T12:33:21.223543Z"}}]
+{"host":"host-1.hostname.com","message":"First message","timestamp":"2020-10-07T12:33:21.223543Z"}
 ```
+
+Due to the threshold of `1` event per 60 seconds.
 
 If you any feedback, let us know on our [Discord chat] or [Twitter].
 
