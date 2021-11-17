@@ -10,13 +10,11 @@ badges:
   type: new feature
 ---
 
-# Failed event routing
-
 We've released a new feature that enables users to route failed events through separate pipelines.
 
 Previously, when Vector encountered an event that failed a given transformation, the event was either dropped or was forwarded to the next step of the process. 
 
-With this new release, Vector enables events that fail to process down a different pipeline without any manual work-around to catch errors, tag, fanout, or filter. In other words, users can now handle failed events in a way the user sees fit, such as routing the failed events to another sink for storage, inspection, and replay. 
+With this new release, Vector enables events that fail to process down a different pipeline without any manual work-around to catch errors, tag, fanout, or filter. In other words, users can now handle failed events in a way the user sees fit, such as routing the failed events to another sink for storage, inspection, and replay. For clarification, we've only added support to the `remap` transform thus far, and unit tests do not currently support assertions on failed events. That said, more support for failed events is actively under development so keep your eyes peeled for announcements down the line. 
 
 As an example, the `dropped` output can be used if you want to capture events that failed during processing and re-direct the failed events to a separate sink from the data that was processed successfully. In a given config below:
 
@@ -98,10 +96,11 @@ This would emit the following output:
 }
 ```
 
-Events that either caused an error or were aborted are written out by the `bar` console sink with the relevant metadata added; on the other hand, events that were valid JSON were processed and output by the `foo` console sink. 
+Events that either caused an error or were aborted are written out by the `bar` console sink with the relevant metadata added; on the other hand, events that were valid JSON were processed and output by the `foo` console sink. More information is available on the [remap docs page]. As a side note, the `metadata` key (above under the `"invalid message"`) is configurable via [`log_schema.metadata_key`][log_schema.metadata_key].
 
-We will be continuing to expand support for routing failed events from other transforms like `filter`. In the meantime, if you any feedback for us, let us know on our [Discord chat][] or on [Twitter][]!
+We will be continuing to expand support for routing failed events from other transforms like `filter`. In the meantime, if you any feedback for us, let us know on our [Discord chat] or on [Twitter]!
 
-
+[remap docs page]: /docs/reference/configuration/transforms/remap/
+[log_schema.metadata_key]: /docs/reference/configuration/global-options/#log_schema.metadata_key
 [Discord chat]: https://discord.com/invite/dX3bdkF
 [Twitter]: https://twitter.com/vectordotdev
