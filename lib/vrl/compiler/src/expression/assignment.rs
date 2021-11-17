@@ -3,7 +3,6 @@ use crate::parser::{
     ast::{self, Ident},
     Node,
 };
-use crate::vm::OpCode;
 use crate::{Context, Expression, Span, State, TypeDef, Value};
 use diagnostic::{DiagnosticError, Label, Note};
 use lookup::LookupBuf;
@@ -410,7 +409,7 @@ where
         match self {
             Variant::Single { target, expr } => {
                 expr.dump(vm)?;
-                vm.write_chunk(OpCode::SetPath);
+                vm.write_chunk(crate::vm::SETPATH);
 
                 let variable = match target {
                     Target::External(Some(path)) => crate::vm::Variable::External(path.clone()),
@@ -428,7 +427,7 @@ where
             } => {
                 // This isn't handling the error case yet.
                 expr.dump(vm)?;
-                vm.write_chunk(OpCode::SetPath);
+                vm.write_chunk(crate::vm::SETPATH);
 
                 let variable = match ok {
                     Target::External(Some(path)) => crate::vm::Variable::External(path.clone()),

@@ -1,5 +1,4 @@
 use crate::expression::{Expr, Resolved};
-use crate::vm::OpCode;
 use crate::{Context, Expression, State, TypeDef, Value};
 use std::collections::BTreeMap;
 use std::{fmt, ops::Deref};
@@ -60,13 +59,13 @@ impl Expression for Object {
         for (key, value) in &self.inner {
             let keyidx = vm.add_constant(Literal::String(key.clone().into()));
 
-            vm.write_chunk(OpCode::Constant);
+            vm.write_chunk(crate::vm::CONSTANT);
             vm.write_primitive(keyidx);
 
             value.dump(vm)?;
         }
 
-        vm.write_chunk(OpCode::CreateObject);
+        vm.write_chunk(crate::vm::CREATEOBJECT);
         vm.write_primitive(self.inner.len());
 
         Ok(())

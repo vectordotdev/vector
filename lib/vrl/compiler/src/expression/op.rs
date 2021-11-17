@@ -240,20 +240,20 @@ impl Expression for Op {
         self.lhs.dump(vm)?;
         self.rhs.dump(vm)?;
         vm.write_chunk(match self.opcode {
-            ast::Opcode::Mul => crate::vm::OpCode::Multiply,
-            ast::Opcode::Div => crate::vm::OpCode::Divide,
-            ast::Opcode::Add => crate::vm::OpCode::Add,
-            ast::Opcode::Sub => crate::vm::OpCode::Subtract,
+            ast::Opcode::Mul => crate::vm::MULTIPLY,
+            ast::Opcode::Div => crate::vm::DIVIDE,
+            ast::Opcode::Add => crate::vm::ADD,
+            ast::Opcode::Sub => crate::vm::SUBTRACT,
             ast::Opcode::Rem => todo!(),
             ast::Opcode::Or => todo!(),
             ast::Opcode::And => todo!(),
             ast::Opcode::Err => todo!(),
-            ast::Opcode::Ne => crate::vm::OpCode::NotEqual,
-            ast::Opcode::Eq => crate::vm::OpCode::Equal,
-            ast::Opcode::Ge => crate::vm::OpCode::GreaterEqual,
-            ast::Opcode::Gt => crate::vm::OpCode::Greater,
-            ast::Opcode::Le => crate::vm::OpCode::LessEqual,
-            ast::Opcode::Lt => crate::vm::OpCode::Less,
+            ast::Opcode::Ne => crate::vm::NOTEQUAL,
+            ast::Opcode::Eq => crate::vm::EQUAL,
+            ast::Opcode::Ge => crate::vm::GREATEREQUAL,
+            ast::Opcode::Gt => crate::vm::GREATER,
+            ast::Opcode::Le => crate::vm::LESSEQUAL,
+            ast::Opcode::Lt => crate::vm::LESS,
             ast::Opcode::Merge => todo!(),
         });
         Ok(())

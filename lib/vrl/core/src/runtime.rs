@@ -1,8 +1,5 @@
 use crate::{state, Context, Program, Target, Value};
-use compiler::{
-    vm::{OpCode, Vm},
-    ExpressionError, Function,
-};
+use compiler::{vm::Vm, ExpressionError, Function};
 use lookup::LookupBuf;
 use shared::TimeZone;
 use std::{error::Error, fmt};
@@ -118,7 +115,7 @@ impl Runtime {
             expr.dump(&mut vm)?;
         }
 
-        vm.write_chunk(OpCode::Return);
+        vm.write_chunk(compiler::vm::RETURN);
 
         Ok(vm)
     }

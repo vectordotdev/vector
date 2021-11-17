@@ -47,7 +47,7 @@ impl Expression for Not {
 
     fn dump(&self, vm: &mut crate::vm::Vm) -> std::result::Result<(), String> {
         self.inner.dump(vm)?;
-        vm.write_chunk(crate::vm::OpCode::Not);
+        vm.write_chunk(crate::vm::NOT);
 
         Ok(())
     }

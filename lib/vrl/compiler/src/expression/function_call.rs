@@ -325,7 +325,7 @@ impl Expression for FunctionCall {
             argument.inner().dump(vm)?;
         }
 
-        vm.write_chunk(crate::vm::OpCode::Call);
+        vm.write_chunk(crate::vm::CALL);
         vm.write_primitive(self.function_id);
 
         Ok(())

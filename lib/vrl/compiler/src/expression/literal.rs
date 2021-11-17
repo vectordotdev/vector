@@ -1,5 +1,4 @@
 use crate::expression::Resolved;
-use crate::vm::OpCode;
 use crate::{value::Regex, Context, Expression, Span, State, TypeDef, Value};
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
@@ -89,7 +88,7 @@ impl Expression for Literal {
 
     fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         let constant = vm.add_constant(self.clone());
-        vm.write_chunk(OpCode::Constant);
+        vm.write_chunk(crate::vm::CONSTANT);
         vm.write_primitive(constant);
         Ok(())
     }

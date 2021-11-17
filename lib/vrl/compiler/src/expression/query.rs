@@ -119,7 +119,7 @@ impl Expression for Query {
     }
 
     fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
-        vm.write_chunk(crate::vm::OpCode::GetPath);
+        vm.write_chunk(crate::vm::GETPATH);
         let variable = match self.target {
             Target::External => crate::vm::Variable::External(self.path.clone()),
             _ => unimplemented!("Only external vars for now"),

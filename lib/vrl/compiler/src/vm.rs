@@ -16,43 +16,42 @@ macro_rules! binary_op {
     }};
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum OpCode {
-    Return,
-    DefineGlobal,
-    GetGlobal,
-    SetGlobal,
-    GetLocal,
-    SetLocal,
-    Constant,
-    Negate,
-    Add,
-    Subtract,
-    Multiply,
-    Divide,
-    Print,
-    Not,
-    Greater,
-    GreaterEqual,
-    Less,
-    LessEqual,
-    NotEqual,
-    Equal,
-    Pop,
-    JumpIfFalse,
-    Jump,
-    Loop,
-    SetPath,
-    GetPath,
-    Call,
-    CreateObject,
-}
+pub const RETURN: u8 = 1;
+pub const DEFINEGLOBAL: u8 = 2;
+pub const GETGLOBAL: u8 = 3;
+pub const SETGLOBAL: u8 = 4;
+pub const GETLOCAL: u8 = 5;
+pub const SETLOCAL: u8 = 6;
+pub const CONSTANT: u8 = 7;
+pub const NEGATE: u8 = 8;
+pub const ADD: u8 = 9;
+pub const SUBTRACT: u8 = 10;
+pub const MULTIPLY: u8 = 11;
+pub const DIVIDE: u8 = 12;
+pub const PRINT: u8 = 13;
+pub const NOT: u8 = 14;
+pub const GREATER: u8 = 15;
+pub const GREATEREQUAL: u8 = 16;
+pub const LESS: u8 = 17;
+pub const LESSEQUAL: u8 = 18;
+pub const NOTEQUAL: u8 = 19;
+pub const EQUAL: u8 = 20;
+pub const POP: u8 = 21;
+pub const JUMPIFFALSE: u8 = 22;
+pub const JUMP: u8 = 23;
+pub const LOOP: u8 = 24;
+pub const SETPATH: u8 = 25;
+pub const GETPATH: u8 = 29;
+pub const CALL: u8 = 30;
+pub const CREATEOBJECT: u8 = 31;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+/*
+  #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Instruction {
     OpCode(OpCode),
     Primitive(usize),
 }
+*/
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Variable {
@@ -62,7 +61,7 @@ pub enum Variable {
 
 #[derive(Clone, Debug, Default)]
 pub struct Vm {
-    instructions: Vec<Instruction>,
+    instructions: Vec<u8>,
     globals: HashMap<String, Value>,
     values: Vec<Literal>,
     targets: Vec<Variable>,
@@ -80,46 +79,40 @@ impl Vm {
         self.values.len() - 1
     }
 
-    pub fn write_chunk(&mut self, code: OpCode) {
-        self.instructions.push(Instruction::OpCode(code));
+    pub fn write_chunk(&mut self, code: u8) {
+        self.instructions.push(code);
     }
 
-    pub fn write_chunk_at(&mut self, pos: usize, code: OpCode) {
-        self.instructions[pos] = Instruction::OpCode(code);
+    pub fn write_chunk_at(&mut self, pos: usize, code: u8) {
+        self.instructions[pos] = code;
     }
 
-    pub fn instructions(&self) -> &Vec<Instruction> {
+    pub fn instructions(&self) -> &Vec<u8> {
         &self.instructions
     }
 
     pub fn write_primitive(&mut self, code: usize) {
-        self.instructions.push(Instruction::Primitive(code));
+        self.instructions.push(code as u8);
     }
 
     pub fn write_primitive_at(&mut self, pos: usize, code: usize) {
-        self.instructions[pos] = Instruction::Primitive(code);
+        self.instructions[pos] = code as u8;
     }
 
     pub fn stack_mut(&mut self) -> &mut Vec<Value> {
         &mut self.stack
     }
 
-    fn next(&mut self) -> OpCode {
+    fn next(&mut self) -> u8 {
         let byte = self.instructions[self.ip];
         self.ip += 1;
-        match byte {
-            Instruction::OpCode(opcode) => opcode,
-            _ => panic!("Expecting opcode"),
-        }
+        byte
     }
 
     fn next_primitive(&mut self) -> usize {
         let byte = self.instructions[self.ip];
         self.ip += 1;
-        match byte {
-            Instruction::Primitive(primitive) => primitive,
-            _ => panic!("Expecting primitive"),
-        }
+        byte as usize
     }
 
     pub fn get_constant(&self, constant: &str) -> Option<usize> {
@@ -146,6 +139,7 @@ impl Vm {
     }
 
     pub fn dissassemble(&self) -> Vec<String> {
+        /*
         self.instructions
             .iter()
             .enumerate()
@@ -154,9 +148,11 @@ impl Vm {
                 Instruction::Primitive(primitive) => format!("{:04}: {}", idx, primitive),
             })
             .collect()
+        */
+        Vec::new()
     }
 
-    pub fn emit_jump(&mut self, instruction: OpCode) -> usize {
+    pub fn emit_jump(&mut self, instruction: u8) -> usize {
         self.write_chunk(instruction);
 
         // Insert placeholder
@@ -184,24 +180,24 @@ impl Vm {
         loop {
             let next = self.next();
             match next {
-                OpCode::Return => {
+                RETURN => {
                     return Ok(self.stack.pop().unwrap_or(Value::Null));
                 }
-                OpCode::Constant => {
+                CONSTANT => {
                     let value = self.read_constant()?;
                     self.stack.push(value.to_value());
                 }
-                OpCode::Negate => match self.stack.pop() {
+                NEGATE => match self.stack.pop() {
                     None => return Err("Negating nothing".to_string()),
                     Some(Value::Float(value)) => self.stack.push(Value::Float(value * -1.0)),
                     _ => return Err("Negating non number".to_string()),
                 },
-                OpCode::Not => match self.stack.pop() {
+                NOT => match self.stack.pop() {
                     None => return Err("Notting nothing".to_string()),
                     Some(Value::Boolean(value)) => self.stack.push(Value::Boolean(!value)),
                     _ => return Err("Notting non boolean".to_string()),
                 },
-                OpCode::Add => {
+                ADD => {
                     binary_op!(self,
                                 (Some(Value::Float(value1)), Some(Value::Float(value2))) => Value::Float(value1 + value2),
                                 (Some(Value::Bytes(value1)), Some(Value::Bytes(value2))) => Value::Bytes({
@@ -213,32 +209,32 @@ impl Vm {
                                 }),
                     )
                 }
-                OpCode::Subtract => binary_op!(self,
+                SUBTRACT => binary_op!(self,
                     (Some(Value::Integer(value1)), Some(Value::Integer(value2))) => Value::Integer(value1 - value2),),
-                OpCode::Multiply => binary_op!(self,
+                MULTIPLY => binary_op!(self,
                     (Some(Value::Integer(value1)), Some(Value::Integer(value2))) => Value::Integer(value1 * value2),),
-                OpCode::Divide => binary_op!(self,
+                DIVIDE => binary_op!(self,
                     (Some(Value::Integer(value1)), Some(Value::Integer(value2))) => Value::Integer(value1 / value2),),
-                OpCode::Print => match self.stack.pop() {
+                PRINT => match self.stack.pop() {
                     None => return Err("Negating nothing".to_string()),
                     Some(value) => println!("{}", value),
                 },
-                OpCode::Greater => binary_op!(self,
+                GREATER => binary_op!(self,
                     (Some(Value::Float(value1)), Some(Value::Float(value2))) => Value::Boolean(value1 > value2),),
-                OpCode::GreaterEqual => binary_op!(self,
+                GREATEREQUAL => binary_op!(self,
                     (Some(Value::Float(value1)), Some(Value::Float(value2))) => Value::Boolean(value1 >= value2),),
-                OpCode::Less => binary_op!(self,
+                LESS => binary_op!(self,
                     (Some(Value::Float(value1)), Some(Value::Float(value2))) => Value::Boolean(value1 < value2),),
-                OpCode::LessEqual => binary_op!(self,
+                LESSEQUAL => binary_op!(self,
                     (Some(Value::Float(value1)), Some(Value::Float(value2))) => Value::Boolean(value1 <= value2),),
-                OpCode::NotEqual => binary_op!(self,
+                NOTEQUAL => binary_op!(self,
                     (Some(value1), Some(value2)) => Value::Boolean(value1 != value2),),
-                OpCode::Equal => binary_op!(self,
+                EQUAL => binary_op!(self,
                     (Some(value1), Some(value2)) => Value::Boolean(value1 == value2),),
-                OpCode::Pop => {
+                POP => {
                     let _ = self.stack.pop();
                 }
-                OpCode::DefineGlobal => match self.read_constant()? {
+                DEFINEGLOBAL => match self.read_constant()? {
                     Literal::String(name) => {
                         self.globals.insert(
                             String::from_utf8_lossy(&name).to_string(),
@@ -249,7 +245,7 @@ impl Vm {
                     }
                     _ => panic!("oooooo"),
                 },
-                OpCode::GetGlobal => match self.read_constant()? {
+                GETGLOBAL => match self.read_constant()? {
                     Literal::String(name) => {
                         let name = String::from_utf8_lossy(&name).to_string();
                         match self.globals.get(&name) {
@@ -259,7 +255,7 @@ impl Vm {
                     }
                     _ => panic!("errr"),
                 },
-                OpCode::SetGlobal => match self.stack.pop() {
+                SETGLOBAL => match self.stack.pop() {
                     Some(obj) => match self.read_constant()? {
                         Literal::String(name) => {
                             self.globals
@@ -269,29 +265,29 @@ impl Vm {
                     },
                     None => panic!("No var"),
                 },
-                OpCode::GetLocal => {
+                GETLOCAL => {
                     let slot = self.next_primitive();
                     self.stack.push(self.stack[slot].clone());
                 }
-                OpCode::SetLocal => {
+                SETLOCAL => {
                     let slot = self.next_primitive();
                     self.stack[slot] = self.stack[self.stack.len() - 1].clone();
                 }
-                OpCode::JumpIfFalse => {
+                JUMPIFFALSE => {
                     let jump = self.next_primitive();
                     if !is_truthy(&self.stack[self.stack.len() - 1]) {
                         self.ip += jump;
                     }
                 }
-                OpCode::Jump => {
+                JUMP => {
                     let jump = self.next_primitive();
                     self.ip += jump;
                 }
-                OpCode::Loop => {
+                LOOP => {
                     let jump = self.next_primitive();
                     self.ip -= jump;
                 }
-                OpCode::SetPath => {
+                SETPATH => {
                     let variable = self.next_primitive();
                     let variable = &self.targets[variable];
                     let value = self.stack.pop().unwrap();
@@ -301,7 +297,7 @@ impl Vm {
                         Variable::External(path) => ctx.target_mut().insert(path, value)?,
                     }
                 }
-                OpCode::GetPath => {
+                GETPATH => {
                     let variable = self.next_primitive();
                     let variable = &self.targets[variable];
 
@@ -313,13 +309,13 @@ impl Vm {
                         Variable::Internal => unimplemented!("variables are junk"),
                     }
                 }
-                OpCode::Call => {
+                CALL => {
                     let function_id = self.next_primitive();
                     let function = &fns[function_id];
 
                     function.call(self);
                 }
-                OpCode::CreateObject => {
+                CREATEOBJECT => {
                     let count = self.next_primitive();
                     let mut object = BTreeMap::new();
 
@@ -333,6 +329,7 @@ impl Vm {
 
                     self.stack.push(Value::Object(object))
                 }
+                _ => panic!("Dodgy instruction"),
             }
         }
     }
