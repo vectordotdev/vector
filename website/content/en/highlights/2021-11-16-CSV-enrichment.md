@@ -66,6 +66,6 @@ For our next steps, we'll look to add support for `or` conditions and add additi
 
 [Enrichment tables]: /docs/reference/glossary/#enrichment-tables
 [get_enrichment_table_record]: /docs/reference/vrl/functions/#get_enrichment_table_record/
-[find_enrichment_table]: /docs/reference/vrl/functions/#find_enrichment_table_records
+[find_enrichment_table_records]: /docs/reference/vrl/functions/#find_enrichment_table_records
 [Discord chat]: https://discord.com/invite/dX3bdkF
 [Twitter]: https://twitter.com/vectordotdev
