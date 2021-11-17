@@ -67,8 +67,6 @@ row = get_enrichment_table_record!("codes", { "code": code })
 ```
 
 For our next steps, we'll look to add support for `or` conditions and add additional enrichment table types (e.g., reading from Redis), but if you any feedback in the meantime, let us know on our [Discord chat] or [Twitter].
-
-
 [Enrichment tables]: /docs/reference/glossary/#enrichment-tables
 [get_enrichment_table_record]: /docs/reference/vrl/functions/#get_enrichment_table_record/
 [find_enrichment_table_records]: /docs/reference/vrl/functions/#find_enrichment_table_records
