@@ -7,7 +7,7 @@ use vector_core::{
     buffers::{Ackable, Acker},
     event::{Finalizable, Metric},
     partition::Partitioner,
-    stream::{Batcher, BatcherSettings, ConcurrentMap, Driver, ExpirationQueue},
+    stream::{PartitionedBatcher, BatcherSettings, ConcurrentMap, Driver, ExpirationQueue, Batcher, ItemBatchSize},
     ByteSizeOf,
 };
 
@@ -23,18 +23,31 @@ pub trait SinkBuilderExt: Stream {
     /// The stream will yield batches of events, with their partition key, when either a batch fills
     /// up or times out. [`Partitioner`] operates on a per-event basis, and has access to the event
     /// itself, and so can access any and all fields of an event.
-    fn batched<P>(
+    fn batched_partitioned<P>(
         self,
         partitioner: P,
         settings: BatcherSettings,
-    ) -> Batcher<Self, P, ExpirationQueue<P::Key>>
-    where
-        Self: Stream<Item = P::Item> + Sized,
-        P: Partitioner + Unpin,
-        P::Key: Eq + Hash + Clone,
-        P::Item: ByteSizeOf,
+    ) -> PartitionedBatcher<Self, P, ExpirationQueue<P::Key>>
+        where
+            Self: Stream<Item=P::Item> + Sized,
+            P: Partitioner + Unpin,
+            P::Key: Eq + Hash + Clone,
+            P::Item: ByteSizeOf,
     {
-        Batcher::new(self, partitioner, settings)
+        PartitionedBatcher::new(self, partitioner, settings)
+    }
+
+    /// Batches the stream based on the given batch settings and batch size calculator.
+    ///
+    /// The stream will yield batches of events, when either a batch fills
+    /// up or times out. The `batch_size_calculator` determines the "size" of each input
+    /// in a batch. The units of "size" are intentionally not defined, so you can choose
+    /// whatever is needed.
+    fn batched<T>(self, settings: BatcherSettings, batch_size_calculator: T) -> Batcher<Self, T>
+        where T: ItemBatchSize<Self::Item>,
+              Self: Sized,
+    {
+        Batcher::new(self, settings, batch_size_calculator)
     }
 
     /// Maps the items in the stream concurrently, up to the configured limit.
@@ -47,10 +60,10 @@ pub trait SinkBuilderExt: Stream {
     /// If the spawned future panics, the panic will be carried through and resumed on the task
     /// calling the stream.
     fn concurrent_map<F, T>(self, limit: Option<NonZeroUsize>, f: F) -> ConcurrentMap<Self, T>
-    where
-        Self: Sized,
-        F: Fn(Self::Item) -> Pin<Box<dyn Future<Output = T> + Send + 'static>> + Send + 'static,
-        T: Send + 'static,
+        where
+            Self: Sized,
+            F: Fn(Self::Item) -> Pin<Box<dyn Future<Output=T> + Send + 'static>> + Send + 'static,
+            T: Send + 'static,
     {
         ConcurrentMap::new(self, limit, f)
     }
@@ -70,12 +83,12 @@ pub trait SinkBuilderExt: Stream {
         limit: Option<NonZeroUsize>,
         builder: B,
     ) -> ConcurrentMap<Self, Result<B::Request, B::Error>>
-    where
-        Self: Sized,
-        Self::Item: Send + 'static,
-        B: RequestBuilder<<Self as Stream>::Item> + Send + Sync + 'static,
-        B::Error: Send,
-        B::Request: Send,
+        where
+            Self: Sized,
+            Self::Item: Send + 'static,
+            B: RequestBuilder<<Self as Stream>::Item> + Send + Sync + 'static,
+            B::Error: Send,
+            B::Request: Send,
     {
         let builder = Arc::new(builder);
 
@@ -122,12 +135,12 @@ pub trait SinkBuilderExt: Stream {
         self,
         mut builder: B,
     ) -> Map<Self, Box<dyn FnMut(Self::Item) -> Vec<Result<B::Request, B::Error>> + Send + Sync>>
-    where
-        Self: Sized,
-        Self::Item: Send + 'static,
-        B: IncrementalRequestBuilder<<Self as Stream>::Item> + Send + Sync + 'static,
-        B::Error: Send,
-        B::Request: Send,
+        where
+            Self: Sized,
+            Self::Item: Send + 'static,
+            B: IncrementalRequestBuilder<<Self as Stream>::Item> + Send + Sync + 'static,
+            B::Error: Send,
+            B::Request: Send,
     {
         self.map(Box::new(move |input| {
             builder
@@ -147,9 +160,9 @@ pub trait SinkBuilderExt: Stream {
     /// absolute metrics to incremental metrics by tracking the change over time for a particular
     /// series, or emitting absolute metrics based on incremental updates.
     fn normalized<N>(self) -> Normalizer<Self, N>
-    where
-        Self: Stream<Item = Metric> + Unpin + Sized,
-        N: MetricNormalize,
+        where
+            Self: Stream<Item=Metric> + Unpin + Sized,
+            N: MetricNormalize,
     {
         Normalizer::new(self)
     }
@@ -164,13 +177,13 @@ pub trait SinkBuilderExt: Stream {
     /// As it is intended to be a terminal step, we require an [`Acker`] in order to be able to
     /// provide acking based on the responses from the underlying service.
     fn into_driver<Svc>(self, service: Svc, acker: Acker) -> Driver<Self, Svc>
-    where
-        Self: Sized,
-        Self::Item: Ackable + Finalizable,
-        Svc: Service<Self::Item>,
-        Svc::Error: fmt::Debug + 'static,
-        Svc::Future: Send + 'static,
-        Svc::Response: DriverResponse,
+        where
+            Self: Sized,
+            Self::Item: Ackable + Finalizable,
+            Svc: Service<Self::Item>,
+            Svc::Error: fmt::Debug + 'static,
+            Svc::Future: Send + 'static,
+            Svc::Response: DriverResponse,
     {
         Driver::new(self, service, acker)
     }
