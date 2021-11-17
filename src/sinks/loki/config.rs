@@ -3,15 +3,14 @@ use super::sink::LokiSink;
 use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
 use crate::http::{Auth, HttpClient, MaybeAuth};
 use crate::sinks::util::encoding::EncodingConfig;
-use crate::sinks::util::{
-    BatchConfig, RealtimeEventBasedDefaultBatchSettings, TowerRequestConfig, UriSerde,
-};
+use crate::sinks::util::{BatchConfig, SinkBatchSettings, TowerRequestConfig, UriSerde};
 use crate::sinks::VectorSink;
 use crate::template::Template;
 use crate::tls::{TlsOptions, TlsSettings};
 use futures::future::FutureExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::num::NonZeroU64;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -35,9 +34,18 @@ pub struct LokiConfig {
     pub request: TowerRequestConfig,
 
     #[serde(default)]
-    pub batch: BatchConfig<RealtimeEventBasedDefaultBatchSettings>,
+    pub batch: BatchConfig<LokiDefaultBatchSettings>,
 
     pub tls: Option<TlsOptions>,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct LokiDefaultBatchSettings;
+
+impl SinkBatchSettings for LokiDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(100_000);
+    const MAX_BYTES: Option<usize> = Some(1_000_000);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
 }
 
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
