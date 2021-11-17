@@ -14,6 +14,7 @@ use crate::{
     Pipeline,
 };
 use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures_util::stream::FuturesOrdered;
 use lazy_static::lazy_static;
 use std::pin::Pin;
 use std::{
@@ -224,7 +225,7 @@ pub async fn build_pieces(
         .unwrap();
 
         let task = match transform {
-            Transform::Function(mut t) => {
+            Transform::Function(t) => {
                 let (mut output, control) = Fanout::new();
 
                 let mut input_rx = input_rx
@@ -234,37 +235,76 @@ pub async fn build_pieces(
                 let mut timer = crate::utilization::Timer::new();
                 let mut last_report = Instant::now();
 
+                let mut in_flight = FuturesOrdered::new();
+                let mut shutting_down = false;
+
                 let transform = async move {
                     timer.start_wait();
-                    while let Some(events) = input_rx.next().await {
-                        let stopped = timer.stop_wait();
-                        if stopped.duration_since(last_report).as_secs() >= 5 {
-                            timer.report();
-                            last_report = stopped;
+                    loop {
+                        tokio::select! {
+                            biased;
+
+                            result = in_flight.next(), if in_flight.len() > 0 => {
+                                match result {
+                                    Some(Ok(output_buf)) => {
+                                        let output_buf: Vec<Event> = output_buf;
+                                        let count = output_buf.len();
+                                        let byte_size = output_buf.size_of();
+
+                                        timer.start_wait();
+                                        output
+                                            .send_all(&mut stream::iter(output_buf.into_iter()).map(Ok))
+                                            .await?;
+
+                                        emit!(&EventsSent { count, byte_size });
+                                    }
+                                    _ => unreachable!("join error or bad poll"),
+                                }
+                            }
+
+                            input_events = input_rx.next(), if in_flight.len() < 64 && !shutting_down => {
+                                match input_events {
+                                    Some(events) => {
+                                        let stopped = timer.stop_wait();
+                                        if stopped.duration_since(last_report).as_secs() >= 5 {
+                                            timer.report();
+                                            last_report = stopped;
+                                        }
+
+                                        emit!(&EventsReceived {
+                                            count: events.len(),
+                                            byte_size: events.size_of(),
+                                        });
+
+                                        let mut t = t.clone();
+                                        let task = tokio::spawn(async move {
+                                            let mut output_buf = Vec::with_capacity(events.len());
+                                            let mut buf = Vec::with_capacity(4); // also an
+                                                                                 // arbitrary
+                                                                                 // smallish
+                                                                                 // constant
+                                            for v in events {
+                                                t.transform(&mut buf, v);
+                                                output_buf.append(&mut buf);
+                                            }
+
+                                            output_buf
+                                        });
+                                        in_flight.push(task);
+                                    }
+                                    None => {
+                                        shutting_down = true;
+                                        continue
+                                    }
+                                }
+                            }
+
+                            else => {
+                                if shutting_down {
+                                    break
+                                }
+                            }
                         }
-
-                        emit!(&EventsReceived {
-                            count: events.len(),
-                            byte_size: events.size_of(),
-                        });
-
-                        let mut output_buf = Vec::with_capacity(events.len());
-                        let mut buf = Vec::with_capacity(4); // also an arbitrary,
-                                                             // smallish constant
-                        for v in events {
-                            t.transform(&mut buf, v);
-                            output_buf.append(&mut buf);
-                        }
-
-                        let count = output_buf.len();
-                        let byte_size = output_buf.size_of();
-
-                        timer.start_wait();
-                        output
-                            .send_all(&mut stream::iter(output_buf.into_iter()).map(Ok))
-                            .await?;
-
-                        emit!(&EventsSent { count, byte_size });
                     }
                     debug!("Finished.");
                     Ok(TaskOutput::Transform)
