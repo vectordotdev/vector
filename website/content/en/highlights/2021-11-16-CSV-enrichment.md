@@ -21,7 +21,7 @@ For example, when collecting events from IoT devices, you may want to keep your 
 
 Let's stick with the IoT example from above, and let's assume that our CSV file contains the below:
 
-```
+```csv
 code,message
 1,"device battery full"
 2,"device battery good"
