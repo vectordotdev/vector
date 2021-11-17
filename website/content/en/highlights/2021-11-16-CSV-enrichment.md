@@ -1,6 +1,6 @@
 ---
 date: "2021-11-15"
-title: "Enrich your observability data with CSV"
+title: "Enrich your observability data from a CSV"
 description: "A guide to using the new CSV enrichment feature"
 authors: ["barieom", "lucperkins"]
 pr_numbers: [9069]
