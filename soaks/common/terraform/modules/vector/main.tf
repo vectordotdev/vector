@@ -16,6 +16,7 @@ resource "kubernetes_service" "vector" {
   }
   spec {
     selector = {
+      app = "vector"
       type      = var.type
     }
     session_affinity = "ClientIP"
@@ -39,6 +40,7 @@ resource "kubernetes_deployment" "vector" {
     name      = "vector"
     namespace = var.namespace
     labels = {
+      app = "vector"
       type      = var.type
     }
   }
@@ -48,6 +50,7 @@ resource "kubernetes_deployment" "vector" {
 
     selector {
       match_labels = {
+        app = "vector"
         type      = var.type
       }
     }
@@ -55,6 +58,7 @@ resource "kubernetes_deployment" "vector" {
     template {
       metadata {
         labels = {
+          app = "vector"
           type      = var.type
         }
         annotations = {
