@@ -90,7 +90,7 @@ pub struct RegexResult {
     pub tz_captured: bool,
 }
 
-fn parse_timezone(tz: &str) -> Result<FixedOffset, String> {
+pub fn parse_timezone(tz: &str) -> Result<FixedOffset, String> {
     let tz = match tz {
         "GMT" | "UTC" | "UT" | "Z" => FixedOffset::east(0),
         _ if tz.starts_with('+') || tz.starts_with('-') => parse_offset(tz)?,

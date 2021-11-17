@@ -400,18 +400,23 @@ fn resolves_match_function(
                         let mut regext_opt = None;
                         if result.tz_captured {
                             regext_opt = Some(Regex::new(&result.regex).map_err(|error| {
-                                    error!(message = "Error compiling regex", regex = %result.regex, %error);
-                                    Error::InvalidFunctionArguments(match_fn.name.clone())
-                                })?);
-                        }
-                        let strp_format = date::convert_time_format(&format).map_err(|error| {
                                 error!(message = "Error compiling regex", regex = %result.regex, %error);
                                 Error::InvalidFunctionArguments(match_fn.name.clone())
-                            })?;
+                            })?);
+                        }
+                        let strp_format = date::convert_time_format(&format).map_err(|error| {
+                            error!(message = "Error compiling regex", regex = %result.regex, %error);
+                            Error::InvalidFunctionArguments(match_fn.name.clone())
+                        })?;
                         let mut target_tz = None;
                         if args.len() == 2 {
                             if let ast::FunctionArgument::Arg(Value::Bytes(b)) = &args[1] {
-                                target_tz = Some(String::from_utf8_lossy(b).to_string());
+                                let tz = String::from_utf8_lossy(b);
+                                date::parse_timezone(&tz).map_err(|error| {
+                                    error!(message = "Invalid(unrecognized) timezone", %error);
+                                    Error::InvalidFunctionArguments(match_fn.name.clone())
+                                })?;
+                                target_tz = Some(tz.to_string());
                             }
                         }
                         let filter = GrokFilter::Date(DateFilter {

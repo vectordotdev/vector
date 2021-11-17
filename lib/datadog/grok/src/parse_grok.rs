@@ -471,6 +471,23 @@ mod tests {
                 "Thu Jun 16 08:29:03 2016",
                 Ok(Value::Integer(1466076543000)),
             ),
-        ])
+        ]);
+
+        // check error handling
+        assert_eq!(
+            parse_grok_rules(&[r#"%{date("ABC:XYZ"):field}"#.to_string()], btreemap! {})
+                .unwrap_err()
+                .to_string(),
+            r#"invalid arguments for the function 'date'"#
+        );
+        assert_eq!(
+            parse_grok_rules(
+                &[r#"%{date("EEE MMM dd HH:mm:ss yyyy", "unknown timezone"):field}"#.to_string()],
+                btreemap! {}
+            )
+            .unwrap_err()
+            .to_string(),
+            r#"invalid arguments for the function 'date'"#
+        );
     }
 }
