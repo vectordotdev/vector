@@ -63,20 +63,11 @@ impl IndexerAcknowledgement {
                 loop {
                     interval.tick().await;
                     let mut channels = idle_task_channels.write().await;
-                    let expiring_channels = channels
-                        .iter()
-                        .filter_map(|(channel_id, channel)| {
-                            if channel.get_last_used().elapsed().as_secs() >= max_idle_time {
-                                Some(channel_id.clone())
-                            } else {
-                                None
-                            }
-                        })
-                        .collect::<Vec<String>>();
+                    let now = Instant::now();
 
-                    for channel_id in expiring_channels {
-                        channels.remove(&channel_id);
-                    }
+                    channels.retain(|_, channel| {
+                        now.duration_since(channel.get_last_used()).as_secs() < max_idle_time
+                    });
                 }
             });
         }

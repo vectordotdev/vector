@@ -1,8 +1,5 @@
 use crate::{
-    config::{
-        log_schema, DataType, Resource, SourceConfig, SourceContext,
-        SourceDescription,
-    },
+    config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
     event::{Event, LogEvent, Value},
     internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
@@ -100,11 +97,7 @@ impl SourceConfig for SplunkConfig {
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let shutdown = cx.shutdown.clone();
         let out = cx.out.clone();
-        let source = SplunkSource::new(
-            self,
-            tls.http_protocol_name(),
-            cx
-        );
+        let source = SplunkSource::new(self, tls.http_protocol_name(), cx);
 
         let event_service = source.event_service(out.clone());
         let raw_service = source.raw_service(out);
@@ -171,11 +164,7 @@ struct SplunkSource {
 }
 
 impl SplunkSource {
-    fn new(
-        config: &SplunkConfig,
-        protocol: &'static str,
-        cx: SourceContext,
-    ) -> Self {
+    fn new(config: &SplunkConfig, protocol: &'static str, cx: SourceContext) -> Self {
         let acknowledgements = cx.acknowledgements;
         let shutdown = cx.shutdown.shared();
         let valid_tokens = config
@@ -855,15 +844,12 @@ mod splunk_response {
 
     pub const INVALID_AUTHORIZATION: HecResponse =
         HecResponse::new(HecStatusCode::InvalidAuthorization);
-    pub const TOKEN_IS_REQUIRED: HecResponse =
-        HecResponse::new(HecStatusCode::TokenIsRequired);
+    pub const TOKEN_IS_REQUIRED: HecResponse = HecResponse::new(HecStatusCode::TokenIsRequired);
     pub const NO_DATA: HecResponse = HecResponse::new(HecStatusCode::NoData);
     pub const SUCCESS: HecResponse = HecResponse::new(HecStatusCode::Success);
     pub const SERVER_IS_BUSY: HecResponse = HecResponse::new(HecStatusCode::ServerIsBusy);
-    pub const NO_CHANNEL: HecResponse =
-        HecResponse::new(HecStatusCode::DataChannelIsMissing);
-    pub const ACK_IS_DISABLED: HecResponse =
-        HecResponse::new(HecStatusCode::AckIsDisabled);
+    pub const NO_CHANNEL: HecResponse = HecResponse::new(HecStatusCode::DataChannelIsMissing);
+    pub const ACK_IS_DISABLED: HecResponse = HecResponse::new(HecStatusCode::AckIsDisabled);
 }
 
 fn finish_ok(maybe_ack_id: Option<u64>) -> Response {
@@ -879,10 +865,9 @@ async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
     if let Some(&error) = rejection.find::<ApiError>() {
         emit!(&SplunkHecRequestError { error });
         Ok((match error {
-            ApiError::MissingAuthorization => response_json(
-                StatusCode::UNAUTHORIZED,
-                splunk_response::TOKEN_IS_REQUIRED,
-            ),
+            ApiError::MissingAuthorization => {
+                response_json(StatusCode::UNAUTHORIZED, splunk_response::TOKEN_IS_REQUIRED)
+            }
             ApiError::InvalidAuthorization => response_json(
                 StatusCode::UNAUTHORIZED,
                 splunk_response::INVALID_AUTHORIZATION,
