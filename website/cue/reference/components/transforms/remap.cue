@@ -8,6 +8,15 @@ components: transforms: "remap": {
 		[Vector Remap Language](\(urls.vrl_reference)) (VRL), an expression-oriented language designed for processing
 		observability data (logs and metrics) in a safe and performant manner.
 
+		This transform also implements an additional `dropped` output. When the
+		`drop_on_error` or `drop_on_abort` configuration values are set to `true`
+		and `reroute_dropped` is also set to `true`, events that result in runtime
+		errors or aborts will be dropped from the default output stream and sent to
+		the `dropped` output instead. For a transform component named `foo`, this
+		output can be accessed by specifying `foo.dropped` as the input to another
+		component. Events sent to this output will be in their original form,
+		omitting any partial modification that took place before the error or abort.
+
 		Please refer to the [VRL reference](\(urls.vrl_reference)) when writing VRL scripts.
 		"""
 
@@ -35,6 +44,7 @@ components: transforms: "remap": {
 	}
 
 	configuration: {
+		timezone: configuration._timezone
 		source: {
 			description: """
 				The [Vector Remap Language](\(urls.vrl_reference)) (VRL) program to execute for each event.
@@ -78,7 +88,9 @@ components: transforms: "remap": {
 			common:   false
 			required: false
 			description: """
-				Drop the event if the VRL program returns an error at runtime.
+				Drop the event from the primary output stream if the VRL program returns
+				an error at runtime. These events will instead be written to the
+				`dropped` output.
 				"""
 			type: bool: default: false
 		}
@@ -86,9 +98,20 @@ components: transforms: "remap": {
 			common:   false
 			required: false
 			description: """
-				Drop the event if the VRL program is manually aborted through the `abort` statement.
+				Drop the event if the VRL program is manually aborted through the
+				`abort` statement. These events will instead be written to the `dropped`
+				output.
 				"""
 			type: bool: default: true
+		}
+		reroute_dropped: {
+			common:   false
+			required: false
+			description: """
+				Send any dropped events (determined according to `drop_on_error` and
+				`drop_on_abort`) to the `dropped` output instead dropping them entirely.
+				"""
+			type: bool: default: false
 		}
 	}
 

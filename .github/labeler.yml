@@ -33,7 +33,3 @@
 
 "domain: external docs":
 - website/cue/**/*
-
-# Run integration tests when any files specifically related to integration tests are changed/
-"ci-condition: integration tests enable":
-- scripts/setup_integration/**/*

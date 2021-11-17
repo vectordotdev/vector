@@ -1,10 +1,12 @@
+use std::num::NonZeroU64;
+
 use crate::config::{DataType, SinkConfig, SinkContext, SinkDescription};
 use crate::event::{Event, Metric, MetricValue};
 use crate::http::HttpClient;
 use crate::sinks::gcp;
 use crate::sinks::util::buffer::metrics::MetricsBuffer;
 use crate::sinks::util::http::{BatchedHttpSink, HttpSink};
-use crate::sinks::util::{BatchConfig, BatchSettings, TowerRequestConfig};
+use crate::sinks::util::{BatchConfig, SinkBatchSettings, TowerRequestConfig};
 use crate::sinks::{Healthcheck, VectorSink};
 use crate::tls::{TlsOptions, TlsSettings};
 use chrono::{DateTime, Utc};
@@ -12,6 +14,15 @@ use futures::{sink::SinkExt, FutureExt};
 use http::header::AUTHORIZATION;
 use http::{HeaderValue, Uri};
 use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct StackdriverMetricsDefaultBatchSettings;
+
+impl SinkBatchSettings for StackdriverMetricsDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(1);
+    const MAX_BYTES: Option<usize> = None;
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -24,7 +35,7 @@ pub struct StackdriverConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<StackdriverMetricsDefaultBatchSettings>,
     pub tls: Option<TlsOptions>,
 }
 
@@ -62,9 +73,7 @@ impl SinkConfig for StackdriverConfig {
         });
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
-        let batch = BatchSettings::default()
-            .events(1)
-            .parse_config(self.batch)?;
+        let batch_settings = self.batch.into_batch_settings()?;
 
         let sink = HttpEventSink {
             config: self.clone(),
@@ -74,9 +83,9 @@ impl SinkConfig for StackdriverConfig {
 
         let sink = BatchedHttpSink::new(
             sink,
-            MetricsBuffer::new(batch.size),
+            MetricsBuffer::new(batch_settings.size),
             request,
-            batch.timeout,
+            batch_settings.timeout,
             client,
             cx.acker(),
         )

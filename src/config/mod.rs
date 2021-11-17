@@ -1,5 +1,4 @@
 use crate::{
-    buffers::Acker,
     conditions,
     event::Metric,
     serde::bool_or_struct,
@@ -18,6 +17,7 @@ use std::fmt::{self, Display, Formatter};
 use std::hash::Hash;
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use vector_core::buffers::{Acker, BufferConfig, BufferType};
 pub use vector_core::config::GlobalOptions;
 pub use vector_core::transform::{DataType, ExpandType, TransformConfig, TransformContext};
 
@@ -259,7 +259,7 @@ pub struct SinkOuter<T> {
     healthcheck: SinkHealthcheckOptions,
 
     #[serde(default)]
-    pub buffer: crate::buffers::BufferConfig,
+    pub buffer: BufferConfig,
 
     #[serde(
         default,
@@ -283,9 +283,16 @@ impl<T> SinkOuter<T> {
         }
     }
 
+    #[cfg_attr(not(feature = "disk-buffer"), allow(unused))]
     pub fn resources(&self, id: &ComponentKey) -> Vec<Resource> {
         let mut resources = self.inner.resources();
-        resources.append(&mut self.buffer.resources(&id.to_string()));
+        for stage in self.buffer.stages() {
+            match stage {
+                BufferType::Memory { .. } => {}
+                #[cfg(feature = "disk-buffer")]
+                BufferType::Disk { .. } => resources.push(Resource::DiskBuffer(id.to_string())),
+            }
+        }
         resources
     }
 

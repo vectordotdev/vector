@@ -1,9 +1,9 @@
+use crate::aws::rusoto::RegionOrEndpoint;
 use crate::config::log_schema;
 use crate::config::{DataType, SinkConfig, SinkContext};
 use crate::event::{EventRef, LogEvent, Value};
 use crate::http::HttpClient;
 use crate::internal_events::TemplateRenderingFailed;
-use crate::rusoto::RegionOrEndpoint;
 use crate::sinks::elasticsearch::request_builder::ElasticsearchRequestBuilder;
 use crate::sinks::elasticsearch::sink::ElasticSearchSink;
 use crate::sinks::elasticsearch::{BatchActionTemplate, IndexTemplate};
@@ -13,7 +13,8 @@ use crate::sinks::elasticsearch::{
 use crate::sinks::util::encoding::EncodingConfigFixed;
 use crate::sinks::util::http::RequestConfig;
 use crate::sinks::util::{
-    BatchConfig, BatchSettings, Buffer, Compression, ServiceBuilderExt, TowerRequestConfig,
+    BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt,
+    TowerRequestConfig,
 };
 use crate::sinks::{Healthcheck, VectorSink};
 use crate::template::Template;
@@ -25,12 +26,10 @@ use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
-use vector_core::stream::BatcherSettings;
 
 use crate::sinks::elasticsearch::encoder::ElasticSearchEncoder;
 use crate::sinks::elasticsearch::retry::ElasticSearchRetryLogic;
 use crate::sinks::elasticsearch::service::{ElasticSearchService, HttpRequestBuilder};
-use std::num::NonZeroUsize;
 use tower::ServiceBuilder;
 
 /// The field name for the timestamp required by data stream mode
@@ -66,7 +65,7 @@ pub struct ElasticSearchConfig {
     pub encoding: EncodingConfigFixed<ElasticSearchEncoder>,
 
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: RequestConfig,
     pub auth: Option<ElasticSearchAuth>,
@@ -307,16 +306,7 @@ impl SinkConfig for ElasticSearchConfig {
         let common = ElasticSearchCommon::parse_config(self)?;
 
         let http_client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
-        let batch_settings = BatchSettings::<Buffer>::default()
-            .bytes(10_000_000)
-            .timeout(1)
-            .parse_config(self.batch)?;
-
-        let batch_settings = BatcherSettings::new(
-            batch_settings.timeout,
-            NonZeroUsize::new(batch_settings.size.bytes).expect("Batch bytes should not be 0"),
-            NonZeroUsize::new(batch_settings.size.events).expect("Batch events should not be 0"),
-        );
+        let batch_settings = self.batch.into_batcher_settings()?;
 
         // This is a bit ugly, but removes a String allocation on every event
         let mut encoding = self.encoding.clone();

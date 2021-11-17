@@ -8,9 +8,8 @@ improved as laid out in [Issue
 
 ## Index of Soaks
 
-* [Datadog Agent -> Remap -> Datadog Logs](./tests/datadog_agent_remap_datadog_logs/README.md)
-* [Syslog -> Loki](./tests/syslog_loki/README.md)
-* [Syslog -> Regex (VRL) -> Log2Metric ->  Datadog Metrics](./tests/syslog_regex_logs2metric_ddmetrics/README.md)
+The test definitions are in `./tests`. `ls -1 ./tests` will give you an index of
+available tests. Each test has its own README.md file with more details.
 
 ## Requirements
 
@@ -80,7 +79,7 @@ Assuming you can follow the pattern of an existing soak test you _should_ be
 able to define a soak by copying the relevant soak into a new directory and
 updating the configuration that is present in that soak's terraform. Consider
 the "Datadog Agent -> Remap -> Datadog Logs" soak in
-[`datadog_agent_remap_datadog_logs/`](datadog_agent_remap_datadog_logs/). If you
+[`tests/datadog_agent_remap_datadog_logs/`](tests/datadog_agent_remap_datadog_logs/). If you
 `tree` that directory you'll see:
 
 ```shell
@@ -132,23 +131,22 @@ resource "kubernetes_namespace" "soak" {
 }
 
 module "vector" {
-  source       = "../../common/terraform/modules/vector"
+  source       = "../../../common/terraform/modules/vector"
   type         = var.type
   vector_image = var.vector_image
   sha          = var.sha
-  test_name    = "datadog_agent_remap_datadog_logs"
   vector-toml  = file("${path.module}/vector.toml")
   namespace    = kubernetes_namespace.soak.metadata[0].name
   depends_on   = [module.http-blackhole]
 }
 module "http-blackhole" {
-  source              = "../../common/terraform/modules/lading_http_blackhole"
+  source              = "../../../common/terraform/modules/lading_http_blackhole"
   type                = var.type
   http-blackhole-toml = file("${path.module}/http_blackhole.toml")
   namespace           = kubernetes_namespace.soak.metadata[0].name
 }
 module "http-gen" {
-  source        = "../../common/terraform/modules/lading_http_gen"
+  source        = "../../../common/terraform/modules/lading_http_gen"
   type          = var.type
   http-gen-toml = file("${path.module}/http_gen.toml")
   namespace     = kubernetes_namespace.soak.metadata[0].name
