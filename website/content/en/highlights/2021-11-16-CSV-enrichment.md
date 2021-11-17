@@ -1,5 +1,5 @@
 ---
-date: "2021-11-15"
+date: "2021-11-18"
 title: "Enrich your observability data from a CSV"
 description: "A guide to using the new CSV enrichment feature"
 authors: ["barieom", "lucperkins"]
@@ -43,7 +43,7 @@ path = "/etc/vector/iot_remap.csv"
 encoding = { type = "csv" }
 
 [enrichment_tables.iot_remap.schema]
-iot_remap = "integer"
+code = "integer"
 message = "string"
 ```
 
