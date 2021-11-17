@@ -1,8 +1,8 @@
 use crate::partition::Partitioner;
 use crate::time::KeyedTimer;
 use crate::ByteSizeOf;
-use futures::{ready, Future, StreamExt};
-use futures::stream::{Stream, Fuse};
+use futures::{ready, StreamExt};
+use futures::stream::{Stream};
 use pin_project::pin_project;
 use std::collections::HashMap;
 use std::hash::{BuildHasherDefault, Hash};
@@ -14,7 +14,7 @@ use std::{cmp, mem};
 use tokio_util::time::delay_queue::Key;
 use tokio_util::time::DelayQueue;
 use twox_hash::XxHash64;
-use tokio::time::Sleep;
+
 
 /// A `KeyedTimer` based on `DelayQueue`.
 pub struct ExpirationQueue<K> {
@@ -403,7 +403,7 @@ impl<St, Prt, KT> Stream for PartitionedBatcher<St, Prt, KT>
 #[cfg(test)]
 mod test {
     use crate::partition::Partitioner;
-    use crate::stream::batcher::{Batcher, ExpirationQueue};
+    use crate::stream::partitioned_batcher::{PartitionedBatcher, ExpirationQueue};
     use crate::time::KeyedTimer;
     use futures::{stream, Stream};
     use pin_project::pin_project;
@@ -522,7 +522,7 @@ mod test {
 
             let item_limit = NonZeroUsize::new(item_limit as usize).unwrap();
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
-            let batcher = Batcher::with_timer(&mut stream, partitioner, timer,
+            let batcher = PartitionedBatcher::with_timer(&mut stream, partitioner, timer,
                                               item_limit, Some(allocation_limit));
             let batcher_size_hint = batcher.size_hint();
 
@@ -545,7 +545,7 @@ mod test {
             let mut stream = stream::iter(stream.into_iter());
             let item_limit = NonZeroUsize::new(item_limit as usize).unwrap();
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
-            let mut batcher = Batcher::with_timer(&mut stream, partitioner,
+            let mut batcher = PartitionedBatcher::with_timer(&mut stream, partitioner,
                                                   timer, item_limit,
                                                   Some(allocation_limit));
             let mut batcher = Pin::new(&mut batcher);
@@ -616,7 +616,7 @@ mod test {
             let mut stream = stream::iter(stream.into_iter());
             let item_limit = NonZeroUsize::new(item_limit as usize).unwrap();
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
-            let mut batcher = Batcher::with_timer(&mut stream, partitioner,
+            let mut batcher = PartitionedBatcher::with_timer(&mut stream, partitioner,
                                                   timer, item_limit,
                                                   Some(allocation_limit));
             let mut batcher = Pin::new(&mut batcher);
@@ -659,7 +659,7 @@ mod test {
             let mut stream = stream::iter(stream.into_iter());
             let item_limit = NonZeroUsize::new(item_limit as usize).unwrap();
             let allocation_limit = NonZeroUsize::new(allocation_limit as usize).unwrap();
-            let mut batcher = Batcher::with_timer(&mut stream, partitioner,
+            let mut batcher = PartitionedBatcher::with_timer(&mut stream, partitioner,
                                                   timer, item_limit,
                                                   Some(allocation_limit));
             let mut batcher = Pin::new(&mut batcher);

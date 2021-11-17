@@ -1,19 +1,19 @@
-use crate::partition::Partitioner;
-use crate::time::KeyedTimer;
+
+
 use crate::ByteSizeOf;
-use futures::{ready, Future, StreamExt};
+use futures::{Future, StreamExt};
 use futures::stream::{Stream, Fuse};
 use pin_project::pin_project;
-use std::collections::HashMap;
-use std::hash::{BuildHasherDefault, Hash};
-use std::num::NonZeroUsize;
+
+
+
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use std::{cmp, mem};
-use tokio_util::time::delay_queue::Key;
-use tokio_util::time::DelayQueue;
-use twox_hash::XxHash64;
+
+
+
+
 use tokio::time::Sleep;
 use crate::stream::BatcherSettings;
 
@@ -208,6 +208,7 @@ impl<S, I> Stream for Batcher<S, I>
 mod test {
     use super::*;
     use futures::stream;
+    use std::num::NonZeroUsize;
 
     #[tokio::test]
     async fn item_limit() {
