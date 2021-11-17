@@ -6671,6 +6671,8 @@ dependencies = [
  "snafu",
  "tokio",
  "toml",
+ "tracing 0.1.29",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -7559,15 +7561,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e0d2eaa99c3c2e41547cfa109e910a68ea03823cccad4a0525dcbc9b01e8c71"
 dependencies = [
  "ansi_term 0.12.1",
+ "chrono",
  "lazy_static",
  "matchers",
  "regex",
  "serde",
  "serde_json",
  "sharded-slab",
+ "smallvec",
  "thread_local",
  "tracing 0.1.29",
  "tracing-core 0.1.21",
+ "tracing-log",
  "tracing-serde",
 ]
 
