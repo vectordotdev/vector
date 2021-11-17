@@ -40,13 +40,13 @@ pub trait SinkBuilderExt: Stream {
         PartitionedBatcher::new(self, partitioner, settings)
     }
 
-    /// Batches the stream based on the given batch settings and batch size calculator.
+    /// Batches the stream based on the given batch settings and item size calculator.
     ///
     /// The stream will yield batches of events, when either a batch fills
-    /// up or times out. The `batch_size_calculator` determines the "size" of each input
+    /// up or times out. The `item_size_calculator` determines the "size" of each input
     /// in a batch. The units of "size" are intentionally not defined, so you can choose
     /// whatever is needed.
-    fn batched<T>(self, settings: BatcherSettings, batch_size_calculator: T) -> Batcher<Self, T>
+    fn batched<T>(self, settings: BatcherSettings, item_size_calculator: T) -> Batcher<Self, T>
     where
         T: ItemBatchSize<Self::Item>,
         Self: Sized,
