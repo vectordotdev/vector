@@ -31,7 +31,7 @@ pub struct RemapConfig {
     #[serde(default = "crate::serde::default_true")]
     pub drop_on_abort: bool,
     pub reroute_dropped: bool,
-    #[serde(default = "crate::serde::default_false")]
+    #[serde(default = "crate::serde::default_true")]
     pub use_vm: bool,
 }
 
