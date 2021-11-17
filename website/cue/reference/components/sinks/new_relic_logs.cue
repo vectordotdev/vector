@@ -19,7 +19,7 @@ components: sinks: new_relic_logs: {
 			batch: {
 				enabled:      true
 				common:       false
-				max_bytes:    5240000
+				max_bytes:    1_000_000
 				timeout_secs: 1
 			}
 			compression: {
