@@ -10,13 +10,28 @@ badges:
   type: new feature
 ---
 
-We've released a new feature that enables users to route failed events through separate pipelines.
+We've released a new feature that enables users to route failed events through
+separate pipelines.
 
-Previously, when Vector encountered an event that failed in a given transform component, the event was either dropped or was forwarded to the next step of the process.
+Previously, when Vector encountered an event that failed in a given transform
+component, the event was either dropped or was forwarded to the next step of the
+process.
 
-With this new release, you can configure Vector to send events that fail to process down a different pipeline, without any manual work-around, to catch errors, tag, fanout, or filter. In other words, users can now handle failed events in a way the user sees fit, such as routing the failed events to another sink for storage, inspection, and replay. We are piloting this feature with the `remap` transform but plan to roll this out to other transforms in the future so keep your eyes peeled for announcements down the line. Note: unit tests do not currently support assertions on failed events but this is also in the works.
+With this new release, you can configure Vector to send events that fail to
+process down a different pipeline, without any manual work-around, to catch
+errors, tag, fanout, or filter. In other words, users can now handle failed
+events in a way the user sees fit, such as routing the failed events to another
+sink for storage, inspection, and replay. We are piloting this feature with the
+`remap` transform but plan to roll this out to other transforms in the future so
+keep your eyes peeled for announcements down the line. Note: unit tests do not
+currently support assertions on failed events but this is also in the works.
 
-For the `remap` transform, there is now a new `.dropped` output that can be used to catch and route events that would have otherwise been dropped. To use this, you need to configure `drop_on_error` to `true` and `reroute_dropped` to `true`. The latter lets you opt into this new feature. Once enabled, you can use the component id of the `remap` transform suffixed with `.dropped` as an input to another component to handle failed events differently.
+For the `remap` transform, there is now a new `.dropped` output that can be used
+to catch and route events that would have otherwise been dropped. To use this,
+you need to configure `drop_on_error` to `true` and `reroute_dropped` to `true`.
+The latter lets you opt into this new feature. Once enabled, you can use the
+component id of the `remap` transform suffixed with `.dropped` as an input to
+another component to handle failed events differently.
 
 See the below example for how this works.
 
@@ -101,9 +116,16 @@ If run, this would emit the following output:
 }
 ```
 
-Events that either caused an error or were aborted are written out by the `bar` console sink with the relevant metadata added; on the other hand, events that were valid JSON were processed and output by the `foo` console sink. More information is available on the [remap docs page]. As a side note, the `metadata` key (above under the `"invalid message"`) is configurable via [`log_schema.metadata_key`][log_schema.metadata_key].
+Events that either caused an error or were aborted are written out by the `bar`
+console sink with the relevant metadata added; on the other hand, events that
+were valid JSON were processed and output by the `foo` console sink. More
+information is available on the [remap docs page]. As a side note, the
+`metadata` key (above under the `"invalid message"`) is configurable via
+[`log_schema.metadata_key`][log_schema.metadata_key].
 
-We will be continuing to expand support for routing failed events from other transforms like `filter`. In the meantime, if you any feedback for us, let us know on our [Discord chat] or on [Twitter]!
+We will be continuing to expand support for routing failed events from other
+transforms like `filter`. In the meantime, if you any feedback for us, let us
+know on our [Discord chat] or on [Twitter]!
 
 [remap docs page]: /docs/reference/configuration/transforms/remap/
 [log_schema.metadata_key]: /docs/reference/configuration/global-options/#log_schema.metadata_key
