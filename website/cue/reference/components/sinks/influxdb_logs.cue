@@ -43,10 +43,21 @@ components: sinks: influxdb_logs: {
 	}
 
 	configuration: sinks._influxdb.configuration & {
-		namespace: {
-			description: "A prefix that will be added to all logs names."
+		measurement: {
+			description: "The influxdb measurement that will be written to."
 			groups: ["v1", "v2"]
 			required: true
+			type: string: {
+				examples: ["vector-logs"]
+			}
+		}
+		namespace: {
+			description: """
+			  `{namespace}.vector` will be encoded as the destination infuxdb measurement.
+			"""
+			groups: ["v1", "v2"]
+			required: false
+			warngins: ["Deprecated, please use `measurement` instead."]
 			type: string: {
 				examples: ["service"]
 			}
