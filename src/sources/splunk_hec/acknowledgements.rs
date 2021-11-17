@@ -10,7 +10,7 @@ use std::{
     },
     time::{Duration, Instant},
 };
-use tokio::{sync::RwLock, time::interval};
+use tokio::time::interval;
 use vector_core::event::BatchStatusReceiver;
 use warp::Rejection;
 
@@ -45,15 +45,15 @@ pub struct IndexerAcknowledgement {
     max_pending_acks: u64,
     max_pending_acks_per_channel: u64,
     max_number_of_ack_channels: u64,
-    channels: Arc<RwLock<HashMap<String, Arc<Channel>>>>,
+    channels: Arc<tokio::sync::Mutex<HashMap<String, Arc<Channel>>>>,
     shutdown: Shared<ShutdownSignal>,
     total_pending_acks: AtomicU64,
 }
 
 impl IndexerAcknowledgement {
     pub fn new(config: HecAcknowledgementsConfig, shutdown: Shared<ShutdownSignal>) -> Self {
-        let channels: Arc<RwLock<HashMap<String, Arc<Channel>>>> =
-            Arc::new(RwLock::new(HashMap::new()));
+        let channels: Arc<tokio::sync::Mutex<HashMap<String, Arc<Channel>>>> =
+            Arc::new(tokio::sync::Mutex::new(HashMap::new()));
         let max_idle_time = u64::from(config.max_idle_time);
         let idle_task_channels = Arc::clone(&channels);
 
@@ -62,7 +62,7 @@ impl IndexerAcknowledgement {
                 let mut interval = interval(Duration::from_secs(max_idle_time));
                 loop {
                     interval.tick().await;
-                    let mut channels = idle_task_channels.write().await;
+                    let mut channels = idle_task_channels.lock().await;
                     let now = Instant::now();
 
                     channels.retain(|_, channel| {
@@ -84,13 +84,11 @@ impl IndexerAcknowledgement {
 
     /// Creates a channel with the specified id if it does not exist.
     async fn create_or_get_channel(&self, id: String) -> Result<Arc<Channel>, Rejection> {
-        let channels = self.channels.read().await;
+        let mut channels = self.channels.lock().await;
         if let Some(channel) = channels.get(&id) {
             return Ok(Arc::clone(channel));
         }
-        drop(channels);
 
-        let mut channels = self.channels.write().await;
         if channels.len() < self.max_number_of_ack_channels as usize {
             // Create the channel if it does not exist
             let channel = Arc::new(Channel::new(
@@ -138,12 +136,11 @@ impl IndexerAcknowledgement {
 
     /// Drops the oldest ack id (if one exists) from each channel
     async fn drop_oldest_pending_ack_per_channel(&self) -> u64 {
-        let channels = self.channels.write().await;
+        let channels = self.channels.lock().await;
         let dropped_count = channels
             .iter()
             .filter(|(_, channel)| channel.drop_oldest_pending_ack())
             .count();
-        println!("drop count: {:?}", dropped_count);
         dropped_count as u64
     }
 }
