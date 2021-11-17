@@ -1,13 +1,15 @@
 # Build soak test infra
 #
-# This workflow builds our soak test infrastructure. The containers here are
-# only built on push to master branch as they do not change otherwise.
+# This workflow builds our soak test infrastructure. The image here is
+# built on a push to master branch that update the 'lib/soak' directory.
 name: Soak Infra
 
 on:
   push:
     branches:
       - master
+    paths:
+      - 'lib/soak'
 
 jobs:
   cancel-previous:
