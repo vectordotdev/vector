@@ -45,7 +45,14 @@ jobs:
         uses: docker/metadata-action@548e2346a9987b56d8a4104fe776321ff8e23440
         with:
           images: ghcr.io/${{ github.repository }}/soak-observer
+          flavor: |
+            latest=true
           tags: type=sha, format=long
+          labels: |
+            org.opencontainers.image.description=Inspects a Prometheus with a configured query, used in Vector soak infra.
+            org.opencontainers.image.source=https://github.com/vectordotdev/vector/tree/master/lib/soak
+            org.opencontainers.image.title=Soak Observer
+            org.opencontainers.image.url=https://github.com/vectordotdev/vector/tree/master/lib/soak
 
       - name: Build and push Docker image
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
