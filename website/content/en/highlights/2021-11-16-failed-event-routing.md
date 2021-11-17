@@ -100,7 +100,7 @@ This would emit the following output:
 
 Events that either caused an error or were aborted are written out by the `bar` console sink with the relevant metadata added; on the other hand, events that were valid JSON were processed and output by the `foo` console sink. 
 
-For our next steps, we'll be looking to add `filtering` functionality, which will enable events to be passed to the next processor if a condition is not. In the meantime, if you any feedback for us, let us know on our [Discord chat][] or on [Twitter][]!
+We will be continuing to expand support for routing failed events from other transforms like `filter`. In the meantime, if you any feedback for us, let us know on our [Discord chat][] or on [Twitter][]!
 
 
 [Discord chat]: https://discord.com/invite/dX3bdkF
