@@ -45,7 +45,7 @@ iot_remap = "integer"
 message = "string"
 ```
 
-Now, to translate the output from IoT devices to human-readable messages in our `iot_remap.csv` file, the following is required. To do so, leverage the [`get_enrichment_table_record`][get_enrichment_table_record] function:
+Now, to translate the output from IoT devices to human-readable messages in our `iot_remap.csv` we can make use of the [`get_enrichment_table_record`][get_enrichment_table_record] function:
 
 ``` toml
 [transforms.enrich_iot_logs]
