@@ -3,7 +3,7 @@ date: "2021-11-16"
 title: "Initial support for routing failed events released"
 description: "Routing failed events from the `remap` transform"
 authors: ["barieom", "lukesteensen"]
-pr_numbers: []
+pr_numbers: [9417, 9169]
 release: "0.18.0"
 hide_on_release_notes: false
 badges:
