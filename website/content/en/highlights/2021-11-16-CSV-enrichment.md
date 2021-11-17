@@ -10,9 +10,9 @@ badges:
   type: new feature
 ---
 
-We're excited to share that we've released a new feature that allows users to enrich events flowing through the topology using a CSV file.
+We're excited to share that we've released a new feature that enables users to enrich events flowing through the topology using a CSV file.
 
-[Enrichment tables] is a new concept in Vector that allows you to enrich events from external data sources. To start, we've added the ability to enrich events from a CSV file by looking up a row, or rows, matching provided conditions, allowing users to map the data into the event using the full power of VRL.
+[Enrichment tables] are a new concept in Vector that enables you to enrich events from external data sources. To start, we've added the ability to enrich events from a CSV file by looking up a row, or rows, matching provided conditions, allowing users to map the data into the event using the full power of VRL.
 
 To support mapping events based on enrichment table data, two new VRL functions are now available:
 
@@ -56,9 +56,9 @@ inputs = ["vector_agents"]
 source = '''
 . = parse_json!(.message)
 
-code = del(.code)
+iot_remap = del(.iot_remap)
 
-row = get_enrichment_table_record!("codes", { "code": code })
+row = get_enrichment_table_record!("codes", { "iot_remap": iot_remap })
 .message = row.message
 '''
 ```
