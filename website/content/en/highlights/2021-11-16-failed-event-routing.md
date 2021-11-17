@@ -1,7 +1,7 @@
 ---
 date: "2021-11-16"
 title: "Failed event routing feature released"
-description: "A guide for using the new pipelines functionality"
+description: "Routing failed events from the `remap` transform"
 authors: ["barieom", "lukesteensen"]
 pr_numbers: []
 release: "0.18.0"
