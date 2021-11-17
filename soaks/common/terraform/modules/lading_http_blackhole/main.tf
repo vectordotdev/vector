@@ -82,10 +82,6 @@ resource "kubernetes_deployment" "http-blackhole" {
           }
 
           resources {
-            limits = {
-              cpu    = "100m"
-              memory = "32Mi"
-            }
             requests = {
               cpu    = "100m"
               memory = "32Mi"

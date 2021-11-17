@@ -1,10 +1,10 @@
+use crate::aws::rusoto::{AwsAuthentication, RegionOrEndpoint};
 use crate::config::SinkContext;
 use crate::sinks::s3_common::sink::S3Sink;
 use crate::sinks::util::encoding::StandardEncodings;
-use crate::sinks::util::BatchSettings;
+use crate::sinks::util::BulkSizeBasedDefaultBatchSettings;
 use crate::{
     config::{DataType, GenerateConfig, ProxyConfig, SinkConfig},
-    rusoto::{AwsAuthentication, RegionOrEndpoint},
     sinks::{
         s3_common::{
             self,
@@ -27,10 +27,6 @@ use vector_core::sink::VectorSink;
 use super::sink::S3RequestOptions;
 use crate::sinks::util::partitioner::KeyPartitioner;
 
-const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = BatchSettings::const_default()
-    .bytes(10_000_000)
-    .timeout(300);
-
 const DEFAULT_KEY_PREFIX: &str = "date=%F/";
 const DEFAULT_FILENAME_TIME_FORMAT: &str = "%s";
 const DEFAULT_FILENAME_APPEND_UUID: bool = true;
@@ -51,7 +47,7 @@ pub struct S3SinkConfig {
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     // Deprecated name. Moved to auth.
@@ -116,9 +112,7 @@ impl S3SinkConfig {
             .service(service);
 
         // Configure our partitioning/batching.
-        let batch_settings = DEFAULT_BATCH_SETTINGS
-            .parse_config(self.batch)?
-            .into_batcher_settings()?;
+        let batch_settings = self.batch.into_batcher_settings()?;
         let key_prefix = self
             .key_prefix
             .as_ref()

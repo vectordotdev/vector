@@ -1,8 +1,8 @@
 #[cfg(feature = "aws-s3-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    use crate::aws::rusoto::RegionOrEndpoint;
     use crate::config::SinkContext;
-    use crate::rusoto::RegionOrEndpoint;
     use crate::sinks::aws_s3::S3SinkConfig;
     use crate::sinks::s3_common::config::S3Options;
     use crate::sinks::util::encoding::StandardEncodings;
@@ -302,6 +302,10 @@ mod integration_tests {
     }
 
     fn config(bucket: &str, batch_size: usize) -> S3SinkConfig {
+        let mut batch = BatchConfig::default();
+        batch.max_events = Some(batch_size);
+        batch.timeout_secs = Some(5);
+
         S3SinkConfig {
             bucket: bucket.to_string(),
             key_prefix: Some(random_string(10) + "/date=%F"),
@@ -312,11 +316,7 @@ mod integration_tests {
             region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
             encoding: StandardEncodings::Text.into(),
             compression: Compression::None,
-            batch: BatchConfig {
-                max_events: Some(batch_size),
-                timeout_secs: Some(5),
-                ..Default::default()
-            },
+            batch,
             request: TowerRequestConfig::default(),
             assume_role: None,
             auth: Default::default(),

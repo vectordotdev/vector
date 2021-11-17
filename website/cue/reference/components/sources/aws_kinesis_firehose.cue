@@ -79,6 +79,7 @@ components: sources: aws_kinesis_firehose: {
 				examples: ["A94A8FE5CCB19BA61C4C08"]
 			}
 		}
+		acknowledgements: configuration._acknowledgements
 		record_compression: {
 			common:      true
 			description: """

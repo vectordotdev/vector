@@ -6,7 +6,7 @@ use crate::sinks::util::{Compression, ElementCount, RequestBuilder};
 use std::io;
 use std::sync::Arc;
 
-use crate::buffers::Ackable;
+use vector_core::buffers::Ackable;
 use vector_core::ByteSizeOf;
 
 #[derive(Clone)]

@@ -6,6 +6,7 @@ on:
       - v0.*
       - v1.*
 
+
 env:
   AUTOINSTALL: true
   VERBOSE: true

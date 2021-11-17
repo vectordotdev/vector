@@ -1,5 +1,5 @@
 [sources.pipelines_syslog]
-type = "generator"
+type = "demo_logs"
 format = "syslog"
 
 [transforms.pipelines_gate]

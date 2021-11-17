@@ -1,6 +1,6 @@
 /// This pipelines transform is a bit complex and needs a simple example.
 ///
-/// If we take the following example in consideration
+/// If we consider the following example:
 ///
 /// ```toml
 /// [transforms.my_pipelines]
@@ -70,8 +70,8 @@ inventory::submit! {
     TransformDescription::new::<PipelinesConfig>("pipelines")
 }
 
-/// This represents the configuration of a single pipeline,
-/// not the pipelines transform itself.
+/// This represents the configuration of a single pipeline, not the pipelines transform
+/// itself, which can contain multiple individual pipelines
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct PipelineConfig {
     name: String,

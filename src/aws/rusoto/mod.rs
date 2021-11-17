@@ -1,3 +1,8 @@
+mod auth;
+pub mod region;
+
+//TODO: replace with direct import
+pub use super::auth::AwsAuthentication;
 use crate::config::ProxyConfig;
 use crate::{http::HttpError, tls::MaybeTlsSettings};
 use async_trait::async_trait;
@@ -8,8 +13,11 @@ use http::{
     Method, Request, Response, StatusCode,
 };
 use hyper::body::{Body, HttpBody};
+use hyper::client;
 use once_cell::sync::OnceCell;
 use regex::bytes::RegexSet;
+pub use region::{region_from_endpoint, RegionOrEndpoint};
+use rusoto_core::credential::ProfileProvider;
 use rusoto_core::{
     request::{
         DispatchSignedRequest, DispatchSignedRequestFuture, HttpDispatchError, HttpResponse,
@@ -30,19 +38,13 @@ use std::{
     time::Duration,
 };
 use tower::{Service, ServiceExt};
+// use crate::http;
 
-pub mod auth;
-pub mod region;
-pub use auth::AwsAuthentication;
-use hyper::client;
-pub use region::{region_from_endpoint, RegionOrEndpoint};
-use rusoto_core::credential::ProfileProvider;
-
-pub type Client = HttpClient<super::http::HttpClient<RusotoBody>>;
+pub type Client = HttpClient<crate::http::HttpClient<RusotoBody>>;
 
 pub fn client(proxy: &ProxyConfig) -> crate::Result<Client> {
     let settings = MaybeTlsSettings::enable_client()?;
-    let client = super::http::HttpClient::new(settings, proxy)?;
+    let client = crate::http::HttpClient::new(settings, proxy)?;
     Ok(HttpClient { client })
 }
 
@@ -51,7 +53,7 @@ pub fn custom_client(
     client_builder: &mut client::Builder,
 ) -> crate::Result<Client> {
     let settings = MaybeTlsSettings::enable_client()?;
-    let client = super::http::HttpClient::new_with_custom_client(settings, proxy, client_builder)?;
+    let client = crate::http::HttpClient::new_with_custom_client(settings, proxy, client_builder)?;
     Ok(HttpClient { client })
 }
 

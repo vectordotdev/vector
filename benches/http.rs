@@ -8,7 +8,7 @@ use std::net::SocketAddr;
 use tokio::runtime::Runtime;
 use vector::{
     config, sinks,
-    sinks::util::Compression,
+    sinks::util::{BatchConfig, Compression},
     sources,
     test_util::{next_addr, random_lines, runtime, send_lines, start_topology, wait_for_tcp},
     Error,
@@ -39,6 +39,9 @@ fn benchmark_http(c: &mut Criterion) {
                             "in",
                             sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
                         );
+                        let mut batch = BatchConfig::default();
+                        batch.max_bytes = Some(num_lines * line_size);
+
                         config.add_sink(
                             "out",
                             &["in"],
@@ -48,10 +51,7 @@ fn benchmark_http(c: &mut Criterion) {
                                 method: Default::default(),
                                 auth: Default::default(),
                                 headers: Default::default(),
-                                batch: sinks::util::BatchConfig {
-                                    max_bytes: Some(num_lines * line_size),
-                                    ..Default::default()
-                                },
+                                batch,
                                 encoding: sinks::http::Encoding::Text.into(),
                                 request: Default::default(),
                                 tls: Default::default(),
