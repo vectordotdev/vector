@@ -109,14 +109,13 @@ impl IndexerAcknowledgement {
         batch_rx: BatchStatusReceiver,
     ) -> Result<u64, Rejection> {
         let channel = self.create_or_get_channel(channel_id).await?;
-        let ack_id = channel.get_ack_id(batch_rx);
         let total_pending_acks = self.total_pending_acks.fetch_add(1, Ordering::Relaxed) + 1;
-        if total_pending_acks > self.max_pending_acks {
-            self.total_pending_acks.fetch_sub(
-                self.drop_oldest_pending_ack_per_channel().await,
-                Ordering::Relaxed,
-            );
+        if total_pending_acks > self.max_pending_acks && !self.drop_oldest_pending_ack_from_channels().await {
+            self.total_pending_acks.fetch_sub(1, Ordering::Relaxed);
+            return Err(Rejection::from(ApiError::ServiceUnavailable));
         }
+
+        let ack_id = channel.get_ack_id(batch_rx);
         Ok(ack_id)
     }
 
@@ -134,14 +133,17 @@ impl IndexerAcknowledgement {
         Ok(acks_status)
     }
 
-    /// Drops the oldest ack id (if one exists) from each channel
-    async fn drop_oldest_pending_ack_per_channel(&self) -> u64 {
+    /// Drops the oldest ack id (if one exists) across all channels
+    async fn drop_oldest_pending_ack_from_channels(&self) -> bool {
         let channels = self.channels.lock().await;
-        let dropped_count = channels
-            .iter()
-            .filter(|(_, channel)| channel.drop_oldest_pending_ack())
-            .count();
-        dropped_count as u64
+        let mut ordered_channels = channels.values().collect::<Vec<_>>();
+        ordered_channels.sort_by_key(|a| a.get_last_used());
+        for channel in ordered_channels {
+            if channel.drop_oldest_pending_ack() {
+                return true;
+            }
+        }
+        false
     }
 }
 
@@ -149,14 +151,14 @@ pub struct Channel {
     last_used_timestamp: Mutex<Instant>,
     currently_available_ack_id: AtomicU64,
     ack_ids_status: Arc<Mutex<RoaringTreemap>>,
-    ack_event_finalizer: Arc<OrderedFinalizer<u64>>,
+    ack_event_finalizer: OrderedFinalizer<u64>,
 }
 
 impl Channel {
     fn new(max_pending_acks_per_channel: u64, shutdown: Shared<ShutdownSignal>) -> Self {
         let ack_ids_status = Arc::new(Mutex::new(RoaringTreemap::new()));
         let finalizer_ack_ids_status = Arc::clone(&ack_ids_status);
-        let ack_event_finalizer = Arc::new(OrderedFinalizer::new(shutdown, move |ack_id: u64| {
+        let ack_event_finalizer = OrderedFinalizer::new(shutdown, move |ack_id: u64| {
             let mut ack_ids_status = finalizer_ack_ids_status.lock().unwrap();
             ack_ids_status.insert(ack_id);
             if ack_ids_status.len() > max_pending_acks_per_channel {
@@ -167,7 +169,7 @@ impl Channel {
                     None => unreachable!(),
                 };
             };
-        }));
+        });
 
         Self {
             last_used_timestamp: Mutex::new(Instant::now()),
@@ -313,7 +315,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_indexer_ack_exceed_max_pending_acks() {
+    async fn test_indexer_ack_exceed_max_pending_acks_drop_acks() {
         let shutdown = ShutdownSignal::noop().shared();
         let config = HecAcknowledgementsConfig {
             max_pending_acks: NonZeroU64::new(10).unwrap(),
@@ -353,6 +355,30 @@ mod tests {
             .values()
             .all(|status| *status));
     }
+
+    #[tokio::test]
+    async fn test_indexer_ack_exceed_max_pending_acks_server_busy() {
+        let shutdown = ShutdownSignal::noop().shared();
+        let config = HecAcknowledgementsConfig {
+            max_pending_acks: NonZeroU64::new(1).unwrap(),
+            ..Default::default()
+        };
+        let idx_ack = IndexerAcknowledgement::new(config, shutdown);
+        let channel = String::from("channel-id");
+
+        let (_tx, batch_rx) = BatchNotifier::new_with_receiver();
+        idx_ack
+            .get_ack_id_from_channel(channel.clone(), batch_rx)
+            .await
+            .unwrap();
+        
+        let (_tx, batch_rx) = BatchNotifier::new_with_receiver();
+        assert!(idx_ack
+            .get_ack_id_from_channel(channel.clone(), batch_rx)
+            .await
+            .is_err());
+    }
+
 
     #[tokio::test]
     async fn test_indexer_ack_create_channels() {
