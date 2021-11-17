@@ -409,7 +409,7 @@ fn resolves_match_function(
                                 Error::InvalidFunctionArguments(match_fn.name.clone())
                             })?;
                         let mut target_tz = None;
-                        if args.len() > 1 {
+                        if args.len() == 2 {
                             if let ast::FunctionArgument::Arg(Value::Bytes(b)) = &args[1] {
                                 target_tz = Some(String::from_utf8_lossy(b).to_string());
                             }
