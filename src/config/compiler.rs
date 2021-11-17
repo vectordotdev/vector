@@ -17,6 +17,20 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         errors.extend(name_errors);
     }
 
+    let graph = match Graph::new(&builder.sources, &builder.transforms, &builder.sinks) {
+        Ok(graph) => graph,
+        Err(graph_errors) => {
+            errors.extend(graph_errors);
+            return Err(errors);
+        }
+    };
+
+    if let Err(type_errors) = graph.typecheck() {
+        errors.extend(type_errors);
+    }
+
+    let warnings = validation::warnings(&builder);
+
     let expansions = expand_macros(&mut builder)?;
 
     expand_globs(&mut builder);
@@ -49,18 +63,6 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         tests,
         provider: _,
     } = builder;
-
-    let graph = match Graph::new(&sources, &transforms, &sinks) {
-        Ok(graph) => graph,
-        Err(graph_errors) => {
-            errors.extend(graph_errors);
-            return Err(errors);
-        }
-    };
-
-    if let Err(type_errors) = graph.typecheck() {
-        errors.extend(type_errors);
-    }
 
     // Inputs are resolved from string into OutputIds as part of graph construction, so update them
     // here before adding to the final config (the types require this).
@@ -95,8 +97,6 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             tests,
             expansions,
         };
-
-        let warnings = validation::warnings(&config);
 
         Ok((config, warnings))
     } else {

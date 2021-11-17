@@ -1,4 +1,4 @@
-use super::{builder::ConfigBuilder, ComponentKey, Config, OutputId, Resource};
+use super::{builder::ConfigBuilder, ComponentKey, OutputId, Resource};
 use std::collections::HashMap;
 
 /// Check that provide + topology config aren't present in the same builder, which is an error.
@@ -138,7 +138,7 @@ pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     }
 }
 
-pub fn warnings(config: &Config) -> Vec<String> {
+pub fn warnings(config: &ConfigBuilder) -> Vec<String> {
     let mut warnings = vec![];
 
     let source_names = config.sources.keys().map(|name| ("source", name.clone()));
@@ -149,15 +149,14 @@ pub fn warnings(config: &Config) -> Vec<String> {
 
     // TODO: maybe warn about no consumers for named outputs as well?
     for (input_type, name) in transform_names.chain(source_names) {
-        let id = OutputId::from(&name);
         if !config
             .transforms
             .iter()
-            .any(|(_, transform)| transform.inputs.contains(&id))
+            .any(|(_, transform)| transform.inputs.contains(&name.to_string()))
             && !config
                 .sinks
                 .iter()
-                .any(|(_, sink)| sink.inputs.contains(&id))
+                .any(|(_, sink)| sink.inputs.contains(&name.to_string()))
         {
             warnings.push(format!(
                 "{} \"{}\" has no consumers",
