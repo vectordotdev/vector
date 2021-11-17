@@ -9,10 +9,6 @@ use crate::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
         SplunkHecRequestReceived,
     },
-    sources::splunk_hec::{
-        acknowledgements::{HecAckStatusRequest, HecAckStatusResponse, IndexerAcknowledgement},
-        splunk_response::HecResponseMetadata,
-    },
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
@@ -36,8 +32,11 @@ use vector_core::{event::BatchNotifier, ByteSizeOf};
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
 use self::{
-    acknowledgements::HecAcknowledgementsConfig,
-    splunk_response::{HecResponse, HecStatusCode},
+    acknowledgements::{
+        HecAckStatusRequest, HecAckStatusResponse, HecAcknowledgementsConfig,
+        IndexerAcknowledgement,
+    },
+    splunk_response::{HecResponse, HecResponseMetadata, HecStatusCode},
 };
 
 mod acknowledgements;
@@ -795,7 +794,6 @@ impl warp::reject::Reject for ApiError {}
 
 /// Cached bodies for common responses
 mod splunk_response {
-    use lazy_static::lazy_static;
     use serde::Serialize;
 
     // https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/TroubleshootHTTPEventCollector#Possible_error_codes
@@ -805,7 +803,6 @@ mod splunk_response {
         InvalidAuthorization = 3,
         NoData = 5,
         InvalidDataFormat = 6,
-        InternalServerError = 8,
         ServerIsBusy = 9,
         DataChannelIsMissing = 10,
         EventFieldIsRequired = 12,
@@ -837,7 +834,6 @@ mod splunk_response {
                 HecStatusCode::InvalidAuthorization => "Invalid authorization",
                 HecStatusCode::NoData => "No data",
                 HecStatusCode::InvalidDataFormat => "Invalid data format",
-                HecStatusCode::InternalServerError => "Internal server error",
                 HecStatusCode::DataChannelIsMissing => "Data channel is missing",
                 HecStatusCode::EventFieldIsRequired => "Event field is required",
                 HecStatusCode::EventFieldCannotBeBlank => "Event field cannot be blank",
@@ -858,31 +854,26 @@ mod splunk_response {
         }
     }
 
-    lazy_static! {
-        pub static ref INVALID_AUTHORIZATION: HecResponse =
-            HecResponse::new(HecStatusCode::InvalidAuthorization);
-        pub static ref TOKEN_IS_REQUIRED: HecResponse =
-            HecResponse::new(HecStatusCode::TokenIsRequired);
-        pub static ref NO_DATA: HecResponse = HecResponse::new(HecStatusCode::NoData);
-        pub static ref SUCCESS: HecResponse = HecResponse::new(HecStatusCode::Success);
-        pub static ref SERVER_ERROR: HecResponse =
-            HecResponse::new(HecStatusCode::InternalServerError);
-        pub static ref SERVER_IS_BUSY: HecResponse = HecResponse::new(HecStatusCode::ServerIsBusy);
-        pub static ref NO_CHANNEL: HecResponse =
-            HecResponse::new(HecStatusCode::DataChannelIsMissing);
-        pub static ref ACK_IS_DISABLED: HecResponse =
-            HecResponse::new(HecStatusCode::AckIsDisabled);
-    }
+    pub const INVALID_AUTHORIZATION: HecResponse =
+        HecResponse::new(HecStatusCode::InvalidAuthorization);
+    pub const TOKEN_IS_REQUIRED: HecResponse =
+        HecResponse::new(HecStatusCode::TokenIsRequired);
+    pub const NO_DATA: HecResponse = HecResponse::new(HecStatusCode::NoData);
+    pub const SUCCESS: HecResponse = HecResponse::new(HecStatusCode::Success);
+    pub const SERVER_IS_BUSY: HecResponse = HecResponse::new(HecStatusCode::ServerIsBusy);
+    pub const NO_CHANNEL: HecResponse =
+        HecResponse::new(HecStatusCode::DataChannelIsMissing);
+    pub const ACK_IS_DISABLED: HecResponse =
+        HecResponse::new(HecStatusCode::AckIsDisabled);
 }
 
 fn finish_ok(maybe_ack_id: Option<u64>) -> Response {
-    if let Some(ack_id) = maybe_ack_id {
-        let body = HecResponse::new(HecStatusCode::Success)
-            .with_metadata(HecResponseMetadata::AckId(ack_id));
-        response_json(StatusCode::OK, &body)
+    let body = if let Some(ack_id) = maybe_ack_id {
+        HecResponse::new(HecStatusCode::Success).with_metadata(HecResponseMetadata::AckId(ack_id))
     } else {
-        response_json(StatusCode::OK, &*splunk_response::SUCCESS)
-    }
+        splunk_response::SUCCESS
+    };
+    response_json(StatusCode::OK, &body)
 }
 
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
@@ -891,17 +882,17 @@ async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
         Ok((match error {
             ApiError::MissingAuthorization => response_json(
                 StatusCode::UNAUTHORIZED,
-                &*splunk_response::TOKEN_IS_REQUIRED,
+                splunk_response::TOKEN_IS_REQUIRED,
             ),
             ApiError::InvalidAuthorization => response_json(
                 StatusCode::UNAUTHORIZED,
-                &*splunk_response::INVALID_AUTHORIZATION,
+                splunk_response::INVALID_AUTHORIZATION,
             ),
             ApiError::UnsupportedEncoding => empty_response(StatusCode::UNSUPPORTED_MEDIA_TYPE),
             ApiError::MissingChannel => {
-                response_json(StatusCode::BAD_REQUEST, &*splunk_response::NO_CHANNEL)
+                response_json(StatusCode::BAD_REQUEST, splunk_response::NO_CHANNEL)
             }
-            ApiError::NoData => response_json(StatusCode::BAD_REQUEST, &*splunk_response::NO_DATA),
+            ApiError::NoData => response_json(StatusCode::BAD_REQUEST, splunk_response::NO_DATA),
             ApiError::ServerShutdown => empty_response(StatusCode::SERVICE_UNAVAILABLE),
             ApiError::InvalidDataFormat { event } => response_json(
                 StatusCode::BAD_REQUEST,
@@ -921,10 +912,10 @@ async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
             ApiError::BadRequest => empty_response(StatusCode::BAD_REQUEST),
             ApiError::ServiceUnavailable => response_json(
                 StatusCode::SERVICE_UNAVAILABLE,
-                &*splunk_response::SERVER_IS_BUSY,
+                splunk_response::SERVER_IS_BUSY,
             ),
             ApiError::AckIsDisabled => {
-                response_json(StatusCode::BAD_REQUEST, &*splunk_response::ACK_IS_DISABLED)
+                response_json(StatusCode::BAD_REQUEST, splunk_response::ACK_IS_DISABLED)
             }
         },))
     } else {
@@ -1812,7 +1803,7 @@ mod tests {
         .json::<HecAckStatusResponse>()
         .await
         .unwrap();
-        assert!(!ack_res.acks.values().all(|ack_status| *ack_status));
+        assert!(ack_res.acks.values().all(|ack_status| !*ack_status));
 
         let ack_message_acked = serde_json::to_string(&HecAckStatusRequest {
             acks: vec![event_res.ack_id],
