@@ -84,9 +84,9 @@ where
     }
 }
 
-pub struct ByteSizeOfBatchSize;
+pub struct ByteSizeOfItemSize;
 
-impl<T: ByteSizeOf> ItemBatchSize<T> for ByteSizeOfBatchSize {
+impl<T: ByteSizeOf> ItemBatchSize<T> for ByteSizeOfItemSize {
     fn size(&self, item: &T) -> usize {
         item.size_of()
     }

@@ -6,7 +6,7 @@ mod partitioned_batcher;
 
 pub use driver::DriverResponse;
 
-pub use batcher::{Batcher, ByteSizeOfBatchSize, ItemBatchSize};
+pub use batcher::{Batcher, ByteSizeOfItemSize, ItemBatchSize};
 pub use partitioned_batcher::{BatcherSettings, ExpirationQueue, PartitionedBatcher};
 
 pub use concurrent_map::ConcurrentMap;
