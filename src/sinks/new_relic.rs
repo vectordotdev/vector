@@ -1,26 +1,85 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{Event, Value, MetricValue},
-    http::{HttpClient},
+    buffers::Acker,
+    config::{
+        DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig
+    },
+    event::{
+        Event, Value, MetricValue
+    },
+    http::HttpClient,
     sinks::util::{
-        batch::{BatchError, BatchSize},
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration, TimestampFormat},
-        http::{BatchedHttpSink, HttpSink},
-        Batch, PushResult, BatchConfig, BatchSettings, Compression, TowerRequestConfig,
+        service::ServiceBuilderExt,
+        builder::SinkBuilderExt,
+        retries::RetryLogic,
+        batch::{
+            BatchError, BatchSize
+        },
+        encoding::{
+            Encoder, EncodingConfigWithDefault, EncodingConfig, EncodingConfiguration, TimestampFormat
+        },
+        http::{
+            BatchedHttpSink, HttpSink
+        },
+        Batch, PushResult, BatchConfig, BatchSettings, Compression, TowerRequestConfig, StreamSink, RequestBuilder
     },
     tls::TlsSettings,
 };
-use futures::{future, FutureExt, SinkExt};
-use http::{Request, Uri};
-use serde::{Deserialize, Serialize};
+use vector_core::{
+    internal_event::InternalEvent,
+    stream::BatcherSettings,
+    partition::NullPartitioner,
+    event::{
+        EventStatus, Finalizable, EventFinalizers
+    },
+    buffers::Ackable
+};
+use async_trait::async_trait;
+use futures::{
+    stream::{
+        BoxStream, StreamExt
+    },
+    future::{
+        self, BoxFuture
+    },
+    FutureExt, SinkExt
+};
+use http::{
+    Request, Uri
+};
+use serde::{
+    Deserialize, Serialize
+};
 use flate2::write::GzEncoder;
-use chrono::{DateTime, Utc};
+use chrono::{
+    DateTime, Utc
+};
 use std::{
+    fmt::Debug,
     collections::HashMap,
     convert::TryFrom,
-    io::Write,
-    time::SystemTime
+    io,
+    time::SystemTime,
+    task::{
+        Context, Poll
+    },
+    num::NonZeroUsize
 };
+use tower::{
+    layer::{util::Stack, Layer},
+    limit::RateLimit,
+    retry::Retry,
+    timeout::Timeout,
+    util::BoxService,
+    Service, ServiceBuilder,
+};
+
+//Copied from sinks/datadog/logs/config.rs
+use crate::sinks::util::encoding::EncodingConfigFixed;
+use crate::sinks::{VectorSink};
+use crate::tls::{MaybeTlsSettings, TlsConfig};
+use indoc::indoc;
+use std::sync::Arc;
+use vector_core::config::proxy::ProxyConfig;
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
@@ -30,7 +89,15 @@ pub enum Encoding {
     Default,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+impl Encoder<Vec<Event>> for Encoding {
+    fn encode_input(&self, mut input: Vec<Event>, writer: &mut dyn io::Write) -> io::Result<usize> {
+        //TODO: ?
+        println!("---> NewRelicSamplesEncoding encode_input");
+        io::Result::Ok(0)
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy, Derivative)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 pub enum NewRelicRegion {
@@ -39,7 +106,7 @@ pub enum NewRelicRegion {
     Eu,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy, Derivative)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 pub enum NewRelicApi {
@@ -372,6 +439,7 @@ pub struct NewRelicConfig {
 
 impl_generate_config_from_default!(NewRelicConfig);
 
+/*
 #[async_trait::async_trait]
 #[typetag::serde(name = "new_relic")]
 impl SinkConfig for NewRelicConfig {
@@ -479,6 +547,269 @@ impl HttpSink for NewRelicConfig {
         else {
             Err(NewRelicSinkError::boxed("Error generating API model"))
         }
+    }
+}
+*/
+
+////////////////////////////////////////////////////////
+/// 
+/// New sink style (StreamSink)
+/// 
+////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct NewRelicApiRequest {
+    pub batch_size: usize,
+    pub finalizers: EventFinalizers,
+    //TODO
+}
+
+impl Ackable for NewRelicApiRequest {
+    fn ack_size(&self) -> usize {
+        self.batch_size
+    }
+}
+
+impl Finalizable for NewRelicApiRequest {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        std::mem::take(&mut self.finalizers)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct NewRelicApiService {
+    //client: HttpClient,
+    api: NewRelicApi,
+}
+
+#[derive(Debug)]
+pub enum NewRelicApiResponse {
+    Ok,
+    NotOk,
+}
+
+impl AsRef<EventStatus> for NewRelicApiResponse {
+    fn as_ref(&self) -> &EventStatus {
+        match self {
+            NewRelicApiResponse::Ok => &EventStatus::Delivered,
+            NewRelicApiResponse::NotOk => &EventStatus::Errored,
+        }
+    }
+}
+
+impl Service<NewRelicApiRequest> for NewRelicApiService {
+    type Response = NewRelicApiResponse;
+    type Error = NewRelicSinkError;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, request: NewRelicApiRequest) -> Self::Future {
+        println!("----> Call from NewRelicApiRequest, request = {:#?}", request);
+        Box::pin(async move {
+            println!("---> Future returned by NewRelicApiRequest");
+
+            Ok(NewRelicApiResponse::Ok)
+        })
+    }
+}
+
+#[derive(Clone)]
+struct NewRelicCredentials {
+    pub license_key: String,
+    pub account_id: String,
+}
+
+impl From<&NewRelicConfig> for NewRelicCredentials {
+    fn from(config: &NewRelicConfig) -> Self {
+        Self {
+            license_key: config.license_key.clone(),
+            account_id: config.account_id.clone(),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "new_relic")]
+impl SinkConfig for NewRelicConfig {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        let encoding = self.encoding.clone();
+
+        let batcher_settings = BatchSettings::<NewRelicBuffer>::default()
+            .events(self.batch.max_events.unwrap_or(50))
+            .timeout(self.batch.timeout_secs.unwrap_or(30))
+            .parse_config(self.batch)?
+            .into_batcher_settings()?;
+
+        let request_limits = self.request.unwrap_with(&Default::default());
+
+        let service = ServiceBuilder::new()
+            .settings(request_limits, NewRelicApiRetry)
+            .service(NewRelicApiService {
+                api: self.api
+            });
+
+        let sink = NewRelicSink {
+            service: service,
+            acker: cx.acker(),
+            encoding,
+            credentials: NewRelicCredentials::from(self),
+            compression: self.compression,
+            batcher_settings,
+        };
+
+        Ok((
+            super::VectorSink::Stream(Box::new(sink)),
+            future::ok(()).boxed(),
+        ))
+    }
+
+    fn input_type(&self) -> DataType {
+        DataType::Any
+    }
+
+    fn sink_type(&self) -> &'static str {
+        "new_relic"
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct NewRelicApiRetry;
+
+impl RetryLogic for NewRelicApiRetry {
+    type Error = NewRelicSinkError;
+    type Response = NewRelicApiResponse;
+
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        println!("-----> is_retriable_error");
+        false
+    }
+}
+
+/*
+#[derive(Debug)]
+pub struct NewRelicEventProcessed;
+
+impl InternalEvent for NewRelicEventProcessed {
+    fn emit_metrics(&self) {
+        // TODO: Emit some counters
+    }
+}
+*/
+
+#[derive(Debug)]
+pub enum RequestBuildError {
+    PayloadTooBig,
+    Io { error: std::io::Error },
+}
+
+impl From<io::Error> for RequestBuildError {
+    fn from(error: io::Error) -> RequestBuildError {
+        RequestBuildError::Io { error }
+    }
+}
+
+struct NewRelicRequestBuilder {
+    encoding: EncodingConfigWithDefault<Encoding>,
+    compression: Compression,
+    credentials: NewRelicCredentials
+}
+
+impl RequestBuilder<((), Vec<Event>)> for NewRelicRequestBuilder {
+    type Metadata = NewRelicCredentials;
+    type Events = Vec<Event>;
+    type Encoder = EncodingConfigWithDefault<Encoding>;
+    type Payload = Vec<u8>;
+    type Request = NewRelicApiRequest;
+    type Error = RequestBuildError;
+
+    fn compression(&self) -> Compression {
+        todo!()
+    }
+
+    fn encoder(&self) -> &Self::Encoder {
+        todo!()
+    }
+
+    fn split_input(&self, input: ((), Vec<Event>)) -> (Self::Metadata, Self::Events) {
+        todo!()
+    }
+
+    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+        todo!()
+    }
+}
+
+struct NewRelicSink<S> {
+    pub service: S,
+    pub acker: Acker,
+    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub credentials: NewRelicCredentials,
+    pub compression: Compression,
+    pub batcher_settings: BatcherSettings,
+}
+
+#[async_trait]
+impl<S> StreamSink for NewRelicSink<S>
+where
+    S: Service<NewRelicApiRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: AsRef<EventStatus> + Send + 'static,
+    S::Error: Debug + Into<crate::Error> + Send,
+{
+    async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        println!("------> EVENT STREAM:\n\n");
+
+        let partitioner = NullPartitioner::new();
+        let builder_limit = NonZeroUsize::new(64);
+        let request_builder = NewRelicRequestBuilder {
+            encoding: self.encoding,
+            compression: self.compression,
+            credentials: self.credentials.clone()
+        };
+
+        let sink = input
+            .batched(partitioner, self.batcher_settings)
+            .request_builder(builder_limit, request_builder);
+            //TODO: filter map
+            //TODO: into_driver -> we need a service!
+
+        println!("----> SINK:");
+        //println!("{:#?}", sink);
+        println!("----------------------------------------------------------------------------");
+
+        //let sink = input
+        //.batched(partitioner, self.batcher_settings)
+        //.request_builder(builder_limit, request_builder)
+        //.filter_map(|request| async move {
+        //    match request {
+        //        Err(e) => {
+        //            error!("Failed to build Datadog Logs request: {:?}.", e);
+        //            None
+        //        }
+        //        Ok(req) => Some(req),
+        //    }
+        //})
+        //.into_driver(self.service, self.acker);
+
+        //TODO: filter map and all the stuff
+
+        /*
+        while let Some(event) = input.next().await {
+            self.acker.ack(1);
+            println!("-----------> Event received:\n{:#?}", event);
+            println!("----------------------------------------------------------------------------");
+
+            //emit!(&NewRelicEventProcessed);
+        }
+        */
+
+        Ok(())
     }
 }
 
