@@ -1,8 +1,8 @@
 use crate::partition::Partitioner;
 use crate::time::KeyedTimer;
 use crate::ByteSizeOf;
-use futures::{ready, StreamExt};
-use futures::stream::{Stream};
+use futures::ready;
+use futures::stream::Stream;
 use pin_project::pin_project;
 use std::collections::HashMap;
 use std::hash::{BuildHasherDefault, Hash};
@@ -14,7 +14,6 @@ use std::{cmp, mem};
 use tokio_util::time::delay_queue::Key;
 use tokio_util::time::DelayQueue;
 use twox_hash::XxHash64;
-
 
 /// A `KeyedTimer` based on `DelayQueue`.
 pub struct ExpirationQueue<K> {
@@ -53,8 +52,8 @@ impl<K> ExpirationQueue<K> {
 }
 
 impl<K> KeyedTimer<K> for ExpirationQueue<K>
-    where
-        K: Eq + Hash + Clone,
+where
+    K: Eq + Hash + Clone,
 {
     fn clear(&mut self) {
         self.expirations.clear();
@@ -129,8 +128,8 @@ impl<I> ByteSizeOf for Batch<I> {
 }
 
 impl<I> Batch<I>
-    where
-        I: ByteSizeOf,
+where
+    I: ByteSizeOf,
 {
     /// Create a new Batch instance
     ///
@@ -241,8 +240,8 @@ impl BatcherSettings {
 
 #[pin_project]
 pub struct PartitionedBatcher<St, Prt, KT>
-    where
-        Prt: Partitioner,
+where
+    Prt: Partitioner,
 {
     /// The total number of bytes a single batch in this struct is allowed to
     /// hold.
@@ -266,11 +265,11 @@ pub struct PartitionedBatcher<St, Prt, KT>
 }
 
 impl<St, Prt> PartitionedBatcher<St, Prt, ExpirationQueue<Prt::Key>>
-    where
-        St: Stream<Item=Prt::Item>,
-        Prt: Partitioner + Unpin,
-        Prt::Key: Eq + Hash + Clone,
-        Prt::Item: ByteSizeOf,
+where
+    St: Stream<Item = Prt::Item>,
+    Prt: Partitioner + Unpin,
+    Prt::Key: Eq + Hash + Clone,
+    Prt::Item: ByteSizeOf,
 {
     pub fn new(stream: St, partitioner: Prt, settings: BatcherSettings) -> Self {
         Self {
@@ -286,11 +285,11 @@ impl<St, Prt> PartitionedBatcher<St, Prt, ExpirationQueue<Prt::Key>>
 }
 
 impl<St, Prt, KT> PartitionedBatcher<St, Prt, KT>
-    where
-        St: Stream<Item=Prt::Item>,
-        Prt: Partitioner + Unpin,
-        Prt::Key: Eq + Hash + Clone,
-        Prt::Item: ByteSizeOf,
+where
+    St: Stream<Item = Prt::Item>,
+    Prt: Partitioner + Unpin,
+    Prt::Key: Eq + Hash + Clone,
+    Prt::Item: ByteSizeOf,
 {
     pub fn with_timer(
         stream: St,
@@ -313,12 +312,12 @@ impl<St, Prt, KT> PartitionedBatcher<St, Prt, KT>
 }
 
 impl<St, Prt, KT> Stream for PartitionedBatcher<St, Prt, KT>
-    where
-        St: Stream<Item=Prt::Item>,
-        Prt: Partitioner + Unpin,
-        Prt::Key: Eq + Hash + Clone,
-        Prt::Item: ByteSizeOf,
-        KT: KeyedTimer<Prt::Key>,
+where
+    St: Stream<Item = Prt::Item>,
+    Prt: Partitioner + Unpin,
+    Prt::Key: Eq + Hash + Clone,
+    Prt::Item: ByteSizeOf,
+    KT: KeyedTimer<Prt::Key>,
 {
     type Item = (Prt::Key, Vec<Prt::Item>);
 
@@ -403,7 +402,7 @@ impl<St, Prt, KT> Stream for PartitionedBatcher<St, Prt, KT>
 #[cfg(test)]
 mod test {
     use crate::partition::Partitioner;
-    use crate::stream::partitioned_batcher::{PartitionedBatcher, ExpirationQueue};
+    use crate::stream::partitioned_batcher::{ExpirationQueue, PartitionedBatcher};
     use crate::time::KeyedTimer;
     use futures::{stream, Stream};
     use pin_project::pin_project;

@@ -1,22 +1,14 @@
-
-
 use crate::ByteSizeOf;
+use futures::stream::{Fuse, Stream};
 use futures::{Future, StreamExt};
-use futures::stream::{Stream, Fuse};
 use pin_project::pin_project;
-
-
 
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
-
-
-
-use tokio::time::Sleep;
 use crate::stream::BatcherSettings;
-
+use tokio::time::Sleep;
 
 pub trait ItemBatchSize<T> {
     /// The size of an individual item in a batch.
@@ -24,7 +16,9 @@ pub trait ItemBatchSize<T> {
 }
 
 impl<T, F> ItemBatchSize<T> for F
-    where F: Fn(&T) -> usize {
+where
+    F: Fn(&T) -> usize,
+{
     fn size(&self, item: &T) -> usize {
         (self)(item)
     }
@@ -32,7 +26,9 @@ impl<T, F> ItemBatchSize<T> for F
 
 #[pin_project]
 pub struct Batcher<S, I>
-    where S: Stream {
+where
+    S: Stream,
+{
     /// The total "size" of all items in a batch. Size is intentionally
     /// vague here since it is user defined, and can vary.
     ///
@@ -70,8 +66,10 @@ pub enum Maybe<T> {
 }
 
 impl<S, I> Batcher<S, I>
-    where S: Stream,
-          I: ItemBatchSize<S::Item> {
+where
+    S: Stream,
+    I: ItemBatchSize<S::Item>,
+{
     pub fn new(stream: S, settings: BatcherSettings, batch_size_calculator: I) -> Self {
         Self {
             batch_size_limit: settings.size_limit,
@@ -95,8 +93,10 @@ impl<T: ByteSizeOf> ItemBatchSize<T> for ByteSizeOfBatchSize {
 }
 
 impl<S> Batcher<S, ByteSizeOfBatchSize>
-    where S: Stream,
-          <S as Stream>::Item: ByteSizeOf {
+where
+    S: Stream,
+    <S as Stream>::Item: ByteSizeOf,
+{
     /// Creates a `Batcher` using the `ByteSizeOf` trait for calculating the size of an item
     pub fn new_using_byte_size_of(stream: S, settings: BatcherSettings) -> Self {
         Self::new(stream, settings, ByteSizeOfBatchSize)
@@ -104,9 +104,10 @@ impl<S> Batcher<S, ByteSizeOfBatchSize>
 }
 
 impl<S, I> Batcher<S, I>
-    where S: Stream,
-          I: ItemBatchSize<S::Item> {
-
+where
+    S: Stream,
+    I: ItemBatchSize<S::Item>,
+{
     fn size_fits_in_batch(&self, item_size: usize) -> bool {
         if self.batch.is_empty() {
             // make sure any individual item can always fit in a batch
@@ -117,8 +118,7 @@ impl<S, I> Batcher<S, I>
 
     /// returns true iff it is not possible for another item to fit in the batch
     fn is_batch_full(&self) -> bool {
-        self.batch.len() >= self.batch_item_limit
-        || self.current_size >= self.batch_size_limit
+        self.batch.len() >= self.batch_item_limit || self.current_size >= self.batch_size_limit
     }
 
     fn take_batch(self: Pin<&mut Self>) -> Vec<S::Item> {
@@ -142,12 +142,13 @@ impl<S, I> Batcher<S, I>
             this.timer.set(Maybe::Some(tokio::time::sleep(timeout)));
         }
     }
-
 }
 
 impl<S, I> Stream for Batcher<S, I>
-    where S: Stream,
-          I: ItemBatchSize<S::Item> {
+where
+    S: Stream,
+    I: ItemBatchSize<S::Item>,
+{
     type Item = Vec<S::Item>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -169,7 +170,7 @@ impl<S, I> Stream for Batcher<S, I>
                         } else if self.batch.len() == 1 {
                             self.as_mut().reset_timer();
                         }
-                    }else {
+                    } else {
                         let output = Poll::Ready(Some(self.as_mut().take_batch()));
                         self.as_mut().push_item(item, item_size);
                         self.as_mut().reset_timer();
@@ -177,19 +178,19 @@ impl<S, I> Stream for Batcher<S, I>
                     }
                 }
                 Poll::Pending => {
-                   if let MaybeProj::Some(timer) = self.as_mut().project().timer.project() {
-                       match timer.poll(cx) {
-                           Poll::Ready(()) => {
-                               self.as_mut().project().timer.set(Maybe::None);
-                               return Poll::Ready(Some(self.take_batch()));
-                           }
-                           Poll::Pending => {
-                               return Poll::Pending;
-                           }
-                       }
+                    if let MaybeProj::Some(timer) = self.as_mut().project().timer.project() {
+                        match timer.poll(cx) {
+                            Poll::Ready(()) => {
+                                self.as_mut().project().timer.set(Maybe::None);
+                                return Poll::Ready(Some(self.take_batch()));
+                            }
+                            Poll::Pending => {
+                                return Poll::Pending;
+                            }
+                        }
                     } else {
                         return Poll::Pending;
-                   }
+                    }
                 }
             }
         }
@@ -199,10 +200,6 @@ impl<S, I> Stream for Batcher<S, I>
         self.stream.size_hint()
     }
 }
-
-
-
-
 
 #[cfg(test)]
 mod test {
@@ -218,31 +215,35 @@ mod test {
             NonZeroUsize::new(10000).unwrap(),
             NonZeroUsize::new(2).unwrap(),
         );
-        let batcher = Batcher::new(stream, settings, |x: &u32| { *x as usize });
+        let batcher = Batcher::new(stream, settings, |x: &u32| *x as usize);
         let batches: Vec<_> = batcher.collect().await;
-        assert_eq!(batches, vec![
-            vec![1, 2],
-            vec![3],
-        ])
+        assert_eq!(batches, vec![vec![1, 2], vec![3],])
     }
 
     #[tokio::test]
     async fn size_limit() {
-        let batcher = Batcher::new(stream::iter([1, 2, 3, 4, 5, 6, 2, 3, 1]), BatcherSettings::new(
-            Duration::from_millis(100),
-            NonZeroUsize::new(5).unwrap(),
-            NonZeroUsize::new(100).unwrap(),
-        ), |x: &u32| { *x as usize });
+        let batcher = Batcher::new(
+            stream::iter([1, 2, 3, 4, 5, 6, 2, 3, 1]),
+            BatcherSettings::new(
+                Duration::from_millis(100),
+                NonZeroUsize::new(5).unwrap(),
+                NonZeroUsize::new(100).unwrap(),
+            ),
+            |x: &u32| *x as usize,
+        );
         let batches: Vec<_> = batcher.collect().await;
-        assert_eq!(batches, vec![
-            vec![1, 2],
-            vec![3],
-            vec![4],
-            vec![5],
-            vec![6],
-            vec![2, 3],
-            vec![1],
-        ]);
+        assert_eq!(
+            batches,
+            vec![
+                vec![1, 2],
+                vec![3],
+                vec![4],
+                vec![5],
+                vec![6],
+                vec![2, 3],
+                vec![1],
+            ]
+        );
     }
 
     #[tokio::test]
@@ -251,11 +252,15 @@ mod test {
 
         let timeout = Duration::from_millis(100);
         let stream = stream::iter([1, 2]).chain(stream::pending());
-        let batcher = Batcher::new(stream, BatcherSettings::new(
-            timeout,
-            NonZeroUsize::new(5).unwrap(),
-            NonZeroUsize::new(100).unwrap(),
-        ), |x: &u32| { *x as usize });
+        let batcher = Batcher::new(
+            stream,
+            BatcherSettings::new(
+                timeout,
+                NonZeroUsize::new(5).unwrap(),
+                NonZeroUsize::new(100).unwrap(),
+            ),
+            |x: &u32| *x as usize,
+        );
 
         tokio::pin!(batcher);
         let mut next = batcher.next();
@@ -265,4 +270,3 @@ mod test {
         assert_eq!(batch, Some(vec![1, 2]));
     }
 }
-

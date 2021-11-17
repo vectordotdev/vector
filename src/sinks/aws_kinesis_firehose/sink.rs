@@ -43,7 +43,7 @@ impl KinesisSink {
                     Ok(req) => Some(req),
                 }
             })
-            .batched( self.batch_settings, ByteSizeOfBatchSize)
+            .batched(self.batch_settings, ByteSizeOfBatchSize)
             .into_driver(self.service, self.acker);
 
         sink.run().await
