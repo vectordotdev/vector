@@ -1,8 +1,8 @@
 ---
 date: "2021-11-16"
 title: "Automatic namespacing for configuration files"
-description: "A guide that addresses the new automatic namespacing functionality"
-authors: ["barieom", "spencergilbert"]
+description: "New automatic namespacing functionality to better organize your Vector configuration files"
+authors: ["barieom"]
 pr_numbers: [9378]
 release: "0.18.0"
 hide_on_release_notes: false
@@ -19,8 +19,8 @@ To further paint this pain point, Vector users may have had dozens of Vector con
 ```
 /etc/vector/
 │   file001.toml
-│   file002.toml    
-│	file003.toml
+│   file002.toml
+│   file003.toml
 │   ...
 │   file022.toml
 │   file023.toml
@@ -60,7 +60,7 @@ which becomes
 type = "anything"
 ```
 
-This additionally serves as a way to provide more RBAC (role-based access control) to admins at, say, organizations with sophisticated structure. In projects or organizations where read-write access needs to be limited or restricted for different teams, _automatic namespacing_ can provide different teams access to specific pipelines, such as limiting the access to a security team to only the security pipeline.
+This can similarly be applied to [`enrichment_tables`][] and [`tests`][] as well. In addition, this serves as a way to provide more RBAC (role-based access control) to admins at, say, organizations with sophisticated structure. In projects or organizations where read-write access needs to be limited or restricted for different teams, _automatic namespacing_ can provide different teams access to specific pipelines, such as limiting the access to a security team to only the security pipeline.
 
 If you any feedback for us, let us know on our [Discord chat] or on [Twitter].
 
