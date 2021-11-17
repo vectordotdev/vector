@@ -12,15 +12,19 @@ badges:
 
 We've released a new feature that enables users to route failed events through separate pipelines.
 
-Previously, when Vector encountered an event that failed a given transformation, the event was either dropped or was forwarded to the next step of the process. 
+Previously, when Vector encountered an event that failed in a given transform component, the event was either dropped or was forwarded to the next step of the process.
 
-With this new release, Vector enables events that fail to process down a different pipeline without any manual work-around to catch errors, tag, fanout, or filter. In other words, users can now handle failed events in a way the user sees fit, such as routing the failed events to another sink for storage, inspection, and replay. For clarification, we've only added support to the `remap` transform thus far, and unit tests do not currently support assertions on failed events. That said, more support for failed events is actively under development so keep your eyes peeled for announcements down the line. 
+With this new release, you can configure Vector to send events that fail to process down a different pipeline, without any manual work-around, to catch errors, tag, fanout, or filter. In other words, users can now handle failed events in a way the user sees fit, such as routing the failed events to another sink for storage, inspection, and replay. We are piloting this feature with the `remap` transform but plan to roll this out to other transforms in the future so keep your eyes peeled for announcements down the line. Note: unit tests do not currently support assertions on failed events but this is also in the works.
 
-As an example, the `dropped` output can be used if you want to capture events that failed during processing and re-direct the failed events to a separate sink from the data that was processed successfully. In a given config below:
+For the `remap` transform, there is now a new `.dropped` output that can be used to catch and route events that would have otherwise been dropped. To use this, you need to configure `drop_on_error` to `true` and `reroute_dropped` to `true`. The latter lets you opt into this new feature. Once enabled, you can use the component id of the `remap` transform suffixed with `.dropped` as an input to another component to handle failed events differently.
+
+See the below example for how this works.
+
+Let's start with this configuration:
 
 ``` toml
 [sources.in]
-  type = "generator"
+  type = "demo_logs"
   format = "shuffle"
   interval = 1.0
   lines = [
@@ -50,13 +54,14 @@ As an example, the `dropped` output can be used if you want to capture events th
 
 [sinks.bar]
   type = "console"
-  inputs = ["my_remap.dropped"]
+  inputs = ["my_remap.dropped"] # note the new `.dropped` here!
   encoding.codec = "json"
-``` 
+```
 
-This would emit the following output:
-``` 
-  {
+If run, this would emit the following output:
+
+```json
+{
   "foo": "bar",
   "message": "valid message",
   "processed": true,
