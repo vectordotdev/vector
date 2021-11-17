@@ -183,13 +183,8 @@ impl Vm {
     ) -> Result<Value, String> {
         loop {
             let next = self.next();
-
-            // println!("{:?}", self.stack);
-            // println!("{:?}", next);
-
             match next {
                 OpCode::Return => {
-                    // println!("Stack in {:?}", self.stack);
                     return Ok(self.stack.pop().unwrap_or(Value::Null));
                 }
                 OpCode::Constant => {

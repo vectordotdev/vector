@@ -31,6 +31,8 @@ pub struct RemapConfig {
     #[serde(default = "crate::serde::default_true")]
     pub drop_on_abort: bool,
     pub reroute_dropped: bool,
+    #[serde(default = "crate::serde::default_false")]
+    pub use_vm: bool,
 }
 
 inventory::submit! {
@@ -68,7 +70,7 @@ pub struct Remap {
     component_key: Option<ComponentKey>,
     program: Program,
     runtime: Runtime,
-    vm: Vm,
+    vm: Option<Vm>,
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
@@ -102,10 +104,12 @@ impl Remap {
         )
         .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
 
-        // println!("{:?}", program);
-        // println!("{:#?}", self.vm.dissassemble());
         let mut runtime = Runtime::default();
-        let vm = runtime.compile(&program)?;
+        let vm = if config.use_vm {
+            Some(runtime.compile(&program)?)
+        } else {
+            None
+        };
 
         Ok(Remap {
             component_key: context.key.clone(),
@@ -196,69 +200,73 @@ impl FallibleFunctionTransform for Remap {
 
         let mut target: VrlTarget = event.into();
 
-        let functions = vrl_stdlib::all();
-        let result = self
-            .runtime
-            .run_vm(&mut self.vm, &mut target, &self.timezone, &functions);
+        match self.vm {
+            Some(ref mut vm) => {
+                vm.reset();
+                let functions = vrl_stdlib::all();
+                let result = self
+                    .runtime
+                    .run_vm(vm, &mut target, &self.timezone, &functions);
 
-        match result {
-            Ok(_) => {
-                for event in target.into_events() {
-                    output.push(event)
+                match result {
+                    Ok(_) => {
+                        for event in target.into_events() {
+                            output.push(event)
+                        }
+                    }
+                    Err(_) => {
+                        emit!(&RemapMappingAbort {
+                            event_dropped: self.drop_on_abort,
+                        });
+
+                        if !self.drop_on_abort {
+                            output.push(original_event.expect("event will be set"))
+                        }
+                    }
                 }
             }
-            Err(_) => {
-                emit!(&RemapMappingAbort {
-                    event_dropped: self.drop_on_abort,
-                });
+            None => {
+                let result = self
+                    .runtime
+                    .resolve(&mut target, &self.program, &self.timezone);
+                self.runtime.clear();
 
-                if !self.drop_on_abort {
-                    output.push(original_event.expect("event will be set"))
+                match result {
+                    Ok(_) => {
+                        for event in target.into_events() {
+                            output.push(event)
+                        }
+                    }
+                    Err(Terminate::Abort(error)) => {
+                        emit!(&RemapMappingAbort {
+                            event_dropped: self.drop_on_abort,
+                        });
+
+                        if !self.drop_on_abort {
+                            output.push(original_event.expect("event will be set"))
+                        } else if self.reroute_dropped {
+                            let mut event = original_event.expect("event will be set");
+                            self.annotate_dropped(&mut event, "abort", error);
+                            err_output.push(event)
+                        }
+                    }
+                    Err(Terminate::Error(error)) => {
+                        emit!(&RemapMappingError {
+                            error: error.to_string(),
+                            event_dropped: self.drop_on_error,
+                        });
+
+                        if !self.drop_on_error {
+                            output.push(original_event.expect("event will be set"))
+                        } else if self.reroute_dropped {
+                            let mut event = original_event.expect("event will be set");
+                            self.annotate_dropped(&mut event, "error", error);
+                            err_output.push(event)
+                        }
+                    }
                 }
             }
         }
-
-        /*
-        let result = self
-            .runtime
-            .resolve(&mut target, &self.program, &self.timezone);
-        self.runtime.clear();
-
-        match result {
-            Ok(_) => {
-                for event in target.into_events() {
-                    output.push(event)
-                }
-            }
-            Err(Terminate::Abort(error)) => {
-                emit!(&RemapMappingAbort {
-                    event_dropped: self.drop_on_abort,
-                });
-
-                if !self.drop_on_abort {
-                    output.push(original_event.expect("event will be set"))
-                } else if self.reroute_dropped {
-                    let mut event = original_event.expect("event will be set");
-                    self.annotate_dropped(&mut event, "abort", error);
-                    err_output.push(event)
-                }
-            }
-            Err(Terminate::Error(error)) => {
-                emit!(&RemapMappingError {
-                    error: error.to_string(),
-                    event_dropped: self.drop_on_error,
-                });
-
-                if !self.drop_on_error {
-                    output.push(original_event.expect("event will be set"))
-                } else if self.reroute_dropped {
-                    let mut event = original_event.expect("event will be set");
-                    self.annotate_dropped(&mut event, "error", error);
-                    err_output.push(event)
-                }
-            }
-        }
-        */
     }
 }
 
