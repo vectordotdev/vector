@@ -53,8 +53,10 @@ impl TryFrom<&Function> for GrokFilter {
                 .args
                 .as_ref()
                 .and_then(|args| {
-                    if let FunctionArgument::Arg(ref null_value) = args[0] {
-                        Some(GrokFilter::NullIf(null_value.to_string()))
+                    if let FunctionArgument::Arg(Value::Bytes(null_value)) = &args[0] {
+                        Some(GrokFilter::NullIf(
+                            String::from_utf8_lossy(null_value).to_string(),
+                        ))
                     } else {
                         None
                     }
@@ -141,8 +143,8 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
             )),
         },
         GrokFilter::NullIf(null_value) => match value {
-            Value::Bytes(_) => {
-                if value.to_string() == *null_value {
+            Value::Bytes(bytes) => {
+                if String::from_utf8_lossy(bytes) == *null_value {
                     Ok(Value::Null)
                 } else {
                     Ok(value.to_owned())

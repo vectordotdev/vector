@@ -167,7 +167,7 @@ fn parse_grok_rule<'a>(
 ) -> Result<ParsedGrokRule, Error> {
     lazy_static! {
         static ref GROK_PATTERN_RE: onig::Regex =
-            onig::Regex::new(r#"%\{([^"\}]|(?<!\+)"(\\"|[^"])*(?<!\+)")+\}"#).unwrap();
+            onig::Regex::new(r#"%\{(?:[^"\}]|(?<!\\)"(?:\\"|[^"])*(?<!\\)")+\}"#).unwrap();
     }
     // find all patterns %{}
     let raw_grok_patterns = GROK_PATTERN_RE
@@ -391,6 +391,29 @@ fn resolves_match_function(
         grok_pattern_name => Ok(grok_pattern_name.to_string()),
     };
     result
+}
+
+// test some tricky cases here, more high-level tests are in parse_grok
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use shared::btreemap;
+
+    #[test]
+    fn supports_escaped_quotes() {
+        let rules = parse_grok_rules(
+            &[r#"%{notSpace:field:nullIf("with \"escaped\" quotes")}"#.to_string()],
+            btreemap! {},
+        )
+        .expect("couldn't parse rules");
+        assert!(matches!(
+            &rules[0]
+                .filters
+                .get(&LookupBuf::from("field"))
+                .expect("invalid grok pattern")[0],
+            GrokFilter::NullIf(v) if *v == r#"with "escaped" quotes"#
+        ));
+    }
 }
 
 include!(concat!(env!("OUT_DIR"), "/patterns.rs"));

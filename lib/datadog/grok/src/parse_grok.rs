@@ -53,11 +53,13 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule) -> Result<Value, Error> {
             // apply filters
             if let Some(filters) = grok_rule.filters.get(&path) {
                 filters.iter().for_each(|filter| {
-                    match apply_filter(value.as_ref().unwrap(), filter) {
-                        Ok(v) => value = Some(v),
-                        Err(error) => {
-                            warn!(message = "Error applying filter", path = %path, filter = %filter, %error);
-                            value = None;
+                    if let Some(ref v) = value {
+                        match apply_filter(v, filter) {
+                            Ok(v) => value = Some(v),
+                            Err(error) => {
+                                warn!(message = "Error applying filter", path = %path, filter = %filter, %error);
+                                value = None;
+                            }
                         }
                     }
                 });
@@ -127,7 +129,7 @@ mod tests {
                 "_auth" => r#"%{notSpace:http.auth:nullIf("-")}"#.to_string(),
                 "_bytes_written" => r#"%{integer:network.bytes_written}"#.to_string(),
                 "_client_ip" => r#"%{ipOrHost:network.client.ip}"#.to_string(),
-                "_version" => r#"HTTP\/(?<http.version>\d+\.\d+)"#.to_string(),
+                "_version" => r#"HTTP\/%{regex("\\d+\\.\\d+"):http.version}"#.to_string(),
                 "_url" => r#"%{notSpace:http.url}"#.to_string(),
                 "_ident" => r#"%{notSpace:http.ident}"#.to_string(),
                 "_user_agent" => r#"%{regex("[^\\\"]*"):http.useragent}"#.to_string(),

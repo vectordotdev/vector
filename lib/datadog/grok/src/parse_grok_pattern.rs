@@ -75,6 +75,24 @@ mod tests {
     }
 
     #[test]
+    fn escaped_quotes() {
+        let input = r#"%{data:field:filter("escaped \"quotes\"")}"#;
+        let parsed = parse_grok_pattern(input).unwrap_or_else(|error| {
+            panic!("Problem parsing grok: {:?}", error);
+        });
+        assert_eq!(
+            parsed.destination,
+            Some(Destination {
+                path: LookupBuf::from("field"),
+                filter_fn: Some(Function {
+                    name: "filter".to_string(),
+                    args: Some(vec![FunctionArgument::Arg(r#"escaped "quotes""#.into())])
+                })
+            })
+        );
+    }
+
+    #[test]
     fn empty_field_with_filter() {
         let input = r#"%{data::json}"#;
         let parsed = parse_grok_pattern(input).unwrap_or_else(|error| {
