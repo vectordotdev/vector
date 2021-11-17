@@ -92,17 +92,6 @@ impl<T: ByteSizeOf> ItemBatchSize<T> for ByteSizeOfBatchSize {
     }
 }
 
-impl<S> Batcher<S, ByteSizeOfBatchSize>
-where
-    S: Stream,
-    <S as Stream>::Item: ByteSizeOf,
-{
-    /// Creates a `Batcher` using the `ByteSizeOf` trait for calculating the size of an item
-    pub fn new_using_byte_size_of(stream: S, settings: BatcherSettings) -> Self {
-        Self::new(stream, settings, ByteSizeOfBatchSize)
-    }
-}
-
 impl<S, I> Batcher<S, I>
 where
     S: Stream,
