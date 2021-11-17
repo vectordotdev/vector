@@ -10,18 +10,15 @@ badges:
   type: new feature
 ---
 
-# Enrich your data with CSV 
-
-We're excited to share that we've released a new feature that allows users to enrich events flowing through the topology using a CSV file. 
+We're excited to share that we've released a new feature that allows users to enrich events flowing through the topology using a CSV file.
 
 [Enrichment tables] is a new concept in Vector that allows you to enrich events from external data sources. To start, we've added the ability to enrich events from a CSV file by looking up a row, or rows, matching provided conditions, allowing users to map the data into the event using the full power of VRL.
 To support mapping events based on enrichment table data, two new VRL functions are now available:
- - [`get_enrichment_table_record`][get_enrichment_table_record] works by looking up a single row CSV file 
- - [`find_enrichment_table_records`][get_enrichment_table] can return multiple rows in an array format for more complex use cases
 
+- [`get_enrichment_table_record`][get_enrichment_table_record] works by looking up a single row CSV file
+- [`find_enrichment_table_records`][get_enrichment_table_records] can return multiple rows in an array format for more complex use cases
 
 For example, when collecting events from IoT devices, you may want to keep your payloads coming from the devices to be small. By enriching events from a CSV file, users can reformat the data to be more human readable and provide better context (e.g., converting data emitted by the IoT device — `1`, `2`, `3` — to `"Low battery"`, `"Medium battery"`, `"High battery"`).
-
 
 Let's stick with the IoT example from above, and let's assume that our CSV file contains the below:
 
@@ -66,7 +63,6 @@ row = get_enrichment_table_record!("codes", { "code": code })
 ```
 
 For our next steps, we'll look to add support for `or` conditions and add additional enrichment table types (e.g., reading from Redis), but if you any feedback in the meantime, let us know on our [Discord chat] or [Twitter].
-
 
 [Enrichment tables]: /docs/reference/glossary/#enrichment-tables
 [get_enrichment_table_record]: /docs/reference/vrl/functions/#get_enrichment_table_record/
