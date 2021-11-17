@@ -12,7 +12,13 @@ badges:
 
 We've released automatic namespacing for configuration files, which simplifies namespace configuration for your pipelines.
 
-As Vector continues to evolves, releasing more configuration-heavy functionality such as an aggregator role and pipelines features, there's often a proliferation in the amount of configuration necessary to run Vector. The ability to organize Vector across multiple files was also lacking in any concrete recommendations for collaboration and navigation; Vector users may have dozens of Vector configuration files, from multiple source files to countless sink files, in a single directory.
+As Vector continues to evolves, releasing more configuration-heavy functionality
+such as an aggregator role and pipelines features, there's often a proliferation
+in the amount of configuration necessary to run Vector. The ability to organize
+Vector across multiple files was also lacking in any concrete recommendations
+for collaboration and navigation; Vector users may have dozens of Vector
+configuration files, from multiple source files to countless sink files, in
+a single directory.
 
 Let's look at how we can refactor an existing set of Vector configuartion files.
 
@@ -28,11 +34,21 @@ Assuming Vector is loaded using the configuration via `--config-dir /etc/vector`
 │   file023.toml
 ```
 
-We can update this using Vector's new  _automatic namespacing_ to organize the configuration into separate files based on Vector's configuration directory structure. This makes it easy for users like you to split up your configuration files and collaborate with others on their team.
+We can update this using Vector's new  _automatic namespacing_ to organize the
+configuration into separate files based on Vector's configuration directory
+structure. This makes it easy for users like you to split up your configuration
+files and collaborate with others on their team.
 
-When using `--config-dir` to provide Vector's configuration, it will look for subdirectories with the component types (e.g. `transforms`, or `sources`) and automatically infer that the files in these directories refer to that type of component. Further, Vector will use filenames of the configuration files as their component ID. The end result is that you have to specify less configuration as Vector can infer the component type and id from the directory structure.
+When using `--config-dir` to provide Vector's configuration, it will look for
+subdirectories with the component types (e.g. `transforms`, or `sources`) and
+automatically infer that the files in these directories refer to that type of
+component. Further, Vector will use filenames of the configuration files as
+their component ID. The end result is that you have to specify less
+configuration as Vector can infer the component type and id from the directory
+structure.
 
-Using the above example, now with _automatic namespacing_, you can update this to look like:
+Using the above example, now with _automatic namespacing_, you can update this
+to look like:
 
 ```text
 /etc/vector/
