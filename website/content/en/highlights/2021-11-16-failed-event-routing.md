@@ -1,6 +1,6 @@
 ---
 date: "2021-11-16"
-title: "Failed event routing feature released"
+title: "Initial support for routing failed events released"
 description: "Routing failed events from the `remap` transform"
 authors: ["barieom", "lukesteensen"]
 pr_numbers: []
