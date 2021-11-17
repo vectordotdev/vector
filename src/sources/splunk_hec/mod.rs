@@ -1,7 +1,6 @@
-use crate::shutdown::ShutdownSignal;
 use crate::{
     config::{
-        log_schema, AcknowledgementsConfig, DataType, Resource, SourceConfig, SourceContext,
+        log_schema, DataType, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::{Event, LogEvent, Value},
@@ -16,7 +15,6 @@ use bytes::{Buf, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
 use futures::{stream, FutureExt, SinkExt};
-use futures_util::future::Shared;
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
@@ -100,15 +98,16 @@ fn default_socket_address() -> SocketAddr {
 impl SourceConfig for SplunkConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let shutdown = cx.shutdown.clone();
+        let out = cx.out.clone();
         let source = SplunkSource::new(
             self,
             tls.http_protocol_name(),
-            cx.acknowledgements,
-            cx.shutdown.clone().shared(),
+            cx
         );
 
-        let event_service = source.event_service(cx.out.clone());
-        let raw_service = source.raw_service(cx.out);
+        let event_service = source.event_service(out.clone());
+        let raw_service = source.raw_service(out);
         let health_service = source.health_service();
         let ack_service = source.ack_service();
         let options = SplunkSource::options();
@@ -138,7 +137,6 @@ impl SourceConfig for SplunkConfig {
 
         let listener = tls.bind(&self.address).await?;
 
-        let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
             let span = crate::trace::current_span();
             warp::serve(services.with(warp::trace(move |_info| span.clone())))
@@ -176,9 +174,10 @@ impl SplunkSource {
     fn new(
         config: &SplunkConfig,
         protocol: &'static str,
-        acknowledgements: AcknowledgementsConfig,
-        shutdown: Shared<ShutdownSignal>,
+        cx: SourceContext,
     ) -> Self {
+        let acknowledgements = cx.acknowledgements;
+        let shutdown = cx.shutdown.shared();
         let valid_tokens = config
             .valid_tokens
             .iter()
