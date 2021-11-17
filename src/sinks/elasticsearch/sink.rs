@@ -62,8 +62,6 @@ impl ElasticSearchSink {
             })
             .filter_map(|x| async move { x })
             .filter_map(move |log| future::ready(process_log(log, &mode, &id_key_field)))
-            // .batched(NullPartitioner::new(), self.batch_settings)
-            // .map(|(_, batch)| batch)
             .batched(self.batch_settings, ByteSizeOfItemSize)
             .request_builder(request_builder_concurrency_limit, self.request_builder)
             .filter_map(|request| async move {
