@@ -122,6 +122,10 @@ pub struct Config {
     /// Optional path to a kubeconfig file readable by Vector. If not set,
     /// Vector will try to connect to Kubernetes using in-cluster configuration.
     kube_config_file: Option<PathBuf>,
+
+    /// How long to delay removing entries from our map when we receive a deletion
+    /// event from the watched stream.
+    delay_deletion_ms: usize,
 }
 
 inventory::submit! {
@@ -157,6 +161,7 @@ impl Default for Config {
             ingestion_timestamp_field: None,
             timezone: None,
             kube_config_file: None,
+            delay_deletion_ms: default_delay_deletion_ms(),
         }
     }
 }
@@ -200,6 +205,7 @@ struct Source {
     glob_minimum_cooldown: Duration,
     ingestion_timestamp_field: Option<String>,
     timezone: TimeZone,
+    delay_deletion: Duration,
 }
 
 impl Source {
@@ -228,6 +234,13 @@ impl Source {
                 "unable to convert glob_minimum_cooldown_ms from usize to u64 without data loss",
             ));
 
+        let delay_deletion = Duration::from_millis(
+            config
+                .delay_deletion_ms
+                .try_into()
+                .expect("unable to convert delay_deletion_ms from usize to u64 without data loss"),
+        );
+
         Ok(Self {
             client,
             data_dir,
@@ -243,6 +256,7 @@ impl Source {
             glob_minimum_cooldown,
             ingestion_timestamp_field: config.ingestion_timestamp_field.clone(),
             timezone,
+            delay_deletion,
         })
     }
 
@@ -266,6 +280,7 @@ impl Source {
             glob_minimum_cooldown,
             ingestion_timestamp_field,
             timezone,
+            delay_deletion,
         } = self;
 
         let watcher =
@@ -278,8 +293,7 @@ impl Source {
             HashKey::Uid,
         );
         let state_writer = k8s::state::instrumenting::Writer::new(state_writer);
-        let state_writer =
-            k8s::state::delayed_delete::Writer::new(state_writer, Duration::from_secs(60));
+        let state_writer = k8s::state::delayed_delete::Writer::new(state_writer, delay_deletion);
 
         let mut reflector = k8s::reflector::Reflector::new(
             watcher,
@@ -303,7 +317,7 @@ impl Source {
         );
         let ns_state_writer = k8s::state::instrumenting::Writer::new(ns_state_writer);
         let ns_state_writer =
-            k8s::state::delayed_delete::Writer::new(ns_state_writer, Duration::from_secs(60));
+            k8s::state::delayed_delete::Writer::new(ns_state_writer, delay_deletion);
 
         let mut ns_reflector = k8s::reflector::Reflector::new(
             ns_watcher,
@@ -543,6 +557,10 @@ const fn default_glob_minimum_cooldown_ms() -> usize {
 
 const fn default_fingerprint_lines() -> usize {
     1
+}
+
+const fn default_delay_deletion_ms() -> usize {
+    60_000
 }
 
 // This function constructs the patterns we exclude from file watching, created

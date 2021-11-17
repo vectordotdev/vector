@@ -19,7 +19,7 @@ components: sinks: gcp_pubsub: {
 			batch: {
 				enabled:      true
 				common:       false
-				max_bytes:    10485760
+				max_bytes:    10_000_000
 				max_events:   1000
 				timeout_secs: 1
 			}
