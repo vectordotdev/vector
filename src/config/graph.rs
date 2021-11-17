@@ -198,7 +198,7 @@ impl Graph {
                 let inputs = self
                     .edges
                     .iter()
-                    .filter(|e| e.to == n.to_owned())
+                    .filter(|e| e.to == n)
                     .map(|e| e.from.clone());
                 for input in inputs {
                     if !visited.contains(&input.component) {
