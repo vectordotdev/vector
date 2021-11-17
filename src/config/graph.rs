@@ -1,6 +1,6 @@
 use super::{ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, TransformOuter};
-use indexmap::IndexMap;
-use std::collections::{HashMap, HashSet};
+use indexmap::{set::IndexSet, IndexMap};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 #[derive(Debug, Clone)]
 pub enum Node {
@@ -137,56 +137,28 @@ impl Graph {
         }
     }
 
-    fn paths(&self) -> Result<Vec<Vec<ComponentKey>>, Vec<String>> {
-        let mut errors = Vec::new();
-
-        let nodes = self
-            .nodes
-            .iter()
-            .filter_map(|(name, node)| match node {
-                Node::Sink { .. } => Some(name),
-                _ => None,
-            })
-            .flat_map(|node| {
-                paths_rec(self, node, Vec::new()).unwrap_or_else(|err| {
-                    errors.push(err);
-                    Vec::new()
-                })
-            })
-            .collect();
-
-        if !errors.is_empty() {
-            errors.sort();
-            errors.dedup();
-            Err(errors)
-        } else {
-            Ok(nodes)
-        }
-    }
-
     pub fn typecheck(&self) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
 
-        for path in self.paths()? {
-            for pair in path.windows(2) {
-                let (x, y) = (&pair[0], &pair[1]);
-                if self.nodes.get(x).is_none() || self.nodes.get(y).is_none() {
-                    continue;
-                }
-                match (self.nodes[x].clone(), self.nodes[y].clone()) {
-                    (Node::Source { ty: ty1 }, Node::Sink { ty: ty2, .. })
-                    | (Node::Source { ty: ty1 }, Node::Transform { in_ty: ty2, .. })
-                    | (Node::Transform { out_ty: ty1, .. }, Node::Transform { in_ty: ty2, .. })
-                    | (Node::Transform { out_ty: ty1, .. }, Node::Sink { ty: ty2, .. }) => {
-                        if ty1 != ty2 && ty1 != DataType::Any && ty2 != DataType::Any {
-                            errors.push(format!(
-                                "Data type mismatch between {} ({:?}) and {} ({:?})",
-                                x, ty1, y, ty2
-                            ));
-                        }
+        // check that all edges connect components with compatible data types
+        for edge in &self.edges {
+            let (in_key, out_key) = (&edge.from.component, &edge.to);
+            if self.nodes.get(in_key).is_none() || self.nodes.get(out_key).is_none() {
+                continue;
+            }
+            match (self.nodes[in_key].clone(), self.nodes[out_key].clone()) {
+                (Node::Source { ty: ty1 }, Node::Sink { ty: ty2, .. })
+                | (Node::Source { ty: ty1 }, Node::Transform { in_ty: ty2, .. })
+                | (Node::Transform { out_ty: ty1, .. }, Node::Transform { in_ty: ty2, .. })
+                | (Node::Transform { out_ty: ty1, .. }, Node::Sink { ty: ty2, .. }) => {
+                    if ty1 != ty2 && ty1 != DataType::Any && ty2 != DataType::Any {
+                        errors.push(format!(
+                            "Data type mismatch between {} ({:?}) and {} ({:?})",
+                            in_key, ty1, out_key, ty2
+                        ));
                     }
-                    (Node::Sink { .. }, _) | (_, Node::Source { .. }) => unreachable!(),
                 }
+                (Node::Sink { .. }, _) | (_, Node::Source { .. }) => unreachable!(),
             }
         }
 
@@ -197,6 +169,58 @@ impl Graph {
             errors.dedup();
             Err(errors)
         }
+    }
+
+    pub fn check_for_cycles(&self) -> Result<(), String> {
+        // find all sinks
+        let sinks = self.nodes.iter().filter_map(|(name, node)| match node {
+            Node::Sink { .. } => Some(name),
+            _ => None,
+        });
+
+        // run DFS from each sink while keep tracking the current stack to detect cycles
+        for s in sinks {
+            let mut traversal: VecDeque<ComponentKey> = VecDeque::new();
+            let mut visited: HashSet<ComponentKey> = HashSet::new();
+            let mut stack: IndexSet<ComponentKey> = IndexSet::new();
+
+            traversal.push_back(s.to_owned());
+            while !traversal.is_empty() {
+                let n = traversal.back().expect("can't be empty").clone();
+                if !visited.contains(&n) {
+                    visited.insert(n.clone());
+                    stack.insert(n.clone());
+                } else {
+                    // we came back to the node after exploring all its children - remove it from the stack and traversal
+                    stack.remove(&n);
+                    traversal.pop_back();
+                }
+                let inputs = self
+                    .edges
+                    .iter()
+                    .filter(|e| e.to == n.to_owned())
+                    .map(|e| e.from.clone());
+                for input in inputs {
+                    if !visited.contains(&input.component) {
+                        traversal.push_back(input.component);
+                    } else if stack.contains(&input.component) {
+                        // we reached the node while it is on the current stack - it's a cycle
+                        let path = stack
+                            .iter()
+                            .skip(1) // skip the sink
+                            .rev()
+                            .map(|item| item.to_string())
+                            .collect::<Vec<_>>();
+                        return Err(format!(
+                            "Cyclic dependency detected in the chain [ {} -> {} ]",
+                            input.component.id(),
+                            path.join(" -> ")
+                        ));
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     pub fn valid_inputs(&self) -> HashSet<OutputId> {
@@ -256,52 +280,6 @@ impl Graph {
             .filter(|edge| &edge.to == node)
             .map(|edge| edge.from.clone())
             .collect()
-    }
-}
-
-fn paths_rec(
-    graph: &Graph,
-    node: &ComponentKey,
-    mut path: Vec<ComponentKey>,
-) -> Result<Vec<Vec<ComponentKey>>, String> {
-    if let Some(i) = path.iter().position(|p| p == node) {
-        let mut segment = path.split_off(i);
-        segment.push(node.into());
-        // I think this is maybe easier to grok from source -> sink, but I'm not
-        // married to either.
-        segment.reverse();
-        return Err(format!(
-            "Cyclic dependency detected in the chain [ {} ]",
-            segment
-                .iter()
-                .map(|item| item.to_string())
-                .collect::<Vec<_>>()
-                .join(" -> ")
-        ));
-    }
-    path.push(node.clone());
-    match graph.nodes.get(node) {
-        Some(Node::Source { .. }) | None => {
-            path.reverse();
-            Ok(vec![path])
-        }
-        Some(Node::Transform { .. }) | Some(Node::Sink { .. }) => {
-            let inputs = graph
-                .edges
-                .iter()
-                .filter(|e| &e.to == node)
-                .map(|e| e.from.clone());
-            let mut paths = Vec::new();
-            for input in inputs {
-                match paths_rec(graph, &input.component, path.clone()) {
-                    Ok(mut p) => paths.append(&mut p),
-                    Err(err) => {
-                        return Err(err);
-                    }
-                }
-            }
-            Ok(paths)
-        }
     }
 }
 
@@ -380,10 +358,8 @@ mod test {
         graph.add_sink("out", DataType::Log, vec!["three"]);
 
         assert_eq!(
-            Err(vec![
-                "Cyclic dependency detected in the chain [ three -> one -> two -> three ]".into()
-            ]),
-            graph.paths()
+            Err("Cyclic dependency detected in the chain [ three -> one -> two -> three ]".into()),
+            graph.check_for_cycles()
         );
 
         let mut graph = Graph::default();
@@ -394,16 +370,12 @@ mod test {
         graph.add_sink("out", DataType::Log, vec!["two"]);
 
         assert_eq!(
-            Err(vec![
-                "Cyclic dependency detected in the chain [ two -> three -> one -> two ]".into()
-            ]),
-            graph.paths()
+            Err("Cyclic dependency detected in the chain [ two -> three -> one -> two ]".into()),
+            graph.check_for_cycles()
         );
         assert_eq!(
-            Err(vec![
-                "Cyclic dependency detected in the chain [ two -> three -> one -> two ]".into()
-            ]),
-            graph.typecheck()
+            Err("Cyclic dependency detected in the chain [ two -> three -> one -> two ]".into()),
+            graph.check_for_cycles()
         );
 
         let mut graph = Graph::default();
@@ -413,10 +385,8 @@ mod test {
 
         // This isn't really a cyclic dependency but let me have this one.
         assert_eq!(
-            Err(vec![
-                "Cyclic dependency detected in the chain [ in -> in ]".into()
-            ]),
-            graph.paths()
+            Err("Cyclic dependency detected in the chain [ in -> in ]".into()),
+            graph.check_for_cycles()
         );
     }
 
@@ -429,7 +399,7 @@ mod test {
         graph.add_transform("three", DataType::Log, DataType::Log, vec!["one", "two"]);
         graph.add_sink("out", DataType::Log, vec!["three"]);
 
-        graph.paths().unwrap();
+        graph.check_for_cycles().unwrap();
     }
 
     #[test]
