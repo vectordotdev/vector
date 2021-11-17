@@ -93,6 +93,11 @@ releases: "0.18.0": {
 		- (breaking!) The `upper_limit` field for aggregated summaries from the
 		  `metric_to_log` transform has been renamed to `q` which is a common shorthand
 		  for `quantile`.
+		- We have continued to add additional instrumentation to components with
+		  the goal of having them all match the [Component
+		  Specification](https://github.com/vectordotdev/vector/blob/master/docs/specs/component.md#instrumentation).
+		  Once we have finished this we will post a highlight outlining all of
+		  the added metrics.
 
 		# Bug Fixes:
 
