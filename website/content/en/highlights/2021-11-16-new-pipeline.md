@@ -1,7 +1,7 @@
 ---
 date: "2021-11-16"
 title: "Pipelines is now available on Vector"
-description: "A guide for using the new pipelines functionality"
+description: "New pipelines now enables further collaboration"
 authors: ["barieom"]
 pr_numbers: []
 release: "0.18.0"
@@ -10,7 +10,6 @@ badges:
   type: new feature
 ---
 
-# Pipelines is now available on Vector
 
 We're excited to announce a new release that introduces the concept of Pipelines to Vector.
 
@@ -20,16 +19,15 @@ Vector's topology is based on a [directed acylclic graph], enabling users to cre
 However, this is in contrast to many leading observability pipeline offerings — such as [Datadog's LWL Pipelines][] — by defining a linear set of transforms, in which the first transform feeds into the second, then the third, in sequential manner. Diagram below highlights the different flow compared to the DAG model:
 ![New pipeline example](/img/new-pipeline-example.png)
 
-To align with industry comparable workflows, Vector now offers a linear transforms, reducing complexity. 
+With the new Vector pipelines, linear transforms is now supported on Vector, reducing complexity and, more importantly, promoting collaboration across teams. Pipelines introduces a collaboration point in your pipeline so that each person can operate in their own pipelines without having to dive into a single config file containing thousands of lines of configurations. Because linear pipelines decouples observability data from its source, transformation, and sink stages, developers or teams can focus on specific processors they are responsible for.
 
 To illustrate this better, let's assume we have a pipeline with three stages - source, transforms, then sink. The `transforms` directory has the following structure:
 
 ```
 /transforms/
 └───processing/
-│   └───logs/   
-│       │   sudo.toml
-│       │   aws_s3_access_logs.toml
+│    │   sudo.toml
+│    │   aws_s3_access_logs.toml
 │   
 │   processing.toml
 │   
@@ -114,7 +112,7 @@ type = "pipelines"
 inputs = ["datadog_agent", "syslog"]
 mode = "linear"
 
-logs.order = [
+.order = [
     "aws_s3_access_logs",
     "sudo"
 ]
