@@ -76,7 +76,7 @@ pub struct Encoder {
 }
 ```
 
-`Encoder` implements `tokio_util::codec::Encoder<SmallVec<[Event; 1]>>`. Internally, events first go through the `Serializer` which implements `tokio_util::codec::Encoder<SmallVec<[Event; 1]>>` and are then handed over to the `Framer` which implements `tokio_util::codec::Encoder<Bytes>`.
+`Encoder` implements `tokio_util::codec::Encoder<Event>`. Internally, events first go through the `Serializer` which implements `tokio_util::codec::Encoder<Event>` and are then handed over to the `Framer` which implements `tokio_util::codec::Encoder<Bytes>`.
 
 ## Plan Of Attack
 
