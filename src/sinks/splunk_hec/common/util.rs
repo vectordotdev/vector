@@ -78,8 +78,9 @@ pub async fn build_request(
     token: &str,
     compression: Compression,
     events: Vec<u8>,
+    path: &str,
 ) -> crate::Result<Request<Vec<u8>>> {
-    let uri = build_uri(endpoint, "/services/collector/event").context(UriParseError)?;
+    let uri = build_uri(endpoint, path).context(UriParseError)?;
 
     let mut builder = Request::post(uri)
         .header("Content-Type", "application/json")
