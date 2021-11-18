@@ -85,8 +85,8 @@ components: sources: redis: {
 			type: string: {
 				default: "list"
 				enum: {
-					list:    "Use list"
-					channel: "Use channel"
+					list:    "Use the Redis `list` data type."
+					channel: "Use the Redis `channel` data type."
 				}
 				syntax: "literal"
 			}
