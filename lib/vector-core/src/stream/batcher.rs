@@ -142,10 +142,12 @@ where
         loop {
             match self.as_mut().project().stream.poll_next(cx) {
                 Poll::Ready(None) => {
-                    if self.batch.is_empty() {
-                        return Poll::Ready(None);
-                    } else {
-                        return Poll::Ready(Some(self.take_batch()));
+                    return {
+                        if self.batch.is_empty() {
+                            Poll::Ready(None)
+                        } else {
+                            Poll::Ready(Some(self.take_batch()))
+                        }
                     }
                 }
                 Poll::Ready(Some(item)) => {
@@ -165,22 +167,22 @@ where
                     }
                 }
                 Poll::Pending => {
-                    if let MaybeProj::Some(timer) = self.as_mut().project().timer.project() {
-                        match timer.poll(cx) {
-                            Poll::Ready(()) => {
-                                self.as_mut().project().timer.set(Maybe::None);
-                                debug_assert!(
-                                    !self.batch.is_empty(),
-                                    "timer should have been cancelled"
-                                );
-                                return Poll::Ready(Some(self.take_batch()));
+                    return {
+                        if let MaybeProj::Some(timer) = self.as_mut().project().timer.project() {
+                            match timer.poll(cx) {
+                                Poll::Ready(()) => {
+                                    self.as_mut().project().timer.set(Maybe::None);
+                                    debug_assert!(
+                                        !self.batch.is_empty(),
+                                        "timer should have been cancelled"
+                                    );
+                                    Poll::Ready(Some(self.take_batch()))
+                                }
+                                Poll::Pending => Poll::Pending,
                             }
-                            Poll::Pending => {
-                                return Poll::Pending;
-                            }
+                        } else {
+                            Poll::Pending
                         }
-                    } else {
-                        return Poll::Pending;
                     }
                 }
             }
@@ -193,6 +195,7 @@ where
 }
 
 #[cfg(test)]
+#[allow(clippy::similar_names)]
 mod test {
     use super::*;
     use futures::stream;
@@ -208,7 +211,7 @@ mod test {
         );
         let batcher = Batcher::new(stream, settings, |x: &u32| *x as usize);
         let batches: Vec<_> = batcher.collect().await;
-        assert_eq!(batches, vec![vec![1, 2], vec![3],])
+        assert_eq!(batches, vec![vec![1, 2], vec![3],]);
     }
 
     #[tokio::test]
