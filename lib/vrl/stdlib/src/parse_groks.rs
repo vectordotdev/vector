@@ -78,26 +78,25 @@ impl Function for ParseGroks {
         &[Example {
             title: "parse grok pattern",
             source: indoc! {r#"
-                value = "2020-10-02T23:22:12.223222Z info hello world"
-                patterns = [
-                    "%{common_prefix} %{_status} %{_message}",
-                    "%{common_prefix} %{_message}"
-                ],
-                aliases = {
-                    common_prefix: "%{_timestamp} %{_loglevel}",
-                    _timestamp: "%{TIMESTAMP_ISO8601:timestamp}",
-                    _loglevel: "%{LOGLEVEL:level}",
-                    _status: "%{POSINT:status}",
-                    _message: "%{GREEDYDATA:message}"
-                }
-
-                parse_grok!(value, patterns, false, aliases)
+                parse_groks!(
+                    "2020-10-02T23:22:12.223222Z info hello world",
+                    patterns: [
+                        "%{common_prefix} %{_status} %{_message}",
+                        "%{common_prefix} %{_message}"
+                    ],
+                    aliases: {
+                        "common_prefix": "%{_timestamp} %{_loglevel}",
+                        "_timestamp": "%{TIMESTAMP_ISO8601:timestamp}",
+                        "_loglevel": "%{LOGLEVEL:level}",
+                        "_status": "%{POSINT:status}",
+                        "_message": "%{GREEDYDATA:message}"
+                    })
             "#},
             result: Ok(indoc! {r#"
                 {
                     "timestamp": "2020-10-02T23:22:12.223222Z",
                     "level": "info",
-                    "message": "Hello world"
+                    "message": "hello world"
                 }
             "#}),
         }]
@@ -271,11 +270,11 @@ mod test {
                     "%{common_prefix} %{_message}".into(),
                     ]),
                 aliases: value!({
-                    common_prefix: "%{_timestamp} %{_loglevel}",
-                    _timestamp: "%{TIMESTAMP_ISO8601:timestamp}",
-                    _loglevel: "%{LOGLEVEL:level}",
-                    _status: "%{POSINT:status}",
-                    _message: "%{GREEDYDATA:message}"
+                    "common_prefix": "%{_timestamp} %{_loglevel}",
+                    "_timestamp": "%{TIMESTAMP_ISO8601:timestamp}",
+                    "_loglevel": "%{LOGLEVEL:level}",
+                    "_status": "%{POSINT:status}",
+                    "_message": "%{GREEDYDATA:message}"
                 })
             ],
             want: Ok(Value::from(btreemap! {
@@ -297,11 +296,11 @@ mod test {
                     "%{common_prefix} %{_message}".into(),
                     ]),
                 aliases: value!({
-                    common_prefix: "%{_timestamp} %{_loglevel}",
-                    _timestamp: "%{TIMESTAMP_ISO8601:timestamp}",
-                    _loglevel: "%{LOGLEVEL:level}",
-                    _status: "%{POSINT:status}",
-                    _message: "%{GREEDYDATA:message}"
+                    "common_prefix": "%{_timestamp} %{_loglevel}",
+                    "_timestamp": "%{TIMESTAMP_ISO8601:timestamp}",
+                    "_loglevel": "%{LOGLEVEL:level}",
+                    "_status": "%{POSINT:status}",
+                    "_message": "%{GREEDYDATA:message}"
                 })
             ],
             want: Ok(Value::from(btreemap! {
@@ -322,19 +321,19 @@ mod test {
                     r#"%{access_common} (%{number:duration:scale(1000000000)} )?"%{_referer}" "%{_user_agent}"( "%{_x_forwarded_for}")?.*"#.into(),
                     ]),
                 aliases: value!({
-                    access_common: r#"%{_client_ip} %{_ident} %{_auth} \[%{_date_access}\] "(?>%{_method} |)%{_url}(?> %{_version}|)" %{_status_code} (?>%{_bytes_written}|-)"#,
-                    _auth: r#"%{notSpace:http.auth:nullIf("-")}"#,
-                    _bytes_written: r#"%{integer:network.bytes_written}"#,
-                    _client_ip: r#"%{ipOrHost:network.client.ip}"#,
-                    _version: r#"HTTP\/(?<http.version>\d+\.\d+)"#,
-                    _url: r#"%{notSpace:http.url}"#,
-                    _ident: r#"%{notSpace:http.ident}"#,
-                    _user_agent: r#"%{regex("[^\\\"]*"):http.useragent}"#,
-                    _referer: r#"%{notSpace:http.referer}"#,
-                    _status_code: r#"%{integer:http.status_code}"#,
-                    _method: r#"%{word:http.method}"#,
-                    _date_access: r#"%{notSpace:date_access}"#,
-                    _x_forwarded_for: r#"%{regex("[^\\\"]*"):http._x_forwarded_for:nullIf("-")}"#
+                    "access_common": r#"%{_client_ip} %{_ident} %{_auth} \[%{_date_access}\] "(?>%{_method} |)%{_url}(?> %{_version}|)" %{_status_code} (?>%{_bytes_written}|-)"#,
+                    "_auth": r#"%{notSpace:http.auth:nullIf("-")}"#,
+                    "_bytes_written": r#"%{integer:network.bytes_written}"#,
+                    "_client_ip": r#"%{ipOrHost:network.client.ip}"#,
+                    "_version": r#"HTTP\/(?<http.version>\d+\.\d+)"#,
+                    "_url": r#"%{notSpace:http.url}"#,
+                    "_ident": r#"%{notSpace:http.ident}"#,
+                    "_user_agent": r#"%{regex("[^\\\"]*"):http.useragent}"#,
+                    "_referer": r#"%{notSpace:http.referer}"#,
+                    "_status_code": r#"%{integer:http.status_code}"#,
+                    "_method": r#"%{word:http.method}"#,
+                    "_date_access": r#"%{notSpace:date_access}"#,
+                    "_x_forwarded_for": r#"%{regex("[^\\\"]*"):http._x_forwarded_for:nullIf("-")}"#
                 })
             ],
             want: Ok(Value::Object(btreemap! {

@@ -57,11 +57,11 @@ remap: functions: parse_groks: {
 						"%{common_prefix} %{_message}",
 					],
 					aliases: {
-						common_prefix: "%{_timestamp} %{_loglevel}",
-						_timestamp: "%{TIMESTAMP_ISO8601:timestamp}",
-						_loglevel: "%{LOGLEVEL:level}",
-						_status: "%{POSINT:status}",
-						_message: "%{GREEDYDATA:message}"
+						"common_prefix": "%{_timestamp} %{_loglevel}",
+						"_timestamp": "%{TIMESTAMP_ISO8601:timestamp}",
+						"_loglevel": "%{LOGLEVEL:level}",
+						"_status": "%{POSINT:status}",
+						"_message": "%{GREEDYDATA:message}"
 					}
 				)
 				"""#
