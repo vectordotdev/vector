@@ -1,24 +1,20 @@
 use metrics::counter;
+pub use vector_core::internal_event::EventsReceived;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct EventsReceived {
-    pub count: usize,
+pub struct BytesReceived {
     pub byte_size: usize,
+    pub protocol: &'static str,
 }
 
-impl InternalEvent for EventsReceived {
+impl InternalEvent for BytesReceived {
     fn emit_logs(&self) {
-        trace!(message = "Events received.", count = %self.count, byte_size = %self.byte_size);
+        trace!(message = "Bytes received.", byte_size = %self.byte_size, protocol = %self.protocol);
     }
 
     fn emit_metrics(&self) {
-        counter!("component_received_events_total", self.count as u64);
-        counter!("events_in_total", self.count as u64);
-        counter!(
-            "component_received_event_bytes_total",
-            self.byte_size as u64
-        );
+        counter!("component_received_bytes_total", self.byte_size as u64, "protocol" => self.protocol);
     }
 }
 
@@ -45,23 +41,6 @@ impl InternalEvent for HttpClientBytesReceived<'_> {
             "protocol" => self.protocol.to_owned(),
             "endpoint" => self.endpoint.to_owned(),
         );
-    }
-}
-
-#[derive(Debug)]
-pub struct BytesSent<'a> {
-    pub byte_size: usize,
-    pub protocol: &'a str,
-}
-
-impl<'a> InternalEvent for BytesSent<'a> {
-    fn emit_logs(&self) {
-        trace!(message = "Bytes sent.", byte_size = %self.byte_size, protocol = %self.protocol);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("component_sent_bytes_total", self.byte_size as u64,
-                 "protocol" => self.protocol.to_string());
     }
 }
 

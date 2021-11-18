@@ -29,14 +29,8 @@ components: sources: journald: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            false
-			"x86_64-pc-windows-msv":          false
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
+			"x86_64-apple-darwin":   false
+			"x86_64-pc-windows-msv": false
 		}
 
 		requirements: []
@@ -49,11 +43,11 @@ components: sources: journald: {
 	}
 
 	configuration: {
+		acknowledgements: configuration._acknowledgements
 		batch_size: {
 			common:      false
 			description: "The systemd journal is read in batches, and a checkpoint is set at the end of each batch. This option limits the size of the batch."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 16
 				unit:    null
@@ -63,19 +57,16 @@ components: sources: journald: {
 			common:      true
 			description: "Include only entries from the current boot."
 			required:    false
-			warnings: []
 			type: bool: default: true
 		}
 		exclude_units: {
 			common:      true
 			description: "The list of unit names to exclude from monitoring. Unit names lacking a `\".\"` will have `\".service\"` appended to make them a valid service unit name."
 			required:    false
-			warnings: []
 			type: array: {
 				default: []
 				items: type: string: {
 					examples: ["badservice", "sysinit.target"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -83,7 +74,6 @@ components: sources: journald: {
 			common:      true
 			description: "This list contains sets of field/value pairs that, if any are present in a journal entry, will cause the entry to be excluded from this source. If `exclude_units` is specified, it will be merged into this list."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: [
 					{
@@ -100,7 +90,6 @@ components: sources: journald: {
 							default: []
 							items: type: string: {
 								examples: ["sshd.service", "ntpd.service"]
-								syntax: "literal"
 							}
 						}
 					}
@@ -111,12 +100,10 @@ components: sources: journald: {
 			common:      true
 			description: "The list of unit names to monitor. If empty or not present, all units are accepted. Unit names lacking a `\".\"` will have `\".service\"` appended to make them a valid service unit name."
 			required:    false
-			warnings: []
 			type: array: {
 				default: []
 				items: type: string: {
 					examples: ["ntpd", "sysinit.target"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -124,7 +111,6 @@ components: sources: journald: {
 			common:      true
 			description: "This list contains sets of field/value pairs to monitor. If empty or not present, all journal fields are accepted. If `include_units` is specified, it will be merged into this list."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: [
 					{
@@ -141,7 +127,6 @@ components: sources: journald: {
 							default: []
 							items: type: string: {
 								examples: ["sshd.service", "ntpd.service"]
-								syntax: "literal"
 							}
 						}
 					}
@@ -152,22 +137,18 @@ components: sources: journald: {
 			common:      false
 			description: "The full path of the `journalctl` executable. If not set, Vector will search the path for `journalctl`."
 			required:    false
-			warnings: []
 			type: string: {
 				default: "journalctl"
 				examples: ["/usr/local/bin/journalctl"]
-				syntax: "literal"
 			}
 		}
 		journal_directory: {
 			common:      false
 			description: "The full path of the journal directory. If not set, `journalctl` will use the default system journal paths"
 			required:    false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["/run/log/journal"]
-				syntax: "literal"
 			}
 		}
 	}
@@ -182,7 +163,6 @@ components: sources: journald: {
 					required:    true
 					type: string: {
 						examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
-						syntax: "literal"
 					}
 				}
 				timestamp: fields._current_timestamp
@@ -193,7 +173,6 @@ components: sources: journald: {
 					type: string: {
 						default: null
 						examples: ["/usr/sbin/ntpd", "c36e9ea52800a19d214cb71b53263a28"]
-						syntax: "literal"
 					}
 				}
 			}
@@ -264,11 +243,13 @@ components: sources: journald: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
-		invalid_record_total:            components.sources.internal_metrics.output.metrics.invalid_record_total
-		invalid_record_bytes_total:      components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
-		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:          components.sources.internal_metrics.output.metrics.processed_events_total
-		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
+		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
+		invalid_record_total:                 components.sources.internal_metrics.output.metrics.invalid_record_total
+		invalid_record_bytes_total:           components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
+		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
 	}
 }

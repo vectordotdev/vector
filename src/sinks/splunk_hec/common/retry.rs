@@ -26,13 +26,16 @@ impl RetryLogic for HecRetryLogic {
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
-            _ if status.is_server_error() => RetryAction::Retry(format!(
-                "{}: {}",
-                status,
-                String::from_utf8_lossy(response.http_response.body())
-            )),
+            _ if status.is_server_error() => RetryAction::Retry(
+                format!(
+                    "{}: {}",
+                    status,
+                    String::from_utf8_lossy(response.http_response.body())
+                )
+                .into(),
+            ),
             _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("response status: {}", status)),
+            _ => RetryAction::DontRetry(format!("response status: {}", status).into()),
         }
     }
 }

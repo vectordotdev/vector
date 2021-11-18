@@ -1,9 +1,11 @@
 use buffers::bytes::{DecodeBytes, EncodeBytes};
-use buffers::{self, Variant};
+use buffers::topology::builder::IntoBuffer;
+use buffers::topology::channel::{BufferReceiver, BufferSender};
+use buffers::{self, MemoryBuffer, Variant, WhenFull};
 use bytes::{Buf, BufMut};
 use core_common::byte_size_of::ByteSizeOf;
 use futures::task::{noop_waker, Context, Poll};
-use futures::{Sink, Stream};
+use futures::{Sink, SinkExt, Stream};
 use metrics_tracing_context::{MetricsLayer, TracingContextLayer};
 use metrics_util::layers::Layer;
 use metrics_util::DebuggingRecorder;
@@ -79,6 +81,7 @@ impl<const N: usize> DecodeBytes<Message<N>> for Message<N> {
     }
 }
 
+#[allow(dead_code)]
 #[allow(clippy::type_complexity)]
 pub fn setup<const N: usize>(
     max_events: usize,
@@ -95,6 +98,27 @@ pub fn setup<const N: usize>(
 
     let (tx, rx, _) = buffers::build::<Message<N>>(variant, Span::none()).unwrap();
     (Pin::new(tx.get()), Box::pin(rx), messages)
+}
+
+#[allow(dead_code)]
+#[allow(clippy::type_complexity)]
+pub fn setup_in_memory_v2<const N: usize>(
+    max_events: usize,
+    when_full: WhenFull,
+) -> (
+    Pin<Box<dyn Sink<Message<N>, Error = ()> + Unpin + Send>>,
+    Pin<Box<dyn Stream<Item = Message<N>> + Unpin + Send>>,
+    Vec<Message<N>>,
+) {
+    let mut messages: Vec<Message<N>> = Vec::with_capacity(max_events);
+    for i in 0..max_events {
+        messages.push(Message::new(i as u64));
+    }
+
+    let (tx, rx) = MemoryBuffer::new(max_events).into_buffer_parts();
+    let sender = BufferSender::new(tx, when_full).sink_map_err(|_| ());
+    let receiver = BufferReceiver::new(rx);
+    (Box::pin(sender), Box::pin(receiver), messages)
 }
 
 fn send_msg<const N: usize>(

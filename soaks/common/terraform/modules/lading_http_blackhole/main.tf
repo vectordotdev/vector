@@ -71,7 +71,7 @@ resource "kubernetes_deployment" "http-blackhole" {
         automount_service_account_token = false
         container {
           image_pull_policy = "IfNotPresent"
-          image             = "ghcr.io/blt/lading:0.5.0"
+          image             = var.lading_image
           name              = "http-blackhole"
           command           = ["/http_blackhole"]
 
@@ -82,10 +82,6 @@ resource "kubernetes_deployment" "http-blackhole" {
           }
 
           resources {
-            limits = {
-              cpu    = "100m"
-              memory = "32Mi"
-            }
             requests = {
               cpu    = "100m"
               memory = "32Mi"

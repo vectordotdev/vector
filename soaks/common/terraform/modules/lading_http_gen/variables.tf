@@ -12,3 +12,8 @@ variable "http-gen-toml" {
   description = "The rendered http_gen.toml for this test"
   type        = string
 }
+
+variable "lading_image" {
+  description = "The lading image to run"
+  type = string
+}

@@ -1,0 +1,331 @@
+ # Soak test vector
+ #
+ # This workflow runs our 'soak' tests, which are relative evaluations of
+ # vector's master branch HEAD to whatever SHA was just pushed into the project
+ # (unless that SHA happens to be master branch HEAD). The goal is to give
+ # quick-ish feedback on all-up vector for a variety of configs as to whether
+ # throughput performance has gone down, gotten more variable in the pushed SHA.
+ #
+ # Soaks are always done relative to the pushed SHA, meaning any changes you
+ # introduce to the soak tests will be picked up both for the master HEAD soak
+ # and your current SHA. Tags are SHA-SHA. The first SHA is the one that
+ # triggered this workflow, the second is the one of the vector being tested. For
+ # comparison images the two SHAs are identical.
+ name: Soak
+
+ on: {}
+
+ jobs:
+   cancel-previous:
+     runs-on: ubuntu-20.04
+     timeout-minutes: 3
+     if: github.ref != 'refs/heads/master'
+     steps:
+       - uses: styfle/cancel-workflow-action@0.9.1
+         with:
+           access_token: ${{ secrets.GITHUB_TOKEN }}
+           all_but_latest: true # can cancel workflows scheduled later
+
+   compute-test-plan:
+     name: Compute soak test plan
+     runs-on: ubuntu-20.04
+     outputs:
+       matrix: ${{ steps.set-matrix.outputs.matrix }}
+     steps:
+       - name: Check out the repo
+         uses: actions/checkout@v2
+
+       - uses: actions/github-script@v5
+         id: set-matrix
+         with:
+           script: |
+             const fs = require('fs')
+             target = fs.readdirSync('soaks/tests')
+
+             const matrix = {
+               target
+             }
+
+             core.setOutput('matrix', matrix)
+       - name: Dump matrix context
+         env:
+           MATRIX_CONTEXT: ${{ toJson(steps.set-matrix.outputs.matrix) }}
+         run: echo "$MATRIX_CONTEXT"
+
+   compute-soak-meta:
+     name: Compute metadata for soaks
+     runs-on: ubuntu-20.04
+     outputs:
+       pr-number: ${{ steps.pr-metadata.outputs.PR_NUMBER }}
+       comparison-sha: ${{ steps.comparison.outputs.COMPARISON_SHA }}
+       comparison-tag: ${{ steps.comparison.outputs.COMPARISON_TAG }}
+       baseline-sha: ${{ steps.baseline.outputs.BASELINE_SHA }}
+       baseline-tag: ${{ steps.baseline.outputs.BASELINE_TAG }}
+       vector-cpus: ${{ steps.system.outputs.VECTOR_CPUS }}
+       soak-cpus: ${{ steps.system.outputs.SOAK_CPUS }}
+       soak-memory: ${{ steps.system.outputs.SOAK_MEMORY }}
+     steps:
+       - uses: actions/checkout@v2.3.5
+         with:
+           ref: master
+           path: baseline-vector
+
+       - name: Report on PR metadata
+         id: pr-metadata
+         run: |
+           export PR_NUMBER=${{ github.event.number }}
+           echo "::set-output name=PR_NUMBER::${PR_NUMBER}"
+           echo "PR number: ${PR_NUMBER}"
+
+       - name: Setup comparison variables
+         id: comparison
+         run: |
+           export COMPARISON_SHA=${{ github.event.pull_request.head.sha }}
+           export COMPARISON_TAG="${{ github.event.pull_request.head.sha }}-${{ github.event.pull_request.head.sha }}"
+
+           echo "comparison sha is: ${COMPARISON_SHA}"
+           echo "comparison tag is: ${COMPARISON_TAG}"
+
+           echo "::set-output name=COMPARISON_TAG::${COMPARISON_TAG}"
+           echo "::set-output name=COMPARISON_SHA::${COMPARISON_SHA}"
+
+       - name: Setup baseline variables
+         id: baseline
+         run: |
+           pushd baseline-vector
+           export BASELINE_SHA=$(git rev-parse HEAD)
+           popd
+
+           export BASELINE_TAG="${{ github.event.pull_request.head.sha }}-${BASELINE_SHA}"
+           echo "baseline sha is: ${BASELINE_SHA}"
+           echo "baseline tag is: ${BASELINE_TAG}"
+
+           echo "::set-output name=BASELINE_TAG::${BASELINE_TAG}"
+           echo "::set-output name=BASELINE_SHA::${BASELINE_SHA}"
+
+       - name: Setup system details
+         id: system
+         run: |
+           export SOAK_CPUS="7"
+           export SOAK_MEMORY="30g"
+           export VECTOR_CPUS="4"
+
+           echo "soak cpus total: ${SOAK_CPUS}"
+           echo "soak memory total: ${SOAK_MEMORY}"
+           echo "vector cpus: ${VECTOR_CPUS}"
+
+           echo "::set-output name=SOAK_CPUS::${SOAK_CPUS}"
+           echo "::set-output name=SOAK_MEMORY::${SOAK_MEMORY}"
+           echo "::set-output name=VECTOR_CPUS::${VECTOR_CPUS}"
+
+   build-baseline-image:
+     name: Build baseline 'soak-vector' container
+     runs-on: [self-hosted, linux, x64, general]
+     needs: [compute-soak-meta]
+     steps:
+       - uses: actions/checkout@v2.3.5
+
+       - uses: actions/checkout@v2.3.5
+         with:
+           ref: master
+           path: baseline-vector
+
+       - name: Set up Docker Buildx
+         id: buildx
+         uses: docker/setup-buildx-action@v1
+
+       - name: Log in to the Container registry
+         uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+         with:
+           registry: ghcr.io
+           username: ${{ github.actor }}
+           password: ${{ secrets.GITHUB_TOKEN }}
+
+       - name: Extract metadata (tags, labels) for Docker
+         id: meta
+         uses: docker/metadata-action@548e2346a9987b56d8a4104fe776321ff8e23440
+         with:
+           flavor: |
+             latest=false
+             prefix=
+             suffix=
+           images: ghcr.io/${{ github.repository }}/soak-vector
+           tags: type=raw, value=${{ needs.compute-soak-meta.outputs.baseline-tag }}
+
+       - name: Build and push 'soak-vector' image
+         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
+         with:
+           context: baseline-vector/
+           file: soaks/Dockerfile
+           builder: ${{ steps.buildx.outputs.name }}
+           push: true
+           tags: ${{ steps.meta.outputs.tags }}
+           labels: ${{ steps.meta.outputs.labels }}
+           cache-from: type=gha, scope=${{ github.workflow }}
+           cache-to: type=gha, scope=${{ github.workflow }}
+
+   build-comparison-image:
+     name: Build comparison 'soak-vector' container
+     runs-on: [self-hosted, linux, x64, general]
+     needs: [compute-soak-meta]
+     steps:
+       - uses: actions/checkout@v2.4.0
+
+       - name: Set up Docker Buildx
+         uses: docker/setup-buildx-action@v1
+
+       - name: Log in to the Container registry
+         uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+         with:
+           registry: ghcr.io
+           username: ${{ github.actor }}
+           password: ${{ secrets.GITHUB_TOKEN }}
+
+       - name: Extract metadata (tags, labels) for Docker
+         id: meta
+         uses: docker/metadata-action@548e2346a9987b56d8a4104fe776321ff8e23440
+         with:
+           flavor: |
+             latest=false
+             prefix=
+             suffix=
+           images: ghcr.io/${{ github.repository }}/soak-vector
+           tags: type=raw, value=${{ needs.compute-soak-meta.outputs.comparison-tag }}
+
+       - name: Build and push 'soak-vector' image
+         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
+         with:
+           context: .
+           file: soaks/Dockerfile
+           push: true
+           tags: ${{ steps.meta.outputs.tags }}
+           labels: ${{ steps.meta.outputs.labels }}
+           cache-from: type=gha, scope=${{ github.workflow }}
+           cache-to: type=gha, scope=${{ github.workflow }}
+
+   soak-baseline:
+     name: Soak (${{ matrix.target }}) - baseline
+     if: ${{ github.actor != 'dependabot[bot]' }}
+     runs-on: [self-hosted, linux, x64, soak]
+     needs: [compute-soak-meta, compute-test-plan, build-baseline-image]
+     strategy:
+       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
+     steps:
+       - name: Check out the repo
+         uses: actions/checkout@v2.4.0
+
+       - name: Run baseline experiment
+         if: steps.cache-primes.outputs.cache-hit != 'true'
+         run: |
+           rm -rf /tmp/${{ github.event.number }}-${{ github.run_attempt }}/
+           mkdir -p /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
+           ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
+                                   --local-image "false" \
+                                   --variant "baseline" \
+                                   --tag ${{ needs.compute-soak-meta.outputs.baseline-tag }} \
+                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
+                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
+                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
+                                   --capture-dir /tmp/${{ github.event.number }}-${{ github.run_attempt }}
+
+       - name: Upload timing captures
+         uses: actions/upload-artifact@v1
+         with:
+           name: ${{ github.event.number }}-${{ github.run_attempt }}-${{ matrix.target }}-baseline
+           path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/baseline.captures
+
+   soak-comparison:
+     name: Soak (${{ matrix.target }}) - comparison
+     if: ${{ github.actor != 'dependabot[bot]' }}
+     runs-on: [self-hosted, linux, x64, soak]
+     needs: [compute-soak-meta, compute-test-plan, build-comparison-image]
+     strategy:
+       matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
+     steps:
+       - name: Check out the repo
+         uses: actions/checkout@v2.4.0
+
+       - name: Run comparison experiment
+         if: steps.cache-primes.outputs.cache-hit != 'true'
+         run: |
+           rm -rf /tmp/${{ github.event.number }}-${{ github.run_attempt }}/
+           mkdir -p /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
+           ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
+                                   --local-image "false" \
+                                   --variant "comparison" \
+                                   --tag ${{ needs.compute-soak-meta.outputs.comparison-tag }} \
+                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
+                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
+                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
+                                   --capture-dir /tmp/${{ github.event.number }}-${{ github.run_attempt }}
+
+       - name: Upload timing captures
+         uses: actions/upload-artifact@v1
+         with:
+           name: ${{ github.event.number }}-${{ github.run_attempt }}-${{ matrix.target }}-comparison
+           path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/comparison.captures
+
+   analyze-results:
+     name: Soak analysis
+     if: ${{ github.actor != 'dependabot[bot]' }}
+     runs-on: ubuntu-20.04
+     needs: [compute-soak-meta, soak-baseline, soak-comparison]
+
+     steps:
+       - name: Install 'miller'
+         run: sudo apt-get install -y miller
+
+       - name: Check out the repo
+         uses: actions/checkout@v2.4.0
+
+       - name: Download captures artifact
+         uses: actions/download-artifact@v2
+         with:
+           path: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
+
+       - name: Display structure of downloaded files
+         run: ls -R
+         working-directory: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
+
+       - name: Analyze captures
+         run: |
+           # convert the individual artifacts into a folder for each
+           # soak test (containing both comparison/baseline files)
+
+           pushd ${{ github.event.number }}-${{ github.run_attempt }}-captures
+           prefix="./${{ github.event.number }}-${{ github.run_attempt }}-"
+           echo "Prefix: $prefix"
+           for dir in ./*; do
+             if [[ $dir == *-comparison ]]
+             then
+               soak_dir=${dir%"-comparison"}
+               soak_dir="./${soak_dir#$prefix}"
+               mkdir -p $soak_dir
+               cp $dir/comparison.captures $soak_dir/comparison.captures
+               rm -rf $dir
+             else
+               soak_dir=${dir%"-baseline"}
+               soak_dir="./${soak_dir#$prefix}"
+               mkdir -p $soak_dir
+               cp $dir/baseline.captures $soak_dir/baseline.captures
+               rm -rf $dir
+             fi
+           done
+           popd
+           ./soaks/bin/analyze_experiment.sh --capture-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures \
+                                             --baseline ${{ needs.compute-soak-meta.outputs.baseline-sha }} \
+                                             --comparison ${{ needs.compute-soak-meta.outputs.comparison-sha }} \
+                                             --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} > /tmp/${{ github.event.number}}-${{ github.run_attempt }}-analysis
+
+       - name: Read analysis file
+         id: read-analysis
+         uses: juliangruber/read-file-action@v1
+         with:
+           path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}-analysis
+
+       - name: Post Results To PR
+         uses: peter-evans/create-or-update-comment@v1
+         with:
+           issue-number: ${{ needs.compute-soak-meta.outputs.pr-number }}
+           edit-mode: replace
+           body: ${{ steps.read-analysis.outputs.content }}

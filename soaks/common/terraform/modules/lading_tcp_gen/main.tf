@@ -66,7 +66,7 @@ resource "kubernetes_deployment" "tcp-gen" {
         automount_service_account_token = false
         container {
           image_pull_policy = "IfNotPresent"
-          image             = "ghcr.io/blt/lading:0.5.1"
+          image             = var.lading_image
           name              = "tcp-gen"
           command           = ["/tcp_gen"]
 

@@ -9,6 +9,8 @@ use super::{
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "datadog-pipelines")]
+use std::collections::BTreeMap;
 use vector_core::{config::GlobalOptions, default_data_dir, transform::TransformConfig};
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -21,7 +23,7 @@ pub struct ConfigBuilder {
     pub api: api::Options,
     #[cfg(feature = "datadog-pipelines")]
     #[serde(default)]
-    pub datadog: datadog::Options,
+    pub datadog: Option<datadog::Options>,
     #[serde(default)]
     pub healthchecks: HealthcheckOptions,
     #[serde(default)]
@@ -35,6 +37,21 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub tests: Vec<TestDefinition>,
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
+}
+
+#[cfg(feature = "datadog-pipelines")]
+#[derive(Serialize)]
+struct ConfigBuilderHash<'a> {
+    #[cfg(feature = "api")]
+    api: &'a api::Options,
+    global: &'a GlobalOptions,
+    healthchecks: &'a HealthcheckOptions,
+    enrichment_tables: BTreeMap<&'a ComponentKey, &'a EnrichmentTableOuter>,
+    sources: BTreeMap<&'a ComponentKey, &'a SourceOuter>,
+    sinks: BTreeMap<&'a ComponentKey, &'a SinkOuter<String>>,
+    transforms: BTreeMap<&'a ComponentKey, &'a TransformOuter<String>>,
+    tests: &'a Vec<TestDefinition>,
+    provider: &'a Option<Box<dyn provider::ProviderConfig>>,
 }
 
 impl Clone for ConfigBuilder {
@@ -169,9 +186,11 @@ impl ConfigBuilder {
         #[cfg(feature = "datadog-pipelines")]
         {
             self.datadog = with.datadog;
-            if self.datadog.enabled {
-                // enable other enterprise features
-                self.global.enterprise = true;
+            if let Some(datadog) = &self.datadog {
+                if datadog.enabled {
+                    // enable other enterprise features
+                    self.global.enterprise = true;
+                }
             }
         }
 
@@ -252,23 +271,8 @@ impl ConfigBuilder {
     /// an order-stable JSON of the config builder and feeding its bytes into a SHA256 hasher.
     pub fn sha256_hash(&self) -> String {
         use sha2::{Digest, Sha256};
-        use std::collections::BTreeMap;
 
-        #[derive(Serialize)]
-        struct ConfigBuilderHash<'a> {
-            #[cfg(feature = "api")]
-            api: &'a api::Options,
-            global: &'a GlobalOptions,
-            healthchecks: &'a HealthcheckOptions,
-            enrichment_tables: BTreeMap<&'a ComponentKey, &'a EnrichmentTableOuter>,
-            sources: BTreeMap<&'a ComponentKey, &'a SourceOuter>,
-            sinks: BTreeMap<&'a ComponentKey, &'a SinkOuter<String>>,
-            transforms: BTreeMap<&'a ComponentKey, &'a TransformOuter<String>>,
-            tests: &'a Vec<TestDefinition>,
-            provider: &'a Option<Box<dyn provider::ProviderConfig>>,
-        }
-
-        let value = serde_json::json!(ConfigBuilderHash {
+        let value = serde_json::to_string(&ConfigBuilderHash {
             #[cfg(feature = "api")]
             api: &self.api,
             global: &self.global,
@@ -279,9 +283,10 @@ impl ConfigBuilder {
             transforms: self.transforms.iter().collect(),
             tests: &self.tests,
             provider: &self.provider,
-        });
+        })
+        .expect("should serialize to JSON");
 
-        let output = Sha256::digest(value.to_string().as_bytes());
+        let output = Sha256::digest(value.as_bytes());
 
         hex::encode(output)
     }
@@ -296,5 +301,67 @@ impl ConfigBuilder {
     pub fn from_json(input: &str) -> Self {
         crate::config::format::deserialize(input, Some(crate::config::format::Format::Json))
             .unwrap()
+    }
+}
+
+#[cfg(all(test, feature = "datadog-pipelines", feature = "api"))]
+mod tests {
+    use crate::config::ConfigBuilder;
+
+    #[test]
+    /// We are relying on `serde_json` to serialize keys in the ordered provided. If this test
+    /// fails, it likely means an implementation detail of serialization has changed, which is
+    /// likely to impact the final hash.
+    fn version_json_order() {
+        use super::{ConfigBuilder, ConfigBuilderHash};
+        use serde_json::{json, Value};
+
+        // Expected key order of serialization. This is important for guaranteeing that a
+        // hash is reproducible across versions.
+        let expected_keys = [
+            "api",
+            "global",
+            "healthchecks",
+            "enrichment_tables",
+            "sources",
+            "sinks",
+            "transforms",
+            "tests",
+            "provider",
+        ];
+
+        let builder = ConfigBuilder::default();
+
+        let value = json!(ConfigBuilderHash {
+            api: &builder.api,
+            global: &builder.global,
+            healthchecks: &builder.healthchecks,
+            enrichment_tables: builder.enrichment_tables.iter().collect(),
+            sources: builder.sources.iter().collect(),
+            sinks: builder.sinks.iter().collect(),
+            transforms: builder.transforms.iter().collect(),
+            tests: &builder.tests,
+            provider: &builder.provider,
+        });
+
+        match value {
+            // Should serialize to a map.
+            Value::Object(map) => {
+                // Check ordering.
+                assert!(map.keys().eq(expected_keys));
+            }
+            _ => panic!("should serialize to object"),
+        }
+    }
+
+    #[test]
+    /// If this hash changes, it means either the `ConfigBuilder` has changed what it
+    /// serializes, or the implementation of `serde_json` has changed. If this test fails, we
+    /// should ideally be able to fix so that the original hash passes!
+    fn version_hash_match() {
+        assert_eq!(
+            "14def8ff43fe0255b3234a7c3d7488379a119b7dbcf311c77ad308a83173d92c",
+            ConfigBuilder::default().sha256_hash()
+        );
     }
 }

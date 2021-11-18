@@ -8,7 +8,7 @@
 use crate::event::{Event, Metric, MetricValue};
 use crate::metrics::{self, Controller};
 use crate::sinks::VectorSink;
-use futures::{stream, SinkExt, Stream};
+use futures::{stream, SinkExt, Stream, StreamExt};
 use lazy_static::lazy_static;
 use std::env;
 use vector_core::event_test_util;
@@ -27,6 +27,9 @@ pub const FILE_SINK_TAGS: [&str; 2] = ["file", "protocol"];
 
 /// The standard set of tags for all `HttpSink`-based sinks.
 pub const HTTP_SINK_TAGS: [&str; 2] = ["endpoint", "protocol"];
+
+/// The standard set of tags for all `AWS`-based sinks.
+pub const AWS_SINK_TAGS: [&str; 2] = ["protocol", "region"];
 
 /// This struct is used to describe a set of component tests.
 pub struct ComponentTests {
@@ -180,9 +183,19 @@ where
     S: Stream<Item = Result<Event, ()>> + Send + Unpin,
 {
     init_test();
-    sink.into_sink()
-        .send_all(&mut events)
-        .await
-        .expect("Sending event stream to sink failed");
+    match sink {
+        VectorSink::Sink(mut sink) => {
+            sink.send_all(&mut events)
+                .await
+                .expect("Sending event stream to sink failed");
+        }
+        VectorSink::Stream(stream) => {
+            let events = events.filter_map(|x| async move { x.ok() }).boxed();
+            stream
+                .run(events)
+                .await
+                .expect("Sending event stream to sink failed");
+        }
+    }
     SINK_TESTS.assert(tags);
 }

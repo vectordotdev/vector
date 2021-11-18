@@ -1,5 +1,4 @@
 use crate::{
-    buffers::Acker,
     config::SinkContext,
     dns,
     event::Event,
@@ -37,7 +36,7 @@ use tokio::{
     net::TcpStream,
     time::sleep,
 };
-use vector_core::ByteSizeOf;
+use vector_core::{buffers::Acker, ByteSizeOf};
 
 #[derive(Debug, Snafu)]
 enum TcpError {

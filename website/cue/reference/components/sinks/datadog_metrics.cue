@@ -12,8 +12,8 @@ components: sinks: datadog_metrics: {
 			batch: {
 				enabled:      true
 				common:       false
-				max_events:   20
-				timeout_secs: 1
+				max_events:   100_000
+				timeout_secs: 2
 			}
 			compression: enabled: false
 			encoding: enabled:    false
@@ -63,7 +63,6 @@ components: sinks: datadog_metrics: {
 			type: string: {
 				default: null
 				examples: ["service"]
-				syntax: "literal"
 			}
 		}
 	}

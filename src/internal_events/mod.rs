@@ -25,7 +25,7 @@ pub(crate) mod aws_s3;
 pub(crate) mod aws_s3_sink;
 #[cfg(feature = "sinks-aws_sqs")]
 mod aws_sqs;
-#[cfg(feature = "sinks-azure_blob")]
+#[cfg(any(feature = "sinks-azure_blob", feature = "sinks-datadog_archives"))]
 pub(crate) mod azure_blob;
 mod batch;
 mod blackhole;
@@ -37,14 +37,18 @@ mod concat;
 mod conditions;
 #[cfg(feature = "sinks-console")]
 mod console;
-#[cfg(feature = "sinks-datadog")]
+#[cfg(feature = "sinks-datadog_events")]
 mod datadog_events;
-#[cfg(feature = "sinks-datadog")]
+#[cfg(feature = "sinks-datadog_logs")]
 mod datadog_logs;
+#[cfg(feature = "sinks-datadog_metrics")]
+mod datadog_metrics;
 #[cfg(any(feature = "codecs"))]
 mod decoder;
 #[cfg(feature = "transforms-dedupe")]
 mod dedupe;
+#[cfg(feature = "sources-demo_logs")]
+mod demo_logs;
 #[cfg(feature = "sources-dnstap")]
 mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
@@ -59,8 +63,6 @@ mod exec;
 mod filter;
 #[cfg(feature = "sources-fluent")]
 mod fluent;
-#[cfg(feature = "sources-generator")]
-mod generator;
 #[cfg(feature = "transforms-geoip")]
 mod geoip;
 #[cfg(feature = "transforms-grok_parser")]
@@ -134,6 +136,8 @@ mod syslog;
 mod tag_cardinality_limit;
 mod tcp;
 mod template;
+#[cfg(feature = "transforms-throttle")]
+mod throttle;
 #[cfg(feature = "transforms-tokenizer")]
 mod tokenizer;
 mod udp;
@@ -183,14 +187,18 @@ pub use self::concat::*;
 pub use self::conditions::*;
 #[cfg(feature = "sinks-console")]
 pub use self::console::*;
-#[cfg(feature = "sinks-datadog")]
+#[cfg(feature = "sinks-datadog_events")]
 pub use self::datadog_events::*;
-#[cfg(feature = "sinks-datadog")]
+#[cfg(feature = "sinks-datadog_logs")]
 pub use self::datadog_logs::*;
+#[cfg(feature = "sinks-datadog_metrics")]
+pub use self::datadog_metrics::*;
 #[cfg(any(feature = "codecs"))]
 pub use self::decoder::*;
 #[cfg(feature = "transforms-dedupe")]
 pub(crate) use self::dedupe::*;
+#[cfg(feature = "sources-demo_logs")]
+pub use self::demo_logs::*;
 #[cfg(feature = "sources-dnstap")]
 pub(crate) use self::dnstap::*;
 #[cfg(feature = "sources-docker_logs")]
@@ -211,8 +219,6 @@ pub use self::file::*;
 pub use self::filter::*;
 #[cfg(feature = "sources-fluent")]
 pub use self::fluent::*;
-#[cfg(feature = "sources-generator")]
-pub use self::generator::*;
 #[cfg(feature = "transforms-geoip")]
 pub(crate) use self::geoip::*;
 #[cfg(feature = "transforms-grok_parser")]
@@ -224,7 +230,7 @@ pub(crate) use self::host_metrics::*;
     feature = "sources-utils-http",
     feature = "sources-utils-http-encoding",
     feature = "sinks-http",
-    feature = "sources-datadog",
+    feature = "sources-datadog_agent",
     feature = "sources-splunk_hec",
 ))]
 pub(crate) use self::http::*;
@@ -290,6 +296,8 @@ pub use self::syslog::*;
 pub(crate) use self::tag_cardinality_limit::*;
 pub use self::tcp::*;
 pub use self::template::*;
+#[cfg(feature = "transforms-throttle")]
+pub use self::throttle::*;
 #[cfg(feature = "transforms-tokenizer")]
 pub(crate) use self::tokenizer::*;
 pub use self::udp::*;

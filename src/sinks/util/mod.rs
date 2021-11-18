@@ -5,6 +5,8 @@ pub mod builder;
 pub mod compressor;
 pub mod encoding;
 pub mod http;
+pub mod normalizer;
+pub mod partitioner;
 pub mod processed_event;
 pub mod request_builder;
 pub mod retries;
@@ -27,14 +29,19 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::borrow::Cow;
 
-pub use batch::{Batch, BatchConfig, BatchSettings, BatchSize, PushResult};
+pub use batch::{
+    Batch, BatchConfig, BatchSettings, BatchSize, BulkSizeBasedDefaultBatchSettings, Merged,
+    NoDefaultsBatchSettings, PushResult, RealtimeEventBasedDefaultBatchSettings,
+    RealtimeSizeBasedDefaultBatchSettings, SinkBatchSettings, Unmerged,
+};
 pub use buffer::json::{BoxedRawValue, JsonArrayBuffer};
 pub use buffer::partition::Partition;
 pub use buffer::vec::{EncodedLength, VecBuffer};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
 pub use builder::SinkBuilderExt;
 pub use compressor::Compressor;
-pub use request_builder::RequestBuilder;
+pub use normalizer::Normalizer;
+pub use request_builder::{IncrementalRequestBuilder, RequestBuilder};
 pub use service::{
     Concurrency, ServiceBuilderExt, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
     TowerRequestLayer, TowerRequestSettings,

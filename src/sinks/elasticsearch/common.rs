@@ -6,7 +6,7 @@ use crate::transforms::metric_to_log::MetricToLog;
 
 use crate::sinks::util::http::RequestConfig;
 
-use crate::rusoto::region_from_endpoint;
+use crate::aws::rusoto::region_from_endpoint;
 use crate::sinks::util::{Compression, TowerRequestConfig, UriSerde};
 use crate::tls::TlsSettings;
 use http::{StatusCode, Uri};
@@ -16,7 +16,7 @@ use snafu::ResultExt;
 use std::convert::TryFrom;
 
 use super::{InvalidHost, Request};
-use crate::rusoto;
+use crate::aws::rusoto;
 use crate::sinks::elasticsearch::encoder::ElasticSearchEncoder;
 use crate::sinks::util::encoding::EncodingConfigFixed;
 use crate::sinks::HealthcheckError;
