@@ -113,9 +113,9 @@ datadog-search-syntax = { path = "lib/datadog/search-syntax", optional = true }
 async-stream = "0.3.2"
 async-trait = "0.1.51"
 futures = { version = "0.3.17", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.13.0", default-features = false, features = ["full"] }
+tokio = { version = "1.13.1", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
-tokio-stream = { version = "0.1.7", default-features = false, features = ["net", "sync", "time"] }
+tokio-stream = { version = "0.1.8", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.6", default-features = false, features = ["time"] }
 console-subscriber = { git = "https://github.com/tokio-rs/console", rev = "f2c30d52c9f22de69bac38009a9183135808806c",  optional = true }
 
@@ -132,7 +132,7 @@ metrics = { version = "0.17.0", default-features = false, features = ["std"] }
 metrics-tracing-context = { version = "0.8.0", default-features = false }
 metrics-util = { version = "0.10.1", default-features = false, features = ["std"] }
 
-# Aws
+# AWS - Rusoto
 rusoto_cloudwatch = { version = "0.47.0", optional = true }
 rusoto_core = { version = "0.47.0", features = ["encoding"], optional = true }
 rusoto_credential = { version = "0.47.0", optional = true }
@@ -144,6 +144,12 @@ rusoto_s3 = { version = "0.47.0", optional = true }
 rusoto_signature = { version = "0.47.0", optional = true }
 rusoto_sqs = { version = "0.47.0", optional = true }
 rusoto_sts = { version = "0.47.0", optional = true }
+
+# AWS - Official SDK
+aws-config = {version = "0.0.22-alpha", optional = true}
+aws-types = {version = "0.0.22-alpha", optional = true}
+aws-sdk-sqs = {version = "0.0.22-alpha", optional = true}
+
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "16bcf0ab1bb6e380d966a69d314de1e99ede553a", default-features = false, features = ["enable_reqwest"], optional = true }
@@ -159,6 +165,7 @@ serde = { version = "1.0.130", default-features = false, features = ["derive"] }
 serde_bytes = { version = "0.11.5", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.68", default-features = false, features = ["raw_value"] }
 serde_yaml = { version = "0.8.21", default-features = false }
+serde_with = { version = "1.11.0", default-features = false, features = ["macros"] }
 
 # Messagepack
 rmp-serde = { version = "0.15.5", default-features = false, optional = true }
@@ -245,7 +252,7 @@ md-5 = { version = "0.9", optional = true }
 mlua = { version = "0.6.6", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 mongodb = { version = "2.0.1", default-features = false, features = ["tokio-runtime"], optional = true }
 async-nats = { version = "0.10.1", default-features = false, optional = true }
-nom = { version = "7.0.0", default-features = false, optional = true }
+nom = { version = "7.1.0", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 num_cpus = { version = "1.13.0", default-features = false }
 once_cell = { version = "1.8", default-features = false }
@@ -258,7 +265,7 @@ pulsar = { version = "4.1", default-features = false, features = ["tokio-runtime
 rand = { version = "0.8.4", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.2", default-features = false }
 rdkafka = { version = "0.27.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
-redis = { version = "0.21.3", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
+redis = { version = "0.21.4", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
 seahash = { version = "4.1.0", default-features = false, optional = true }
 semver = { version = "1.0.4", default-features = false, features = ["serde", "std"], optional = true }
@@ -415,12 +422,13 @@ sources = ["sources-logs", "sources-metrics"]
 sources-logs = [
   "sources-aws_kinesis_firehose",
   "sources-aws_s3",
+  "sources-aws_sqs",
   "sources-datadog_agent",
   "sources-docker_logs",
   "sources-exec",
   "sources-file",
   "sources-fluent",
-  "sources-generator",
+  "sources-demo_logs",
   "sources-heroku_logs",
   "sources-http",
   "sources-internal_logs",
@@ -453,6 +461,7 @@ sources-apache_metrics = []
 sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "infer", "sources-utils-tls", "warp", "codecs"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid", "codecs", "zstd"]
+sources-aws_sqs = ["aws-config", "aws-types", "aws-sdk-sqs", "codecs"]
 sources-datadog_agent = ["snap", "sources-utils-tls", "warp", "sources-utils-http-error", "protobuf-build", "codecs"]
 sources-dnstap = ["base64", "data-encoding", "trust-dns-proto", "dnsmsg-parser", "protobuf-build"]
 sources-docker_logs = ["docker"]
@@ -460,7 +469,7 @@ sources-eventstoredb_metrics = []
 sources-exec = ["codecs"]
 sources-file = ["file-source"]
 sources-fluent = ["base64", "listenfd", "tokio-util/net", "rmpv", "rmp-serde", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "serde_bytes", "codecs"]
-sources-generator = ["fakedata", "codecs"]
+sources-demo_logs = ["fakedata", "codecs"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "codecs"]
 sources-host_metrics = ["heim"]
 sources-http = ["sources-utils-http", "codecs", "sources-utils-http-query"]
@@ -639,10 +648,10 @@ sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-clickhouse = []
 sinks-console = []
-sinks-datadog_archives = ["sinks-aws_s3", "sinks-gcp"]
+sinks-datadog_archives = ["sinks-aws_s3", "sinks-azure_blob", "sinks-gcp"]
 sinks-datadog_events = []
 sinks-datadog_logs = []
-sinks-datadog_metrics = ["protobuf-build"]
+sinks-datadog_metrics = ["protobuf-build", "sinks-azure_blob"]
 sinks-elasticsearch = ["rusoto", "transforms-metric_to_log"]
 sinks-file = []
 sinks-gcp = ["base64", "goauth", "gouth", "smpl_jwt", "uuid"]
@@ -727,7 +736,7 @@ aws-ecs-metrics-integration-tests = ["sources-aws_ecs_metrics"]
 aws-kinesis-firehose-integration-tests = ["rusoto_es", "sinks-aws_kinesis_firehose", "sinks-elasticsearch"]
 aws-kinesis-streams-integration-tests = ["sinks-aws_kinesis_streams"]
 aws-s3-integration-tests = ["sinks-aws_s3", "sources-aws_s3"]
-aws-sqs-integration-tests = ["sinks-aws_sqs"]
+aws-sqs-integration-tests = ["sinks-aws_sqs", "sources-aws_sqs"]
 azure-blob-integration-tests = ["sinks-azure_blob"]
 clickhouse-integration-tests = ["sinks-clickhouse", "warp"]
 docker-logs-integration-tests = ["sources-docker_logs", "unix"]
@@ -754,7 +763,7 @@ dnstap-integration-tests = ["sources-dnstap"]
 
 disable-resolv-conf = []
 shutdown-tests = ["rdkafka", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-log_to_metric", "transforms-lua", "unix"]
-cli-tests = ["sinks-blackhole", "sinks-socket", "sources-generator", "sources-file"]
+cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
 
 # grouping together features for benchmarks
 # excluing API client due to running out of memory during linking in Github Actions

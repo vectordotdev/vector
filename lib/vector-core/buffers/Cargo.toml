@@ -29,6 +29,7 @@ tokio-test = "0.4.2"
 metrics-exporter-prometheus = "0.6"
 metrics-util = { version = "0.10.1", default-features = false }
 metrics-tracing-context = { version = "0.8.1", default-features = false }
+serde_yaml = { version = "0.8", default-features = false }
 tracing-subscriber = { version = "0.2.25", default-features = false, features = ["registry"] }
 
 [features]

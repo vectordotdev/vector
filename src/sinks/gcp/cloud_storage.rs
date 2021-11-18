@@ -2,6 +2,7 @@ use super::{GcpAuthConfig, GcpCredentials, Scope};
 use crate::sinks::gcs_common::config::{GcsRetryLogic, BASE_URL};
 use crate::sinks::gcs_common::service::GcsMetadata;
 use crate::sinks::util::partitioner::KeyPartitioner;
+use crate::sinks::util::BulkSizeBasedDefaultBatchSettings;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
@@ -16,7 +17,7 @@ use crate::{
         util::encoding::StandardEncodings,
         util::RequestBuilder,
         util::{
-            batch::{BatchConfig, BatchSettings},
+            batch::BatchConfig,
             encoding::{EncodingConfig, EncodingConfiguration},
             Compression, ServiceBuilderExt, TowerRequestConfig,
         },
@@ -57,7 +58,7 @@ pub struct GcsSinkConfig {
     #[serde(default)]
     compression: Compression,
     #[serde(default)]
-    batch: BatchConfig,
+    batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     request: TowerRequestConfig,
     #[serde(flatten)]
@@ -131,12 +132,6 @@ impl SinkConfig for GcsSinkConfig {
     }
 }
 
-const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = {
-    BatchSettings::const_default()
-        .bytes(10_000_000)
-        .timeout(300)
-};
-
 impl GcsSinkConfig {
     fn build_sink(
         &self,
@@ -150,9 +145,7 @@ impl GcsSinkConfig {
             ..Default::default()
         });
 
-        let batch_settings = DEFAULT_BATCH_SETTINGS
-            .parse_config(self.batch)?
-            .into_batcher_settings()?;
+        let batch_settings = self.batch.into_batcher_settings()?;
 
         let partitioner = self.key_partitioner()?;
 

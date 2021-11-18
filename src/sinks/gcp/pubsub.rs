@@ -1,5 +1,8 @@
+use std::num::NonZeroU64;
+
 use super::{GcpAuthConfig, GcpCredentials, Scope};
 use crate::sinks::gcs_common::config::healthcheck_response;
+use crate::sinks::util::SinkBatchSettings;
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::Event,
@@ -8,7 +11,7 @@ use crate::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpSink},
-            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
+            BatchConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, UriParseError, VectorSink,
     },
@@ -27,6 +30,18 @@ enum HealthcheckError {
     TopicNotFound,
 }
 
+// 10MB maximum message size: https://cloud.google.com/pubsub/quotas#resource_limits
+const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct PubsubDefaultBatchSettings;
+
+impl SinkBatchSettings for PubsubDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(1000);
+    const MAX_BYTES: Option<usize> = Some(10_000_000);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct PubsubConfig {
@@ -39,7 +54,7 @@ pub struct PubsubConfig {
     pub auth: GcpAuthConfig,
 
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<PubsubDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(
@@ -74,11 +89,11 @@ impl_generate_config_from_default!(PubsubConfig);
 impl SinkConfig for PubsubConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = PubsubSink::from_config(self).await?;
-        let batch_settings = BatchSettings::default()
-            .bytes(10_000_000)
-            .events(1000)
-            .timeout(1)
-            .parse_config(self.batch)?;
+        let batch_settings = self
+            .batch
+            .validate()?
+            .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)?
+            .into_batch_settings()?;
         let request_settings = self.request.unwrap_with(&Default::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;

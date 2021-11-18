@@ -1,4 +1,3 @@
-use crate::buffers::Acker;
 use crate::config::log_schema;
 use crate::event::{Event, LogEvent};
 use crate::internal_events::DatadogEventsFieldInvalid;
@@ -12,6 +11,7 @@ use futures::stream::BoxStream;
 use futures::StreamExt;
 use std::num::NonZeroUsize;
 use tower::util::BoxService;
+use vector_core::buffers::Acker;
 
 pub struct DatadogEventsSink {
     pub service: BoxService<DatadogEventsRequest, DatadogEventsResponse, crate::Error>,

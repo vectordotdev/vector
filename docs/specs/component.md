@@ -42,7 +42,7 @@ outline these rules to guide new component development and ongoing maintenance.
 This specification addresses _direct_ component development and does not cover
 aspects that components inherit "for free". For example, this specification does
 not cover global context, such as `component_id`, that all components receive in
-their telemetry by nature of being a Vector compoent.
+their telemetry by nature of being a Vector component.
 
 ## How to read this document
 
@@ -114,8 +114,9 @@ There is leeway in the implementation of these events:
 
 #### BytesReceived
 
-*Sources* MUST emit a `BytesReceived` event immediately after receiving bytes
-from the upstream source and before the creation of a Vector event.
+*Sources* MUST emit a `BytesReceived` event immediately after receiving
+and (optionally) filtering bytes from the upstream source and before the
+creation of a Vector event.
 
 * Properties
   * `byte_size`

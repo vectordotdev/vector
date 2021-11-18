@@ -3,7 +3,7 @@ use crate::kafka::{KafkaAuthConfig, KafkaCompression};
 use crate::serde::to_string;
 use crate::sinks::kafka::sink::{healthcheck, KafkaSink};
 use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
-use crate::sinks::util::BatchConfig;
+use crate::sinks::util::{BatchConfig, NoDefaultsBatchSettings};
 use crate::sinks::{Healthcheck, VectorSink};
 use futures::FutureExt;
 use rdkafka::ClientConfig;
@@ -20,7 +20,7 @@ pub(crate) struct KafkaSinkConfig {
     pub encoding: EncodingConfig<StandardEncodings>,
     /// These batching options will **not** override librdkafka_options values.
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<NoDefaultsBatchSettings>,
     #[serde(default)]
     pub compression: KafkaCompression,
     #[serde(flatten)]

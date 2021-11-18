@@ -1,9 +1,9 @@
 ---
-title: Generator
-description: Generate fake events, which can be useful for testing, benchmarking, and demos
+title: AWS SQS
+description: Collect logs from [AWS SQS](https://aws.amazon.com/sqs)
 kind: source
 layout: component
-tags: ["generator", "random", "fake", "component", "source"]
+tags: ["aws", "sqs", "queue", "component", "source", "logs"]
 ---
 
 {{/*

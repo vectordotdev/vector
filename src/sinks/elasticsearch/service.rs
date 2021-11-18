@@ -1,5 +1,3 @@
-use crate::buffers::Ackable;
-
 use crate::event::{EventFinalizers, EventStatus, Finalizable};
 use crate::http::{Auth, HttpClient};
 use crate::sinks::util::http::{HttpBatchService, RequestConfig};
@@ -10,8 +8,9 @@ use hyper::service::Service;
 use hyper::{Body, Request};
 use std::task::{Context, Poll};
 use tower::ServiceExt;
+use vector_core::buffers::Ackable;
 
-use crate::rusoto::AwsCredentialsProvider;
+use crate::aws::rusoto::AwsCredentialsProvider;
 use crate::sinks::util::{Compression, ElementCount};
 use http::header::HeaderName;
 use hyper::header::HeaderValue;

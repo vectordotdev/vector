@@ -1,6 +1,6 @@
 use super::BulkAction;
+use crate::aws::rusoto::AwsAuthentication;
 use crate::event::{LogEvent, Metric, MetricKind, MetricValue, Value};
-use crate::rusoto::AwsAuthentication;
 use crate::sinks::elasticsearch::sink::process_log;
 use crate::sinks::elasticsearch::{
     DataStreamConfig, ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig,
@@ -279,13 +279,13 @@ fn allows_using_excepted_fields() {
 
 #[test]
 fn validate_host_header_on_aws_requests() {
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(1);
+
     let config = ElasticSearchConfig {
         auth: Some(ElasticSearchAuth::Aws(AwsAuthentication::Default {})),
         endpoint: "http://abc-123.us-east-1.es.amazonaws.com".into(),
-        batch: BatchConfig {
-            max_events: Some(1),
-            ..Default::default()
-        },
+        batch,
         ..Default::default()
     };
 

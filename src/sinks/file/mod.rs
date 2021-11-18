@@ -1,6 +1,5 @@
 use crate::expiring_hash_map::ExpiringHashMap;
 use crate::{
-    buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, EventStatus, Finalizable},
     internal_events::{FileBytesSent, FileOpen, TemplateRenderingFailed},
@@ -20,6 +19,7 @@ use futures::{
 };
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
+use vector_core::buffers::Acker;
 use vector_core::internal_event::EventsSent;
 use vector_core::ByteSizeOf;
 

@@ -1,4 +1,3 @@
-use crate::buffers::Ackable;
 use crate::event::Event;
 use crate::event::{EventFinalizers, Finalizable};
 use crate::sinks::aws_kinesis_streams::sink::KinesisProcessedEvent;
@@ -7,6 +6,7 @@ use crate::sinks::util::{Compression, RequestBuilder};
 use bytes::Bytes;
 use rusoto_kinesis::PutRecordsRequestEntry;
 use std::io;
+use vector_core::buffers::Ackable;
 use vector_core::ByteSizeOf;
 
 pub struct KinesisRequestBuilder {
