@@ -10,6 +10,7 @@ use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::runtime::Builder;
 use tokio::time::sleep;
+use tracing::{debug, error, info};
 
 fn default_config_path() -> String {
     "/etc/vector/soak/observer.toml".to_string()
@@ -142,9 +143,16 @@ impl Worker {
 
         let mut file = File::create(self.capture_path).await?;
 
+        info!(
+            "observing startup delay sleep of {} seconds",
+            self.startup_delay
+        );
         sleep(Duration::from_secs(self.startup_delay)).await;
+        info!("finished with sleep");
+
         file.write_all(b"EXPERIMENT\tVECTOR-ID\tTIME\tQUERY\tVALUE\n")
             .await?;
+        file.flush().await?;
         loop {
             let request = client.get(self.url.clone()).build()?;
             let body = client
@@ -152,6 +160,7 @@ impl Worker {
                 .await?
                 .json::<QueryResponse>()
                 .await?;
+            debug!("body: {:?}", body.data);
 
             if !body.data.result.is_empty() {
                 let time = body.data.result[0].value.time;
@@ -164,8 +173,9 @@ impl Worker {
                     .as_bytes(),
                 )
                 .await?;
+                file.flush().await?;
             } else {
-                // TODO log error to stderr or what not
+                error!("failed to request body: {:?}", body.data);
             }
             sleep(Duration::from_secs(1)).await;
         }
@@ -184,6 +194,7 @@ fn get_config() -> Config {
 }
 
 fn main() {
+    tracing_subscriber::fmt().init();
     let config: Config = get_config();
     let runtime = Builder::new_current_thread()
         .enable_time()
