@@ -7,7 +7,7 @@ releases: "0.18.0": {
 	description: """
 		The Vector team is pleased to announce version 0.18.0!
 
-		Be sure to check out the [upgrade guide](/highlights/2021-11-16-0-18-upgrade-guide) for breaking changes in this release.
+		Be sure to check out the [upgrade guide](/highlights/2021-11-16-0-18-0-upgrade-guide) for breaking changes in this release.
 
 		In case you missed it, we've also released a new unified `vector` helm chart! This new chart can deployed as either
 		as either an agent or aggregator role and so deprecates our existing `vector-agent` and `vector-aggregator` charts.
@@ -128,12 +128,12 @@ releases: "0.18.0": {
 		## Other changes
 
 		- The deprecated `batch.max_size` parameter has been removed in this release.
-		  See the [upgrade guide](/highlights/2021-11-16-0-18-upgrade-guide) for more.
+		  See the [upgrade guide](/highlights/2021-11-16-0-18-0-upgrade-guide) for more.
 		- The deprecated `request.in_flight_limit` has been removed in this release.
-		  See the [upgrade guide](/highlights/2021-11-16-0-18-upgrade-guide) for more.
+		  See the [upgrade guide](/highlights/2021-11-16-0-18-0-upgrade-guide) for more.
 		- The deprecated `host` and `namespace` field on the `datadog_metrics`
 		  sink has been removed. See the [upgrade
-		  guide](/highlights/2021-11-16-0-18-upgrade-guide) for more.
+		  guide](/highlights/2021-11-16-0-18-0-upgrade-guide) for more.
 		"""
 
 	whats_next: [
