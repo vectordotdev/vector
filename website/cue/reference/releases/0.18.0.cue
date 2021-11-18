@@ -99,7 +99,7 @@ releases: "0.18.0": {
 		  Once we have finished this we will post a highlight outlining all of
 		  the added metrics.
 
-		# Bug Fixes:
+		## Bug Fixes:
 
 		- Configuring the number of threads (via `--threads`) for Vector now actually
 		  takes effect again rather than it always using the number of available cores.
