@@ -99,7 +99,7 @@ impl EventFinalizers {
     /// status. This *drops* the finalizer array elements so they may
     /// immediately signal the source batch.
     pub fn update_sources(&mut self) {
-        let finalizers = mem::replace(&mut self.0, vec![].into());
+        let finalizers = mem::take(&mut self.0);
         for finalizer in finalizers.iter() {
             finalizer.update_batch();
         }
