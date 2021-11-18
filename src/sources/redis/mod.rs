@@ -96,7 +96,7 @@ fn redis_source(
         }
     }
 
-    let client = build_client(config).expect("Failed to open redis client.");
+    let client = build_client(config).map_err(|_| "Failed to open redis client.".into())?;
     let key = config.key.clone();
     let redis_key = config.redis_key.clone();
 
