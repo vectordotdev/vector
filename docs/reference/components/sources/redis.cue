@@ -117,7 +117,7 @@ components: sources: redis: {
 		}
 		redis_key: {
 			common:      false
-			description: "The log field name to use for the redis key. If unspecified, the key would not be added to the log event."
+			description: "The log field name to use for the redis key. If unspecified, the key is not added to the log event."
 			required:    false
 			warnings: []
 			type: string: {
