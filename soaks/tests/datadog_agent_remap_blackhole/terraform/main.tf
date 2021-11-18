@@ -48,5 +48,6 @@ module "http-gen" {
   type          = var.type
   http-gen-toml = file("${path.module}/http_gen.toml")
   namespace     = kubernetes_namespace.soak.metadata[0].name
+  lading_image  = var.lading_image
   depends_on    = [module.monitoring, module.vector]
 }
