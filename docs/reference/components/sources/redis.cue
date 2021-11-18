@@ -141,10 +141,9 @@ components: sources: redis: {
 		redis_rs: {
 			title: "redis-rs"
 			body:  """
-				The `redis` source uses [`redis-rs`](\(urls.redis_rs)) under the hood. This
-				is a is a high level redis library for Rust. It provides convenient access to all Redis functionality through a very flexible but low-level API.
-				It uses a customizable type conversion trait so that any operation can return results in just the type you are expecting.
-				This makes for a very pleasant development experience.
+				The `redis` source uses [`redis-rs`](\(urls.redis_rs)) under the hood, which is a high level Redis library
+				for Rust. It provides convenient access to all Redis functionality through a very flexible but low-level
+				API.
 				"""
 		}
 	}
