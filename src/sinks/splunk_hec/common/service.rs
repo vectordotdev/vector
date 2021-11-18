@@ -80,7 +80,7 @@ impl Service<HecRequest> for HecService {
                         if let Some(ack_id) = body.ack_id {
                             let (tx, rx) = oneshot::channel();
                             let _ = ack_id_sender.send((ack_id, tx));
-                            println!("{:?}", rx.await);
+                            println!("got back a status from the acknowledgements {:?}", rx.await);
                         } 
                         // Otherwise, we should return EventStatus::Delivered immediately
                     },
@@ -132,7 +132,7 @@ impl HttpRequestBuilder {
             self.token.as_str(),
             self.compression,
             req.body,
-            "services/collector/event",
+            "/services/collector/event",
         )
         .await
     }
@@ -143,7 +143,7 @@ impl HttpRequestBuilder {
             self.token.as_str(),
             self.compression,
             body,
-            "services/collector/ack",
+            "/services/collector/ack",
         )
         .await
     }
