@@ -321,8 +321,11 @@ impl Expression for FunctionCall {
     }
 
     fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
+        // TODO, dump arguments in order declared in the function
+        // including any unspecified optional parameters.
         for argument in &*self.arguments {
             argument.inner().dump(vm)?;
+            vm.write_chunk(crate::vm::MOVEPARAMETER);
         }
 
         vm.write_chunk(crate::vm::CALL);
