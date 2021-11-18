@@ -41,7 +41,7 @@ use futures::{
     future::{
         self, BoxFuture
     },
-    FutureExt, SinkExt
+    FutureExt, SinkExt, Future
 };
 use http::{
     Request, Uri
@@ -603,6 +603,7 @@ impl Service<NewRelicApiRequest> for NewRelicApiService {
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+        println!("----> poll_ready");
         Poll::Ready(Ok(()))
     }
 
@@ -655,7 +656,7 @@ impl SinkConfig for NewRelicConfig {
             });
 
         let sink = NewRelicSink {
-            service: service,
+            service,
             acker: cx.acker(),
             encoding,
             credentials: NewRelicCredentials::from(self),
@@ -665,6 +666,7 @@ impl SinkConfig for NewRelicConfig {
 
         Ok((
             super::VectorSink::Stream(Box::new(sink)),
+            //TODO: create healthcheck
             future::ok(()).boxed(),
         ))
     }
@@ -702,17 +704,17 @@ impl InternalEvent for NewRelicEventProcessed {
 }
 */
 
-#[derive(Debug)]
-pub enum RequestBuildError {
-    PayloadTooBig,
-    Io { error: std::io::Error },
-}
+// #[derive(Debug)]
+// pub enum RequestBuildError {
+//     PayloadTooBig,
+//     Io { error: std::io::Error },
+// }
 
-impl From<io::Error> for RequestBuildError {
-    fn from(error: io::Error) -> RequestBuildError {
-        RequestBuildError::Io { error }
-    }
-}
+// impl From<io::Error> for RequestBuildError {
+//     fn from(error: io::Error) -> RequestBuildError {
+//         RequestBuildError::Io { error }
+//     }
+// }
 
 struct NewRelicRequestBuilder {
     encoding: EncodingConfigWithDefault<Encoding>,
@@ -720,13 +722,13 @@ struct NewRelicRequestBuilder {
     credentials: NewRelicCredentials
 }
 
-impl RequestBuilder<((), Vec<Event>)> for NewRelicRequestBuilder {
+impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
     type Metadata = NewRelicCredentials;
     type Events = Vec<Event>;
     type Encoder = EncodingConfigWithDefault<Encoding>;
     type Payload = Vec<u8>;
     type Request = NewRelicApiRequest;
-    type Error = RequestBuildError;
+    type Error = std::io::Error;
 
     fn compression(&self) -> Compression {
         todo!()
@@ -736,7 +738,7 @@ impl RequestBuilder<((), Vec<Event>)> for NewRelicRequestBuilder {
         todo!()
     }
 
-    fn split_input(&self, input: ((), Vec<Event>)) -> (Self::Metadata, Self::Events) {
+    fn split_input(&self, input: Vec<Event>) -> (Self::Metadata, Self::Events) {
         todo!()
     }
 
@@ -754,15 +756,14 @@ struct NewRelicSink<S> {
     pub batcher_settings: BatcherSettings,
 }
 
-#[async_trait]
-impl<S> StreamSink for NewRelicSink<S>
+impl<S> NewRelicSink<S>
 where
     S: Service<NewRelicApiRequest> + Send + 'static,
     S::Future: Send + 'static,
     S::Response: AsRef<EventStatus> + Send + 'static,
     S::Error: Debug + Into<crate::Error> + Send,
 {
-    async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run_inner(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         println!("------> EVENT STREAM:\n\n");
 
         let partitioner = NullPartitioner::new();
@@ -775,41 +776,39 @@ where
 
         let sink = input
             .batched(partitioner, self.batcher_settings)
-            .request_builder(builder_limit, request_builder);
-            //TODO: filter map
-            //TODO: into_driver -> we need a service!
+            .map(|(_, batch)| batch)
+            .request_builder(builder_limit, request_builder)
+            .filter_map(|request: Result<NewRelicApiRequest, std::io::Error>| async move {
+                match request {
+                    Err(e) => {
+                        error!("Failed to build New Relic request: {:?}.", e);
+                        None
+                    }
+                    Ok(req) => Some(req),
+                }
+            })
+            .into_driver(self.service, self.acker);
 
         println!("----> SINK:");
         //println!("{:#?}", sink);
         println!("----------------------------------------------------------------------------");
 
-        //let sink = input
-        //.batched(partitioner, self.batcher_settings)
-        //.request_builder(builder_limit, request_builder)
-        //.filter_map(|request| async move {
-        //    match request {
-        //        Err(e) => {
-        //            error!("Failed to build Datadog Logs request: {:?}.", e);
-        //            None
-        //        }
-        //        Ok(req) => Some(req),
-        //    }
-        //})
-        //.into_driver(self.service, self.acker);
-
-        //TODO: filter map and all the stuff
-
-        /*
-        while let Some(event) = input.next().await {
-            self.acker.ack(1);
-            println!("-----------> Event received:\n{:#?}", event);
-            println!("----------------------------------------------------------------------------");
-
-            //emit!(&NewRelicEventProcessed);
-        }
-        */
-
+        let x = sink.run();
+        x.await;
         Ok(())
+    }
+}
+
+#[async_trait]
+impl<S> StreamSink for NewRelicSink<S>
+where
+    S: Service<NewRelicApiRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: AsRef<EventStatus> + Send + 'static,
+    S::Error: Debug + Into<crate::Error> + Send,
+{
+    async fn run(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        self.run_inner(input).await
     }
 }
 
