@@ -89,11 +89,26 @@ pub enum Encoding {
     Default,
 }
 
-impl Encoder<Vec<Event>> for Encoding {
-    fn encode_input(&self, mut input: Vec<Event>, writer: &mut dyn io::Write) -> io::Result<usize> {
-        //TODO: ?
-        println!("---> NewRelicSamplesEncoding encode_input");
-        io::Result::Ok(0)
+impl Encoder<Result<NewRelicApiModel, &'static str>> for EncodingConfigWithDefault<Encoding> {
+    fn encode_input(&self, input: Result<NewRelicApiModel, &'static str>, writer: &mut dyn io::Write) -> io::Result<usize> {
+        if let Ok(api_model) = input {
+            println!("---> EncodingConfigWithDefault encode_input = {:#?}", api_model);
+            let json = match api_model {
+                NewRelicApiModel::Events(ev_api_model) => ev_api_model.to_json(),
+                NewRelicApiModel::Metrics(met_api_model) => met_api_model.to_json(),
+                NewRelicApiModel::Logs(log_api_model) => log_api_model.to_json(),
+            };
+            if let Some(json) = json {
+                writer.write(&json);
+                io::Result::Ok(json.len())
+            }
+            else {
+                io::Result::Ok(0)
+            }
+        }
+        else {
+            io::Result::Ok(0)
+        }
     }
 }
 
@@ -116,30 +131,26 @@ pub enum NewRelicApi {
     Logs
 }
 
-pub trait ToJSON<T> : Serialize + TryFrom<T>
-where
-    <Self as TryFrom<T>>::Error: std::fmt::Display
-{
-    fn to_json(event: T) -> Option<Vec<u8>> {
-        match Self::try_from(event) {
-            Ok(model) => {
-                match serde_json::to_vec(&model) {
-                    Ok(mut json) => {
-                        json.push(b'\n');
-                        Some(json)
-                    },
-                    Err(error) => {
-                        error!(message = "Failed generating JSON.", %error);
-                        None
-                    }
-                }
+pub trait ToJSON : Serialize {
+    fn to_json(&self) -> Option<Vec<u8>> {
+        match serde_json::to_vec(self) {
+            Ok(mut json) => {
+                json.push(b'\n');
+                Some(json)
             },
             Err(error) => {
-                error!(message = "Failed converting model.", %error);
+                error!(message = "Failed generating JSON.", %error);
                 None
             }
         }
     }
+}
+
+#[derive(Debug)]
+pub enum NewRelicApiModel {
+    Metrics(MetricsApiModel),
+    Events(EventsApiModel),
+    Logs(LogsApiModel)
 }
 
 type KeyValData = HashMap<String, Value>;
@@ -168,7 +179,7 @@ impl MetricsApiModel {
     }
 }
 
-impl ToJSON<Vec<Event>> for MetricsApiModel {}
+impl ToJSON for MetricsApiModel {}
 
 impl TryFrom<Vec<Event>> for MetricsApiModel {
     type Error = &'static str;
@@ -224,7 +235,7 @@ impl EventsApiModel {
     }
 }
 
-impl ToJSON<Vec<Event>> for EventsApiModel {}
+impl ToJSON for EventsApiModel {}
 
 impl TryFrom<Vec<Event>> for EventsApiModel {
     type Error = &'static str;
@@ -298,7 +309,7 @@ impl LogsApiModel {
     }
 }
 
-impl ToJSON<Vec<Event>> for LogsApiModel {}
+impl ToJSON for LogsApiModel {}
 
 impl TryFrom<Vec<Event>> for LogsApiModel {
     type Error = &'static str;
@@ -621,15 +632,7 @@ impl Service<NewRelicApiRequest> for NewRelicApiService {
 struct NewRelicCredentials {
     pub license_key: String,
     pub account_id: String,
-}
-
-impl NewRelicCredentials {
-    pub fn empty() -> Self {
-        Self {
-            license_key: String::new(),
-            account_id: String::new()
-        }
-    }
+    pub api: NewRelicApi
 }
 
 impl From<&NewRelicConfig> for NewRelicCredentials {
@@ -637,6 +640,7 @@ impl From<&NewRelicConfig> for NewRelicCredentials {
         Self {
             license_key: config.license_key.clone(),
             account_id: config.account_id.clone(),
+            api: config.api.clone()
         }
     }
 }
@@ -668,6 +672,7 @@ impl SinkConfig for NewRelicConfig {
             service,
             acker: cx.acker(),
             encoding,
+            // TODO: put credentials inside an Arc to avoid cloning it again and again
             credentials: NewRelicCredentials::from(self),
             compression: self.compression,
             batcher_settings,
@@ -733,7 +738,7 @@ struct NewRelicRequestBuilder {
 
 impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
     type Metadata = (NewRelicCredentials, usize, EventFinalizers);
-    type Events = Vec<Event>;
+    type Events = Result<NewRelicApiModel, &'static str>;
     type Encoder = EncodingConfigWithDefault<Encoding>;
     type Payload = Vec<u8>;
     type Request = NewRelicApiRequest;
@@ -751,18 +756,43 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
 
     fn split_input(&self, mut input: Vec<Event>) -> (Self::Metadata, Self::Events) {
         println!("----> NewRelicRequestBuilder split_input = {:#?}", input);
-        //TODO: get real credentials from the input (pass a tuple with credentials and Vec)
         let events_len = input.len();
         let finalizers = input.take_finalizers();
-        let metadata = (NewRelicCredentials::empty(), events_len, finalizers);
-        (metadata, input)
+        let api_mode = || -> Result<NewRelicApiModel, &str> {
+            match self.credentials.api {
+                NewRelicApi::Events => {
+                    Ok(
+                        NewRelicApiModel::Events(
+                            EventsApiModel::try_from(input)?
+                        )
+                    )
+                },
+                NewRelicApi::Metrics => {
+                    Ok(
+                        NewRelicApiModel::Metrics(
+                            MetricsApiModel::try_from(input)?
+                        )
+                    )
+                },
+                NewRelicApi::Logs => {
+                    Ok(
+                        NewRelicApiModel::Logs(
+                            LogsApiModel::try_from(input)?
+                        )
+                    )
+                },
+            }
+        }();
+        let metadata = (self.credentials.clone(), events_len, finalizers);
+        (metadata, api_mode)
     }
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        println!("----> NewRelicRequestBuilder build_request = {:#?}", payload);
+        println!("----> NewRelicRequestBuilder build_request = {:#?}", String::from_utf8_lossy(&payload));
+        let (_credentials, _events_len, finalizers) = metadata;
         NewRelicApiRequest {
             batch_size: 0,
-            finalizers: metadata.2
+            finalizers
         }
     }
 }
