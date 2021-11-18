@@ -66,7 +66,7 @@ resource "kubernetes_deployment" "splunk-hec-blackhole" {
         automount_service_account_token = false
         container {
           image_pull_policy = "IfNotPresent"
-          image             = "ghcr.io/blt/lading:0.5.3"
+          image             = var.lading_image
           name              = "splunk-hec-blackhole"
           command           = ["/splunk_hec_blackhole"]
 
