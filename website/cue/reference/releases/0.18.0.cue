@@ -1,7 +1,7 @@
 package metadata
 
 releases: "0.18.0": {
-	date:     "2021-11-17"
+	date:     "2021-11-18"
 	codename: ""
 
 	description: """
@@ -19,13 +19,13 @@ releases: "0.18.0": {
 
 		- Initial support for routing failed events from transforms has been added,
 		  starting with the `remap` transform. See [the
-		  highlight](/en/highlights/2021-11-16-failed-event-routing) for more.
+		  highlight](/highlights/2021-11-16-failed-event-routing) for more.
 		- Initial support for enriching events from external data sources has been
 		  added via a new Vector concept, enrichment tables. To start, we've added
 		  support for enriching events with data from a CSV file. See [the
 		  highlight](/highlights/2021-11-16-CSV-enrichment) for more.
 		- A new `throttle` transform has been added for controlling costs. See [the
-		  highlight](/highlights/2021-11-12-event-trottle-transform) for more.
+		  highlight](/highlights/2021-11-12-event-throttle-transform) for more.
 		- Better support for breaking up Vector configuration into multiple files
 		  was added via deriving configuration from file and directory names. See
 		  [the highlight](/highlights/2021-11-16-implicit-namespacing) for more.
