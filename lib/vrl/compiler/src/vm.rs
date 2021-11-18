@@ -1,4 +1,4 @@
-use crate::{expression::Literal, Context, Function, Value};
+use crate::{expression::Literal, function::VmArgumentList, Context, Function, Value};
 use std::collections::{BTreeMap, HashMap};
 
 macro_rules! binary_op {
@@ -46,6 +46,8 @@ pub enum OpCode {
     GetPath,
     Call,
     CreateObject,
+    EmptyParameter,
+    MoveParameter,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -67,6 +69,7 @@ pub struct Vm {
     values: Vec<Literal>,
     targets: Vec<Variable>,
     stack: Vec<Value>,
+    parameter_stack: Vec<Option<Value>>,
     ip: usize,
 }
 
@@ -102,6 +105,14 @@ impl Vm {
 
     pub fn stack_mut(&mut self) -> &mut Vec<Value> {
         &mut self.stack
+    }
+
+    pub fn parameter_stack(&self) -> &Vec<Option<Value>> {
+        &self.parameter_stack
+    }
+
+    pub fn parameter_stack_mut(&mut self) -> &mut Vec<Option<Value>> {
+        &mut self.parameter_stack
     }
 
     fn next(&mut self) -> OpCode {
@@ -317,7 +328,10 @@ impl Vm {
                     let function_id = self.next_primitive();
                     let function = &fns[function_id];
 
-                    function.call(self);
+                    let argumentlist = VmArgumentList::new(function.parameters(), self);
+
+                    // TODO Handle errors
+                    self.stack.push(function.call(argumentlist));
                 }
                 OpCode::CreateObject => {
                     let count = self.next_primitive();
@@ -333,6 +347,8 @@ impl Vm {
 
                     self.stack.push(Value::Object(object))
                 }
+                OpCode::EmptyParameter => self.parameter_stack.push(None),
+                OpCode::MoveParameter => self.parameter_stack.push(self.stack.pop()),
             }
         }
     }

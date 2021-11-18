@@ -55,7 +55,9 @@ pub trait Function: Sync + fmt::Debug {
         &[]
     }
 
-    fn call(&self, _vm: &mut Vm) {}
+    fn call(&self, _args: VmArgumentList) -> Value {
+        Value::Null
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -410,5 +412,35 @@ impl diagnostic::DiagnosticError for Error {
 impl From<Error> for Box<dyn diagnostic::DiagnosticError> {
     fn from(error: Error) -> Self {
         Box::new(error) as _
+    }
+}
+
+pub struct VmArgumentList {
+    args: &'static [Parameter],
+    values: Vec<Option<Value>>,
+}
+
+impl VmArgumentList {
+    pub fn new(args: &'static [Parameter], vm: &mut Vm) -> Self {
+        let len = vm.parameter_stack().len();
+        Self {
+            args,
+            values: vm.parameter_stack_mut().drain(len - args.len()..).collect(),
+        }
+    }
+
+    /// Returns the parameter with the given name.
+    /// Note the this can only be called once per parameter since the value is
+    /// removed from the list.
+    pub fn required(&mut self, name: &str) -> Value {
+        // Get the position the given argument is found in the parameter stack.
+        let pos = self
+            .args
+            .iter()
+            .position(|param| param.keyword == name)
+            .expect("parameter doesn't exist");
+
+        // Return the parameter found at this position.
+        self.values[self.args.len() - pos - 1].take().unwrap()
     }
 }
