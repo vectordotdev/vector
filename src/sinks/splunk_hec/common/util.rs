@@ -14,7 +14,17 @@ use crate::{
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use snafu::{ResultExt, Snafu};
+use uuid::Uuid;
 use vector_core::{config::proxy::ProxyConfig, event::EventRef};
+
+// A Splunk channel must be a GUID/UUID formatted value
+// https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/AboutHECIDXAck#About_channels_and_sending_data
+lazy_static::lazy_static! {
+    static ref SPLUNK_CHANNEL: String = {
+        let mut buf = Uuid::encode_buffer();
+        Uuid::new_v4().to_hyphenated().encode_lower(&mut buf).to_string()
+    };
+}
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SplunkHecDefaultBatchSettings;
@@ -73,7 +83,8 @@ pub async fn build_request(
 
     let mut builder = Request::post(uri)
         .header("Content-Type", "application/json")
-        .header("Authorization", format!("Splunk {}", token));
+        .header("Authorization", format!("Splunk {}", token))
+        .header("X-Splunk-Request-Channel", format!("{}", SPLUNK_CHANNEL.as_str()));
 
     if let Some(ce) = compression.content_encoding() {
         builder = builder.header("Content-Encoding", ce);

@@ -1,7 +1,4 @@
-use std::{
-    sync::Arc,
-    task::{Context, Poll},
-};
+use std::{sync::Arc, task::{Context, Poll}};
 
 use crate::sinks::{
     splunk_hec::common::{build_request, request::HecRequest, response::HecResponse},
@@ -9,6 +6,7 @@ use crate::sinks::{
 };
 use futures_util::future::BoxFuture;
 use http::Request;
+use serde::Deserialize;
 use tower::{Service, ServiceExt};
 use vector_core::event::EventStatus;
 
@@ -18,6 +16,14 @@ use crate::{http::HttpClient, sinks::util::Compression};
 pub struct HecService {
     pub batch_service:
         HttpBatchService<BoxFuture<'static, Result<Request<Vec<u8>>, crate::Error>>, HecRequest>,
+}
+
+#[derive(Deserialize, Debug)]
+struct HecAckResponseBody {
+    text: String,
+    code: u8,
+    #[serde(alias = "ackId")]
+    ack_id: Option<u64>,
 }
 
 impl HecService {
@@ -49,6 +55,7 @@ impl Service<HecRequest> for HecService {
             let events_count = req.events_count;
             let events_byte_size = req.events_byte_size;
             let response = http_service.call(req).await?;
+            println!("{:?}", serde_json::from_slice::<HecAckResponseBody>(response.body()));
             let event_status = if response.status().is_success() {
                 EventStatus::Delivered
             } else if response.status().is_server_error() {
