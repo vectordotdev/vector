@@ -11,7 +11,7 @@ use crate::{
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::HttpRetryLogic,
             EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
-            RealtimeEventBasedDefaultBatchSettings, TowerRequestConfig,
+            SinkBatchSettings, TowerRequestConfig,
         },
     },
     template::Template,
@@ -23,9 +23,19 @@ use http::Uri;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use std::num::NonZeroU64;
 use std::task;
 use tower::ServiceBuilder;
 use vector_core::ByteSizeOf;
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct PrometheusRemoteWriteDefaultBatchSettings;
+
+impl SinkBatchSettings for PrometheusRemoteWriteDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(1_000);
+    const MAX_BYTES: Option<usize> = None;
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+}
 
 #[derive(Debug, Snafu)]
 enum Errors {
@@ -46,7 +56,7 @@ pub struct RemoteWriteConfig {
     pub quantiles: Vec<f64>,
 
     #[serde(default)]
-    pub batch: BatchConfig<RealtimeEventBasedDefaultBatchSettings>,
+    pub batch: BatchConfig<PrometheusRemoteWriteDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
 

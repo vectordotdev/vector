@@ -66,7 +66,7 @@ components: transforms: throttle: {
 				unit: null
 			}
 		}
-		window: {
+		window_secs: {
 			description: """
 				The time frame in which the configured `threshold` is applied.
 				"""
