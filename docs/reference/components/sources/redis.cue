@@ -60,7 +60,7 @@ components: sources: redis: {
 
 	configuration: {
 		url: {
-			description: "The Redis URL to connect to. The url _must_ take the form of `redis://server:port/db`."
+			description: "The Redis URL to connect to. The url _must_ take the form of `protocol://server:port/db` where the protocol can either be `redis` or `rediss` for connections secured via TLS."
 			groups: ["tcp"]
 			required: true
 			warnings: []
