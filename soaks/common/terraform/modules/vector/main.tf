@@ -16,7 +16,8 @@ resource "kubernetes_service" "vector" {
   }
   spec {
     selector = {
-      type      = var.type
+      app  = "vector"
+      type = var.type
     }
     session_affinity = "ClientIP"
     port {
@@ -39,7 +40,8 @@ resource "kubernetes_deployment" "vector" {
     name      = "vector"
     namespace = var.namespace
     labels = {
-      type      = var.type
+      app  = "vector"
+      type = var.type
     }
   }
 
@@ -48,14 +50,16 @@ resource "kubernetes_deployment" "vector" {
 
     selector {
       match_labels = {
-        type      = var.type
+        app  = "vector"
+        type = var.type
       }
     }
 
     template {
       metadata {
         labels = {
-          type      = var.type
+          app  = "vector"
+          type = var.type
         }
         annotations = {
           "prometheus.io/scrape" = true
@@ -87,7 +91,7 @@ resource "kubernetes_deployment" "vector" {
             # memory consumption we only make a request here on memory. This
             # avoids vector crashing for want of a malloc.
             limits = {
-              cpu    = var.vector_cpus
+              cpu = var.vector_cpus
             }
             requests = {
               cpu    = var.vector_cpus
