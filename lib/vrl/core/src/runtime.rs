@@ -108,8 +108,12 @@ impl Runtime {
         Ok(values.pop().unwrap_or(Value::Null))
     }
 
-    pub fn compile(&mut self, program: &Program) -> Result<Vm, String> {
-        let mut vm = Vm::new();
+    pub fn compile(
+        &mut self,
+        fns: Vec<Box<dyn Function + Send + Sync>>,
+        program: &Program,
+    ) -> Result<Vm, String> {
+        let mut vm = Vm::new(fns);
 
         for expr in program.iter() {
             expr.dump(&mut vm)?;
@@ -125,10 +129,9 @@ impl Runtime {
         vm: &mut Vm,
         target: &mut dyn Target,
         timezone: &TimeZone,
-        fns: &[Box<dyn Function>],
     ) -> Result<Value, String> {
         let mut context = Context::new(target, &mut self.state, timezone);
         vm.reset();
-        vm.interpret(fns, &mut context)
+        vm.interpret(&mut context)
     }
 }

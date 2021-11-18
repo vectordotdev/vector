@@ -19,7 +19,6 @@ address = "0.0.0.0:8282"
 [transforms.remap]
 type = "remap"
 inputs = ["datadog_agent"]
-use_vm = true
 source = '''
 .hostname = "vector"
 

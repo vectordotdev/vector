@@ -9,7 +9,7 @@ use std::convert::TryFrom;
 pub type Errors = Vec<Box<dyn DiagnosticError>>;
 
 pub struct Compiler<'a> {
-    fns: &'a [Box<dyn Function>],
+    fns: &'a [Box<dyn Function + Send + Sync>],
     state: &'a mut State,
     errors: Errors,
     fallible: bool,
@@ -17,7 +17,7 @@ pub struct Compiler<'a> {
 }
 
 impl<'a> Compiler<'a> {
-    pub(super) fn new(fns: &'a [Box<dyn Function>], state: &'a mut State) -> Self {
+    pub(super) fn new(fns: &'a [Box<dyn Function + Send + Sync>], state: &'a mut State) -> Self {
         Self {
             fns,
             state,

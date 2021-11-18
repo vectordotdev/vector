@@ -146,7 +146,7 @@ fn execute(
     let state = state::Runtime::default();
     let mut runtime = Runtime::new(state);
 
-    let vm = runtime.compile(program).unwrap();
+    let vm = runtime.compile(Default::default(), program).unwrap();
 
     println!("{:#?}", vm.dissassemble());
     Ok(Value::Null)

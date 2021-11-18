@@ -421,12 +421,8 @@ pub struct VmArgumentList {
 }
 
 impl VmArgumentList {
-    pub fn new(args: &'static [Parameter], vm: &mut Vm) -> Self {
-        let len = vm.parameter_stack().len();
-        Self {
-            args,
-            values: vm.parameter_stack_mut().drain(len - args.len()..).collect(),
-        }
+    pub fn new(args: &'static [Parameter], values: Vec<Option<Value>>) -> Self {
+        Self { args, values }
     }
 
     /// Returns the parameter with the given name.
