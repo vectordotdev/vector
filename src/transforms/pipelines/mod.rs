@@ -65,6 +65,7 @@ use crate::config::{
 use crate::transforms::Transform;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 inventory::submit! {
     TransformDescription::new::<PipelinesConfig>("pipelines")
@@ -208,6 +209,11 @@ impl TransformConfig for PipelinesConfig {
     fn transform_type(&self) -> &'static str {
         "pipelines"
     }
+
+    /// The pipelines transform shouldn't be embedded in another pipelines transform.
+    fn nestable(&self, parents: &HashSet<&'static str>) -> bool {
+        !parents.contains(&self.transform_type())
+    }
 }
 
 impl GenerateConfig for PipelinesConfig {
@@ -251,6 +257,7 @@ mod tests {
     use super::{GenerateConfig, PipelinesConfig};
     use crate::config::{ComponentKey, TransformOuter};
     use indexmap::IndexMap;
+    use std::collections::HashSet;
 
     #[test]
     fn generate_config() {
@@ -279,8 +286,9 @@ mod tests {
         let name = ComponentKey::global("foo");
         let mut transforms = IndexMap::new();
         let mut expansions = IndexMap::new();
+        let parents = HashSet::new();
         outer
-            .expand(name, &mut transforms, &mut expansions)
+            .expand(name, &parents, &mut transforms, &mut expansions)
             .unwrap();
         assert_eq!(transforms.len(), 9);
         assert_eq!(
