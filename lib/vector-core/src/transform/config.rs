@@ -1,6 +1,7 @@
 use crate::config::{ComponentKey, GlobalOptions};
 use async_trait::async_trait;
 use indexmap::IndexMap;
+use std::path::Path;
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum DataType {
@@ -69,6 +70,11 @@ pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone 
         &mut self,
     ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
         Ok(None)
+    }
+
+    /// Loading sections of the transform from subdirectories.
+    fn load_from_subdir(&mut self, _path: &Path) -> Result<Vec<String>, Vec<String>> {
+        Ok(Vec::new())
     }
 }
 

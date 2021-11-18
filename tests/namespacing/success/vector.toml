@@ -1,6 +1,11 @@
 # Set global options
 data_dir = "/var/lib/vector"
 
+[sources.syslog]
+  type = "syslog"
+  mode = "tcp"
+  address = "0.0.0.0:9000"
+
 # Sample the data to save on cost
 [transforms.apache_sample]
   inputs       = ["apache_parser"]

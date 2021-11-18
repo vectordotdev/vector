@@ -1,0 +1,82 @@
+name = "AWS S3 access logs"
+
+# Processor 1: Grok Parser: Parsing S3 Access Logs
+[[transforms]]
+type = "remap"
+source = '''
+. |= parse_groks(
+    .message,
+    patterns: [
+        # Access
+        "%{_s3_bucket_owner} %{_s3_bucket} %{_date_access} (?>%{_client_ip}|-) %{_client_id} %{_request_id} %{_s3_operation} %{notSpace} "(?>%{_method} |)%{_url}(?> %{_version}|)" %{_status_code} %{_s3_error_code} (?>%{_bytes_written}|-) (?>%{_object_size}|-) %{_duration} (?>%{_request_processing_time}|-) "%{_referer}" "%{_user_agent}" %{_request_version_id}.*",
+
+        # Fallback
+        "%{_s3_bucket_owner} %{_s3_bucket} %{_date_access} (?>%{_client_ip}|-) %{_client_id} %{_request_id} %{_s3_operation}.*"
+    ]
+    aliases: {
+        "_s3_bucket_owner": "%{notSpace:s3.bucket_owner}",
+        "_s3_bucket": "%{notSpace:s3.bucket}",
+        "_s3_operation": "%{notSpace:s3.operation}",
+        "_s3_error_code": "%{notSpace:s3.error_code:nullIf("-")}",
+        "_request_processing_time": "%{integer:http.request_processing_time}",
+        "_request_id": "%{notSpace:http.request_id}",
+        "_request_version_id": "%{notSpace:http.request_version_id:nullIf("-")}",
+        "_bytes_written": "%{integer:network.bytes_written}",
+        "_bytes_read": "%{integer:network.bytes_read}",
+        "_object_size": "%{integer:network.object_size}",
+        "_client_ip": "%{ipOrHost:network.client.ip}",
+        "_client_id": "%{notSpace:network.client.id}",
+        "_version": "HTTP\/%{regex(\"\\d+\\.\\d+\"):http.version}",
+        "_url": "%{notSpace:http.url}",
+        "_ident": "%{notSpace:http.ident:nullIf("-")}",
+        "_user_agent": "%{regex(\"[^\\\\"]*"):http.useragent}",
+        "_referer": "%{notSpace:http.referer:nullIf("-")}",
+        "_status_code": "%{integer:http.status_code}",
+        "_method": "%{word:http.method}",
+        "_duration": "%{integer:duration:scale(1000000)}",
+        "_date_access \[%{date(\"dd/MMM/yyyy:HH:mm:ss Z\"):date_access}\]"
+    }
+)
+'''
+
+# Processor 2: User-Agent Parser
+[[transforms]]
+type = "remap"
+source = '''
+.http.useragent_details |= parse_user_agent(.http.useragent)
+'''
+
+# Processor 3: Url Parser
+[[transforms]]
+type = "remap"
+source = '''
+.http.url_details |= parse_user_agent(.http.url)
+'''
+
+# Processor 4: Date Remapper: Define date_access as the official timestamp of the log
+[[transforms]]
+type = "remap"
+source = '''
+schema_set_timestamp(.date_access)
+'''
+
+# Processor 5: Category Processor: Categorize status code
+[[transforms]]
+type = "remap"
+source = '''
+.http.status_category = switch http.status_code {
+when 200...299:
+    "OK"
+when 300...399:
+    "notice"
+when 400...499:
+    "warning"
+}
+'''
+
+# Processor 6: Status Remapper: Set the log status based on the status code value
+[[transforms]]
+type = "remap"
+source = '''
+schema_set_status(.http.status_category)
+'''

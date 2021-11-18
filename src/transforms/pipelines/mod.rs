@@ -62,11 +62,13 @@ mod router;
 
 use crate::conditions::AnyCondition;
 use crate::config::{
-    DataType, ExpandType, GenerateConfig, TransformConfig, TransformContext, TransformDescription,
+    DataType, ExpandType, GenerateConfig, LoadableConfig, TransformConfig, TransformContext,
+    TransformDescription,
 };
 use crate::transforms::Transform;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 inventory::submit! {
     TransformDescription::new::<PipelinesConfig>("pipelines")
@@ -114,13 +116,34 @@ impl PipelineConfig {
     }
 }
 
+impl LoadableConfig for PipelineConfig {}
+
+#[cfg(test)]
+impl PipelineConfig {
+    pub fn transforms(&self) -> &Vec<Box<dyn TransformConfig>> {
+        &self.transforms
+    }
+}
+
 /// This represent an ordered list of pipelines depending on the event type.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct EventTypeConfig {
     #[serde(default)]
     order: Option<Vec<String>>,
+    #[serde(default)]
     pipelines: IndexMap<String, PipelineConfig>,
+}
+
+#[cfg(test)]
+impl EventTypeConfig {
+    pub fn order(&self) -> &Option<Vec<String>> {
+        &self.order
+    }
+
+    pub fn pipelines(&self) -> &IndexMap<String, PipelineConfig> {
+        &self.pipelines
+    }
 }
 
 impl EventTypeConfig {
@@ -157,6 +180,23 @@ impl EventTypeConfig {
     }
 }
 
+impl LoadableConfig for EventTypeConfig {
+    fn load_subfolder(&mut self, path: &Path) -> Result<Vec<String>, Vec<String>> {
+        match PipelineConfig::load_from_dir(path) {
+            Ok((pipelines, warnings)) => {
+                self.pipelines.extend(
+                    pipelines
+                        .into_iter()
+                        .map(|(key, value)| (key.to_string(), value)),
+                );
+                println!("loaded pipelines {:?}", self.pipelines.keys());
+                Ok(warnings)
+            }
+            Err(errors) => Err(errors),
+        }
+    }
+}
+
 /// The configuration of the pipelines transform itself.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct PipelinesConfig {
@@ -164,6 +204,17 @@ pub struct PipelinesConfig {
     logs: EventTypeConfig,
     #[serde(default)]
     metrics: EventTypeConfig,
+}
+
+#[cfg(test)]
+impl PipelinesConfig {
+    pub fn logs(&self) -> &EventTypeConfig {
+        &self.logs
+    }
+
+    pub fn metrics(&self) -> &EventTypeConfig {
+        &self.metrics
+    }
 }
 
 impl PipelinesConfig {
@@ -217,6 +268,35 @@ impl TransformConfig for PipelinesConfig {
 
     fn transform_type(&self) -> &'static str {
         "pipelines"
+    }
+
+    fn load_from_subdir(&mut self, path: &Path) -> Result<Vec<String>, Vec<String>> {
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+
+        let logs_path = path.join("logs");
+        if logs_path.is_dir() {
+            println!("load logs folder");
+            match self.logs.load_subfolder(&logs_path) {
+                Ok(warns) => warnings.extend(warns),
+                Err(errs) => errors.extend(errs),
+            }
+        }
+
+        let metrics_path = path.join("metrics");
+        if metrics_path.is_dir() {
+            println!("load metrics folder");
+            match self.metrics.load_subfolder(&logs_path) {
+                Ok(warns) => warnings.extend(warns),
+                Err(errs) => errors.extend(errs),
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(warnings)
+        } else {
+            Err(errors)
+        }
     }
 }
 

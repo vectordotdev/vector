@@ -37,14 +37,14 @@ lazy_static! {
     pub static ref CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::default();
 }
 
-fn component_name(path: &Path) -> Result<String, Vec<String>> {
+pub fn component_name(path: &Path) -> Result<String, Vec<String>> {
     path.file_stem()
         .and_then(|name| name.to_str())
         .map(|name| name.to_string())
         .ok_or_else(|| vec![format!("Couldn't get component name for file: {:?}", path)])
 }
 
-trait LoadableConfig: Sized + serde::de::DeserializeOwned {
+pub trait LoadableConfig: Sized + serde::de::DeserializeOwned {
     fn load_from_file(
         path: &Path,
     ) -> Result<Option<(ComponentKey, Self, Vec<String>)>, Vec<String>> {
@@ -67,25 +67,51 @@ trait LoadableConfig: Sized + serde::de::DeserializeOwned {
             .map_err(|err| vec![format!("Could not read config dir: {:?}, {}.", path, err)])?;
         let mut warnings = Vec::new();
         let mut errors = Vec::new();
-        for res in readdir {
-            match res {
-                Ok(direntry) => {
-                    let entry_path = direntry.path();
-                    if entry_path.is_file() {
-                        match Self::load_from_file(&entry_path) {
-                            Ok(Some((name, component, warns))) => {
-                                result.insert(name, component);
-                                warnings.extend(warns);
-                            }
-                            Ok(None) => (),
-                            Err(errs) => errors.extend(errs),
-                        }
-                    }
-                }
+        let (files, folders) = readdir
+            .into_iter()
+            .filter_map(|direntry| match direntry {
+                Ok(value) => Some(value.path()),
                 Err(err) => {
                     errors.push(format!(
                         "Could not read file in config dir: {:?}, {}.",
                         path, err
+                    ));
+                    None
+                }
+            })
+            .fold(
+                (Vec::new(), Vec::new()),
+                |(mut files, mut folders), entry| {
+                    if entry.is_file() {
+                        files.push(entry);
+                    } else if entry.is_dir() {
+                        folders.push(entry);
+                    }
+                    (files, folders)
+                },
+            );
+        // To merge the subfolders with and existing config, we need first to load the files.
+        for entry in files {
+            match Self::load_from_file(&entry) {
+                Ok(Some((name, component, warns))) => {
+                    result.insert(name, component);
+                    warnings.extend(warns);
+                }
+                Ok(None) => (),
+                Err(errs) => errors.extend(errs),
+            }
+        }
+        for entry in folders {
+            if let Ok(name) = component_name(&entry).map(ComponentKey::from) {
+                if let Some(existing) = result.get_mut(&name) {
+                    match existing.load_subfolder(&entry) {
+                        Ok(warns) => warnings.extend(warns),
+                        Err(errs) => errors.extend(errs),
+                    }
+                } else {
+                    errors.push(format!(
+                        "You need a configuration file to load the component {:?} with subfolders",
+                        name
                     ));
                 }
             }
@@ -103,10 +129,15 @@ trait LoadableConfig: Sized + serde::de::DeserializeOwned {
 }
 
 impl LoadableConfig for EnrichmentTableOuter {}
-impl LoadableConfig for TransformOuter<String> {}
 impl LoadableConfig for SinkOuter<String> {}
 impl LoadableConfig for SourceOuter {}
 impl LoadableConfig for TestDefinition {}
+
+impl LoadableConfig for TransformOuter<String> {
+    fn load_subfolder(&mut self, path: &Path) -> Result<Vec<String>, Vec<String>> {
+        self.inner.load_from_subdir(path)
+    }
+}
 
 impl LoadableConfig for ConfigBuilder {
     fn load_subfolder(&mut self, path: &Path) -> Result<Vec<String>, Vec<String>> {
@@ -411,6 +442,7 @@ where
 mod tests {
     use super::load_builder_from_paths;
     use crate::config::{ComponentKey, ConfigPath};
+    use crate::transforms::pipelines::PipelinesConfig;
     use std::path::PathBuf;
 
     #[test]
@@ -431,6 +463,23 @@ mod tests {
         assert!(builder
             .sinks
             .contains_key(&ComponentKey::from("es_cluster")));
+        assert!(builder
+            .transforms
+            .contains_key(&ComponentKey::from("processing")));
+        let processing = builder
+            .transforms
+            .get(&ComponentKey::from("processing"))
+            .unwrap();
+        let processing = serde_json::to_value(&processing.inner).unwrap();
+        let processing: PipelinesConfig = serde_json::from_value(processing).unwrap();
+        assert!(processing.logs().order().is_some());
+        assert!(processing.metrics().order().is_none());
+        let aws_s3_access_logs = processing
+            .logs()
+            .pipelines()
+            .get("aws_s3_access_logs")
+            .unwrap();
+        assert_eq!(aws_s3_access_logs.transforms().len(), 6);
         assert_eq!(builder.tests.len(), 2);
     }
 

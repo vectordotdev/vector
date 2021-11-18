@@ -1,0 +1,7 @@
+type = "pipelines"
+inputs = ["datadog_agent", "syslog"]
+mode = "linear"
+
+[logs]
+order = ["aws_s3_access_logs", "sudo"]
+

@@ -1,0 +1,2 @@
+type = "datadog_agent"
+address = "0.0.0.0:81"
