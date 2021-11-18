@@ -220,7 +220,6 @@ jobs:
         uses: actions/checkout@v2.4.0
 
       - name: Run baseline experiment
-        if: steps.cache-primes.outputs.cache-hit != 'true'
         run: |
           rm -rf /tmp/${{ github.event.number }}-${{ github.run_attempt }}/
           mkdir -p /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
@@ -239,6 +238,10 @@ jobs:
           name: ${{ github.event.number }}-${{ github.run_attempt }}-${{ matrix.target }}-baseline
           path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/baseline.captures
 
+      - name: Clear up unused images
+        run: |
+          docker system prune --all
+
   soak-comparison:
     name: Soak (${{ matrix.target }}) - comparison
     if: ${{ github.actor != 'dependabot[bot]' }}
@@ -251,7 +254,6 @@ jobs:
         uses: actions/checkout@v2.4.0
 
       - name: Run comparison experiment
-        if: steps.cache-primes.outputs.cache-hit != 'true'
         run: |
           rm -rf /tmp/${{ github.event.number }}-${{ github.run_attempt }}/
           mkdir -p /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
@@ -269,6 +271,10 @@ jobs:
         with:
           name: ${{ github.event.number }}-${{ github.run_attempt }}-${{ matrix.target }}-comparison
           path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/comparison.captures
+
+      - name: Clear up unused images
+        run: |
+          docker system prune --all
 
   analyze-results:
     name: Soak analysis
