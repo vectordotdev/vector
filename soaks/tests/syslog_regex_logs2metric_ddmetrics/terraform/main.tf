@@ -48,6 +48,7 @@ module "http-blackhole" {
   type                = var.type
   http-blackhole-toml = file("${path.module}/http_blackhole.toml")
   namespace           = kubernetes_namespace.soak.metadata[0].name
+  lading_image        = var.lading_image
   depends_on          = [module.monitoring]
 }
 module "tcp-gen" {
@@ -55,5 +56,6 @@ module "tcp-gen" {
   type         = var.type
   tcp-gen-toml = file("${path.module}/tcp_gen.toml")
   namespace    = kubernetes_namespace.soak.metadata[0].name
+  lading_image = var.lading_image
   depends_on   = [module.monitoring, module.vector]
 }

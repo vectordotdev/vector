@@ -1,22 +1,22 @@
 resource "kubernetes_config_map" "lading" {
   metadata {
-    name      = "lading-tcp-gen"
+    name      = "lading-splunk-hec-gen"
     namespace = var.namespace
   }
 
   data = {
-    "tcp_gen.toml" = var.tcp-gen-toml
+    "splunk_hec_gen.toml" = var.splunk-hec-gen-toml
   }
 }
 
-resource "kubernetes_service" "tcp-gen" {
+resource "kubernetes_service" "splunk-hec-gen" {
   metadata {
-    name      = "tcp-gen"
+    name      = "splunk-hec-gen"
     namespace = var.namespace
   }
   spec {
     selector = {
-      app  = "tcp-gen"
+      app  = "splunk-hec-gen"
       type = var.type
     }
     session_affinity = "ClientIP"
@@ -29,12 +29,12 @@ resource "kubernetes_service" "tcp-gen" {
   }
 }
 
-resource "kubernetes_deployment" "tcp-gen" {
+resource "kubernetes_deployment" "splunk-hec-gen" {
   metadata {
-    name      = "tcp-gen"
+    name      = "splunk-hec-gen"
     namespace = var.namespace
     labels = {
-      app  = "tcp-gen"
+      app  = "splunk-hec-gen"
       type = var.type
     }
   }
@@ -44,7 +44,7 @@ resource "kubernetes_deployment" "tcp-gen" {
 
     selector {
       match_labels = {
-        app  = "tcp-gen"
+        app  = "splunk-hec-gen"
         type = var.type
       }
     }
@@ -52,7 +52,7 @@ resource "kubernetes_deployment" "tcp-gen" {
     template {
       metadata {
         labels = {
-          app  = "tcp-gen"
+          app  = "splunk-hec-gen"
           type = var.type
         }
         annotations = {
@@ -67,8 +67,8 @@ resource "kubernetes_deployment" "tcp-gen" {
         container {
           image_pull_policy = "IfNotPresent"
           image             = var.lading_image
-          name              = "tcp-gen"
-          command           = ["/tcp_gen"]
+          name              = "splunk-hec-gen"
+          command           = ["/splunk_hec_gen"]
 
           volume_mount {
             mount_path = "/etc/lading"
