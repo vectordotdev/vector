@@ -17,10 +17,7 @@ pub fn subscribe(
     let mut out = out.sink_map_err(|error| error!(message="Error sending event.", %error));
     let fut = async move {
         trace!("Get redis async connection.");
-        let conn = client
-            .get_async_connection()
-            .await
-            .expect("Failed to get redis async connection.");
+        let conn = client.get_async_connection().await.map_err(|_| ())?;
         trace!("Get redis async connection success.");
         let mut pubsub_conn = conn.into_pubsub();
         trace!("Subscrib channel:{}.", key.as_str());

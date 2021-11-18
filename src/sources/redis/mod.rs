@@ -7,6 +7,7 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
+use redis::{Client, RedisResult};
 use serde::{Deserialize, Serialize};
 
 mod channel;
@@ -96,7 +97,7 @@ fn redis_source(
         }
     }
 
-    let client = build_client(config).map_err(|_| "Failed to open redis client.".into())?;
+    let client = build_client(config).map_err(|_| "Failed to open redis client.")?;
     let key = config.key.clone();
     let redis_key = config.redis_key.clone();
 
@@ -118,11 +119,11 @@ fn redis_source(
     }
 }
 
-fn build_client(config: &RedisSourceConfig) -> crate::Result<redis::Client> {
+fn build_client(config: &RedisSourceConfig) -> RedisResult<Client> {
     trace!("Open redis client.");
-    let client = redis::Client::open(config.url.as_str())?;
+    let client = redis::Client::open(config.url.as_str());
     trace!("Open redis client successed.");
-    Ok(client)
+    client
 }
 
 fn create_event(line: &str, key: String, redis_key: &Option<String>) -> Event {
@@ -192,10 +193,7 @@ mod integration_test {
     async fn send_event_by_list(key: String, text: &str) {
         let client = redis::Client::open(REDIS_SERVER).unwrap();
         trace!("Get redis connection manager.");
-        let mut conn = client
-            .get_tokio_connection_manager()
-            .await
-            .expect("Failed to get redis async connection.");
+        let mut conn = client.get_tokio_connection_manager().await.unwrap();
         trace!("Get redis connection manager success.");
         let res: RedisResult<i32> = conn.lpush(key, text).await;
         match res {
