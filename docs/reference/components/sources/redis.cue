@@ -80,7 +80,7 @@ components: sources: redis: {
 		}
 		data_type: {
 			common:      false
-			description: "The Redis Data Type(list or channel) to use."
+			description: "The Redis data type (`list` or `channel`) to use."
 			required:    false
 			type: string: {
 				default: "list"
