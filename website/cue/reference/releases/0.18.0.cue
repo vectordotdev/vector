@@ -49,7 +49,7 @@ releases: "0.18.0": {
 		  - `buffer_discarded_events_total`: The number of events that have been
 			discarded from the buffer because it is full (relevant when `when_full` is
 			`drop_newest`)
-		  - The `$LOG` environment variable for configuring the Vector log level has
+		- The `$LOG` environment variable for configuring the Vector log level has
 			been renamed to `$VECTOR_LOG`. `$LOG` is still also accepted for backwards
 			compatibility. This change makes logging configuration more in-line with
 			Vector's other environment variable based options, and isolates Vector from
