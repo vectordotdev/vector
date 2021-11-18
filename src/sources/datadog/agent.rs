@@ -11,8 +11,7 @@ use crate::{
         Event,
     },
     internal_events::{
-        DatadogAgentLogDecoded, DatadogAgentMetricDecoded, DatadogAgentRequestReceived,
-        HttpDecompressError,
+        DatadogAgentLogDecoded, DatadogAgentMetricDecoded, HttpBytesReceived, HttpDecompressError,
     },
     serde::{default_decoding, default_framing_message_based},
     sources::{
@@ -87,9 +86,8 @@ impl GenerateConfig for DatadogAgentConfig {
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
-        let source = DatadogAgentSource::new(self.store_api_key, decoder);
-
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let source = DatadogAgentSource::new(self.store_api_key, decoder, tls.http_protocol_name());
         let listener = tls.bind(&self.address).await?;
         let log_service = source
             .clone()
@@ -153,6 +151,7 @@ struct DatadogAgentSource {
     log_schema_timestamp_key: &'static str,
     log_schema_source_type_key: &'static str,
     decoder: codecs::Decoder,
+    protocol: &'static str,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -161,7 +160,7 @@ struct DatadogSeriesRequest {
 }
 
 impl DatadogAgentSource {
-    fn new(store_api_key: bool, decoder: codecs::Decoder) -> Self {
+    fn new(store_api_key: bool, decoder: codecs::Decoder, protocol: &'static str) -> Self {
         Self {
             store_api_key,
             api_key_matcher: Regex::new(r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??")
@@ -169,6 +168,7 @@ impl DatadogAgentSource {
             log_schema_source_type_key: log_schema().source_type_key(),
             log_schema_timestamp_key: log_schema().timestamp_key(),
             decoder,
+            protocol,
         }
     }
 
@@ -244,6 +244,11 @@ impl DatadogAgentSource {
                       api_token: Option<String>,
                       query_params: ApiKeyQueryParams,
                       body: Bytes| {
+                    emit!(&HttpBytesReceived {
+                        byte_size: body.len(),
+                        http_path: path.as_str(),
+                        protocol: self.protocol,
+                    });
                     let events = decode(&encoding_header, body).and_then(|body| {
                         self.decode_log_body(
                             body,
@@ -270,6 +275,11 @@ impl DatadogAgentSource {
                       api_token: Option<String>,
                       query_params: ApiKeyQueryParams,
                       body: Bytes| {
+                    emit!(&HttpBytesReceived {
+                        byte_size: body.len(),
+                        http_path: path.as_str(),
+                        protocol: self.protocol,
+                    });
                     let events = decode(&encoding_header, body).and_then(|body| {
                         self.decode_datadog_series(
                             body,
@@ -313,6 +323,11 @@ impl DatadogAgentSource {
                       api_token: Option<String>,
                       query_params: ApiKeyQueryParams,
                       body: Bytes| {
+                    emit!(&HttpBytesReceived {
+                        byte_size: body.len(),
+                        http_path: path.as_str(),
+                        protocol: self.protocol,
+                    });
                     let events = decode(&encoding_header, body).and_then(|body| {
                         self.decode_datadog_sketches(
                             body,
@@ -487,9 +502,6 @@ fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMessag
             }
         }
     }
-    emit!(&DatadogAgentRequestReceived {
-        byte_size: body.len(),
-    });
     Ok(body)
 }
 
@@ -502,7 +514,7 @@ fn into_vector_metric(dd_metric: DatadogSeriesMetric, api_key: Option<Arc<str>>)
     dd_metric
         .host
         .as_ref()
-        .and_then(|host| tags.insert("host".into(), host.to_owned()));
+        .and_then(|host| tags.insert(log_schema().host_key().to_owned(), host.to_owned()));
     dd_metric
         .source_type_name
         .as_ref()
@@ -525,15 +537,7 @@ fn into_vector_metric(dd_metric: DatadogSeriesMetric, api_key: Option<Arc<str>>)
                 .with_timestamp(Some(Utc.timestamp(dd_point.0, 0)))
                 .with_tags(Some(tags.clone()))
             })
-            .map(|mut metric| {
-                if let Some(k) = &api_key {
-                    metric
-                        .metadata_mut()
-                        .set_datadog_api_key(Some(Arc::clone(k)));
-                }
-                metric.into()
-            })
-            .collect(),
+            .collect::<Vec<_>>(),
         DatadogMetricType::Gauge => dd_metric
             .points
             .iter()
@@ -546,15 +550,7 @@ fn into_vector_metric(dd_metric: DatadogSeriesMetric, api_key: Option<Arc<str>>)
                 .with_timestamp(Some(Utc.timestamp(dd_point.0, 0)))
                 .with_tags(Some(tags.clone()))
             })
-            .map(|mut metric| {
-                if let Some(k) = &api_key {
-                    metric
-                        .metadata_mut()
-                        .set_datadog_api_key(Some(Arc::clone(k)));
-                }
-                metric.into()
-            })
-            .collect(),
+            .collect::<Vec<_>>(),
         // Agent sends rate only for dogstatsd counter https://github.com/DataDog/datadog-agent/blob/f4a13c6dca5e2da4bb722f861a8ac4c2f715531d/pkg/metrics/counter.go#L8-L10
         // for consistency purpose (w.r.t. (dog)statsd source) they are turned back into counters
         DatadogMetricType::Rate => dd_metric
@@ -572,16 +568,18 @@ fn into_vector_metric(dd_metric: DatadogSeriesMetric, api_key: Option<Arc<str>>)
                 .with_timestamp(Some(Utc.timestamp(dd_point.0, 0)))
                 .with_tags(Some(tags.clone()))
             })
-            .map(|mut metric| {
-                if let Some(k) = &api_key {
-                    metric
-                        .metadata_mut()
-                        .set_datadog_api_key(Some(Arc::clone(k)));
-                }
-                metric.into()
-            })
-            .collect(),
+            .collect::<Vec<_>>(),
     }
+    .into_iter()
+    .map(|mut metric| {
+        if let Some(k) = &api_key {
+            metric
+                .metadata_mut()
+                .set_datadog_api_key(Some(Arc::clone(k)));
+        }
+        metric.into()
+    })
+    .collect()
 }
 
 fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMessage {
@@ -663,7 +661,7 @@ mod tests {
 
             let decoder =
                 codecs::Decoder::new(Box::new(BytesCodec::new()), Box::new(BytesParser::new()));
-            let source = DatadogAgentSource::new(true, decoder);
+            let source = DatadogAgentSource::new(true, decoder, "http");
             let events = source.decode_log_body(body, api_key).unwrap();
             assert_eq!(events.len(), msgs.len());
             for (msg, event) in msgs.into_iter().zip(events.into_iter()) {
@@ -1357,7 +1355,7 @@ mod tests {
                 metric.timestamp(),
                 Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10))
             );
-            assert_eq!(metric.kind(), MetricKind::Absolute);
+            assert_eq!(metric.kind(), MetricKind::Incremental);
             assert_eq!(metric.tags().unwrap()["host"], "a_host".to_string());
             assert_eq!(metric.tags().unwrap()["foo"], "bar".to_string());
             assert_eq!(metric.tags().unwrap()["foobar"], "".to_string());

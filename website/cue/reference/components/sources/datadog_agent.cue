@@ -142,6 +142,5 @@ components: sources: datadog_agent: {
 		datadog_logs_received_in_total:       components.sources.internal_metrics.output.metrics.datadog_logs_received_in_total
 		datadog_metrics_received_in_total:    components.sources.internal_metrics.output.metrics.datadog_metrics_received_in_total
 		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
-		requests_received_total:              components.sources.internal_metrics.output.metrics.requests_received_total
 	}
 }

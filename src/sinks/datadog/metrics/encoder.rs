@@ -186,8 +186,12 @@ impl DatadogMetricsEncoder {
             // Series metrics are encoded via JSON, in an incremental fashion.
             DatadogMetricsEndpoint::Series => {
                 // A single `Metric` might generate multiple Datadog series metrics.
-                let all_series =
-                    generate_series_metrics(&metric, &self.default_namespace, self.last_sent)?;
+                let all_series = generate_series_metrics(
+                    &metric,
+                    &self.default_namespace,
+                    self.log_schema,
+                    self.last_sent,
+                )?;
 
                 // We handle adding the JSON array separator (comma) manually since the encoding is
                 // happening incrementally.
@@ -410,11 +414,18 @@ fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
 fn generate_series_metrics(
     metric: &Metric,
     default_namespace: &Option<Arc<str>>,
+    log_schema: &'static LogSchema,
     last_sent: Option<Instant>,
 ) -> Result<Vec<DatadogSeriesMetric>, EncoderError> {
     let name = get_namespaced_name(metric, default_namespace);
+
+    let mut tags = metric.tags().cloned().unwrap_or_default();
+    let host = tags.remove(log_schema.host_key());
+    let source_type_name = tags.remove("source_type_name");
+    let device = tags.remove("device");
     let ts = encode_timestamp(metric.timestamp());
-    let tags = metric.tags().map(encode_tags);
+    let tags = Some(encode_tags(&tags));
+    // let tags = metric.tags().map(encode_tags);
     let interval = last_sent
         .map(|then| then.elapsed())
         .map(|d| d.as_secs().try_into().unwrap_or(i64::MAX));
@@ -426,9 +437,9 @@ fn generate_series_metrics(
             interval,
             points: vec![DatadogPoint(ts, *value)],
             tags,
-            host: None,
-            source_type_name: None,
-            device: None,
+            host,
+            source_type_name,
+            device,
         }],
         MetricValue::Set { values } => vec![DatadogSeriesMetric {
             metric: name,
@@ -436,9 +447,9 @@ fn generate_series_metrics(
             interval: None,
             points: vec![DatadogPoint(ts, values.len() as f64)],
             tags,
-            host: None,
-            source_type_name: None,
-            device: None,
+            host,
+            source_type_name,
+            device,
         }],
         MetricValue::Gauge { value } => vec![DatadogSeriesMetric {
             metric: name,
@@ -446,9 +457,9 @@ fn generate_series_metrics(
             interval: None,
             points: vec![DatadogPoint(ts, *value)],
             tags,
-            host: None,
-            source_type_name: None,
-            device: None,
+            host,
+            source_type_name,
+            device,
         }],
         MetricValue::AggregatedSummary {
             quantiles,
@@ -462,9 +473,9 @@ fn generate_series_metrics(
                     interval,
                     points: vec![DatadogPoint(ts, f64::from(*count))],
                     tags: tags.clone(),
-                    host: None,
-                    source_type_name: None,
-                    device: None,
+                    host: host.clone(),
+                    source_type_name: source_type_name.clone(),
+                    device: device.clone(),
                 },
                 DatadogSeriesMetric {
                     metric: format!("{}.sum", &name),
@@ -472,9 +483,9 @@ fn generate_series_metrics(
                     interval: None,
                     points: vec![DatadogPoint(ts, *sum)],
                     tags: tags.clone(),
-                    host: None,
-                    source_type_name: None,
-                    device: None,
+                    host: host.clone(),
+                    source_type_name: source_type_name.clone(),
+                    device: device.clone(),
                 },
             ];
 
@@ -485,9 +496,9 @@ fn generate_series_metrics(
                     interval: None,
                     points: vec![DatadogPoint(ts, quantile.value)],
                     tags: tags.clone(),
-                    host: None,
-                    source_type_name: None,
-                    device: None,
+                    host: host.clone(),
+                    source_type_name: source_type_name.clone(),
+                    device: device.clone(),
                 })
             }
             results

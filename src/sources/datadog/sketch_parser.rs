@@ -52,7 +52,7 @@ pub(crate) fn decode_ddsketch(frame: Bytes, api_key: Option<Arc<str>>) -> Result
                         .unwrap_or_else(AgentDDSketch::with_agent_defaults),
                     );
                     let mut metric =
-                        Metric::new(sketch_series.metric.clone(), MetricKind::Absolute, val)
+                        Metric::new(sketch_series.metric.clone(), MetricKind::Incremental, val)
                             .with_tags(Some(tags.clone()))
                             .with_timestamp(Some(Utc.timestamp(sketch.ts, 0)));
                     if let Some(k) = &api_key {

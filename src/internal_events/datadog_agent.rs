@@ -2,22 +2,6 @@ use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub struct DatadogAgentRequestReceived {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for DatadogAgentRequestReceived {
-    fn emit_logs(&self) {
-        trace!(message = "Received requests.", byte_size = ?self.byte_size);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("component_received_bytes_total", self.byte_size as u64,);
-        counter!("requests_received_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub struct DatadogAgentMetricDecoded {
     pub byte_size: usize,
     pub count: usize,

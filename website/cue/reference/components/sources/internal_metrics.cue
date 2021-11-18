@@ -596,13 +596,13 @@ components: sources: internal_metrics: {
 		}
 		datadog_logs_received_in_total: {
 			description:       "Number of Datadog logs received."
-			type:              "gauge"
+			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
 		datadog_metrics_received_in_total: {
 			description:       "Number of Datadog metrics received."
-			type:              "gauge"
+			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
