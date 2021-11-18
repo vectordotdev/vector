@@ -101,7 +101,7 @@ components: sources: redis: {
 				options: {
 					method: {
 						common:      false
-						description: "The Method(brpop or blpop) to pop messages when data_type is list."
+						description: "The method (`brpop` or `blpop`) to pop messages when `data_type` is list."
 						required:    false
 						type: string: {
 							default: "blpop"
