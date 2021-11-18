@@ -110,7 +110,9 @@ impl IndexerAcknowledgement {
     ) -> Result<u64, Rejection> {
         let channel = self.create_or_get_channel(channel_id).await?;
         let total_pending_acks = self.total_pending_acks.fetch_add(1, Ordering::Relaxed) + 1;
-        if total_pending_acks > self.max_pending_acks && !self.drop_oldest_pending_ack_from_channels().await {
+        if total_pending_acks > self.max_pending_acks
+            && !self.drop_oldest_pending_ack_from_channels().await
+        {
             self.total_pending_acks.fetch_sub(1, Ordering::Relaxed);
             return Err(Rejection::from(ApiError::ServiceUnavailable));
         }
@@ -371,14 +373,13 @@ mod tests {
             .get_ack_id_from_channel(channel.clone(), batch_rx)
             .await
             .unwrap();
-        
+
         let (_tx, batch_rx) = BatchNotifier::new_with_receiver();
         assert!(idx_ack
             .get_ack_id_from_channel(channel.clone(), batch_rx)
             .await
             .is_err());
     }
-
 
     #[tokio::test]
     async fn test_indexer_ack_create_channels() {
