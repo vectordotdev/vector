@@ -8302,6 +8302,7 @@ dependencies = [
  "cidr-utils",
  "criterion",
  "csv",
+ "datadog-grok",
  "datadog-search-syntax",
  "dns-lookup",
  "grok",

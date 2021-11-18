@@ -18,11 +18,15 @@ pub enum Error {
 }
 
 /// Parses a given source field value by applying the list of grok rules until the first match found.
-pub fn parse_grok(source_field: &str, grok_rules: &[GrokRule]) -> Result<Value, Error> {
+pub fn parse_grok(
+    source_field: &str,
+    grok_rules: &[GrokRule],
+    remove_empty: bool,
+) -> Result<Value, Error> {
     grok_rules
         .iter()
         .fold_while(Err(Error::NoMatch), |_, rule| {
-            let result = apply_grok_rule(source_field, rule);
+            let result = apply_grok_rule(source_field, rule, remove_empty);
             if let Err(Error::NoMatch) = result {
                 Continue(result)
             } else {
@@ -37,7 +41,7 @@ pub fn parse_grok(source_field: &str, grok_rules: &[GrokRule]) -> Result<Value, 
 /// Possible errors:
 /// - FailedToApplyFilter - matches the rule, but there was a runtime error while applying on of the filters
 /// - NoMatch - this rule does not match a given string
-fn apply_grok_rule(source: &str, grok_rule: &GrokRule) -> Result<Value, Error> {
+fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Result<Value, Error> {
     let mut parsed = Value::from(btreemap! {});
 
     if let Some(ref matches) = grok_rule.pattern.match_against(source) {
@@ -73,10 +77,14 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule) -> Result<Value, Error> {
                     }
                     // anything else at the root leve must be ignored
                     _ if path.is_root() || path.segments[0].is_index() => {}
-                    // otherwise just apply VRL lookup logic
-                    _ => parsed.insert(&path, value).unwrap_or_else(
-                        |error| warn!(message = "Error updating field value", path = %path, %error),
-                    ),
+                    // ignore empty strings if necessary
+                    Value::Bytes(b) if remove_empty && b.is_empty() => {}
+                    // otherwise just apply VRL lookup insert logic
+                    _ => {
+                        parsed.insert(&path, value).unwrap_or_else(
+                                |error| warn!(message = "Error updating field value", path = %path, %error)
+                            );
+                    }
                 };
             }
         }
@@ -103,7 +111,12 @@ mod tests {
             btreemap! {},
         )
         .expect("couldn't parse rules");
-        let parsed = parse_grok("2020-10-02T23:22:12.223222Z info Hello world", &rules).unwrap();
+        let parsed = parse_grok(
+            "2020-10-02T23:22:12.223222Z info Hello world",
+            &rules,
+            false,
+        )
+        .unwrap();
 
         assert_eq!(
             parsed,
@@ -120,12 +133,12 @@ mod tests {
         let rules = parse_grok_rules(
             // patterns
             &[
-                r#"%{_access.common}"#.to_string(),
-                r#"%{_access.common} (%{number:duration:scale(1000000000)} )?"%{_referer}" "%{_user_agent}"( "%{_x_forwarded_for}")?.*"#.to_string()
+                r#"%{access.common}"#.to_string(),
+                r#"%{access.common} (%{number:duration:scale(1000000000)} )?"%{_referer}" "%{_user_agent}"( "%{_x_forwarded_for}")?.*"#.to_string()
             ],
             // aliases
             btreemap! {
-                "_access.common" => r#"%{_client_ip} %{_ident} %{_auth} \[%{_date_access}\] "(?>%{_method} |)%{_url}(?> %{_version}|)" %{_status_code} (?>%{_bytes_written}|-)"#.to_string(),
+                "access.common" => r#"%{_client_ip} %{_ident} %{_auth} \[%{_date_access}\] "(?>%{_method} |)%{_url}(?> %{_version}|)" %{_status_code} (?>%{_bytes_written}|-)"#.to_string(),
                 "_auth" => r#"%{notSpace:http.auth:nullIf("-")}"#.to_string(),
                 "_bytes_written" => r#"%{integer:network.bytes_written}"#.to_string(),
                 "_client_ip" => r#"%{ipOrHost:network.client.ip}"#.to_string(),
@@ -138,7 +151,7 @@ mod tests {
                 "_method" => r#"%{word:http.method}"#.to_string(),
                 "_date_access" => r#"%{notSpace:date_access}"#.to_string(),
                 "_x_forwarded_for" => r#"%{regex("[^\\\"]*"):http._x_forwarded_for:nullIf("-")}"#.to_string()}).expect("couldn't parse rules");
-        let parsed = parse_grok(r##"127.0.0.1 - frank [13/Jul/2016:10:55:36] "GET /apache_pb.gif HTTP/1.0" 200 2326 0.202 "http://www.perdu.com/" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36" "-""##, &rules).unwrap();
+        let parsed = parse_grok(r##"127.0.0.1 - frank [13/Jul/2016:10:55:36] "GET /apache_pb.gif HTTP/1.0" 200 2326 0.202 "http://www.perdu.com/" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36" "-""##, &rules, false).unwrap();
 
         assert_eq!(
             parsed,
@@ -209,7 +222,7 @@ mod tests {
         for (filter, k, v) in tests {
             let rules =
                 parse_grok_rules(&[filter.to_string()], btreemap! {}).expect("should parse rules");
-            let parsed = parse_grok(k, &rules);
+            let parsed = parse_grok(k, &rules, false);
 
             if v.is_ok() {
                 assert_eq!(parsed.unwrap(), v.unwrap());
@@ -223,7 +236,7 @@ mod tests {
         for (filter, k, v) in tests {
             let rules = parse_grok_rules(&[filter.to_string()], btreemap! {})
                 .expect("couldn't parse rules");
-            let parsed = parse_grok(k, &rules);
+            let parsed = parse_grok(k, &rules, false);
 
             if v.is_ok() {
                 assert_eq!(
@@ -360,7 +373,7 @@ mod tests {
             btreemap! {},
         )
         .expect("couldn't parse rules");
-        let error = parse_grok("an ungrokkable message", &rules).unwrap_err();
+        let error = parse_grok("an ungrokkable message", &rules, false).unwrap_err();
 
         assert_eq!(error, Error::NoMatch);
     }
@@ -375,7 +388,7 @@ mod tests {
             btreemap! {},
         )
             .expect("couldn't parse rules");
-        let parsed = parse_grok("1 info -", &rules).unwrap();
+        let parsed = parse_grok("1 info -", &rules, false).unwrap();
 
         assert_eq!(
             parsed,
