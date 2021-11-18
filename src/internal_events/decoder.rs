@@ -30,3 +30,33 @@ impl<'a> InternalEvent for DecoderDeserializeFailed<'a> {
         counter!("decoder_deserialize_errors_total", 1);
     }
 }
+
+#[derive(Debug)]
+pub struct EncoderFramingFailed<'a> {
+    pub error: &'a crate::codecs::encoding::BoxedFramingError,
+}
+
+impl<'a> InternalEvent for EncoderFramingFailed<'a> {
+    fn emit_logs(&self) {
+        warn!(message = "Failed framing bytes.", error = %self.error, internal_log_rate_secs = 10);
+    }
+
+    fn emit_metrics(&self) {
+        counter!("encoder_framing_errors_total", 1);
+    }
+}
+
+#[derive(Debug)]
+pub struct EncoderSerializeFailed<'a> {
+    pub error: &'a crate::Error,
+}
+
+impl<'a> InternalEvent for EncoderSerializeFailed<'a> {
+    fn emit_logs(&self) {
+        warn!(message = "Failed serializing frame.", error = %self.error, internal_log_rate_secs = 10);
+    }
+
+    fn emit_metrics(&self) {
+        counter!("encoder_serialize_errors_total", 1);
+    }
+}

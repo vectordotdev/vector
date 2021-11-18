@@ -8,7 +8,9 @@ mod json;
 #[cfg(feature = "sources-syslog")]
 mod syslog;
 
-pub use self::bytes::{BytesDeserializer, BytesDeserializerConfig};
+pub use self::bytes::{
+    BytesDeserializer, BytesDeserializerConfig, BytesSerializer, BytesSerializerConfig,
+};
 #[cfg(feature = "sources-syslog")]
 pub use self::syslog::{SyslogDeserializer, SyslogDeserializerConfig};
 pub use json::{JsonDeserializer, JsonDeserializerConfig};

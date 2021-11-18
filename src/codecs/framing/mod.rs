@@ -10,7 +10,13 @@ mod newline_delimited;
 mod octet_counting;
 
 pub use self::bytes::{BytesDecoder, BytesDecoderConfig};
-pub use character_delimited::{CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig};
+pub use character_delimited::{
+    CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig, CharacterDelimitedEncoder,
+    CharacterDelimitedEncoderConfig,
+};
 pub use length_delimited::{LengthDelimitedDecoder, LengthDelimitedDecoderConfig};
-pub use newline_delimited::{NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig};
+pub use newline_delimited::{
+    NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig, NewlineDelimitedEncoder,
+    NewlineDelimitedEncoderConfig,
+};
 pub use octet_counting::{OctetCountingDecoder, OctetCountingDecoderConfig};

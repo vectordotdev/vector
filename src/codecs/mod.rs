@@ -10,12 +10,15 @@ mod framing;
 
 pub use decoding::Decoder;
 pub use format::{
-    BytesDeserializer, BytesDeserializerConfig, JsonDeserializer, JsonDeserializerConfig,
+    BytesDeserializer, BytesDeserializerConfig, BytesSerializer, BytesSerializerConfig,
+    JsonDeserializer, JsonDeserializerConfig,
 };
 #[cfg(feature = "sources-syslog")]
 pub use format::{SyslogDeserializer, SyslogDeserializerConfig};
 pub use framing::{
     BytesDecoder, BytesDecoderConfig, CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig,
-    LengthDelimitedDecoder, LengthDelimitedDecoderConfig, NewlineDelimitedDecoder,
-    NewlineDelimitedDecoderConfig, OctetCountingDecoder, OctetCountingDecoderConfig,
+    CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, LengthDelimitedDecoder,
+    LengthDelimitedDecoderConfig, NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig,
+    NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig, OctetCountingDecoder,
+    OctetCountingDecoderConfig,
 };
