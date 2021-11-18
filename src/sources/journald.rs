@@ -462,10 +462,7 @@ fn create_command(
 }
 
 fn create_event(record: Record, batch: &Option<Arc<BatchNotifier>>) -> Event {
-    let mut log = LogEvent::from_iter(record);
-    if let Some(batch) = batch {
-        log = log.with_batch_notifier(batch);
-    }
+    let mut log = LogEvent::from_iter(record).with_batch_notifier_option(batch);
 
     // Convert some journald-specific field names into Vector standard ones.
     if let Some(message) = log.remove(MESSAGE) {

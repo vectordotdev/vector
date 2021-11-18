@@ -44,6 +44,7 @@ components: transforms: "remap": {
 	}
 
 	configuration: {
+		timezone: configuration._timezone
 		source: {
 			description: """
 				The [Vector Remap Language](\(urls.vrl_reference)) (VRL) program to execute for each event.

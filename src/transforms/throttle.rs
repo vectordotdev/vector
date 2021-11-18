@@ -18,7 +18,7 @@ use std::time::Duration;
 #[serde(deny_unknown_fields, default)]
 pub struct ThrottleConfig {
     threshold: u32,
-    window: f64,
+    window_secs: f64,
     key_field: Option<Template>,
     exclude: Option<AnyCondition>,
 }
@@ -68,7 +68,7 @@ where
         context: &TransformContext,
         clock: C,
     ) -> crate::Result<Self> {
-        let flush_keys_interval = Duration::from_secs_f64(config.window);
+        let flush_keys_interval = Duration::from_secs_f64(config.window_secs);
 
         let threshold = match NonZeroU32::new(config.threshold) {
             Some(threshold) => threshold,
@@ -76,7 +76,7 @@ where
         };
 
         let quota = match Quota::with_period(Duration::from_secs_f64(
-            config.window / threshold.get() as f64,
+            config.window_secs / threshold.get() as f64,
         )) {
             Some(quota) => quota.allow_burst(threshold),
             None => return Err(Box::new(ConfigError::NonZero)),
@@ -178,7 +178,7 @@ where
 
 #[derive(Debug, Snafu)]
 pub enum ConfigError {
-    #[snafu(display("`threshold`, and `window` must be non-zero"))]
+    #[snafu(display("`threshold`, and `window_secs` must be non-zero"))]
     NonZero,
 }
 
@@ -200,7 +200,7 @@ mod tests {
         let config = toml::from_str::<ThrottleConfig>(
             r#"
 threshold = 2
-window = 5
+window_secs = 5
 "#,
         )
         .unwrap();
@@ -263,7 +263,7 @@ window = 5
         let config = toml::from_str::<ThrottleConfig>(
             r#"
 threshold = 2
-window = 5
+window_secs = 5
 exclude = """
 exists(.special)
 """
@@ -338,7 +338,7 @@ exists(.special)
         let config = toml::from_str::<ThrottleConfig>(
             r#"
 threshold = 1
-window = 5
+window_secs = 5
 key_field = "{{ bucket }}"
 "#,
         )
