@@ -57,8 +57,10 @@ components: sinks: influxdb_logs: {
 			"""
 			groups: ["v1", "v2"]
 			required: false
-			warngins: ["Deprecated, please use `measurement` instead."]
+			common: true
+			warnings: ["Deprecated, please use `measurement` instead."]
 			type: string: {
+				default: null
 				examples: ["service"]
 			}
 		}
