@@ -218,18 +218,20 @@ impl InfluxDbLogsConfig {
                 Some(_) => {
                     warn!("Option `namespace` has been preceded by `measurement`.");
                     measure
-                },
-                None => measure
+                }
+                None => measure,
             },
             None => match self.namespace.clone() {
                 Some(namespace) => {
-                    warn!("Option `namespace` has been deprecated. Use `measurement` instead. \
+                    warn!(
+                        "Option `namespace` has been deprecated. Use `measurement` instead. \
                            For example, you can use `measurement=<namespace>.vector` for the \
-                           same effect.");
+                           same effect."
+                    );
                     format!("{}.vector", namespace)
                 }
-                None => panic!("Option `measurement` is required.")
-            }
+                None => panic!("Option `measurement` is required."),
+            },
         };
         measurement
     }

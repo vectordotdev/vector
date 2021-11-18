@@ -110,7 +110,7 @@ components: sinks: influxdb_logs: {
 						Will be mapped to Influx's line protocol:
 
 						```influxdb_line_protocol
-						ns.vector,host=my.host.com,metric_type=logs custom_field="custom_value",message="<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar" 1572642947000000000
+						vector-logs,host=my.host.com,metric_type=logs custom_field="custom_value",message="<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar" 1572642947000000000
 						```
 						"""
 				},
