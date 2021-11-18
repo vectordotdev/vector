@@ -623,6 +623,15 @@ struct NewRelicCredentials {
     pub account_id: String,
 }
 
+impl NewRelicCredentials {
+    pub fn empty() -> Self {
+        Self {
+            license_key: String::new(),
+            account_id: String::new()
+        }
+    }
+}
+
 impl From<&NewRelicConfig> for NewRelicCredentials {
     fn from(config: &NewRelicConfig) -> Self {
         Self {
@@ -723,7 +732,7 @@ struct NewRelicRequestBuilder {
 }
 
 impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
-    type Metadata = NewRelicCredentials;
+    type Metadata = (NewRelicCredentials, usize, EventFinalizers);
     type Events = Vec<Event>;
     type Encoder = EncodingConfigWithDefault<Encoding>;
     type Payload = Vec<u8>;
@@ -731,19 +740,30 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
     type Error = std::io::Error;
 
     fn compression(&self) -> Compression {
-        todo!()
+        println!("----> NewRelicRequestBuilder compression");
+        self.compression
     }
 
     fn encoder(&self) -> &Self::Encoder {
-        todo!()
+        println!("----> NewRelicRequestBuilder encoder");
+        &self.encoding
     }
 
-    fn split_input(&self, input: Vec<Event>) -> (Self::Metadata, Self::Events) {
-        todo!()
+    fn split_input(&self, mut input: Vec<Event>) -> (Self::Metadata, Self::Events) {
+        println!("----> NewRelicRequestBuilder split_input = {:#?}", input);
+        //TODO: get real credentials from the input (pass a tuple with credentials and Vec)
+        let events_len = input.len();
+        let finalizers = input.take_finalizers();
+        let metadata = (NewRelicCredentials::empty(), events_len, finalizers);
+        (metadata, input)
     }
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        todo!()
+        println!("----> NewRelicRequestBuilder build_request = {:#?}", payload);
+        NewRelicApiRequest {
+            batch_size: 0,
+            finalizers: metadata.2
+        }
     }
 }
 
@@ -764,7 +784,7 @@ where
     S::Error: Debug + Into<crate::Error> + Send,
 {
     async fn run_inner(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        println!("------> EVENT STREAM:\n\n");
+        println!("------> NewRelicSink run_inner");
 
         let partitioner = NullPartitioner::new();
         let builder_limit = NonZeroUsize::new(64);
@@ -789,13 +809,7 @@ where
             })
             .into_driver(self.service, self.acker);
 
-        println!("----> SINK:");
-        //println!("{:#?}", sink);
-        println!("----------------------------------------------------------------------------");
-
-        let x = sink.run();
-        x.await;
-        Ok(())
+        sink.run().await
     }
 }
 
