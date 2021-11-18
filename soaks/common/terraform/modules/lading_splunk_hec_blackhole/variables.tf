@@ -8,8 +8,8 @@ variable "namespace" {
   type        = string
 }
 
-variable "http-gen-toml" {
-  description = "The rendered http_gen.toml for this test"
+variable "splunk-hec-blackhole-toml" {
+  description = "The rendered splunk_hec_blackhole.toml for this test"
   type        = string
 }
 

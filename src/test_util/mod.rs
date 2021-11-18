@@ -191,13 +191,7 @@ fn map_batch_stream(
     stream: impl Stream<Item = LogEvent>,
     batch: Option<Arc<BatchNotifier>>,
 ) -> impl Stream<Item = Event> {
-    stream.map(move |log| {
-        match &batch {
-            None => log,
-            Some(batch) => log.with_batch_notifier(batch),
-        }
-        .into()
-    })
+    stream.map(move |log| log.with_batch_notifier_option(&batch).into())
 }
 
 pub fn random_lines_with_stream(
