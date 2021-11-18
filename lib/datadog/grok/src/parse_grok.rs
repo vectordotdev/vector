@@ -392,4 +392,102 @@ mod tests {
             "Circular dependency found in the alias 'pattern1'"
         );
     }
+
+    #[test]
+    fn supports_date_matcher() {
+        test_grok_pattern(vec![
+            (
+                r#"%{date("HH:mm:ss"):field}"#,
+                "14:20:15",
+                Ok(Value::Integer(51615000)),
+            ),
+            (
+                r#"%{date("dd/MMM/yyyy"):field}"#,
+                "06/Mar/2013",
+                Ok(Value::Integer(1362528000000)),
+            ),
+            (
+                r#"%{date("EEE MMM dd HH:mm:ss yyyy"):field}"#,
+                "Thu Jun 16 08:29:03 2016",
+                Ok(Value::Integer(1466065743000)),
+            ),
+            (
+                r#"%{date("dd/MMM/yyyy:HH:mm:ss Z"):field}"#,
+                "06/Mar/2013:01:36:30 +0900",
+                Ok(Value::Integer(1362501390000)),
+            ),
+            (
+                r#"%{date("yyyy-MM-dd'T'HH:mm:ss.SSSZ"):field}"#,
+                "2016-11-29T16:21:36.431+0000",
+                Ok(Value::Integer(1480436496431)),
+            ),
+            (
+                r#"%{date("yyyy-MM-dd'T'HH:mm:ss.SSSZZ"):field}"#,
+                "2016-11-29T16:21:36.431+00:00",
+                Ok(Value::Integer(1480436496431)),
+            ),
+            (
+                r#"%{date("dd/MMM/yyyy:HH:mm:ss.SSS"):field}"#,
+                "06/Feb/2009:12:14:14.655",
+                Ok(Value::Integer(1233922454655)),
+            ),
+            (
+                r#"%{date("yyyy-MM-dd HH:mm:ss.SSS z"):field}"#,
+                "2007-08-31 19:22:22.427 CET",
+                Ok(Value::Integer(1188580942427)),
+            ),
+            (
+                r#"%{date("yyyy-MM-dd HH:mm:ss.SSS zzzz"):field}"#,
+                "2007-08-31 19:22:22.427 America/Thule",
+                Ok(Value::Integer(1188598942427)),
+            ),
+            (
+                r#"%{date("yyyy-MM-dd HH:mm:ss.SSS Z"):field}"#,
+                "2007-08-31 19:22:22.427 -03:00",
+                Ok(Value::Integer(1188598942427)),
+            ),
+            (
+                r#"%{date("EEE MMM dd HH:mm:ss yyyy", "Europe/Moscow"):field}"#,
+                "Thu Jun 16 08:29:03 2016",
+                Ok(Value::Integer(1466054943000)),
+            ),
+            (
+                r#"%{date("EEE MMM dd HH:mm:ss yyyy", "UTC+5"):field}"#,
+                "Thu Jun 16 08:29:03 2016",
+                Ok(Value::Integer(1466047743000)),
+            ),
+            (
+                r#"%{date("EEE MMM dd HH:mm:ss yyyy", "+3"):field}"#,
+                "Thu Jun 16 08:29:03 2016",
+                Ok(Value::Integer(1466054943000)),
+            ),
+            (
+                r#"%{date("EEE MMM dd HH:mm:ss yyyy", "+03:00"):field}"#,
+                "Thu Jun 16 08:29:03 2016",
+                Ok(Value::Integer(1466054943000)),
+            ),
+            (
+                r#"%{date("EEE MMM dd HH:mm:ss yyyy", "-0300"):field}"#,
+                "Thu Jun 16 08:29:03 2016",
+                Ok(Value::Integer(1466076543000)),
+            ),
+        ]);
+
+        // check error handling
+        assert_eq!(
+            parse_grok_rules(&[r#"%{date("ABC:XYZ"):field}"#.to_string()], btreemap! {})
+                .unwrap_err()
+                .to_string(),
+            r#"invalid arguments for the function 'date'"#
+        );
+        assert_eq!(
+            parse_grok_rules(
+                &[r#"%{date("EEE MMM dd HH:mm:ss yyyy", "unknown timezone"):field}"#.to_string()],
+                btreemap! {}
+            )
+            .unwrap_err()
+            .to_string(),
+            r#"invalid arguments for the function 'date'"#
+        );
+    }
 }
