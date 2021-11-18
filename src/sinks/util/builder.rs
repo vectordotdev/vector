@@ -51,7 +51,7 @@ pub trait SinkBuilderExt: Stream {
         T: ItemBatchSize<Self::Item>,
         Self: Sized,
     {
-        Batcher::new(self, settings, batch_size_calculator)
+        Batcher::new(self, settings, item_size_calculator)
     }
 
     /// Maps the items in the stream concurrently, up to the configured limit.

@@ -15,6 +15,14 @@ pub trait ItemBatchSize<T> {
     fn size(&self, item: &T) -> usize;
 }
 
+pub struct ByteSizeOfItemSize;
+
+impl<T: ByteSizeOf> ItemBatchSize<T> for ByteSizeOfItemSize {
+    fn size(&self, item: &T) -> usize {
+        item.size_of()
+    }
+}
+
 impl<T, F> ItemBatchSize<T> for F
 where
     F: Fn(&T) -> usize,
@@ -84,14 +92,6 @@ where
     }
 }
 
-pub struct ByteSizeOfItemSize;
-
-impl<T: ByteSizeOf> ItemBatchSize<T> for ByteSizeOfItemSize {
-    fn size(&self, item: &T) -> usize {
-        item.size_of()
-    }
-}
-
 impl<S, I> Batcher<S, I>
 where
     S: Stream,
@@ -111,8 +111,9 @@ where
     }
 
     fn take_batch(self: Pin<&mut Self>) -> Vec<S::Item> {
-        let this = self.project();
+        let mut this = self.project();
         *this.current_size = 0;
+        this.timer.set(Maybe::None);
         std::mem::take(this.batch)
     }
 
@@ -122,14 +123,11 @@ where
         *this.current_size += item_size;
     }
 
-    fn reset_timer(self: Pin<&mut Self>) {
+    fn start_timer(self: Pin<&mut Self>) {
         let timeout = self.timeout;
-        let mut this = self.project();
-        if let MaybeProj::Some(timer) = this.timer.as_mut().project() {
-            timer.reset(tokio::time::Instant::now() + timeout);
-        } else {
-            this.timer.set(Maybe::Some(tokio::time::sleep(timeout)));
-        }
+        self.project()
+            .timer
+            .set(Maybe::Some(tokio::time::sleep(timeout)));
     }
 }
 
@@ -157,12 +155,12 @@ where
                         if self.is_batch_full() {
                             return Poll::Ready(Some(self.as_mut().take_batch()));
                         } else if self.batch.len() == 1 {
-                            self.as_mut().reset_timer();
+                            self.as_mut().start_timer();
                         }
                     } else {
                         let output = Poll::Ready(Some(self.as_mut().take_batch()));
                         self.as_mut().push_item(item, item_size);
-                        self.as_mut().reset_timer();
+                        self.as_mut().start_timer();
                         return output;
                     }
                 }
@@ -171,6 +169,10 @@ where
                         match timer.poll(cx) {
                             Poll::Ready(()) => {
                                 self.as_mut().project().timer.set(Maybe::None);
+                                debug_assert!(
+                                    !self.batch.is_empty(),
+                                    "timer should have been cancelled"
+                                );
                                 return Poll::Ready(Some(self.take_batch()));
                             }
                             Poll::Pending => {
