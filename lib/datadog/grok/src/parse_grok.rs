@@ -279,6 +279,15 @@ mod tests {
     }
 
     #[test]
+    fn regex_with_empty_field() {
+        test_grok_pattern(vec![(
+            r#"%{regex("\\d+\\.\\d+")} %{data:field}"#,
+            "1.0 field_value",
+            Ok(Value::from("field_value")),
+        )]);
+    }
+
+    #[test]
     fn does_not_merge_field_maps() {
         // only root-level maps are merged
         test_grok_pattern_without_field(vec![(
