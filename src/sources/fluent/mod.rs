@@ -1,11 +1,12 @@
 use super::util::{SocketListenAddr, TcpError, TcpSource};
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
-        SourceDescription,
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
+        SourceContext, SourceDescription,
     },
     event::{Event, LogEvent},
     internal_events::{FluentMessageDecodeError, FluentMessageReceived},
+    serde::bool_or_struct,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
 };
@@ -31,6 +32,8 @@ pub struct FluentConfig {
     tls: Option<TlsConfig>,
     keepalive: Option<TcpKeepaliveConfig>,
     receive_buffer_bytes: Option<usize>,
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -44,6 +47,7 @@ impl GenerateConfig for FluentConfig {
             keepalive: None,
             tls: None,
             receive_buffer_bytes: None,
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -63,6 +67,7 @@ impl SourceConfig for FluentConfig {
             tls,
             self.receive_buffer_bytes,
             cx,
+            self.acknowledgements,
         )
     }
 

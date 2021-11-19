@@ -116,6 +116,7 @@ impl SourceConfig for SyslogConfig {
                     tls,
                     receive_buffer_bytes,
                     cx,
+                    false.into(),
                 )
             }
             Mode::Udp {

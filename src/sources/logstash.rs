@@ -1,10 +1,11 @@
 use super::util::{SocketListenAddr, TcpError, TcpSource};
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
-        SourceDescription,
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
+        SourceContext, SourceDescription,
     },
     event::{Event, Value},
+    serde::bool_or_struct,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
     types,
@@ -27,6 +28,8 @@ pub struct LogstashConfig {
     keepalive: Option<TcpKeepaliveConfig>,
     tls: Option<TlsConfig>,
     receive_buffer_bytes: Option<usize>,
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -40,6 +43,7 @@ impl GenerateConfig for LogstashConfig {
             keepalive: None,
             tls: None,
             receive_buffer_bytes: None,
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -61,6 +65,7 @@ impl SourceConfig for LogstashConfig {
             tls,
             self.receive_buffer_bytes,
             cx,
+            self.acknowledgements,
         )
     }
 

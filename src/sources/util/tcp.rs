@@ -1,7 +1,7 @@
 use super::{AfterReadExt as _, TcpError};
 use crate::{
-    config::{Resource, SourceContext},
-    event::Event,
+    config::{AcknowledgementsConfig, Resource, SourceContext},
+    event::{BatchNotifier, BatchStatus, Event},
     internal_events::{
         ConnectionOpen, OpenGauge, TcpBytesReceived, TcpSendAckError, TcpSocketConnectionError,
     },
@@ -16,7 +16,7 @@ use serde::{de, Deserialize, Deserializer, Serialize};
 use smallvec::SmallVec;
 use socket2::SockRef;
 use std::net::{IpAddr, SocketAddr};
-use std::{fmt, io, mem::drop, time::Duration};
+use std::{fmt, io, mem::drop, sync::Arc, time::Duration};
 use tokio::{
     io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
@@ -84,6 +84,7 @@ where
         tls: MaybeTlsSettings,
         receive_buffer_bytes: Option<usize>,
         cx: SourceContext,
+        acknowledgements: AcknowledgementsConfig,
     ) -> crate::Result<crate::sources::Source> {
         let out = cx
             .out
@@ -164,6 +165,7 @@ where
                                 tripwire,
                                 peer_addr.ip(),
                                 out,
+                                acknowledgements.enabled,
                             );
 
                             tokio::spawn(
@@ -187,6 +189,7 @@ async fn handle_stream<T>(
     mut tripwire: BoxFuture<'static, ()>,
     peer_addr: IpAddr,
     mut out: impl Sink<Event> + Send + 'static + Unpin,
+    acknowledgements: bool,
 ) where
     <<T as TcpSource>::Decoder as tokio_util::codec::Decoder>::Item: std::marker::Send,
     T: TcpSource,
@@ -247,10 +250,31 @@ async fn handle_stream<T>(
                 match res {
                     Some(Ok((item, byte_size))) => {
                         let ack = source.build_ack(&item);
+                        let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(acknowledgements);
                         let mut events = item.into();
+                        if let Some(batch) = batch{
+                            for event in &mut events {
+                                event.add_batch_notifier(Arc::clone(&batch));
+                            }
+                        }
                         source.handle_events(&mut events, host.clone(), byte_size);
                         match out.send_all(&mut stream::iter(events).map(Ok)).await {
                             Ok(_) => {
+                                if let Some(receiver) = receiver {
+                                    match receiver.await {
+                                        BatchStatus::Delivered => (),
+                                        BatchStatus::Errored => {
+                                            warn!(message = "Error delivering events to sink.",
+                                                  internal_log_rate_secs = 5);
+                                            break;
+                                        }
+                                        BatchStatus::Failed => {
+                                            warn!(message = "Failed to deliver events to sink.",
+                                                  internal_log_rate_secs = 5);
+                                            break;
+                                        }
+                                    }
+                                }
                                 let stream = reader.get_mut();
                                 if let Err(error) = stream.write_all(&ack).await {
                                     emit!(&TcpSendAckError{ error });

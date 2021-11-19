@@ -64,6 +64,7 @@ impl VectorConfig {
             tls,
             self.receive_buffer_bytes,
             cx,
+            false.into(),
         )
     }
 

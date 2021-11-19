@@ -110,6 +110,7 @@ impl SourceConfig for StatsdConfig {
                     tls,
                     config.receive_buffer_bytes,
                     cx,
+                    false.into(),
                 )
             }
             #[cfg(unix)]

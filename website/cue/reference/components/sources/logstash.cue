@@ -50,6 +50,7 @@ components: sources: logstash: {
 	}
 
 	configuration: {
+		acknowledgements: _configuration.acknowledgements
 		address: {
 			description: "The address to listen for TCP connections on."
 			required:    true
