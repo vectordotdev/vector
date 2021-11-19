@@ -789,21 +789,11 @@ fn event_error(text: &str, code: u16, event: usize) -> Response {
 #[cfg(test)]
 mod tests {
     use super::{parse_timestamp, SplunkConfig};
-    use crate::{
-        config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
-        event::Event,
-        sinks::{
-            splunk_hec::logs::{config::HecSinkLogsConfig, encoder::HecLogsEncoder},
-            util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
-            Healthcheck, VectorSink,
-        },
-        test_util::{
+    use crate::{Pipeline, config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext}, event::Event, sinks::{Healthcheck, VectorSink, splunk_hec::{common::acknowledgements::HecClientAcknowledgementsConfig, logs::{config::HecSinkLogsConfig, encoder::HecLogsEncoder}}, util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig}}, test_util::{
             collect_n,
             components::{self, HTTP_PUSH_SOURCE_TAGS, SOURCE_TESTS},
             next_addr, wait_for_tcp,
-        },
-        Pipeline,
-    };
+        }};
     use chrono::{TimeZone, Utc};
     use futures::{channel::mpsc, stream, StreamExt};
     use std::{future::ready, net::SocketAddr};
@@ -865,6 +855,7 @@ mod tests {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
+            indexer_acknowledgements: HecClientAcknowledgementsConfig::default(),
         }
         .build(SinkContext::new_test())
         .await
