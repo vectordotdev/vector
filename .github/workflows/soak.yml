@@ -240,7 +240,7 @@ jobs:
 
       - name: Clear up unused images
         run: |
-          docker system prune --all
+          docker system prune --all --volumes --force
 
   soak-comparison:
     name: Soak (${{ matrix.target }}) - comparison
@@ -274,7 +274,7 @@ jobs:
 
       - name: Clear up unused images
         run: |
-          docker system prune --all
+          docker system prune --all --volumes --force
 
   analyze-results:
     name: Soak analysis
