@@ -95,7 +95,7 @@ components: sources: splunk_hec: {
 						required:    false
 						type: uint: {
 							default: 1000000
-							unit: null
+							unit:    null
 						}
 					}
 					max_pending_acks: {
@@ -104,7 +104,7 @@ components: sources: splunk_hec: {
 						required:    false
 						type: uint: {
 							default: 10000000
-							unit: null
+							unit:    null
 						}
 					}
 					max_pending_acks_per_channel: {
@@ -113,7 +113,7 @@ components: sources: splunk_hec: {
 						required:    false
 						type: uint: {
 							default: 1000000
-							unit: null
+							unit:    null
 						}
 					}
 					ack_idle_cleanup: {
@@ -130,7 +130,7 @@ components: sources: splunk_hec: {
 						required:    false
 						type: uint: {
 							default: 300
-							unit: "seconds"
+							unit:    "seconds"
 						}
 					}
 				}
