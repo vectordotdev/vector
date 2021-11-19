@@ -158,6 +158,7 @@ impl WriteState {
         self.data_file_size = 0;
     }
 
+    /// Ensures this writer is ready to attempt writer the next record.
     pub async fn ensure_ready_for_write(&mut self) -> io::Result<()> {
         // If our data file is already open, and it has room left, then we're good here.  Otherwise,
         // flush everything and reset ourselves so that we can open the next data file for writing.
@@ -267,6 +268,7 @@ impl WriteState {
         }
     }
 
+    /// Writes a record.
     pub async fn write_record(&mut self, payload: &[u8]) -> io::Result<()> {
         let _ = self.ensure_ready_for_write().await?;
 
@@ -274,7 +276,7 @@ impl WriteState {
         let n = self
             .writer
             .as_mut()
-            .unwrap()
+            .expect("writer should exist after ensure_ready_for_write")
             .write_record(id, payload)
             .await?;
 
@@ -286,7 +288,12 @@ impl WriteState {
 
     pub async fn flush(&mut self) -> io::Result<()> {
         // We always flush the `BufWriter` when this is called, but we don't always flush to disk or
-        // flush the ledger.
+        // flush the ledger.  This is enough for readers on Linux since the file ends up in the page
+        // cache, as we don't do any O_DIRECT fanciness, and the new contents can be immediately
+        // read.
+        //
+        // TODO: Windows has a page cache as well, and macOS _should_, but we should verify this
+        // behavior works on those platforms as well.
         if let Some(writer) = self.writer.as_mut() {
             let _ = writer.flush().await?;
             self.ledger.notify_writer_waiters();
@@ -297,35 +304,10 @@ impl WriteState {
                 let _ = writer.sync_all().await?;
             }
 
-            self.ledger.flush().await
+            self.ledger.flush()
         } else {
             Ok(())
         }
-    }
-}
-
-pub struct WriteTransaction<'a> {
-    inner: &'a mut WriteState,
-}
-
-impl<'a> WriteTransaction<'a> {
-    pub async fn write<R>(&mut self, record: R) -> io::Result<()>
-    where
-        R: AsRef<[u8]>,
-    {
-        let record_buf = record.as_ref();
-
-        // Check that the record isn't bigger than the maximum record size.  This isn't a limitation
-        // of writing to files, but mostly just common sense to have some reasonable upper bound.
-        if record_buf.len() > self.inner.max_record_size {
-            return Err(io::Error::new(io::ErrorKind::Other, "record too large"));
-        }
-
-        self.inner.write_record(record_buf).await
-    }
-
-    pub async fn commit(self) -> io::Result<()> {
-        self.inner.flush().await
     }
 }
 
@@ -339,44 +321,66 @@ impl Writer {
         Writer { state }
     }
 
-    pub async fn ensure_ready_for_write(&mut self) -> io::Result<()> {
-        self.state.ensure_ready_for_write().await
+    /// Writes a record.
+    pub async fn write_record<R>(&mut self, record: R) -> io::Result<()>
+    where
+        R: AsRef<[u8]>,
+    {
+        let record_buf = record.as_ref();
+
+        // Check that the record isn't bigger than the maximum record size.  This isn't a limitation
+        // of writing to files, but mostly just common sense to have some reasonable upper bound.
+        if record_buf.len() > self.state.max_record_size {
+            return Err(io::Error::new(io::ErrorKind::Other, "record too large"));
+        }
+
+        self.state.write_record(record_buf).await
     }
 
-    pub fn transaction(&mut self) -> WriteTransaction<'_> {
-        WriteTransaction {
-            inner: &mut self.state,
-        }
+    /// Flushes the writer.
+    ///
+    /// This must be called for the reader to be able to make progress.
+    ///
+    /// This does not ensure that the data is fully synchronized (i.e. `fsync`) to disk, however it
+    /// may sometimes perform a full synchronization if the time since the last full synchronization
+    /// occurred has exceeded a configured limit.
+    pub async fn flush(&mut self) -> io::Result<()> {
+        self.state.flush().await
+    }
+
+    pub fn get_ledger_state(&self) -> String {
+        format!("{:#?}", self.state.ledger.state())
     }
 }
 
 pub struct Reader {
     ledger: Arc<Ledger>,
-    data_file: Option<RecordReader<File>>,
+    reader: Option<RecordReader<File>>,
     last_reader_record_id: u64,
+    ready_to_read: bool,
 }
 
 impl Reader {
     fn new(ledger: Arc<Ledger>) -> Self {
-        let last_reader_record_id = ledger.state().get_last_reader_record_id();
         Reader {
             ledger,
-            data_file: None,
-            last_reader_record_id,
+            reader: None,
+            last_reader_record_id: 0,
+            ready_to_read: false,
         }
     }
 
     /// Switches the reader over to the next data file to read.
     async fn roll_to_next_data_file(&mut self) -> io::Result<()> {
         // Delete the current data file, and increment our reader file ID.
-        self.data_file = None;
+        self.reader = None;
 
         // Delete the current data file, and increment our reader file ID.
         let data_file_path = self.ledger.get_current_reader_data_file_path();
         let _ = fs::remove_file(&data_file_path).await?;
 
         self.ledger.state().increment_reader_file_id();
-        let _ = self.ledger.flush().await?;
+        let _ = self.ledger.flush()?;
 
         // Notify any waiting writers that we've deleted a data file, which they may be waiting on
         // because they're looking to reuse the file ID of the file we just finished reading.
@@ -385,9 +389,9 @@ impl Reader {
     }
 
     /// Ensures this reader is ready to attempt reading the next record.
-    pub async fn ensure_ready_for_read(&mut self) -> io::Result<()> {
+    async fn ensure_ready_for_read(&mut self) -> io::Result<()> {
         // We have nothing to do if we already have a data file open.
-        if self.data_file.is_some() {
+        if self.reader.is_some() {
             return Ok(());
         }
 
@@ -408,7 +412,7 @@ impl Reader {
                 },
             };
 
-            self.data_file = Some(RecordReader::new(data_file));
+            self.reader = Some(RecordReader::new(data_file));
             return Ok(());
         }
     }
@@ -416,6 +420,12 @@ impl Reader {
     fn update_reader_last_record_id(&mut self, record_id: u64) {
         let previous_id = self.last_reader_record_id;
         self.last_reader_record_id = record_id;
+
+        // Don't execute the ID delta logic when we're still in setup mode, which is where we would
+        // be reading record IDs below our last read record ID.
+        if !self.ready_to_read {
+            return;
+        }
 
         let id_delta = record_id - previous_id;
         match id_delta {
@@ -432,7 +442,10 @@ impl Reader {
                 // If `n` is equal to `record_id`, that means the process restarted and we're
                 // seeking to the last record that we marked ourselves as having read, so no issues.
                 if n != record_id {
-                    println!("skipped records; last {}, now {}", previous_id, record_id);
+                    println!(
+                        "skipped records; last {}, now {} (delta={})",
+                        previous_id, record_id, id_delta
+                    );
 
                     // TODO: This is where we would emit an actual metric to track the corrupted
                     // (and thus dropped) events we just skipped over.
@@ -465,29 +478,28 @@ impl Reader {
             let _ = self.next().await?;
         }
 
+        self.ready_to_read = true;
+
         Ok(())
     }
 
+    /// Reads a record.
     pub async fn next(&mut self) -> io::Result<&ArchivedRecord<'_>> {
         let token = loop {
             let _ = self.ensure_ready_for_read().await?;
             let reader = self
-                .data_file
+                .reader
                 .as_mut()
-                .expect("reader was ensured to be ready");
+                .expect("reader should exist after ensure_ready_for_read");
 
             let current_writer_file_id = self.ledger.state().get_current_writer_file_id();
             let current_reader_file_id = self.ledger.state().get_current_reader_file_id();
 
-            // Try reading a record.  If there wasn't enough data to read the length-delimiter, we
-            // get back `None`, and we fall through to waiting for the writer to notify us before
-            // trying again.
-
             // Try reading a record, which if successful, gives us a token to actually read/get a
-            // reference to the record.  This is a slightly-tricky song-and-dance due rustc not yet
-            // fully understanding mutable borrows when conditional control flow is involved.
+            // reference to the record.  This is a slightly-tricky song-and-dance due to rustc not
+            // yet fully understanding mutable borrows when conditional control flow is involved.
             match reader.try_next_record().await? {
-                // Not even enough data to read a length delimiter, so we need to wait for ther
+                // Not even enough data to read a length delimiter, so we need to wait for the
                 // writer to signal us that there's some actual data to read.
                 None => {}
                 // A length-delimited payload was read, but we failed to deserialize it as a valid
@@ -521,34 +533,28 @@ impl Reader {
                 Some(RecordEntry::Valid(token)) => break token,
             };
 
-            // Fundamentally, when we can't fully read the header during the attempted header
-            // read, there's two possible scenarios at play:
+            // Fundamentally, when `try_read_record` returns `None`, there's two possible scenarios:
             //
             // 1. we are entirely caught up to the writer
             // 2. we've hit the end of the data file and need to go to the next one
             //
-            // In order to figure out which situation we're in, we load both the current reader
-            // file ID and current writer file ID.  When we hit the above scenarios, our state
-            // does not transition, so when we get to the end of the loop, we check if we're
-            // still in the "need header" state.
+            // When we're in this state, we first "wait" for the writer to wake us up.  This might
+            // be an existing buffered wakeup, or we might actually be waiting for the next wakeup.
+            // Regardless of which type of wakeup it is, we still end up checking if the reader and
+            // writer file IDs that we loaded originally match.
             //
-            // When we're in this state, we first "wait" for the writer to wake us up.  This
-            // might be an existing buffered wakeup, or we might actually be waiting for the
-            // next wakeup.  Regardless of which type of wakeup it is, we still end up checking
-            // if the reader and writer file IDs that we loaded match.
+            // If the file IDs were identical, it would imply that reader is still on the writer's
+            // current data file.  We simply continue the loop in this case.  It may lead to the
+            // same thing, `try_read_record` returning `None` with an identical reader/writer file
+            // ID, but that's OK, because it would mean we were actually waiting for the writer to
+            // make progress now.  If the wakeup was valid, due to writer progress, then, well...
+            // we'd actually be able to read data.
             //
-            // If the file IDs were identical, it would imply that reader is still on the
-            // current writer data file.  We simply continue the loop in this case.  It may lead
-            // to the same thing, being stuck in the "need header" state with an identical
-            // reader/writer file ID, but that's OK, because it would mean we were actually
-            // waiting for the writer to make progress now.  If the wakeupo was valid, due to
-            // writer progress, then, well... we'd actually be able to read data.
-            //
-            // If the file IDs were not identical, we now know the writer has moved on.
-            // Crucially, since we always flush our writes before waking up, including before
-            // moving to a new file, then we know that if the reader/writer were not identical
-            // at the start the loop, and we still ended up in the "need header" state, that we
-            // have hit the actual end of the current reader data file, and need to move on.
+            // If the file IDs were not identical, we now know the writer has moved on.  Crucially,
+            // since we always flush our writes before waking up, including before moving to a new
+            // file, then we know that if the reader/writer were not identical at the start the
+            // loop, and `try_read_record` returned `None`, that we have hit the actual end of the
+            // reader's current data file, and need to move on.
             self.ledger.wait_for_writer().await;
 
             if current_writer_file_id != current_reader_file_id {
@@ -560,9 +566,9 @@ impl Reader {
         // it out and return a reference to it.
         self.update_reader_last_record_id(token.record_id());
         let reader = self
-            .data_file
+            .reader
             .as_mut()
-            .expect("reader was ensured to be ready");
+            .expect("reader should exist after ensure_ready_for_read");
         reader.read_record(token).await
     }
 }
@@ -582,7 +588,8 @@ impl Buffer {
             DATA_FILE_TARGET_MAX_SIZE,
             DATA_FILE_MAX_RECORD_SIZE,
         );
-        let reader = Reader::new(ledger);
+        let mut reader = Reader::new(ledger);
+        let _ = reader.seek_to_next_record().await?;
 
         Ok((writer, reader))
     }

@@ -27,6 +27,18 @@ fn generate_block_cache() -> Vec<Block> {
 
 #[tokio::main]
 async fn main() {
+    let mut args = std::env::args();
+    let writer_count = args
+        .nth(1)
+        .expect("1st arg must be number of records to write")
+        .parse::<usize>()
+        .expect("1st arg must be number of records to write");
+    let reader_count: usize = args
+        .nth(0)
+        .expect("2nd arg must be number of records to read")
+        .parse::<usize>()
+        .expect("2nd arg must be number of records to read");
+
     // Generate our block cache, which ensures the writer spends as little time as possible actually
     // generating the data that it writes to the buffer.
     let block_cache = generate_block_cache();
@@ -36,9 +48,6 @@ async fn main() {
     );
 
     // Set up our target record count, write batch size, progress counters, etc.
-    let transaction_count = 100_000;
-    let transaction_size = 100;
-
     let write_position = Arc::new(AtomicUsize::new(0));
     let read_position = Arc::new(AtomicUsize::new(0));
     let bytes_written = Arc::new(AtomicUsize::new(0));
@@ -55,29 +64,32 @@ async fn main() {
         .await
         .expect("failed to open buffer");
 
+    println!(
+        "[disk_v2] startup ledger state: {}",
+        writer.get_ledger_state()
+    );
+
     let (writer_tx, mut writer_rx) = oneshot::channel();
     let _ = tokio::spawn(async move {
         let mut tx_histo = Histogram::<u64>::new(3).expect("should not fail");
         let mut records = block_cache.iter().cycle();
 
-        for _ in 0..transaction_count {
+        for _ in 0..writer_count {
             let tx_start = Instant::now();
 
             let mut tx_bytes_total = 0;
-            for _ in 0..transaction_size {
-                let record = records.next().expect("should never be empty");
-                tx_bytes_total += record.bytes.len();
-                writer
-                    .write_record(&record.bytes)
-                    .await
-                    .expect("failed to write record");
-            }
+            let record = records.next().expect("should never be empty");
+            tx_bytes_total += record.bytes.len();
+            writer
+                .write_record(&record.bytes)
+                .await
+                .expect("failed to write record");
             writer.flush().await.expect("failed to flush writer");
 
             let elapsed = tx_start.elapsed().as_nanos() as u64;
             tx_histo.record(elapsed).expect("should not fail");
 
-            writer_position.fetch_add(transaction_size, Ordering::Relaxed);
+            writer_position.fetch_add(1, Ordering::Relaxed);
             writer_bytes_written.fetch_add(tx_bytes_total, Ordering::Relaxed);
         }
 
@@ -88,9 +100,8 @@ async fn main() {
     let _ = tokio::spawn(async move {
         let mut rx_histo = Histogram::<u64>::new(3).expect("should not fail");
 
-        let total_records_expected = transaction_count * transaction_size;
-
-        for _ in 0..total_records_expected {
+        let mut last_id = None;
+        for _ in 0..reader_count {
             let rx_start = Instant::now();
 
             let record = reader.next().await.expect("read should not fail");
@@ -98,8 +109,17 @@ async fn main() {
             let elapsed = rx_start.elapsed().as_nanos() as u64;
             rx_histo.record(elapsed).expect("should not fail");
 
+            if last_id.is_none() {
+                println!("started reading at record ID {}", record.id());
+            }
+            last_id = Some(record.id());
+
             reader_position.fetch_add(1, Ordering::Relaxed);
             reader_bytes_read.fetch_add(record.payload().len(), Ordering::Relaxed);
+        }
+
+        if let Some(id) = last_id {
+            println!("finished reading at record ID {}", id);
         }
 
         let _ = reader_tx.send((reader, rx_histo));
@@ -149,12 +169,12 @@ async fn main() {
     let total_time = start.elapsed();
     let write_bytes = bytes_written.load(Ordering::Relaxed);
     let read_bytes = bytes_read.load(Ordering::Relaxed);
-    assert_eq!(write_bytes, read_bytes);
 
     println!(
-        "[disk_v2] writer and reader done: {} total records ({}) written and read in {:?}",
-        transaction_count * transaction_size,
+        "[disk_v2] writer and reader done: {} records written ({} bytes), {} records read, in {:?}",
+        writer_count,
         human_bytes(write_bytes as f64),
+        reader_count,
         total_time
     );
 

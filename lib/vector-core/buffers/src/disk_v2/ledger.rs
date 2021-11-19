@@ -1,5 +1,5 @@
 use std::{
-    io,
+    fmt, io,
     path::{Path, PathBuf},
     sync::atomic::{AtomicU16, AtomicU64, Ordering},
     time::{Duration, Instant},
@@ -31,7 +31,7 @@ use super::{backed_archive::BackedArchive, ser::SerializeError};
 ///
 /// Do not do any of the listed things unless you _absolute_ know what you're doing. :)
 #[derive(Archive, Serialize, Debug)]
-#[archive_attr(derive(CheckBytes))]
+#[archive_attr(derive(CheckBytes, Debug))]
 pub struct LedgerState {
     /// Total number of records persisted in this buffer.
     #[with(Atomic)]
@@ -124,7 +124,6 @@ impl ArchivedLedgerState {
     }
 }
 
-#[derive(Debug)]
 pub struct Ledger {
     // Path to the data directory.
     data_dir: PathBuf,
@@ -212,7 +211,7 @@ impl Ledger {
         self.state().decrement_total_buffer_size(bytes_deleted);
     }
 
-    pub async fn flush(&self) -> io::Result<()> {
+    pub fn flush(&self) -> io::Result<()> {
         self.state.get_backing_ref().flush()
     }
 
@@ -291,5 +290,19 @@ impl Ledger {
             last_flush: AtomicCell::new(Instant::now()),
             flush_interval,
         })
+    }
+}
+
+impl fmt::Debug for Ledger {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Ledger")
+            .field("data_dir", &self.data_dir)
+            .field("ledger_lock", &self.ledger_lock)
+            .field("state", &self.state.get_archive_ref())
+            .field("reader_notify", &self.reader_notify)
+            .field("writer_notify", &self.writer_notify)
+            .field("last_flush", &self.last_flush)
+            .field("flush_interval", &self.flush_interval)
+            .finish()
     }
 }
