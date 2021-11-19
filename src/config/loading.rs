@@ -44,20 +44,21 @@ pub fn component_name(path: &Path) -> Result<String, Vec<String>> {
         .ok_or_else(|| vec![format!("Couldn't get component name for file: {:?}", path)])
 }
 
-pub trait LoadableConfig: Sized + serde::de::DeserializeOwned {
-    fn load_from_file(
-        path: &Path,
-    ) -> Result<Option<(ComponentKey, Self, Vec<String>)>, Vec<String>> {
-        let name = component_name(path).map(ComponentKey::from)?;
-        if let Some(file) = open_config(path) {
-            let format = Format::from_path(path).ok();
-            let (component, warnings): (Self, Vec<String>) = load(file, format)?;
-            Ok(Some((name, component, warnings)))
-        } else {
-            Ok(None)
-        }
+pub fn load_from_file<T>(path: &Path) -> Result<Option<(ComponentKey, T, Vec<String>)>, Vec<String>>
+where
+    T: serde::de::DeserializeOwned,
+{
+    let name = component_name(path).map(ComponentKey::from)?;
+    if let Some(file) = open_config(path) {
+        let format = Format::from_path(path).ok();
+        let (component, warnings): (T, Vec<String>) = load(file, format)?;
+        Ok(Some((name, component, warnings)))
+    } else {
+        Ok(None)
     }
+}
 
+pub trait LoadableConfig: Sized + serde::de::DeserializeOwned {
     fn load_from_dir(
         path: &Path,
     ) -> Result<(IndexMap<ComponentKey, Self>, Vec<String>), Vec<String>> {
@@ -92,7 +93,7 @@ pub trait LoadableConfig: Sized + serde::de::DeserializeOwned {
             );
         // To merge the subfolders with and existing config, we need first to load the files.
         for entry in files {
-            match Self::load_from_file(&entry) {
+            match load_from_file::<Self>(&entry) {
                 Ok(Some((name, component, warns))) => {
                     result.insert(name, component);
                     warnings.extend(warns);
@@ -285,7 +286,7 @@ fn load_builder_from_file(
     path: &Path,
     builder: &mut ConfigBuilder,
 ) -> Result<Vec<String>, Vec<String>> {
-    match ConfigBuilder::load_from_file(path)? {
+    match load_from_file::<ConfigBuilder>(path)? {
         Some((_, loaded, warnings)) => {
             builder.append(loaded)?;
             Ok(warnings)
@@ -438,7 +439,7 @@ where
     format::deserialize(&with_vars, format).map(|builder| (builder, warnings))
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "transforms-pipelines"))]
 mod tests {
     use super::load_builder_from_paths;
     use crate::config::{ComponentKey, ConfigPath};

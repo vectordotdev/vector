@@ -62,8 +62,8 @@ mod router;
 
 use crate::conditions::AnyCondition;
 use crate::config::{
-    DataType, ExpandType, GenerateConfig, LoadableConfig, TransformConfig, TransformContext,
-    TransformDescription,
+    load_from_file, DataType, ExpandType, GenerateConfig, LoadableConfig, TransformConfig,
+    TransformContext, TransformDescription,
 };
 use crate::transforms::Transform;
 use indexmap::IndexMap;
@@ -116,12 +116,68 @@ impl PipelineConfig {
     }
 }
 
-impl LoadableConfig for PipelineConfig {}
+impl LoadableConfig for PipelineConfig {
+    fn load_subfolder(&mut self, path: &Path) -> Result<Vec<String>, Vec<String>> {
+        let readdir = path
+            .read_dir()
+            .map_err(|err| vec![format!("Could not read config dir: {:?}, {}.", path, err)])?;
+        let mut result = Vec::<(String, Box<dyn TransformConfig>)>::new();
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+
+        for direntry in readdir {
+            let entry = match direntry {
+                Ok(entry) => entry.path(),
+                Err(err) => {
+                    errors.push(format!("Could not read entry in {:?}: {:?}", path, err));
+                    continue;
+                }
+            };
+            if !entry.is_file() {
+                errors.push(format!("Only files are allowed in {:?}", path));
+                continue;
+            }
+            match load_from_file(&entry) {
+                Ok(Some((component_key, component, warns))) => {
+                    warnings.extend(warns);
+                    result.push((component_key.to_string(), component));
+                }
+                Ok(None) => {}
+                Err(errs) => {
+                    errors.extend(errs);
+                }
+            };
+        }
+
+        if errors.is_empty() {
+            // we want the transforms to be sorted by filename
+            result.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+
+            self.transforms
+                .extend(result.into_iter().map(|(_, value)| value));
+
+            Ok(warnings)
+        } else {
+            Err(errors)
+        }
+    }
+}
 
 #[cfg(test)]
 impl PipelineConfig {
+    pub fn new(name: &str) -> Self {
+        Self {
+            name: name.to_owned(),
+            transforms: Vec::new(),
+        }
+    }
+
     pub fn transforms(&self) -> &Vec<Box<dyn TransformConfig>> {
         &self.transforms
+    }
+
+    pub fn transforms_mut(&mut self) -> &mut Vec<Box<dyn TransformConfig>> {
+        &mut self.transforms
     }
 }
 
@@ -137,12 +193,16 @@ pub struct EventTypeConfig {
 
 #[cfg(test)]
 impl EventTypeConfig {
-    pub fn order(&self) -> &Option<Vec<String>> {
+    pub const fn order(&self) -> &Option<Vec<String>> {
         &self.order
     }
 
-    pub fn pipelines(&self) -> &IndexMap<String, PipelineConfig> {
+    pub const fn pipelines(&self) -> &IndexMap<String, PipelineConfig> {
         &self.pipelines
+    }
+
+    pub fn pipelines_mut(&mut self) -> &mut IndexMap<String, PipelineConfig> {
+        &mut self.pipelines
     }
 }
 
@@ -189,7 +249,6 @@ impl LoadableConfig for EventTypeConfig {
                         .into_iter()
                         .map(|(key, value)| (key.to_string(), value)),
                 );
-                println!("loaded pipelines {:?}", self.pipelines.keys());
                 Ok(warnings)
             }
             Err(errors) => Err(errors),
@@ -208,11 +267,11 @@ pub struct PipelinesConfig {
 
 #[cfg(test)]
 impl PipelinesConfig {
-    pub fn logs(&self) -> &EventTypeConfig {
+    pub const fn logs(&self) -> &EventTypeConfig {
         &self.logs
     }
 
-    pub fn metrics(&self) -> &EventTypeConfig {
+    pub const fn metrics(&self) -> &EventTypeConfig {
         &self.metrics
     }
 }
@@ -276,7 +335,6 @@ impl TransformConfig for PipelinesConfig {
 
         let logs_path = path.join("logs");
         if logs_path.is_dir() {
-            println!("load logs folder");
             match self.logs.load_subfolder(&logs_path) {
                 Ok(warns) => warnings.extend(warns),
                 Err(errs) => errors.extend(errs),
@@ -285,7 +343,6 @@ impl TransformConfig for PipelinesConfig {
 
         let metrics_path = path.join("metrics");
         if metrics_path.is_dir() {
-            println!("load metrics folder");
             match self.metrics.load_subfolder(&logs_path) {
                 Ok(warns) => warnings.extend(warns),
                 Err(errs) => errors.extend(errs),
@@ -342,9 +399,12 @@ impl PipelinesConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::{GenerateConfig, PipelinesConfig};
-    use crate::config::{ComponentKey, TransformOuter};
+    use super::{EventTypeConfig, GenerateConfig, PipelineConfig, PipelinesConfig};
+    use crate::config::{ComponentKey, LoadableConfig, TransformOuter};
+    use crate::transforms::noop::Noop;
     use indexmap::IndexMap;
+    use std::fs::File;
+    use std::io::Write;
 
     #[test]
     fn generate_config() {
@@ -360,6 +420,84 @@ mod tests {
         assert_eq!(foo.transforms.len(), 2);
         let bar = config.logs.pipelines.get("bar").unwrap();
         assert_eq!(bar.transforms.len(), 1);
+    }
+
+    #[test]
+    fn parsing_pipeline_per_file() {
+        let base_folder = tempfile::tempdir().unwrap();
+        let folder = base_folder.path();
+        let mut pipeline = File::create(folder.join("first.toml")).unwrap();
+        writeln!(
+            &mut pipeline,
+            r#"
+        name = "first"
+
+        [[transforms]]
+        type = "remap"
+        source = ""
+
+        [[transforms]]
+        type = "remap"
+        source = ""
+        "#
+        )
+        .unwrap();
+        let mut pipeline = File::create(folder.join("second.toml")).unwrap();
+        writeln!(
+            &mut pipeline,
+            r#"
+        name = "second"
+
+        [[transforms]]
+        type = "remap"
+        source = ""
+
+        [[transforms]]
+        type = "remap"
+        source = ""
+        "#
+        )
+        .unwrap();
+
+        let mut event_type_config = EventTypeConfig::default();
+        event_type_config
+            .pipelines_mut()
+            .insert("existing".to_owned(), PipelineConfig::new("existing"));
+        let warnings = event_type_config.load_subfolder(folder).unwrap();
+        assert!(warnings.is_empty());
+        assert_eq!(event_type_config.pipelines().len(), 3);
+    }
+
+    #[test]
+    fn parsing_transform_per_file() {
+        let base_folder = tempfile::tempdir().unwrap();
+        let folder = base_folder.path();
+        let mut transform = File::create(folder.join("0002-the-second.toml")).unwrap();
+        writeln!(
+            &mut transform,
+            r#"
+        type = "remap"
+        source = ""
+        "#
+        )
+        .unwrap();
+        let mut transform = File::create(folder.join("0001-the-first.toml")).unwrap();
+        writeln!(
+            &mut transform,
+            r#"
+        type = "remap"
+        source = ""
+        "#
+        )
+        .unwrap();
+
+        let mut pipeline_config = PipelineConfig::new("foo");
+        pipeline_config
+            .transforms_mut()
+            .push(Box::new(Noop::default()));
+        let warnings = pipeline_config.load_subfolder(folder).unwrap();
+        assert!(warnings.is_empty());
+        assert_eq!(pipeline_config.transforms().len(), 3);
     }
 
     #[test]
