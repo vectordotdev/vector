@@ -198,7 +198,7 @@ To:
 These examples are intended to serve as a basic guide on how you can start
 leveraging `enrichment tables`. If you are or decide to use `enrichment tables`
 for other use cases, let us know on our [Discord chat] or [Twitter], along with
-any feedback you have for the Vector team!
+any feedback or request for additional support you have for the Vector team!
 
 
 [Enrichment tables]: /docs/reference/glossary/#enrichment-tables
