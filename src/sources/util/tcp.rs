@@ -1,6 +1,6 @@
 use super::{AfterReadExt as _, TcpError};
 use crate::{
-    config::Resource,
+    config::{Resource, SourceContext},
     event::Event,
     internal_events::{
         ConnectionOpen, OpenGauge, TcpBytesReceived, TcpSendAckError, TcpSocketConnectionError,
@@ -8,7 +8,6 @@ use crate::{
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
-    Pipeline,
 };
 use bytes::Bytes;
 use futures::{future::BoxFuture, FutureExt, Sink, SinkExt, StreamExt};
@@ -84,10 +83,11 @@ where
         shutdown_timeout_secs: u64,
         tls: MaybeTlsSettings,
         receive_buffer_bytes: Option<usize>,
-        shutdown_signal: ShutdownSignal,
-        out: Pipeline,
+        cx: SourceContext,
     ) -> crate::Result<crate::sources::Source> {
-        let out = out.sink_map_err(|error| error!(message = "Error sending event.", %error));
+        let out = cx
+            .out
+            .sink_map_err(|error| error!(message = "Error sending event.", %error));
 
         let listenfd = ListenFd::from_env();
 
@@ -105,7 +105,7 @@ where
                     .unwrap_or(addr)
             );
 
-            let tripwire = shutdown_signal.clone();
+            let tripwire = cx.shutdown.clone();
             let tripwire = async move {
                 let _ = tripwire.await;
                 sleep(Duration::from_secs(shutdown_timeout_secs)).await;
@@ -113,13 +113,13 @@ where
             .shared();
 
             let connection_gauge = OpenGauge::new();
-            let shutdown_clone = shutdown_signal.clone();
+            let shutdown_clone = cx.shutdown.clone();
 
             listener
                 .accept_stream()
                 .take_until(shutdown_clone)
                 .for_each(move |connection| {
-                    let shutdown_signal = shutdown_signal.clone();
+                    let shutdown_signal = cx.shutdown.clone();
                     let tripwire = tripwire.clone();
                     let source = self.clone();
                     let out = out.clone();

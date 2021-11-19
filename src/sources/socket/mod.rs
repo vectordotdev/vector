@@ -108,8 +108,7 @@ impl SourceConfig for SocketConfig {
                     config.shutdown_timeout_secs(),
                     tls,
                     config.receive_buffer_bytes(),
-                    cx.shutdown,
-                    cx.out,
+                    cx,
                 )
             }
             Mode::Udp(config) => {

@@ -115,8 +115,7 @@ impl SourceConfig for SyslogConfig {
                     shutdown_secs,
                     tls,
                     receive_buffer_bytes,
-                    cx.shutdown,
-                    cx.out,
+                    cx,
                 )
             }
             Mode::Udp {

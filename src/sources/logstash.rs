@@ -60,8 +60,7 @@ impl SourceConfig for LogstashConfig {
             shutdown_secs,
             tls,
             self.receive_buffer_bytes,
-            cx.shutdown,
-            cx.out,
+            cx,
         )
     }
 
