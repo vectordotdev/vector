@@ -19,7 +19,7 @@ use vector_core::event::EventStatus;
 
 use crate::{http::HttpClient, sinks::util::Compression};
 
-use super::acknowledgements::run_acknowledgements;
+use super::acknowledgements::{run_acknowledgements, HecClientAcknowledgementsConfig};
 
 #[derive(Clone)]
 pub struct HecService {
@@ -37,7 +37,11 @@ struct HecAckResponseBody {
 }
 
 impl HecService {
-    pub fn new(client: HttpClient, http_request_builder: HttpRequestBuilder) -> Self {
+    pub fn new(
+        client: HttpClient,
+        http_request_builder: HttpRequestBuilder,
+        indexer_acknowledgements: HecClientAcknowledgementsConfig,
+    ) -> Self {
         let event_client = client.clone();
         let ack_client = client;
         let http_request_builder = Arc::new(http_request_builder);
@@ -47,6 +51,7 @@ impl HecService {
             rx,
             ack_client,
             Arc::clone(&http_request_builder),
+            indexer_acknowledgements,
         ));
 
         let batch_service = HttpBatchService::new(event_client, move |req| {
@@ -101,7 +106,6 @@ impl Service<HecRequest> for HecService {
                     // handle body parsing errors
                     Err(e) => EventStatus::Delivered,
                 }
-                // EventStatus::Delivered
             } else if response.status().is_server_error() {
                 EventStatus::Errored
             } else {

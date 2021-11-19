@@ -94,11 +94,14 @@ pub async fn run_acknowledgements(
     mut receiver: UnboundedReceiver<(u64, Sender<EventStatus>)>,
     client: HttpClient,
     http_request_builder: Arc<HttpRequestBuilder>,
+    indexer_acknowledgements: HecClientAcknowledgementsConfig,
 ) {
     // todo: pass in query interval
-    let mut interval = tokio::time::interval(Duration::from_secs(10));
+    let mut interval = tokio::time::interval(Duration::from_secs(
+        indexer_acknowledgements.query_interval as u64,
+    ));
     // todo: pass in retry limit
-    let mut ack_event_finalizer = AckEventFinalizer::new(30);
+    let mut ack_event_finalizer = AckEventFinalizer::new(indexer_acknowledgements.retry_limit);
 
     loop {
         tokio::select! {

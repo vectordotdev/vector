@@ -113,7 +113,11 @@ impl HecSinkLogsConfig {
         };
         let service = ServiceBuilder::new()
             .settings(request_settings, HecRetryLogic)
-            .service(HecService::new(client, http_request_builder));
+            .service(HecService::new(
+                client,
+                http_request_builder,
+                self.indexer_acknowledgements.clone(),
+            ));
 
         let batch_settings = self.batch.into_batcher_settings()?;
 
