@@ -69,7 +69,7 @@ impl AckEventFinalizer {
 
     /// Builds an ack query body with the currently stored ack ids.
     pub fn get_ack_query_body(&mut self) -> HecAckQueryRequestBody {
-        self.clear();
+        self.clear_expired_ack_ids();
         HecAckQueryRequestBody {
             acks: self.acks.keys().collect::<Vec<_>>(),
         }
@@ -85,7 +85,7 @@ impl AckEventFinalizer {
     }
 
     /// Removes all expired ack ids (those with a retry count of 0).
-    fn clear(&mut self) {
+    fn clear_expired_ack_ids(&mut self) {
         self.acks.retain(|_, (retries, _)| *retries == 0);
     }
 }
@@ -95,6 +95,7 @@ pub async fn run_acknowledgements(
     client: HttpClient,
     http_request_builder: Arc<HttpRequestBuilder>,
 ) {
+    // todo: pass in query interval
     let mut interval = tokio::time::interval(Duration::from_secs(10));
     // todo: pass in retry limit
     let mut ack_event_finalizer = AckEventFinalizer::new(30);
@@ -107,6 +108,7 @@ pub async fn run_acknowledgements(
 
                 match ack_query_response {
                     Ok(ack_query_response) => {
+                        ack_event_finalizer.decrement_retries();
                         let acked_ack_ids = ack_query_response.acks.iter().filter_map(|(ack_id, ack_status)| ack_status.then(|| *ack_id)).collect::<Vec<u64>>();
                         ack_event_finalizer.ack_success_ack_ids(acked_ack_ids.as_slice());
                     },
