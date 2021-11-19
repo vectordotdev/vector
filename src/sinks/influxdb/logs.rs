@@ -213,27 +213,22 @@ impl HttpSink for InfluxDbLogsSink {
 
 impl InfluxDbLogsConfig {
     fn get_measurement(&self) -> String {
-        let measurement = match self.measurement.clone() {
-            Some(measure) => match self.namespace.clone() {
-                Some(_) => {
-                    warn!("Option `namespace` has been preceded by `measurement`.");
-                    measure
-                }
-                None => measure,
-            },
-            None => match self.namespace.clone() {
-                Some(namespace) => {
-                    warn!(
-                        "Option `namespace` has been deprecated. Use `measurement` instead. \
-                           For example, you can use `measurement=<namespace>.vector` for the \
-                           same effect."
-                    );
-                    format!("{}.vector", namespace)
-                }
-                None => panic!("Option `measurement` is required."),
-            },
-        };
-        measurement
+        match (self.measurement.as_ref(), self.namespace.as_ref()) {
+            (Some(measure), Some(_)) => {
+                warn!("Option `namespace` has been preceded by `measurement`.");
+                measure.clone()
+            }
+            (Some(measure), None)) => measure.clone(),
+            (None, Some(namespace)) => {
+                warn!(
+                    "Option `namespace` has been deprecated. Use `measurement` instead. \
+                       For example, you can use `measurement=<namespace>.vector` for the \
+                       same effect."
+                );
+                format!("{}.vector", namespace)
+            }
+            (None, None) => panic!("Option `measurement` is required."),
+        }
     }
 
     fn healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {

@@ -44,7 +44,7 @@ components: sinks: influxdb_logs: {
 
 	configuration: sinks._influxdb.configuration & {
 		measurement: {
-			description: "The influxdb measurement that will be written to."
+			description: "The influxdb measurement name that will be written to."
 			groups: ["v1", "v2"]
 			required: true
 			type: string: {
