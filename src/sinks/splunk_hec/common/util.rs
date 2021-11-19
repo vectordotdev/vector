@@ -220,9 +220,15 @@ mod tests {
         let compression = Compression::None;
         let events = "events".as_bytes().to_vec();
 
-        let request = build_request(endpoint, token, compression, events.clone(), "/services/collector/event")
-            .await
-            .unwrap();
+        let request = build_request(
+            endpoint,
+            token,
+            compression,
+            events.clone(),
+            "/services/collector/event",
+        )
+        .await
+        .unwrap();
 
         assert_eq!(
             request.uri(),
@@ -251,9 +257,15 @@ mod tests {
         let compression = Compression::gzip_default();
         let events = "events".as_bytes().to_vec();
 
-        let request = build_request(endpoint, token, compression, events.clone(), "/services/collector/event")
-            .await
-            .unwrap();
+        let request = build_request(
+            endpoint,
+            token,
+            compression,
+            events.clone(),
+            "/services/collector/event",
+        )
+        .await
+        .unwrap();
 
         assert_eq!(
             request.uri(),
@@ -285,9 +297,15 @@ mod tests {
         let compression = Compression::gzip_default();
         let events = "events".as_bytes().to_vec();
 
-        let err = build_request(endpoint, token, compression, events.clone(), "/services/collector/event")
-            .await
-            .unwrap_err();
+        let err = build_request(
+            endpoint,
+            token,
+            compression,
+            events.clone(),
+            "/services/collector/event",
+        )
+        .await
+        .unwrap_err();
         assert_eq!(err.to_string(), "URI parse error: invalid format")
     }
 }

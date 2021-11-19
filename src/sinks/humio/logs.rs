@@ -1,5 +1,17 @@
 use super::{host_key, Encoding};
-use crate::{config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription}, sinks::splunk_hec::logs::config::HecSinkLogsConfig, sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig}, sinks::{Healthcheck, VectorSink, splunk_hec::common::{SplunkHecDefaultBatchSettings, acknowledgements::HecClientAcknowledgementsConfig}}, template::Template, tls::TlsOptions};
+use crate::{
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    sinks::splunk_hec::logs::config::HecSinkLogsConfig,
+    sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
+    sinks::{
+        splunk_hec::common::{
+            acknowledgements::HecClientAcknowledgementsConfig, SplunkHecDefaultBatchSettings,
+        },
+        Healthcheck, VectorSink,
+    },
+    template::Template,
+    tls::TlsOptions,
+};
 use serde::{Deserialize, Serialize};
 
 const HOST: &str = "https://cloud.humio.com";

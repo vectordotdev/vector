@@ -77,7 +77,7 @@ impl Service<HecRequest> for HecService {
 
     fn call(&mut self, req: HecRequest) -> Self::Future {
         let mut http_service = self.batch_service.clone();
-        let ack_finalizer_tx= self.ack_finalizer_tx.clone();
+        let ack_finalizer_tx = self.ack_finalizer_tx.clone();
         Box::pin(async move {
             http_service.ready().await?;
             let events_count = req.events_count;
@@ -103,7 +103,7 @@ impl Service<HecRequest> for HecService {
                         // This may occur if Splunk changes the response format in future versions.
                         error!(message = "Unable to parse Splunk HEC response", ?error);
                         EventStatus::Delivered
-                    },
+                    }
                 }
             } else if response.status().is_server_error() {
                 EventStatus::Errored
