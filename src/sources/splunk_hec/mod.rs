@@ -305,7 +305,11 @@ impl SplunkSource {
                             BatchNotifier::maybe_new_with_receiver(idx_ack.is_some());
                         let event = raw_event(body, gzip, channel_id.clone(), remote, xff, batch)?;
                         let maybe_ack_id: Option<u64> = match (idx_ack, receiver) {
-                            (Some(idx_ack), Some(receiver)) => Some(idx_ack.get_ack_id_from_channel(channel_id, receiver).await?),
+                            (Some(idx_ack), Some(receiver)) => Some(
+                                idx_ack
+                                    .get_ack_id_from_channel(channel_id, receiver)
+                                    .await?,
+                            ),
                             _ => None,
                         };
 
