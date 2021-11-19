@@ -21,10 +21,8 @@ use std::{
 };
 use tokio_util::codec::Decoder;
 
-use crate::sources::fluent::message::{
-    FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentTimestamp,
-};
 mod message;
+use self::message::{FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentTimestamp};
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct FluentConfig {
@@ -172,20 +170,31 @@ impl FluentDecoder {
         byte_size: usize,
     ) -> Result<(), DecodeError> {
         match message {
-            FluentMessage::Message(tag, timestamp, record)
-            | FluentMessage::MessageWithOptions(tag, timestamp, record, ..) => {
+            FluentMessage::Message(tag, timestamp, record) => {
                 self.unread_frames.push_back((
                     FluentFrame {
                         tag,
                         timestamp,
                         record,
+                        chunk: None,
                     },
                     byte_size,
                 ));
                 Ok(())
             }
-            FluentMessage::Forward(tag, entries)
-            | FluentMessage::ForwardWithOptions(tag, entries, ..) => {
+            FluentMessage::MessageWithOptions(tag, timestamp, record, options) => {
+                self.unread_frames.push_back((
+                    FluentFrame {
+                        tag,
+                        timestamp,
+                        record,
+                        chunk: options.chunk,
+                    },
+                    byte_size,
+                ));
+                Ok(())
+            }
+            FluentMessage::Forward(tag, entries) => {
                 self.unread_frames.extend(entries.into_iter().map(
                     |FluentEntry(timestamp, record)| {
                         (
@@ -193,6 +202,23 @@ impl FluentDecoder {
                                 tag: tag.clone(),
                                 timestamp,
                                 record,
+                                chunk: None,
+                            },
+                            byte_size,
+                        )
+                    },
+                ));
+                Ok(())
+            }
+            FluentMessage::ForwardWithOptions(tag, entries, options) => {
+                self.unread_frames.extend(entries.into_iter().map(
+                    |FluentEntry(timestamp, record)| {
+                        (
+                            FluentFrame {
+                                tag: tag.clone(),
+                                timestamp,
+                                record,
+                                chunk: options.chunk.clone(),
                             },
                             byte_size,
                         )
@@ -211,6 +237,7 @@ impl FluentDecoder {
                             tag: tag.clone(),
                             timestamp,
                             record,
+                            chunk: None,
                         },
                         byte_size,
                     ));
@@ -240,6 +267,7 @@ impl FluentDecoder {
                             tag: tag.clone(),
                             timestamp,
                             record,
+                            chunk: options.chunk.clone(),
                         },
                         byte_size,
                     ));
@@ -350,6 +378,7 @@ struct FluentFrame {
     tag: FluentTag,
     timestamp: FluentTimestamp,
     record: FluentRecord,
+    chunk: Option<String>,
 }
 
 impl From<FluentFrame> for Event {
@@ -370,6 +399,7 @@ impl From<FluentFrame> for LogEvent {
             tag,
             timestamp,
             record,
+            chunk: _,
         } = frame;
 
         let mut log = LogEvent::default();

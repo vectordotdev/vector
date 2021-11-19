@@ -42,8 +42,8 @@ pub(super) enum FluentMessage {
 #[derive(Default, Debug, Deserialize)]
 #[serde(default)]
 pub(super) struct FluentMessageOptions {
-    size: Option<u64>,     // client provided hint for the number of entries
-    chunk: Option<String>, // unused right now, would be used for acks
+    size: Option<u64>,                // client provided hint for the number of entries
+    pub(super) chunk: Option<String>, // client provided chunk identifier for acks
     pub(super) compressed: Option<String>, // this one is required if present
 }
 
