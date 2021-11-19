@@ -7,10 +7,6 @@ releases: "0.18.0": {
 	description: """
 		The Vector team is pleased to announce version 0.18.0!
 
-		{{< warning title="Known issues" >}}
-		- The `elasticsearch` sink incorrectly prints a message for each delivered event
-		{{< /warning >}}
-
 		Be sure to check out the [upgrade guide](/highlights/2021-11-18-0-18-0-upgrade-guide) for breaking changes in this release.
 
 		In case you missed it, we've also released a new unified `vector` helm chart! This new chart can deployed as either
@@ -18,6 +14,9 @@ releases: "0.18.0": {
 		See the [chart upgrade
 		guide](https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/README.md#upgrading) for how to
 		transition from the old charts.
+
+		## Known Issues
+		- The `elasticsearch` sink incorrectly prints a message for each delivered event
 
 		## Features
 
