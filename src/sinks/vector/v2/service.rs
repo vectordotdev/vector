@@ -1,4 +1,3 @@
-use crate::Error;
 use futures::future::BoxFuture;
 use std::task::{Context, Poll};
 use hyper_proxy::ProxyConnector;
@@ -6,12 +5,24 @@ use hyper_openssl::HttpsConnector;
 use hyper::client::HttpConnector;
 use tonic::body::BoxBody;
 use http::Uri;
+use crate::proto::vector as proto_vector;
+use vector_core::event::proto as proto_event;
+use crate::sinks::util::uri;
+use proto_event::EventWrapper;
+use tower::ServiceBuilder;
+use futures::TryFutureExt;
+use tonic::IntoRequest;
+use prost::Message;
+use crate::sinks::vector::v2::VectorSinkError;
+use crate::Error;
+use crate::internal_events::EndpointBytesSent;
+use crate::sinks::vector::v2::sink::EventWrapperWrapper;
 
 #[derive(Clone, Debug)]
 pub struct VectorService {
-    client: proto::Client<HyperSvc>,
-    protocol: String,
-    endpoint: String,
+    pub client: proto_vector::Client<HyperSvc>,
+    pub protocol: String,
+    pub endpoint: String,
 }
 
 pub struct VectorResponse {
@@ -24,7 +35,7 @@ impl VectorService {
         uri: Uri,
     ) -> Self {
         let (protocol, endpoint) = uri::protocol_endpoint(uri.clone());
-        let proto_client = proto::Client::new(HyperSvc { uri, client });
+        let proto_client = proto_vector::Client::new(HyperSvc { uri, client });
         Self {
             client: proto_client,
             protocol,
@@ -33,7 +44,7 @@ impl VectorService {
     }
 }
 
-impl tower::Service<Vec<EventWrapper>> for VectorService {
+impl tower::Service<Vec<EventWrapperWrapper>> for VectorService {
     type Response = VectorResponse;
     type Error = Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
@@ -47,10 +58,10 @@ impl tower::Service<Vec<EventWrapper>> for VectorService {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, events: Vec<EventWrapper>) -> Self::Future {
+    fn call(&mut self, events: Vec<EventWrapperWrapper>) -> Self::Future {
         let mut service = self.clone();
 
-        let request = proto::PushEventsRequest { events };
+        let request = proto_vector::PushEventsRequest { events };
         let byte_size = request.encoded_len();
         let future = async move {
             service.client
@@ -58,11 +69,11 @@ impl tower::Service<Vec<EventWrapper>> for VectorService {
                 .map_ok(|_response| {
                     emit!(&EndpointBytesSent {
                         byte_size,
-                        protocol: &client.protocol,
-                        endpoint: &client.endpoint,
+                        protocol: &service.protocol,
+                        endpoint: &service.endpoint,
                     });
                 })
-                .map_err(|source| Error::Request { source })
+                .map_err(|source| VectorSinkError::Request { source })
                 .await
         };
 
@@ -70,36 +81,36 @@ impl tower::Service<Vec<EventWrapper>> for VectorService {
     }
 }
 
-//
-// #[derive(Clone, Debug)]
-// struct HyperSvc {
-//     uri: Uri,
-//     client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
-// }
-//
 
-//
-// impl tower::Service<hyper::Request<BoxBody>> for HyperSvc {
-//     type Response = hyper::Response<hyper::Body>;
-//     type Error = hyper::Error;
-//     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-//
-//     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-//         Poll::Ready(Ok(()))
-//     }
-//
-//     fn call(&mut self, mut req: hyper::Request<BoxBody>) -> Self::Future {
-//         let uri = Uri::builder()
-//             .scheme(self.uri.scheme().unwrap().clone())
-//             .authority(self.uri.authority().unwrap().clone())
-//             .path_and_query(req.uri().path_and_query().unwrap().clone())
-//             .build()
-//             .unwrap();
-//
-//         *req.uri_mut() = uri;
-//
-//         Box::pin(self.client.request(req))
-//     }
-// }
+#[derive(Clone, Debug)]
+struct HyperSvc {
+    uri: Uri,
+    client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
+}
+
+
+
+impl tower::Service<hyper::Request<BoxBody>> for HyperSvc {
+    type Response = hyper::Response<hyper::Body>;
+    type Error = hyper::Error;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, mut req: hyper::Request<BoxBody>) -> Self::Future {
+        let uri = Uri::builder()
+            .scheme(self.uri.scheme().unwrap().clone())
+            .authority(self.uri.authority().unwrap().clone())
+            .path_and_query(req.uri().path_and_query().unwrap().clone())
+            .build()
+            .unwrap();
+
+        *req.uri_mut() = uri;
+
+        Box::pin(self.client.request(req))
+    }
+}
 
 
