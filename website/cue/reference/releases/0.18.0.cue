@@ -15,6 +15,9 @@ releases: "0.18.0": {
 		guide](https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/README.md#upgrading) for how to
 		transition from the old charts.
 
+		## Known Issues
+		- The `elasticsearch` sink incorrectly prints a message for each delivered event
+
 		## Features
 
 		- Initial support for routing failed events from transforms has been added,
