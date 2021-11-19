@@ -10,7 +10,7 @@ use crate::{
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
 };
 use bytes::Bytes;
-use futures::{future::BoxFuture, FutureExt, Sink, SinkExt, StreamExt};
+use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use smallvec::SmallVec;
@@ -249,19 +249,17 @@ async fn handle_stream<T>(
                         let ack = source.build_ack(&item);
                         let mut events = item.into();
                         source.handle_events(&mut events, host.clone(), byte_size);
-                        for event in events {
-                            match out.send(event).await {
-                                Ok(_) => {
-                                    let stream = reader.get_mut();
-                                    if let Err(error) = stream.write_all(&ack).await {
-                                        emit!(&TcpSendAckError{ error });
-                                        break;
-                                    }
-                                }
-                                Err(_) => {
-                                    warn!("Failed to send event.");
+                        match out.send_all(&mut stream::iter(events).map(Ok)).await {
+                            Ok(_) => {
+                                let stream = reader.get_mut();
+                                if let Err(error) = stream.write_all(&ack).await {
+                                    emit!(&TcpSendAckError{ error });
                                     break;
                                 }
+                            }
+                            Err(_) => {
+                                warn!("Failed to send event.");
+                                break;
                             }
                         }
                     }
