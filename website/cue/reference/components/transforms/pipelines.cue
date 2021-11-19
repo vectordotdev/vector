@@ -84,7 +84,7 @@ components: transforms: pipelines: {
 						A condition to filter the events that will be processed by the pipeline. If the conditions is not satisfied,
 						the event will be forwarded to the next pipeline.
 
-						The filter uses the same format that the conditions used for [unit testing](\(urls.vector_unit_tests)).
+						The filter uses the same format that conditions use for [unit testing](\(urls.vector_unit_tests)).
 						"""
 					required:    false
 					common:      true
