@@ -1,3 +1,6 @@
+#![deny(clippy::print_stdout)]
+#![deny(clippy::dbg_macro)]
+
 use indexmap::IndexMap;
 use snafu::ResultExt;
 use std::{collections::BTreeMap, convert::TryFrom};

@@ -10,6 +10,8 @@
 //!
 
 #![deny(missing_debug_implementations, missing_copy_implementations)]
+#![deny(clippy::print_stdout)]
+#![deny(clippy::dbg_macro)]
 
 mod client;
 /// GraphQL queries

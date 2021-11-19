@@ -1,3 +1,6 @@
+#![deny(clippy::print_stdout)]
+#![deny(clippy::dbg_macro)]
+
 mod util;
 
 #[cfg(feature = "append")]

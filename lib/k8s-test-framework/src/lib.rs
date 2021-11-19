@@ -9,6 +9,8 @@
 //! the opportunity to test e2e: not just the code layer, but also the
 //! deployment configuration.
 
+#![deny(clippy::print_stdout)]
+#![deny(clippy::dbg_macro)]
 #![deny(
     missing_debug_implementations,
     missing_copy_implementations,

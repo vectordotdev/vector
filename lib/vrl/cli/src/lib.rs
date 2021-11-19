@@ -1,3 +1,6 @@
+#![deny(clippy::print_stdout)]
+#![deny(clippy::dbg_macro)]
+
 pub mod cmd;
 #[cfg(feature = "repl")]
 mod repl;

@@ -1,3 +1,6 @@
+#![deny(clippy::print_stdout)]
+#![deny(clippy::dbg_macro)]
+
 use indoc::formatdoc;
 use k8s_openapi::{
     api::core::v1::{Affinity, Container, Pod, PodAffinity, PodAffinityTerm, PodSpec},
