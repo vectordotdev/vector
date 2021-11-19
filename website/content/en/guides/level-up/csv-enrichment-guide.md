@@ -19,14 +19,14 @@ Before you begin, this guide assumes the following:
 {{< /requirement >}}
 
 
-It's important for any organization maintaining an observability pipelines to 
-have flexibility to manipulate their observability data — whether it be appending 
-better context to an event or triggering alerts when there is a potential threat. 
-A key component that drives that flexibility is enriching your data from different 
-sources. Vector now offers initial support for enriching events from external data 
-sources, which is currently powered by a powerful Vector concept, 
-[`enrichment tables`][Enrichment tables]. For now, our support for enrichment 
-through external data sources is limited to `csv` files, but we're  looking to 
+It's important for any organization maintaining an observability pipelines to
+have flexibility to manipulate their observability data — whether it be appending
+better context to an event or triggering alerts when there is a potential threat.
+A key component that drives that flexibility is enriching your data from different
+sources. Vector now offers initial support for enriching events from external data
+sources, which is currently powered by a powerful Vector concept,
+[`enrichment tables`][Enrichment tables]. For now, our support for enrichment
+through external data sources is limited to `csv` files, but we're  looking to
 add support for more data sources.
 
 This guide walks through how you can start enriching your observability by
@@ -34,15 +34,15 @@ This guide walks through how you can start enriching your observability by
 
 ## Use Case 1 - IoT Devices
 
-When working with IoT devices, you often want to minimize payloads being 
-emmitted by the devices, even when collecting events from those devices. This 
-is where [Enrichment tables] comes in very handy. Let's assume that you have an 
-IoT device that emits its status - `online`, `offline`, `transmitting`, and 
-`error` states, but the device needs to emit as little payload as possible 
-due to technical constraints or requirements; instead, the IoT can device can 
-emit integers — `1` for `online`, `2` for `offline`, etc. 
+When working with IoT devices, you often want to minimize payloads being
+emmitted by the devices, even when collecting events from those devices. This
+is where [Enrichment tables] comes in very handy. Let's assume that you have an
+IoT device that emits its status - `online`, `offline`, `transmitting`, and
+`error` states, but the device needs to emit as little payload as possible
+due to technical constraints or requirements; instead, the IoT can device can
+emit integers — `1` for `online`, `2` for `offline`, etc.
 
-To enrich the IoT device's observability data, let's use a `csv` file 
+To enrich the IoT device's observability data, let's use a `csv` file
 containing the following information:
 
 ```csv
@@ -56,8 +56,8 @@ status_code,status_message
 9,"device status not responding"
 ```
 
-To enrich your observability data, you can use ['get_enrichment_table_record'][get_enrichment_table_record]. 
-Assuming that your `csv` files is called `iot_status.csv`, the following 
+To enrich your observability data, you can use ['get_enrichment_table_record'][get_enrichment_table_record].
+Assuming that your `csv` files is called `iot_status.csv`, the following
 illustrates the required Vector configuration:
 
 ``` toml
@@ -73,8 +73,8 @@ status_code = "integer"
 status_message = "string"
 ```
 
-After this configuration, we can now translate the output from IoT devices to 
-human-readable messages that provide further context in our `iot_status.csv`. 
+After this configuration, we can now translate the output from IoT devices to
+human-readable messages that provide further context in our `iot_status.csv`.
 To do so, we can make use of the [`get_enrichment_table_record`][get_enrichment_table_record] function:
 
 ``` toml
@@ -114,31 +114,31 @@ To:
 }
 ```
 
-While the previous example is relatively straightforward, the second example 
-use case really shows how powerful event enrichment can be for your 
-observability pipeline. 
+While the previous example is relatively straightforward, the second example
+use case really shows how powerful event enrichment can be for your
+observability pipeline.
 
 ## Use Case 2 - Setting Alerts for Suspicious Access
 
-In this example, you are dealing with a system where attempted access from 
+In this example, you are dealing with a system where attempted access from
 specific identifiers, such as a blacklisted IP address, must automatically trigger
-alerts to relevant personnel on your team. You can leverage an external database 
-(though Vector's current solution is limited to `csv` files) that contain 
-a list of blacklisted IP address and enrich the data so that whatever downstream 
-log management solution your team may be using, such as 
+alerts to relevant personnel on your team. You can leverage an external database
+(though Vector's current solution is limited to `csv` files) that contain
+a list of blacklisted IP address and enrich the data so that whatever downstream
+log management solution your team may be using, such as
 [Datadog's Log Management product], can trigger the alert based on the scrubbed
-log. 
+log.
 
-The key benefit to using `enrichment tables` in this case is that you can 
+The key benefit to using `enrichment tables` in this case is that you can
 enrich your observability data to trigger an alert on your on-premise network
 from a data source that is also securely on your on-premise server; in other words,
 you don't need to worry about uploading the data source containing potentially
-sensitive or proprietary information to a 3rd party log management solution. 
+sensitive or proprietary information to a 3rd party log management solution.
 
-Let's assume that you have a `csv` file containing a list of sensitive IP 
-addresses that's deemed suspicious for your company for one reason or another. 
+Let's assume that you have a `csv` file containing a list of sensitive IP
+addresses that's deemed suspicious for your company for one reason or another.
 Any IP address that's on the list that attempts to access specific URL
-on your service must trigger an alert to your team for further investigation. In 
+on your service must trigger an alert to your team for further investigation. In
 that case, you can set your `csv` file, let's call it  similarly to below:
 
 ``` csv
@@ -149,7 +149,8 @@ ip,alert_type,severity
 203.0.113.0, "warn", "medium"
 ```
 
-Assuming you set the `enrichment_tables` similarly to the configuration in Use Case 1 example, the following configuration is all that's necessary:
+Assuming you set the `enrichment_tables` similarly to the configuration in Use
+ Case 1 example, the following configuration is all that's necessary:
 
 ``` toml
 [transforms.ip_alert]
@@ -188,14 +189,14 @@ To:
   "timestamp": "2019-11-01T21:15:47+00:00",
   ...
   "alert": { 
-  	"type" : "alert",
-  	"severity" : "medium"
+    "type" : "alert",
+    "severity" : "medium"
   }
 }
 ```
 
-These examples are intended to serve as a basic guide on how you can start 
-leveraging `enrichment tables`. If you are or decide to use `enrichment tables` 
+These examples are intended to serve as a basic guide on how you can start
+leveraging `enrichment tables`. If you are or decide to use `enrichment tables`
 for other use cases, let us know on our [Discord chat] or [Twitter], along with
 any feedback you have for the Vector team!
 
