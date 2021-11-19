@@ -58,14 +58,22 @@ async fn make_listener(
     }
 }
 
+pub enum TcpSourceAck {
+    Ack,
+    Error,
+    Reject,
+}
+
 pub trait TcpSourceAcker {
-    fn build_ack(self) -> Bytes;
+    fn build_ack(self, ack: TcpSourceAck) -> Bytes;
 }
 
 pub struct TcpNullAcker;
 
 impl TcpSourceAcker for TcpNullAcker {
-    fn build_ack(self) -> Bytes {
+    // This function builds an acknowledgement from the source data in
+    // the acker and the given acknowledgement code.
+    fn build_ack(self, _ack: TcpSourceAck) -> Bytes {
         Bytes::new()
     }
 }
@@ -287,7 +295,7 @@ async fn handle_stream<T>(
                                     }
                                 }
                                 let stream = reader.get_mut();
-                                let ack = acker.build_ack();
+                                let ack = acker.build_ack(TcpSourceAck::Ack);
                                 if let Err(error) = stream.write_all(&ack).await {
                                     emit!(&TcpSendAckError{ error });
                                     break;

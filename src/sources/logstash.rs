@@ -1,4 +1,4 @@
-use super::util::{SocketListenAddr, TcpError, TcpSource, TcpSourceAcker};
+use super::util::{SocketListenAddr, TcpError, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
@@ -139,12 +139,17 @@ impl LogstashAcker {
 
 impl TcpSourceAcker for LogstashAcker {
     // https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md#ack-frame-type
-    fn build_ack(self) -> Bytes {
-        let mut bytes: Vec<u8> = Vec::with_capacity(6);
-        bytes.push(self.protocol.into());
-        bytes.push(LogstashFrameType::Ack.into());
-        bytes.extend(self.sequence_number.to_be_bytes().iter());
-        Bytes::from(bytes)
+    fn build_ack(self, ack: TcpSourceAck) -> Bytes {
+        match ack {
+            TcpSourceAck::Ack => {
+                let mut bytes: Vec<u8> = Vec::with_capacity(6);
+                bytes.push(self.protocol.into());
+                bytes.push(LogstashFrameType::Ack.into());
+                bytes.extend(self.sequence_number.to_be_bytes().iter());
+                Bytes::from(bytes)
+            }
+            _ => Bytes::new(),
+        }
     }
 }
 
