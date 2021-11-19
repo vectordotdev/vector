@@ -8,7 +8,7 @@ In the context of sinks, we refer to _encoding_ as serializing an event to bytes
 
 Currently, most sinks include the common `EncodingConfig<T>` in their config. It takes a generic argument where enums specify which encodings they support. However, the actual encoding logic is reimplemented by each sink individually, rather than falling back to a shared inventory of codec implementations. This leads to unnecessary drift in their feature set and behavior.
 
-Furthermore, the shared `EncodingConfig` as it is implemented today is concerned with three tasks: Reshaping an event (including/excluding fields), serializing an event to a byte message, and framing/batching events. In accordance with the functionality that the decoding side provides, we want keep these concepts separate for a simpler mental model. In fact, we want to separate reshaping from codecs entirely and move it to the responsibilities of the schema work as outline in the next section.
+Furthermore, the shared `EncodingConfig` as it is implemented today is concerned with three tasks: Reshaping an event (including/excluding fields), serializing an event to a byte message, and framing/batching events. In accordance with the functionality that the decoding side provides, we want to keep these concepts separate for a simpler mental model. In fact, we want to separate reshaping from codecs entirely and move it to the responsibilities of the schema work as outlined in the next section.
 
 ## Cross cutting concerns
 
