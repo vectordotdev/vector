@@ -7,6 +7,7 @@ use crate::{
     http::HttpClient,
     sinks::{
         splunk_hec::common::{
+            acknowledgements::HecClientAcknowledgementsConfig,
             build_healthcheck, create_client, host_key,
             retry::HecRetryLogic,
             service::{HecService, HttpRequestBuilder},
@@ -48,6 +49,7 @@ pub struct HecSinkLogsConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
+    pub indexer_acknowledgements: HecClientAcknowledgementsConfig,
 }
 
 impl GenerateConfig for HecSinkLogsConfig {
@@ -65,6 +67,7 @@ impl GenerateConfig for HecSinkLogsConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
+            indexer_acknowledgements: HecClientAcknowledgementsConfig::default(),
         })
         .unwrap()
     }

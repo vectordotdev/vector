@@ -85,7 +85,10 @@ pub async fn build_request(
     let mut builder = Request::post(uri)
         .header("Content-Type", "application/json")
         .header("Authorization", format!("Splunk {}", token))
-        .header("X-Splunk-Request-Channel", format!("{}", SPLUNK_CHANNEL.as_str()));
+        .header(
+            "X-Splunk-Request-Channel",
+            format!("{}", SPLUNK_CHANNEL.as_str()),
+        );
 
     if let Some(ce) = compression.content_encoding() {
         builder = builder.header("Content-Encoding", ce);

@@ -2,11 +2,26 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use hyper::Body;
 use serde::{Deserialize, Serialize};
-use tokio::{sync::{mpsc::UnboundedReceiver, oneshot::Sender}};
+use tokio::sync::{mpsc::UnboundedReceiver, oneshot::Sender};
 
 use crate::http::HttpClient;
 
 use super::service::HttpRequestBuilder;
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct HecClientAcknowledgementsConfig {
+    query_interval: u8,
+    retry_limit: u8,
+}
+
+impl Default for HecClientAcknowledgementsConfig {
+    fn default() -> Self {
+        Self {
+            query_interval: 10,
+            retry_limit: 30,
+        }
+    }
+}
 
 #[derive(Serialize)]
 struct HecAckQueryRequestBody<'a> {
@@ -18,7 +33,11 @@ struct HecAckQueryResponseBody {
     acks: HashMap<u64, bool>,
 }
 
-pub async fn run_acknowledgements(mut receiver: UnboundedReceiver<(u64, Sender<bool>)>, client: HttpClient, http_request_builder: Arc<HttpRequestBuilder>) {
+pub async fn run_acknowledgements(
+    mut receiver: UnboundedReceiver<(u64, Sender<bool>)>,
+    client: HttpClient,
+    http_request_builder: Arc<HttpRequestBuilder>,
+) {
     let mut interval = tokio::time::interval(Duration::from_secs(10));
     let mut ack_map: HashMap<u64, Sender<bool>> = HashMap::new();
 
@@ -47,7 +66,7 @@ pub async fn run_acknowledgements(mut receiver: UnboundedReceiver<(u64, Sender<b
                     match ack_map.remove(&ack_id) {
                         Some(tx) => tx.send(true).unwrap(),
                         None => {
-                            // this should be unreachable since the request uses 
+                            // this should be unreachable since the request uses
                         },
                     }
                 }
@@ -55,11 +74,10 @@ pub async fn run_acknowledgements(mut receiver: UnboundedReceiver<(u64, Sender<b
             ack_info = receiver.recv() => {
                 match ack_info {
                     Some((ack_id, tx)) => {
-                        println!("received ack id {:?}", ack_id);
                         ack_map.insert(ack_id, tx);
                     },
                     None => break,
-                }       
+                }
             }
         }
     }

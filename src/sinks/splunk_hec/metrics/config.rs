@@ -5,6 +5,7 @@ use vector_core::transform::DataType;
 
 use crate::config::{GenerateConfig, SinkConfig, SinkContext};
 use crate::http::HttpClient;
+use crate::sinks::splunk_hec::common::acknowledgements::HecClientAcknowledgementsConfig;
 use crate::sinks::splunk_hec::common::retry::HecRetryLogic;
 use crate::sinks::splunk_hec::common::service::{HecService, HttpRequestBuilder};
 use crate::sinks::splunk_hec::common::{
@@ -36,6 +37,7 @@ pub struct HecMetricsSinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
+    pub indexer_acknowledgements: HecClientAcknowledgementsConfig,
 }
 
 impl GenerateConfig for HecMetricsSinkConfig {
@@ -52,6 +54,7 @@ impl GenerateConfig for HecMetricsSinkConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
+            indexer_acknowledgements: HecClientAcknowledgementsConfig::default(),
         })
         .unwrap()
     }

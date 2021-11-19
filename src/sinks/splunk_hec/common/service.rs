@@ -10,7 +10,10 @@ use crate::sinks::{
 use futures_util::future::BoxFuture;
 use http::Request;
 use serde::Deserialize;
-use tokio::sync::{mpsc::{self, UnboundedSender}, oneshot::{self, Sender}};
+use tokio::sync::{
+    mpsc::{self, UnboundedSender},
+    oneshot::{self, Sender},
+};
 use tower::{Service, ServiceExt};
 use vector_core::event::EventStatus;
 
@@ -40,7 +43,11 @@ impl HecService {
         let http_request_builder = Arc::new(http_request_builder);
         // for transmitting ack_id's
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(run_acknowledgements(rx, ack_client, Arc::clone(&http_request_builder)));
+        tokio::spawn(run_acknowledgements(
+            rx,
+            ack_client,
+            Arc::clone(&http_request_builder),
+        ));
 
         let batch_service = HttpBatchService::new(event_client, move |req| {
             let request_builder = Arc::clone(&http_request_builder);
@@ -81,9 +88,9 @@ impl Service<HecRequest> for HecService {
                             let (tx, rx) = oneshot::channel();
                             let _ = ack_id_sender.send((ack_id, tx));
                             println!("got back a status from the acknowledgements {:?}", rx.await);
-                        } 
+                        }
                         // Otherwise, we should return EventStatus::Delivered immediately
-                    },
+                    }
                     // handle body parsing errors
                     Err(_) => todo!(),
                 }
