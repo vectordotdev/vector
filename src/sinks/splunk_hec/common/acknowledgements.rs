@@ -24,7 +24,7 @@ impl Default for HecClientAcknowledgementsConfig {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct HecAckQueryRequestBody<'a> {
     acks: Vec<&'a u64>,
 }
@@ -37,30 +37,28 @@ struct HecAckQueryResponseBody {
 pub struct AckEventFinalizer {
     acks: HashMap<u64, (u8, Sender<EventStatus>)>,
     retry_limit: u8,
-    // ack_event_status_sender: Sender<EventStatus>,
 }
 
 impl AckEventFinalizer {
-    // pub fn new(retries: u8, ack_event_status_sender: Sender<EventStatus>) -> Self {
     pub fn new(retry_limit: u8) -> Self {
         Self {
             acks: HashMap::new(),
             retry_limit,
-            // ack_event_status_sender,
         }
     }
 
-    pub fn insert_ack_id(&mut self, ack_id: u64, ack_event_status_sender: Sender<EventStatus>) {
+    pub fn insert(&mut self, ack_id: u64, ack_event_status_sender: Sender<EventStatus>) {
         self.acks
             .insert(ack_id, (self.retry_limit, ack_event_status_sender));
     }
 
     /// Remove successfully acked ack ids and notify that the event has been Delivered
-    pub fn ack_success_ack_ids(&mut self, ack_ids: &[u64]) {
+    pub fn finalize_ack_ids(&mut self, ack_ids: &[u64]) {
         for ack_id in ack_ids {
             match self.acks.remove(ack_id) {
                 Some((_, ack_event_status_sender)) => {
                     let _ = ack_event_status_sender.send(EventStatus::Delivered);
+                    debug!("Finalized ack id {:?}", ack_id);
                 }
                 None => {}
             }
@@ -86,7 +84,7 @@ impl AckEventFinalizer {
 
     /// Removes all expired ack ids (those with a retry count of 0).
     fn clear_expired_ack_ids(&mut self) {
-        self.acks.retain(|_, (retries, _)| *retries == 0);
+        self.acks.retain(|_, (retries, _)| *retries > 0);
     }
 }
 
@@ -96,11 +94,9 @@ pub async fn run_acknowledgements(
     http_request_builder: Arc<HttpRequestBuilder>,
     indexer_acknowledgements: HecClientAcknowledgementsConfig,
 ) {
-    // todo: pass in query interval
     let mut interval = tokio::time::interval(Duration::from_secs(
         indexer_acknowledgements.query_interval as u64,
     ));
-    // todo: pass in retry limit
     let mut ack_event_finalizer = AckEventFinalizer::new(indexer_acknowledgements.retry_limit);
 
     loop {
@@ -111,9 +107,10 @@ pub async fn run_acknowledgements(
 
                 match ack_query_response {
                     Ok(ack_query_response) => {
+                        debug!("Received ack statuses {:?}", ack_query_response);
                         ack_event_finalizer.decrement_retries();
                         let acked_ack_ids = ack_query_response.acks.iter().filter_map(|(ack_id, ack_status)| ack_status.then(|| *ack_id)).collect::<Vec<u64>>();
-                        ack_event_finalizer.ack_success_ack_ids(acked_ack_ids.as_slice());
+                        ack_event_finalizer.finalize_ack_ids(acked_ack_ids.as_slice());
                     },
                     Err(error) => {
                         error!(message = "Unable to send ack query request", ?error);
@@ -123,7 +120,8 @@ pub async fn run_acknowledgements(
             ack_info = receiver.recv() => {
                 match ack_info {
                     Some((ack_id, tx)) => {
-                        ack_event_finalizer.insert_ack_id(ack_id, tx);
+                        ack_event_finalizer.insert(ack_id, tx);
+                        debug!("Stored ack id {}", ack_id);
                     },
                     None => break,
                 }

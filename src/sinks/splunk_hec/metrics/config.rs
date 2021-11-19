@@ -37,6 +37,7 @@ pub struct HecMetricsSinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
+    #[serde(default)]
     pub indexer_acknowledgements: HecClientAcknowledgementsConfig,
 }
 
