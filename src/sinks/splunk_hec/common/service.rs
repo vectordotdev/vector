@@ -25,7 +25,7 @@ use super::acknowledgements::run_acknowledgements;
 pub struct HecService {
     pub batch_service:
         HttpBatchService<BoxFuture<'static, Result<Request<Vec<u8>>, crate::Error>>, HecRequest>,
-    ack_id_sender: UnboundedSender<(u64, Sender<bool>)>,
+    ack_id_sender: UnboundedSender<(u64, Sender<EventStatus>)>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -83,18 +83,25 @@ impl Service<HecRequest> for HecService {
                 let body = serde_json::from_slice::<HecAckResponseBody>(response.body());
                 match body {
                     Ok(body) => {
-                        // If there is an ack_id, ack using it
                         if let Some(ack_id) = body.ack_id {
                             let (tx, rx) = oneshot::channel();
-                            let _ = ack_id_sender.send((ack_id, tx));
-                            println!("got back a status from the acknowledgements {:?}", rx.await);
+                            let event_status = if ack_id_sender.send((ack_id, tx)).is_ok() {
+                                match rx.await {
+                                    Ok(status) => status,
+                                    Err(_) => EventStatus::Dropped,
+                                }
+                            } else {
+                                EventStatus::Dropped
+                            };
+                            event_status
+                        } else {
+                            EventStatus::Delivered
                         }
-                        // Otherwise, we should return EventStatus::Delivered immediately
                     }
                     // handle body parsing errors
-                    Err(_) => todo!(),
+                    Err(e) => EventStatus::Delivered,
                 }
-                EventStatus::Delivered
+                // EventStatus::Delivered
             } else if response.status().is_server_error() {
                 EventStatus::Errored
             } else {
