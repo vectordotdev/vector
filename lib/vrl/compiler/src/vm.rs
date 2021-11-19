@@ -1,5 +1,6 @@
 use crate::{expression::Literal, function::VmArgumentList, Context, Function, Value};
 use std::collections::{BTreeMap, HashMap};
+use std::sync::Arc;
 
 macro_rules! binary_op {
     ($self: ident, $($pat: pat => $expr: expr,)*) => {{
@@ -64,6 +65,7 @@ pub enum Variable {
 
 #[derive(Clone, Debug, Default)]
 pub struct Vm {
+    fns: Arc<Vec<Box<dyn Function + Send + Sync>>>,
     instructions: Vec<Instruction>,
     globals: HashMap<String, Value>,
     values: Vec<Literal>,
@@ -74,8 +76,11 @@ pub struct Vm {
 }
 
 impl Vm {
-    pub fn new() -> Self {
-        Default::default()
+    pub fn new(fns: Vec<Box<dyn Function + Send + Sync>>) -> Self {
+        Self {
+            fns: Arc::new(fns),
+            ..Default::default()
+        }
     }
 
     pub fn add_constant(&mut self, object: Literal) -> usize {
@@ -187,11 +192,7 @@ impl Vm {
         self.ip = 0;
     }
 
-    pub fn interpret<'a>(
-        &mut self,
-        fns: &[Box<dyn Function>],
-        ctx: &mut Context<'a>,
-    ) -> Result<Value, String> {
+    pub fn interpret<'a>(&mut self, ctx: &mut Context<'a>) -> Result<Value, String> {
         loop {
             let next = self.next();
             match next {
@@ -326,12 +327,17 @@ impl Vm {
                 }
                 OpCode::Call => {
                     let function_id = self.next_primitive();
-                    let function = &fns[function_id];
+                    let parameters = &self.fns[function_id].parameters();
 
-                    let argumentlist = VmArgumentList::new(function.parameters(), self);
+                    let len = self.parameter_stack().len();
+                    let args = self
+                        .parameter_stack_mut()
+                        .drain(len - parameters.len()..)
+                        .collect();
+                    let argumentlist = VmArgumentList::new(parameters, args);
 
                     // TODO Handle errors
-                    self.stack.push(function.call(argumentlist));
+                    self.stack.push(self.fns[function_id].call(argumentlist));
                 }
                 OpCode::CreateObject => {
                     let count = self.next_primitive();

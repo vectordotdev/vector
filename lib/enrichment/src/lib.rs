@@ -75,11 +75,9 @@ pub trait Table: DynClone {
 
 dyn_clone::clone_trait_object!(Table);
 
-pub fn vrl_functions() -> Vec<Box<dyn vrl_core::Function>> {
+pub fn vrl_functions() -> Vec<Box<dyn vrl_core::Function + Send + Sync>> {
     vec![
-        Box::new(get_enrichment_table_record::GetEnrichmentTableRecord)
-            as Box<dyn vrl_core::Function>,
-        Box::new(find_enrichment_table_records::FindEnrichmentTableRecords)
-            as Box<dyn vrl_core::Function>,
+        Box::new(get_enrichment_table_record::GetEnrichmentTableRecord) as _,
+        Box::new(find_enrichment_table_records::FindEnrichmentTableRecords) as _,
     ]
 }

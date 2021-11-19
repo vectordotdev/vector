@@ -106,9 +106,11 @@ impl Remap {
 
         let mut runtime = Runtime::default();
         let vm = if config.use_vm {
-            Some(runtime.compile(&program)?)
+            Some(runtime.compile(vrl_stdlib::all(), &program)?)
         } else {
-            None
+            // Make sure it is using the vm..
+            Some(runtime.compile(vrl_stdlib::all(), &program)?)
+            //None
         };
 
         Ok(Remap {
@@ -202,11 +204,7 @@ impl FallibleFunctionTransform for Remap {
 
         match self.vm {
             Some(ref mut vm) => {
-                vm.reset();
-                let functions = vrl_stdlib::all();
-                let result = self
-                    .runtime
-                    .run_vm(vm, &mut target, &self.timezone, &functions);
+                let result = self.runtime.run_vm(vm, &mut target, &self.timezone);
 
                 match result {
                     Ok(_) => {

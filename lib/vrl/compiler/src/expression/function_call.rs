@@ -37,7 +37,7 @@ impl FunctionCall {
         ident: Node<Ident>,
         abort_on_error: bool,
         arguments: Vec<Node<FunctionArgument>>,
-        funcs: &[Box<dyn Function>],
+        funcs: &[Box<dyn Function + Send + Sync>],
         state: &mut State,
     ) -> Result<Self, Error> {
         let (ident_span, ident) = ident.take();

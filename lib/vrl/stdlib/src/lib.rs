@@ -490,7 +490,7 @@ pub use upcase::Upcase;
 #[cfg(feature = "uuid_v4")]
 pub use uuid_v4::UuidV4;
 
-pub fn all() -> Vec<Box<dyn vrl::Function>> {
+pub fn all() -> Vec<Box<dyn vrl::Function + Send + Sync>> {
     vec![
         #[cfg(feature = "append")]
         Box::new(Append),
