@@ -98,13 +98,12 @@ pub async fn run_acknowledgements(
     let mut interval = tokio::time::interval(Duration::from_secs(10));
     // todo: pass in retry limit
     let mut ack_event_finalizer = AckEventFinalizer::new(30);
-    let client = Arc::new(client);
 
     loop {
         tokio::select! {
             _ = interval.tick() => {
                 let ack_query_body = ack_event_finalizer.get_ack_query_body();
-                let ack_query_response = send_ack_query_request(client.clone(), http_request_builder.clone(), &ack_query_body).await;
+                let ack_query_response = send_ack_query_request(&client, http_request_builder.clone(), &ack_query_body).await;
 
                 match ack_query_response {
                     Ok(ack_query_response) => {
@@ -129,7 +128,7 @@ pub async fn run_acknowledgements(
 }
 
 async fn send_ack_query_request(
-    client: Arc<HttpClient>,
+    client: &HttpClient,
     http_request_builder: Arc<HttpRequestBuilder>,
     request_body: &HecAckQueryRequestBody<'_>,
 ) -> crate::Result<HecAckQueryResponseBody> {
