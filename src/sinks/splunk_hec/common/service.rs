@@ -25,7 +25,7 @@ use super::acknowledgements::{run_acknowledgements, HecClientAcknowledgementsCon
 pub struct HecService {
     pub batch_service:
         HttpBatchService<BoxFuture<'static, Result<Request<Vec<u8>>, crate::Error>>, HecRequest>,
-    ack_id_sender: UnboundedSender<(u64, Sender<EventStatus>)>,
+    ack_finalizer_tx: UnboundedSender<(u64, Sender<EventStatus>)>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -45,7 +45,6 @@ impl HecService {
         let event_client = client.clone();
         let ack_client = client;
         let http_request_builder = Arc::new(http_request_builder);
-        // for transmitting ack_id's
         let (tx, rx) = mpsc::unbounded_channel();
         tokio::spawn(run_acknowledgements(
             rx,
@@ -62,7 +61,7 @@ impl HecService {
         });
         Self {
             batch_service,
-            ack_id_sender: tx,
+            ack_finalizer_tx: tx,
         }
     }
 }
@@ -78,7 +77,7 @@ impl Service<HecRequest> for HecService {
 
     fn call(&mut self, req: HecRequest) -> Self::Future {
         let mut http_service = self.batch_service.clone();
-        let ack_id_sender = self.ack_id_sender.clone();
+        let ack_finalizer_tx= self.ack_finalizer_tx.clone();
         Box::pin(async move {
             http_service.ready().await?;
             let events_count = req.events_count;
@@ -90,21 +89,21 @@ impl Service<HecRequest> for HecService {
                     Ok(body) => {
                         if let Some(ack_id) = body.ack_id {
                             let (tx, rx) = oneshot::channel();
-                            let event_status = if ack_id_sender.send((ack_id, tx)).is_ok() {
-                                match rx.await {
-                                    Ok(status) => status,
-                                    Err(_) => EventStatus::Dropped,
-                                }
-                            } else {
-                                EventStatus::Dropped
-                            };
-                            event_status
+                            match ack_finalizer_tx.send((ack_id, tx)) {
+                                Ok(_) => rx.await.unwrap_or(EventStatus::Dropped),
+                                // If we cannot send ack ids to the acker, fall back to default behavior
+                                Err(_) => EventStatus::Delivered,
+                            }
                         } else {
+                            // Default behavior if indexer acknowledgements is disabled
                             EventStatus::Delivered
                         }
                     }
-                    // handle body parsing errors
-                    Err(e) => EventStatus::Delivered,
+                    Err(error) => {
+                        // This may occur if Splunk changes the response format in future versions.
+                        error!(message = "Unable to parse Splunk HEC response", ?error);
+                        EventStatus::Delivered
+                    },
                 }
             } else if response.status().is_server_error() {
                 EventStatus::Errored
