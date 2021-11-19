@@ -864,6 +864,7 @@ dependencies = [
  "criterion",
  "crossbeam-utils 0.8.5",
  "db-key",
+ "fslock",
  "futures 0.3.17",
  "hdrhistogram",
  "human_bytes",
@@ -2271,6 +2272,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f41b048a94555da0f42f1d632e2e19510084fb8e303b0daa2816e733fb3644a0"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "fslock"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "31bbcaaf785e09a604b93b15b9ccb41cbf4716fa04c788748d157cb3134d717b"
+dependencies = [
+ "libc",
+ "winapi 0.3.9",
 ]
 
 [[package]]

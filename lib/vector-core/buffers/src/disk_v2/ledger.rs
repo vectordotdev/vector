@@ -8,6 +8,7 @@ use std::{
 use bytecheck::CheckBytes;
 use bytes::BytesMut;
 use crossbeam_utils::atomic::AtomicCell;
+use fslock::LockFile;
 use memmap2::{MmapMut, MmapOptions};
 use rkyv::{with::Atomic, Archive, Serialize};
 use tokio::{fs::OpenOptions, io::AsyncWriteExt, sync::Notify};
@@ -127,6 +128,8 @@ impl ArchivedLedgerState {
 pub struct Ledger {
     // Path to the data directory.
     data_dir: PathBuf,
+    // Advisory lock for this buffer directory.
+    ledger_lock: LockFile,
     // Ledger state.
     state: BackedArchive<MmapMut, LedgerState>,
     // Notifier for reader-related progress.
@@ -217,6 +220,18 @@ impl Ledger {
     where
         P: AsRef<Path>,
     {
+        // Acquire an execlusive lock on our lock file, which prevents another Vector process from
+        // loading this buffer and clashing with us.  Specifically, though: this does _not_ prevent
+        // another process from messing with our ledger files, or any oif the data files, etc.
+        let ledger_lock_path = data_dir.as_ref().join("buffer.lock");
+        let mut ledger_lock = LockFile::open(&ledger_lock_path)?;
+        if !ledger_lock.try_lock()? {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "failed to lock buffer.lock; is another Vector process running and using this buffer?",
+            ));
+        }
+
         // Open the ledger file, which may involve creating it if it doesn't yet exist.
         let ledger_path = data_dir.as_ref().join("buffer.db");
         let mut ledger_handle = OpenOptions::new()
@@ -269,6 +284,7 @@ impl Ledger {
 
         Ok(Ledger {
             data_dir: data_dir.as_ref().to_owned(),
+            ledger_lock,
             state: ledger_state,
             reader_notify: Notify::new(),
             writer_notify: Notify::new(),

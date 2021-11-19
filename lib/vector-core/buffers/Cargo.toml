@@ -11,6 +11,7 @@ bytecheck = { version = "0.6.5", default-features = false, features = ["std"] }
 crc32fast = { version = "1.2.1", default-features = false, features = ["std"] }
 crossbeam-utils = { version = "0.8.5", default-features = false }
 db-key = { version = "0.0.5", default-features = false, optional = true }
+fslock = { version = "0.2.0", default-features = false, features = ["std"] }
 futures = { version = "0.3.17", default-features = false, features = ["std"] }
 core_common = { path = "../core-common", default-features = false }
 leveldb = { version = "0.8.6", default-features = false, optional = true }

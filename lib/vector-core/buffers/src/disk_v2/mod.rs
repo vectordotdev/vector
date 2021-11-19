@@ -88,7 +88,6 @@
 //! reaching 2^64, which will take a really, really, really long time.
 //!
 //! # Implementation TODOs:
-//! - implement an advisory lock around the ledger so multiple processes can't collide (`fs2` crate)
 //! - wire up seeking to the last (according to the ledger) read record when first creating a reader
 //! - make file size limits configurable for testing purposes (we could easily write 2-3x of the
 //!   128MB target under test, but it'd be faster if we didn't have to, and doing that would take a
@@ -100,6 +99,7 @@
 //! - figure out a way to deal with restarting a process where some updates were unflushed, and the
 //!   writer ends up reusing some record IDs that get double read by the reader, which itself has
 //!   logic for detecting non-monotonic record IDs
+//! - implement specific error types so that we can return more useful errors than just wrapped I/O errors
 use std::{
     io::{self, ErrorKind},
     path::Path,
