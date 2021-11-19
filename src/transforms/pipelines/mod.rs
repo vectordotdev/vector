@@ -61,9 +61,9 @@ mod filter;
 mod router;
 
 use crate::conditions::AnyCondition;
+use crate::config::loading::{load_from_file, read_dir, LoadableConfig};
 use crate::config::{
-    load_from_file, DataType, ExpandType, GenerateConfig, LoadableConfig, TransformConfig,
-    TransformContext, TransformDescription,
+    DataType, ExpandType, GenerateConfig, TransformConfig, TransformContext, TransformDescription,
 };
 use crate::transforms::Transform;
 use indexmap::IndexMap;
@@ -118,9 +118,7 @@ impl PipelineConfig {
 
 impl LoadableConfig for PipelineConfig {
     fn load_subfolder(&mut self, path: &Path) -> Result<Vec<String>, Vec<String>> {
-        let readdir = path
-            .read_dir()
-            .map_err(|err| vec![format!("Could not read config dir: {:?}, {}.", path, err)])?;
+        let readdir = read_dir(path)?;
         let mut result = Vec::<(String, Box<dyn TransformConfig>)>::new();
         let mut errors = Vec::new();
         let mut warnings = Vec::new();
@@ -400,7 +398,8 @@ impl PipelinesConfig {
 #[cfg(test)]
 mod tests {
     use super::{EventTypeConfig, GenerateConfig, PipelineConfig, PipelinesConfig};
-    use crate::config::{ComponentKey, LoadableConfig, TransformOuter};
+    use crate::config::loading::LoadableConfig;
+    use crate::config::{ComponentKey, TransformOuter};
     use crate::transforms::noop::Noop;
     use indexmap::IndexMap;
     use std::fs::File;

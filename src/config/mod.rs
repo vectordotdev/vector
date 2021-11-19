@@ -31,7 +31,7 @@ mod diff;
 pub mod format;
 mod graph;
 mod id;
-mod loading;
+pub mod loading;
 pub mod provider;
 mod unit_test;
 mod validation;
@@ -43,9 +43,8 @@ pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
 pub use id::{ComponentKey, ComponentScope, OutputId};
 pub use loading::{
-    component_name, load, load_builder_from_paths, load_from_file, load_from_paths,
-    load_from_paths_with_provider, load_from_str, merge_path_lists, process_paths, LoadableConfig,
-    CONFIG_PATHS,
+    component_name, load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider,
+    load_from_str, merge_path_lists, process_paths, CONFIG_PATHS,
 };
 pub use unit_test::build_unit_tests_main as build_unit_tests;
 pub use validation::warnings;

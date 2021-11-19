@@ -44,6 +44,11 @@ pub fn component_name(path: &Path) -> Result<String, Vec<String>> {
         .ok_or_else(|| vec![format!("Couldn't get component name for file: {:?}", path)])
 }
 
+pub fn read_dir(path: &Path) -> Result<std::fs::ReadDir, Vec<String>> {
+    path.read_dir()
+        .map_err(|err| vec![format!("Could not read config dir: {:?}, {}.", path, err)])
+}
+
 pub fn load_from_file<T>(path: &Path) -> Result<Option<(ComponentKey, T, Vec<String>)>, Vec<String>>
 where
     T: serde::de::DeserializeOwned,
@@ -63,9 +68,7 @@ pub trait LoadableConfig: Sized + serde::de::DeserializeOwned {
         path: &Path,
     ) -> Result<(IndexMap<ComponentKey, Self>, Vec<String>), Vec<String>> {
         let mut result = IndexMap::new();
-        let readdir = path
-            .read_dir()
-            .map_err(|err| vec![format!("Could not read config dir: {:?}, {}.", path, err)])?;
+        let readdir = read_dir(path)?;
         let mut warnings = Vec::new();
         let mut errors = Vec::new();
         let (files, folders) = readdir
@@ -299,9 +302,7 @@ fn load_builder_from_dir(
     path: &Path,
     builder: &mut ConfigBuilder,
 ) -> Result<Vec<String>, Vec<String>> {
-    let readdir = path
-        .read_dir()
-        .map_err(|err| vec![format!("Could not read config dir: {:?}, {}.", path, err)])?;
+    let readdir = read_dir(path)?;
     let mut warnings = Vec::new();
     let mut errors = Vec::new();
     for res in readdir {
