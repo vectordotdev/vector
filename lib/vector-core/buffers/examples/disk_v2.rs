@@ -36,7 +36,7 @@ async fn main() {
     );
 
     // Set up our target record count, write batch size, progress counters, etc.
-    let transaction_count = 300_000;
+    let transaction_count = 100_000;
     let transaction_size = 100;
 
     let write_position = Arc::new(AtomicUsize::new(0));
@@ -93,13 +93,13 @@ async fn main() {
         for _ in 0..total_records_expected {
             let rx_start = Instant::now();
 
-            let (_record_id, record_buf) = reader.next().await.expect("read should not fail");
+            let record = reader.next().await.expect("read should not fail");
 
             let elapsed = rx_start.elapsed().as_nanos() as u64;
             rx_histo.record(elapsed).expect("should not fail");
 
             reader_position.fetch_add(1, Ordering::Relaxed);
-            reader_bytes_read.fetch_add(record_buf.len(), Ordering::Relaxed);
+            reader_bytes_read.fetch_add(record.payload().len(), Ordering::Relaxed);
         }
 
         let _ = reader_tx.send((reader, rx_histo));
@@ -128,9 +128,9 @@ async fn main() {
                 Err(_) => panic!("[disk_v2 reader] task failed unexpectedly!"),
             },
             _ = progress_interval.tick(), if writer_result.is_none() || reader_result.is_none() => {
-                if let Some((writer, _)) = writer_result.as_mut() {
-                    writer.maybe_flush().await.expect("failed to flush");
-                }
+                //if let Some((writer, _)) = writer_result.as_mut() {
+                //    writer.flush().await.expect("failed to flush");
+                //}
 
                 let elapsed = start.elapsed();
                 let write_pos = write_position.load(Ordering::Relaxed);
