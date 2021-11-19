@@ -50,7 +50,7 @@ pub use self::http::HttpSourceAuthConfig;
 pub use encoding_config::EncodingConfig;
 pub use multiline_config::MultilineConfig;
 #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
-pub use tcp::{SocketListenAddr, TcpSource};
+pub use tcp::{SocketListenAddr, TcpNullAcker, TcpSource, TcpSourceAcker};
 #[cfg(any(
     all(feature = "sources-utils-tls", feature = "listenfd"),
     feature = "codecs",

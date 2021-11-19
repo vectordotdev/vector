@@ -1,4 +1,5 @@
-use crate::sources::statsd::parser::ParseError;
+use self::parser::ParseError;
+use super::util::{SocketListenAddr, TcpNullAcker, TcpSource};
 use crate::udp;
 use crate::{
     codecs::{self, NewlineDelimitedCodec, Parser},
@@ -6,7 +7,6 @@ use crate::{
     event::Event,
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
-    sources::util::{SocketListenAddr, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
@@ -214,12 +214,17 @@ impl TcpSource for StatsdTcpSource {
     type Error = codecs::Error;
     type Item = SmallVec<[Event; 1]>;
     type Decoder = codecs::Decoder;
+    type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
         codecs::Decoder::new(
             Box::new(NewlineDelimitedCodec::new()),
             Box::new(StatsdParser),
         )
+    }
+
+    fn build_acker(&self, _: &Self::Item) -> Self::Acker {
+        TcpNullAcker
     }
 }
 

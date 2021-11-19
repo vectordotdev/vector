@@ -58,6 +58,18 @@ async fn make_listener(
     }
 }
 
+pub trait TcpSourceAcker {
+    fn build_ack(self) -> Bytes;
+}
+
+pub struct TcpNullAcker;
+
+impl TcpSourceAcker for TcpNullAcker {
+    fn build_ack(self) -> Bytes {
+        Bytes::new()
+    }
+}
+
 pub trait TcpSource: Clone + Send + Sync + 'static
 where
     <<Self as TcpSource>::Decoder as tokio_util::codec::Decoder>::Item: std::marker::Send,
@@ -67,14 +79,13 @@ where
     type Error: From<io::Error> + TcpError + std::fmt::Debug + std::fmt::Display + Send;
     type Item: Into<SmallVec<[Event; 1]>> + Send;
     type Decoder: Decoder<Item = (Self::Item, usize), Error = Self::Error> + Send + 'static;
+    type Acker: TcpSourceAcker + Send;
 
     fn decoder(&self) -> Self::Decoder;
 
     fn handle_events(&self, _events: &mut [Event], _host: Bytes, _byte_size: usize) {}
 
-    fn build_ack(&self, _item: &Self::Item) -> Bytes {
-        Bytes::new()
-    }
+    fn build_acker(&self, item: &Self::Item) -> Self::Acker;
 
     fn run(
         self,
@@ -249,7 +260,7 @@ async fn handle_stream<T>(
             res = reader.next() => {
                 match res {
                     Some(Ok((item, byte_size))) => {
-                        let ack = source.build_ack(&item);
+                        let acker = source.build_acker(&item);
                         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(acknowledgements);
                         let mut events = item.into();
                         if let Some(batch) = batch{
@@ -276,6 +287,7 @@ async fn handle_stream<T>(
                                     }
                                 }
                                 let stream = reader.get_mut();
+                                let ack = acker.build_ack();
                                 if let Err(error) = stream.write_all(&ack).await {
                                     emit!(&TcpSendAckError{ error });
                                     break;

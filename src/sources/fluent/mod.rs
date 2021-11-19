@@ -1,4 +1,4 @@
-use super::util::{SocketListenAddr, TcpError, TcpSource};
+use super::util::{SocketListenAddr, TcpError, TcpNullAcker, TcpSource};
 use crate::{
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
@@ -89,6 +89,7 @@ impl TcpSource for FluentSource {
     type Error = DecodeError;
     type Item = FluentFrame;
     type Decoder = FluentDecoder;
+    type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
         FluentDecoder::new()
@@ -102,6 +103,10 @@ impl TcpSource for FluentSource {
                 log.insert(log_schema().host_key(), host.clone());
             }
         }
+    }
+
+    fn build_acker(&self, _: &Self::Item) -> Self::Acker {
+        TcpNullAcker
     }
 }
 
