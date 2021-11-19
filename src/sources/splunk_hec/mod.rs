@@ -241,15 +241,7 @@ impl SplunkSource {
 
                         let (batch, receiver) =
                             BatchNotifier::maybe_new_with_receiver(idx_ack.is_some());
-                        let mut events = stream::iter(EventIterator::new(
-                            Deserializer::from_reader(reader).into_iter::<JsonValue>(),
-                            channel.clone(),
-                            remote,
-                            xff,
-                            batch,
-                        ));
-
-                        let maybe_ack_id = match (idx_ack, receiver, channel) {
+                        let maybe_ack_id = match (idx_ack, receiver, channel.clone()) {
                             (Some(idx_ack), Some(receiver), Some(channel_id)) => {
                                 match idx_ack.get_ack_id_from_channel(channel_id, receiver).await {
                                     Ok(ack_id) => Some(ack_id),
@@ -258,6 +250,14 @@ impl SplunkSource {
                             }
                             _ => None,
                         };
+                        let mut events = stream::iter(EventIterator::new(
+                            Deserializer::from_reader(reader).into_iter::<JsonValue>(),
+                            channel,
+                            remote,
+                            xff,
+                            batch,
+                        ));
+
                         let res = out.send_all(&mut events).await;
 
                         out.flush().await?;
@@ -303,15 +303,15 @@ impl SplunkSource {
                     async move {
                         let (batch, receiver) =
                             BatchNotifier::maybe_new_with_receiver(idx_ack.is_some());
-                        let event = raw_event(body, gzip, channel_id.clone(), remote, xff, batch)?;
-                        let maybe_ack_id: Option<u64> = match (idx_ack, receiver) {
+                        let maybe_ack_id = match (idx_ack, receiver) {
                             (Some(idx_ack), Some(receiver)) => Some(
                                 idx_ack
-                                    .get_ack_id_from_channel(channel_id, receiver)
+                                    .get_ack_id_from_channel(channel_id.clone(), receiver)
                                     .await?,
                             ),
                             _ => None,
                         };
+                        let event = raw_event(body, gzip, channel_id, remote, xff, batch)?;
 
                         let res = out.send(event).await;
                         res.map(|_| maybe_ack_id)
