@@ -98,7 +98,7 @@ impl GenerateConfig for InfluxDbLogsConfig {
 #[typetag::serde(name = "influxdb_logs")]
 impl SinkConfig for InfluxDbLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let measurement = self.get_measurement();
+        let measurement = self.get_measurement()?;
         let mut tags: HashSet<String> = self.tags.clone().into_iter().collect();
         tags.insert(log_schema().host_key().to_string());
         tags.insert(log_schema().source_type_key().to_string());
@@ -212,22 +212,22 @@ impl HttpSink for InfluxDbLogsSink {
 }
 
 impl InfluxDbLogsConfig {
-    fn get_measurement(&self) -> String {
+    fn get_measurement(&self) -> Result<String, String> {
         match (self.measurement.as_ref(), self.namespace.as_ref()) {
             (Some(measure), Some(_)) => {
-                warn!("Option `namespace` has been preceded by `measurement`.");
-                measure.clone()
-            }
-            (Some(measure), None)) => measure.clone(),
+                warn!("Option `namespace` has been superseded by `measurement`.");
+                Ok(measure.clone())
+            },
+            (Some(measure), None) => Ok(measure.clone()),
             (None, Some(namespace)) => {
                 warn!(
                     "Option `namespace` has been deprecated. Use `measurement` instead. \
                        For example, you can use `measurement=<namespace>.vector` for the \
                        same effect."
                 );
-                format!("{}.vector", namespace)
-            }
-            (None, None) => panic!("Option `measurement` is required."),
+                Ok(format!("{}.vector", namespace))
+            },
+            (None, None) => Err("The option `measurement` is required.".to_string()),
         }
     }
 
@@ -299,7 +299,7 @@ mod tests {
         "#};
 
         let sink_config = toml::from_str::<InfluxDbLogsConfig>(config).unwrap();
-        assert_eq!("ns.vector", sink_config.get_measurement());
+        assert_eq!("ns.vector", sink_config.get_measurement().unwrap());
     }
 
     #[test]
