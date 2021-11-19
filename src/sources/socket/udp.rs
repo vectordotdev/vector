@@ -9,7 +9,7 @@ use crate::{
     internal_events::{SocketEventsReceived, SocketMode, SocketReceiveError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    sources::{util::TcpError, Source},
+    sources::{util::StreamDecodingError, Source},
     udp, Pipeline,
 };
 use bytes::{Bytes, BytesMut};

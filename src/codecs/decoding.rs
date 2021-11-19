@@ -5,7 +5,7 @@ use crate::{
     codecs::{BytesDeserializer, NewlineDelimitedDecoder},
     event::Event,
     internal_events::{DecoderDeserializeFailed, DecoderFramingFailed},
-    sources::util::TcpError,
+    sources::util::StreamDecodingError,
 };
 use bytes::{Bytes, BytesMut};
 use dyn_clone::DynClone;
@@ -42,7 +42,7 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl TcpError for Error {
+impl StreamDecodingError for Error {
     fn can_continue(&self) -> bool {
         match self {
             Self::FramingError(error) => error.can_continue(),
@@ -57,7 +57,7 @@ impl TcpError for Error {
 /// It requires conformance to `TcpError` so that we can determine whether the
 /// error is recoverable or if trying to continue will lead to hanging up the
 /// TCP source indefinitely.
-pub trait FramingError: std::error::Error + TcpError + Send + Sync {}
+pub trait FramingError: std::error::Error + StreamDecodingError + Send + Sync {}
 
 impl std::error::Error for BoxedFramingError {}
 
@@ -80,7 +80,7 @@ impl From<LinesCodecError> for BoxedFramingError {
 /// A `Box` containing a `FramingError`.
 pub type BoxedFramingError = Box<dyn FramingError>;
 
-impl TcpError for BoxedFramingError {
+impl StreamDecodingError for BoxedFramingError {
     fn can_continue(&self) -> bool {
         self.as_ref().can_continue()
     }
