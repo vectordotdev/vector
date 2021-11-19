@@ -38,7 +38,6 @@ module "vector" {
   source       = "../../../common/terraform/modules/vector"
   type         = var.type
   vector_image = var.vector_image
-  test_name    = "datadog_agent_remap_datadog_logs"
   vector-toml  = file("${path.module}/vector.toml")
   namespace    = kubernetes_namespace.soak.metadata[0].name
   vector_cpus  = var.vector_cpus
@@ -50,6 +49,7 @@ module "http-blackhole" {
   http-blackhole-toml = file("${path.module}/http_blackhole.toml")
   namespace           = kubernetes_namespace.soak.metadata[0].name
   depends_on          = [module.monitoring]
+  lading_image        = var.lading_image
 }
 module "tcp-gen" {
   source       = "../../../common/terraform/modules/lading_tcp_gen"
@@ -57,4 +57,5 @@ module "tcp-gen" {
   tcp-gen-toml = file("${path.module}/tcp_gen.toml")
   namespace    = kubernetes_namespace.soak.metadata[0].name
   depends_on   = [module.monitoring, module.vector]
+  lading_image = var.lading_image
 }

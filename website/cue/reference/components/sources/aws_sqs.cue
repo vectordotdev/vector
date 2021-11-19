@@ -62,16 +62,16 @@ components: sources: aws_sqs: components._aws & {
 				unit:    "seconds"
 			}
 		}
-		//  client_concurrency: {
-		//   common: true
-		//   description: "How many clients are receiving / acking SQS messages. Increasing may allow higher throughput. Note: the default is 1 / CPU core"
-		//   required: false
-		//   warnings: []
-		//   type: uint: {
-		//    default: 1
-		//    unit: "# of clients"
-		//   }
-		//  }
+		client_concurrency: {
+			common:      true
+			description: "How many clients are receiving / acking SQS messages. Increasing may allow higher throughput. Note: the default is 1 / CPU core"
+			required:    false
+			warnings: []
+			type: uint: {
+				default: 1
+				unit:    "concurrency"
+			}
+		}
 		queue_url: {
 			description: "The URL of the SQS queue to receive events from."
 			required:    true
