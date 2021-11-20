@@ -212,7 +212,7 @@ impl HttpSink for InfluxDbLogsSink {
 }
 
 impl InfluxDbLogsConfig {
-    fn get_measurement(&self) -> Result<String, String> {
+    fn get_measurement(&self) -> Result<String, &'static str> {
         match (self.measurement.as_ref(), self.namespace.as_ref()) {
             (Some(measure), Some(_)) => {
                 warn!("Option `namespace` has been superseded by `measurement`.");
@@ -227,7 +227,7 @@ impl InfluxDbLogsConfig {
                 );
                 Ok(format!("{}.vector", namespace))
             }
-            (None, None) => Err("The option `measurement` is required.".to_string()),
+            (None, None) => Err("The `measurement` option is required."),
         }
     }
 
