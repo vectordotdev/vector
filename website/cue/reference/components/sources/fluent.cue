@@ -179,16 +179,6 @@ components: sources: fluent: {
 				If you would find this useful, [please let us know](\(urls.vector_repo)/issues/7532).
 				"""
 		}
-
-		acking: {
-			title: "Acknowledgement support"
-			body:  """
-				The `fluent` source currently does not support the acknowledgement parts of the Fluent protocol and so
-				the `require_ack_response` option forward output plugins for Fluent and Fluent Bit cannot be used.
-
-				If you would find this useful, [please let us know](\(urls.vector_repo)/issues/7533).
-				"""
-		}
 	}
 
 	telemetry: metrics: {

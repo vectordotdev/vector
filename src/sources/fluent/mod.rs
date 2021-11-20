@@ -1,4 +1,4 @@
-use super::util::{SocketListenAddr, TcpError, TcpNullAcker, TcpSource};
+use super::util::{SocketListenAddr, TcpError, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
@@ -89,7 +89,7 @@ impl TcpSource for FluentSource {
     type Error = DecodeError;
     type Item = FluentFrame;
     type Decoder = FluentDecoder;
-    type Acker = TcpNullAcker;
+    type Acker = FluentAcker;
 
     fn decoder(&self) -> Self::Decoder {
         FluentDecoder::new()
@@ -105,8 +105,8 @@ impl TcpSource for FluentSource {
         }
     }
 
-    fn build_acker(&self, _: &Self::Item) -> Self::Acker {
-        TcpNullAcker
+    fn build_acker(&self, frame: &Self::Item) -> Self::Acker {
+        FluentAcker::new(frame)
     }
 }
 
@@ -374,6 +374,30 @@ impl Decoder for FluentEntryStreamDecoder {
         src.advance(byte_size);
 
         res
+    }
+}
+
+struct FluentAcker {
+    chunk: Option<String>,
+}
+
+impl FluentAcker {
+    fn new(frame: &FluentFrame) -> Self {
+        Self {
+            chunk: frame.chunk.clone(),
+        }
+    }
+}
+
+impl TcpSourceAcker for FluentAcker {
+    fn build_ack(self, ack: TcpSourceAck) -> Bytes {
+        match self.chunk {
+            None => Bytes::new(),
+            Some(chunk) => match ack {
+                TcpSourceAck::Ack => format!(r#"{{"ack": "{}"}}"#, chunk).into(),
+                _ => "{}".into(),
+            },
+        }
     }
 }
 
