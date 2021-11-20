@@ -119,7 +119,7 @@ mod test {
     use vector_core::event::{EventStatus, Metric, MetricKind, MetricValue};
 
     #[test]
-    fn genreate_config() {
+    fn generate_config() {
         crate::test_util::test_generate_config::<PrometheusRemoteWriteConfig>();
     }
 

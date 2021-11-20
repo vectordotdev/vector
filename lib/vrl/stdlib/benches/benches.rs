@@ -445,7 +445,7 @@ bench_function! {
         want: Ok("42"),
     }
 
-    hexidecimal {
+    hexadecimal {
         args: func_args![value: 42, base: 16],
         want: Ok(value!("2a")),
     }

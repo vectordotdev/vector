@@ -1,5 +1,5 @@
 variable "type" {
-  description = "The type of the vector install, whether 'baseline' or 'comparision'"
+  description = "The type of the vector install, whether 'baseline' or 'comparison'"
   type        = string
 }
 

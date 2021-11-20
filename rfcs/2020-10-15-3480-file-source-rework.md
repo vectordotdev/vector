@@ -299,7 +299,7 @@ If we adopt this, we can also implement a solution where we don't hold open file
 handles for files that match `skip_older_than`, since this has caused some
 issues. Naively, we need the open handle to attempt reads in case new data is
 written to the file, but we could also implement that as a new state of
-`FileWatcher` that stashes the inital size and periodically checks the file
+`FileWatcher` that stashes the initial size and periodically checks the file
 metadata (mtime and size) to see if it should start reading at what was the end.
 
 ### General tweaks

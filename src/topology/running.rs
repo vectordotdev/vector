@@ -163,7 +163,7 @@ impl RunningTopology {
     }
 
     /// On Error, topology is in invalid state.
-    /// May change componenets even if reload fails.
+    /// May change components even if reload fails.
     pub async fn reload_config_and_respawn(&mut self, new_config: Config) -> Result<bool, ()> {
         if self.config.global != new_config.global {
             error!(
@@ -179,7 +179,7 @@ impl RunningTopology {
         let buffers = self.shutdown_diff(&diff, &new_config).await;
 
         // Gives windows some time to make available any port
-        // released by shutdown componenets.
+        // released by shutdown components.
         // Issue: https://github.com/timberio/vector/issues/3035
         if cfg!(windows) {
             // This value is guess work.
