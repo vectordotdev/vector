@@ -58,6 +58,7 @@ async fn make_listener(
     }
 }
 
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub enum TcpSourceAck {
     Ack,
     Error,
@@ -279,25 +280,30 @@ async fn handle_stream<T>(
                         source.handle_events(&mut events, host.clone(), byte_size);
                         match out.send_all(&mut stream::iter(events).map(Ok)).await {
                             Ok(_) => {
-                                if let Some(receiver) = receiver {
-                                    match receiver.await {
-                                        BatchStatus::Delivered => (),
-                                        BatchStatus::Errored => {
-                                            warn!(message = "Error delivering events to sink.",
-                                                  internal_log_rate_secs = 5);
-                                            break;
+                                let ack = match receiver {
+                                    None => TcpSourceAck::Ack,
+                                    Some(receiver) =>
+                                        match receiver.await {
+                                            BatchStatus::Delivered => TcpSourceAck::Ack,
+                                            BatchStatus::Errored => {
+                                                warn!(message = "Error delivering events to sink.",
+                                                      internal_log_rate_secs = 5);
+                                                TcpSourceAck::Error
+                                            }
+                                            BatchStatus::Failed => {
+                                                warn!(message = "Failed to deliver events to sink.",
+                                                      internal_log_rate_secs = 5);
+                                                TcpSourceAck::Reject
+                                            }
                                         }
-                                        BatchStatus::Failed => {
-                                            warn!(message = "Failed to deliver events to sink.",
-                                                  internal_log_rate_secs = 5);
-                                            break;
-                                        }
-                                    }
-                                }
+                                };
                                 let stream = reader.get_mut();
-                                let ack = acker.build_ack(TcpSourceAck::Ack);
-                                if let Err(error) = stream.write_all(&ack).await {
+                                let ack_bytes = acker.build_ack(ack);
+                                if let Err(error) = stream.write_all(&ack_bytes).await {
                                     emit!(&TcpSendAckError{ error });
+                                    break;
+                                }
+                                if ack != TcpSourceAck::Ack {
                                     break;
                                 }
                             }
