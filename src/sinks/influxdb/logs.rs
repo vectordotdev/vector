@@ -217,7 +217,7 @@ impl InfluxDbLogsConfig {
             (Some(measure), Some(_)) => {
                 warn!("Option `namespace` has been superseded by `measurement`.");
                 Ok(measure.clone())
-            },
+            }
             (Some(measure), None) => Ok(measure.clone()),
             (None, Some(namespace)) => {
                 warn!(
@@ -226,7 +226,7 @@ impl InfluxDbLogsConfig {
                        same effect."
                 );
                 Ok(format!("{}.vector", namespace))
-            },
+            }
             (None, None) => Err("The option `measurement` is required.".to_string()),
         }
     }
