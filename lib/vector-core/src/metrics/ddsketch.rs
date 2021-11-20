@@ -116,7 +116,7 @@ impl Config {
 
     /// Gets the key for the given value.
     ///
-    /// The key correponds to the bin where this value would be represented. The value returned here
+    /// The key corresponds to the bin where this value would be represented. The value returned here
     /// is such that: γ^k <= v < γ^(k+1).
     #[allow(clippy::cast_possible_truncation)]
     pub fn key(&self, v: f64) -> i16 {
@@ -411,7 +411,7 @@ impl AgentDDSketch {
 
         trim_left(&mut temp, self.config.bin_limit);
 
-        // PERF TOOD: This is where we might do a mem::swap instead so that we could shove the
+        // PERF TODO: This is where we might do a mem::swap instead so that we could shove the
         // bin vector into an object pool but I'm not sure this actually matters at the moment.
         self.bins = temp;
     }
@@ -477,7 +477,7 @@ impl AgentDDSketch {
 
         trim_left(&mut temp, self.config.bin_limit);
 
-        // PERF TOOD: This is where we might do a mem::swap instead so that we could shove the
+        // PERF TODO: This is where we might do a mem::swap instead so that we could shove the
         // bin vector into an object pool but I'm not sure this actually matters at the moment.
         self.bins = temp;
     }

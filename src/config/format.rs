@@ -58,7 +58,7 @@ mod tests {
     /// This test ensures the logic to guess file format from the file path
     /// works correctly.
     /// Like all other tests, it also demonstrates various cases and how our
-    /// code behaves when it enounters them.
+    /// code behaves when it encounters them.
     #[test]
     fn test_from_path() {
         let cases = vec![

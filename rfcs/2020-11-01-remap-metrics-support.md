@@ -119,7 +119,7 @@ Allows you to change the name of the metric.
 
 ### `get_namespace() -> string`
 
-Returns the namepace of the metric.
+Returns the namespace of the metric.
 
 ### `set_namespace(string)`
 
@@ -209,7 +209,7 @@ convert this into a sampled distribution. A function could be provided that
 enables this: `sample_gauge_values([buckets], sample_rate)`.
 
 The complexities involved with providing such functions are that it means
-there is no longer a strict one-to-one correspondance between input and output
+there is no longer a strict one-to-one correspondence between input and output
 events. Many input events would be summarised to a single output event.
 
 We would need to think about what would need to be done should

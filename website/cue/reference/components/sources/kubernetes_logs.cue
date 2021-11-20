@@ -403,7 +403,7 @@ components: sources: kubernetes_logs: {
 				}
 			}
 			stream: {
-				description: "The name of the stream the log line was sumbitted to."
+				description: "The name of the stream the log line was submitted to."
 				required:    true
 				type: string: {
 					examples: ["stdout", "stderr"]

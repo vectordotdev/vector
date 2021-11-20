@@ -85,7 +85,7 @@ impl PathsProvider for K8sPathsProvider {
 /// `Static Pod`s: they keep their logs at the path that consists of config
 /// hashsum instead of the `Pod` `uid`. The reason for this is `kubelet` is
 /// locally authoritative over those `Pod`s, and the API only has
-/// `Monitor Pod`s - the "dummy" entires useful for discovery and association.
+/// `Monitor Pod`s - the "dummy" entries useful for discovery and association.
 /// Their UIDs are generated at the Kubernetes API side, and do not represent
 /// the actual config hashsum as one would expect.
 ///

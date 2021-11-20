@@ -45,7 +45,7 @@ pub fn port_forward(
     })
 }
 
-/// Keeps track of the continiously running `kubectl port-forward` command,
+/// Keeps track of the continuously running `kubectl port-forward` command,
 /// exposing the API to terminate it when needed.
 #[derive(Debug)]
 pub struct PortForwarder {

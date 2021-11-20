@@ -318,7 +318,7 @@ impl DatadogMetricsEncoder {
 
     fn try_encode_pending(&mut self) -> Result<(), FinishError> {
         // The Datadog Agent uses a particular Protocol Buffers library to incrementally encode the
-        // DDSketch structures into a payload, similiar to how we incrementally encode the series
+        // DDSketch structures into a payload, similar to how we incrementally encode the series
         // metrics.  Unfortunately, there's no existing Rust crate that allows writing out Protocol
         // Buffers payloads by hand, so we have to cheat a little and buffer up the metrics until
         // the very end.
