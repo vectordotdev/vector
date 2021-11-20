@@ -132,15 +132,4 @@ where
             _archive: PhantomData,
         })
     }
-
-    /// Gets a mutable reference to the backing store.
-    pub fn get_backing_mut(&mut self) -> &mut B {
-        &mut self.backing
-    }
-
-    /// Gets a reference to the archived value.
-    pub fn get_archive_mut(&mut self) -> &mut T::Archived {
-        let pinned = Pin::new(self.backing.as_mut());
-        unsafe { archived_value_mut::<T>(pinned, 0).get_mut() }
-    }
 }

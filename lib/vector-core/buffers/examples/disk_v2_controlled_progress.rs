@@ -21,7 +21,7 @@ fn generate_block_cache() -> Vec<Block> {
     // better simulate actual transactions with the speed of pre-computing the records.
     let mut rng = rand::thread_rng();
     let labels = vec![("target".to_string(), "disk_v2".to_string())];
-    let block_chunks = chunk_bytes(&mut rng, 256_000_000, &[512, 768, 1024, 2048]);
+    let block_chunks = chunk_bytes(&mut rng, 512_000_000, &[512, 768, 1024, 2048]);
     construct_block_cache(&payload::Json::default(), &block_chunks, &labels)
 }
 
@@ -33,17 +33,22 @@ async fn main() {
         .expect("1st arg must be number of records to write")
         .parse::<usize>()
         .expect("1st arg must be number of records to write");
+    let writer_batch_size = args
+        .nth(0)
+        .expect("2nd arg must be number of records per write batch")
+        .parse::<usize>()
+        .expect("2nd arg must be number of records per write batch");
     let reader_count: usize = args
         .nth(0)
-        .expect("2nd arg must be number of records to read")
+        .expect("3rd arg must be number of records to read")
         .parse::<usize>()
-        .expect("2nd arg must be number of records to read");
+        .expect("3rd arg must be number of records to read");
 
     // Generate our block cache, which ensures the writer spends as little time as possible actually
     // generating the data that it writes to the buffer.
     let block_cache = generate_block_cache();
     println!(
-        "[disk_v2 init] generated block cache of 256MB ({} blocks)",
+        "[disk_v2 init] generated block cache of 512MB ({} blocks)",
         block_cache.len()
     );
 
@@ -74,22 +79,28 @@ async fn main() {
         let mut tx_histo = Histogram::<u64>::new(3).expect("should not fail");
         let mut records = block_cache.iter().cycle();
 
-        for _ in 0..writer_count {
+        let iters = writer_count / writer_batch_size;
+
+        for _ in 0..iters {
             let tx_start = Instant::now();
 
             let mut tx_bytes_total = 0;
             let record = records.next().expect("should never be empty");
             tx_bytes_total += record.bytes.len();
-            writer
-                .write_record(&record.bytes)
-                .await
-                .expect("failed to write record");
+            for _ in 0..writer_batch_size {
+                let record = records.next().expect("should never be empty");
+                tx_bytes_total += record.bytes.len();
+                writer
+                    .write_record(&record.bytes)
+                    .await
+                    .expect("failed to write record");
+            }
             writer.flush().await.expect("failed to flush writer");
 
             let elapsed = tx_start.elapsed().as_nanos() as u64;
             tx_histo.record(elapsed).expect("should not fail");
 
-            writer_position.fetch_add(1, Ordering::Relaxed);
+            writer_position.fetch_add(writer_batch_size, Ordering::Relaxed);
             writer_bytes_written.fetch_add(tx_bytes_total, Ordering::Relaxed);
         }
 

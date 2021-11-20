@@ -5594,9 +5594,9 @@ dependencies = [
 
 [[package]]
 name = "rkyv"
-version = "0.7.20"
+version = "0.7.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e419b2e30d088b21c4bf3072561535305df8066e89937ad05fc205b99874c23c"
+checksum = "ef4a148a71d5ce547f2ded9dec695514e4381431bb6bd5960a5640722d51a083"
 dependencies = [
  "bytecheck",
  "hashbrown 0.11.2",
@@ -5608,9 +5608,9 @@ dependencies = [
 
 [[package]]
 name = "rkyv_derive"
-version = "0.7.20"
+version = "0.7.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ae58c4ba80f15f2f0842f4c61729e92c4e33a09bd78196c2b1ab9b0771a3ddf"
+checksum = "e822baff2d1c30419c362d1836425af4bfc0fd557465b925946ccdb6b4e892b6"
 dependencies = [
  "proc-macro2 1.0.30",
  "quote 1.0.10",
@@ -7589,7 +7589,7 @@ version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f559b464de2e2bdabcac6a210d12e9b5a5973c251e102c44c585c71d51bd78e"
 dependencies = [
- "cfg-if 1.0.0",
+ "cfg-if 0.1.10",
  "static_assertions",
 ]
 

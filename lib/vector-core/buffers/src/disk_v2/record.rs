@@ -2,7 +2,11 @@ use std::ptr::addr_of;
 
 use bytecheck::{CheckBytes, ErrorBox, StructCheckError};
 use crc32fast::Hasher;
-use rkyv::{boxed::ArchivedBox, with::RefAsBox, Archive, Archived, Serialize};
+use rkyv::{
+    boxed::ArchivedBox,
+    with::{CopyOptimize, RefAsBox},
+    Archive, Archived, Serialize,
+};
 
 use super::ser::{try_as_archive, DeserializeError};
 
@@ -49,7 +53,7 @@ pub struct Record<'a> {
     // The record length.
     //
     // This is the number of bytes that follow the header.
-    #[with(RefAsBox)]
+    #[with(CopyOptimize, RefAsBox)]
     payload: &'a [u8],
 }
 

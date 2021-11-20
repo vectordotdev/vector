@@ -128,9 +128,9 @@ async fn main() {
                 Err(_) => panic!("[disk_v2 reader] task failed unexpectedly!"),
             },
             _ = progress_interval.tick(), if writer_result.is_none() || reader_result.is_none() => {
-                //if let Some((writer, _)) = writer_result.as_mut() {
-                //    writer.flush().await.expect("failed to flush");
-                //}
+                if let Some((writer, _)) = writer_result.as_mut() {
+                    writer.flush().await.expect("failed to flush");
+                }
 
                 let elapsed = start.elapsed();
                 let write_pos = write_position.load(Ordering::Relaxed);
