@@ -3,21 +3,18 @@ use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 use vector_core::transform::DataType;
 
-use crate::config::{GenerateConfig, SinkConfig, SinkContext};
-use crate::http::HttpClient;
-use crate::sinks::splunk_hec::common::acknowledgements::HecClientAcknowledgementsConfig;
-use crate::sinks::splunk_hec::common::retry::HecRetryLogic;
-use crate::sinks::splunk_hec::common::service::{HecService, HttpRequestBuilder};
-use crate::sinks::splunk_hec::common::{
-    build_healthcheck, create_client, host_key, SplunkHecDefaultBatchSettings,
-};
-use crate::sinks::splunk_hec::metrics::request_builder::HecMetricsRequestBuilder;
-use crate::sinks::splunk_hec::metrics::sink::HecMetricsSink;
-use crate::sinks::util::{BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig};
-use crate::sinks::Healthcheck;
-use crate::template::Template;
-use crate::tls::TlsOptions;
+use crate::{config::{GenerateConfig, SinkConfig, SinkContext}, http::HttpClient, sinks::{Healthcheck, splunk_hec::common::{
+            acknowledgements::{
+                default_hec_client_acknowledgements_config, HecClientAcknowledgementsConfig,
+            },
+            build_healthcheck, create_client, host_key,
+            retry::HecRetryLogic,
+            service::{HecService, HttpRequestBuilder},
+            SplunkHecDefaultBatchSettings,
+        }, util::{BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig}}, template::Template, tls::TlsOptions};
 use vector_core::sink::VectorSink;
+
+use super::{request_builder::HecMetricsRequestBuilder, sink::HecMetricsSink};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -37,8 +34,8 @@ pub struct HecMetricsSinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
-    #[serde(default)]
-    pub indexer_acknowledgements: HecClientAcknowledgementsConfig,
+    #[serde(default = "default_hec_client_acknowledgements_config")]
+    pub indexer_acknowledgements: Option<HecClientAcknowledgementsConfig>,
 }
 
 impl GenerateConfig for HecMetricsSinkConfig {
@@ -55,7 +52,7 @@ impl GenerateConfig for HecMetricsSinkConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
-            indexer_acknowledgements: HecClientAcknowledgementsConfig::default(),
+            indexer_acknowledgements: Some(HecClientAcknowledgementsConfig::default()),
         })
         .unwrap()
     }

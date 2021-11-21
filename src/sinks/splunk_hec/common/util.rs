@@ -3,28 +3,14 @@ use std::num::NonZeroU64;
 use crate::{
     http::HttpClient,
     internal_events::TemplateRenderingFailed,
-    sinks::{
-        self,
-        util::{Compression, SinkBatchSettings},
-        UriParseError,
-    },
+    sinks::{self, util::SinkBatchSettings, UriParseError},
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use snafu::{ResultExt, Snafu};
-use uuid::Uuid;
 use vector_core::{config::proxy::ProxyConfig, event::EventRef};
-
-// A Splunk channel must be a GUID/UUID formatted value
-// https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/AboutHECIDXAck#About_channels_and_sending_data
-lazy_static::lazy_static! {
-    static ref SPLUNK_CHANNEL: String = {
-        let mut buf = Uuid::encode_buffer();
-        Uuid::new_v4().to_hyphenated().encode_lower(&mut buf).to_string()
-    };
-}
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SplunkHecDefaultBatchSettings;
@@ -73,30 +59,6 @@ pub async fn build_healthcheck(
     }
 }
 
-pub async fn build_request(
-    endpoint: &str,
-    token: &str,
-    compression: Compression,
-    events: Vec<u8>,
-    path: &str,
-) -> crate::Result<Request<Vec<u8>>> {
-    let uri = build_uri(endpoint, path).context(UriParseError)?;
-
-    let mut builder = Request::post(uri)
-        .header("Content-Type", "application/json")
-        .header("Authorization", format!("Splunk {}", token))
-        .header(
-            "X-Splunk-Request-Channel",
-            format!("{}", SPLUNK_CHANNEL.as_str()),
-        );
-
-    if let Some(ce) = compression.content_encoding() {
-        builder = builder.header("Content-Encoding", ce);
-    }
-
-    builder.body(events).map_err(Into::into)
-}
-
 pub fn build_uri(host: &str, path: &str) -> Result<Uri, http::uri::InvalidUri> {
     format!("{}{}", host.trim_end_matches('/'), path).parse::<Uri>()
 }
@@ -132,7 +94,7 @@ mod tests {
     };
 
     use crate::sinks::{
-        splunk_hec::common::{build_healthcheck, build_request, create_client},
+        splunk_hec::common::{build_healthcheck, create_client, service::HttpRequestBuilder},
         util::Compression,
     };
 
@@ -219,16 +181,15 @@ mod tests {
         let token = "token";
         let compression = Compression::None;
         let events = "events".as_bytes().to_vec();
-
-        let request = build_request(
-            endpoint,
-            token,
+        let http_request_builder = HttpRequestBuilder {
+            endpoint: String::from(endpoint),
+            token: String::from(token),
             compression,
-            events.clone(),
-            "/services/collector/event",
-        )
-        .await
-        .unwrap();
+        };
+
+        let request = http_request_builder
+            .build_request(events.clone(), "/services/collector/event")
+            .unwrap();
 
         assert_eq!(
             request.uri(),
@@ -256,16 +217,15 @@ mod tests {
         let token = "token";
         let compression = Compression::gzip_default();
         let events = "events".as_bytes().to_vec();
-
-        let request = build_request(
-            endpoint,
-            token,
+        let http_request_builder = HttpRequestBuilder {
+            endpoint: String::from(endpoint),
+            token: String::from(token),
             compression,
-            events.clone(),
-            "/services/collector/event",
-        )
-        .await
-        .unwrap();
+        };
+
+        let request = http_request_builder
+            .build_request(events.clone(), "/services/collector/event")
+            .unwrap();
 
         assert_eq!(
             request.uri(),
@@ -296,16 +256,15 @@ mod tests {
         let token = "token";
         let compression = Compression::gzip_default();
         let events = "events".as_bytes().to_vec();
-
-        let err = build_request(
-            endpoint,
-            token,
+        let http_request_builder = HttpRequestBuilder {
+            endpoint: String::from(endpoint),
+            token: String::from(token),
             compression,
-            events.clone(),
-            "/services/collector/event",
-        )
-        .await
-        .unwrap_err();
+        };
+
+        let err = http_request_builder
+            .build_request(events.clone(), "/services/collector/event")
+            .unwrap_err();
         assert_eq!(err.to_string(), "URI parse error: invalid format")
     }
 }

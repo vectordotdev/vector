@@ -868,7 +868,7 @@ mod tests {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
-            indexer_acknowledgements: HecClientAcknowledgementsConfig::default(),
+            indexer_acknowledgements: Some(HecClientAcknowledgementsConfig::default()),
         }
         .build(SinkContext::new_test())
         .await

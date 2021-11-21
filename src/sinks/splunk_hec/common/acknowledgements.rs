@@ -24,6 +24,10 @@ impl Default for HecClientAcknowledgementsConfig {
     }
 }
 
+pub fn default_hec_client_acknowledgements_config() -> Option<HecClientAcknowledgementsConfig> {
+    Some(HecClientAcknowledgementsConfig::default())
+}
+
 #[derive(Serialize, Eq, PartialEq, Debug)]
 pub struct HecAckQueryRequestBody {
     pub acks: Vec<u64>,
@@ -34,7 +38,7 @@ struct HecAckQueryResponseBody {
     acks: HashMap<u64, bool>,
 }
 
-pub struct HecAckClient {
+struct HecAckClient {
     acks: HashMap<u64, (u8, Sender<EventStatus>)>,
     retry_limit: u8,
     client: HttpClient,
@@ -42,7 +46,7 @@ pub struct HecAckClient {
 }
 
 impl HecAckClient {
-    pub fn new(
+    fn new(
         retry_limit: u8,
         client: HttpClient,
         http_request_builder: Arc<HttpRequestBuilder>,
@@ -56,31 +60,33 @@ impl HecAckClient {
     }
 
     /// Add an ack id to be queried
-    pub fn add(&mut self, ack_id: u64, ack_event_status_sender: Sender<EventStatus>) {
+    fn add(&mut self, ack_id: u64, ack_event_status_sender: Sender<EventStatus>) {
         self.acks
             .insert(ack_id, (self.retry_limit, ack_event_status_sender));
     }
 
     /// Query Splunk HEC and finalize events that are successfully acked
-    pub async fn run(&mut self) {
+    async fn run(&mut self) {
         let ack_query_body = self.get_ack_query_body();
-        let ack_query_response = self.send_ack_query_request(&ack_query_body).await;
+        if !ack_query_body.acks.is_empty() {
+            let ack_query_response = self.send_ack_query_request(&ack_query_body).await;
 
-        match ack_query_response {
-            Ok(ack_query_response) => {
-                debug!("Received ack statuses {:?}", ack_query_response);
-                self.decrement_retries();
-                let acked_ack_ids = ack_query_response
-                    .acks
-                    .iter()
-                    .filter_map(|(ack_id, ack_status)| ack_status.then(|| *ack_id))
-                    .collect::<Vec<u64>>();
-                self.finalize_ack_ids(acked_ack_ids.as_slice());
-            }
-            Err(error) => {
-                error!(message = "Unable to send ack query request", ?error);
-            }
-        };
+            match ack_query_response {
+                Ok(ack_query_response) => {
+                    debug!("Received ack statuses {:?}", ack_query_response);
+                    self.decrement_retries();
+                    let acked_ack_ids = ack_query_response
+                        .acks
+                        .iter()
+                        .filter_map(|(ack_id, ack_status)| ack_status.then(|| *ack_id))
+                        .collect::<Vec<u64>>();
+                    self.finalize_ack_ids(acked_ack_ids.as_slice());
+                }
+                Err(error) => {
+                    error!(message = "Unable to send ack query request", ?error);
+                }
+            };
+        }
     }
 
     /// Remove successfully acked ack ids and notify that the event has been Delivered
@@ -126,8 +132,7 @@ impl HecAckClient {
         let request_body_bytes = serde_json::to_vec(request_body)?;
         let request = self
             .http_request_builder
-            .build_ack_request(request_body_bytes)
-            .await?;
+            .build_request(request_body_bytes, "/services/collector/ack")?;
 
         let response = self.client.send(request.map(Body::from)).await?;
         let response_body = hyper::body::to_bytes(response.into_body()).await?;
