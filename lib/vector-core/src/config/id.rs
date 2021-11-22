@@ -8,43 +8,33 @@ use std::{
 };
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct ComponentKey {
-    id: String,
-}
+pub struct ComponentKey(String);
 
 impl ComponentKey {
-    pub fn global<T: Into<String>>(id: T) -> Self {
-        Self { id: id.into() }
+    pub fn id(&self) -> &str {
+        &self.0
     }
 
-    pub fn id(&self) -> &str {
-        self.id.as_str()
+    pub fn create_child(&self, name: &str) -> Self {
+        Self::from(format!("{}.{}", self.0, name))
     }
 }
 
 impl From<String> for ComponentKey {
     fn from(value: String) -> Self {
-        Self::from(value.as_str())
+        Self(value)
     }
 }
 
 impl From<&str> for ComponentKey {
     fn from(value: &str) -> Self {
-        Self {
-            id: value.to_string(),
-        }
-    }
-}
-
-impl<T: ToString> From<&T> for ComponentKey {
-    fn from(value: &T) -> Self {
-        Self::from(value.to_string())
+        Self::from(value.to_owned())
     }
 }
 
 impl fmt::Display for ComponentKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.id.fmt(f)
+        self.0.fmt(f)
     }
 }
 
@@ -59,7 +49,7 @@ impl Serialize for ComponentKey {
 
 impl Ord for ComponentKey {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.id.cmp(&other.id)
+        self.0.cmp(&other.0)
     }
 }
 
@@ -82,7 +72,7 @@ impl<'de> Visitor<'de> for ComponentKeyVisitor {
     where
         E: de::Error,
     {
-        Ok(ComponentKey::global(value))
+        Ok(ComponentKey::from(value))
     }
 }
 
@@ -102,7 +92,7 @@ mod tests {
     #[test]
     fn deserialize_string() {
         let result: ComponentKey = serde_json::from_str("\"foo\"").unwrap();
-        assert_eq!(result.id, "foo");
+        assert_eq!(result.id(), "foo");
     }
 
     #[test]
