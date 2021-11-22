@@ -113,9 +113,10 @@ impl HecAckClient {
     /// Decrements retry count on all ack ids by 1
     fn decrement_retries(&mut self) {
         for (retries, _) in self.acks.values_mut() {
-            if *retries > 0 {
-                *retries -= 1;
-            }
+            *retries = retries.checked_sub(1).unwrap_or(0);
+            // if *retries > 0 {
+            //     *retries -= 1;
+            // }
         }
     }
 

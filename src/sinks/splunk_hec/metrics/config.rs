@@ -3,7 +3,11 @@ use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 use vector_core::transform::DataType;
 
-use crate::{config::{GenerateConfig, SinkConfig, SinkContext}, http::HttpClient, sinks::{Healthcheck, splunk_hec::common::{
+use crate::{
+    config::{GenerateConfig, SinkConfig, SinkContext},
+    http::HttpClient,
+    sinks::{
+        splunk_hec::common::{
             acknowledgements::{
                 default_hec_client_acknowledgements_config, HecClientAcknowledgementsConfig,
             },
@@ -11,7 +15,13 @@ use crate::{config::{GenerateConfig, SinkConfig, SinkContext}, http::HttpClient,
             retry::HecRetryLogic,
             service::{HecService, HttpRequestBuilder},
             SplunkHecDefaultBatchSettings,
-        }, util::{BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig}}, template::Template, tls::TlsOptions};
+        },
+        util::{BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig},
+        Healthcheck,
+    },
+    template::Template,
+    tls::TlsOptions,
+};
 use vector_core::sink::VectorSink;
 
 use super::{request_builder::HecMetricsRequestBuilder, sink::HecMetricsSink};

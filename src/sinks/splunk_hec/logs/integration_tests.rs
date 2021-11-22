@@ -2,7 +2,10 @@ use crate::{
     config::{SinkConfig, SinkContext},
     sinks::{
         splunk_hec::{
-            common::integration_test_helpers::get_token,
+            common::{
+                acknowledgements::HecClientAcknowledgementsConfig,
+                integration_test_helpers::get_token,
+            },
             logs::{config::HecSinkLogsConfig, encoder::HecLogsEncoder},
         },
         util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
@@ -84,6 +87,7 @@ async fn config(
         batch,
         request: TowerRequestConfig::default(),
         tls: None,
+        indexer_acknowledgements: Some(HecClientAcknowledgementsConfig::default()),
     }
 }
 
