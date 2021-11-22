@@ -1,6 +1,8 @@
 //! Perform a port forward from a port listening on a local system to the
 //! a port exposed from a cluster-deployed resource.
 
+#![allow(clippy::print_stdout)] // test framework
+
 use super::Result;
 use std::process::{ExitStatus, Stdio};
 use tokio::{
