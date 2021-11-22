@@ -11,9 +11,24 @@ use crossbeam_utils::atomic::AtomicCell;
 use fslock::LockFile;
 use memmap2::{MmapMut, MmapOptions};
 use rkyv::{with::Atomic, Archive, Serialize};
+use snafu::{ResultExt, Snafu};
 use tokio::{fs::OpenOptions, io::AsyncWriteExt, sync::Notify};
 
 use super::{backed_archive::BackedArchive, ser::SerializeError};
+
+#[derive(Debug, Snafu)]
+pub enum LedgerLoadCreateError {
+    #[snafu(display("ledger I/O error: {}", source))]
+    Io { source: io::Error },
+    #[snafu(display(
+        "failed to lock buffer.lock; is another Vector process running and using this buffer?"
+    ))]
+    LedgerLockAlreadyHeld,
+    #[snafu(display("failed to deserialize ledger from buffer: {}", reason))]
+    FailedToDeserialize { reason: String },
+    #[snafu(display("failed to serialize ledger to buffer: {}", reason))]
+    FailedToSerialize { reason: String },
+}
 
 /// Ledger state.
 ///
@@ -70,19 +85,27 @@ impl Default for LedgerState {
 }
 
 impl ArchivedLedgerState {
-    pub fn increment_total_records(&self) {
-        self.total_records.fetch_add(1, Ordering::AcqRel);
+    pub fn increment_records(&self, record_size: u64) {
+        self.total_records.fetch_add(1, Ordering::Relaxed);
+        self.total_buffer_size
+            .fetch_add(record_size, Ordering::Relaxed);
     }
 
-    pub fn increment_total_buffer_size(&self, amount: u64) {
-        self.total_buffer_size.fetch_add(amount, Ordering::AcqRel);
+    pub fn decrement_records(&self, record_size: u64) {
+        self.total_records.fetch_sub(1, Ordering::Relaxed);
+        self.total_buffer_size
+            .fetch_sub(record_size, Ordering::Relaxed);
     }
 
     pub fn decrement_total_buffer_size(&self, amount: u64) {
         self.total_buffer_size.fetch_sub(amount, Ordering::AcqRel);
     }
 
-    pub fn acquire_next_writer_record_id(&self) -> u64 {
+    pub fn get_next_writer_record_id(&self) -> u64 {
+        self.writer_next_record_id.load(Ordering::Acquire) + 1
+    }
+
+    pub fn increment_next_writer_record_id(&self) -> u64 {
         self.writer_next_record_id.fetch_add(1, Ordering::AcqRel)
     }
 
@@ -202,33 +225,32 @@ impl Ledger {
         false
     }
 
-    pub fn track_write(&self, bytes_written: u64) {
-        self.state().increment_total_records();
-        self.state().increment_total_buffer_size(bytes_written);
+    pub fn track_write(&self, record_size: u64) {
+        self.state().increment_records(record_size);
     }
 
-    pub fn track_deletion(&self, bytes_deleted: u64) {
-        self.state().decrement_total_buffer_size(bytes_deleted);
+    pub fn track_read(&self, record_size: u64) {
+        self.state().decrement_records(record_size);
     }
 
     pub fn flush(&self) -> io::Result<()> {
         self.state.get_backing_ref().flush()
     }
 
-    pub async fn load_or_create<P>(data_dir: P, flush_interval: Duration) -> io::Result<Ledger>
+    pub async fn load_or_create<P>(
+        data_dir: P,
+        flush_interval: Duration,
+    ) -> Result<Ledger, LedgerLoadCreateError>
     where
         P: AsRef<Path>,
     {
         // Acquire an execlusive lock on our lock file, which prevents another Vector process from
         // loading this buffer and clashing with us.  Specifically, though: this does _not_ prevent
-        // another process from messing with our ledger files, or any oif the data files, etc.
+        // another process from messing with our ledger files, or any of the data files, etc.
         let ledger_lock_path = data_dir.as_ref().join("buffer.lock");
-        let mut ledger_lock = LockFile::open(&ledger_lock_path)?;
-        if !ledger_lock.try_lock()? {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "failed to lock buffer.lock; is another Vector process running and using this buffer?",
-            ));
+        let mut ledger_lock = LockFile::open(&ledger_lock_path).context(Io)?;
+        if !ledger_lock.try_lock().context(Io)? {
+            return Err(LedgerLoadCreateError::LedgerLockAlreadyHeld);
         }
 
         // Open the ledger file, which may involve creating it if it doesn't yet exist.
@@ -238,25 +260,26 @@ impl Ledger {
             .write(true)
             .create(true)
             .open(&ledger_path)
-            .await?;
+            .await
+            .context(Io)?;
 
         // If we just created the ledger file, then we need to create the default ledger state, and
         // then serialize and write to the file, before trying to load it as a memory-mapped file.
-        let ledger_metadata = ledger_handle.metadata().await?;
+        let ledger_metadata = ledger_handle.metadata().await.context(Io)?;
         let ledger_len = ledger_metadata.len();
         if ledger_len == 0 {
             let mut buf = BytesMut::new();
             loop {
                 match BackedArchive::from_value(&mut buf, LedgerState::default()) {
                     Ok(archive) => {
-                        let _ = ledger_handle.write_all(archive.get_backing_ref()).await?;
+                        let _ = ledger_handle
+                            .write_all(archive.get_backing_ref())
+                            .await
+                            .context(Io)?;
                         break;
                     }
                     Err(SerializeError::FailedToSerialize(reason)) => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::Other,
-                            format!("failed to serialize ledger state: {}", reason),
-                        ))
+                        return Err(LedgerLoadCreateError::FailedToSerialize { reason })
                     }
                     // Our buffer wasn't big enough, but that's OK!  Resize it and try again.
                     Err(SerializeError::BackingStoreTooSmall(_, min_len)) => buf.resize(min_len, 0),
@@ -267,17 +290,16 @@ impl Ledger {
         // Load the ledger state by memory-mapping the ledger file, and zero-copy deserializing our
         // ledger state back out of it.
         let ledger_handle = ledger_handle.into_std().await;
-        let ledger_mmap = unsafe { MmapOptions::new().map_mut(&ledger_handle)? };
+        let ledger_mmap = unsafe { MmapOptions::new().map_mut(&ledger_handle).context(Io)? };
 
         let ledger_state = match BackedArchive::from_backing(ledger_mmap) {
             // Deserialized the ledger state without issue from an existing file.
             Ok(backed) => backed,
             // Either invalid data, or the buffer doesn't represent a valid ledger structure.
             Err(e) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("failed to open ledger: {}", e.into_inner()),
-                ))
+                return Err(LedgerLoadCreateError::FailedToDeserialize {
+                    reason: e.into_inner(),
+                })
             }
         };
 

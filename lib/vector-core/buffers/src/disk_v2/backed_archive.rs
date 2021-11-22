@@ -1,8 +1,8 @@
-use std::{marker::PhantomData, pin::Pin};
+use std::marker::PhantomData;
 
 use bytecheck::CheckBytes;
 use rkyv::{
-    archived_value, archived_value_mut, check_archived_value,
+    archived_value, check_archived_value,
     ser::{serializers::AllocSerializer, Serializer},
     validation::validators::DefaultValidator,
     Archive, Serialize,

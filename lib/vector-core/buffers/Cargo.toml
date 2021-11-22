@@ -58,3 +58,7 @@ harness = false
 [[bench]]
 name = "in_memory_v2"
 harness = false
+
+[[example]]
+name = "disk_v1"
+required-features = ["disk-buffer"]

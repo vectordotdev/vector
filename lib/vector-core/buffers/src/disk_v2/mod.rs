@@ -99,7 +99,7 @@
 //!   writer ends up reusing some record IDs that get double read by the reader, which itself has
 //!   logic for detecting non-monotonic record IDs
 //! - implement specific error types so that we can return more useful errors than just wrapped I/O errors
-use std::{io, path::Path, sync::Arc, time::Duration};
+use std::{marker::PhantomData, path::Path, sync::Arc, time::Duration};
 
 use snafu::{ResultExt, Snafu};
 
@@ -111,29 +111,43 @@ mod record;
 mod ser;
 mod writer;
 
+use crate::Bufferable;
+
 use self::{
     common::{DATA_FILE_MAX_RECORD_SIZE, DATA_FILE_TARGET_MAX_SIZE},
-    ledger::Ledger,
-    reader::Reader,
-    writer::Writer,
+    ledger::{Ledger, LedgerLoadCreateError},
+    reader::{Reader, ReaderError},
+    writer::{Writer, WriterError},
 };
 
 #[derive(Debug, Snafu)]
-pub enum BuildError {
-    // Generic I/O error.
-    Io { source: io::Error },
+pub enum BufferError<T>
+where
+    T: Bufferable,
+{
+    #[snafu(display("failed to load/create ledger: {}", source))]
+    LedgerError { source: LedgerLoadCreateError },
+    #[snafu(display("failed to seek to position where reader left off: {}", source))]
+    ReaderSeekFailed { source: ReaderError<T> },
+    #[snafu(display("failed to seek to position where writer left off: {}", source))]
+    WriterSeekFailed { source: WriterError<T> },
 }
 
-pub struct Buffer;
+pub struct Buffer<T> {
+    _t: PhantomData<T>,
+}
 
-impl Buffer {
-    pub async fn from_path<P>(data_dir: P) -> Result<(Writer, Reader), BuildError>
+impl<T> Buffer<T>
+where
+    T: Bufferable,
+{
+    pub async fn from_path<P>(data_dir: P) -> Result<(Writer<T>, Reader<T>), BufferError<T>>
     where
         P: AsRef<Path>,
     {
         let ledger = Ledger::load_or_create(data_dir, Duration::from_secs(1))
             .await
-            .context(Io)?;
+            .context(LedgerError)?;
         let ledger = Arc::new(ledger);
 
         let writer = Writer::new(
@@ -142,7 +156,10 @@ impl Buffer {
             DATA_FILE_MAX_RECORD_SIZE,
         );
         let mut reader = Reader::new(ledger);
-        let _ = reader.seek_to_next_record().await.context(Io)?;
+        let _ = reader
+            .seek_to_next_record()
+            .await
+            .context(ReaderSeekFailed)?;
 
         Ok((writer, reader))
     }

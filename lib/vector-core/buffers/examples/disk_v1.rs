@@ -1,7 +1,6 @@
 #[cfg(feature = "disk-buffer")]
 use std::path::PathBuf;
 use std::{
-    io::copy,
     str::FromStr,
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -10,78 +9,35 @@ use std::{
     time::{Duration, Instant},
 };
 
-use buffers::{
-    bytes::{DecodeBytes, EncodeBytes},
-    Variant, WhenFull,
-};
-use bytes::{Buf, BufMut};
-use core_common::byte_size_of::ByteSizeOf;
+use buffers::{helpers::VariableMessage, Variant, WhenFull};
 use futures::{SinkExt, StreamExt};
 use hdrhistogram::Histogram;
-use human_bytes::human_bytes;
-use lading_common::{
-    block::{chunk_bytes, construct_block_cache, Block},
-    payload,
-};
+use rand::Rng;
 use tokio::{select, sync::oneshot, time};
 use tracing::Span;
 
-#[derive(Clone, Debug)]
-struct RecordWrapper(Vec<u8>);
-
-impl ByteSizeOf for RecordWrapper {
-    fn allocated_bytes(&self) -> usize {
-        self.0.capacity()
-    }
-}
-
-impl EncodeBytes<RecordWrapper> for RecordWrapper {
-    type Error = ();
-
-    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
-    where
-        B: BufMut,
-    {
-        buffer.put_slice(self.0.as_slice());
-        Ok(())
-    }
-}
-
-impl DecodeBytes<RecordWrapper> for RecordWrapper {
-    type Error = String;
-
-    fn decode<B>(buffer: B) -> Result<RecordWrapper, Self::Error>
-    where
-        B: Buf,
-    {
-        let buf_len = buffer.remaining();
-        let mut writer = Vec::with_capacity(buf_len);
-        let mut reader = buffer.reader();
-        let n = copy(&mut reader, &mut writer).expect("should never fail to copy");
-        assert_eq!(n, buf_len as u64);
-
-        Ok(RecordWrapper(writer))
-    }
-}
-
-fn generate_block_cache() -> Vec<Block> {
-    // Generate a 256MB block cache of small JSON messages.  This gives us pre-built messages that
-    // are slightly varied in size, and differing in contained data, up to 256MB total.  Now we can
-    // better simulate actual transactions with the speed of pre-computing the records.
+fn generate_record_cache() -> Vec<VariableMessage> {
+    // Generate a bunch of `VariableMessage` records that we'll cycle through, with payloads between
+    // 512 bytes and 8 kilobytes.  This shiuld be fairly close to normal log events.
     let mut rng = rand::thread_rng();
-    let labels = vec![("target".to_string(), "disk_v1".to_string())];
-    let block_chunks = chunk_bytes(&mut rng, 256_000_000, &[512, 768, 1024, 2048]);
-    construct_block_cache(&payload::Json::default(), &block_chunks, &labels)
+    let mut records = Vec::new();
+    for i in 0..200_000 {
+        let payload_size = rng.gen_range(512..8192);
+        let payload = (0..payload_size).map(|_| rng.gen()).collect();
+        let message = VariableMessage::new(i, payload);
+        records.push(message);
+    }
+    records
 }
 
 #[tokio::main]
 async fn main() {
     // Generate our block cache, which ensures the writer spends as little time as possible actually
     // generating the data that it writes to the buffer.
-    let block_cache = generate_block_cache();
+    let record_cache = generate_record_cache();
     println!(
-        "[disk_v1 init] generated block cache of 256MB ({} blocks)",
-        block_cache.len()
+        "[disk_v1 init] generated record cache ({} blocks)",
+        record_cache.len()
     );
 
     // Set up our target record count, write batch size, progress counters, etc.
@@ -89,13 +45,9 @@ async fn main() {
 
     let write_position = Arc::new(AtomicUsize::new(0));
     let read_position = Arc::new(AtomicUsize::new(0));
-    let bytes_written = Arc::new(AtomicUsize::new(0));
-    let bytes_read = Arc::new(AtomicUsize::new(0));
 
     let writer_position = Arc::clone(&write_position);
     let reader_position = Arc::clone(&read_position);
-    let writer_bytes_written = Arc::clone(&bytes_written);
-    let reader_bytes_read = Arc::clone(&bytes_read);
 
     // Now create the writer and reader and their associated tasks.
     let start = Instant::now();
@@ -108,7 +60,7 @@ async fn main() {
     };
 
     let (writer, mut reader, acker) =
-        buffers::build::<RecordWrapper>(variant, Span::none()).expect("failed to create buffer");
+        buffers::build::<VariableMessage>(variant, Span::none()).expect("failed to create buffer");
     let mut writer = writer.get();
 
     let (reader_tx, mut reader_rx) = oneshot::channel();
@@ -130,7 +82,6 @@ async fn main() {
             rx_histo.record(elapsed).expect("should not fail");
 
             reader_position.fetch_add(1, Ordering::Relaxed);
-            reader_bytes_read.fetch_add(record_buf.0.len(), Ordering::Relaxed);
         }
 
         let _ = reader_tx.send((reader, rx_histo));
@@ -139,14 +90,13 @@ async fn main() {
     let (writer_tx, mut writer_rx) = oneshot::channel();
     let _ = tokio::spawn(async move {
         let mut tx_histo = Histogram::<u64>::new(3).expect("should not fail");
-        let mut records = block_cache.iter().cycle();
+        let mut records = record_cache.iter().cycle();
 
         for _ in 0..total_records {
             let tx_start = Instant::now();
 
-            let record = records.next().expect("should never be empty");
-            let tx_bytes = record.bytes.len();
-            if let Err(_) = writer.send(RecordWrapper(record.bytes.clone())).await {
+            let record = records.next().cloned().expect("should never be empty");
+            if let Err(_) = writer.send(record).await {
                 panic!("failed to write record");
             }
 
@@ -154,7 +104,6 @@ async fn main() {
             tx_histo.record(elapsed).expect("should not fail");
 
             writer_position.fetch_add(1, Ordering::Relaxed);
-            writer_bytes_written.fetch_add(tx_bytes, Ordering::Relaxed);
         }
 
         let _ = writer_tx.send((writer, tx_histo));
@@ -186,11 +135,9 @@ async fn main() {
                 let elapsed = start.elapsed();
                 let write_pos = write_position.load(Ordering::Relaxed);
                 let read_pos = read_position.load(Ordering::Relaxed);
-                let write_bytes = bytes_written.load(Ordering::Relaxed);
-                let read_bytes = bytes_read.load(Ordering::Relaxed);
 
-                println!("[disk_v1 writer] {:?}s: position = {:11}, bytes wrtn = {:11}", elapsed.as_secs(), write_pos, write_bytes);
-                println!("[disk_v1 reader] {:?}s: position = {:11}, bytes read = {:11}", elapsed.as_secs(), read_pos, read_bytes);
+                println!("[disk_v1 writer] {:?}s: position = {:11}", elapsed.as_secs(), write_pos);
+                println!("[disk_v1 reader] {:?}s: position = {:11}", elapsed.as_secs(), read_pos);
             },
             else => break,
         }
@@ -198,15 +145,10 @@ async fn main() {
 
     // Now dump out all of our summary statistics.
     let total_time = start.elapsed();
-    let write_bytes = bytes_written.load(Ordering::Relaxed);
-    let read_bytes = bytes_read.load(Ordering::Relaxed);
-    assert_eq!(write_bytes, read_bytes);
 
     println!(
-        "[disk_v1] writer and reader done: {} total records ({}) written and read in {:?}",
-        total_records,
-        human_bytes(write_bytes as f64),
-        total_time
+        "[disk_v1] writer and reader done: {} total records written and read in {:?}",
+        total_records, total_time
     );
 
     println!("[disk_v1] writer summary:");

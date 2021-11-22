@@ -22,6 +22,8 @@ pub mod disk;
 
 pub mod disk_v2;
 
+pub mod helpers;
+
 mod internal_events;
 #[cfg(test)]
 mod test;
@@ -135,13 +137,21 @@ impl Arbitrary for WhenFull {
 ///
 /// This supertrait serves as the base trait for any item that can be pushed into a buffer.
 pub trait Bufferable:
-    ByteSizeOf + EncodeBytes<Self> + DecodeBytes<Self> + Send + Sync + Unpin + Sized + 'static
+    ByteSizeOf + EncodeBytes<Self> + DecodeBytes<Self> + Debug + Send + Sync + Unpin + Sized + 'static
 {
 }
 
 // Blanket implementation for anything that is already bufferable.
 impl<T> Bufferable for T where
-    T: ByteSizeOf + EncodeBytes<Self> + DecodeBytes<Self> + Send + Sync + Unpin + Sized + 'static
+    T: ByteSizeOf
+        + EncodeBytes<Self>
+        + DecodeBytes<Self>
+        + Debug
+        + Send
+        + Sync
+        + Unpin
+        + Sized
+        + 'static
 {
 }
 

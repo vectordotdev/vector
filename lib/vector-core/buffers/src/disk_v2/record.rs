@@ -17,7 +17,7 @@ pub enum RecordStatus {
     /// Contains the record ID for the given record.
     Valid(u64),
     /// The record was able to be read from the buffer, but the checksum was not valid.
-    Corrupted,
+    Corrupted { calculated: u32, actual: u32 },
     /// The record was not able to be read from the buffer due to an error during deserialization.
     FailedDeserialization(DeserializeError),
 }
@@ -106,20 +106,22 @@ impl<'a> Record<'a> {
 }
 
 impl<'a> ArchivedRecord<'a> {
-    /// Gets the ID of this record.
-    pub fn id(&self) -> u64 {
-        self.id
-    }
-
     /// Gets the payload of this record.
     pub fn payload(&self) -> &[u8] {
         &self.payload
     }
 
     /// Verifies if the stored checksum of this record matches the record itself.
-    pub fn verify_checksum(&self, checksummer: &Hasher) -> bool {
+    pub fn verify_checksum(&self, checksummer: &Hasher) -> RecordStatus {
         let calculated = generate_checksum(checksummer, self.id, &self.payload);
-        self.checksum == calculated
+        if self.checksum == calculated {
+            RecordStatus::Valid(self.id)
+        } else {
+            RecordStatus::Corrupted {
+                calculated,
+                actual: self.checksum,
+            }
+        }
     }
 }
 
@@ -142,13 +144,7 @@ fn generate_checksum(checksummer: &Hasher, id: u64, payload: &[u8]) -> u32 {
 /// debugging-oriented fashion.
 pub fn try_as_record_archive(buf: &[u8], checksummer: &Hasher) -> RecordStatus {
     match try_as_archive::<Record<'_>>(buf) {
-        Ok(archive) => {
-            if archive.verify_checksum(checksummer) {
-                RecordStatus::Valid(archive.id)
-            } else {
-                RecordStatus::Corrupted
-            }
-        }
+        Ok(archive) => archive.verify_checksum(checksummer),
         Err(e) => RecordStatus::FailedDeserialization(e),
     }
 }

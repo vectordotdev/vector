@@ -1,5 +1,6 @@
 use std::{
     io::{self, ErrorKind},
+    marker::PhantomData,
     sync::Arc,
 };
 
@@ -7,40 +8,71 @@ use crc32fast::Hasher;
 use rkyv::{
     ser::{
         serializers::{
-            AlignedSerializer, AllocScratch, BufferScratch, CompositeSerializer, FallbackScratch,
+            AlignedSerializer, AllocScratch, BufferScratch, CompositeSerializer,
+            CompositeSerializerError, FallbackScratch,
         },
         Serializer,
     },
     AlignedVec, Infallible,
 };
+use snafu::{ResultExt, Snafu};
 use tokio::{
     fs::{File, OpenOptions},
     io::{AsyncWrite, AsyncWriteExt, BufWriter},
 };
 
-use super::{ledger::Ledger, record::Record};
+use crate::{
+    bytes::EncodeBytes,
+    disk_v2::{ledger::Ledger, record::Record},
+    Bufferable,
+};
 
-pub struct RecordWriter<W> {
-    writer: BufWriter<W>,
-    buf: AlignedVec,
-    scratch: AlignedVec,
-    checksummer: Hasher,
+#[derive(Debug, Snafu)]
+pub enum WriterError<R>
+where
+    R: Bufferable,
+    <R as EncodeBytes<R>>::Error: 'static,
+{
+    #[snafu(display("write I/O error: {}", source))]
+    Io { source: io::Error },
+    #[snafu(display("record too large: limit is {}, actual was {}", limit, actual))]
+    RecordTooLarge { limit: usize, actual: usize },
+    #[snafu(display("failed to encode record: {:?}", source))]
+    FailedToEncode {
+        source: <R as EncodeBytes<R>>::Error,
+    },
+    #[snafu(display("failed to serialize encoded record to buffer: {}", reason))]
+    FailedToSerialize { reason: String },
 }
 
-impl<W> RecordWriter<W>
+pub struct RecordWriter<W, T> {
+    writer: BufWriter<W>,
+    encode_buf: Vec<u8>,
+    ser_buf: AlignedVec,
+    ser_scratch: AlignedVec,
+    checksummer: Hasher,
+    max_record_size: usize,
+    _t: PhantomData<T>,
+}
+
+impl<W, T> RecordWriter<W, T>
 where
     W: AsyncWrite + Unpin,
+    T: Bufferable,
 {
     /// Creates a new `RecordWriter` around the provided writer.
     ///
     /// Internally, the writer is wrapped in a `BufWriter<W>`, so callers should not pass in an
     /// already buffered writer.
-    pub fn new(writer: W) -> Self {
+    pub fn new(writer: W, record_max_size: usize) -> Self {
         Self {
             writer: BufWriter::new(writer),
-            buf: AlignedVec::with_capacity(2048),
-            scratch: AlignedVec::with_capacity(2048),
+            encode_buf: Vec::with_capacity(2048),
+            ser_buf: AlignedVec::with_capacity(2048),
+            ser_scratch: AlignedVec::with_capacity(2048),
             checksummer: Hasher::new(),
+            max_record_size: record_max_size,
+            _t: PhantomData,
         }
     }
 
@@ -55,28 +87,59 @@ where
     /// If there is an I/O error while writing the record, an error variant will be returned
     /// describing the error.  Additionally, if there is an error while serializing the record, an
     /// error variant will be returned describing the serialization error.
-    pub async fn write_record(&mut self, id: u64, payload: &[u8]) -> io::Result<usize> {
-        let record = Record::with_checksum(id, payload, &self.checksummer);
+    pub async fn write_record(&mut self, id: u64, record: T) -> Result<usize, WriterError<T>> {
+        // We first encode the record, which puts it into the desired encoded form.  This is where
+        // we assert the record is within size limits, etc.
+        self.encode_buf.clear();
+        let encode_result = record.encode(&mut self.encode_buf);
+        let encoded_len = encode_result
+            .map(|_| self.encode_buf.len())
+            .context(FailedToEncode)?;
+        if encoded_len > self.max_record_size {
+            return Err(WriterError::RecordTooLarge {
+                limit: self.max_record_size,
+                actual: encoded_len,
+            });
+        }
 
-        // Serialize the record., and grab the length
-        self.buf.clear();
+        let record = Record::with_checksum(id, &self.encode_buf, &self.checksummer);
+
+        // Now serialize the record, which puts it into its archived form.  This is what powers our
+        // ability to do zero-copy deserialization from disk.
+        //
+        // NOTE: This operation is put into its own block scope because otherwise `serializer` lives
+        // untilk the end of the function, and it contains a mutable buffer pointer, which is
+        // `!Send` and thus can't move across await points.  Do not rearrange.
+        self.ser_buf.clear();
         let archive_len = {
             let mut serializer = CompositeSerializer::new(
-                AlignedSerializer::new(&mut self.buf),
-                FallbackScratch::new(BufferScratch::new(&mut self.scratch), AllocScratch::new()),
+                AlignedSerializer::new(&mut self.ser_buf),
+                FallbackScratch::new(
+                    BufferScratch::new(&mut self.ser_scratch),
+                    AllocScratch::new(),
+                ),
                 Infallible,
             );
 
-            if let Err(e) = serializer.serialize_value(&record) {
-                // TODO: what do we do here? :thinkies:
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("failed to serialize record: {}", e),
-                ));
+            match serializer.serialize_value(&record) {
+                Ok(n) => Ok(serializer.pos()),
+                Err(e) => match e {
+                    // AlignedSerializer is infallible so we should never hit this.
+                    CompositeSerializerError::SerializerError(_) => unreachable!(),
+                    CompositeSerializerError::ScratchSpaceError(sse) => {
+                        return Err(WriterError::FailedToSerialize {
+                            reason: format!(
+                                "insufficient space to serialize encoded record: {}",
+                                sse
+                            ),
+                        })
+                    }
+                    // We aren't serializing shared values (Infallible) so we should never hit this.
+                    CompositeSerializerError::SharedError(_) => unreachable!(),
+                },
             }
-            serializer.pos()
-        };
-        assert_eq!(self.buf.len(), archive_len as usize);
+        }?;
+        assert_eq!(self.ser_buf.len(), archive_len as usize);
 
         let wire_archive_len: u32 = archive_len
             .try_into()
@@ -84,8 +147,9 @@ where
         let _ = self
             .writer
             .write_all(&wire_archive_len.to_be_bytes()[..])
-            .await?;
-        let _ = self.writer.write_all(&self.buf).await?;
+            .await
+            .context(Io)?;
+        let _ = self.writer.write_all(&self.ser_buf).await.context(Io)?;
 
         Ok(4 + archive_len)
     }
@@ -104,7 +168,7 @@ where
     }
 }
 
-impl RecordWriter<File> {
+impl<T> RecordWriter<File, T> {
     /// Synchronizes the underlying file to disk.
     ///
     /// This tries to synchronize both data and metadata.
@@ -118,28 +182,37 @@ impl RecordWriter<File> {
     }
 }
 
-struct WriteState {
+pub struct Writer<T> {
     ledger: Arc<Ledger>,
-    writer: Option<RecordWriter<File>>,
+    writer: Option<RecordWriter<File, T>>,
     data_file_size: u64,
     target_data_file_size: u64,
     max_record_size: usize,
+    _t: PhantomData<T>,
 }
 
-impl WriteState {
-    pub fn new(ledger: Arc<Ledger>, target_data_file_size: u64, max_record_size: usize) -> Self {
-        Self {
+impl<T> Writer<T>
+where
+    T: Bufferable,
+{
+    pub(crate) fn new(
+        ledger: Arc<Ledger>,
+        target_data_file_size: u64,
+        max_record_size: usize,
+    ) -> Self {
+        Writer {
             ledger,
             writer: None,
             data_file_size: 0,
             target_data_file_size,
             max_record_size,
+            _t: PhantomData,
         }
     }
 
-    fn track_write(&mut self, bytes_written: u64) {
-        self.data_file_size += bytes_written;
-        self.ledger.track_write(bytes_written);
+    fn track_write(&mut self, record_size: u64) {
+        self.data_file_size += record_size;
+        self.ledger.track_write(record_size);
     }
 
     fn can_write(&mut self) -> bool {
@@ -242,7 +315,7 @@ impl WriteState {
                     // Make sure the file is flushed to disk, especially if we just created it.
                     let _ = data_file.sync_all().await?;
 
-                    self.writer = Some(RecordWriter::new(data_file));
+                    self.writer = Some(RecordWriter::new(data_file, self.max_record_size));
                     self.data_file_size = data_file_size;
 
                     // If we opened the "next" data file, we need to increment the current writer
@@ -262,23 +335,34 @@ impl WriteState {
     }
 
     /// Writes a record.
-    pub async fn write_record(&mut self, payload: &[u8]) -> io::Result<()> {
-        let _ = self.ensure_ready_for_write().await?;
+    pub async fn write_record(&mut self, record: T) -> Result<usize, WriterError<T>> {
+        let _ = self.ensure_ready_for_write().await.context(Io)?;
 
-        let id = self.ledger.state().acquire_next_writer_record_id();
+        // Grab the next record ID and attempt to write the record.
+        let id = self.ledger.state().get_next_writer_record_id();
         let n = self
             .writer
             .as_mut()
             .expect("writer should exist after ensure_ready_for_write")
-            .write_record(id, payload)
+            .write_record(id, record)
             .await?;
 
-        // Update the metadata now that we've written the record.
+        // Since we succeeded in writing the record, increment the next record ID and metadata for
+        // the writer.  We do this here to avoid consuming record IDs even if a write failed, as we
+        // depend on the "record IDs are monotonic" invariant for detecting skipped records during read.
+        self.ledger.state().increment_next_writer_record_id();
         self.track_write(n as u64);
 
-        Ok(())
+        Ok(n)
     }
 
+    /// Flushes the writer.
+    ///
+    /// This must be called for the reader to be able to make progress.
+    ///
+    /// This does not ensure that the data is fully synchronized (i.e. `fsync`) to disk, however it
+    /// may sometimes perform a full synchronization if the time since the last full synchronization
+    /// occurred has exceeded a configured limit.
     pub async fn flush(&mut self) -> io::Result<()> {
         // We always flush the `BufWriter` when this is called, but we don't always flush to disk or
         // flush the ledger.  This is enough for readers on Linux since the file ends up in the page
@@ -302,50 +386,8 @@ impl WriteState {
             Ok(())
         }
     }
-}
-
-pub struct Writer {
-    state: WriteState,
-}
-
-impl Writer {
-    pub(crate) fn new(
-        ledger: Arc<Ledger>,
-        target_data_file_size: u64,
-        max_record_size: usize,
-    ) -> Self {
-        let state = WriteState::new(ledger, target_data_file_size, max_record_size);
-        Writer { state }
-    }
-
-    /// Writes a record.
-    pub async fn write_record<R>(&mut self, record: R) -> io::Result<()>
-    where
-        R: AsRef<[u8]>,
-    {
-        let record_buf = record.as_ref();
-
-        // Check that the record isn't bigger than the maximum record size.  This isn't a limitation
-        // of writing to files, but mostly just common sense to have some reasonable upper bound.
-        if record_buf.len() > self.state.max_record_size {
-            return Err(io::Error::new(io::ErrorKind::Other, "record too large"));
-        }
-
-        self.state.write_record(record_buf).await
-    }
-
-    /// Flushes the writer.
-    ///
-    /// This must be called for the reader to be able to make progress.
-    ///
-    /// This does not ensure that the data is fully synchronized (i.e. `fsync`) to disk, however it
-    /// may sometimes perform a full synchronization if the time since the last full synchronization
-    /// occurred has exceeded a configured limit.
-    pub async fn flush(&mut self) -> io::Result<()> {
-        self.state.flush().await
-    }
 
     pub fn get_ledger_state(&self) -> String {
-        format!("{:#?}", self.state.ledger.state())
+        format!("{:#?}", self.ledger.state())
     }
 }
