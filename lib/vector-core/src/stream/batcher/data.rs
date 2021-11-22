@@ -4,6 +4,10 @@ pub trait BatchData<T> {
     fn len(&self) -> usize;
     fn take_batch(&mut self) -> Self::Batch;
     fn push_item(&mut self, item: T);
+
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 impl<T> BatchData<T> for Vec<T> {

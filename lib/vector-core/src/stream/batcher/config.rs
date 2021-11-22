@@ -112,6 +112,8 @@ where
     item_size(settings, vec![], ByteSizeOfItemSize)
 }
 
+/// A batcher config using the `ItemBatchSize` trait to determine batch sizes.
+/// The output is built with the supplied reducer function.
 pub fn item_size_reducer<I, T, F, S>(
     settings: BatcherSettings,
     item_size: I,
