@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, Resource, SinkContext},
+    config::{GenerateConfig, SinkContext},
     sinks::util::tcp::TcpSinkConfig,
     sinks::{Healthcheck, VectorSink},
     tcp::TcpKeepaliveConfig,

@@ -1,5 +1,5 @@
 use crate::event::proto::EventWrapper;
-use crate::event::{Event, EventFinalizer, EventFinalizers, Finalizable};
+use crate::event::{Event, EventFinalizers, Finalizable};
 use crate::sinks::util::{SinkBuilderExt, StreamSink};
 use crate::sinks::vector::v2::service::{VectorRequest, VectorResponse};
 use crate::Error;
@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures::StreamExt;
 use prost::Message;
-use std::future;
+
 use tower::util::BoxService;
 use vector_core::buffers::Acker;
 use vector_core::stream::{batcher, BatcherSettings};
