@@ -8,7 +8,7 @@ use rand::random;
 use std::num::NonZeroUsize;
 use tower::util::BoxService;
 use vector_core::buffers::Acker;
-use vector_core::stream::{BatcherSettings, ByteSizeOfItemSize};
+use vector_core::stream::{batcher, BatcherSettings};
 
 use crate::sinks::util::processed_event::ProcessedEvent;
 use crate::sinks::util::{SinkBuilderExt, StreamSink};
@@ -50,7 +50,7 @@ impl KinesisSink {
                     Ok(req) => Some(req),
                 }
             })
-            .batched(self.batch_settings, ByteSizeOfItemSize)
+            .batched(batcher::config::byte_size_of_vec(self.batch_settings))
             .into_driver(self.service, self.acker);
 
         sink.run().await

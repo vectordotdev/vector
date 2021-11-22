@@ -1,10 +1,8 @@
-use crate::sinks::util::EncodedLength;
 use snafu::Snafu;
 
-
-mod sink;
 mod config;
 mod service;
+mod sink;
 
 pub use config::VectorConfig;
 

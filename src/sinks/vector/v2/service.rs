@@ -1,22 +1,24 @@
-use futures::future::BoxFuture;
-use std::task::{Context, Poll};
-use hyper_proxy::ProxyConnector;
-use hyper_openssl::HttpsConnector;
-use hyper::client::HttpConnector;
-use tonic::body::BoxBody;
-use http::Uri;
+use crate::event::{EventFinalizers, EventStatus, Finalizable};
+use crate::internal_events::EndpointBytesSent;
 use crate::proto::vector as proto_vector;
-use vector_core::event::proto as proto_event;
 use crate::sinks::util::uri;
-use proto_event::EventWrapper;
-use tower::ServiceBuilder;
-use futures::TryFutureExt;
-use tonic::IntoRequest;
-use prost::Message;
 use crate::sinks::vector::v2::VectorSinkError;
 use crate::Error;
-use crate::internal_events::EndpointBytesSent;
-use crate::sinks::vector::v2::sink::EventWrapperWrapper;
+use futures::future::BoxFuture;
+use futures::TryFutureExt;
+use http::Uri;
+use hyper::client::HttpConnector;
+use hyper_openssl::HttpsConnector;
+use hyper_proxy::ProxyConnector;
+use prost::Message;
+use proto_event::EventWrapper;
+use std::task::{Context, Poll};
+use tonic::body::BoxBody;
+use tonic::IntoRequest;
+use vector_core::buffers::Ackable;
+use vector_core::event::proto as proto_event;
+use vector_core::internal_event::EventsSent;
+use vector_core::stream::DriverResponse;
 
 #[derive(Clone, Debug)]
 pub struct VectorService {
@@ -26,7 +28,40 @@ pub struct VectorService {
 }
 
 pub struct VectorResponse {
+    events_count: usize,
+    events_byte_size: usize,
+}
 
+impl DriverResponse for VectorResponse {
+    fn event_status(&self) -> EventStatus {
+        EventStatus::Delivered
+    }
+
+    fn events_sent(&self) -> EventsSent {
+        EventsSent {
+            count: self.events_count,
+            byte_size: self.events_byte_size,
+        }
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct VectorRequest {
+    pub events: Vec<EventWrapper>,
+    pub finalizers: EventFinalizers,
+    pub events_byte_size: usize,
+}
+
+impl Ackable for VectorRequest {
+    fn ack_size(&self) -> usize {
+        self.events.len()
+    }
+}
+
+impl Finalizable for VectorRequest {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.finalizers.take_finalizers()
+    }
 }
 
 impl VectorService {
@@ -35,7 +70,10 @@ impl VectorService {
         uri: Uri,
     ) -> Self {
         let (protocol, endpoint) = uri::protocol_endpoint(uri.clone());
-        let proto_client = proto_vector::Client::new(HyperSvc { uri, client });
+        let proto_client = proto_vector::Client::new(HyperSvc {
+            uri,
+            client: hyper_client,
+        });
         Self {
             client: proto_client,
             protocol,
@@ -44,7 +82,7 @@ impl VectorService {
     }
 }
 
-impl tower::Service<Vec<EventWrapperWrapper>> for VectorService {
+impl tower::Service<VectorRequest> for VectorService {
     type Response = VectorResponse;
     type Error = Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
@@ -58,13 +96,17 @@ impl tower::Service<Vec<EventWrapperWrapper>> for VectorService {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, events: Vec<EventWrapperWrapper>) -> Self::Future {
+    fn call(&mut self, list: VectorRequest) -> Self::Future {
         let mut service = self.clone();
+        let events_count = list.events.len();
 
-        let request = proto_vector::PushEventsRequest { events };
+        let request = proto_vector::PushEventsRequest {
+            events: list.events,
+        };
         let byte_size = request.encoded_len();
         let future = async move {
-            service.client
+            service
+                .client
                 .push_events(request.into_request())
                 .map_ok(|_response| {
                     emit!(&EndpointBytesSent {
@@ -72,8 +114,12 @@ impl tower::Service<Vec<EventWrapperWrapper>> for VectorService {
                         protocol: &service.protocol,
                         endpoint: &service.endpoint,
                     });
+                    VectorResponse {
+                        events_count,
+                        events_byte_size: 0,
+                    }
                 })
-                .map_err(|source| VectorSinkError::Request { source })
+                .map_err(|source| VectorSinkError::Request { source }.into())
                 .await
         };
 
@@ -81,14 +127,11 @@ impl tower::Service<Vec<EventWrapperWrapper>> for VectorService {
     }
 }
 
-
 #[derive(Clone, Debug)]
-struct HyperSvc {
+pub struct HyperSvc {
     uri: Uri,
     client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
 }
-
-
 
 impl tower::Service<hyper::Request<BoxBody>> for HyperSvc {
     type Response = hyper::Response<hyper::Body>;
@@ -112,5 +155,3 @@ impl tower::Service<hyper::Request<BoxBody>> for HyperSvc {
         Box::pin(self.client.request(req))
     }
 }
-
-

@@ -1,22 +1,21 @@
-use crate::sinks::util::{BatchConfig, RealtimeEventBasedDefaultBatchSettings, TowerRequestConfig};
-use crate::tls::{TlsConfig, MaybeTlsSettings, tls_connector_builder};
-use crate::config::{GenerateConfig, SinkContext, ProxyConfig, DataType, Resource, SinkHealthcheckOptions};
-use http::Uri;
+use crate::config::{GenerateConfig, ProxyConfig, SinkContext, SinkHealthcheckOptions};
+use crate::proto::vector as proto;
+use crate::sinks::util::retries::RetryLogic;
+use crate::sinks::util::{
+    BatchConfig, RealtimeEventBasedDefaultBatchSettings, ServiceBuilderExt, TowerRequestConfig,
+};
+use crate::sinks::vector::v2::service::{VectorResponse, VectorService};
+use crate::sinks::vector::v2::sink::VectorSink;
+use crate::sinks::vector::v2::VectorSinkError;
 use crate::sinks::{Healthcheck, VectorSink as VectorSinkType};
+use crate::tls::{tls_connector_builder, MaybeTlsSettings, TlsConfig};
+use http::Uri;
+use hyper::client::HttpConnector;
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
-use hyper::client::HttpConnector;
+use serde::{Deserialize, Serialize};
 use tonic::body::BoxBody;
-use crate::sinks::util::retries::RetryLogic;
-use crate::proto::vector as proto;
-use crate::sinks::vector::v2::service::VectorService;
-use crate::sinks::vector::v2::sink::VectorSink;
-use serde::{Serialize, Deserialize};
-use snafu::Snafu;
-use crate::sinks::vector::v2::VectorSinkError;
 use tower::ServiceBuilder;
-use crate::Error;
-
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -29,8 +28,6 @@ pub struct VectorConfig {
     #[serde(default)]
     tls: Option<TlsConfig>,
 }
-
-
 
 impl GenerateConfig for VectorConfig {
     fn generate_config() -> toml::Value {
@@ -48,7 +45,10 @@ fn default_config(address: &str) -> VectorConfig {
 }
 
 impl VectorConfig {
-    pub(crate) async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSinkType, Healthcheck)> {
+    pub(crate) async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSinkType, Healthcheck)> {
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
         let uri = with_default_scheme(&self.address, tls.is_tls())?;
 
@@ -73,29 +73,22 @@ impl VectorConfig {
         let sink = VectorSink {
             batch_settings,
             service,
-            acker: cx.acker()
+            acker: cx.acker(),
         };
 
-        Ok((VectorSinkType::Stream(Box::new(sink)), Box::pin(healthcheck)))
-    }
-
-    pub(super) const fn input_type(&self) -> DataType {
-        DataType::Any
-    }
-
-    pub(super) const fn sink_type(&self) -> &'static str {
-        "vector"
-    }
-
-    pub(super) const fn resources(&self) -> Vec<Resource> {
-        Vec::new()
+        Ok((
+            VectorSinkType::Stream(Box::new(sink)),
+            Box::pin(healthcheck),
+        ))
     }
 }
 
-
 /// Check to see if the remote service accepts new events.
 //TODO: use proto::Client instead of service?
-async fn healthcheck(mut service: VectorService, options: SinkHealthcheckOptions) -> crate::Result<()> {
+async fn healthcheck(
+    mut service: VectorService,
+    options: SinkHealthcheckOptions,
+) -> crate::Result<()> {
     if !options.enabled {
         return Ok(());
     }
@@ -176,8 +169,8 @@ fn new_client(
 struct VectorGrpcRetryLogic;
 
 impl RetryLogic for VectorGrpcRetryLogic {
-    type Error = Error;
-    type Response = ();
+    type Error = VectorSinkError;
+    type Response = VectorResponse;
 
     fn is_retriable_error(&self, err: &Self::Error) -> bool {
         use tonic::Code::*;

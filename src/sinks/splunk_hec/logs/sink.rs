@@ -3,7 +3,7 @@ use std::{fmt, num::NonZeroUsize};
 use async_trait::async_trait;
 use futures_util::{future, stream::BoxStream, StreamExt};
 use tower::Service;
-use vector_core::stream::{ByteSizeOfItemSize, DriverResponse};
+use vector_core::stream::{batcher, DriverResponse};
 use vector_core::{
     config::log_schema,
     event::{Event, LogEvent, Value},
@@ -63,7 +63,7 @@ where
                     indexed_fields,
                 ))
             })
-            .batched(self.batch_settings, ByteSizeOfItemSize)
+            .batched(batcher::config::byte_size_of_vec(self.batch_settings))
             .request_builder(builder_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
