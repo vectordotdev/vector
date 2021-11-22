@@ -23,7 +23,7 @@ components: sinks: _splunk_hec: {
 			            required: false
 			            type: uint: {
                             default: 30
-                            unit: null 
+                            unit: null
 			            }
                     }
                 }
@@ -34,13 +34,13 @@ components: sinks: _splunk_hec: {
         indexer_acknowledgements: {
             title: "Indexer Acknowledgements"
             body: """
-                For more accurate end-to-end acknowledgements, this sink will automatically integrate with 
-                [Splunk HEC indexer acknowledgements](https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/AboutHECIDXAck) 
-                if the provided Splunk HEC token has the feature enabled. In other words, if `ackID`'s are present in Splunk 
-                HEC responses, this sink will store and query for the status of said `ackID`'s to confirm that data has been successfully 
+                For more accurate end-to-end acknowledgements, this sink will automatically integrate with
+                [Splunk HEC indexer acknowledgements](https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/AboutHECIDXAck)
+                if the provided Splunk HEC token has the feature enabled. In other words, if `ackID`'s are present in Splunk
+                HEC responses, this sink will store and query for the status of said `ackID`'s to confirm that data has been successfully
                 delivered.
 
-                The Splunk channel required for indexer acknowledgements is created using a randomly generated UUID. 
+                The Splunk channel required for indexer acknowledgements is created using a randomly generated UUID.
                 """
         }
     }

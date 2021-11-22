@@ -58,7 +58,7 @@ impl HecService {
         let event_client = client.clone();
         let ack_client = client;
         let http_request_builder = Arc::new(http_request_builder);
-        let tx = indexer_acknowledgements.and_then(|indexer_acknowledgements| {
+        let tx = indexer_acknowledgements.map(|indexer_acknowledgements| {
             let (tx, rx) = mpsc::unbounded_channel();
             tokio::spawn(run_acknowledgements(
                 rx,
@@ -66,7 +66,7 @@ impl HecService {
                 Arc::clone(&http_request_builder),
                 indexer_acknowledgements,
             ));
-            Some(tx)
+            tx
         });
 
         let batch_service = HttpBatchService::new(event_client, move |req: HecRequest| {
@@ -160,10 +160,7 @@ impl HttpRequestBuilder {
         let mut builder = Request::post(uri)
             .header("Content-Type", "application/json")
             .header("Authorization", format!("Splunk {}", self.token.as_str()))
-            .header(
-                "X-Splunk-Request-Channel",
-                format!("{}", SPLUNK_CHANNEL.as_str()),
-            );
+            .header("X-Splunk-Request-Channel", SPLUNK_CHANNEL.as_str());
 
         if let Some(ce) = self.compression.content_encoding() {
             builder = builder.header("Content-Encoding", ce);

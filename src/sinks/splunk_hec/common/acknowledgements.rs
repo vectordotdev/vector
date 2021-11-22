@@ -92,12 +92,9 @@ impl HecAckClient {
     /// Remove successfully acked ack ids and notify that the event has been Delivered
     fn finalize_ack_ids(&mut self, ack_ids: &[u64]) {
         for ack_id in ack_ids {
-            match self.acks.remove(ack_id) {
-                Some((_, ack_event_status_sender)) => {
-                    let _ = ack_event_status_sender.send(EventStatus::Delivered);
-                    debug!("Finalized ack id {:?}", ack_id);
-                }
-                None => {}
+            if let Some((_, ack_event_status_sender)) = self.acks.remove(ack_id) {
+                let _ = ack_event_status_sender.send(EventStatus::Delivered);
+                debug!("Finalized ack id {:?}", ack_id);
             }
         }
     }
@@ -106,7 +103,7 @@ impl HecAckClient {
     fn get_ack_query_body(&mut self) -> HecAckQueryRequestBody {
         self.clear_expired_ack_ids();
         HecAckQueryRequestBody {
-            acks: self.acks.keys().map(|id| *id).collect::<Vec<u64>>(),
+            acks: self.acks.keys().copied().collect::<Vec<u64>>(),
         }
     }
 
@@ -203,7 +200,7 @@ mod tests {
 
     fn populate_ack_client(
         ack_client: &mut HecAckClient,
-        ack_ids: &Vec<u64>,
+        ack_ids: &[u64],
     ) -> Vec<Receiver<EventStatus>> {
         let mut ack_status_rxs = Vec::new();
         for ack_id in ack_ids {
@@ -222,7 +219,7 @@ mod tests {
         let expected_ack_body = HecAckQueryRequestBody { acks: ack_ids };
 
         let mut ack_request_body = ack_client.get_ack_query_body();
-        ack_request_body.acks.sort();
+        ack_request_body.acks.sort_unstable();
         assert_eq!(expected_ack_body, ack_request_body);
     }
 
@@ -233,7 +230,7 @@ mod tests {
         let _ = populate_ack_client(&mut ack_client, &ack_ids);
 
         let mut ack_request_body = ack_client.get_ack_query_body();
-        ack_request_body.acks.sort();
+        ack_request_body.acks.sort_unstable();
         assert_eq!(ack_ids, ack_request_body.acks);
         ack_client.decrement_retries();
 

@@ -263,7 +263,7 @@ mod tests {
         };
 
         let err = http_request_builder
-            .build_request(events.clone(), "/services/collector/event")
+            .build_request(events, "/services/collector/event")
             .unwrap_err();
         assert_eq!(err.to_string(), "URI parse error: invalid format")
     }
