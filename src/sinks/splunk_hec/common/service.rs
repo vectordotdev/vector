@@ -109,7 +109,7 @@ impl Service<HecRequest> for HecService {
                             if let Some(ack_id) = body.ack_id {
                                 let (tx, rx) = oneshot::channel();
                                 match ack_finalizer_tx.send((ack_id, tx)) {
-                                    Ok(_) => rx.await.unwrap_or(EventStatus::Dropped),
+                                    Ok(_) => rx.await.unwrap_or(EventStatus::Failed),
                                     // If we cannot send ack ids to the ack client, fall back to default behavior
                                     Err(_) => EventStatus::Delivered,
                                 }
