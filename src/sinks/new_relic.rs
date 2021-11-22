@@ -24,6 +24,9 @@ use crate::{
     },
     tls::TlsSettings,
 };
+use hyper::Body;
+use http::header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE};
+use tracing::Instrument;
 use vector_core::{
     internal_event::InternalEvent,
     stream::BatcherSettings,
@@ -99,8 +102,8 @@ impl Encoder<Result<NewRelicApiModel, &'static str>> for EncodingConfigWithDefau
                 NewRelicApiModel::Logs(log_api_model) => log_api_model.to_json(),
             };
             if let Some(json) = json {
-                writer.write(&json);
-                io::Result::Ok(json.len())
+                let size = writer.write(&json)?;
+                io::Result::Ok(size)
             }
             else {
                 io::Result::Ok(0)
@@ -572,7 +575,9 @@ impl HttpSink for NewRelicConfig {
 pub struct NewRelicApiRequest {
     pub batch_size: usize,
     pub finalizers: EventFinalizers,
-    //TODO
+    pub credentials: NewRelicCredentials,
+    pub payload: Vec<u8>,
+    pub compression: Compression
 }
 
 impl Ackable for NewRelicApiRequest {
@@ -589,8 +594,7 @@ impl Finalizable for NewRelicApiRequest {
 
 #[derive(Debug, Clone)]
 pub struct NewRelicApiService {
-    //client: HttpClient,
-    api: NewRelicApi,
+    client: HttpClient
 }
 
 #[derive(Debug)]
@@ -620,19 +624,68 @@ impl Service<NewRelicApiRequest> for NewRelicApiService {
 
     fn call(&mut self, request: NewRelicApiRequest) -> Self::Future {
         println!("----> Call from NewRelicApiRequest, request = {:#?}", request);
+
+        let mut client = self.client.clone();
+
+        let uri = request.credentials.get_uri();
+
+        let http_request = Request::post(&uri)
+            .header(CONTENT_TYPE, "application/json")
+            .header("Api-Key", request.credentials.license_key.clone());
+
+        let http_request = if let Some(ce) = request.compression.content_encoding() {
+            http_request.header(CONTENT_ENCODING, ce)
+        } else {
+            http_request
+        };
+
+        let http_request = http_request
+            .header(CONTENT_LENGTH, request.payload.len())
+            .body(Body::from(request.payload))
+            .expect("building HTTP request failed unexpectedly");
+
         Box::pin(async move {
             println!("---> Future returned by NewRelicApiRequest");
-
-            Ok(NewRelicApiResponse::Ok)
+            match client.call(http_request).in_current_span().await {
+                Ok(response) => Ok(NewRelicApiResponse::Ok),
+                //TODO: set error message
+                Err(error) => Err(NewRelicSinkError::new(""))
+            }
         })
     }
 }
 
-#[derive(Clone)]
-struct NewRelicCredentials {
+#[derive(Debug, Clone)]
+pub struct NewRelicCredentials {
     pub license_key: String,
     pub account_id: String,
-    pub api: NewRelicApi
+    pub api: NewRelicApi,
+    pub region: NewRelicRegion
+}
+
+impl NewRelicCredentials {
+    pub fn get_uri(&self) -> Uri {
+        match self.api {
+            NewRelicApi::Events => {
+                match self.region {
+                    NewRelicRegion::Us => format!("https://insights-collector.newrelic.com/v1/accounts/{}/events", self.account_id).parse::<Uri>().unwrap(),
+                    NewRelicRegion::Eu => format!("https://insights-collector.eu01.nr-data.net/v1/accounts/{}/events", self.account_id).parse::<Uri>().unwrap(),
+                }
+            },
+            NewRelicApi::Metrics => {
+                match self.region {
+                    NewRelicRegion::Us => Uri::from_static("https://metric-api.newrelic.com/metric/v1"),
+                    NewRelicRegion::Eu => Uri::from_static("https://metric-api.eu.newrelic.com/metric/v1"),
+                }
+            },
+            NewRelicApi::Logs => {
+                match self.region {
+                    NewRelicRegion::Us => Uri::from_static("https://log-api.newrelic.com/log/v1"),
+                    NewRelicRegion::Eu => Uri::from_static("https://log-api.eu.newrelic.com/log/v1"),
+                }
+            }
+        }
+    }
 }
 
 impl From<&NewRelicConfig> for NewRelicCredentials {
@@ -640,7 +693,8 @@ impl From<&NewRelicConfig> for NewRelicCredentials {
         Self {
             license_key: config.license_key.clone(),
             account_id: config.account_id.clone(),
-            api: config.api.clone()
+            api: config.api.clone(),
+            region: config.region.unwrap_or(NewRelicRegion::Us)
         }
     }
 }
@@ -661,11 +715,13 @@ impl SinkConfig for NewRelicConfig {
             .into_batcher_settings()?;
 
         let request_limits = self.request.unwrap_with(&Default::default());
+        let tls_settings = TlsSettings::from_options(&None)?;
+        let client = HttpClient::new(tls_settings, &cx.proxy)?;
 
         let service = ServiceBuilder::new()
             .settings(request_limits, NewRelicApiRetry)
             .service(NewRelicApiService {
-                api: self.api
+                client
             });
 
         let sink = NewRelicSink {
@@ -703,6 +759,7 @@ impl RetryLogic for NewRelicApiRetry {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         println!("-----> is_retriable_error");
+        //TODO: add retry logic
         false
     }
 }
@@ -758,7 +815,7 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
         println!("----> NewRelicRequestBuilder split_input = {:#?}", input);
         let events_len = input.len();
         let finalizers = input.take_finalizers();
-        let api_mode = || -> Result<NewRelicApiModel, &str> {
+        let api_model = || -> Result<NewRelicApiModel, &str> {
             match self.credentials.api {
                 NewRelicApi::Events => {
                     Ok(
@@ -784,15 +841,19 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
             }
         }();
         let metadata = (self.credentials.clone(), events_len, finalizers);
-        (metadata, api_mode)
+        (metadata, api_model)
     }
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
         println!("----> NewRelicRequestBuilder build_request = {:#?}", String::from_utf8_lossy(&payload));
         let (_credentials, _events_len, finalizers) = metadata;
+        //TODO: send payload to api request
         NewRelicApiRequest {
             batch_size: 0,
-            finalizers
+            finalizers,
+            credentials: self.credentials.clone(),
+            payload,
+            compression: self.compression
         }
     }
 }
