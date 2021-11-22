@@ -11,8 +11,8 @@ use super::service::HttpRequestBuilder;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct HecClientAcknowledgementsConfig {
-    query_interval: u8,
-    retry_limit: u8,
+    pub query_interval: u8,
+    pub retry_limit: u8,
 }
 
 impl Default for HecClientAcknowledgementsConfig {
@@ -114,9 +114,6 @@ impl HecAckClient {
     fn decrement_retries(&mut self) {
         for (retries, _) in self.acks.values_mut() {
             *retries = retries.checked_sub(1).unwrap_or(0);
-            // if *retries > 0 {
-            //     *retries -= 1;
-            // }
         }
     }
 
