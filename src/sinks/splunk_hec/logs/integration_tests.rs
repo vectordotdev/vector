@@ -17,7 +17,7 @@ use crate::{
 use futures::stream;
 use serde_json::Value as JsonValue;
 use std::future::ready;
-use std::{convert::TryFrom, sync::Arc};
+use std::{convert::TryFrom, num::NonZeroU8, sync::Arc};
 use tokio::time::{sleep, Duration};
 use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
@@ -320,8 +320,8 @@ async fn splunk_indexer_acknowledgements() {
     let cx = SinkContext::new_test();
 
     let acknowledgements_config = HecClientAcknowledgementsConfig {
-        query_interval: 1,
-        retry_limit: 5,
+        query_interval: NonZeroU8::new(1).unwrap(),
+        retry_limit: NonZeroU8::new(5).unwrap(),
     };
 
     let config = HecSinkLogsConfig {

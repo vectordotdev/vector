@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, num::NonZeroU8, sync::Arc, time::Duration};
 
 use hyper::Body;
 use serde::{Deserialize, Serialize};
@@ -11,15 +11,15 @@ use super::service::HttpRequestBuilder;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct HecClientAcknowledgementsConfig {
-    pub query_interval: u8,
-    pub retry_limit: u8,
+    pub query_interval: NonZeroU8,
+    pub retry_limit: NonZeroU8,
 }
 
 impl Default for HecClientAcknowledgementsConfig {
     fn default() -> Self {
         Self {
-            query_interval: 10,
-            retry_limit: 30,
+            query_interval: NonZeroU8::new(10).unwrap(),
+            retry_limit: NonZeroU8::new(30).unwrap(),
         }
     }
 }
@@ -142,10 +142,10 @@ pub async fn run_acknowledgements(
     indexer_acknowledgements: HecClientAcknowledgementsConfig,
 ) {
     let mut interval = tokio::time::interval(Duration::from_secs(
-        indexer_acknowledgements.query_interval as u64,
+        indexer_acknowledgements.query_interval.get() as u64,
     ));
     let mut ack_client = HecAckClient::new(
-        indexer_acknowledgements.retry_limit,
+        indexer_acknowledgements.retry_limit.get(),
         client,
         http_request_builder,
     );
