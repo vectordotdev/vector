@@ -7,22 +7,54 @@ use std::{
     fmt,
 };
 
+pub const GLOBAL_SCOPE: &str = "global";
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct ComponentKey(String);
+pub struct ComponentKey {
+    id: String,
+    scope_len: usize,
+}
 
 impl ComponentKey {
     pub fn id(&self) -> &str {
-        &self.0
+        &self.id
+    }
+
+    pub fn name(&self) -> &str {
+        if self.is_global() {
+            &self.id
+        } else {
+            &self.id[(self.scope_len + 1)..]
+        }
+    }
+
+    pub fn scope(&self) -> &str {
+        if self.is_global() {
+            GLOBAL_SCOPE
+        } else {
+            &self.id[0..self.scope_len]
+        }
+    }
+
+    pub fn is_global(&self) -> bool {
+        self.scope_len == 0
     }
 
     pub fn create_child(&self, name: &str) -> Self {
-        Self::from(format!("{}.{}", self.0, name))
+        Self {
+            id: format!("{}.{}", self.id, name),
+            scope_len: self.id.len(),
+        }
     }
 }
 
 impl From<String> for ComponentKey {
     fn from(value: String) -> Self {
-        Self(value)
+        let scope_len = value.rfind('.').unwrap_or(0);
+        Self {
+            id: value,
+            scope_len,
+        }
     }
 }
 
@@ -34,7 +66,7 @@ impl From<&str> for ComponentKey {
 
 impl fmt::Display for ComponentKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
+        self.id.fmt(f)
     }
 }
 
@@ -49,7 +81,13 @@ impl Serialize for ComponentKey {
 
 impl Ord for ComponentKey {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.0.cmp(&other.0)
+        let self_scope = self.scope();
+        let other_scope = other.scope();
+        if self_scope == other_scope {
+            self.id.cmp(&other.id)
+        } else {
+            self_scope.cmp(&other_scope)
+        }
     }
 }
 
