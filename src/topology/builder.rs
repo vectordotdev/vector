@@ -407,6 +407,7 @@ pub async fn build_pieces(
                 "sink",
                 component_kind = "sink",
                 component_id = %key.id(),
+                component_scope = %key.scope(),
                 component_type = typetag,
                 component_name = %key.id(),
                 buffer_type = buffer_type,

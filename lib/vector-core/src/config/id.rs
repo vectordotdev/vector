@@ -85,8 +85,12 @@ impl Ord for ComponentKey {
         let other_scope = other.scope();
         if self_scope == other_scope {
             self.id.cmp(&other.id)
+        } else if self.is_global() {
+            Ordering::Greater
+        } else if other.is_global() {
+            Ordering::Less
         } else {
-            self_scope.cmp(&other_scope)
+            self_scope.cmp(other_scope)
         }
     }
 }
