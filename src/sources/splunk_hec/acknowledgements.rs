@@ -168,7 +168,7 @@ impl Channel {
                     Some(min) => ack_ids_status.remove(min),
                     // max pending acks per channel is guaranteed to be >= 1,
                     // thus there must be at least one ack id available to remove
-                    None => unreachable!(),
+                    None => unreachable!("Indexer acknowledgements channel must allow at least one pending ack"),
                 };
             };
         });
