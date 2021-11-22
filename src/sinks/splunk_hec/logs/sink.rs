@@ -3,11 +3,10 @@ use std::{fmt, num::NonZeroUsize};
 use async_trait::async_trait;
 use futures_util::{future, stream::BoxStream, StreamExt};
 use tower::Service;
-use vector_core::stream::DriverResponse;
+use vector_core::stream::{ByteSizeOfItemSize, DriverResponse};
 use vector_core::{
     config::log_schema,
     event::{Event, LogEvent, Value},
-    partition::NullPartitioner,
     sink::StreamSink,
     stream::BatcherSettings,
     ByteSizeOf,
@@ -64,8 +63,7 @@ where
                     indexed_fields,
                 ))
             })
-            .batched(NullPartitioner::new(), self.batch_settings)
-            .map(|(_, batch)| batch)
+            .batched(self.batch_settings, ByteSizeOfItemSize)
             .request_builder(builder_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
