@@ -1,5 +1,3 @@
-#![deny(clippy::print_stdout)]
-#![deny(clippy::dbg_macro)]
 #![warn(
     missing_debug_implementations,
     rust_2018_idioms,

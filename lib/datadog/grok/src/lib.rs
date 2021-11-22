@@ -1,6 +1,3 @@
-#![deny(clippy::print_stdout)]
-#![deny(clippy::dbg_macro)]
-
 mod ast;
 mod grok_filter;
 mod lexer;

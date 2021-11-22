@@ -26,9 +26,6 @@
 
 // For more information, please refer to <http://unlicense.org>
 
-#![deny(clippy::print_stdout)]
-#![deny(clippy::dbg_macro)]
-
 use rand::{thread_rng, Rng};
 use std::net::{IpAddr, SocketAddr, TcpListener, ToSocketAddrs, UdpSocket};
 

@@ -12,9 +12,7 @@
 #![deny(clippy::trivially_copy_pass_by_ref)]
 #![deny(clippy::disallowed_method)] // [nursery] mark some functions as verboten
 #![deny(clippy::missing_const_for_fn)] // [nursery] valuable to the optimizer,
-// but may produce false positives
-#![deny(clippy::print_stdout)]
-#![deny(clippy::dbg_macro)]
+                                       // but may produce false positives
 
 #[macro_use]
 extern crate tracing;

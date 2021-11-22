@@ -5,8 +5,6 @@
 
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
-#![deny(clippy::print_stdout)]
-#![deny(clippy::dbg_macro)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::type_complexity)] // long-types happen, especially in async code
 #![allow(clippy::must_use_candidate)]

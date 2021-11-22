@@ -1,6 +1,3 @@
-#![deny(clippy::print_stdout)]
-#![deny(clippy::dbg_macro)]
-
 use lalrpop_util::lalrpop_mod;
 lalrpop_mod!(
     #[allow(clippy::all)]

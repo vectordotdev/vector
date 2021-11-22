@@ -5,8 +5,6 @@
 
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
-#![deny(clippy::print_stdout)]
-#![deny(clippy::dbg_macro)]
 
 pub mod byte_size_of;
 pub mod internal_event;

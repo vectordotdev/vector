@@ -1,6 +1,3 @@
-#![deny(clippy::print_stdout)]
-#![deny(clippy::dbg_macro)]
-
 mod diagnostic;
 mod formatter;
 mod label;

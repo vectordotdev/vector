@@ -1,6 +1,3 @@
-#![deny(clippy::print_stdout)]
-#![deny(clippy::dbg_macro)]
-
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 

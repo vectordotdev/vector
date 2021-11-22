@@ -1,6 +1,3 @@
-#![deny(clippy::print_stdout)]
-#![deny(clippy::dbg_macro)]
-
 use dashmap::DashMap;
 use std::fmt;
 use tracing_core::{

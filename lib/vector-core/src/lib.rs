@@ -10,8 +10,6 @@
 
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
-#![deny(clippy::print_stdout)]
-#![deny(clippy::dbg_macro)]
 #![allow(clippy::cast_possible_wrap)]
 #![allow(clippy::cast_sign_loss)]
 #![allow(clippy::default_trait_access)] // triggers on generated prost code

@@ -1,6 +1,3 @@
-#![deny(clippy::print_stdout)]
-#![deny(clippy::dbg_macro)]
-
 #[cfg(feature = "aws_cloudwatch_logs_subscription")]
 pub mod aws_cloudwatch_logs_subscription;
 

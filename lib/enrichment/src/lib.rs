@@ -1,6 +1,3 @@
-#![deny(clippy::print_stdout)]
-#![deny(clippy::dbg_macro)]
-
 pub mod find_enrichment_table_records;
 pub mod get_enrichment_table_record;
 pub mod tables;
