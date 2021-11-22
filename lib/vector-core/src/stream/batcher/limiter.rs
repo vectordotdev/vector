@@ -1,5 +1,5 @@
 use crate::stream::batcher::data::BatchData;
-use crate::stream::BatcherSettings;
+
 use crate::ByteSizeOf;
 
 pub trait BatchLimiter<T, B> {

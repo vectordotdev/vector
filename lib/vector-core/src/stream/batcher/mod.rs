@@ -2,18 +2,13 @@ pub mod config;
 pub mod data;
 pub mod limiter;
 
-use crate::ByteSizeOf;
 use futures::stream::{Fuse, Stream};
 use futures::{Future, StreamExt};
 use pin_project::pin_project;
 
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::time::Duration;
 
-use crate::stream::batcher::data::BatchData;
-use crate::stream::batcher::limiter::BatchLimiter;
-use crate::stream::BatcherSettings;
 use tokio::time::Sleep;
 
 use config::BatchConfig;
@@ -119,73 +114,84 @@ where
     }
 }
 
-// #[cfg(test)]
-// #[allow(clippy::similar_names)]
-// mod test {
-//     use super::*;
-//     use futures::stream;
-//     use std::num::NonZeroUsize;
-//
-//     #[tokio::test]
-//     async fn item_limit() {
-//         let stream = stream::iter([1, 2, 3]);
-//         let settings = BatcherSettings::new(
-//             Duration::from_millis(100),
-//             NonZeroUsize::new(10000).unwrap(),
-//             NonZeroUsize::new(2).unwrap(),
-//         );
-//         let batcher = Batcher::new(stream, settings, |x: &u32| *x as usize);
-//         let batches: Vec<_> = batcher.collect().await;
-//         assert_eq!(batches, vec![vec![1, 2], vec![3],]);
-//     }
-//
-//     #[tokio::test]
-//     async fn size_limit() {
-//         let batcher = Batcher::new(
-//             stream::iter([1, 2, 3, 4, 5, 6, 2, 3, 1]),
-//             BatcherSettings::new(
-//                 Duration::from_millis(100),
-//                 NonZeroUsize::new(5).unwrap(),
-//                 NonZeroUsize::new(100).unwrap(),
-//             ),
-//             |x: &u32| *x as usize,
-//         );
-//         let batches: Vec<_> = batcher.collect().await;
-//         assert_eq!(
-//             batches,
-//             vec![
-//                 vec![1, 2],
-//                 vec![3],
-//                 vec![4],
-//                 vec![5],
-//                 vec![6],
-//                 vec![2, 3],
-//                 vec![1],
-//             ]
-//         );
-//     }
-//
-//     #[tokio::test]
-//     async fn timeout_limit() {
-//         tokio::time::pause();
-//
-//         let timeout = Duration::from_millis(100);
-//         let stream = stream::iter([1, 2]).chain(stream::pending());
-//         let batcher = Batcher::new(
-//             stream,
-//             BatcherSettings::new(
-//                 timeout,
-//                 NonZeroUsize::new(5).unwrap(),
-//                 NonZeroUsize::new(100).unwrap(),
-//             ),
-//             |x: &u32| *x as usize,
-//         );
-//
-//         tokio::pin!(batcher);
-//         let mut next = batcher.next();
-//         assert_eq!(futures::poll!(&mut next), Poll::Pending);
-//         tokio::time::advance(timeout).await;
-//         let batch = next.await;
-//         assert_eq!(batch, Some(vec![1, 2]));
-//     }
-// }
+#[cfg(test)]
+#[allow(clippy::similar_names)]
+mod test {
+    use super::*;
+    use crate::stream::{batcher, BatcherSettings};
+    use futures::stream;
+    use std::num::NonZeroUsize;
+    use std::time::Duration;
+
+    #[tokio::test]
+    async fn item_limit() {
+        let stream = stream::iter([1, 2, 3]);
+        let settings = BatcherSettings::new(
+            Duration::from_millis(100),
+            NonZeroUsize::new(10000).unwrap(),
+            NonZeroUsize::new(2).unwrap(),
+        );
+        let batcher = Batcher::new(
+            stream,
+            batcher::config::item_size(settings, vec![], |x: &u32| *x as usize),
+        );
+        let batches: Vec<_> = batcher.collect().await;
+        assert_eq!(batches, vec![vec![1, 2], vec![3],]);
+    }
+
+    #[tokio::test]
+    async fn size_limit() {
+        let batcher = Batcher::new(
+            stream::iter([1, 2, 3, 4, 5, 6, 2, 3, 1]),
+            batcher::config::item_size(
+                BatcherSettings::new(
+                    Duration::from_millis(100),
+                    NonZeroUsize::new(5).unwrap(),
+                    NonZeroUsize::new(100).unwrap(),
+                ),
+                vec![],
+                |x: &u32| *x as usize,
+            ),
+        );
+        let batches: Vec<_> = batcher.collect().await;
+        assert_eq!(
+            batches,
+            vec![
+                vec![1, 2],
+                vec![3],
+                vec![4],
+                vec![5],
+                vec![6],
+                vec![2, 3],
+                vec![1],
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn timeout_limit() {
+        tokio::time::pause();
+
+        let timeout = Duration::from_millis(100);
+        let stream = stream::iter([1, 2]).chain(stream::pending());
+        let batcher = Batcher::new(
+            stream,
+            batcher::config::item_size(
+                BatcherSettings::new(
+                    timeout,
+                    NonZeroUsize::new(5).unwrap(),
+                    NonZeroUsize::new(100).unwrap(),
+                ),
+                vec![],
+                |x: &u32| *x as usize,
+            ),
+        );
+
+        tokio::pin!(batcher);
+        let mut next = batcher.next();
+        assert_eq!(futures::poll!(&mut next), Poll::Pending);
+        tokio::time::advance(timeout).await;
+        let batch = next.await;
+        assert_eq!(batch, Some(vec![1, 2]));
+    }
+}
