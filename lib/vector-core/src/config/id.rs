@@ -7,43 +7,18 @@ use std::{
     fmt,
 };
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum ComponentScope {
-    Global,
-}
-
-impl fmt::Display for ComponentScope {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Global => write!(f, "global"),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ComponentKey {
     id: String,
-    scope: ComponentScope,
 }
 
 impl ComponentKey {
     pub fn global<T: Into<String>>(id: T) -> Self {
-        Self {
-            id: id.into(),
-            scope: ComponentScope::Global,
-        }
+        Self { id: id.into() }
     }
 
     pub fn id(&self) -> &str {
         self.id.as_str()
-    }
-
-    pub const fn scope(&self) -> &ComponentScope {
-        &self.scope
-    }
-
-    pub const fn is_global(&self) -> bool {
-        matches!(self.scope, ComponentScope::Global)
     }
 }
 
@@ -57,7 +32,6 @@ impl From<&str> for ComponentKey {
     fn from(value: &str) -> Self {
         Self {
             id: value.to_string(),
-            scope: ComponentScope::Global,
         }
     }
 }
@@ -85,11 +59,7 @@ impl Serialize for ComponentKey {
 
 impl Ord for ComponentKey {
     fn cmp(&self, other: &Self) -> Ordering {
-        if self.scope == other.scope {
-            self.id.cmp(&other.id)
-        } else {
-            self.scope.cmp(&other.scope)
-        }
+        self.id.cmp(&other.id)
     }
 }
 
