@@ -166,6 +166,7 @@ impl PipelineConfig {
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_owned(),
+            filter: None,
             transforms: Vec::new(),
         }
     }
