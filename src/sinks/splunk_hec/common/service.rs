@@ -9,7 +9,7 @@ use crate::sinks::{
 };
 use futures_util::future::BoxFuture;
 use http::Request;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use tokio::sync::{
     mpsc::{self, UnboundedSender},
@@ -41,7 +41,7 @@ pub struct HecService {
     ack_finalizer_tx: Option<UnboundedSender<(u64, Sender<EventStatus>)>>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 struct HecAckResponseBody {
     text: String,
     code: u8,
@@ -167,5 +167,252 @@ impl HttpRequestBuilder {
         }
 
         builder.body(body).map_err(Into::into)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        collections::HashMap,
+        num::NonZeroU8,
+        sync::atomic::{AtomicU64, Ordering},
+    };
+
+    use futures_util::{stream::FuturesUnordered, StreamExt};
+    use tower::Service;
+    use vector_core::{
+        config::proxy::ProxyConfig,
+        event::{EventFinalizers, EventStatus},
+    };
+    use wiremock::{
+        matchers::{header, header_exists, method, path},
+        Mock, MockServer, Request, Respond, ResponseTemplate,
+    };
+
+    use crate::{
+        http::HttpClient,
+        sinks::{
+            splunk_hec::common::{
+                acknowledgements::{
+                    HecAckQueryRequestBody, HecAckQueryResponseBody,
+                    HecClientAcknowledgementsConfig,
+                },
+                request::HecRequest,
+                service::{HecAckResponseBody, HecService, HttpRequestBuilder},
+            },
+            util::Compression,
+        },
+    };
+
+    const TOKEN: &str = "token";
+    static ACK_ID: AtomicU64 = AtomicU64::new(0);
+
+    fn get_hec_service(
+        endpoint: String,
+        acknowledgements_config: HecClientAcknowledgementsConfig,
+    ) -> HecService {
+        let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
+        let http_request_builder = HttpRequestBuilder {
+            endpoint,
+            token: String::from(TOKEN),
+            compression: Compression::default(),
+        };
+        HecService::new(client, http_request_builder, Some(acknowledgements_config))
+    }
+
+    fn get_hec_request() -> HecRequest {
+        let body = String::from("test-message").into_bytes();
+        let events_byte_size = body.len();
+        HecRequest {
+            body,
+            events_count: 1,
+            events_byte_size,
+            finalizers: EventFinalizers::default(),
+        }
+    }
+
+    async fn get_hec_mock_server<R>(acknowledgements_enabled: bool, ack_response: R) -> MockServer
+    where
+        R: Respond + 'static,
+    {
+        // Authorization tokens and channels are required
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/services/collector/event"))
+            .and(header(
+                "Authorization",
+                format!("Splunk {}", TOKEN).as_str(),
+            ))
+            .and(header_exists("X-Splunk-Request-Channel"))
+            .respond_with(move |_: &Request| {
+                let ack_id =
+                    acknowledgements_enabled.then(|| ACK_ID.fetch_add(1, Ordering::Relaxed));
+                ResponseTemplate::new(200).set_body_json(HecAckResponseBody {
+                    text: String::from("Success"),
+                    code: 0,
+                    ack_id,
+                })
+            })
+            .mount(&mock_server)
+            .await;
+
+        Mock::given(method("POST"))
+            .and(path("/services/collector/ack"))
+            .and(header(
+                "Authorization",
+                format!("Splunk {}", TOKEN).as_str(),
+            ))
+            .and(header_exists("X-Splunk-Request-Channel"))
+            .respond_with(ack_response)
+            .mount(&mock_server)
+            .await;
+
+        mock_server
+    }
+
+    #[tokio::test]
+    async fn acknowledgements_enabled_on_server() {
+        let ack_response = |req: &Request| {
+            let req =
+                serde_json::from_slice::<HecAckQueryRequestBody>(req.body.as_slice()).unwrap();
+            ResponseTemplate::new(200).set_body_json(HecAckQueryResponseBody {
+                acks: req
+                    .acks
+                    .into_iter()
+                    .map(|ack_id| (ack_id, true))
+                    .collect::<HashMap<_, _>>(),
+            })
+        };
+        let mock_server = get_hec_mock_server(true, ack_response).await;
+
+        let acknowledgements_config = HecClientAcknowledgementsConfig {
+            query_interval: NonZeroU8::new(1).unwrap(),
+            ..HecClientAcknowledgementsConfig::default()
+        };
+        let mut service = get_hec_service(mock_server.uri(), acknowledgements_config);
+
+        let mut responses = (0..10)
+            .map(|_| service.call(get_hec_request()))
+            .collect::<FuturesUnordered<_>>();
+        while let Some(response) = responses.next().await {
+            assert_eq!(EventStatus::Delivered, response.unwrap().event_status)
+        }
+    }
+
+    #[tokio::test]
+    async fn acknowledgements_disabled_on_server() {
+        let ack_response = |_: &Request| ResponseTemplate::new(400);
+        let mock_server = get_hec_mock_server(false, ack_response).await;
+
+        let acknowledgements_config = HecClientAcknowledgementsConfig {
+            query_interval: NonZeroU8::new(1).unwrap(),
+            ..HecClientAcknowledgementsConfig::default()
+        };
+        let mut service = get_hec_service(mock_server.uri(), acknowledgements_config);
+
+        let request = get_hec_request();
+        let response = service.call(request).await.unwrap();
+        assert_eq!(EventStatus::Delivered, response.event_status)
+    }
+
+    #[tokio::test]
+    async fn acknowledgements_enabled_on_server_retry_limit_exceeded() {
+        let ack_response = |req: &Request| {
+            let req =
+                serde_json::from_slice::<HecAckQueryRequestBody>(req.body.as_slice()).unwrap();
+            ResponseTemplate::new(200).set_body_json(HecAckQueryResponseBody {
+                acks: req
+                    .acks
+                    .into_iter()
+                    .map(|ack_id| (ack_id, false))
+                    .collect::<HashMap<_, _>>(),
+            })
+        };
+        let mock_server = get_hec_mock_server(true, ack_response).await;
+
+        let acknowledgements_config = HecClientAcknowledgementsConfig {
+            query_interval: NonZeroU8::new(1).unwrap(),
+            retry_limit: NonZeroU8::new(1).unwrap(),
+        };
+        let mut service = get_hec_service(mock_server.uri(), acknowledgements_config);
+
+        let request = get_hec_request();
+        let response = service.call(request).await.unwrap();
+        assert_eq!(EventStatus::Failed, response.event_status)
+    }
+
+    #[tokio::test]
+    async fn acknowledgements_server_changed_ack_response_format() {
+        let ack_response = |_: &Request| {
+            ResponseTemplate::new(200)
+                .set_body_json(serde_json::json!(r#"{ "new": "a new response body" }"#))
+        };
+        let mock_server = get_hec_mock_server(true, ack_response).await;
+
+        let acknowledgements_config = HecClientAcknowledgementsConfig {
+            query_interval: NonZeroU8::new(1).unwrap(),
+            retry_limit: NonZeroU8::new(3).unwrap(),
+        };
+        let mut service = get_hec_service(mock_server.uri(), acknowledgements_config);
+
+        let request = get_hec_request();
+        let response = service.call(request).await.unwrap();
+        assert_eq!(EventStatus::Delivered, response.event_status)
+    }
+
+    #[tokio::test]
+    async fn acknowledgements_enabled_on_server_ack_endpoint_failing() {
+        let ack_response = |_: &Request| ResponseTemplate::new(503);
+        let mock_server = get_hec_mock_server(true, ack_response).await;
+
+        let acknowledgements_config = HecClientAcknowledgementsConfig {
+            query_interval: NonZeroU8::new(1).unwrap(),
+            retry_limit: NonZeroU8::new(3).unwrap(),
+        };
+        let mut service = get_hec_service(mock_server.uri(), acknowledgements_config);
+
+        let request = get_hec_request();
+        let response = service.call(request).await.unwrap();
+        assert_eq!(EventStatus::Failed, response.event_status)
+    }
+
+    #[tokio::test]
+    async fn acknowledgements_server_changed_event_response_format() {
+        let ack_response = |req: &Request| {
+            let req =
+                serde_json::from_slice::<HecAckQueryRequestBody>(req.body.as_slice()).unwrap();
+            ResponseTemplate::new(200).set_body_json(HecAckQueryResponseBody {
+                acks: req
+                    .acks
+                    .into_iter()
+                    .map(|ack_id| (ack_id, true))
+                    .collect::<HashMap<_, _>>(),
+            })
+        };
+        let mock_server = get_hec_mock_server(true, ack_response).await;
+        // Override the usual event endpoint
+        Mock::given(method("POST"))
+            .and(path("/services/collector/event"))
+            .and(header(
+                "Authorization",
+                format!("Splunk {}", TOKEN).as_str(),
+            ))
+            .and(header_exists("X-Splunk-Request-Channel"))
+            .respond_with(move |_: &Request| {
+                ResponseTemplate::new(200).set_body_json(r#"{ "new": "a new response body" }"#)
+            })
+            .mount(&mock_server)
+            .await;
+
+        let acknowledgements_config = HecClientAcknowledgementsConfig {
+            query_interval: NonZeroU8::new(1).unwrap(),
+            retry_limit: NonZeroU8::new(1).unwrap(),
+        };
+        let mut service = get_hec_service(mock_server.uri(), acknowledgements_config);
+
+        let request = get_hec_request();
+        let response = service.call(request).await.unwrap();
+        assert_eq!(EventStatus::Delivered, response.event_status)
     }
 }

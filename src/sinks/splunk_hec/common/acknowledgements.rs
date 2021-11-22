@@ -28,14 +28,21 @@ pub fn default_hec_client_acknowledgements_config() -> Option<HecClientAcknowled
     Some(HecClientAcknowledgementsConfig::default())
 }
 
-#[derive(Serialize, Eq, PartialEq, Debug)]
+#[derive(Deserialize, Serialize, Eq, PartialEq, Debug)]
 pub struct HecAckQueryRequestBody {
     pub acks: Vec<u64>,
 }
 
-#[derive(Deserialize, Debug)]
-struct HecAckQueryResponseBody {
-    acks: HashMap<u64, bool>,
+#[derive(Deserialize, Serialize, Debug)]
+pub struct HecAckQueryResponseBody {
+    pub acks: HashMap<u64, bool>,
+}
+
+enum HecAckApiError {
+    ClientBuildRequest,
+    ClientParseResponse,
+    ClientSendQuery,
+    ServerSendQuery,
 }
 
 struct HecAckClient {
@@ -74,7 +81,6 @@ impl HecAckClient {
             match ack_query_response {
                 Ok(ack_query_response) => {
                     debug!("Received ack statuses {:?}", ack_query_response);
-                    self.decrement_retries();
                     let acked_ack_ids = ack_query_response
                         .acks
                         .iter()
@@ -83,7 +89,24 @@ impl HecAckClient {
                     self.finalize_ack_ids(acked_ack_ids.as_slice());
                 }
                 Err(error) => {
-                    error!(message = "Unable to send ack query request", ?error);
+                    match error {
+                        HecAckApiError::ClientParseResponse | HecAckApiError::ClientSendQuery => {
+                            // If we are permanently unable to interact with
+                            // Splunk HEC indexer acknowledgements (e.g. due to
+                            // request/response format changes in future
+                            // versions), log an error and fall back to default
+                            // behavior.
+                            error!(message = "Unable to parse ack query response. Acknowledging based on initial 200 OK.");
+                            self.finalize_ack_ids(
+                                self.acks.keys().copied().collect::<Vec<_>>().as_slice(),
+                            )
+                        }
+                        _ => {
+                            // Otherwise, errors may be recoverable, log an error
+                            // and proceed with retries.
+                            error!(message = "Unable to send ack query request");
+                        }
+                    }
                 }
             };
         }
@@ -121,17 +144,35 @@ impl HecAckClient {
 
     // Send an ack status query request to Splunk HEC
     async fn send_ack_query_request(
-        &self,
+        &mut self,
         request_body: &HecAckQueryRequestBody,
-    ) -> crate::Result<HecAckQueryResponseBody> {
-        let request_body_bytes = serde_json::to_vec(request_body)?;
+    ) -> Result<HecAckQueryResponseBody, HecAckApiError> {
+        self.decrement_retries();
+        let request_body_bytes =
+            serde_json::to_vec(request_body).map_err(|_| HecAckApiError::ClientBuildRequest)?;
         let request = self
             .http_request_builder
-            .build_request(request_body_bytes, "/services/collector/ack")?;
+            .build_request(request_body_bytes, "/services/collector/ack")
+            .map_err(|_| HecAckApiError::ClientBuildRequest)?;
 
-        let response = self.client.send(request.map(Body::from)).await?;
-        let response_body = hyper::body::to_bytes(response.into_body()).await?;
-        serde_json::from_slice::<HecAckQueryResponseBody>(&response_body).map_err(Into::into)
+        let response = self
+            .client
+            .send(request.map(Body::from))
+            .await
+            .map_err(|_| HecAckApiError::ServerSendQuery)?;
+
+        let status = response.status();
+        if status.is_success() {
+            let response_body = hyper::body::to_bytes(response.into_body())
+                .await
+                .map_err(|_| HecAckApiError::ClientParseResponse)?;
+            serde_json::from_slice::<HecAckQueryResponseBody>(&response_body)
+                .map_err(|_| HecAckApiError::ClientParseResponse)
+        } else if status.is_client_error() {
+            Err(HecAckApiError::ClientSendQuery)
+        } else {
+            Err(HecAckApiError::ServerSendQuery)
+        }
     }
 }
 
