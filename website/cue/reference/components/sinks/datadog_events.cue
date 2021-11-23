@@ -61,12 +61,12 @@ components: sinks: datadog_events: {
 		}
 		endpoint: {
 			common:        false
-			description:   "The endpoint to send data to. Must include the path."
+			description:   "The endpoint to send data to."
 			relevant_when: "site is not set"
 			required:      false
 			type: string: {
 				default: null
-				examples: ["127.0.0.1:8080/api/v1/events", "example.com:12345/api/v1/events"]
+				examples: ["127.0.0.1:8080", "example.com:12345"]
 			}
 		}
 		site:     sinks._datadog.configuration.site
