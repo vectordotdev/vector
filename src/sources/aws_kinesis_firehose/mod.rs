@@ -1,9 +1,4 @@
-use crate::{
-    codecs::{DecodingConfig, FramingConfig, ParserConfig},
-    config::{DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
-    serde::{default_decoding, default_framing_message_based},
-    tls::{MaybeTlsSettings, TlsConfig},
-};
+use crate::{codecs::{DecodingConfig, FramingConfig, ParserConfig}, config::{AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription}, serde::{bool_or_struct, default_decoding, default_framing_message_based}, tls::{MaybeTlsSettings, TlsConfig}};
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use std::{fmt, net::SocketAddr};
@@ -24,6 +19,8 @@ pub struct AwsKinesisFirehoseConfig {
     framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
     decoding: Box<dyn ParserConfig>,
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -56,7 +53,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
             self.access_key.clone(),
             self.record_compression.unwrap_or_default(),
             decoder,
-            cx.acknowledgements.enabled,
+            self.acknowledgements.enabled,
             cx.out,
         );
 
@@ -102,6 +99,7 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
             record_compression: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
+            acknowledgements: AcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -167,8 +165,7 @@ mod tests {
         let status = if delivered { Delivered } else { Failed };
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
-        let mut cx = SourceContext::new_test(sender);
-        cx.acknowledgements.enabled = true;
+        let cx = SourceContext::new_test(sender);
         tokio::spawn(async move {
             AwsKinesisFirehoseConfig {
                 address,
@@ -177,6 +174,7 @@ mod tests {
                 record_compression,
                 framing: default_framing_message_based(),
                 decoding: default_decoding(),
+                acknowledgements: true.into(),
             }
             .build(cx)
             .await
