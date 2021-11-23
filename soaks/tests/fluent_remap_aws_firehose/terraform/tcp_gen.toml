@@ -1,9 +1,0 @@
-worker_threads = 2
-prometheus_addr = "0.0.0.0:9090"
-
-[targets.vector]
-addr = "vector:8282"
-variant = "Fluent"
-bytes_per_second = "256 Mb"
-block_sizes = ["1Kb", "2Kb", "4Kb", "8Kb", "256Kb", "512Kb", "1024Kb"]
-maximum_prebuild_cache_size_bytes = "512 Mb"

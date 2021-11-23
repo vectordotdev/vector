@@ -78,7 +78,7 @@ fn validate_cleanup() {
     path.set_extension("data");
     support::overwrite_file(path.clone(), "");
 
-    // Config with some componenets that write to file system.
+    // Config with some components that write to file system.
     let config = support::create_file(
         source_config(
             r#"
@@ -135,7 +135,7 @@ fn validate_ignore_healthcheck() {
 fn validate(config: &str) -> i32 {
     let dir = support::create_directory();
 
-    // Config with some componenets that write to file system.
+    // Config with some components that write to file system.
     let config = support::create_file(config);
 
     // Run vector

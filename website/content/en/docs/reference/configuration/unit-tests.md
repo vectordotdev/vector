@@ -188,7 +188,7 @@ One important thing to note is that with this example configuration Vector is se
 logs from Docker images using the [`docker_logs`][docker_logs] source. If Vector were running in
 production, the `add_metadata` transform we're unit testing here would be modifying real log events.
 But that's *not* what we're testing here. Instead, the `insert_at = "add_metadata"` directive
-artifically inserts our test inputs into the `add_metadata` transform. You should think of Vector
+artificially inserts our test inputs into the `add_metadata` transform. You should think of Vector
 unit tests as a way of **mocking observability data sources** and ensuring that your transforms
 respond to those mock sources the way that you would expect.
 

@@ -1,7 +1,7 @@
 use crate::aws::auth::AwsAuthentication;
 use crate::codecs::{DecodingConfig, FramingConfig, ParserConfig};
-use crate::config::{DataType, SourceConfig, SourceContext};
-use crate::serde::{default_decoding, default_framing_message_based};
+use crate::config::{AcknowledgementsConfig, DataType, SourceConfig, SourceContext};
+use crate::serde::{bool_or_struct, default_decoding, default_framing_message_based};
 use crate::sources::aws_sqs::source::SqsSource;
 
 use crate::aws::region::RegionOrEndpoint;
@@ -34,6 +34,9 @@ pub struct AwsSqsConfig {
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: Box<dyn ParserConfig>,
+
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 #[async_trait::async_trait]
@@ -60,7 +63,7 @@ impl SourceConfig for AwsSqsConfig {
                 decoder,
                 poll_secs: self.poll_secs,
                 concurrency: self.client_concurrency,
-                acknowledgements: cx.acknowledgements.enabled,
+                acknowledgements: self.acknowledgements.enabled,
             }
             .run(cx.out, cx.shutdown),
         ))

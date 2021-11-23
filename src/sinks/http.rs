@@ -584,7 +584,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn json_compresion() {
+    async fn json_compression() {
         let num_lines = 1000;
 
         let in_addr = next_addr();

@@ -242,7 +242,6 @@ mod test {
                 globals: GlobalOptions::default(),
                 shutdown,
                 out: tx,
-                acknowledgements: true.into(),
                 proxy: Default::default(),
             })
             .await
@@ -280,7 +279,6 @@ mod test {
                 globals: GlobalOptions::default(),
                 shutdown,
                 out: tx,
-                acknowledgements: true.into(),
                 proxy: Default::default(),
             })
             .await

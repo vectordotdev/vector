@@ -112,7 +112,7 @@ components: sources: aws_sqs: components._aws & {
 			title: "AWS SQS"
 			body: """
 				The `aws_sqs` source receives messages from [AWS SQS](https://aws.amazon.com/sqs/)
-				(Simple Queue Service). This is a highly scaleable / durable queueing system with
+				(Simple Queue Service). This is a highly scalable / durable queueing system with
 				at-least-once queuing semantics. Messages are received in batches (up to 10 at a time),
 				and then deleted in batches (again up to 10). Messages are either deleted immediately
 				after receiving, or after it has been fully processed by the sinks, depending on the

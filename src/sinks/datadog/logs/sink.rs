@@ -229,7 +229,7 @@ where
         };
 
         let sink = input
-            .batched(partitioner, self.batch_settings)
+            .batched_partitioned(partitioner, self.batch_settings)
             .request_builder(builder_limit, request_builder)
             .filter_map(|request| async move {
                 match request {

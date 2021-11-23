@@ -19,7 +19,7 @@
 //! For more advanced use cases like HTTP based sinks, one should use the
 //! `BatchedHttpSink` type, which is a wrapper for `BatchSink` and `HttpSink`.
 //!
-//! # Driving to completetion
+//! # Driving to completion
 //!
 //! Each sink utility provided here strictly follows the patterns described in
 //! the `futures::Sink` docs. Each sink utility must be polled from a valid

@@ -91,7 +91,7 @@ pub struct Config {
 
     /// Max amount of bytes to read from a single file before switching over
     /// to the next file.
-    /// This allows distributing the reads more or less evenly accross
+    /// This allows distributing the reads more or less evenly across
     /// the files.
     max_read_bytes: usize,
 
@@ -341,7 +341,7 @@ impl Source {
             paths_provider,
             // Max amount of bytes to read from a single file before switching
             // over to the next file.
-            // This allows distributing the reads more or less evenly accross
+            // This allows distributing the reads more or less evenly across
             // the files.
             max_read_bytes,
             // We want to use checkpoining mechanism, and resume from where we
@@ -383,7 +383,7 @@ impl Source {
             // last log file is currently picked. Thus there's no need for
             // ordering, as each logical log stream is guaranteed to start with
             // just one file, makis it impossible to interleave with other
-            // relevant log lines in the absense of such relevant log lines.
+            // relevant log lines in the absence of such relevant log lines.
             oldest_first: false,
             // We do not remove the log files, `kubelet` is responsible for it.
             remove_after: None,
@@ -687,7 +687,7 @@ mod tests {
     fn prepare_field_selector() {
         let cases = vec![
             // We're not testing `Config::default()` or empty `self_node_name`
-            // as passing env vars in the concurrent tests is diffucult.
+            // as passing env vars in the concurrent tests is difficult.
             (
                 Config {
                     self_node_name: "qwe".to_owned(),

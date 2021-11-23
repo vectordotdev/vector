@@ -66,7 +66,7 @@ difficult to come up with for such a wide variety of potential pipelines. For
 these two reasons, I doubt that level (4) is worthwhile right now (this could
 change when/if we have more data-driven config definition in general).
 
-My proposal is that we initally focus on level (2) while collecting data on use
+My proposal is that we initially focus on level (2) while collecting data on use
 cases that require level (3). It is my assumption that the largest number of
 these types of composed components will be similar to the example of the NGINX
 source. We will want to combine an existing source (file) with an existing

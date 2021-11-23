@@ -18,11 +18,15 @@ pub enum Error {
 }
 
 /// Parses a given source field value by applying the list of grok rules until the first match found.
-pub fn parse_grok(source_field: &str, grok_rules: &[GrokRule]) -> Result<Value, Error> {
+pub fn parse_grok(
+    source_field: &str,
+    grok_rules: &[GrokRule],
+    remove_empty: bool,
+) -> Result<Value, Error> {
     grok_rules
         .iter()
         .fold_while(Err(Error::NoMatch), |_, rule| {
-            let result = apply_grok_rule(source_field, rule);
+            let result = apply_grok_rule(source_field, rule, remove_empty);
             if let Err(Error::NoMatch) = result {
                 Continue(result)
             } else {
@@ -37,7 +41,7 @@ pub fn parse_grok(source_field: &str, grok_rules: &[GrokRule]) -> Result<Value, 
 /// Possible errors:
 /// - FailedToApplyFilter - matches the rule, but there was a runtime error while applying on of the filters
 /// - NoMatch - this rule does not match a given string
-fn apply_grok_rule(source: &str, grok_rule: &GrokRule) -> Result<Value, Error> {
+fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Result<Value, Error> {
     let mut parsed = Value::from(btreemap! {});
 
     if let Some(ref matches) = grok_rule.pattern.match_against(source) {
@@ -53,11 +57,13 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule) -> Result<Value, Error> {
             // apply filters
             if let Some(filters) = grok_rule.filters.get(&path) {
                 filters.iter().for_each(|filter| {
-                    match apply_filter(value.as_ref().unwrap(), filter) {
-                        Ok(v) => value = Some(v),
-                        Err(error) => {
-                            warn!(message = "Error applying filter", path = %path, filter = %filter, %error);
-                            value = None;
+                    if let Some(ref v) = value {
+                        match apply_filter(v, filter) {
+                            Ok(v) => value = Some(v),
+                            Err(error) => {
+                                warn!(message = "Error applying filter", path = %path, filter = %filter, %error);
+                                value = None;
+                            }
                         }
                     }
                 });
@@ -71,10 +77,14 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule) -> Result<Value, Error> {
                     }
                     // anything else at the root leve must be ignored
                     _ if path.is_root() || path.segments[0].is_index() => {}
-                    // otherwise just apply VRL lookup logic
-                    _ => parsed.insert(&path, value).unwrap_or_else(
-                        |error| warn!(message = "Error updating field value", path = %path, %error),
-                    ),
+                    // ignore empty strings if necessary
+                    Value::Bytes(b) if remove_empty && b.is_empty() => {}
+                    // otherwise just apply VRL lookup insert logic
+                    _ => {
+                        parsed.insert(&path, value).unwrap_or_else(
+                                |error| warn!(message = "Error updating field value", path = %path, %error)
+                            );
+                    }
                 };
             }
         }
@@ -101,7 +111,12 @@ mod tests {
             btreemap! {},
         )
         .expect("couldn't parse rules");
-        let parsed = parse_grok("2020-10-02T23:22:12.223222Z info Hello world", &rules).unwrap();
+        let parsed = parse_grok(
+            "2020-10-02T23:22:12.223222Z info Hello world",
+            &rules,
+            false,
+        )
+        .unwrap();
 
         assert_eq!(
             parsed,
@@ -118,16 +133,16 @@ mod tests {
         let rules = parse_grok_rules(
             // patterns
             &[
-                r#"%{_access.common}"#.to_string(),
-                r#"%{_access.common} (%{number:duration:scale(1000000000)} )?"%{_referer}" "%{_user_agent}"( "%{_x_forwarded_for}")?.*"#.to_string()
+                r#"%{access.common}"#.to_string(),
+                r#"%{access.common} (%{number:duration:scale(1000000000)} )?"%{_referer}" "%{_user_agent}"( "%{_x_forwarded_for}")?.*"#.to_string()
             ],
             // aliases
             btreemap! {
-                "_access.common" => r#"%{_client_ip} %{_ident} %{_auth} \[%{_date_access}\] "(?>%{_method} |)%{_url}(?> %{_version}|)" %{_status_code} (?>%{_bytes_written}|-)"#.to_string(),
+                "access.common" => r#"%{_client_ip} %{_ident} %{_auth} \[%{_date_access}\] "(?>%{_method} |)%{_url}(?> %{_version}|)" %{_status_code} (?>%{_bytes_written}|-)"#.to_string(),
                 "_auth" => r#"%{notSpace:http.auth:nullIf("-")}"#.to_string(),
                 "_bytes_written" => r#"%{integer:network.bytes_written}"#.to_string(),
                 "_client_ip" => r#"%{ipOrHost:network.client.ip}"#.to_string(),
-                "_version" => r#"HTTP\/(?<http.version>\d+\.\d+)"#.to_string(),
+                "_version" => r#"HTTP\/%{regex("\\d+\\.\\d+"):http.version}"#.to_string(),
                 "_url" => r#"%{notSpace:http.url}"#.to_string(),
                 "_ident" => r#"%{notSpace:http.ident}"#.to_string(),
                 "_user_agent" => r#"%{regex("[^\\\"]*"):http.useragent}"#.to_string(),
@@ -136,7 +151,7 @@ mod tests {
                 "_method" => r#"%{word:http.method}"#.to_string(),
                 "_date_access" => r#"%{notSpace:date_access}"#.to_string(),
                 "_x_forwarded_for" => r#"%{regex("[^\\\"]*"):http._x_forwarded_for:nullIf("-")}"#.to_string()}).expect("couldn't parse rules");
-        let parsed = parse_grok(r##"127.0.0.1 - frank [13/Jul/2016:10:55:36] "GET /apache_pb.gif HTTP/1.0" 200 2326 0.202 "http://www.perdu.com/" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36" "-""##, &rules).unwrap();
+        let parsed = parse_grok(r##"127.0.0.1 - frank [13/Jul/2016:10:55:36] "GET /apache_pb.gif HTTP/1.0" 200 2326 0.202 "http://www.perdu.com/" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36" "-""##, &rules, false).unwrap();
 
         assert_eq!(
             parsed,
@@ -207,7 +222,7 @@ mod tests {
         for (filter, k, v) in tests {
             let rules =
                 parse_grok_rules(&[filter.to_string()], btreemap! {}).expect("should parse rules");
-            let parsed = parse_grok(k, &rules);
+            let parsed = parse_grok(k, &rules, false);
 
             if v.is_ok() {
                 assert_eq!(parsed.unwrap(), v.unwrap());
@@ -221,7 +236,7 @@ mod tests {
         for (filter, k, v) in tests {
             let rules = parse_grok_rules(&[filter.to_string()], btreemap! {})
                 .expect("couldn't parse rules");
-            let parsed = parse_grok(k, &rules);
+            let parsed = parse_grok(k, &rules, false);
 
             if v.is_ok() {
                 assert_eq!(
@@ -274,6 +289,15 @@ mod tests {
                 .to_string(),
             r#"invalid arguments for the function 'scale'"#
         );
+    }
+
+    #[test]
+    fn regex_with_empty_field() {
+        test_grok_pattern(vec![(
+            r#"%{regex("\\d+\\.\\d+")} %{data:field}"#,
+            "1.0 field_value",
+            Ok(Value::from("field_value")),
+        )]);
     }
 
     #[test]
@@ -349,7 +373,7 @@ mod tests {
             btreemap! {},
         )
         .expect("couldn't parse rules");
-        let error = parse_grok("an ungrokkable message", &rules).unwrap_err();
+        let error = parse_grok("an ungrokkable message", &rules, false).unwrap_err();
 
         assert_eq!(error, Error::NoMatch);
     }
@@ -364,7 +388,7 @@ mod tests {
             btreemap! {},
         )
             .expect("couldn't parse rules");
-        let parsed = parse_grok("1 info -", &rules).unwrap();
+        let parsed = parse_grok("1 info -", &rules, false).unwrap();
 
         assert_eq!(
             parsed,
@@ -390,6 +414,104 @@ mod tests {
         assert_eq!(
             format!("{}", err),
             "Circular dependency found in the alias 'pattern1'"
+        );
+    }
+
+    #[test]
+    fn supports_date_matcher() {
+        test_grok_pattern(vec![
+            (
+                r#"%{date("HH:mm:ss"):field}"#,
+                "14:20:15",
+                Ok(Value::Integer(51615000)),
+            ),
+            (
+                r#"%{date("dd/MMM/yyyy"):field}"#,
+                "06/Mar/2013",
+                Ok(Value::Integer(1362528000000)),
+            ),
+            (
+                r#"%{date("EEE MMM dd HH:mm:ss yyyy"):field}"#,
+                "Thu Jun 16 08:29:03 2016",
+                Ok(Value::Integer(1466065743000)),
+            ),
+            (
+                r#"%{date("dd/MMM/yyyy:HH:mm:ss Z"):field}"#,
+                "06/Mar/2013:01:36:30 +0900",
+                Ok(Value::Integer(1362501390000)),
+            ),
+            (
+                r#"%{date("yyyy-MM-dd'T'HH:mm:ss.SSSZ"):field}"#,
+                "2016-11-29T16:21:36.431+0000",
+                Ok(Value::Integer(1480436496431)),
+            ),
+            (
+                r#"%{date("yyyy-MM-dd'T'HH:mm:ss.SSSZZ"):field}"#,
+                "2016-11-29T16:21:36.431+00:00",
+                Ok(Value::Integer(1480436496431)),
+            ),
+            (
+                r#"%{date("dd/MMM/yyyy:HH:mm:ss.SSS"):field}"#,
+                "06/Feb/2009:12:14:14.655",
+                Ok(Value::Integer(1233922454655)),
+            ),
+            (
+                r#"%{date("yyyy-MM-dd HH:mm:ss.SSS z"):field}"#,
+                "2007-08-31 19:22:22.427 CET",
+                Ok(Value::Integer(1188580942427)),
+            ),
+            (
+                r#"%{date("yyyy-MM-dd HH:mm:ss.SSS zzzz"):field}"#,
+                "2007-08-31 19:22:22.427 America/Thule",
+                Ok(Value::Integer(1188598942427)),
+            ),
+            (
+                r#"%{date("yyyy-MM-dd HH:mm:ss.SSS Z"):field}"#,
+                "2007-08-31 19:22:22.427 -03:00",
+                Ok(Value::Integer(1188598942427)),
+            ),
+            (
+                r#"%{date("EEE MMM dd HH:mm:ss yyyy", "Europe/Moscow"):field}"#,
+                "Thu Jun 16 08:29:03 2016",
+                Ok(Value::Integer(1466054943000)),
+            ),
+            (
+                r#"%{date("EEE MMM dd HH:mm:ss yyyy", "UTC+5"):field}"#,
+                "Thu Jun 16 08:29:03 2016",
+                Ok(Value::Integer(1466047743000)),
+            ),
+            (
+                r#"%{date("EEE MMM dd HH:mm:ss yyyy", "+3"):field}"#,
+                "Thu Jun 16 08:29:03 2016",
+                Ok(Value::Integer(1466054943000)),
+            ),
+            (
+                r#"%{date("EEE MMM dd HH:mm:ss yyyy", "+03:00"):field}"#,
+                "Thu Jun 16 08:29:03 2016",
+                Ok(Value::Integer(1466054943000)),
+            ),
+            (
+                r#"%{date("EEE MMM dd HH:mm:ss yyyy", "-0300"):field}"#,
+                "Thu Jun 16 08:29:03 2016",
+                Ok(Value::Integer(1466076543000)),
+            ),
+        ]);
+
+        // check error handling
+        assert_eq!(
+            parse_grok_rules(&[r#"%{date("ABC:XYZ"):field}"#.to_string()], btreemap! {})
+                .unwrap_err()
+                .to_string(),
+            r#"invalid arguments for the function 'date'"#
+        );
+        assert_eq!(
+            parse_grok_rules(
+                &[r#"%{date("EEE MMM dd HH:mm:ss yyyy", "unknown timezone"):field}"#.to_string()],
+                btreemap! {}
+            )
+            .unwrap_err()
+            .to_string(),
+            r#"invalid arguments for the function 'date'"#
         );
     }
 }

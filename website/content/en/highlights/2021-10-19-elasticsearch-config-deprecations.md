@@ -1,5 +1,5 @@
 ---
-date: "2021-11-16"
+date: "2021-11-18"
 title: "ElasticSearch sink config changes and deprecations"
 description: ""
 authors: ["fuchsnj"]

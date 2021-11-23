@@ -582,7 +582,7 @@ pub(self) mod tests {
     }
 
     #[tokio::test]
-    async fn are_taged_with_hostname() {
+    async fn are_tagged_with_hostname() {
         let mut metrics = HostMetrics::new(HostMetricsConfig::default())
             .capture_metrics()
             .await;

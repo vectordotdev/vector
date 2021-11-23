@@ -93,7 +93,7 @@ env: []
   #   valueFrom:
   #     secretKeyRef:
   #       name: vector-aggregator
-  #       key: awsAcessKeyId
+  #       key: awsAccessKeyId
 
 # Extra arguments to pass to the `vector` container.
 args: []
@@ -183,7 +183,7 @@ livenessProbe: {}
   #   path: /health
   #   port: api
 
-# Use Readyness Probe (The Probe is using API endpoint which is disabled by default.
+# Use Readiness Probe (The Probe is using API endpoint which is disabled by default.
 # You have to enable the API in the Config to expose the endpoint.)
 readinessProbe: {}
   # httpGet:
@@ -246,7 +246,7 @@ customConfig: {}
 # To be used in clusters that rely on prometheus-operator to gather metrics.
 # You might want to set `podMonitorSelectorNilUsesHelmValues=false` if you're
 # using prometheus-operator Helm chart to allow `PodMonitor` resources
-# dicovery in all namespaces.
+# discovery in all namespaces.
 podMonitor:
   # Whether to add the `PodMonitor` resource or not.
   # `prometheus-operator` CRDs are necessary, otherwise you'll get an error.
@@ -354,7 +354,7 @@ prometheusSink:
   # To be used in clusters that rely on prometheus-operator to gather metrics.
   # You might want to set `podMonitorSelectorNilUsesHelmValues=false` if you're
   # using prometheus-operator Helm chart to allow `PodMonitor` resources
-  # dicovery in all namespaces.
+  # discovery in all namespaces.
   podMonitor:
     # Whether to add the `PodMonitor` resource or not.
     # `prometheus-operator` CRDs are necessary, otherwise you'll get an error.

@@ -70,11 +70,11 @@ better aggregation and accuracy.
 * Vector will support receiving Datadog Metrics sent by the official Datadog Agent through a standard source
 * Metrics received will be fully supported inside Vector, all metric types will be supported
 * The following metrics flow: `n*(Datadog Agents) -> Vector -> Datadog` should just work
-* No foreseen backward compatibily issue (tags management may be a bit bothersome)
+* No foreseen backward compatibility issue (tags management may be a bit bothersome)
 * New configuration settings should be consistent with existing ones
 
 Regarding the Datadog Agent configuration, ideally it should be only a matter of configuring `metrics_dd_url:
-https://vector.mycompany.tld` to forward metrics to a Vector deployement.
+https://vector.mycompany.tld` to forward metrics to a Vector deployment.
 
 The current `dd_url` endpoint configuration has a [conditional
 behavior](https://github.com/DataDog/datadog-agent/blob/main/pkg/config/config.go#L1199-L1201) (also
@@ -124,13 +124,13 @@ The implementation would then consist in:
 
 * Implement a Datadog Agent change and introduce a new override (let's say `metrics_dd_url`) that would only divert
    request to `/api/v1/series` & `/api/beta/sketches` to a specific endpoints.
-* Handle the `/api/v1/series` route (based on both the offical [API](https://docs.datadoghq.com/api/latest/metrics/) and
+* Handle the `/api/v1/series` route (based on both the official [API](https://docs.datadoghq.com/api/latest/metrics/) and
   the [Datadog Agent itself](https://github.com/DataDog/datadog-agent/blob/main/pkg/forwarder/telemetry.go#L20-L31)) to
   cover every metric type handled by this endpoint (count, gauge and rate) and:
   * Add support for missing fields in the `datadog_metrics` sinks
   * The same value but different keys tags (Datadog allows `key:foo` & `key:bar` but Vector doesn't) maybe supported
       later if there is demand for it (see the note below).
-  * Overall this is fairly straighforward
+  * Overall this is fairly straightforward
 * Handle the `/api/beta/sketches` route in the `datadog_agent` source to support sketches/distribution encoded using
   protobuf, but once decoded those sketches will require internal support in Vector:
   * Distribution metrics in the `datadog_metrics` sink would need to use sketches and the associated endpoint. This is
@@ -209,8 +209,8 @@ Instead of being done in the Agent, the request routing could be implemented eit
    Vector, but it would have the advantage of resolving any migrations, not-yet-supported-metric-route in Vector and
    alleviate the need of modifying the Agent.
 
-**Note**: proxying non-metric request is not a complety discarded option, as this might still be useful in some
-situation where proxying everything is explicity wanted or where proxying unknown payload (for example if the Agent is
+**Note**: proxying non-metric request is not a completely discarded option, as this might still be useful in some
+situation where proxying everything is explicitly wanted or where proxying unknown payload (for example if the Agent is
 upgraded and comes with a new metric route not yet supported by Vector) would serve as a data loss prevention mechanism
 and/or help to maintain metric continuity.
 

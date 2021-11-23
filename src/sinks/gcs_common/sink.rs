@@ -57,7 +57,7 @@ where
         let request_builder = self.request_builder;
 
         let sink = input
-            .batched(partitioner, settings)
+            .batched_partitioned(partitioner, settings)
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
             .request_builder(builder_limit, request_builder)
             .filter_map(|request| async move {
