@@ -136,16 +136,29 @@ pub(super) trait MetricCollector {
                     count,
                     sum,
                 } => {
-                    let mut value = 0f64;
                     for bucket in buckets {
-                        // prometheus uses cumulative histogram
-                        // https://prometheus.io/docs/concepts/metric_types/#histogram
-                        value += bucket.count as f64;
+                        // Aggregated histograms are cumulative in Prometheus.  This means that the
+                        // count of values in a bucket should only go up at the upper limit goes up,
+                        // because if you count a value in a specific bucket, by definition, it is
+                        // less than the upper limit of the next bucket.
+                        //
+                        // While most sources should give us buckets that have an "infinity" bucket
+                        // -- everything else that didn't fit in the non-infinity-upper-limit buckets
+                        // -- we can't be sure, so we calculate that bucket ourselves.  This is why
+                        // we make sure to avoid encoding a bucket if its upper limit is already
+                        // infinity, so that we don't double report.
+                        //
+                        // This check will also avoid printing out a bucket whose upper limit is
+                        // negative infinity, because that would make no sense.
+                        if bucket.upper_limit.is_infinite() {
+                            continue;
+                        }
+
                         self.emit_value(
                             timestamp,
                             name,
                             "_bucket",
-                            value,
+                            bucket.count as f64,
                             tags,
                             Some(("le", bucket.upper_limit.to_string())),
                         );
@@ -424,7 +437,10 @@ const fn prometheus_metric_type(metric_value: &MetricValue) -> proto::MetricType
 mod tests {
     use super::super::default_summary_quantiles;
     use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
+    use crate::{
+        event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
+        test_util::stats::AccumulatingHistogram,
+    };
     use chrono::{DateTime, TimeZone};
     use indoc::indoc;
     use pretty_assertions::assert_eq;
@@ -663,7 +679,7 @@ mod tests {
     #[test]
     fn encodes_histogram_text() {
         assert_eq!(
-            encode_histogram::<StringCollector>(),
+            encode_histogram::<StringCollector>(true),
             indoc! {r#"
                 # HELP vector_requests requests
                 # TYPE vector_requests histogram
@@ -671,7 +687,7 @@ mod tests {
                 vector_requests_bucket{le="2.1"} 3 1612325106789
                 vector_requests_bucket{le="3"} 6 1612325106789
                 vector_requests_bucket{le="+Inf"} 6 1612325106789
-                vector_requests_sum 12.5 1612325106789
+                vector_requests_sum 11.5 1612325106789
                 vector_requests_count 6 1612325106789
             "#}
         );
@@ -680,28 +696,80 @@ mod tests {
     #[test]
     fn encodes_histogram_request() {
         assert_eq!(
-            encode_histogram::<TimeSeries>(),
+            encode_histogram::<TimeSeries>(true),
             write_request!(
                 "vector_requests", "requests", Histogram [
                         "_bucket" @ 1612325106789 = 1.0 ["le" => "1"],
                         "_bucket" @ 1612325106789 = 3.0 ["le" => "2.1"],
                         "_bucket" @ 1612325106789 = 6.0 ["le" => "3"],
                         "_bucket" @ 1612325106789 = 6.0 ["le" => "+Inf"],
-                        "_sum" @ 1612325106789 = 12.5 [],
+                        "_sum" @ 1612325106789 = 11.5 [],
                         "_count" @ 1612325106789 = 6.0 []
                     ]
             )
         );
     }
 
-    fn encode_histogram<T: MetricCollector>() -> T::Output {
+    #[test]
+    fn encodes_histogram_text_with_extra_infinity_bound() {
+        assert_eq!(
+            encode_histogram::<StringCollector>(false),
+            indoc! {r#"
+                # HELP vector_requests requests
+                # TYPE vector_requests histogram
+                vector_requests_bucket{le="1"} 1 1612325106789
+                vector_requests_bucket{le="2.1"} 3 1612325106789
+                vector_requests_bucket{le="3"} 6 1612325106789
+                vector_requests_bucket{le="+Inf"} 6 1612325106789
+                vector_requests_sum 11.5 1612325106789
+                vector_requests_count 6 1612325106789
+            "#}
+        );
+    }
+
+    #[test]
+    fn encodes_histogram_request_with_extra_infinity_bound() {
+        assert_eq!(
+            encode_histogram::<TimeSeries>(false),
+            write_request!(
+                "vector_requests", "requests", Histogram [
+                        "_bucket" @ 1612325106789 = 1.0 ["le" => "1"],
+                        "_bucket" @ 1612325106789 = 3.0 ["le" => "2.1"],
+                        "_bucket" @ 1612325106789 = 6.0 ["le" => "3"],
+                        "_bucket" @ 1612325106789 = 6.0 ["le" => "+Inf"],
+                        "_sum" @ 1612325106789 = 11.5 [],
+                        "_count" @ 1612325106789 = 6.0 []
+                    ]
+            )
+        );
+    }
+
+    fn encode_histogram<T: MetricCollector>(remove_inf_bound: bool) -> T::Output {
+        let mut histogram = AccumulatingHistogram::new(&[1.0, 2.1, 3.0][..]);
+        histogram.record_many(&[0.4, 2.0, 1.75, 2.6, 2.25, 2.5][..]);
+
+        // `AccumulatingHistogram` always adds a bucket at the end for positive infinity aka
+        // "everything else we didn't have a bucket for", which we can't necessarily expect from all
+        // sources, but can expect from things like internal metrics.
+        //
+        // This lets us hand back a version of `AggregatedHistogram` with and without that positive
+        // infinity bucket so that we can ensure the encoder for aggregated histograms doesn't spit
+        // out two infinity bounds.
+        let mut buckets = histogram.buckets();
+        if remove_inf_bound {
+            let last = buckets.remove(buckets.len() - 1);
+            if last.upper_limit != f64::INFINITY {
+                buckets.push(last);
+            }
+        }
+
         let metric = Metric::new(
             "requests".to_owned(),
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
-                buckets: vector_core::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
-                count: 6,
-                sum: 12.5,
+                buckets,
+                count: histogram.count(),
+                sum: histogram.sum(),
             },
         )
         .with_timestamp(Some(timestamp()));

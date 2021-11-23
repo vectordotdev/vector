@@ -8038,6 +8038,7 @@ dependencies = [
  "once_cell",
  "openssl",
  "openssl-probe",
+ "ordered-float",
  "percent-encoding",
  "pin-project 1.0.8",
  "portpicker",
