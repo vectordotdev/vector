@@ -1,15 +1,7 @@
 use futures_util::future::Shared;
 use roaring::RoaringTreemap;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    num::NonZeroU64,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc, Mutex,
-    },
-    time::{Duration, Instant},
-};
+use std::{collections::HashMap, num::NonZeroU64, sync::{Arc, Mutex, RwLock, atomic::{AtomicU64, Ordering}}, time::{Duration, Instant}};
 use tokio::time::interval;
 use vector_core::event::BatchStatusReceiver;
 use warp::Rejection;
@@ -150,7 +142,7 @@ impl IndexerAcknowledgement {
 }
 
 pub struct Channel {
-    last_used_timestamp: Mutex<Instant>,
+    last_used_timestamp: RwLock<Instant>,
     currently_available_ack_id: AtomicU64,
     ack_ids_status: Arc<Mutex<RoaringTreemap>>,
     ack_event_finalizer: OrderedFinalizer<u64>,
@@ -174,7 +166,7 @@ impl Channel {
         });
 
         Self {
-            last_used_timestamp: Mutex::new(Instant::now()),
+            last_used_timestamp: RwLock::new(Instant::now()),
             currently_available_ack_id: AtomicU64::new(0),
             ack_ids_status,
             ack_event_finalizer,
@@ -183,7 +175,7 @@ impl Channel {
 
     fn get_ack_id(&self, batch_rx: BatchStatusReceiver) -> u64 {
         {
-            let mut last_used_timestamp = self.last_used_timestamp.lock().unwrap();
+            let mut last_used_timestamp = self.last_used_timestamp.write().unwrap();
             *last_used_timestamp = Instant::now();
         }
         let ack_id = self
@@ -195,7 +187,7 @@ impl Channel {
 
     fn get_acks_status(&self, acks: &[u64]) -> HashMap<u64, bool> {
         {
-            let mut last_used_timestamp = self.last_used_timestamp.lock().unwrap();
+            let mut last_used_timestamp = self.last_used_timestamp.write().unwrap();
             *last_used_timestamp = Instant::now();
         }
         let mut ack_ids_status = self.ack_ids_status.lock().unwrap();
@@ -205,7 +197,7 @@ impl Channel {
     }
 
     fn get_last_used(&self) -> Instant {
-        let last_used_timestamp = self.last_used_timestamp.lock().unwrap();
+        let last_used_timestamp = self.last_used_timestamp.read().unwrap();
         *last_used_timestamp
     }
 
