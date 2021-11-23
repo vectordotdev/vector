@@ -1,17 +1,6 @@
-use crate::{
-    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
-    config::{
-        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
-        SourceDescription,
-    },
-    event::Event,
-    internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
-    serde::{default_decoding, default_framing_message_based},
-    sources::util::{
+use crate::{codecs::{self, DecodingConfig, FramingConfig, ParserConfig}, config::{AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription, log_schema}, event::Event, internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived}, serde::{bool_or_struct, default_decoding, default_framing_message_based}, sources::util::{
         add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig, TcpError,
-    },
-    tls::TlsConfig,
-};
+    }, tls::TlsConfig};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -37,6 +26,8 @@ pub struct LogplexConfig {
     framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
     decoding: Box<dyn ParserConfig>,
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -56,6 +47,7 @@ impl GenerateConfig for LogplexConfig {
             auth: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
+            acknowledgements: AcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -289,8 +281,7 @@ mod tests {
         components::init_test();
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
-        let mut context = SourceContext::new_test(sender);
-        context.acknowledgements.enabled = acknowledgements;
+        let context = SourceContext::new_test(sender);
         tokio::spawn(async move {
             LogplexConfig {
                 address,
@@ -299,6 +290,7 @@ mod tests {
                 auth,
                 framing: default_framing_message_based(),
                 decoding: default_decoding(),
+                acknowledgements: acknowledgements.into(),
             }
             .build(context)
             .await
