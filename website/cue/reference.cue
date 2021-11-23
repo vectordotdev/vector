@@ -355,6 +355,7 @@ _values: {
 
 #Type: {
 	_args: {
+		name:     !=""
 		arrays:   true
 		required: bool
 	}
@@ -377,22 +378,34 @@ _values: {
 	required: Args.required
 
 	#Syntax: {
-		name: "vrl_boolean_expression" | "datadog_search"
+		name:        "vrl_boolean_expression" | "datadog_search"
 		description: !=""
+		example:     !=""
 
 		if name == "vrl_boolean_expression" {
 			description: "VRL Boolean!"
+			example:     #".status_code != 200 && !includes(["info", "debug"], .severity)"#
 		}
 
 		if name == "datadog_search" {
 			description: "Datadog Search!"
+			example:     #"*stack"#
 		}
 	}
 
 	syntaxes: [#Syntax, ...#Syntax]
 
-	if len(syntaxes) == 1 {
-		explainer: "You can abbreviate this condition by..."
+	options: {
+		source: {
+			description: "The text of the condition. The syntax of the condition depends on the value of `type`."
+		}
+
+		type: {
+			description: """
+				The type of condition to supply. See **Available syntaxes** below for a list of available types for this
+				transform.
+				"""
+		}
 	}
 }
 

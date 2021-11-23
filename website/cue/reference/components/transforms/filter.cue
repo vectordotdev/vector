@@ -27,17 +27,17 @@ components: transforms: filter: {
 	configuration: {
 		condition: {
 			description: """
-				The condition to be matched against every input event. Only messages that pass the condition will
-				be forwarded.
+				The condition to be matched against every input event. Only messages that pass the condition are
+				forwarded; messages that don't pass are dropped.
 				"""
 			required: true
 			type: condition: {
 				syntaxes: [{
 					name: "vrl_boolean_expression"
 				},
-				{
-					name: "datadog_search"
-				}]
+					{
+						name: "datadog_search"
+					}]
 			}
 		}
 	}
