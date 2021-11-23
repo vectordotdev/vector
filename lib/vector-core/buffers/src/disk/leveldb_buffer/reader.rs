@@ -128,15 +128,15 @@ where
                         });
 
                         // Store the handle, and let the loop come back around.
-                        println!("read spawned");
                         this.pending_read = Some(handle);
                     }
                     Some(mut handle) => match Pin::new(&mut handle).poll(cx) {
                         Poll::Ready(r) => {
-                            println!("read is ready");
                             match r {
                                 Ok(items) => this.buffer.extend(items),
-                                Err(error) => error!(message = "Error during read", %error),
+                                Err(error) => {
+                                    error!(message = "Error during read", %error)
+                                }
                             }
 
                             this.pending_read = None;
@@ -144,7 +144,6 @@ where
                             break;
                         }
                         Poll::Pending => {
-                            println!("pending read");
                             this.pending_read = Some(handle);
                             return Poll::Pending;
                         }

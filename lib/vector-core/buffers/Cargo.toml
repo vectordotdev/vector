@@ -28,6 +28,7 @@ tokio-util = { version = "0.6", default-features = false }
 tracing = { version = "0.1.29", default-features = false }
 
 [dev-dependencies]
+console-subscriber = { git = "https://github.com/tokio-rs/console", branch = "main" }
 criterion = { version = "0.3", features = ["html_reports"] }
 hdrhistogram = "7.3.0"
 lading_common = { git = "https://github.com/blt/lading", branch = "main" }

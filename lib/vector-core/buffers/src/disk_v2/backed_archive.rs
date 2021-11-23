@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use bytecheck::CheckBytes;
 use rkyv::{
-    archived_value, check_archived_value,
+    archived_root, check_archived_root,
     ser::{serializers::AllocSerializer, Serializer},
     validation::validators::DefaultValidator,
     Archive, Serialize,
@@ -69,7 +69,7 @@ where
         for<'a> T::Archived: CheckBytes<DefaultValidator<'a>>,
     {
         // Validate that the input is, well, valid.
-        let _ = check_archived_value::<T>(backing.as_ref(), 0)?;
+        let _ = check_archived_root::<T>(backing.as_ref())?;
 
         // Now that we know the buffer fits T, we're good to go!
         Ok(Self {
@@ -85,7 +85,7 @@ where
 
     /// Gets a reference to the archived value.
     pub fn get_archive_ref(&self) -> &T::Archived {
-        unsafe { archived_value::<T>(self.backing.as_ref(), 0) }
+        unsafe { archived_root::<T>(self.backing.as_ref()) }
     }
 }
 

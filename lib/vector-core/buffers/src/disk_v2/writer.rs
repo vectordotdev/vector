@@ -5,6 +5,7 @@ use std::{
 };
 
 use crc32fast::Hasher;
+use memmap2::Mmap;
 use rkyv::{
     ser::{
         serializers::{
@@ -23,9 +24,14 @@ use tokio::{
 
 use crate::{
     bytes::EncodeBytes,
-    disk_v2::{ledger::Ledger, record::Record},
+    disk_v2::{
+        ledger::Ledger,
+        record::{Record, RecordStatus},
+    },
     Bufferable,
 };
+
+use super::backed_archive::BackedArchive;
 
 #[derive(Debug, Snafu)]
 pub enum WriterError<R>
@@ -67,13 +73,18 @@ where
     pub fn new(writer: W, record_max_size: usize) -> Self {
         Self {
             writer: BufWriter::new(writer),
-            encode_buf: Vec::with_capacity(2048),
-            ser_buf: AlignedVec::with_capacity(2048),
-            ser_scratch: AlignedVec::with_capacity(2048),
+            encode_buf: Vec::with_capacity(16_384),
+            ser_buf: AlignedVec::with_capacity(16_384),
+            ser_scratch: AlignedVec::with_capacity(16_384),
             checksummer: Hasher::new(),
             max_record_size: record_max_size,
             _t: PhantomData,
         }
+    }
+
+    /// Gets a reference to the underlying writer.
+    pub fn get_ref(&self) -> &W {
+        self.writer.get_ref()
     }
 
     /// Writes a record.
@@ -88,9 +99,12 @@ where
     /// describing the error.  Additionally, if there is an error while serializing the record, an
     /// error variant will be returned describing the serialization error.
     pub async fn write_record(&mut self, id: u64, record: T) -> Result<usize, WriterError<T>> {
+        self.encode_buf.clear();
+        self.ser_buf.clear();
+        self.ser_scratch.clear();
+
         // We first encode the record, which puts it into the desired encoded form.  This is where
         // we assert the record is within size limits, etc.
-        self.encode_buf.clear();
         let encode_result = record.encode(&mut self.encode_buf);
         let encoded_len = encode_result
             .map(|_| self.encode_buf.len())
@@ -110,7 +124,6 @@ where
         // NOTE: This operation is put into its own block scope because otherwise `serializer` lives
         // untilk the end of the function, and it contains a mutable buffer pointer, which is
         // `!Send` and thus can't move across await points.  Do not rearrange.
-        self.ser_buf.clear();
         let archive_len = {
             let mut serializer = CompositeSerializer::new(
                 AlignedSerializer::new(&mut self.ser_buf),
@@ -122,7 +135,7 @@ where
             );
 
             match serializer.serialize_value(&record) {
-                Ok(n) => Ok(serializer.pos()),
+                Ok(_) => Ok(serializer.pos()),
                 Err(e) => match e {
                     // AlignedSerializer is infallible so we should never hit this.
                     CompositeSerializerError::SerializerError(_) => unreachable!(),
@@ -163,8 +176,7 @@ where
     /// If there is an I/O error while flushing either the buffered writer or the underlying writer,
     /// an error variant will be returned describing the error.
     pub async fn flush(&mut self) -> io::Result<()> {
-        let _ = self.writer.flush().await?;
-        self.writer.get_mut().flush().await
+        self.writer.flush().await
     }
 }
 
@@ -224,6 +236,92 @@ where
         self.data_file_size = 0;
     }
 
+    /// Validates that the last write in the current writer data file matches the ledger.
+    pub async fn validate_last_write(&mut self) -> Result<(), WriterError<T>> {
+        let _ = self.ensure_ready_for_write().await.context(Io)?;
+
+        // If our current file is empty, there's no sense doing this check.
+        if self.data_file_size == 0 {
+            return Ok(());
+        }
+
+        // We do a neat little trick here where we open an immutable memory-mapped region against our
+        // current writer data file, which lets us treat it as one big buffer... which is useful for
+        // asking `rkyv` to deserialize just the last record from the file, without having to seek
+        // directly to the start of the record where the length delimiter is.
+        let data_file_handle = self
+            .writer
+            .as_ref()
+            .expect("writer should exist after ensure_ready_for_write")
+            .get_ref()
+            .try_clone()
+            .await
+            .context(Io)?
+            .into_std()
+            .await;
+
+        let data_file_mmap = unsafe { Mmap::map(&data_file_handle).context(Io)? };
+
+        // We have bytes, so we should have an archived record.  Mind you, this could be a partial
+        // write if there was an error so we still need to use `BackedArchive` which will check for
+        // us and ensure we don't try to erroneously map partial bytes to `archivedRecord`.
+        match BackedArchive::<_, Record<'_>>::from_backing(data_file_mmap) {
+            // We got a record (which may or may not be corrupted, still gotta check!) so keep going.
+            Ok(archive) => {
+                let record = archive.get_archive_ref();
+                println!("last record: {:?}", record.debug());
+
+                match record.verify_checksum(&Hasher::new()) {
+                    RecordStatus::Valid(id) => {
+                        // Since we have a valid record, checksum and all, see if the writer record ID
+                        // in the ledger lines up with the record ID we have here.
+                        let ledger_next_writer_record_id =
+                            self.ledger.state().get_next_writer_record_id();
+                        let last_written_record_id = id;
+
+                        // TODO: do we actually want this? the existence of a difference greater
+                        // than one implies there were records written that we tracked via the
+                        // ledger, but that never made it to disk.  if we fix up the ledger "next
+                        // writer record ID" file, we just hide that there was a problem, because
+                        // otherwise the reader would eventually hit this and then the record ID gap
+                        // logic would kick in to emit an event to show that we skipped/dropped a
+                        // bunch of events..
+                        //
+                        // the best we could reasonably do here, I think, is to skip to the next
+                        // data file to limit how many records we lose when we know the data file is
+                        // in a bad state, even if it doesn't account for corrupted records in the
+                        // middle of the file vs the last one.  we'd have to do that in the
+                        // non-success arms of this match, though.
+                        if ledger_next_writer_record_id - 1 != last_written_record_id {
+                            println!("writer record ID mismatch: next ID (ledger) = {}, last ID (written) = {}",
+                                ledger_next_writer_record_id, last_written_record_id);
+                            println!("these values should always be one apart from each other");
+                        }
+                        Ok(())
+                    }
+                    RecordStatus::Corrupted { .. } => {
+                        println!("got invalid checksum from record at end of current writer data file, boo!");
+                        Ok(())
+                    }
+                    // `ArchivedRecord::verify_checksum` doesn't actually return the failed
+                    // deserialization variant of `RecordStatus`, so we might want to switch to
+                    // using `try_as_record_archive` here instead of using `BackedArchive`.
+                    _ => unreachable!(),
+                }
+            }
+            // Oh no, an error! There's nothing for us to do, really, since tghe reader has the
+            // logic for skipping records and deleting files when corruption is detected, so just
+            // let that happened, but spit out the error here for posterity.
+            Err(e) => {
+                println!(
+                    "got error deserializing last record in the current writer data file: {}",
+                    e.into_inner()
+                );
+                Ok(())
+            }
+        }
+    }
+
     /// Ensures this writer is ready to attempt writer the next record.
     pub async fn ensure_ready_for_write(&mut self) -> io::Result<()> {
         // If our data file is already open, and it has room left, then we're good here.  Otherwise,
@@ -270,6 +368,7 @@ where
             };
             let maybe_data_file = OpenOptions::new()
                 .append(true)
+                .read(true)
                 .create_new(true)
                 .open(&data_file_path)
                 .await;
@@ -293,6 +392,7 @@ where
                         // will force a wait on reader progress before trying again.
                         let data_file = OpenOptions::new()
                             .append(true)
+                            .read(true)
                             .create(true)
                             .open(&data_file_path)
                             .await?;

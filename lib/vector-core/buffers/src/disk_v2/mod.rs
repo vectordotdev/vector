@@ -41,7 +41,7 @@
 //!
 //! This represents a small amount of extra space overhead per record, but is beneficial to us as we
 //! avoid a more formal deserialization step, with scratch buffers and memory copies.
-//!     
+//!
 //! ### Writing records
 //!
 //! Records are added to a data file sequentially, and contiguously, with no gaps or data alignment
@@ -95,10 +95,6 @@
 //! - test what happens on file ID rollover
 //! - test what happens on writer wrapping and wanting to open current data file being read by reader
 //! - test what happens when record ID rolls over
-//! - figure out a way to deal with restarting a process where some updates were unflushed, and the
-//!   writer ends up reusing some record IDs that get double read by the reader, which itself has
-//!   logic for detecting non-monotonic record IDs
-//! - implement specific error types so that we can return more useful errors than just wrapped I/O errors
 use std::{marker::PhantomData, path::Path, sync::Arc, time::Duration};
 
 use snafu::{ResultExt, Snafu};
@@ -150,11 +146,16 @@ where
             .context(LedgerError)?;
         let ledger = Arc::new(ledger);
 
-        let writer = Writer::new(
+        let mut writer = Writer::new(
             Arc::clone(&ledger),
             DATA_FILE_TARGET_MAX_SIZE,
             DATA_FILE_MAX_RECORD_SIZE,
         );
+        let _ = writer
+            .validate_last_write()
+            .await
+            .context(WriterSeekFailed)?;
+
         let mut reader = Reader::new(ledger);
         let _ = reader
             .seek_to_next_record()

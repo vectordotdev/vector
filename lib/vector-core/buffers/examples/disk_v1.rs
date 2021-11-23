@@ -22,7 +22,7 @@ fn generate_record_cache() -> Vec<VariableMessage> {
     let mut rng = rand::thread_rng();
     let mut records = Vec::new();
     for i in 0..200_000 {
-        let payload_size = rng.gen_range(512..8192);
+        let payload_size = rng.gen_range(512..4096);
         let payload = (0..payload_size).map(|_| rng.gen()).collect();
         let message = VariableMessage::new(i, payload);
         records.push(message);
@@ -55,7 +55,7 @@ async fn main() {
         id: "disk-v1".to_owned(),
         data_dir: PathBuf::from_str("/tmp/vector/disk-v1-testing").expect("path should be valid"),
         // We don't limit disk size, because we just want to see how fast it can complete the writes/reads.
-        max_size: usize::MAX,
+        max_size: 5 * 1024 * 1024 * 1024,
         when_full: WhenFull::Block,
     };
 
@@ -71,7 +71,7 @@ async fn main() {
         for _ in 0..total_records {
             let rx_start = Instant::now();
 
-            let record_buf = reader.next().await.expect("read should not fail");
+            let _record = reader.next().await.expect("read should not fail");
             unacked += 1;
             if unacked >= 1000 {
                 acker.ack(unacked);

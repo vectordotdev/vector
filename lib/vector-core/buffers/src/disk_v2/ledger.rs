@@ -102,11 +102,11 @@ impl ArchivedLedgerState {
     }
 
     pub fn get_next_writer_record_id(&self) -> u64 {
-        self.writer_next_record_id.load(Ordering::Acquire) + 1
+        self.writer_next_record_id.load(Ordering::Acquire)
     }
 
-    pub fn increment_next_writer_record_id(&self) -> u64 {
-        self.writer_next_record_id.fetch_add(1, Ordering::AcqRel)
+    pub fn increment_next_writer_record_id(&self) {
+        self.writer_next_record_id.fetch_add(1, Ordering::AcqRel);
     }
 
     pub fn get_last_reader_record_id(&self) -> u64 {
@@ -244,7 +244,7 @@ impl Ledger {
     where
         P: AsRef<Path>,
     {
-        // Acquire an execlusive lock on our lock file, which prevents another Vector process from
+        // Acquire an exclusive lock on our lock file, which prevents another Vector process from
         // loading this buffer and clashing with us.  Specifically, though: this does _not_ prevent
         // another process from messing with our ledger files, or any of the data files, etc.
         let ledger_lock_path = data_dir.as_ref().join("buffer.lock");

@@ -106,6 +106,13 @@ impl<'a> Record<'a> {
 }
 
 impl<'a> ArchivedRecord<'a> {
+    pub fn debug(&self) -> String {
+        format!(
+            "checksum:{} id:{} payload:{:x?}",
+            self.checksum, self.id, self.payload
+        )
+    }
+
     /// Gets the payload of this record.
     pub fn payload(&self) -> &[u8] {
         &self.payload

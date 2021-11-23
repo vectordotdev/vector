@@ -175,8 +175,17 @@ where
     }
 
     fn track_read(&mut self, record_size: u64) {
+        // We always track the number of bytes we've read from the given file, because we need an
+        // accurate amount when we check in `roll_to_next_data_file` to see if we have to compensate
+        // for dropping a file that we didn't read to the end.
+        //
+        // However, we _don't_ want to update the ledger if we're just seeking to our last known
+        // read position, because that already happened for all the records we're seeking past.
         self.bytes_read += record_size;
-        self.ledger.track_read(record_size);
+
+        if self.ready_to_read {
+            self.ledger.track_read(record_size);
+        }
     }
 
     /// Switches the reader over to the next data file to read.
@@ -196,8 +205,13 @@ where
             // makes no sense at all.
             let file_size = metadata.len();
             let size_delta = file_size - self.bytes_read;
-            self.ledger.state().decrement_total_buffer_size(size_delta);
+            if size_delta > 0 {
+                println!("fixing up size delta after rolling away from unfinished file: delta={} ({}-{})",
+                    size_delta, file_size, self.bytes_read);
+                self.ledger.state().decrement_total_buffer_size(size_delta);
+            }
         }
+        self.bytes_read = 0;
 
         // Delete the current data file, and increment our reader file ID.
         let data_file_path = self.ledger.get_current_reader_data_file_path();
@@ -298,6 +312,11 @@ where
         // update `self.last_reader_record_id`, so basically... just keep reading records until we
         // get to the one we left off with last time.
         let last_reader_record_id = self.ledger.state().get_last_reader_record_id();
+        println!(
+            "self.last_reader_record_id = {}, seeking to {} (per ledger)",
+            self.last_reader_record_id, last_reader_record_id
+        );
+
         while self.last_reader_record_id < last_reader_record_id {
             let _ = self.next().await?;
         }
