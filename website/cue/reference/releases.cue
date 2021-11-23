@@ -20,11 +20,11 @@ releases: {
 	#CommitSha: =~"^[a-z0-9]{40}$"
 
 	#ChangeLogEntry: {
-		type:             #SemanticType
-		scopes:           [string, ...string] | *[]
-		breaking:         bool | *false
-		description:      string
-		pr_numbers:       [uint, ...uint] | *[]
+		type:        #SemanticType
+		scopes:      [string, ...string] | *[]
+		breaking:    bool | *false
+		description: string
+		pr_numbers:  [uint, ...uint] | *[]
 	}
 
 	#Release: {
