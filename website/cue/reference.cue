@@ -365,7 +365,35 @@ _values: {
 	// For example, the `sinks.http.headers.*` option allows for arbitrary
 	// key/value pairs.
 	{"array": #TypeArray & {_args: required: Args.required}} |
+	{"condition": #TypeCondition & {_args: required: Args.required}} |
 	#TypePrimitive
+}
+
+#TypeCondition: {
+	_args: {
+		required: bool
+	}
+	let Args = _args
+	required: Args.required
+
+	#Syntax: {
+		name: "vrl_boolean_expression" | "datadog_search"
+		description: !=""
+
+		if name == "vrl_boolean_expression" {
+			description: "VRL Boolean!"
+		}
+
+		if name == "datadog_search" {
+			description: "Datadog Search!"
+		}
+	}
+
+	syntaxes: [#Syntax, ...#Syntax]
+
+	if len(syntaxes) == 1 {
+		explainer: "You can abbreviate this condition by..."
+	}
 }
 
 #TypePrimitive: {

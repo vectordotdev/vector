@@ -31,11 +31,13 @@ components: transforms: filter: {
 				be forwarded.
 				"""
 			required: true
-			type: string: {
-				examples: [
-					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
-				]
-				syntax: "remap_boolean_expression"
+			type: condition: {
+				syntaxes: [{
+					name: "vrl_boolean_expression"
+				},
+				{
+					name: "datadog_search"
+				}]
 			}
 		}
 	}
