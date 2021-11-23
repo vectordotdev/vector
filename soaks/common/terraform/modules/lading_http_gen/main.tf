@@ -1,3 +1,14 @@
+resource "kubernetes_config_map" "lading_bootstrap" {
+  metadata {
+    name      = "lading-http-gen-bootstrap"
+    namespace = var.namespace
+  }
+
+  data = {
+    "bootstrap.log" = var.http-gen-static-bootstrap
+  }
+}
+
 resource "kubernetes_config_map" "lading" {
   metadata {
     name      = "lading-http-gen"
@@ -113,8 +124,8 @@ resource "kubernetes_deployment" "http-gen" {
         }
         volume {
           name = "data"
-          host_path {
-            path = "/data"
+          config_map {
+            name = kubernetes_config_map.lading_bootstrap.metadata[0].name
           }
         }
       }

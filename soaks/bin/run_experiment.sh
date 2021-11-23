@@ -90,15 +90,6 @@ minikube mount "${SOAK_CAPTURE_DIR}:/captures" &
 CAPTURE_MOUNT_PID=$!
 popd
 
-pushd "${SOAK_ROOT}/tests/${SOAK_NAME}"
-mkdir --parents data
-# Mount the data directory. This is where the data that supports the test are
-# mounted into the minikube. The software running in the minikube will not write
-# to this directory.
-minikube mount "${SOAK_ROOT}/tests/${SOAK_NAME}/data:/data" &
-DATA_MOUNT_PID=$!
-popd
-
 pushd "${SOAK_ROOT}/tests/${SOAK_NAME}/terraform"
 terraform init
 terraform apply -var "type=${VARIANT}" -var "vector_image=${IMAGE}" -var "vector_cpus=${VECTOR_CPUS}" -var "lading_image=ghcr.io/blt/lading:sha-0da91906d56acc899b829cea971d79f13e712e21" -auto-approve -compact-warnings -input=false -no-color
@@ -108,7 +99,6 @@ sleep "${WARMUP_GRACE}"
 echo "[${VARIANT}] Recording captures to ${SOAK_CAPTURE_DIR}"
 sleep "${TOTAL_SAMPLES}"
 kill "${CAPTURE_MOUNT_PID}"
-kill "${DATA_MOUNT_PID}"
 popd
 
 pushd "${__dir}"

@@ -44,10 +44,17 @@ module "vector" {
   depends_on   = [module.monitoring]
 }
 module "http-gen" {
-  source        = "../../../common/terraform/modules/lading_http_gen"
-  type          = var.type
-  http-gen-yaml = file("${path.module}/http_gen.yaml")
-  namespace     = kubernetes_namespace.soak.metadata[0].name
-  lading_image  = var.lading_image
-  depends_on    = [module.monitoring, module.vector]
+  source                    = "../../../common/terraform/modules/lading_http_gen"
+  type                      = var.type
+  http-gen-yaml             = file("${path.module}/http_gen.yaml")
+  # This is a hack. Ultimately this creates a configmap in the minikube, where
+  # we would _prefer_ to simply mount a directory into the kube. This is not
+  # possible, pending introductoin of
+  # https://github.com/kubernetes/minikube/issues/12301 into a release. Keep in
+  # mind that the bootstrap _must_ be below 1MB in size, which severely limits
+  # the entropy of our experiment.
+  http-gen-static-bootstrap = file("${path.module}/data/http_gen_bootstrap.log")
+  namespace                 = kubernetes_namespace.soak.metadata[0].name
+  lading_image              = var.lading_image
+  depends_on                = [module.monitoring, module.vector]
 }
