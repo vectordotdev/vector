@@ -1,6 +1,8 @@
 use super::util::MultilineConfig;
 use crate::aws::auth::AwsAuthentication;
 use crate::aws::rusoto::{self, RegionOrEndpoint};
+use crate::config::AcknowledgementsConfig;
+use crate::serde::bool_or_struct;
 use crate::{
     config::{DataType, ProxyConfig, SourceConfig, SourceContext, SourceDescription},
     line_agg,
@@ -53,6 +55,9 @@ struct AwsS3Config {
     auth: AwsAuthentication,
 
     multiline: Option<MultilineConfig>,
+
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -75,7 +80,7 @@ impl SourceConfig for AwsS3Config {
             Strategy::Sqs => Ok(Box::pin(
                 self.create_sqs_ingestor(multiline_config, &cx.proxy)
                     .await?
-                    .run(cx),
+                    .run(cx, self.acknowledgements),
             )),
         }
     }
