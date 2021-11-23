@@ -235,6 +235,7 @@ mod integration_tests {
             address: PROMETHEUS_RECEIVE_ADDRESS.parse().unwrap(),
             auth: None,
             tls: None,
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let (tx, rx) = Pipeline::new_test();

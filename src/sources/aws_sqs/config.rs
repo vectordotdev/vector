@@ -36,7 +36,7 @@ pub struct AwsSqsConfig {
     pub decoding: Box<dyn ParserConfig>,
 
     #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 #[async_trait::async_trait]

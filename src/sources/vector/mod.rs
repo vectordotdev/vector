@@ -47,7 +47,11 @@ inventory::submit! {
 
 impl GenerateConfig for VectorConfig {
     fn generate_config() -> toml::Value {
-        v2::VectorConfig::generate_config()
+        let config = toml::Value::try_into::<v2::VectorConfig>(v2::VectorConfig::generate_config()).unwrap();
+        toml::Value::try_from(VectorConfigV2 {
+            version: V2::V2,
+            config,
+        }).unwrap()
     }
 }
 
