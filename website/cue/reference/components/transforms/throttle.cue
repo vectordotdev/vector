@@ -31,13 +31,7 @@ components: transforms: throttle: {
 				The set of logical conditions to exclude events from rate limiting.
 				"""
 			required: false
-			type: string: {
-				default: null
-				examples: [
-					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
-				]
-				syntax: "remap_boolean_expression"
-			}
+			type: condition: syntaxes: [{ name: "vrl_boolean_expression" }]
 		}
 		key_field: {
 			common: false

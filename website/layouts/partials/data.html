@@ -39,9 +39,7 @@
           {{ end }}
 
           {{ with $v.syntax }}
-          {{ if eq . "remap_boolean_expression" }}
-          {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#boolean-expressions") }}
-          {{ else if eq . "remap_program" }}
+          {{ if eq . "remap_program" }}
           {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#program") }}
           {{ else }}
           {{ partial "badge.html" (dict "word" . "color" "gray") }}
@@ -102,8 +100,8 @@
           {{ end }}
         </div>
 
-        <div class="my-4 ml-4">
-          {{ partial "heading.html" (dict "text" "Available syntaxes" "level" 3 "icon" false) }}
+        <div class="my-4 ml-2">
+          {{ partial "heading.html" (dict "text" "Available syntaxes" "level" 3 "icon" false "toc_hide" true) }}
 
           <table class="table-auto">
             <thead>
@@ -138,12 +136,6 @@
             </tbody>
           </table>
         </div>
-
-        {{ with $v.explainer }}
-        <div>
-          {{ . | markdownify }}
-        </div>
-        {{ end }}
       </div>
       {{ end }}
 
@@ -1966,9 +1958,7 @@
         {{ end }}
 
         {{ with $v.syntax }}
-        {{ if eq . "remap_boolean_expression" }}
-        {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#boolean-expressions") }}
-        {{ else if eq . "remap_program" }}
+        {{ if eq . "remap_program" }}
         {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#program") }}
         {{ else }}
         {{ partial "badge.html" (dict "word" . "color" "gray") }}
