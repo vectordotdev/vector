@@ -8,7 +8,7 @@ use rand::random;
 use std::num::NonZeroUsize;
 use tower::util::BoxService;
 use vector_core::buffers::Acker;
-use vector_core::stream::{BatcherSettings};
+use vector_core::stream::BatcherSettings;
 
 use crate::sinks::util::processed_event::ProcessedEvent;
 use crate::sinks::util::{SinkBuilderExt, StreamSink};

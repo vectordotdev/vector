@@ -115,7 +115,7 @@ where
 #[allow(clippy::similar_names)]
 mod test {
     use super::*;
-    use crate::stream::{BatcherSettings};
+    use crate::stream::BatcherSettings;
     use futures::stream;
     use std::num::NonZeroUsize;
     use std::time::Duration;

@@ -3,9 +3,6 @@ use super::limiter;
 
 use std::time::Duration;
 
-
-
-
 use data::BatchData;
 use limiter::BatchLimiter;
 

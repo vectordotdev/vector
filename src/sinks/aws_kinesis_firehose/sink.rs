@@ -9,7 +9,7 @@ use crate::Error;
 use futures::stream::BoxStream;
 use tower::util::BoxService;
 use vector_core::sink::StreamSink;
-use vector_core::stream::{BatcherSettings};
+use vector_core::stream::BatcherSettings;
 
 use crate::sinks::util::SinkBuilderExt;
 use async_trait::async_trait;

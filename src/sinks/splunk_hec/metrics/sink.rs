@@ -21,7 +21,6 @@ use vector_core::{
 
 use super::request_builder::HecMetricsRequestBuilder;
 
-
 pub struct HecMetricsSink<S> {
     pub context: SinkContext,
     pub service: S,

@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use futures::future;
 use futures::StreamExt;
 use tower::util::BoxService;
-use vector_core::stream::{BatcherSettings};
+use vector_core::stream::BatcherSettings;
 use vector_core::ByteSizeOf;
 
 #[derive(Clone, Eq, Hash, PartialEq)]

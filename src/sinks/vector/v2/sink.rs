@@ -10,7 +10,7 @@ use prost::Message;
 
 use tower::util::BoxService;
 use vector_core::buffers::Acker;
-use vector_core::stream::{BatcherSettings};
+use vector_core::stream::BatcherSettings;
 use vector_core::ByteSizeOf;
 
 struct EventData {
