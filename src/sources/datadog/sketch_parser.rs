@@ -21,14 +21,18 @@ pub(crate) fn decode_ddsketch(frame: Bytes, api_key: Option<Arc<str>>) -> Result
     // payload.metadata is always empty for payload coming from dd agents
     Ok(payload
         .sketches
-        .iter()
+        .into_iter()
         .flat_map(|sketch_series| {
             // sketch_series.distributions is also always empty from payload coming from dd agents
-            let mut tags = BTreeMap::<String, String>::new();
-            for tag in &sketch_series.tags {
-                let kv = tag.split_once(":").unwrap_or((tag, ""));
-                tags.insert(kv.0.trim().into(), kv.1.trim().into());
-            }
+            let mut tags: BTreeMap<String, String> = sketch_series
+                .tags
+                .iter()
+                .map(|tag| {
+                    let kv = tag.split_once(":").unwrap_or((&tag, ""));
+                    (kv.0.trim().into(), kv.1.trim().into())
+                })
+                .collect();
+
             tags.insert(
                 log_schema().host_key().to_string(),
                 sketch_series.host.clone(),

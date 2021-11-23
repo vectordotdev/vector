@@ -425,7 +425,6 @@ fn generate_series_metrics(
     let device = tags.remove("device");
     let ts = encode_timestamp(metric.timestamp());
     let tags = Some(encode_tags(&tags));
-    // let tags = metric.tags().map(encode_tags);
     let interval = last_sent
         .map(|then| then.elapsed())
         .map(|d| d.as_secs().try_into().unwrap_or(i64::MAX));
