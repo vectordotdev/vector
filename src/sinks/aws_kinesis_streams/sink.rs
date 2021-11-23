@@ -50,7 +50,7 @@ impl KinesisSink {
                     Ok(req) => Some(req),
                 }
             })
-            .batched(batcher::config::byte_size_of_vec(self.batch_settings))
+            .batched(self.batch_settings.into_byte_size_config())
             .into_driver(self.service, self.acker);
 
         sink.run().await

@@ -63,7 +63,7 @@ where
                     indexed_fields,
                 ))
             })
-            .batched(batcher::config::byte_size_of_vec(self.batch_settings))
+            .batched(self.batch_settings.into_byte_size_config())
             .request_builder(builder_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {

@@ -1,4 +1,7 @@
 use crate::partition::Partitioner;
+use crate::stream::batcher::config::BatchConfigParts;
+use crate::stream::batcher::data::BatchReduce;
+use crate::stream::batcher::limiter::{ByteSizeOfItemSize, ItemBatchSize, SizeLimit};
 use crate::time::KeyedTimer;
 use crate::ByteSizeOf;
 use futures::ready;
@@ -234,6 +237,47 @@ impl BatcherSettings {
             timeout,
             size_limit: size_limit.get(),
             item_limit: item_limit.get(),
+        }
+    }
+
+    /// A batcher config using the `ByteSizeOf` trait to determine batch sizes.
+    /// The output is a Vec<T>
+    pub fn into_byte_size_config<T>(
+        self,
+    ) -> BatchConfigParts<SizeLimit<ByteSizeOfItemSize>, Vec<T>> {
+        BatchConfigParts {
+            batch_limiter: SizeLimit {
+                batch_size_limit: self.size_limit,
+                batch_item_limit: self.item_limit,
+                current_size: 0,
+                item_size_calculator: ByteSizeOfItemSize,
+            },
+            batch_data: vec![],
+            timeout: self.timeout,
+        }
+    }
+
+    /// A batcher config using the `ItemBatchSize` trait to determine batch sizes.
+    /// The output is built with the supplied reducer function.
+    pub fn into_reducer_config<I, T, F, S>(
+        self,
+        item_size: I,
+        reducer: F,
+    ) -> BatchConfigParts<SizeLimit<I>, BatchReduce<F, S>>
+    where
+        I: ItemBatchSize<T>,
+        F: FnMut(&mut S, T),
+        S: Default,
+    {
+        BatchConfigParts {
+            batch_limiter: SizeLimit {
+                batch_size_limit: self.size_limit,
+                batch_item_limit: self.item_limit,
+                current_size: 0,
+                item_size_calculator: item_size,
+            },
+            batch_data: BatchReduce::new(reducer),
+            timeout: self.timeout,
         }
     }
 }

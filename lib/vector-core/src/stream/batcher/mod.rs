@@ -11,11 +11,13 @@ use std::task::{Context, Poll};
 
 use tokio::time::Sleep;
 
-use config::BatchConfig;
+use futures::ready;
+
+pub use config::BatchConfig;
 
 #[pin_project]
 pub struct Batcher<S, C> {
-    config: C,
+    state: C,
 
     #[pin]
     /// The stream this `Batcher` wraps
@@ -39,7 +41,7 @@ where
 {
     pub fn new(stream: S, config: C) -> Self {
         Self {
-            config,
+            state: config,
             stream: stream.fuse(),
             timer: Maybe::None,
         }
@@ -59,47 +61,42 @@ where
             match this.stream.poll_next(cx) {
                 Poll::Ready(None) => {
                     return {
-                        if this.config.batch_len() == 0 {
+                        if this.state.len() == 0 {
                             Poll::Ready(None)
                         } else {
-                            Poll::Ready(Some(this.config.take_batch()))
+                            Poll::Ready(Some(this.state.take_batch()))
                         }
                     }
                 }
                 Poll::Ready(Some(item)) => {
-                    let (item_fits, item_metadata) = this.config.item_fits_in_batch(&item);
+                    let (item_fits, item_metadata) = this.state.item_fits_in_batch(&item);
                     if item_fits {
-                        this.config.push_item(item, item_metadata);
-                        if this.config.is_batch_full() {
+                        this.state.push(item, item_metadata);
+                        if this.state.is_batch_full() {
                             this.timer.set(Maybe::None);
-                            return Poll::Ready(Some(this.config.take_batch()));
-                        } else if this.config.batch_len() == 1 {
+                            return Poll::Ready(Some(this.state.take_batch()));
+                        } else if this.state.len() == 1 {
                             this.timer
-                                .set(Maybe::Some(tokio::time::sleep(this.config.timeout())));
+                                .set(Maybe::Some(tokio::time::sleep(this.state.timeout())));
                         }
                     } else {
-                        let output = Poll::Ready(Some(this.config.take_batch()));
-                        this.config.push_item(item, item_metadata);
+                        let output = Poll::Ready(Some(this.state.take_batch()));
+                        this.state.push(item, item_metadata);
                         this.timer
-                            .set(Maybe::Some(tokio::time::sleep(this.config.timeout())));
+                            .set(Maybe::Some(tokio::time::sleep(this.state.timeout())));
                         return output;
                     }
                 }
                 Poll::Pending => {
                     return {
                         if let MaybeProj::Some(timer) = this.timer.as_mut().project() {
-                            match timer.poll(cx) {
-                                Poll::Ready(()) => {
-                                    this.timer.set(Maybe::None);
-                                    debug_assert!(
-                                        this.config.batch_len() != 0,
-                                        "timer should have been cancelled"
-                                    );
-                                    this.timer.set(Maybe::None);
-                                    Poll::Ready(Some(this.config.take_batch()))
-                                }
-                                Poll::Pending => Poll::Pending,
-                            }
+                            ready!(timer.poll(cx));
+                            this.timer.set(Maybe::None);
+                            debug_assert!(
+                                this.state.len() != 0,
+                                "timer should have been cancelled"
+                            );
+                            Poll::Ready(Some(this.state.take_batch()))
                         } else {
                             Poll::Pending
                         }

@@ -33,8 +33,7 @@ impl VectorSink {
                 finalizers: event.take_finalizers(),
                 wrapper: EventWrapper::from(event),
             })
-            .batched(batcher::config::item_size_reducer(
-                self.batch_settings,
+            .batched(self.batch_settings.into_reducer_config(
                 |data: &EventData| data.wrapper.encoded_len(),
                 |req: &mut VectorRequest, item: EventData| {
                     req.events_byte_size += item.byte_size;

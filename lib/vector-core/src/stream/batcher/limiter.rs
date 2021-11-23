@@ -18,7 +18,7 @@ pub trait BatchLimiter<T, B> {
     fn push_item(&mut self, metadata: Self::ItemMetadata);
 
     /// Reset internal state from a batch being taken.
-    fn take_batch(&mut self);
+    fn reset(&mut self);
 }
 
 pub struct SizeLimit<I> {
@@ -64,7 +64,7 @@ where
         self.current_size += item_size;
     }
 
-    fn take_batch(&mut self) {
+    fn reset(&mut self) {
         self.current_size = 0;
     }
 }
