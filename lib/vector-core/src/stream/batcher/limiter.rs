@@ -5,10 +5,19 @@ use crate::ByteSizeOf;
 pub trait BatchLimiter<T, B> {
     type ItemMetadata;
 
+    /// Return true if it is not possible for another item to fit in the batch
     fn is_batch_full(&self, batch: &B) -> bool;
+
+    /// It is safe to assume that `is_batch_full` would return `false` before this is called.
+    /// You can return arbitrary metadata for an item that will be given back when the item
+    /// is actually pushed onto the batch. This is useful if there is an expensive calculation
+    /// to determine the "size" of the item.
     fn item_fits_in_batch(&self, item: &T, batch: &B) -> (bool, Self::ItemMetadata);
 
+    /// Add a single item to the batch using the metadata that was calculated by `item_fits_in_batch`
     fn push_item(&mut self, metadata: Self::ItemMetadata);
+
+    /// Reset internal state from a batch being taken.
     fn take_batch(&mut self);
 }
 

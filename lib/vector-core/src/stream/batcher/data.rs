@@ -1,8 +1,13 @@
 pub trait BatchData<T> {
     type Batch;
 
+    /// The number of items in the batch
     fn len(&self) -> usize;
+
+    /// Return the current batch, and reset any internal state
     fn take_batch(&mut self) -> Self::Batch;
+
+    /// Add a single item to the batch
     fn push_item(&mut self, item: T);
 
     fn is_empty(&self) -> bool {

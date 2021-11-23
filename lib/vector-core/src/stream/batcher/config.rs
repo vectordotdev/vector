@@ -19,13 +19,26 @@ pub trait BatchConfig<T> {
     type ItemMetadata;
     type Batch;
 
+    /// The number of items in the batch
     fn batch_len(&self) -> usize;
+
+    /// Return the current batch, and reset any internal state
     fn take_batch(&mut self) -> Self::Batch;
+
+    /// Add a single item to the batch, with the given metadata that was calculated by `item_fits_in_batch`
     fn push_item(&mut self, item: T, metadata: Self::ItemMetadata);
 
+    /// Return true if it is not possible for another item to fit in the batch
     fn is_batch_full(&self) -> bool;
+
+    /// It is safe to assume that `is_batch_full` would return `false` before this is called.
+    /// You can return arbitrary metadata for an item that will be given back when the item
+    /// is actually pushed onto the batch. This is useful if there is an expensive calculation
+    /// to determine the "size" of the item.
     fn item_fits_in_batch(&self, item: &T) -> (bool, Self::ItemMetadata);
 
+    /// The maximum amount of time to wait for inputs to a single batch.
+    /// The timer starts when the first item is received.
     fn timeout(&self) -> Duration;
 }
 

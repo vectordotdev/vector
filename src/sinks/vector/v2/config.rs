@@ -84,7 +84,6 @@ impl VectorConfig {
 }
 
 /// Check to see if the remote service accepts new events.
-//TODO: use proto::Client instead of service?
 async fn healthcheck(
     mut service: VectorService,
     options: SinkHealthcheckOptions,
@@ -108,7 +107,7 @@ async fn healthcheck(
 
 /// grpc doesn't like an address without a scheme, so we default to http or https if one isn't
 /// specified in the address.
-fn with_default_scheme(address: &str, tls: bool) -> crate::Result<Uri> {
+pub fn with_default_scheme(address: &str, tls: bool) -> crate::Result<Uri> {
     let uri: Uri = address.parse()?;
     if uri.scheme().is_none() {
         // Default the scheme to http or https.
