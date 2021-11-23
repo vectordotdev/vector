@@ -1,3 +1,5 @@
+#![allow(clippy::print_stdout)] // tests
+
 use crate::sinks::datadog::logs::DatadogLogsConfig;
 use crate::{
     config::SinkConfig,

@@ -115,6 +115,8 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::print_stdout)] //tests
+
     use super::*;
     use crate::{
         event::{Event, EventStatus},

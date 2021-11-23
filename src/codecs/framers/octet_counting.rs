@@ -283,6 +283,8 @@ impl tokio_util::codec::Decoder for OctetCountingCodec {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::print_stdout)]
+
     use super::*;
     use bytes::BufMut;
     use tokio_util::codec::Decoder;
