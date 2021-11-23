@@ -67,7 +67,16 @@ components: sinks: datadog_logs: {
 				examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
 			}
 		}
-		endpoint: sinks._datadog.configuration.endpoint
+		endpoint: {
+			common:        false
+			description:   "The endpoint to send data to. Must include the path."
+			relevant_when: "site is not set"
+			required:      false
+			type: string: {
+				default: null
+				examples: ["127.0.0.1:8080/api/v2/logs", "example.com:12345/api/v2/logs"]
+			}
+		}
 		region:   sinks._datadog.configuration.region
 		site:     sinks._datadog.configuration.site
 	}

@@ -59,7 +59,16 @@ components: sinks: datadog_events: {
 				examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
 			}
 		}
-		endpoint: sinks._datadog.configuration.endpoint
+		endpoint: {
+			common:        false
+			description:   "The endpoint to send data to. Must include the path."
+			relevant_when: "site is not set"
+			required:      false
+			type: string: {
+				default: null
+				examples: ["127.0.0.1:8080/api/v1/events", "example.com:12345/api/v1/events"]
+			}
+		}
 		site:     sinks._datadog.configuration.site
 	}
 

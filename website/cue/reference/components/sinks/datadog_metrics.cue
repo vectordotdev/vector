@@ -50,7 +50,16 @@ components: sinks: datadog_metrics: {
 
 	configuration: {
 		api_key:  sinks._datadog.configuration.api_key
-		endpoint: sinks._datadog.configuration.endpoint
+		endpoint: {
+			common:        false
+			description:   "The endpoint to send data to. Must include the path."
+			relevant_when: "site is not set"
+			required:      false
+			type: string: {
+				default: null
+				examples: ["127.0.0.1:8080/api/v1/series", "example.com:12345/api/v1/series"]
+			}
+		}
 		region:   sinks._datadog.configuration.region
 		default_namespace: {
 			common: true

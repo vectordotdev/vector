@@ -24,16 +24,6 @@ components: sinks: _datadog: {
 				examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
 			}
 		}
-		endpoint: {
-			common:        false
-			description:   "The endpoint to send data to."
-			relevant_when: "site is not set"
-			required:      false
-			type: string: {
-				default: null
-				examples: ["127.0.0.1:8080", "example.com:12345"]
-			}
-		}
 		region: {
 			common:        false
 			description:   "The region to send data to."
