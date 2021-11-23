@@ -10,7 +10,7 @@ remap: literals: string: {
 		no special meaning and the string may contain newlines.
 
 		**Interpreted string** literals are character sequences between double quotes (`"..."`). Within the quotes,
-		any character may appear except newline and unescaped double quote. The text between the quotes forms the result
+		any character may appear except unescaped newline and unescaped double quote. The text between the quotes forms the result
 		of the literal, with backslash escapes interpreted as defined below.
 		"""
 
@@ -20,6 +20,10 @@ remap: literals: string: {
 			"""#,
 		#"""
 			"Hello, world! \\u1F30E"
+			"""#,
+		#"""
+			"Hello, \
+			 world!"
 			"""#,
 		#"""
 			s'Hello, world!'
