@@ -1,7 +1,6 @@
 use crate::{
     conditions,
     event::Metric,
-    serde::bool_or_struct,
     shutdown::ShutdownSignal,
     sinks::{self, util::UriSerde},
     sources,
@@ -163,8 +162,6 @@ impl From<bool> for AcknowledgementsConfig {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SourceOuter {
-    #[serde(default, deserialize_with = "bool_or_struct")]
-    pub acknowledgements: AcknowledgementsConfig,
     #[serde(
         default,
         skip_serializing_if = "vector_core::serde::skip_serializing_if_default"
@@ -177,7 +174,6 @@ pub struct SourceOuter {
 impl SourceOuter {
     pub(crate) fn new(source: impl SourceConfig + 'static) -> Self {
         Self {
-            acknowledgements: Default::default(),
             inner: Box::new(source),
             proxy: Default::default(),
         }
@@ -204,7 +200,6 @@ pub struct SourceContext {
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
-    pub acknowledgements: AcknowledgementsConfig,
     pub proxy: ProxyConfig,
 }
 
@@ -222,7 +217,6 @@ impl SourceContext {
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out,
-                acknowledgements: Default::default(),
                 proxy: Default::default(),
             },
             shutdown,
@@ -236,7 +230,6 @@ impl SourceContext {
             globals: GlobalOptions::default(),
             shutdown: ShutdownSignal::noop(),
             out,
-            acknowledgements: Default::default(),
             proxy: Default::default(),
         }
     }
