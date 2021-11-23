@@ -82,7 +82,7 @@ impl SourceConfig for LogplexConfig {
             query_parameters: self.query_parameters.clone(),
             decoder,
         };
-        source.run(self.address, "events", true, &self.tls, &self.auth, cx)
+        source.run(self.address, "events", true, &self.tls, &self.auth, cx, self.acknowledgements)
     }
 
     fn output_type(&self) -> DataType {

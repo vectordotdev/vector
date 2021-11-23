@@ -1,19 +1,9 @@
-use crate::{
-    codecs::{
+use crate::{codecs::{
         self, BytesDecoderConfig, BytesParserConfig, DecodingConfig, FramingConfig,
         JsonParserConfig, NewlineDelimitedDecoderConfig, ParserConfig,
-    },
-    config::{
-        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
-        SourceDescription,
-    },
-    event::{Event, Value},
-    serde::{default_decoding, default_framing_stream_based},
-    sources::util::{
+    }, config::{AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription, log_schema}, event::{Event, Value}, serde::{bool_or_struct, default_decoding, default_framing_stream_based}, sources::util::{
         add_query_parameters, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
-    },
-    tls::TlsConfig,
-};
+    }, tls::TlsConfig};
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use http::StatusCode;
@@ -42,6 +32,8 @@ pub struct SimpleHttpConfig {
     path_key: String,
     framing: Option<Box<dyn FramingConfig>>,
     decoding: Option<Box<dyn ParserConfig>>,
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -62,6 +54,7 @@ impl GenerateConfig for SimpleHttpConfig {
             strict_path: true,
             framing: Some(default_framing_stream_based()),
             decoding: Some(default_decoding()),
+            acknowledgements: AcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -181,6 +174,7 @@ impl SourceConfig for SimpleHttpConfig {
             &self.tls,
             &self.auth,
             cx,
+            self.acknowledgements,
         )
     }
 
@@ -260,8 +254,7 @@ mod tests {
         let address = next_addr();
         let path = path.to_owned();
         let path_key = path_key.to_owned();
-        let mut context = SourceContext::new_test(sender);
-        context.acknowledgements.enabled = acknowledgements;
+        let context = SourceContext::new_test(sender);
         tokio::spawn(async move {
             SimpleHttpConfig {
                 address,
@@ -275,6 +268,7 @@ mod tests {
                 path,
                 framing,
                 decoding,
+                acknowledgements: acknowledgements.into(),
             }
             .build(context)
             .await
