@@ -22,9 +22,6 @@ use crate::{
     tls::TlsSettings,
 };
 use hyper::Body;
-use http::header::{
-    CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE
-};
 use tracing::Instrument;
 use vector_core::{
     stream::BatcherSettings,
@@ -45,7 +42,10 @@ use futures::{
     FutureExt
 };
 use http::{
-    Request, Uri
+    Request, Uri,
+    header::{
+        CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE
+    }
 };
 use serde::{
     Deserialize, Serialize
@@ -62,12 +62,12 @@ use std::{
     task::{
         Context, Poll
     },
-    num::NonZeroUsize
+    num::NonZeroUsize,
+    sync::Arc
 };
 use tower::{
     Service, ServiceBuilder
 };
-use std::sync::Arc;
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
@@ -442,7 +442,7 @@ impl_generate_config_from_default!(NewRelicConfig);
 pub struct NewRelicApiRequest {
     pub batch_size: usize,
     pub finalizers: EventFinalizers,
-    pub credentials: NewRelicCredentials,
+    pub credentials: Arc<NewRelicCredentials>,
     pub payload: Vec<u8>,
     pub compression: Compression
 }
@@ -590,12 +590,13 @@ impl SinkConfig for NewRelicConfig {
                 client
             });
 
+        let credentials = Arc::from(NewRelicCredentials::from(self));
+
         let sink = NewRelicSink {
             service,
             acker: cx.acker(),
             encoding,
-            // TODO: put credentials inside an Arc to avoid cloning it again and again
-            credentials: NewRelicCredentials::from(self),
+            credentials,
             compression: self.compression,
             batcher_settings,
         };
@@ -633,11 +634,11 @@ impl RetryLogic for NewRelicApiRetry {
 struct NewRelicRequestBuilder {
     encoding: EncodingConfigWithDefault<Encoding>,
     compression: Compression,
-    credentials: NewRelicCredentials
+    credentials: Arc<NewRelicCredentials>
 }
 
 impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
-    type Metadata = (NewRelicCredentials, usize, EventFinalizers);
+    type Metadata = (Arc<NewRelicCredentials>, usize, EventFinalizers);
     type Events = Result<NewRelicApiModel, &'static str>;
     type Encoder = EncodingConfigWithDefault<Encoding>;
     type Payload = Vec<u8>;
@@ -704,7 +705,7 @@ struct NewRelicSink<S> {
     pub service: S,
     pub acker: Acker,
     pub encoding: EncodingConfigWithDefault<Encoding>,
-    pub credentials: NewRelicCredentials,
+    pub credentials: Arc<NewRelicCredentials>,
     pub compression: Compression,
     pub batcher_settings: BatcherSettings,
 }
