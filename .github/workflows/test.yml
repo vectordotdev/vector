@@ -92,7 +92,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2.4.0
-      - uses: actions/cache@v2.1.6
+      - uses: actions/cache@v2.1.7
         name: Cache Cargo registry + index
         with:
           path: |
@@ -129,7 +129,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.4.0
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.6
+      - uses: actions/cache@v2.1.7
         name: Cache Cargo registry + index
         with:
           path: |
@@ -179,7 +179,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2.4.0
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.6
+      - uses: actions/cache@v2.1.7
         name: Cache Cargo registry + index
         with:
           path: |
@@ -219,7 +219,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2.4.0
-      - uses: actions/cache@v2.1.6
+      - uses: actions/cache@v2.1.7
         name: Cache Cargo registry + index
         with:
           path: |
@@ -346,7 +346,7 @@ jobs:
         with:
           # check-version needs tags
           fetch-depth: 0 # fetch everything
-      - uses: actions/cache@v2.1.6
+      - uses: actions/cache@v2.1.7
         name: Cache Cargo registry + index
         with:
           path: |
