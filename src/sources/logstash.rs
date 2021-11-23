@@ -544,10 +544,95 @@ impl From<LogstashEventFrame> for SmallVec<[Event; 1]> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::test_util::{next_addr_for_ip, spawn_collect_n, wait_for_tcp};
+    use crate::{event::EventStatus, Pipeline};
+    use bytes::BufMut;
+    use rand::{thread_rng, Rng};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<LogstashConfig>();
+    }
+
+    #[tokio::test]
+    async fn test_delivered() {
+        test_protocol(EventStatus::Delivered, true).await;
+    }
+
+    #[tokio::test]
+    async fn test_failed() {
+        test_protocol(EventStatus::Failed, false).await;
+    }
+
+    async fn test_protocol(status: EventStatus, sends_ack: bool) {
+        let (sender, recv) = Pipeline::new_test_finalize(status);
+        let address = next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
+        let source = LogstashConfig {
+            address: address.into(),
+            tls: None,
+            keepalive: None,
+            receive_buffer_bytes: None,
+            acknowledgements: true.into(),
+        }
+        .build(SourceContext::new_test(sender))
+        .await
+        .unwrap();
+        tokio::spawn(source);
+        wait_for_tcp(address).await;
+
+        let events = spawn_collect_n(
+            send_req(address, &[("message", "Hello, world!")], sends_ack),
+            recv,
+            1,
+        )
+        .await;
+
+        assert_eq!(events.len(), 1);
+        let log = events[0].as_log();
+        assert_eq!(
+            log.get("message").unwrap().to_string_lossy(),
+            "Hello, world!".to_string()
+        );
+        assert_eq!(
+            log.get("source_type").unwrap().to_string_lossy(),
+            "logstash".to_string()
+        );
+        assert!(log.get("host").is_some());
+        assert!(log.get("timestamp").is_some());
+    }
+
+    fn encode_req(seq: u32, pairs: &[(&str, &str)]) -> Bytes {
+        let mut req = BytesMut::new();
+        req.put_u8(b'2');
+        req.put_u8(b'D');
+        req.put_u32(seq);
+        req.put_u32(pairs.len() as u32);
+        for (key, value) in pairs {
+            req.put_u32(key.len() as u32);
+            req.put(key.as_bytes());
+            req.put_u32(value.len() as u32);
+            req.put(value.as_bytes());
+        }
+        req.into()
+    }
+
+    async fn send_req(address: std::net::SocketAddr, pairs: &[(&str, &str)], sends_ack: bool) {
+        let seq = thread_rng().gen_range(1..u32::MAX);
+        let mut socket = tokio::net::TcpStream::connect(address).await.unwrap();
+
+        let req = encode_req(seq, pairs);
+        socket.write_all(&req).await.unwrap();
+
+        let mut output = BytesMut::new();
+        socket.read_buf(&mut output).await.unwrap();
+
+        if sends_ack {
+            assert_eq!(output.get_u8(), b'2');
+            assert_eq!(output.get_u8(), b'A');
+            assert_eq!(output.get_u32(), seq);
+        }
+        assert_eq!(output.len(), 0);
     }
 }
 
@@ -557,11 +642,12 @@ mod integration_tests {
     use crate::{
         config::SourceContext,
         docker::Container,
+        event::EventStatus,
         test_util::{collect_n, next_addr_for_ip, trace_init, wait_for_tcp},
         tls::TlsOptions,
         Pipeline,
     };
-    use futures::channel::mpsc;
+    use futures::Stream;
     use std::{fs::File, io::Write, net::SocketAddr, time::Duration};
     use tokio::time::timeout;
 
@@ -685,8 +771,8 @@ output {
         assert!(log.get("host").is_some());
     }
 
-    async fn source(tls: Option<TlsConfig>) -> (mpsc::Receiver<Event>, SocketAddr) {
-        let (sender, recv) = Pipeline::new_test();
+    async fn source(tls: Option<TlsConfig>) -> (impl Stream<Item = Event>, SocketAddr) {
+        let (sender, recv) = Pipeline::new_test_finalize(EventStatus::Delivered);
         let address = next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
         tokio::spawn(async move {
             LogstashConfig {
