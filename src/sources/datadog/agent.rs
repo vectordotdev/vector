@@ -353,7 +353,7 @@ impl DatadogAgentSource {
             return Ok(Vec::new());
         }
 
-        let metrics = decode_ddsketch(body, api_key).map_err(|error| {
+        let metrics = decode_ddsketch(body, &api_key).map_err(|error| {
             ErrorMessage::new(
                 StatusCode::UNPROCESSABLE_ENTITY,
                 format!("Error decoding Datadog sketch: {:?}", error),
