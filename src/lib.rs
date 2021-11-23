@@ -47,7 +47,7 @@ pub mod graph;
 pub mod heartbeat;
 pub mod http;
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
-pub(crate) mod kafka;
+pub mod kafka;
 pub mod kubernetes;
 pub mod line_agg;
 pub mod list;

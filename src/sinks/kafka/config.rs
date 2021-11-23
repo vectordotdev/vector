@@ -13,7 +13,7 @@ use std::collections::HashMap;
 pub(crate) const QUEUED_MIN_MESSAGES: u64 = 100000;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub(crate) struct KafkaSinkConfig {
+pub struct KafkaSinkConfig {
     pub bootstrap_servers: String,
     pub topic: String,
     pub key_field: Option<String>,
