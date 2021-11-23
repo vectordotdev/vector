@@ -1,7 +1,15 @@
 use futures_util::future::Shared;
 use roaring::RoaringTreemap;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, num::NonZeroU64, sync::{Arc, Mutex, RwLock, atomic::{AtomicU64, Ordering}}, time::{Duration, Instant}};
+use std::{
+    collections::HashMap,
+    num::NonZeroU64,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Mutex, RwLock,
+    },
+    time::{Duration, Instant},
+};
 use tokio::time::interval;
 use vector_core::event::BatchStatusReceiver;
 use warp::Rejection;
@@ -160,7 +168,9 @@ impl Channel {
                     Some(min) => ack_ids_status.remove(min),
                     // max pending acks per channel is guaranteed to be >= 1,
                     // thus there must be at least one ack id available to remove
-                    None => unreachable!("Indexer acknowledgements channel must allow at least one pending ack"),
+                    None => unreachable!(
+                        "Indexer acknowledgements channel must allow at least one pending ack"
+                    ),
                 };
             };
         });
