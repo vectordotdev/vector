@@ -1,4 +1,5 @@
 {{ $url := .Permalink }}
+{{ $favicon := site.Params.favicon | absURL }}
 {{ $desc := (cond .IsHome site.Params.description .Description) | markdownify | plainify }}
 {{ $author := site.Author }}
 {{ $img := site.Params.site_logo | absURL }}
@@ -17,6 +18,7 @@
 
 {{ hugo.Generator }}
 
+<link rel="shortcut icon" href="{{ $favicon }}">
 <link rel="canonical" href="{{ $url }}">
 
 {{/* Twitter Card metadata */}}
@@ -40,5 +42,4 @@
 <meta name="keywords" content="{{ delimit . "," }}">
 {{ end }}
 
-<link rel="shortcut icon" href="/favicon.ico">
 <link rel="manifest" href="/manifest.json">
