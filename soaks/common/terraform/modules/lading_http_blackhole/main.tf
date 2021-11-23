@@ -5,7 +5,7 @@ resource "kubernetes_config_map" "lading" {
   }
 
   data = {
-    "http_blackhole.toml" = var.http-blackhole-toml
+    "http_blackhole.yaml" = var.http-blackhole-yaml
   }
 }
 
