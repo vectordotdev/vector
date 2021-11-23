@@ -43,7 +43,7 @@ module "http-blackhole" {
 module "tcp-gen" {
   source       = "../../../common/terraform/modules/lading_tcp_gen"
   type         = var.type
-  tcp-gen-yaml = file("${path.module}/../../../common/configs/tcp_gen_syslog_source.toml")
+  tcp-gen-yaml = file("${path.module}/../../../common/configs/tcp_gen_syslog_source.yaml")
   namespace    = kubernetes_namespace.soak.metadata[0].name
   lading_image = var.lading_image
   depends_on   = [module.monitoring, module.vector]
