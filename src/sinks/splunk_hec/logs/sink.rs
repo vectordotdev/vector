@@ -3,7 +3,7 @@ use std::{fmt, num::NonZeroUsize};
 use async_trait::async_trait;
 use futures_util::{future, stream::BoxStream, StreamExt};
 use tower::Service;
-use vector_core::stream::{batcher, DriverResponse};
+use vector_core::stream::{DriverResponse};
 use vector_core::{
     config::log_schema,
     event::{Event, LogEvent, Value},

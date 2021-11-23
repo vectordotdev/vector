@@ -20,7 +20,7 @@ use vector_core::{
 };
 
 use super::request_builder::HecMetricsRequestBuilder;
-use vector_core::stream::batcher;
+
 
 pub struct HecMetricsSink<S> {
     pub context: SinkContext,
