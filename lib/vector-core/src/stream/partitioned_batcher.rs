@@ -242,15 +242,24 @@ impl BatcherSettings {
 
     /// A batcher config using the `ByteSizeOf` trait to determine batch sizes.
     /// The output is a Vec<T>
-    pub fn into_byte_size_config<T>(
+    pub fn into_byte_size_config<T: ByteSizeOf>(
         self,
     ) -> BatchConfigParts<SizeLimit<ByteSizeOfItemSize>, Vec<T>> {
+        self.into_item_size_config(ByteSizeOfItemSize)
+    }
+
+    /// A batcher config using the `ItemBatchSize` trait to determine batch sizes.
+    /// The output is a Vec<T>
+    pub fn into_item_size_config<T, I>(self, item_size: I) -> BatchConfigParts<SizeLimit<I>, Vec<T>>
+    where
+        I: ItemBatchSize<T>,
+    {
         BatchConfigParts {
             batch_limiter: SizeLimit {
                 batch_size_limit: self.size_limit,
                 batch_item_limit: self.item_limit,
                 current_size: 0,
-                item_size_calculator: ByteSizeOfItemSize,
+                item_size_calculator: item_size,
             },
             batch_data: vec![],
             timeout: self.timeout,

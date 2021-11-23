@@ -130,7 +130,7 @@ mod test {
         );
         let batcher = Batcher::new(
             stream,
-            batcher::config::item_size(settings, vec![], |x: &u32| *x as usize),
+            settings.into_item_size_config(|x: &u32| *x as usize),
         );
         let batches: Vec<_> = batcher.collect().await;
         assert_eq!(batches, vec![vec![1, 2], vec![3],]);
@@ -140,15 +140,12 @@ mod test {
     async fn size_limit() {
         let batcher = Batcher::new(
             stream::iter([1, 2, 3, 4, 5, 6, 2, 3, 1]),
-            batcher::config::item_size(
-                BatcherSettings::new(
-                    Duration::from_millis(100),
-                    NonZeroUsize::new(5).unwrap(),
-                    NonZeroUsize::new(100).unwrap(),
-                ),
-                vec![],
-                |x: &u32| *x as usize,
-            ),
+            BatcherSettings::new(
+                Duration::from_millis(100),
+                NonZeroUsize::new(5).unwrap(),
+                NonZeroUsize::new(100).unwrap(),
+            )
+            .into_item_size_config(|x: &u32| *x as usize),
         );
         let batches: Vec<_> = batcher.collect().await;
         assert_eq!(
@@ -173,15 +170,12 @@ mod test {
         let stream = stream::iter([1, 2]).chain(stream::pending());
         let batcher = Batcher::new(
             stream,
-            batcher::config::item_size(
-                BatcherSettings::new(
-                    timeout,
-                    NonZeroUsize::new(5).unwrap(),
-                    NonZeroUsize::new(100).unwrap(),
-                ),
-                vec![],
-                |x: &u32| *x as usize,
-            ),
+            BatcherSettings::new(
+                timeout,
+                NonZeroUsize::new(5).unwrap(),
+                NonZeroUsize::new(100).unwrap(),
+            )
+            .into_item_size_config(|x: &u32| *x as usize),
         );
 
         tokio::pin!(batcher);
