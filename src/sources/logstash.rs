@@ -556,34 +556,26 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::SourceContext,
-        docker::docker,
+        docker::Container,
         test_util::{collect_n, next_addr_for_ip, trace_init, wait_for_tcp},
         tls::TlsOptions,
         Pipeline,
     };
-    use bollard::{
-        container::{Config as ContainerConfig, CreateContainerOptions},
-        image::{CreateImageOptions, ListImagesOptions},
-        models::HostConfig,
-        Docker,
-    };
-    use futures::{channel::mpsc, StreamExt};
-    use std::{collections::HashMap, fs::File, io::Write, net::SocketAddr, time::Duration};
+    use futures::channel::mpsc;
+    use std::{fs::File, io::Write, net::SocketAddr, time::Duration};
     use tokio::time::timeout;
-    use uuid::Uuid;
+
+    const BEATS_IMAGE: &str = "docker.elastic.co/beats/heartbeat";
+    const BEATS_TAG: &str = "7.12.1";
+
+    const LOGSTASH_IMAGE: &str = "docker.elastic.co/logstash/logstash";
+    const LOGSTASH_TAG: &str = "7.13.1";
 
     #[tokio::test]
     async fn beats_heartbeat() {
         trace_init();
 
-        let image = "docker.elastic.co/beats/heartbeat";
-        let tag = "7.12.1";
-
-        let docker = docker(None, None).unwrap();
-
         let (out, address) = source(None).await;
-
-        pull_image(&docker, image, tag).await;
 
         let dir = tempfile::tempdir().unwrap();
         let mut file = File::create(dir.path().join("heartbeat.yml")).unwrap();
@@ -603,43 +595,19 @@ output.logstash:
         )
         .unwrap();
 
-        let options = Some(CreateContainerOptions {
-            name: format!("vector_test_logstash_{}", Uuid::new_v4()),
-        });
-        let config = ContainerConfig {
-            image: Some(format!("{}:{}", image, tag)),
+        let events = Container::new(BEATS_IMAGE, BEATS_TAG)
+            .bind(
+                dir.path().join("heartbeat.yml").display(),
+                "/usr/share/heartbeat/heartbeat.yml",
+            )
             // adding `-strict.perms=false to the default cmd as otherwise heartbeat was
             // complaining about the file permissions when running in CI
             // https://www.elastic.co/guide/en/beats/libbeat/5.3/config-file-permissions.html
-            cmd: Some(vec![
-                String::from("-environment=container"),
-                String::from("-strict.perms=false"),
-            ]),
-            host_config: Some(HostConfig {
-                network_mode: Some(String::from("host")),
-                extra_hosts: Some(vec![String::from("host.docker.internal:host-gateway")]),
-                binds: Some(vec![format!(
-                    "{}/heartbeat.yml:{}",
-                    dir.path().display(),
-                    "/usr/share/heartbeat/heartbeat.yml"
-                )]),
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-
-        let container = docker.create_container(options, config).await.unwrap();
-
-        docker
-            .start_container::<String>(&container.id, None)
+            .cmd("-environment=container")
+            .cmd("-strict.perms=false")
+            .run(timeout(Duration::from_secs(60), collect_n(out, 1)))
             .await
             .unwrap();
-
-        let events = timeout(Duration::from_secs(60), collect_n(out, 1))
-            .await
-            .unwrap();
-
-        remove_container(&docker, &container.id).await;
 
         assert!(!events.is_empty());
 
@@ -657,11 +625,6 @@ output.logstash:
     async fn logstash() {
         trace_init();
 
-        let image = "docker.elastic.co/logstash/logstash";
-        let tag = "7.13.1";
-
-        let docker = docker(None, None).unwrap();
-
         let (out, address) = source(Some(TlsConfig {
             enabled: Some(true),
             options: TlsOptions {
@@ -671,8 +634,6 @@ output.logstash:
             },
         }))
         .await;
-
-        pull_image(&docker, image, tag).await;
 
         let dir = tempfile::tempdir().unwrap();
         let mut file = File::create(dir.path().join("logstash.conf")).unwrap();
@@ -698,43 +659,20 @@ output {
         )
         .unwrap();
 
-        let options = Some(CreateContainerOptions {
-            name: format!("vector_test_logstash_{}", Uuid::new_v4()),
-        });
-        let config = ContainerConfig {
-            image: Some(format!("{}:{}", image, tag)),
-            host_config: Some(HostConfig {
-                network_mode: Some(String::from("host")),
-                extra_hosts: Some(vec![String::from("host.docker.internal:host-gateway")]),
-                binds: Some(vec![
-                    "/dev/null:/usr/share/logstash/config/logstash.yml".to_string(), // tries to contact elasticsearch by default
-                    format!(
-                        "{}/logstash.conf:{}",
-                        dir.path().display(),
-                        "/usr/share/logstash/pipeline/logstash.conf"
-                    ),
-                    format!(
-                        "{}/tests/data/host.docker.internal.crt:/tmp/logstash.crt",
-                        std::env::current_dir().unwrap().display()
-                    ),
-                ]),
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-
-        let container = docker.create_container(options, config).await.unwrap();
-
-        docker
-            .start_container::<String>(&container.id, None)
+        let pwd = std::env::current_dir().unwrap();
+        let events = Container::new(LOGSTASH_IMAGE, LOGSTASH_TAG)
+            .bind("/dev/null", "/usr/share/logstash/config/logstash.yml") // tries to contact elasticsearch by default
+            .bind(
+                dir.path().join("logstash.conf").display(),
+                "/usr/share/logstash/pipeline/logstash.conf",
+            )
+            .bind(
+                pwd.join("tests/data/host.docker.internal.crt").display(),
+                "/tmp/logstash.crt",
+            )
+            .run(timeout(Duration::from_secs(60), collect_n(out, 1)))
             .await
             .unwrap();
-
-        let events = timeout(Duration::from_secs(60), collect_n(out, 1))
-            .await
-            .unwrap();
-
-        remove_container(&docker, &container.id).await;
 
         assert!(!events.is_empty());
 
@@ -745,39 +683,6 @@ output {
             .to_string_lossy()
             .contains("Hello World"));
         assert!(log.get("host").is_some());
-    }
-
-    async fn pull_image(docker: &Docker, image: &str, tag: &str) {
-        let mut filters = HashMap::new();
-        filters.insert(
-            String::from("reference"),
-            vec![format!("{}:{}", image, tag)],
-        );
-
-        let options = Some(ListImagesOptions {
-            filters,
-            ..Default::default()
-        });
-
-        let images = docker.list_images(options).await.unwrap();
-        if images.is_empty() {
-            // If not found, pull it
-            let options = Some(CreateImageOptions {
-                from_image: image,
-                tag,
-                ..Default::default()
-            });
-
-            docker
-                .create_image(options, None, None)
-                .for_each(|item| async move {
-                    let info = item.unwrap();
-                    if let Some(error) = info.error {
-                        panic!("{:?}", error);
-                    }
-                })
-                .await
-        }
     }
 
     async fn source(tls: Option<TlsConfig>) -> (mpsc::Receiver<Event>, SocketAddr) {
@@ -799,22 +704,5 @@ output {
         });
         wait_for_tcp(address).await;
         (recv, address)
-    }
-
-    async fn remove_container(docker: &Docker, id: &str) {
-        trace!("Stopping container.");
-
-        let _ = docker
-            .stop_container(id, None)
-            .await
-            .map_err(|e| error!(%e));
-
-        trace!("Removing container.");
-
-        // Don't panic, as this is unrelated to the test
-        let _ = docker
-            .remove_container(id, None)
-            .await
-            .map_err(|e| error!(%e));
     }
 }

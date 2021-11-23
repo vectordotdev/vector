@@ -752,40 +752,37 @@ mod tests {
 mod integration_tests {
     use crate::config::SourceConfig;
     use crate::config::SourceContext;
-    use crate::docker::docker;
+    use crate::docker::Container;
     use crate::sources::fluent::FluentConfig;
     use crate::test_util::{collect_ready, next_addr_for_ip, trace_init, wait_for_tcp};
     use crate::Pipeline;
-    use bollard::{
-        container::{Config as ContainerConfig, CreateContainerOptions},
-        image::{CreateImageOptions, ListImagesOptions},
-        models::HostConfig,
-        Docker,
-    };
-    use futures::{channel::mpsc, StreamExt};
-    use std::{collections::HashMap, fs::File, io::Write, net::SocketAddr, time::Duration};
+    use futures::channel::mpsc;
+    use std::{fs::File, io::Write, net::SocketAddr, time::Duration};
     use tokio::time::sleep;
-    use uuid::Uuid;
     use vector_core::event::Event;
+
+    const FLUENT_BIT_IMAGE: &str = "fluent/fluent-bit";
+    const FLUENT_BIT_TAG: &str = "1.7";
+    const FLUENTD_IMAGE: &str = "fluent/fluentd";
+    const FLUENTD_TAG: &str = "v1.12";
+
+    fn make_file(name: &str, content: &str) -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        let mut file = File::create(dir.path().join(name)).unwrap();
+        write!(&mut file, "{}", content).unwrap();
+        dir
+    }
 
     #[tokio::test]
     async fn fluentbit() {
         trace_init();
 
-        let image = "fluent/fluent-bit";
-        let tag = "1.7";
-
-        let docker = docker(None, None).unwrap();
-
         let (out, address) = source().await;
 
-        pull_image(&docker, image, tag).await;
-
-        let dir = tempfile::tempdir().unwrap();
-        let mut file = File::create(dir.path().join("fluent-bit.conf")).unwrap();
-        write!(
-            &mut file,
-            r#"
+        let dir = make_file(
+            "fluent-bit.conf",
+            &format!(
+                r#"
 [SERVICE]
     Grace      0
     Flush      1
@@ -800,40 +797,17 @@ mod integration_tests {
     Host          host.docker.internal
     Port          {}
 "#,
-            address.port()
-        )
-        .unwrap();
+                address.port()
+            ),
+        );
 
-        let options = Some(CreateContainerOptions {
-            name: format!("vector_test_fluent_{}", Uuid::new_v4()),
-        });
-        let config = ContainerConfig {
-            image: Some(format!("{}:{}", image, tag)),
-            host_config: Some(HostConfig {
-                network_mode: Some(String::from("host")),
-                extra_hosts: Some(vec![String::from("host.docker.internal:host-gateway")]),
-                binds: Some(vec![format!(
-                    "{}:{}",
-                    dir.path().display(),
-                    "/fluent-bit/etc"
-                )]),
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-
-        let container = docker.create_container(options, config).await.unwrap();
-
-        docker
-            .start_container::<String>(&container.id, None)
-            .await
-            .unwrap();
-
-        sleep(Duration::from_secs(2)).await;
-
-        let events = collect_ready(out).await;
-
-        remove_container(&docker, &container.id).await;
+        let events = Container::new(FLUENT_BIT_IMAGE, FLUENT_BIT_TAG)
+            .bind(dir.path().display(), "/fluent-bit/etc")
+            .run(async move {
+                sleep(Duration::from_secs(2)).await;
+                collect_ready(out).await
+            })
+            .await;
 
         assert!(!events.is_empty());
         assert_eq!(events[0].as_log()["tag"], "dummy.0".into());
@@ -894,89 +868,26 @@ mod integration_tests {
     async fn test_fluentd(config: &str) {
         trace_init();
 
-        let image = "fluent/fluentd";
-        let tag = "v1.12";
-
-        let docker = docker(None, None).unwrap();
-
         let (out, address) = source().await;
 
-        pull_image(&docker, image, tag).await;
+        let dir = make_file(
+            "fluent.conf",
+            &config.replace("PORT", &address.port().to_string()),
+        );
 
-        let dir = tempfile::tempdir().unwrap();
-        let mut file = File::create(dir.path().join("fluent.conf")).unwrap();
-        write!(
-            &mut file,
-            "{}",
-            config.replace("PORT", &address.port().to_string())
-        )
-        .unwrap();
-
-        let options = Some(CreateContainerOptions {
-            name: format!("vector_test_fluent_{}", Uuid::new_v4()),
-        });
-        let config = ContainerConfig {
-            image: Some(format!("{}:{}", image, tag)),
-            host_config: Some(HostConfig {
-                network_mode: Some(String::from("host")),
-                extra_hosts: Some(vec![String::from("host.docker.internal:host-gateway")]),
-                binds: Some(vec![format!("{}:{}", dir.path().display(), "/fluentd/etc")]),
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-
-        let container = docker.create_container(options, config).await.unwrap();
-
-        docker
-            .start_container::<String>(&container.id, None)
-            .await
-            .unwrap();
-
-        sleep(Duration::from_secs(5)).await;
-
-        let events = collect_ready(out).await;
-
-        remove_container(&docker, &container.id).await;
+        let events = Container::new(FLUENTD_IMAGE, FLUENTD_TAG)
+            .bind(dir.path().display(), "/fluentd/etc")
+            .run(async move {
+                sleep(Duration::from_secs(5)).await;
+                collect_ready(out).await
+            })
+            .await;
 
         assert!(!events.is_empty());
         assert_eq!(events[0].as_log()["tag"], "dummy".into());
         assert_eq!(events[0].as_log()["message"], "dummy".into());
         assert!(events[0].as_log().get("timestamp").is_some());
         assert!(events[0].as_log().get("host").is_some());
-    }
-
-    async fn pull_image(docker: &Docker, image: &str, tag: &str) {
-        let mut filters = HashMap::new();
-        filters.insert(
-            String::from("reference"),
-            vec![format!("{}:{}", image, tag)],
-        );
-
-        let options = Some(ListImagesOptions {
-            filters,
-            ..Default::default()
-        });
-
-        let images = docker.list_images(options).await.unwrap();
-        if images.is_empty() {
-            // If not found, pull it
-            let options = Some(CreateImageOptions {
-                from_image: image,
-                tag,
-                ..Default::default()
-            });
-
-            docker
-                .create_image(options, None, None)
-                .for_each(|item| async move {
-                    let info = item.unwrap();
-                    if let Some(error) = info.error {
-                        panic!("{:?}", error);
-                    }
-                })
-                .await
-        }
     }
 
     async fn source() -> (mpsc::Receiver<Event>, SocketAddr) {
@@ -998,22 +909,5 @@ mod integration_tests {
         });
         wait_for_tcp(address).await;
         (recv, address)
-    }
-
-    async fn remove_container(docker: &Docker, id: &str) {
-        trace!("Stopping container.");
-
-        let _ = docker
-            .stop_container(id, None)
-            .await
-            .map_err(|e| error!(%e));
-
-        trace!("Removing container.");
-
-        // Don't panic, as this is unrelated to the test
-        let _ = docker
-            .remove_container(id, None)
-            .await
-            .map_err(|e| error!(%e));
     }
 }
