@@ -165,9 +165,6 @@ impl HttpSink for InfluxDbLogsSink {
         self.encoding.apply_rules(&mut event);
         let mut event = event.into_log();
 
-        // Measurement
-        let measurement = self.measurement.clone();
-
         // Timestamp
         let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key()) {
             Some(Value::Timestamp(ts)) => Some(ts),
@@ -188,7 +185,7 @@ impl HttpSink for InfluxDbLogsSink {
         let mut output = String::new();
         if let Err(error) = influx_line_protocol(
             self.protocol_version,
-            &measurement,
+            &self.measurement,
             "logs",
             Some(tags),
             Some(fields),
@@ -716,6 +713,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
 
         let config = InfluxDbLogsConfig {
+            namespace: None,
             measurement: Some(measure.clone()),
             endpoint: "http://localhost:9999".to_string(),
             tags: Default::default(),
