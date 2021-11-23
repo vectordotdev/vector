@@ -5,6 +5,7 @@ use crate::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
         SplunkHecRequestReceived,
     },
+    serde::bool_or_struct,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
@@ -55,7 +56,8 @@ pub struct SplunkConfig {
     valid_tokens: Option<Vec<String>>,
     tls: Option<TlsConfig>,
     /// Splunk HEC indexer acknowledgement settings
-    indexer_acknowledgements: HecAcknowledgementsConfig,
+    #[serde(deserialize_with = "bool_or_struct")]
+    acknowledgements: HecAcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -81,7 +83,7 @@ impl Default for SplunkConfig {
             token: None,
             valid_tokens: None,
             tls: None,
-            indexer_acknowledgements: Default::default(),
+            acknowledgements: HecAcknowledgementsConfig::default(),
         }
     }
 }
@@ -165,7 +167,6 @@ struct SplunkSource {
 
 impl SplunkSource {
     fn new(config: &SplunkConfig, protocol: &'static str, cx: SourceContext) -> Self {
-        let acknowledgements = cx.acknowledgements;
         let shutdown = cx.shutdown.shared();
         let valid_tokens = config
             .valid_tokens
@@ -173,9 +174,9 @@ impl SplunkSource {
             .flatten()
             .chain(config.token.iter());
 
-        let idx_ack = acknowledgements.enabled.then(|| {
+        let idx_ack = config.acknowledgements.inner.enabled.then(|| {
             Arc::new(IndexerAcknowledgement::new(
-                config.indexer_acknowledgements.clone(),
+                config.acknowledgements.clone(),
                 shutdown,
             ))
         });
@@ -924,10 +925,7 @@ fn response_json(code: StatusCode, body: impl Serialize) -> Response {
 mod tests {
     use super::{acknowledgements::HecAcknowledgementsConfig, parse_timestamp, SplunkConfig};
     use crate::{
-        config::{
-            log_schema, AcknowledgementsConfig, SinkConfig, SinkContext, SourceConfig,
-            SourceContext,
-        },
+        config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
         event::Event,
         sinks::{
             splunk_hec::logs::{config::HecSinkLogsConfig, encoder::HecLogsEncoder},
@@ -975,15 +973,14 @@ mod tests {
         let address = next_addr();
         let valid_tokens =
             valid_tokens.map(|tokens| tokens.iter().map(|&token| String::from(token)).collect());
-        let mut cx = SourceContext::new_test(sender);
-        cx.acknowledgements = AcknowledgementsConfig::from(acknowledgements.is_some());
+        let cx = SourceContext::new_test(sender);
         tokio::spawn(async move {
             SplunkConfig {
                 address,
                 token,
                 valid_tokens,
                 tls: None,
-                indexer_acknowledgements: acknowledgements.unwrap_or_default(),
+                acknowledgements: acknowledgements.unwrap_or_default(),
             }
             .build(cx)
             .await
@@ -1567,7 +1564,11 @@ mod tests {
 
     #[tokio::test]
     async fn ack_json_event() {
-        let (source, address) = source(Some(HecAcknowledgementsConfig::default())).await;
+        let ack_config = HecAcknowledgementsConfig {
+            inner: true.into(),
+            ..Default::default()
+        };
+        let (source, address) = source(Some(ack_config)).await;
         let event_message = r#"{"event":"first", "color": "blue"}{"event":"second"}"#;
         let opts = SendWithOpts {
             channel: Some(Channel::Header("guid")),
@@ -1608,7 +1609,11 @@ mod tests {
 
     #[tokio::test]
     async fn ack_raw_event() {
-        let (source, address) = source(Some(HecAcknowledgementsConfig::default())).await;
+        let ack_config = HecAcknowledgementsConfig {
+            inner: true.into(),
+            ..Default::default()
+        };
+        let (source, address) = source(Some(ack_config)).await;
         let event_message = "raw event message";
         let opts = SendWithOpts {
             channel: Some(Channel::Header("guid")),
@@ -1649,7 +1654,11 @@ mod tests {
 
     #[tokio::test]
     async fn ack_repeat_ack_query() {
-        let (source, address) = source(Some(HecAcknowledgementsConfig::default())).await;
+        let ack_config = HecAcknowledgementsConfig {
+            inner: true.into(),
+            ..Default::default()
+        };
+        let (source, address) = source(Some(ack_config)).await;
         let event_message = "raw event message";
         let opts = SendWithOpts {
             channel: Some(Channel::Header("guid")),
@@ -1702,6 +1711,7 @@ mod tests {
     #[tokio::test]
     async fn ack_exceed_max_number_of_ack_channels() {
         let ack_config = HecAcknowledgementsConfig {
+            inner: true.into(),
             max_number_of_ack_channels: NonZeroU64::new(1).unwrap(),
             ..Default::default()
         };
@@ -1737,6 +1747,7 @@ mod tests {
     #[tokio::test]
     async fn ack_exceed_max_pending_acks_per_channel() {
         let ack_config = HecAcknowledgementsConfig {
+            inner: true.into(),
             max_pending_acks_per_channel: NonZeroU64::new(1).unwrap(),
             ..Default::default()
         };
@@ -1810,7 +1821,11 @@ mod tests {
     #[tokio::test]
     async fn event_service_acknowledgements_enabled_channel_required() {
         let message = r#"{"event":"first", "color": "blue"}"#;
-        let (_, address) = source(Some(HecAcknowledgementsConfig::default())).await;
+        let ack_config = HecAcknowledgementsConfig {
+            inner: true.into(),
+            ..Default::default()
+        };
+        let (_, address) = source(Some(ack_config)).await;
 
         let opts = SendWithOpts {
             channel: None,

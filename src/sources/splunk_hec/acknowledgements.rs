@@ -14,14 +14,16 @@ use tokio::time::interval;
 use vector_core::event::BatchStatusReceiver;
 use warp::Rejection;
 
-use crate::shutdown::ShutdownSignal;
 use crate::sources::util::finalizer::OrderedFinalizer;
+use crate::{config::AcknowledgementsConfig, shutdown::ShutdownSignal};
 
 use super::ApiError;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(default)]
 pub struct HecAcknowledgementsConfig {
+    #[serde(flatten)]
+    pub inner: AcknowledgementsConfig,
     pub max_pending_acks: NonZeroU64,
     pub max_number_of_ack_channels: NonZeroU64,
     pub max_pending_acks_per_channel: NonZeroU64,
@@ -32,11 +34,21 @@ pub struct HecAcknowledgementsConfig {
 impl Default for HecAcknowledgementsConfig {
     fn default() -> Self {
         Self {
+            inner: AcknowledgementsConfig::default(),
             max_pending_acks: NonZeroU64::new(10_000_000).unwrap(),
             max_number_of_ack_channels: NonZeroU64::new(1_000_000).unwrap(),
             max_pending_acks_per_channel: NonZeroU64::new(1_000_000).unwrap(),
             ack_idle_cleanup: false,
             max_idle_time: NonZeroU64::new(300).unwrap(),
+        }
+    }
+}
+
+impl From<bool> for HecAcknowledgementsConfig {
+    fn from(enabled: bool) -> Self {
+        Self {
+            inner: enabled.into(),
+            ..Default::default()
         }
     }
 }
@@ -140,7 +152,9 @@ impl IndexerAcknowledgement {
         let channels = self.channels.lock().await;
         let mut ordered_channels = channels.values().collect::<Vec<_>>();
         ordered_channels.sort_by_key(|a| a.get_last_used());
-        ordered_channels.iter().any(|channel| channel.drop_oldest_pending_ack())
+        ordered_channels
+            .iter()
+            .any(|channel| channel.drop_oldest_pending_ack())
     }
 }
 
@@ -317,6 +331,7 @@ mod tests {
     async fn test_indexer_ack_exceed_max_pending_acks_drop_acks() {
         let shutdown = ShutdownSignal::noop().shared();
         let config = HecAcknowledgementsConfig {
+            inner: true.into(),
             max_pending_acks: NonZeroU64::new(10).unwrap(),
             ..Default::default()
         };
@@ -359,6 +374,7 @@ mod tests {
     async fn test_indexer_ack_exceed_max_pending_acks_server_busy() {
         let shutdown = ShutdownSignal::noop().shared();
         let config = HecAcknowledgementsConfig {
+            inner: true.into(),
             max_pending_acks: NonZeroU64::new(1).unwrap(),
             ..Default::default()
         };
@@ -381,7 +397,10 @@ mod tests {
     #[tokio::test]
     async fn test_indexer_ack_create_channels() {
         let shutdown = ShutdownSignal::noop().shared();
-        let config = HecAcknowledgementsConfig::default();
+        let config = HecAcknowledgementsConfig {
+            inner: true.into(),
+            ..Default::default()
+        };
         let idx_ack = IndexerAcknowledgement::new(config, shutdown);
 
         let channel_one = idx_ack
@@ -408,6 +427,7 @@ mod tests {
     async fn test_indexer_ack_create_channels_exceed_max_number_of_ack_channels() {
         let shutdown = ShutdownSignal::noop().shared();
         let config = HecAcknowledgementsConfig {
+            inner: true.into(),
             max_number_of_ack_channels: NonZeroU64::new(1).unwrap(),
             ..Default::default()
         };
@@ -428,6 +448,7 @@ mod tests {
     async fn test_indexer_ack_channel_idle_expiration() {
         let shutdown = ShutdownSignal::noop().shared();
         let config = HecAcknowledgementsConfig {
+            inner: true.into(),
             max_number_of_ack_channels: NonZeroU64::new(1).unwrap(),
             ack_idle_cleanup: true,
             max_idle_time: NonZeroU64::new(1).unwrap(),
@@ -439,7 +460,7 @@ mod tests {
             .await
             .unwrap();
         // Allow channel to expire and free up the max channel limit of 1
-        sleep(time::Duration::from_secs(2)).await;
+        sleep(time::Duration::from_secs(3)).await;
         assert!(idx_ack
             .create_or_get_channel(String::from("channel-id-2"))
             .await
@@ -450,6 +471,7 @@ mod tests {
     async fn test_indexer_ack_channel_active_does_not_expire() {
         let shutdown = ShutdownSignal::noop().shared();
         let config = HecAcknowledgementsConfig {
+            inner: true.into(),
             ack_idle_cleanup: true,
             max_idle_time: NonZeroU64::new(2).unwrap(),
             ..Default::default()
