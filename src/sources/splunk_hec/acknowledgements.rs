@@ -66,7 +66,7 @@ impl IndexerAcknowledgement {
                     let now = Instant::now();
 
                     channels.retain(|_, channel| {
-                        now.duration_since(channel.get_last_used()).as_secs() < max_idle_time
+                        now.duration_since(channel.get_last_used()).as_secs() <= max_idle_time
                     });
                 }
             });
