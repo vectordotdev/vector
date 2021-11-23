@@ -5,7 +5,7 @@ resource "kubernetes_config_map" "lading" {
   }
 
   data = {
-    "tcp_gen.toml" = var.tcp-gen-toml
+    "tcp_gen.yaml" = var.tcp-gen-yaml
   }
 }
 

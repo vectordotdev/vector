@@ -5,7 +5,7 @@ resource "kubernetes_config_map" "lading" {
   }
 
   data = {
-    "http_gen.toml" = var.http-gen-toml
+    "http_gen.yaml" = var.http-gen-yaml
   }
 }
 
