@@ -188,7 +188,7 @@ impl HttpSink for InfluxDbLogsSink {
         let mut output = String::new();
         if let Err(error) = influx_line_protocol(
             self.protocol_version,
-            measurement,
+            &measurement,
             "logs",
             Some(tags),
             Some(fields),

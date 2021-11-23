@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.18.0"
+version = "0.19.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2021"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -113,7 +113,7 @@ datadog-search-syntax = { path = "lib/datadog/search-syntax", optional = true }
 async-stream = "0.3.2"
 async-trait = "0.1.51"
 futures = { version = "0.3.17", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.13.0", default-features = false, features = ["full"] }
+tokio = { version = "1.13.1", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.8", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.6", default-features = false, features = ["time"] }
@@ -572,7 +572,7 @@ transforms-logfmt_parser = ["logfmt"]
 transforms-lua = ["mlua", "vector_core/lua"]
 transforms-merge = []
 transforms-metric_to_log = []
-transforms-pipelines = []
+transforms-pipelines = ["transforms-filter"]
 transforms-reduce = []
 transforms-regex_parser = []
 transforms-remap = []

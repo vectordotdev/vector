@@ -1,5 +1,5 @@
 variable "type" {
-  description = "The type of the vector install, whether 'baseline' or 'comparision'"
+  description = "The type of the vector install, whether 'baseline' or 'comparison'"
   type        = string
 }
 
@@ -11,4 +11,9 @@ variable "vector_image" {
 variable "vector_cpus" {
   description = "The total number of CPUs to give to vector"
   type        = number
+}
+
+variable "lading_image" {
+  description = "The lading image to run"
+  type        = string
 }

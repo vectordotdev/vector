@@ -62,6 +62,10 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         errors.extend(type_errors);
     }
 
+    if let Err(e) = graph.check_for_cycles() {
+        errors.push(e);
+    }
+
     // Inputs are resolved from string into OutputIds as part of graph construction, so update them
     // here before adding to the final config (the types require this).
     let sinks = sinks

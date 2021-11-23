@@ -260,7 +260,7 @@ fn encode_events(
 
         if let Err(error) = influx_line_protocol(
             protocol_version,
-            fullname,
+            &fullname,
             metric_type,
             tags,
             fields,

@@ -320,7 +320,7 @@ impl LokiSink {
                 let res = filter.filter_record(record);
                 async { res }
             })
-            .batched(RecordPartitionner::default(), self.batch_settings)
+            .batched_partitioned(RecordPartitionner::default(), self.batch_settings)
             .request_builder(NonZeroUsize::new(1), self.request_builder)
             .filter_map(|request| async move {
                 match request {

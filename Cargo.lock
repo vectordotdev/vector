@@ -1295,6 +1295,16 @@ dependencies = [
 
 [[package]]
 name = "chrono-tz"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2554a3155fec064362507487171dcc4edc3df60cb10f3a1fb10ed8094822b120"
+dependencies = [
+ "chrono",
+ "parse-zoneinfo",
+]
+
+[[package]]
+name = "chrono-tz"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "64c01c1c607d25c71bbaa67c113d6c6b36c434744b4fd66691d711b5b1bc0c8b"
@@ -1917,6 +1927,8 @@ name = "datadog-grok"
 version = "0.1.0"
 dependencies = [
  "bytes 1.1.0",
+ "chrono",
+ "chrono-tz 0.5.3",
  "derivative",
  "grok",
  "itertools",
@@ -1926,6 +1938,7 @@ dependencies = [
  "lookup",
  "onig",
  "ordered-float",
+ "peeking_take_while",
  "percent-encoding",
  "regex",
  "serde",
@@ -6476,7 +6489,7 @@ version = "0.1.0"
 dependencies = [
  "bytes 1.1.0",
  "chrono",
- "chrono-tz",
+ "chrono-tz 0.6.0",
  "derivative",
  "nom 7.1.0",
  "serde",
@@ -6671,6 +6684,8 @@ dependencies = [
  "snafu",
  "tokio",
  "toml",
+ "tracing 0.1.29",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -7174,9 +7189,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.13.0"
+version = "1.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "588b2d10a336da58d877567cd8fb8a14b463e2104910f8132cd054b4b96e29ee"
+checksum = "70e992e41e0d2fb9f755b37446f20900f64446ef54874f40a60c78f021ac6144"
 dependencies = [
  "autocfg",
  "bytes 1.1.0",
@@ -7216,9 +7231,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-macros"
-version = "1.5.0"
+version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2dd85aeaba7b68df939bd357c6afb36c87951be9e80bf9c859f2fc3e9fca0fd"
+checksum = "c9efc1aba077437943f7515666aa2b882dfabfbfdf89c819ea75a8d6e9eaba5e"
 dependencies = [
  "proc-macro2 1.0.30",
  "quote 1.0.10",
@@ -7559,15 +7574,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e0d2eaa99c3c2e41547cfa109e910a68ea03823cccad4a0525dcbc9b01e8c71"
 dependencies = [
  "ansi_term 0.12.1",
+ "chrono",
  "lazy_static",
  "matchers",
  "regex",
  "serde",
  "serde_json",
  "sharded-slab",
+ "smallvec",
  "thread_local",
  "tracing 0.1.29",
  "tracing-core 0.1.21",
+ "tracing-log",
  "tracing-serde",
 ]
 
@@ -7907,7 +7925,7 @@ checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
 
 [[package]]
 name = "vector"
-version = "0.18.0"
+version = "0.19.0"
 dependencies = [
  "approx",
  "assert_cmd",
@@ -8280,10 +8298,11 @@ dependencies = [
  "bytes 1.1.0",
  "cached",
  "chrono",
- "chrono-tz",
+ "chrono-tz 0.6.0",
  "cidr-utils",
  "criterion",
  "csv",
+ "datadog-grok",
  "datadog-search-syntax",
  "dns-lookup",
  "grok",
@@ -8319,7 +8338,7 @@ version = "0.1.0"
 dependencies = [
  "ansi_term 0.12.1",
  "chrono",
- "chrono-tz",
+ "chrono-tz 0.6.0",
  "enrichment",
  "glob",
  "prettydiff",

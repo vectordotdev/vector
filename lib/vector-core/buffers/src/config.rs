@@ -262,6 +262,7 @@ impl BufferConfig {
     /// If a disk buffer stage is configured and the data directory provided is `None`, an error
     /// variant will be thrown.
     #[cfg_attr(not(feature = "disk-buffer"), allow(unused))]
+    #[allow(clippy::needless_pass_by_value)]
     pub fn build<T>(
         &self,
         data_dir: &Option<PathBuf>,

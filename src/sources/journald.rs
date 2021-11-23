@@ -392,7 +392,7 @@ impl JournaldSource {
 }
 
 /// A function that starts journalctl process.
-/// Return a stream of output splitted by '\n', and a `StopJournalctlFn`.
+/// Return a stream of output split by '\n', and a `StopJournalctlFn`.
 ///
 /// Code uses `start_journalctl` below,
 /// but we need this type to implement fake journald source in testing.
@@ -462,10 +462,7 @@ fn create_command(
 }
 
 fn create_event(record: Record, batch: &Option<Arc<BatchNotifier>>) -> Event {
-    let mut log = LogEvent::from_iter(record);
-    if let Some(batch) = batch {
-        log = log.with_batch_notifier(batch);
-    }
+    let mut log = LogEvent::from_iter(record).with_batch_notifier_option(batch);
 
     // Convert some journald-specific field names into Vector standard ones.
     if let Some(message) = log.remove(MESSAGE) {

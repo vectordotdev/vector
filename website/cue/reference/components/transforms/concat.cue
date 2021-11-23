@@ -34,7 +34,7 @@ components: transforms: concat: {
 
 	configuration: {
 		items: {
-			description: "A list of substring definitons in the format of source_field[start..end]. For both start and end negative values are counted from the end of the string."
+			description: "A list of substring definitions in the format of source_field[start..end]. For both start and end negative values are counted from the end of the string."
 			required:    true
 			type: array: items: type: string: {
 				examples: ["first[..3]", "second[-5..]", "third[3..6]"]

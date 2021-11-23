@@ -63,7 +63,7 @@ pub struct TcpSocketConnectionError {
 impl InternalEvent for TcpSocketConnectionError {
     fn emit_logs(&self) {
         match self.error {
-            // Specific error that occures when the other side is only
+            // Specific error that occurs when the other side is only
             // doing SYN/SYN-ACK connections for healthcheck.
             // https://github.com/timberio/vector/issues/7318
             TlsError::Handshake { ref source }

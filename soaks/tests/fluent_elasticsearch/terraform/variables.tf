@@ -12,3 +12,8 @@ variable "vector_cpus" {
   description = "The total number of CPUs to give to vector"
   type        = number
 }
+
+variable "lading_image" {
+  description = "The lading image to run"
+  type        = string
+}

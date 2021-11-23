@@ -69,7 +69,7 @@ your editor to give them better IDs, e.g. `s/transform2/scrub_emails/g`.
 
 ## Testing Configs
 
-Test driven Configurationn is a paradigm we just made up, so there's still time
+Test driven Configuration is a paradigm we just made up, so there's still time
 for you to adopt it _before_ it's cool. Vector supports complementing your
 configs with [unit tests][guides.unit-testing], and as it turns out
 they're also pretty useful during the building stage.
