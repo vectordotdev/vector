@@ -108,7 +108,7 @@ async fn config(
         batch,
         request: TowerRequestConfig::default(),
         tls: None,
-        indexer_acknowledgements: Some(HecClientAcknowledgementsConfig::default()),
+        acknowledgements: Some(HecClientAcknowledgementsConfig::default()),
     }
 }
 
@@ -326,7 +326,7 @@ async fn splunk_indexer_acknowledgements() {
 
     let config = HecSinkLogsConfig {
         token: String::from(ACK_TOKEN),
-        indexer_acknowledgements: Some(acknowledgements_config),
+        acknowledgements: Some(acknowledgements_config),
         ..config(HecLogsEncoder::Json, vec!["asdf".to_string()]).await
     };
     let (sink, _) = config.build(cx).await.unwrap();

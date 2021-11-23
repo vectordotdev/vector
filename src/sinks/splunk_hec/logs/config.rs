@@ -53,7 +53,7 @@ pub struct HecSinkLogsConfig {
     pub tls: Option<TlsOptions>,
     // Optional to disable for Humio sinks
     #[serde(default = "default_hec_client_acknowledgements_config")]
-    pub indexer_acknowledgements: Option<HecClientAcknowledgementsConfig>,
+    pub acknowledgements: Option<HecClientAcknowledgementsConfig>,
 }
 
 impl GenerateConfig for HecSinkLogsConfig {
@@ -71,7 +71,7 @@ impl GenerateConfig for HecSinkLogsConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
-            indexer_acknowledgements: Some(HecClientAcknowledgementsConfig::default()),
+            acknowledgements: Some(HecClientAcknowledgementsConfig::default()),
         })
         .unwrap()
     }
@@ -120,7 +120,7 @@ impl HecSinkLogsConfig {
             .service(HecService::new(
                 client,
                 http_request_builder,
-                self.indexer_acknowledgements.clone(),
+                self.acknowledgements.clone(),
             ));
 
         let batch_settings = self.batch.into_batcher_settings()?;

@@ -45,7 +45,7 @@ pub struct HecMetricsSinkConfig {
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
     #[serde(default = "default_hec_client_acknowledgements_config")]
-    pub indexer_acknowledgements: Option<HecClientAcknowledgementsConfig>,
+    pub acknowledgements: Option<HecClientAcknowledgementsConfig>,
 }
 
 impl GenerateConfig for HecMetricsSinkConfig {
@@ -62,7 +62,7 @@ impl GenerateConfig for HecMetricsSinkConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
-            indexer_acknowledgements: Some(HecClientAcknowledgementsConfig::default()),
+            acknowledgements: Some(HecClientAcknowledgementsConfig::default()),
         })
         .unwrap()
     }
@@ -109,7 +109,7 @@ impl HecMetricsSinkConfig {
             .service(HecService::new(
                 client,
                 http_request_builder,
-                self.indexer_acknowledgements.clone(),
+                self.acknowledgements.clone(),
             ));
 
         let batch_settings = self.batch.into_batcher_settings()?;

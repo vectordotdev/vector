@@ -92,7 +92,7 @@ impl HumioLogsConfig {
             batch: self.batch,
             request: self.request,
             tls: self.tls.clone(),
-            indexer_acknowledgements: None,
+            acknowledgements: None,
         }
     }
 }
