@@ -139,8 +139,6 @@ components: sources: datadog_agent: {
 		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
 		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		datadog_logs_received_in_total:       components.sources.internal_metrics.output.metrics.datadog_logs_received_in_total
-		datadog_metrics_received_in_total:    components.sources.internal_metrics.output.metrics.datadog_metrics_received_in_total
 		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
 	}
 }

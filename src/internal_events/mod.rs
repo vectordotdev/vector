@@ -37,8 +37,6 @@ mod concat;
 mod conditions;
 #[cfg(feature = "sinks-console")]
 mod console;
-#[cfg(feature = "sources-datadog_agent")]
-mod datadog_agent;
 #[cfg(feature = "sinks-datadog_events")]
 mod datadog_events;
 #[cfg(feature = "sinks-datadog_logs")]
@@ -189,8 +187,6 @@ pub use self::concat::*;
 pub use self::conditions::*;
 #[cfg(feature = "sinks-console")]
 pub use self::console::*;
-#[cfg(feature = "sources-datadog_agent")]
-pub use self::datadog_agent::*;
 #[cfg(feature = "sinks-datadog_events")]
 pub use self::datadog_events::*;
 #[cfg(feature = "sinks-datadog_logs")]

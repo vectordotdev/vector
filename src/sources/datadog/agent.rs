@@ -10,9 +10,7 @@ use crate::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
     },
-    internal_events::{
-        DatadogAgentLogDecoded, DatadogAgentMetricDecoded, HttpBytesReceived, HttpDecompressError,
-    },
+    internal_events::{EventsReceived, HttpBytesReceived, HttpDecompressError},
     serde::{default_decoding, default_framing_message_based},
     sources::{
         self,
@@ -33,6 +31,7 @@ use std::collections::BTreeMap;
 use std::{io::Read, net::SocketAddr, sync::Arc};
 use tokio_util::codec::Decoder;
 use vector_core::event::{BatchNotifier, BatchStatus};
+use vector_core::ByteSizeOf;
 use warp::{
     filters::BoxedFilter, path, path::FullPath, reject::Rejection, reply::Response, Filter, Reply,
 };
@@ -361,8 +360,8 @@ impl DatadogAgentSource {
             )
         })?;
 
-        emit!(&DatadogAgentMetricDecoded {
-            byte_size: body.len(),
+        emit!(&EventsReceived {
+            byte_size: metrics.size_of(),
             count: metrics.len(),
         });
 
@@ -390,16 +389,18 @@ impl DatadogAgentSource {
             )
         })?;
 
-        emit!(&DatadogAgentMetricDecoded {
-            byte_size: body.len(),
-            count: metrics.series.len(),
-        });
-
-        Ok(metrics
+        let decoded_metrics: Vec<Event> = metrics
             .series
             .into_iter()
             .flat_map(|m| into_vector_metric(m, api_key.clone()))
-            .collect())
+            .collect();
+
+        emit!(&EventsReceived {
+            byte_size: decoded_metrics.size_of(),
+            count: decoded_metrics.len(),
+        });
+
+        Ok(decoded_metrics)
     }
 
     fn decode_log_body(
@@ -465,8 +466,8 @@ impl DatadogAgentSource {
                 }
             }
         }
-        emit!(&DatadogAgentLogDecoded {
-            byte_size: body.len(),
+        emit!(&EventsReceived {
+            byte_size: decoded.size_of(),
             count: decoded.len(),
         });
 
