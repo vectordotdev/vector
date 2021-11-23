@@ -140,12 +140,7 @@ impl IndexerAcknowledgement {
         let channels = self.channels.lock().await;
         let mut ordered_channels = channels.values().collect::<Vec<_>>();
         ordered_channels.sort_by_key(|a| a.get_last_used());
-        for channel in ordered_channels {
-            if channel.drop_oldest_pending_ack() {
-                return true;
-            }
-        }
-        false
+        ordered_channels.iter().any(|channel| channel.drop_oldest_pending_ack())
     }
 }
 
