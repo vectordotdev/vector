@@ -44,7 +44,7 @@ pub enum LedgerLoadCreateError {
 ///
 /// Doing so will change the serialized representation.  This will break things.
 ///
-/// Do not do any of the listed things unless you _absolute_ know what you're doing. :)
+/// Do not do any of the listed things unless you _absolutely_ know what you're doing. :)
 #[derive(Archive, Serialize, Debug)]
 #[archive_attr(derive(CheckBytes, Debug))]
 pub struct LedgerState {

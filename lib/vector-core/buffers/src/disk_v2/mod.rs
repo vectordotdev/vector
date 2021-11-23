@@ -10,9 +10,10 @@
 //! can stay simple and understandable:
 //! - buffer can grow to a maximum of ~8TB in total size
 //! - data files do not exceed 128MB
-//! - more more than 65,536 data files can exist at any given time
+//! - no more than 65,536 data files can exist at any given time
+//! - buffer can grow to a maximum of ~8TB in total size (65k files * 128MB)
 //! - all records are checksummed (CRC32C)
-//! - all records are written sequentially/contiguous, and do not span over multiple data files
+//! - all records are written sequentially/contiguously, and do not span over multiple data files
 //! - writers create and write to data files, while readers read from and delete data files
 //! - endianness of the files is based on the host system (we don't support loading the buffer files
 //!   on a system with different endianness)
@@ -25,6 +26,7 @@
 //! writer always creates new files, and the reader deletes files when they have been fully read.
 //!
 //! ### Record structure
+//!
 //! Records are packed together with a relatively simple pseudo-structure:
 //!   record:
 //!     record_len: uint32
@@ -88,6 +90,7 @@
 //! reaching 2^64, which will take a really, really, really long time.
 //!
 //! # Implementation TODOs:
+//!
 //! - make file size limits configurable for testing purposes (we could easily write 2-3x of the
 //!   128MB target under test, but it'd be faster if we didn't have to, and doing that would take a
 //!   while to exercise certain logic like file ID wraparound)

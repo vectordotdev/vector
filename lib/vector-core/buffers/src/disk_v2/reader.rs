@@ -5,6 +5,7 @@ use std::{
     sync::Arc,
 };
 
+use core_common::internal_event::emit;
 use crc32fast::Hasher;
 use rkyv::{archived_root, AlignedVec};
 use snafu::{ResultExt, Snafu};
@@ -13,7 +14,7 @@ use tokio::{
     io::{AsyncBufReadExt, AsyncRead, BufReader},
 };
 
-use crate::{bytes::DecodeBytes, Bufferable};
+use crate::{bytes::DecodeBytes, internal_events::EventsCorrupted, Bufferable};
 
 use super::{
     ledger::Ledger,
@@ -280,14 +281,10 @@ where
                 // If `n` is equal to `record_id`, that means the process restarted and we're
                 // seeking to the last record that we marked ourselves as having read, so no issues.
                 if n != record_id {
-                    println!(
-                        "skipped records; last {}, now {} (delta={})",
-                        previous_id, record_id, id_delta
-                    );
-
-                    // TODO: This is where we would emit an actual metric to track the corrupted
-                    // (and thus dropped) events we just skipped over.
-                    let _corrupted_events = id_delta - 1;
+                    let corrupted_events = id_delta - 1;
+                    emit(&EventsCorrupted {
+                        count: corrupted_events,
+                    });
                 }
             }
         }
