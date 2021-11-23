@@ -5,7 +5,7 @@ resource "kubernetes_config_map" "lading" {
   }
 
   data = {
-    "splunk_hec_blackhole.toml" = var.splunk-hec-blackhole-toml
+    "splunk_hec_blackhole.yaml" = var.splunk-hec-blackhole-yaml
   }
 }
 
