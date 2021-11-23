@@ -272,13 +272,16 @@ impl PrometheusExporter {
         let address = self.config.address;
 
         tokio::spawn(async move {
+            #[allow(clippy::print_stderr)]
             let tls = MaybeTlsSettings::from_config(&tls, true)
                 .map_err(|error| eprintln!("Server TLS error: {}", error))?;
+            #[allow(clippy::print_stderr)]
             let listener = tls
                 .bind(&address)
                 .await
                 .map_err(|error| eprintln!("Server bind error: {}", error))?;
 
+            #[allow(clippy::print_stderr)]
             Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
                 .serve(new_service)
                 .with_graceful_shutdown(tripwire.then(crate::stream::tripwire_handler))
@@ -658,6 +661,10 @@ mod tests {
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
+    #![allow(clippy::print_stdout)] // tests
+    #![allow(clippy::print_stderr)] // tests
+    #![allow(clippy::dbg_macro)] // tests
+
     use super::*;
     use crate::{config::ProxyConfig, http::HttpClient, test_util::trace_init};
     use chrono::Utc;

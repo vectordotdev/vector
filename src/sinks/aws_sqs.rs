@@ -383,6 +383,8 @@ mod tests {
 #[cfg(feature = "aws-sqs-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    #![allow(clippy::print_stdout)] //tests
+
     use super::*;
     use crate::test_util::{random_lines_with_stream, random_string};
     use rusoto_core::Region;

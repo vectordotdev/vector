@@ -1,6 +1,6 @@
 use crate::{
     codecs::{CharacterDelimitedCodec, FramingError},
-    config::{log_schema, SourceContext},
+    config::{log_schema, AcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::aws_s3::source::{
         SqsMessageDeleteBatchFailed, SqsMessageDeletePartialFailure, SqsMessageDeleteSucceeded,
@@ -180,14 +180,18 @@ impl Ingestor {
         Ok(Ingestor { state })
     }
 
-    pub(super) async fn run(self, cx: SourceContext) -> Result<(), ()> {
+    pub(super) async fn run(
+        self,
+        cx: SourceContext,
+        acknowledgements: AcknowledgementsConfig,
+    ) -> Result<(), ()> {
         let mut handles = Vec::new();
         for _ in 0..self.state.client_concurrency {
             let process = IngestorProcess::new(
                 Arc::clone(&self.state),
                 cx.out.clone(),
                 cx.shutdown.clone(),
-                cx.acknowledgements.enabled,
+                acknowledgements.enabled,
             );
             let fut = async move { process.run().await };
             let handle = tokio::spawn(fut.in_current_span());

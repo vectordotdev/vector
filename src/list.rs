@@ -52,6 +52,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     transforms.retain(|name| !deprecated.contains(name));
     sinks.retain(|name| !deprecated.contains(name));
 
+    #[allow(clippy::print_stdout)]
     match opts.format {
         Format::Text => {
             println!("Sources:");

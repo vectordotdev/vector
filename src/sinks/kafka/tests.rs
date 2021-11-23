@@ -1,3 +1,5 @@
+#![allow(clippy::print_stdout)] // tests
+
 #[cfg(feature = "kafka-integration-tests")]
 #[cfg(test)]
 mod integration_test {

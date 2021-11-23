@@ -87,7 +87,7 @@ where
             .normalized::<DatadogMetricsNormalizer>()
             // We batch metrics by their endpoint i.e. series (counter, gauge, set) vs sketch
             // (distributions, aggregated histograms, metrics that are already sketches)
-            .batched(DatadogMetricsTypePartitioner, self.batch_settings)
+            .batched_partitioned(DatadogMetricsTypePartitioner, self.batch_settings)
             // We build our requests "incrementally", which means that for a single batch of
             // metrics, we might generate N requests to send them all, as Datadog has API-level
             // limits on payload size, so we keep adding metrics to a request until we reach the

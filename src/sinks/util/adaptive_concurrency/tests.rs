@@ -1,4 +1,5 @@
 #![cfg(all(test, feature = "sources-demo_logs"))]
+#![allow(clippy::print_stderr)] //tests
 
 use super::controller::ControllerStatistics;
 use crate::{
