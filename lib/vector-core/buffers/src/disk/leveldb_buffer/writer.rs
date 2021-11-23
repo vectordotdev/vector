@@ -180,7 +180,6 @@ where
         self.writebatch = Writebatch::new();
         self.batch_size = 0;
 
-        //println!("waking");
         self.write_notifier.wake();
     }
 }
@@ -190,7 +189,6 @@ where
     T: Bufferable,
 {
     fn drop(&mut self) {
-        println!("dropping writer");
         if let Some(event) = self.slot.take() {
             // This can happen if poll_close wasn't called which is a bug
             // or we are unwinding the stack.

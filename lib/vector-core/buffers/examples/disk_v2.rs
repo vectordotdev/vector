@@ -27,8 +27,6 @@ fn generate_record_cache() -> Vec<VariableMessage> {
 }
 
 fn main() {
-    console_subscriber::init();
-
     let mut args = std::env::args();
     let writer_count = args
         .nth(1)

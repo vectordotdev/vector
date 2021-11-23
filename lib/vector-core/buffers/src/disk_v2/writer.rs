@@ -137,8 +137,6 @@ where
             match serializer.serialize_value(&record) {
                 Ok(_) => Ok(serializer.pos()),
                 Err(e) => match e {
-                    // AlignedSerializer is infallible so we should never hit this.
-                    CompositeSerializerError::SerializerError(_) => unreachable!(),
                     CompositeSerializerError::ScratchSpaceError(sse) => {
                         return Err(WriterError::FailedToSerialize {
                             reason: format!(
@@ -147,8 +145,9 @@ where
                             ),
                         })
                     }
-                    // We aren't serializing shared values (Infallible) so we should never hit this.
-                    CompositeSerializerError::SharedError(_) => unreachable!(),
+                    // Only our scratch space strategy is fallible, so we should never get here.
+                    CompositeSerializerError::SerializerError(_)
+                    | CompositeSerializerError::SharedError(_) => unreachable!(),
                 },
             }
         }?;
@@ -157,12 +156,11 @@ where
         let wire_archive_len: u32 = archive_len
             .try_into()
             .expect("archive len should always fit into a u32");
-        let _ = self
-            .writer
+        self.writer
             .write_all(&wire_archive_len.to_be_bytes()[..])
             .await
             .context(Io)?;
-        let _ = self.writer.write_all(&self.ser_buf).await.context(Io)?;
+        self.writer.write_all(&self.ser_buf).await.context(Io)?;
 
         Ok(4 + archive_len)
     }
@@ -238,7 +236,7 @@ where
 
     /// Validates that the last write in the current writer data file matches the ledger.
     pub async fn validate_last_write(&mut self) -> Result<(), WriterError<T>> {
-        let _ = self.ensure_ready_for_write().await.context(Io)?;
+        self.ensure_ready_for_write().await.context(Io)?;
 
         // If our current file is empty, there's no sense doing this check.
         if self.data_file_size == 0 {
@@ -269,8 +267,6 @@ where
             // We got a record (which may or may not be corrupted, still gotta check!) so keep going.
             Ok(archive) => {
                 let record = archive.get_archive_ref();
-                println!("last record: {:?}", record.debug());
-
                 match record.verify_checksum(&Hasher::new()) {
                     RecordStatus::Valid(id) => {
                         // Since we have a valid record, checksum and all, see if the writer record ID
@@ -340,7 +336,7 @@ where
             //
             // We still flush ourselves to disk, etc, to make sure all of the data is there.
             should_open_next = true;
-            let _ = self.flush().await?;
+            self.flush().await?;
 
             self.reset();
         }
@@ -413,7 +409,7 @@ where
                 // We successfully opened the file and it can be written to.
                 Some((data_file, data_file_size)) => {
                     // Make sure the file is flushed to disk, especially if we just created it.
-                    let _ = data_file.sync_all().await?;
+                    data_file.sync_all().await?;
 
                     self.writer = Some(RecordWriter::new(data_file, self.max_record_size));
                     self.data_file_size = data_file_size;
@@ -436,7 +432,7 @@ where
 
     /// Writes a record.
     pub async fn write_record(&mut self, record: T) -> Result<usize, WriterError<T>> {
-        let _ = self.ensure_ready_for_write().await.context(Io)?;
+        self.ensure_ready_for_write().await.context(Io)?;
 
         // Grab the next record ID and attempt to write the record.
         let id = self.ledger.state().get_next_writer_record_id();
@@ -472,13 +468,13 @@ where
         // TODO: Windows has a page cache as well, and macOS _should_, but we should verify this
         // behavior works on those platforms as well.
         if let Some(writer) = self.writer.as_mut() {
-            let _ = writer.flush().await?;
+            writer.flush().await?;
             self.ledger.notify_writer_waiters();
         }
 
         if self.ledger.should_flush() {
             if let Some(writer) = self.writer.as_mut() {
-                let _ = writer.sync_all().await?;
+                writer.sync_all().await?;
             }
 
             self.ledger.flush()

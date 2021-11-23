@@ -54,6 +54,23 @@ where
     },
 }
 
+impl<T> ReaderError<T>
+where
+    T: Bufferable,
+{
+    /// Gets whether or not this error represents a "bad" read.
+    ///
+    /// A bad read would be consider a read that involved no I/O error, but was not valid i.e.
+    /// checksums didn't match, or deserialization failed.
+    pub fn is_bad_read(&self) -> bool {
+        match self {
+            ReaderError::InvalidChecksum { .. } => true,
+            ReaderError::FailedToDeserialize { .. } => true,
+            _ => false,
+        }
+    }
+}
+
 pub struct RecordReader<R, T> {
     reader: BufReader<R>,
     aligned_buf: AlignedVec,
@@ -216,10 +233,10 @@ where
 
         // Delete the current data file, and increment our reader file ID.
         let data_file_path = self.ledger.get_current_reader_data_file_path();
-        let _ = fs::remove_file(&data_file_path).await?;
+        fs::remove_file(&data_file_path).await?;
 
         self.ledger.state().increment_reader_file_id();
-        let _ = self.ledger.flush()?;
+        self.ledger.flush()?;
 
         // Notify any waiting writers that we've deleted a data file, which they may be waiting on
         // because they're looking to reuse the file ID of the file we just finished reading.
@@ -326,7 +343,7 @@ where
     /// Reads a record.
     pub async fn next(&mut self) -> Result<T, ReaderError<T>> {
         let token = loop {
-            let _ = self.ensure_ready_for_read().await.context(Io)?;
+            self.ensure_ready_for_read().await.context(Io)?;
             let reader = self
                 .reader
                 .as_mut()
@@ -368,18 +385,16 @@ where
                 // As I type this all out, we're also theoretically vulnerable to that right now on
                 // the very first read, not just after encountering our first known-to-be-corrupted
                 // record.
-                Err(e) => match e {
+                Err(e) => {
                     // Invalid checksums and deserialization failures can't really be acted upon by
                     // the caller, but they might be expecting a read-after-write behavior, so we
                     // return the error to them after ensuring that we roll to the next file first.
-                    e @ ReaderError::InvalidChecksum { .. }
-                    | e @ ReaderError::FailedToDeserialize { .. } => {
-                        let _ = self.roll_to_next_data_file().await.context(Io)?;
-                        return Err(e);
+                    if e.is_bad_read() {
+                        self.roll_to_next_data_file().await.context(Io)?;
                     }
-                    // Nothing specific to do about an I/O error or decoding failure.
-                    e => return Err(e),
-                },
+
+                    return Err(e);
+                }
             };
 
             // Fundamentally, when `try_read_record` returns `None`, there's two possible scenarios:
@@ -407,7 +422,7 @@ where
             self.ledger.wait_for_writer().await;
 
             if current_writer_file_id != current_reader_file_id {
-                let _ = self.roll_to_next_data_file().await.context(Io)?;
+                self.roll_to_next_data_file().await.context(Io)?;
             }
         };
 

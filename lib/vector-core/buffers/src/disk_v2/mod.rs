@@ -81,8 +81,8 @@
 //!
 //! As the disk buffer structure is meant to emulate a ring buffer, most of the bookkeeping resolves around the
 //! writer and reader being able to quickly figure out where they left off.  Record and data file
-//! IDs are simply rolled over when they reach the maximum of their data type, aand are incremented
-//! monontonically as new data files are created, rather than trying to always allocate from the
+//! IDs are simply rolled over when they reach the maximum of their data type, and are incremented
+//! monotonically as new data files are created, rather than trying to always allocate from the
 //! lowest available ID.
 //!
 //! Additionally, record IDs are allocated in the same way: monotonic, sequential, and will wrap
@@ -154,13 +154,13 @@ where
             DATA_FILE_TARGET_MAX_SIZE,
             DATA_FILE_MAX_RECORD_SIZE,
         );
-        let _ = writer
+        writer
             .validate_last_write()
             .await
             .context(WriterSeekFailed)?;
 
         let mut reader = Reader::new(ledger);
-        let _ = reader
+        reader
             .seek_to_next_record()
             .await
             .context(ReaderSeekFailed)?;

@@ -134,9 +134,7 @@ where
                         Poll::Ready(r) => {
                             match r {
                                 Ok(items) => this.buffer.extend(items),
-                                Err(error) => {
-                                    error!(message = "Error during read", %error)
-                                }
+                                Err(error) => error!(message = "Error during read", %error),
                             }
 
                             this.pending_read = None;

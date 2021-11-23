@@ -71,15 +71,15 @@ pub struct LedgerState {
 impl Default for LedgerState {
     fn default() -> Self {
         Self {
-            total_records: Default::default(),
-            total_buffer_size: Default::default(),
+            total_records: AtomicU64::new(0),
+            total_buffer_size: AtomicU64::new(0),
             // First record written is always 1, so that our defualt of 0 for
             // `reader_last_record_id` ensures we start up in a state of "alright, waiting to read
             // record #1 next".
-            writer_next_record_id: 1.into(),
-            writer_current_data_file_id: Default::default(),
-            reader_current_data_file_id: Default::default(),
-            reader_last_record_id: Default::default(),
+            writer_next_record_id: AtomicU64::new(1),
+            writer_current_data_file_id: AtomicU16::new(0),
+            reader_current_data_file_id: AtomicU16::new(0),
+            reader_last_record_id: AtomicU64::new(0),
         }
     }
 }
@@ -190,23 +190,23 @@ impl Ledger {
 
     /// Waits for a signal from the reader that an entire data file has been read and subsequently deleted.
     pub async fn wait_for_reader(&self) {
-        self.reader_notify.notified().await
+        self.reader_notify.notified().await;
     }
 
     /// Waits for a signal from the writer that data has been written to a data file, or that a new
     /// data file has been created.
     pub async fn wait_for_writer(&self) {
-        self.writer_notify.notified().await
+        self.writer_notify.notified().await;
     }
 
     /// Notifies all tasks waiting on progress by the reader.
     pub fn notify_reader_waiters(&self) {
-        self.reader_notify.notify_waiters()
+        self.reader_notify.notify_waiters();
     }
 
     /// Notifies all tasks waiting on progress by the writer.
     pub fn notify_writer_waiters(&self) {
-        self.writer_notify.notify_waiters()
+        self.writer_notify.notify_waiters();
     }
 
     /// Determines whether or not all files should be flushed/fsync'd to disk.
@@ -217,7 +217,11 @@ impl Ledger {
     pub fn should_flush(&self) -> bool {
         let last_flush = self.last_flush.load();
         if last_flush.elapsed() > self.flush_interval {
-            if let Ok(_) = self.last_flush.compare_exchange(last_flush, Instant::now()) {
+            if self
+                .last_flush
+                .compare_exchange(last_flush, Instant::now())
+                .is_ok()
+            {
                 return true;
             }
         }
