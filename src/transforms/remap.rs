@@ -763,6 +763,61 @@ mod tests {
         );
     }
 
+    #[test]
+    fn check_remap_branching_disabled() {
+        let happy = Event::try_from(serde_json::json!({"hello": "world"})).unwrap();
+        let abort = Event::try_from(serde_json::json!({"hello": "goodbye"})).unwrap();
+        let error = Event::try_from(serde_json::json!({"hello": 42})).unwrap();
+
+        let conf = RemapConfig {
+            source: Some(formatdoc! {r#"
+                if exists(.tags) {{
+                    # metrics
+                    .tags.foo = "bar"
+                    if string!(.tags.hello) == "goodbye" {{
+                      abort
+                    }}
+                }} else {{
+                    # logs
+                    .foo = "bar"
+                    if string!(.hello) == "goodbye" {{
+                      abort
+                    }}
+                }}
+            "#}),
+            drop_on_error: true,
+            drop_on_abort: true,
+            reroute_dropped: false,
+            ..Default::default()
+        };
+
+        assert!(conf.named_outputs().is_empty());
+
+        let context = TransformContext {
+            key: Some(ComponentKey::from("remapper")),
+            ..Default::default()
+        };
+        let mut tform = Remap::new(conf, &context).unwrap();
+
+        let output = transform_one_fallible(&mut tform, happy).unwrap();
+        let log = output.as_log();
+        assert_eq!(log["hello"], "world".into());
+        assert_eq!(log["foo"], "bar".into());
+        assert!(!log.contains("metadata"));
+
+        let mut out = Vec::new();
+        let mut err = Vec::new();
+        tform.transform(&mut out, &mut err, abort);
+        assert!(out.is_empty());
+        assert!(err.is_empty());
+
+        let mut out = Vec::new();
+        let mut err = Vec::new();
+        tform.transform(&mut out, &mut err, error);
+        assert!(out.is_empty());
+        assert!(err.is_empty());
+    }
+
     fn transform_one_fallible(
         ft: &mut dyn FallibleFunctionTransform,
         event: Event,
