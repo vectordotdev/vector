@@ -28,7 +28,7 @@ pub(crate) fn decode_ddsketch(frame: Bytes, api_key: Option<Arc<str>>) -> Result
                 .tags
                 .iter()
                 .map(|tag| {
-                    let kv = tag.split_once(":").unwrap_or((&tag, ""));
+                    let kv = tag.split_once(":").unwrap_or((tag, ""));
                     (kv.0.trim().into(), kv.1.trim().into())
                 })
                 .collect();

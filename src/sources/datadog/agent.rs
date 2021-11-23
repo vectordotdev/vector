@@ -353,7 +353,7 @@ impl DatadogAgentSource {
             return Ok(Vec::new());
         }
 
-        let metrics = decode_ddsketch(body.clone(), api_key).map_err(|error| {
+        let metrics = decode_ddsketch(body, api_key).map_err(|error| {
             ErrorMessage::new(
                 StatusCode::UNPROCESSABLE_ENTITY,
                 format!("Error decoding Datadog sketch: {:?}", error),
@@ -512,20 +512,20 @@ fn into_vector_metric(dd_metric: DatadogSeriesMetric, api_key: Option<Arc<str>>)
         .unwrap_or_default()
         .iter()
         .map(|tag| {
-            let kv = tag.split_once(":").unwrap_or((&tag, ""));
+            let kv = tag.split_once(":").unwrap_or((tag, ""));
             (kv.0.trim().into(), kv.1.trim().into())
         })
         .collect();
 
     dd_metric
         .host
-        .and_then(|host| tags.insert(log_schema().host_key().to_owned(), host.to_owned()));
+        .and_then(|host| tags.insert(log_schema().host_key().to_owned(), host));
     dd_metric
         .source_type_name
-        .and_then(|source| tags.insert("source_type_name".into(), source.to_owned()));
+        .and_then(|source| tags.insert("source_type_name".into(), source));
     dd_metric
         .device
-        .and_then(|dev| tags.insert("device".into(), dev.to_owned()));
+        .and_then(|dev| tags.insert("device".into(), dev));
 
     match dd_metric.r#type {
         DatadogMetricType::Count => dd_metric
