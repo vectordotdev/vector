@@ -52,7 +52,56 @@ components: sources: splunk_hec: {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._acknowledgements & {
+			type: object: {
+				options: {
+					max_number_of_ack_channels: {
+						common:      false
+						description: "The maximum number of Splunk HEC channels clients can use with this source. Minimum of `1`."
+						required:    false
+						type: uint: {
+							default: 1000000
+							unit:    null
+						}
+					}
+					max_pending_acks: {
+						common:      false
+						description: "The maximum number of ack statuses pending query across all channels. Equivalent to the `max_number_of_acked_requests_pending_query` Splunk HEC setting. Minimum of `1`."
+						required:    false
+						type: uint: {
+							default: 10000000
+							unit:    null
+						}
+					}
+					max_pending_acks_per_channel: {
+						common:      false
+						description: "The maximum number of ack statuses pending query for a single channel. Equivalent to the `max_number_of_acked_requests_pending_query_per_ack_channel` Splunk HEC setting. Minimum of `1`."
+						required:    false
+						type: uint: {
+							default: 1000000
+							unit:    null
+						}
+					}
+					ack_idle_cleanup: {
+						common:      false
+						description: "Whether or not to remove channels after idling for `max_idle_time` seconds. A channel is idling if it is not used for sending data or querying ack statuses."
+						required:    false
+						type: bool: {
+							default: false
+						}
+					}
+					max_idle_time: {
+						common:      false
+						description: "The amount of time a channel is allowed to idle before removal. Channels can potentially idle for longer than this setting but clients should not rely on such behavior. Minimum of `1`."
+						required:    false
+						type: uint: {
+							default: 300
+							unit:    "seconds"
+						}
+					}
+				}
+			}
+		}
 		address: {
 			common:      true
 			description: "The address to accept connections on."
@@ -80,59 +129,6 @@ components: sources: splunk_hec: {
 
 				items: type: string: {
 					examples: ["A94A8FE5CCB19BA61C4C08"]
-				}
-			}
-		}
-		indexer_acknowledgements: {
-			common:      false
-			description: "The configuration for Splunk HEC indexer acknowledgements behavior. Only used if the `acknowledgements` option is enabled."
-			required:    false
-			type: object: {
-				options: {
-					max_number_of_ack_channels: {
-						common:      false
-						description: "The maximum number of Splunk HEC channels clients can use with this source. Minimum of 1."
-						required:    false
-						type: uint: {
-							default: 1000000
-							unit:    null
-						}
-					}
-					max_pending_acks: {
-						common:      false
-						description: "The maximum number of ack statuses pending query across all channels. Minimum of 1. Equivalent to the `max_number_of_acked_requests_pending_query` Splunk HEC setting."
-						required:    false
-						type: uint: {
-							default: 10000000
-							unit:    null
-						}
-					}
-					max_pending_acks_per_channel: {
-						common:      false
-						description: "The maximum number of ack statuses pending query for a single channel. Minimum of 1. Equivalent to the `max_number_of_acked_requests_pending_query_per_ack_channel` Splunk HEC setting."
-						required:    false
-						type: uint: {
-							default: 1000000
-							unit:    null
-						}
-					}
-					ack_idle_cleanup: {
-						common:      false
-						description: "Whether or not to remove channels after idling for `max_idle_time` seconds. Idling means that the channel is not used when sending data or when querying ack statuses."
-						required:    false
-						type: bool: {
-							default: false
-						}
-					}
-					max_idle_time: {
-						common:      false
-						description: "The amount of time a channel is allowed to idle before removal. Channels can potentially idle for longer than this setting but clients should not rely on such behavior. Minimum of 1."
-						required:    false
-						type: uint: {
-							default: 300
-							unit:    "seconds"
-						}
-					}
 				}
 			}
 		}
