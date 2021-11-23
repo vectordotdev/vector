@@ -22,7 +22,7 @@ interpreted as described in [RFC 2119].
    1. [Batching](#batching)
    1. [Events](#events)
       1. [BytesReceived](#bytesreceived)
-      1. [EventsRecevied](#eventsrecevied)
+      1. [EventsReceived](#eventsrecevied)
       1. [EventsSent](#eventssent)
       1. [BytesSent](#bytessent)
       1. [Error](#error)

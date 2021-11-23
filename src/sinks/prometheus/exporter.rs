@@ -301,7 +301,7 @@ impl StreamSink for PrometheusExporter {
             let mut metrics = self.metrics.write().unwrap();
 
             // sets need to be expired from time to time
-            // because otherwise they could grow infinitelly
+            // because otherwise they could grow infinitely
             let now = Utc::now().timestamp();
             let interval = now - metrics.last_flush_timestamp;
             if interval > self.config.flush_period_secs as i64 {

@@ -20,7 +20,7 @@ for collaboration and navigation; Vector users may have dozens of Vector
 configuration files, from multiple source files to countless sink files, in
 a single directory.
 
-Let's look at how we can refactor an existing set of Vector configuartion files.
+Let's look at how we can refactor an existing set of Vector configuration files.
 
 Assuming Vector is loaded using the configuration via `--config-dir /etc/vector`:
 

@@ -22,6 +22,9 @@ tracing = { version = "0.1.29", default-features = false }
 snafu = { version = "0.6", default-features = false }
 ordered-float = { version = "2", default-features = false }
 onig = {version  = "6.3.1", default-features = false }
+chrono = { version = "0.4.19", default-features = false }
+chrono-tz = { version = "0.5.3", default-features = false }
+peeking_take_while = { version = "0.1.2", default-features = false }
 
 # Internal
 lookup = { path = "../../lookup" }

@@ -77,7 +77,7 @@ impl TransformConfig for EventRouterConfig {
                     inner: self.filter.clone(),
                 }),
             );
-            res.insert("transforms".to_string(), inner.clone());
+            res.insert("pipelines".to_string(), inner.clone());
             Ok(Some((res, ExpandType::Serial { alias: true })))
         } else {
             Err("must specify at least one pipeline".into())

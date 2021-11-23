@@ -200,6 +200,13 @@ impl Event {
             Self::Metric(metric) => metric.with_batch_notifier(batch).into(),
         }
     }
+
+    pub fn with_batch_notifier_option(self, batch: &Option<Arc<BatchNotifier>>) -> Self {
+        match self {
+            Self::Log(log) => log.with_batch_notifier_option(batch).into(),
+            Self::Metric(metric) => metric.with_batch_notifier_option(batch).into(),
+        }
+    }
 }
 
 impl EventDataEq for Event {

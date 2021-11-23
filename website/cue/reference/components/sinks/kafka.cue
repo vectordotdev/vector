@@ -125,7 +125,7 @@ components: sinks: kafka: {
 		}
 		headers_key: {
 			common:      false
-			description: "The log field name to use for the Kafka headers. If ommited, no headers will be written."
+			description: "The log field name to use for the Kafka headers. If omitted, no headers will be written."
 			required:    false
 			type: string: {
 				default: null

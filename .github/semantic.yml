@@ -166,6 +166,7 @@ scopes:
   - lua transform # Anything `lua` transform related
   - merge transform # Anything `merge` transform related
   - metric_to_log transform # Anything `metric_to_log` transform related
+  - pipelines transform # Anything `pipelines` transform related
   - reduce transform # Anything `reduce` transform related
   - regex_parser transform # Anything `regex_parser` transform related
   - remap transform # Anything `remap` transform related
@@ -176,6 +177,7 @@ scopes:
   - sample transform # Anything `sample` transform related
   - split transform # Anything `split` transform related
   - tag_cardinality_limit transform # Anything `tag_cardinality_limit` transform related
+  - throttle transform # Anything `throttle` transform related
   - tokenizer transform # Anything `tokenizer` transform related
   - wasm transform # Anything `wasm` transform related
 

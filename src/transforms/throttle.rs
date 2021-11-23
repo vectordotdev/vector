@@ -226,7 +226,7 @@ window_secs = 5
             if let Some(_event) = out_stream.next().await {
                 count += 1;
             } else {
-                panic!("Unexpectedly recieved None in output stream");
+                panic!("Unexpectedly received None in output stream");
             }
         }
         assert_eq!(2, count);
@@ -245,7 +245,7 @@ window_secs = 5
         // The rate limiter should now be refreshed and allow an additional event through
         if let Some(_event) = out_stream.next().await {
         } else {
-            panic!("Unexpectedly recieved None in output stream");
+            panic!("Unexpectedly received None in output stream");
         }
 
         // We should be back to pending, having nothing waiting for us
@@ -292,7 +292,7 @@ exists(.special)
             if let Some(_event) = out_stream.next().await {
                 count += 1;
             } else {
-                panic!("Unexpectedly recieved None in output stream");
+                panic!("Unexpectedly received None in output stream");
             }
         }
         assert_eq!(2, count);
@@ -310,7 +310,7 @@ exists(.special)
         // The rate limiter should allow this log through regardless of current limit
         if let Some(_event) = out_stream.next().await {
         } else {
-            panic!("Unexpectedly recieved None in output stream");
+            panic!("Unexpectedly received None in output stream");
         }
 
         clock.advance(Duration::from_secs(3));
@@ -320,7 +320,7 @@ exists(.special)
         // The rate limiter should now be refreshed and allow an additional event through
         if let Some(_event) = out_stream.next().await {
         } else {
-            panic!("Unexpectedly recieved None in output stream");
+            panic!("Unexpectedly received None in output stream");
         }
 
         // We should be back to pending, having nothing waiting for us
@@ -369,7 +369,7 @@ key_field = "{{ bucket }}"
             if let Some(_event) = out_stream.next().await {
                 count += 1;
             } else {
-                panic!("Unexpectedly recieved None in output stream");
+                panic!("Unexpectedly received None in output stream");
             }
         }
         assert_eq!(2, count);

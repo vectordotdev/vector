@@ -129,7 +129,7 @@ components: sources: fluent: {
 				"""
 		}
 
-		fluentd_configuartion: {
+		fluentd_configuration: {
 			title: "Fluentd configuration"
 			body: """
 				To configure Fluentd to forward to a Vector instance, you can use the following output configuration:

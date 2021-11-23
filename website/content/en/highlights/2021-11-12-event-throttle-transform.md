@@ -58,7 +58,7 @@ window_secs = 60
 
 ...only one event will be allowed through:
 
-```
+```json
 {"host":"host-1.hostname.com","message":"First message","timestamp":"2020-10-07T12:33:21.223543Z"}
 ```
 
