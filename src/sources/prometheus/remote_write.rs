@@ -1,8 +1,18 @@
 use super::parser;
-use crate::{config::{self, AcknowledgementsConfig, GenerateConfig, SourceConfig, SourceContext, SourceDescription}, event::Event, internal_events::PrometheusRemoteWriteParseError, serde::bool_or_struct, sources::{
+use crate::{
+    config::{
+        self, AcknowledgementsConfig, GenerateConfig, SourceConfig, SourceContext,
+        SourceDescription,
+    },
+    event::Event,
+    internal_events::PrometheusRemoteWriteParseError,
+    serde::bool_or_struct,
+    sources::{
         self,
         util::{decode, ErrorMessage, HttpSource, HttpSourceAuthConfig},
-    }, tls::TlsConfig};
+    },
+    tls::TlsConfig,
+};
 use bytes::Bytes;
 use prometheus_parser::proto;
 use prost::Message;
@@ -45,7 +55,15 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
 impl SourceConfig for PrometheusRemoteWriteConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let source = RemoteWriteSource;
-        source.run(self.address, "", true, &self.tls, &self.auth, cx, self.acknowledgements)
+        source.run(
+            self.address,
+            "",
+            true,
+            &self.tls,
+            &self.auth,
+            cx,
+            self.acknowledgements,
+        )
     }
 
     fn output_type(&self) -> crate::config::DataType {

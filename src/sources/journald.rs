@@ -1,4 +1,15 @@
-use crate::{Pipeline, codecs::{BoxedFramingError, CharacterDelimitedCodec}, config::{AcknowledgementsConfig, DataType, SourceConfig, SourceContext, SourceDescription, log_schema}, event::{BatchNotifier, Event, LogEvent, Value}, internal_events::{BytesReceived, JournaldEventsReceived, JournaldInvalidRecordError}, serde::bool_or_struct, shutdown::ShutdownSignal};
+use crate::{
+    codecs::{BoxedFramingError, CharacterDelimitedCodec},
+    config::{
+        log_schema, AcknowledgementsConfig, DataType, SourceConfig, SourceContext,
+        SourceDescription,
+    },
+    event::{BatchNotifier, Event, LogEvent, Value},
+    internal_events::{BytesReceived, JournaldEventsReceived, JournaldInvalidRecordError},
+    serde::bool_or_struct,
+    shutdown::ShutdownSignal,
+    Pipeline,
+};
 use bytes::Bytes;
 use chrono::TimeZone;
 use futures::{future, stream, stream::BoxStream, SinkExt, StreamExt};

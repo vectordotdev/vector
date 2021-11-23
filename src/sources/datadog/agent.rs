@@ -1,7 +1,19 @@
-use crate::{Pipeline, codecs::{self, DecodingConfig, FramingConfig, ParserConfig}, config::{AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription, log_schema}, event::Event, internal_events::HttpDecompressError, serde::{bool_or_struct, default_decoding, default_framing_message_based}, sources::{
+use crate::{
+    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
+    config::{
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
+        SourceContext, SourceDescription,
+    },
+    event::Event,
+    internal_events::HttpDecompressError,
+    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    sources::{
         self,
         util::{ErrorMessage, TcpError},
-    }, tls::{MaybeTlsSettings, TlsConfig}};
+    },
+    tls::{MaybeTlsSettings, TlsConfig},
+    Pipeline,
+};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use chrono::Utc;
 use flate2::read::{DeflateDecoder, MultiGzDecoder};

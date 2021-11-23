@@ -1,9 +1,19 @@
-use crate::{codecs::{
+use crate::{
+    codecs::{
         self, BytesDecoderConfig, BytesParserConfig, DecodingConfig, FramingConfig,
         JsonParserConfig, NewlineDelimitedDecoderConfig, ParserConfig,
-    }, config::{AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription, log_schema}, event::{Event, Value}, serde::{bool_or_struct, default_decoding, default_framing_stream_based}, sources::util::{
+    },
+    config::{
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
+        SourceContext, SourceDescription,
+    },
+    event::{Event, Value},
+    serde::{bool_or_struct, default_decoding, default_framing_stream_based},
+    sources::util::{
         add_query_parameters, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
-    }, tls::TlsConfig};
+    },
+    tls::TlsConfig,
+};
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use http::StatusCode;

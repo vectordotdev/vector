@@ -1,5 +1,18 @@
 use super::util::finalizer::OrderedFinalizer;
-use crate::{Pipeline, codecs::{self, DecodingConfig, FramingConfig, ParserConfig}, config::{AcknowledgementsConfig, DataType, SourceConfig, SourceContext, SourceDescription, log_schema}, event::{BatchNotifier, Event, Value}, internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed}, kafka::{KafkaAuthConfig, KafkaStatisticsContext}, serde::{bool_or_struct, default_decoding, default_framing_message_based}, shutdown::ShutdownSignal, sources::util::TcpError};
+use crate::{
+    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
+    config::{
+        log_schema, AcknowledgementsConfig, DataType, SourceConfig, SourceContext,
+        SourceDescription,
+    },
+    event::{BatchNotifier, Event, Value},
+    internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
+    kafka::{KafkaAuthConfig, KafkaStatisticsContext},
+    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    shutdown::ShutdownSignal,
+    sources::util::TcpError,
+    Pipeline,
+};
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};

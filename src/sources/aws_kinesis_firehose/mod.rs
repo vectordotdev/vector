@@ -1,4 +1,12 @@
-use crate::{codecs::{DecodingConfig, FramingConfig, ParserConfig}, config::{AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription}, serde::{bool_or_struct, default_decoding, default_framing_message_based}, tls::{MaybeTlsSettings, TlsConfig}};
+use crate::{
+    codecs::{DecodingConfig, FramingConfig, ParserConfig},
+    config::{
+        AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
+        SourceDescription,
+    },
+    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    tls::{MaybeTlsSettings, TlsConfig},
+};
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use std::{fmt, net::SocketAddr};

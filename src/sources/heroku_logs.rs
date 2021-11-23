@@ -1,6 +1,17 @@
-use crate::{codecs::{self, DecodingConfig, FramingConfig, ParserConfig}, config::{AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription, log_schema}, event::Event, internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived}, serde::{bool_or_struct, default_decoding, default_framing_message_based}, sources::util::{
+use crate::{
+    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
+    config::{
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
+        SourceContext, SourceDescription,
+    },
+    event::Event,
+    internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
+    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    sources::util::{
         add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig, TcpError,
-    }, tls::TlsConfig};
+    },
+    tls::TlsConfig,
+};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -82,7 +93,15 @@ impl SourceConfig for LogplexConfig {
             query_parameters: self.query_parameters.clone(),
             decoder,
         };
-        source.run(self.address, "events", true, &self.tls, &self.auth, cx, self.acknowledgements)
+        source.run(
+            self.address,
+            "events",
+            true,
+            &self.tls,
+            &self.auth,
+            cx,
+            self.acknowledgements,
+        )
     }
 
     fn output_type(&self) -> DataType {

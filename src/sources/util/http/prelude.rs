@@ -3,7 +3,12 @@ use super::{
     encoding::decode,
     error::ErrorMessage,
 };
-use crate::{Pipeline, config::{AcknowledgementsConfig, SourceContext}, internal_events::{HttpBadRequest, HttpBytesReceived, HttpEventsReceived}, tls::{MaybeTlsSettings, TlsConfig}};
+use crate::{
+    config::{AcknowledgementsConfig, SourceContext},
+    internal_events::{HttpBadRequest, HttpBytesReceived, HttpEventsReceived},
+    tls::{MaybeTlsSettings, TlsConfig},
+    Pipeline,
+};
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};

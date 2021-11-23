@@ -1,4 +1,14 @@
-use crate::{Pipeline, config::SourceContext, config::{AcknowledgementsConfig, DataType, GenerateConfig, Resource}, internal_events::{EventsReceived, TcpBytesReceived}, proto::vector as proto, serde::bool_or_struct, shutdown::ShutdownSignalToken, sources::{util::AfterReadExt as _, Source}, tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig}};
+use crate::{
+    config::SourceContext,
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Resource},
+    internal_events::{EventsReceived, TcpBytesReceived},
+    proto::vector as proto,
+    serde::bool_or_struct,
+    shutdown::ShutdownSignalToken,
+    sources::{util::AfterReadExt as _, Source},
+    tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig},
+    Pipeline,
+};
 
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};

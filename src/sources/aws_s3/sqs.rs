@@ -1,8 +1,16 @@
-use crate::{Pipeline, codecs::{CharacterDelimitedCodec, FramingError}, config::{AcknowledgementsConfig, SourceContext, log_schema}, event::{BatchNotifier, BatchStatus, LogEvent}, internal_events::aws_s3::source::{
+use crate::{
+    codecs::{CharacterDelimitedCodec, FramingError},
+    config::{log_schema, AcknowledgementsConfig, SourceContext},
+    event::{BatchNotifier, BatchStatus, LogEvent},
+    internal_events::aws_s3::source::{
         SqsMessageDeleteBatchFailed, SqsMessageDeletePartialFailure, SqsMessageDeleteSucceeded,
         SqsMessageProcessingFailed, SqsMessageProcessingSucceeded, SqsMessageReceiveFailed,
         SqsMessageReceiveSucceeded, SqsS3EventReceived, SqsS3EventRecordInvalidEventIgnored,
-    }, line_agg::{self, LineAgg}, shutdown::ShutdownSignal};
+    },
+    line_agg::{self, LineAgg},
+    shutdown::ShutdownSignal,
+    Pipeline,
+};
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, SinkExt, Stream, StreamExt, TryFutureExt};
@@ -172,7 +180,11 @@ impl Ingestor {
         Ok(Ingestor { state })
     }
 
-    pub(super) async fn run(self, cx: SourceContext, acknowledgements: AcknowledgementsConfig) -> Result<(), ()> {
+    pub(super) async fn run(
+        self,
+        cx: SourceContext,
+        acknowledgements: AcknowledgementsConfig,
+    ) -> Result<(), ()> {
         let mut handles = Vec::new();
         for _ in 0..self.state.client_concurrency {
             let process = IngestorProcess::new(
