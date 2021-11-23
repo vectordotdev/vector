@@ -42,11 +42,20 @@ impl_generate_config_from_default!(RemapConfig);
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
     async fn build(&self, context: &TransformContext) -> Result<Transform> {
-        Remap::new(self.clone(), context).map(Transform::fallible_function)
+        let remap = Remap::new(self.clone(), context)?;
+        Ok(if self.reroute_dropped {
+            Transform::fallible_function(remap)
+        } else {
+            Transform::function(remap)
+        })
     }
 
     fn named_outputs(&self) -> Vec<String> {
-        vec![String::from("dropped")]
+        if self.reroute_dropped {
+            vec![String::from("dropped")]
+        } else {
+            vec![]
+        }
     }
 
     fn input_type(&self) -> DataType {
