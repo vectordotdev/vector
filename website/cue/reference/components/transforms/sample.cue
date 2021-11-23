@@ -46,7 +46,7 @@ components: transforms: sample: {
 				The set of logical conditions to exclude events from sampling.
 				"""
 			required: false
-			type: condition: syntaxes: [{ name: "vrl_boolean_expression" }]
+			type: condition: syntaxes: [{name: "vrl"}]
 		}
 		rate: {
 			description: """

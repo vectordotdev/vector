@@ -33,7 +33,7 @@ components: transforms: filter: {
 			required: true
 			type: condition: {
 				syntaxes: [{
-					name: "vrl_boolean_expression"
+					name: "vrl"
 				},
 					{
 						name: "datadog_search"

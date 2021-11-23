@@ -42,7 +42,7 @@ components: transforms: route: {
 							condition will be included in this route.
 							"""
 						required: true
-						type: condition: syntaxes: [{ name: "vrl_boolean_expression" }]
+						type: condition: syntaxes: [{name: "vrl"}]
 					}
 				}
 			}

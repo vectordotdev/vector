@@ -378,17 +378,20 @@ _values: {
 	required: Args.required
 
 	#Syntax: {
-		name:        "vrl_boolean_expression" | "datadog_search"
+		name:        "vrl" | "datadog_search"
 		description: !=""
 		example:     !=""
 
-		if name == "vrl_boolean_expression" {
-			description: "VRL Boolean!"
+		if name == "vrl" {
+			description: """
+				A [Vector Remap Language](\(urls.vrl_reference)) (VRL) [Boolean
+				expression](\(urls.vrl_boolean_expression)).
+				"""
 			example:     #".status_code != 200 && !includes(["info", "debug"], .severity)"#
 		}
 
 		if name == "datadog_search" {
-			description: "Datadog Search!"
+			description: "A [Datadog Search](\(urls.datadog_search_syntax)) query string."
 			example:     #"*stack"#
 		}
 	}
