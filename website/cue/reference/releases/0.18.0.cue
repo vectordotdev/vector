@@ -17,6 +17,8 @@ releases: "0.18.0": {
 
 		## Known Issues
 		- The `elasticsearch` sink incorrectly prints a message for each delivered event
+		- A change to internal telemetry causes aggregated histograms emitted by the
+		`prometheus_exporter` and `prometheus_remote_write` sinks to be incorrectly tallied.
 
 		## Features
 
