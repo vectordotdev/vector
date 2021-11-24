@@ -83,6 +83,7 @@ members = [
   "lib/lookup",
   "lib/vrl/cli",
   "lib/vrl/compiler",
+  "lib/vrl/compiler/src/precompiled",
   "lib/vrl/core",
   "lib/vrl/diagnostic",
   "lib/vrl/parser",

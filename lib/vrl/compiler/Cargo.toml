@@ -15,6 +15,7 @@ bitflags = "1"
 bytes = "1.1.0"
 chrono = "0.4"
 dyn-clone = "1.0.4"
+inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "master", features = ["llvm13-0"] }
 lalrpop-util = "0.19"
 ordered-float = "2"
 paste = "1"

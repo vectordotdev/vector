@@ -18,6 +18,7 @@ pub use self::regex::Regex;
 pub use error::Error;
 pub use kind::Kind;
 
+#[repr(C)]
 #[derive(Debug, Clone, Hash, PartialEq)]
 pub enum Value {
     Bytes(Bytes),

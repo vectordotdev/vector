@@ -1,6 +1,7 @@
 use crate::{state::Runtime, Target};
 use shared::TimeZone;
 
+#[repr(C)]
 pub struct Context<'a> {
     target: &'a mut dyn Target,
     state: &'a mut Runtime,

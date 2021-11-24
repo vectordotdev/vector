@@ -6,6 +6,7 @@ mod test_util;
 
 pub mod expression;
 pub mod function;
+pub mod llvm;
 pub mod state;
 pub mod type_def;
 pub mod value;

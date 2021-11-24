@@ -3350,6 +3350,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "inkwell"
+version = "0.1.0"
+source = "git+https://github.com/TheDan64/inkwell?branch=master#4ddaa3b4e3c3593c3382769b1d81267e3a5681f9"
+dependencies = [
+ "either",
+ "inkwell_internals",
+ "libc",
+ "llvm-sys",
+ "once_cell",
+ "parking_lot",
+]
+
+[[package]]
+name = "inkwell_internals"
+version = "0.5.0"
+source = "git+https://github.com/TheDan64/inkwell?branch=master#4ddaa3b4e3c3593c3382769b1d81267e3a5681f9"
+dependencies = [
+ "proc-macro2 1.0.30",
+ "quote 1.0.10",
+ "syn 1.0.80",
+]
+
+[[package]]
 name = "inotify"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3718,6 +3741,19 @@ dependencies = [
  "libc",
  "uuid",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "llvm-sys"
+version = "130.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a0de69eac0257a2f6c0da27b42e6a8dd21bae7b39c37caf87aee6021d79d61f"
+dependencies = [
+ "cc",
+ "lazy_static",
+ "libc",
+ "regex",
+ "semver 0.11.0",
 ]
 
 [[package]]
@@ -5040,6 +5076,14 @@ name = "ppv-lite86"
 version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac74c624d6b2d21f425f752262f42188365d7b8ff1aff74c82e45136510a4857"
+
+[[package]]
+name = "precompiled"
+version = "0.1.0"
+dependencies = [
+ "lookup",
+ "vrl-compiler",
+]
 
 [[package]]
 name = "precomputed-hash"
@@ -8240,6 +8284,7 @@ dependencies = [
  "criterion",
  "dyn-clone",
  "indoc",
+ "inkwell",
  "lalrpop-util",
  "lookup",
  "ordered-float",
