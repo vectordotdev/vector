@@ -194,8 +194,7 @@ mod tests {
         sinks::{
             splunk_hec::common::{
                 acknowledgements::{
-                    HecAckQueryRequestBody, HecAckQueryResponseBody,
-                    HecClientAcknowledgementsConfig,
+                    HecAckStatusRequest, HecAckStatusResponse, HecClientAcknowledgementsConfig,
                 },
                 request::HecRequest,
                 service::{HecAckResponseBody, HecService, HttpRequestBuilder},
@@ -274,9 +273,8 @@ mod tests {
     #[tokio::test]
     async fn acknowledgements_enabled_on_server() {
         let ack_response = |req: &Request| {
-            let req =
-                serde_json::from_slice::<HecAckQueryRequestBody>(req.body.as_slice()).unwrap();
-            ResponseTemplate::new(200).set_body_json(HecAckQueryResponseBody {
+            let req = serde_json::from_slice::<HecAckStatusRequest>(req.body.as_slice()).unwrap();
+            ResponseTemplate::new(200).set_body_json(HecAckStatusResponse {
                 acks: req
                     .acks
                     .into_iter()
@@ -319,9 +317,8 @@ mod tests {
     #[tokio::test]
     async fn acknowledgements_enabled_on_server_retry_limit_exceeded() {
         let ack_response = |req: &Request| {
-            let req =
-                serde_json::from_slice::<HecAckQueryRequestBody>(req.body.as_slice()).unwrap();
-            ResponseTemplate::new(200).set_body_json(HecAckQueryResponseBody {
+            let req = serde_json::from_slice::<HecAckStatusRequest>(req.body.as_slice()).unwrap();
+            ResponseTemplate::new(200).set_body_json(HecAckStatusResponse {
                 acks: req
                     .acks
                     .into_iter()
@@ -380,9 +377,8 @@ mod tests {
     #[tokio::test]
     async fn acknowledgements_server_changed_event_response_format() {
         let ack_response = |req: &Request| {
-            let req =
-                serde_json::from_slice::<HecAckQueryRequestBody>(req.body.as_slice()).unwrap();
-            ResponseTemplate::new(200).set_body_json(HecAckQueryResponseBody {
+            let req = serde_json::from_slice::<HecAckStatusRequest>(req.body.as_slice()).unwrap();
+            ResponseTemplate::new(200).set_body_json(HecAckStatusResponse {
                 acks: req
                     .acks
                     .into_iter()

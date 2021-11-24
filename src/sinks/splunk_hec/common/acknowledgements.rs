@@ -29,12 +29,12 @@ pub fn default_hec_client_acknowledgements_config() -> Option<HecClientAcknowled
 }
 
 #[derive(Deserialize, Serialize, Eq, PartialEq, Debug)]
-pub struct HecAckQueryRequestBody {
+pub struct HecAckStatusRequest {
     pub acks: Vec<u64>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct HecAckQueryResponseBody {
+pub struct HecAckStatusResponse {
     pub acks: HashMap<u64, bool>,
 }
 
@@ -123,9 +123,9 @@ impl HecAckClient {
     }
 
     /// Builds an ack query body with the currently stored ack ids.
-    fn get_ack_query_body(&mut self) -> HecAckQueryRequestBody {
+    fn get_ack_query_body(&mut self) -> HecAckStatusRequest {
         self.clear_expired_ack_ids();
-        HecAckQueryRequestBody {
+        HecAckStatusRequest {
             acks: self.acks.keys().copied().collect::<Vec<u64>>(),
         }
     }
@@ -145,8 +145,8 @@ impl HecAckClient {
     // Send an ack status query request to Splunk HEC
     async fn send_ack_query_request(
         &mut self,
-        request_body: &HecAckQueryRequestBody,
-    ) -> Result<HecAckQueryResponseBody, HecAckApiError> {
+        request_body: &HecAckStatusRequest,
+    ) -> Result<HecAckStatusResponse, HecAckApiError> {
         self.decrement_retries();
         let request_body_bytes =
             serde_json::to_vec(request_body).map_err(|_| HecAckApiError::ClientBuildRequest)?;
@@ -166,7 +166,7 @@ impl HecAckClient {
             let response_body = hyper::body::to_bytes(response.into_body())
                 .await
                 .map_err(|_| HecAckApiError::ClientParseResponse)?;
-            serde_json::from_slice::<HecAckQueryResponseBody>(&response_body)
+            serde_json::from_slice::<HecAckStatusResponse>(&response_body)
                 .map_err(|_| HecAckApiError::ClientParseResponse)
         } else if status.is_client_error() {
             Err(HecAckApiError::ClientSendQuery)
@@ -221,7 +221,7 @@ mod tests {
         http::HttpClient,
         sinks::{
             splunk_hec::common::{
-                acknowledgements::HecAckQueryRequestBody, service::HttpRequestBuilder,
+                acknowledgements::HecAckStatusRequest, service::HttpRequestBuilder,
             },
             util::Compression,
         },
@@ -257,7 +257,7 @@ mod tests {
         let mut ack_client = get_ack_client(1);
         let ack_ids = (0..100).collect::<Vec<u64>>();
         let _ = populate_ack_client(&mut ack_client, &ack_ids);
-        let expected_ack_body = HecAckQueryRequestBody { acks: ack_ids };
+        let expected_ack_body = HecAckStatusRequest { acks: ack_ids };
 
         let mut ack_request_body = ack_client.get_ack_query_body();
         ack_request_body.acks.sort_unstable();
