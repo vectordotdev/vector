@@ -1423,7 +1423,6 @@ mod tests {
             400,
             post(address, "services/collector/event", message).await
         );
-        println!("400 err");
 
         let event = collect_n(source, 1).await.remove(0);
         SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
