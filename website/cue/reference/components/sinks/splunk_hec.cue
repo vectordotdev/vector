@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: _splunk_hec: {
 	configuration: {
-		indexer_acknowledgements: {
+		acknowledgements: {
 			common:      false
 			description: "The configuration for Splunk HEC indexer acknowledgement client behavior."
 			required:    false
@@ -10,7 +10,7 @@ components: sinks: _splunk_hec: {
 				options: {
 					query_interval: {
 						common:      false
-						description: "The amount of time to wait in between queries to the Splunk HEC indexer acknowledgement endpoint."
+						description: "The amount of time to wait in between queries to the Splunk HEC indexer acknowledgement endpoint. Minimum of `1`."
 						required:    false
 						type: uint: {
 							default: 10
@@ -19,7 +19,7 @@ components: sinks: _splunk_hec: {
 					}
 					retry_limit: {
 						common:      false
-						description: "The maximum number of times an ack id will be queried for its status."
+						description: "The maximum number of times an ack id will be queried for its status. Minimum of `1`."
 						required:    false
 						type: uint: {
 							default: 30
