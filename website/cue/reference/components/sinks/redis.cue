@@ -79,13 +79,14 @@ components: sinks: redis: {
 		}
 		data_type: {
 			common:      false
-			description: "The Redis data type (`list` or `channel`) to use."
+			description: "The Redis data type (`list`, `channel` or `stream`) to use."
 			required:    false
 			type: string: {
 				default: "list"
 				enum: {
 					list:    "Use the Redis `list` data type."
 					channel: "Use the Redis `channel` data type."
+					stream: "Use the Redis `stream` data type."
 				}
 			}
 		}
@@ -107,6 +108,53 @@ components: sinks: redis: {
 								rpush: "Use the `rpush` method to publish messages."
 							}
 						}
+					}
+				}
+			}
+		}
+		stream: {
+			common:      false
+			description: "Options for the Redis `stream` data type."
+			required:    false
+			type: object: {
+				examples: []
+				options: {
+    				field: {
+        				description: "The field used to publish the message when `data_type` is `stream`."
+        				required:    true
+        				type: string: {
+							examples: ["message"]
+						}
+    				}
+    				maxlen: {
+        				common:      false
+        				description: "Object containing maximum length settings for the Redis `stream`."
+        				required:    false
+        				type: object: {
+            				examples: []
+            				options: {
+                				type: {
+	                    			common:      false
+                    				description: "Type of stream [trimming method](\(urls.redis_stream_trimming)) to use."
+                    				required:    false
+                    				type: string: {
+	                        			default: "equals"
+    	                    			enum: {
+                            				equals: "Use exact trimming for this stream."
+                            				approx: "Use almost exact trimming for this stream."
+                        				}
+                    				}
+                				}
+								threshold: {
+									description: "Threshold to be used for trimming."
+									required: true
+									type: uint: {
+										unit: null
+										examples: [1000]
+									}
+								}
+            				}
+        				}
 					}
 				}
 			}

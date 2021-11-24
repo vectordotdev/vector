@@ -13,7 +13,7 @@ use crate::{
     template::{Template, TemplateParseError},
 };
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
-use redis::{aio::ConnectionManager, RedisError, RedisResult};
+use redis::{aio::ConnectionManager, streams::StreamMaxlen, RedisError, RedisResult};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
@@ -45,6 +45,7 @@ pub enum DataTypeConfig {
     #[derivative(Default)]
     List,
     Channel,
+    Stream,
 }
 
 #[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
@@ -53,13 +54,39 @@ pub struct ListOption {
     method: Method,
 }
 
-#[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize)]
+#[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
+pub enum MaxLenType {
+    #[derivative(Default)]
+    Equals,
+    Approx,
+}
+
+#[derive(Clone, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
+pub struct MaxLenOption {
+    #[serde(alias = "type")]
+    maxlen_type: MaxLenType,
+    threshold: usize,
+}
+
+#[derive(Clone, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub struct StreamOption {
+    field: String,
+    maxlen: Option<MaxLenOption>,
+}
+
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 pub enum DataType {
     #[derivative(Default)]
     List(Method),
     Channel,
+    Stream {
+        field: String,
+        maxlen: Option<StreamMaxlen>,
+    },
 }
 
 #[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
@@ -95,6 +122,8 @@ pub struct RedisSinkConfig {
     data_type: DataTypeConfig,
     #[serde(alias = "list")]
     list_option: Option<ListOption>,
+    #[serde(alias = "stream")]
+    stream_option: Option<StreamOption>,
     url: String,
     key: String,
     #[serde(default)]
@@ -160,9 +189,33 @@ impl RedisSinkConfig {
 
         let method = self.list_option.map(|option| option.method);
 
+        let maxlen = match self.stream_option {
+            None => None,
+            Some(ref option) => match option.maxlen {
+                None => None,
+                Some(ref maxlen) => match maxlen.maxlen_type {
+                    MaxLenType::Equals => Some(StreamMaxlen::Equals(maxlen.threshold)),
+                    MaxLenType::Approx => Some(StreamMaxlen::Approx(maxlen.threshold)),
+                },
+            },
+        };
+
         let data_type = match self.data_type {
             DataTypeConfig::Channel => DataType::Channel,
             DataTypeConfig::List => DataType::List(method.unwrap_or_default()),
+            DataTypeConfig::Stream => {
+                if let Some(option) = &self.stream_option {
+                    DataType::Stream {
+                        field: option.field.clone(),
+                        maxlen,
+                    }
+                } else {
+                    return Err(
+                        "Redis stream requires a field name, specify it with `stream.field`."
+                            .into(),
+                    );
+                }
+            }
         };
 
         let batch = self.batch.into_batch_settings()?;
@@ -302,7 +355,7 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
 
         for kv in kvs {
             byte_size += kv.encoded_length();
-            match self.data_type {
+            match &self.data_type {
                 DataType::List(method) => match method {
                     Method::LPush => {
                         if count > 1 {
@@ -324,6 +377,25 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
                         pipe.atomic().publish(kv.key, kv.value);
                     } else {
                         pipe.publish(kv.key, kv.value);
+                    }
+                }
+                DataType::Stream { field, maxlen } => {
+                    let fv = [(field, kv.value)];
+                    match maxlen {
+                        None => {
+                            if count > 1 {
+                                pipe.atomic().xadd(kv.key, "*", &fv);
+                            } else {
+                                pipe.xadd(kv.key, "*", &fv);
+                            }
+                        }
+                        Some(value) => {
+                            if count > 1 {
+                                pipe.atomic().xadd_maxlen(kv.key, *value, "*", &fv);
+                            } else {
+                                pipe.xadd_maxlen(kv.key, *value, "*", &fv);
+                            }
+                        }
                     }
                 }
             }
@@ -423,6 +495,8 @@ mod integration_tests {
     use super::*;
     use crate::test_util::{random_lines_with_stream, random_string, trace_init};
     use rand::Rng;
+    use redis::streams::StreamReadOptions;
+    use redis::streams::StreamReadReply;
     use redis::AsyncCommands;
 
     const REDIS_SERVER: &str = "redis://127.0.0.1:6379/0";
@@ -450,6 +524,7 @@ mod integration_tests {
                 rate_limit_num: Option::from(u64::MAX),
                 ..Default::default()
             },
+            stream_option: None,
         };
 
         // Publish events.
@@ -509,6 +584,7 @@ mod integration_tests {
                 rate_limit_num: Option::from(u64::MAX),
                 ..Default::default()
             },
+            stream_option: None,
         };
 
         // Publish events.
@@ -581,6 +657,7 @@ mod integration_tests {
                 rate_limit_num: Option::from(u64::MAX),
                 ..Default::default()
             },
+            stream_option: None,
         };
 
         // Publish events.
@@ -601,6 +678,155 @@ mod integration_tests {
                 assert_eq!(received_msg_num, num_events);
                 break;
             }
+        }
+    }
+
+    #[tokio::test]
+    async fn redis_sink_list_stream() {
+        trace_init();
+
+        let key = format!("test-stream-key-{}", random_string(10));
+        debug!("Test key name: {}.", key);
+        let field = format!("test-stream-field-{}", random_string(10));
+        debug!("Test field name: {}.", field);
+        let mut rng = rand::thread_rng();
+        let num_events = rng.gen_range(10000..20000);
+        debug!("Test events num: {}.", num_events);
+
+        let cnf = RedisSinkConfig {
+            url: REDIS_SERVER.to_owned(),
+            key: key.clone(),
+            encoding: Encoding::Json.into(),
+            data_type: DataTypeConfig::Stream,
+            list_option: None,
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig {
+                rate_limit_num: Option::from(u64::MAX),
+                ..Default::default()
+            },
+            stream_option: Some(StreamOption {
+                field: field.clone(),
+                maxlen: None,
+            }),
+        };
+
+        // Publish events.
+        let conn = cnf.build_client().await.unwrap();
+        let cx = SinkContext::new_test();
+
+        let sink = cnf.new(conn, cx).unwrap();
+        let mut events: Vec<Event> = Vec::new();
+        for i in 0..num_events {
+            let s: String = i.to_string();
+            let e = Event::from(s);
+            events.push(e);
+        }
+
+        let stream = stream::iter(events.clone());
+        sink.run(stream).await.unwrap();
+
+        let mut conn = cnf.build_client().await.unwrap();
+        let key_exists: bool = conn.exists(key.clone()).await.unwrap();
+        debug!("Test key: {} exists: {}.", key, key_exists);
+        assert!(key_exists);
+        let llen: usize = conn.xlen(key.clone()).await.unwrap();
+        debug!("Test key: {} len: {}.", key, llen);
+        assert_eq!(llen, num_events);
+
+        let opts = StreamReadOptions::default().count(2 * num_events);
+
+        // Read whole stream at once
+        let results: RedisResult<StreamReadReply> =
+            conn.xread_options(&[key.clone()], &["0"], &opts).await;
+        assert!(results.is_ok());
+
+        let stream_key = &results.unwrap().keys[0];
+        assert_eq!(stream_key.key, key);
+
+        for i in 0..num_events {
+            let e = events.get(i).unwrap().as_log();
+            let s = serde_json::to_string(e).unwrap_or_default();
+            assert!(stream_key.ids[i].map.contains_key(&field));
+            let val: String = stream_key.ids[i].get(&field).unwrap();
+            assert_eq!(val, s);
+        }
+    }
+
+    #[tokio::test]
+    async fn redis_sink_list_stream_maxlen() {
+        trace_init();
+
+        let key = format!("test-stream-key-{}", random_string(10));
+        debug!("Test key name: {}.", key);
+        let field = format!("test-stream-field-{}", random_string(10));
+        debug!("Test field name: {}.", field);
+        let mut rng = rand::thread_rng();
+        let num_events = rng.gen_range(10000..20000);
+        debug!("Test events num: {}.", num_events);
+
+        let max_len = rng.gen_range(10000..num_events);
+        debug!("Test max_len: {}.", max_len);
+
+        let cnf = RedisSinkConfig {
+            url: REDIS_SERVER.to_owned(),
+            key: key.clone(),
+            encoding: Encoding::Json.into(),
+            data_type: DataTypeConfig::Stream,
+            list_option: None,
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig {
+                rate_limit_num: Option::from(u64::MAX),
+                ..Default::default()
+            },
+            stream_option: Some(StreamOption {
+                field: field.clone(),
+                maxlen: Some(MaxLenOption {
+                    maxlen_type: MaxLenType::Equals,
+                    threshold: max_len,
+                }),
+            }),
+        };
+
+        // Publish events.
+        let conn = cnf.build_client().await.unwrap();
+        let cx = SinkContext::new_test();
+
+        let sink = cnf.new(conn, cx).unwrap();
+        let mut events: Vec<Event> = Vec::new();
+        for i in 0..num_events {
+            let s: String = i.to_string();
+            let e = Event::from(s);
+            events.push(e);
+        }
+
+        let stream = stream::iter(events.clone());
+        sink.run(stream).await.unwrap();
+
+        let mut conn = cnf.build_client().await.unwrap();
+        let key_exists: bool = conn.exists(key.clone()).await.unwrap();
+        debug!("Test key: {} exists: {}.", key, key_exists);
+        assert!(key_exists);
+        let llen: usize = conn.xlen(key.clone()).await.unwrap();
+        debug!("Test key: {} len: {}.", key, llen);
+        assert_eq!(llen, max_len);
+
+        let opts = StreamReadOptions::default().count(2 * num_events);
+
+        // Read whole stream at once
+        let results: RedisResult<StreamReadReply> =
+            conn.xread_options(&[key.clone()], &["0"], &opts).await;
+        assert!(results.is_ok());
+
+        let stream_key = &results.unwrap().keys[0];
+        assert_eq!(stream_key.key, key);
+
+        let start_index = num_events - max_len;
+        for i in 0..max_len {
+            let e = events.get(start_index + i).unwrap().as_log();
+            let s = serde_json::to_string(e).unwrap_or_default();
+            assert!(stream_key.ids[i].map.contains_key(&field));
+            let val: String = stream_key.ids[i].get(&field).unwrap();
+            assert_eq!(val, s);
         }
     }
 }
