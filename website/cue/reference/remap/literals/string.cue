@@ -50,6 +50,14 @@ remap: literals: string: {
 				"`\\'`":       "Single quote"
 			}
 		}
+		multiline_strings: {
+			title: "Multiline strings"
+			description: """
+				Long strings can be split over multiple lines by adding a backslash just before the
+				newline. The newline and any whitespace at the start of the ensuing line is not
+				included in the string.
+				"""
+		}
 		concatenation: {
 			title: "Concatenation"
 			description: """
