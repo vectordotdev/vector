@@ -80,7 +80,6 @@ pub enum Encoding {
 impl Encoder<Result<NewRelicApiModel, &'static str>> for EncodingConfigWithDefault<Encoding> {
     fn encode_input(&self, input: Result<NewRelicApiModel, &'static str>, writer: &mut dyn io::Write) -> io::Result<usize> {
         if let Ok(api_model) = input {
-            println!("---> EncodingConfigWithDefault encode_input = {:#?}", api_model);
             let json = match api_model {
                 NewRelicApiModel::Events(ev_api_model) => ev_api_model.to_json(),
                 NewRelicApiModel::Metrics(met_api_model) => met_api_model.to_json(),
@@ -485,12 +484,12 @@ impl Service<NewRelicApiRequest> for NewRelicApiService {
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        println!("----> poll_ready");
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, request: NewRelicApiRequest) -> Self::Future {
-        println!("----> Call from NewRelicApiRequest, request = {:#?}", request);
+
+        info!("Sending {} events.", request.batch_size);
 
         let mut client = self.client.clone();
 
@@ -512,7 +511,6 @@ impl Service<NewRelicApiRequest> for NewRelicApiService {
             .expect("building HTTP request failed unexpectedly");
 
         Box::pin(async move {
-            println!("---> Future returned by NewRelicApiRequest");
             match client.call(http_request).in_current_span().await {
                 Ok(_) => Ok(NewRelicApiResponse::Ok),
                 Err(_) => Err(NewRelicSinkError::new("HTTP request error"))
@@ -603,7 +601,6 @@ impl SinkConfig for NewRelicConfig {
 
         Ok((
             super::VectorSink::Stream(Box::new(sink)),
-            //TODO: create healthcheck
             future::ok(()).boxed(),
         ))
     }
@@ -625,8 +622,7 @@ impl RetryLogic for NewRelicApiRetry {
     type Response = NewRelicApiResponse;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
-        println!("-----> is_retriable_error");
-        //TODO: add retry logic
+        // Never retry.
         false
     }
 }
@@ -646,17 +642,14 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
     type Error = std::io::Error;
 
     fn compression(&self) -> Compression {
-        println!("----> NewRelicRequestBuilder compression");
         self.compression
     }
 
     fn encoder(&self) -> &Self::Encoder {
-        println!("----> NewRelicRequestBuilder encoder");
         &self.encoding
     }
 
     fn split_input(&self, mut input: Vec<Event>) -> (Self::Metadata, Self::Events) {
-        println!("----> NewRelicRequestBuilder split_input = {:#?}", input);
         let events_len = input.len();
         let finalizers = input.take_finalizers();
         let api_model = || -> Result<NewRelicApiModel, &str> {
@@ -689,10 +682,9 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
     }
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        println!("----> NewRelicRequestBuilder build_request = {:#?}", String::from_utf8_lossy(&payload));
-        let (_credentials, _events_len, finalizers) = metadata;
+        let (_credentials, events_len, finalizers) = metadata;
         NewRelicApiRequest {
-            batch_size: 0,
+            batch_size: events_len,
             finalizers,
             credentials: self.credentials.clone(),
             payload,
@@ -718,8 +710,6 @@ where
     S::Error: Debug + Into<crate::Error> + Send,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        println!("------> NewRelicSink run_inner");
-
         let partitioner = NullPartitioner::new();
         let builder_limit = NonZeroUsize::new(64);
         let request_builder = NewRelicRequestBuilder {
