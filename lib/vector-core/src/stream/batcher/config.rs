@@ -19,6 +19,11 @@ pub trait BatchConfig<T> {
     /// Returns the number of elements in the batch
     fn len(&self) -> usize;
 
+    /// Determines whether the batch is empty or not
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Returns the current batch, and resets any internal state
     fn take_batch(&mut self) -> Self::Batch;
 
