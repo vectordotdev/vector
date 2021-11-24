@@ -113,7 +113,7 @@ mod writer;
 use crate::Bufferable;
 
 use self::{
-    common::{DATA_FILE_MAX_RECORD_SIZE, DATA_FILE_TARGET_MAX_SIZE},
+    common::BufferConfig,
     ledger::{Ledger, LedgerLoadCreateError},
     reader::{Reader, ReaderError},
     writer::{Writer, WriterError},
@@ -140,20 +140,13 @@ impl<T> Buffer<T>
 where
     T: Bufferable,
 {
-    pub async fn from_path<P>(data_dir: P) -> Result<(Writer<T>, Reader<T>), BufferError<T>>
-    where
-        P: AsRef<Path>,
-    {
-        let ledger = Ledger::load_or_create(data_dir, Duration::from_secs(1))
-            .await
-            .context(LedgerError)?;
+    pub async fn from_config(
+        config: BufferConfig,
+    ) -> Result<(Writer<T>, Reader<T>), BufferError<T>> {
+        let ledger = Ledger::load_or_create(config).await.context(LedgerError)?;
         let ledger = Arc::new(ledger);
 
-        let mut writer = Writer::new(
-            Arc::clone(&ledger),
-            DATA_FILE_TARGET_MAX_SIZE,
-            DATA_FILE_MAX_RECORD_SIZE,
-        );
+        let mut writer = Writer::new(Arc::clone(&ledger));
         writer
             .validate_last_write()
             .await

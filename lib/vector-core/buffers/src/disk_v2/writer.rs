@@ -4,6 +4,7 @@ use std::{
     sync::Arc,
 };
 
+use bytes::BufMut;
 use crc32fast::Hasher;
 use memmap2::Mmap;
 use rkyv::{
@@ -31,7 +32,7 @@ use crate::{
     Bufferable,
 };
 
-use super::backed_archive::BackedArchive;
+use super::{backed_archive::BackedArchive, common::BufferConfig};
 
 #[derive(Debug, Snafu)]
 pub enum WriterError<R>
@@ -41,8 +42,8 @@ where
 {
     #[snafu(display("write I/O error: {}", source))]
     Io { source: io::Error },
-    #[snafu(display("record too large: limit is {}, actual was {}", limit, actual))]
-    RecordTooLarge { limit: usize, actual: usize },
+    #[snafu(display("record too large: limit is {}", limit))]
+    RecordTooLarge { limit: usize },
     #[snafu(display("failed to encode record: {:?}", source))]
     FailedToEncode {
         source: <R as EncodeBytes<R>>::Error,
@@ -105,14 +106,27 @@ where
 
         // We first encode the record, which puts it into the desired encoded form.  This is where
         // we assert the record is within size limits, etc.
-        let encode_result = record.encode(&mut self.encode_buf);
+        //
+        // NOTE: Some encoders may not write to the buffer in a way that fills it up before
+        // themselves returning an error because they know the buffer is too small.  This means we
+        // may often return the "failed to encode" error variant when the true error is that the
+        // record size, when encoded, exceeds our limit.
+        //
+        // Unfortunately, there's not a whole lot for us to do here beyond allowing our buffer to
+        // grow beyond the limit so that we can try to allow encoding to succeed so that we can grab
+        // the actual encoded size and then check it against the limit.
+        //
+        // C'est la vie.
+        let encode_result = {
+            let mut encode_buf = (&mut self.encode_buf).limit(self.max_record_size);
+            record.encode(&mut encode_buf)
+        };
         let encoded_len = encode_result
             .map(|_| self.encode_buf.len())
             .context(FailedToEncode)?;
-        if encoded_len > self.max_record_size {
+        if encoded_len >= self.max_record_size {
             return Err(WriterError::RecordTooLarge {
                 limit: self.max_record_size,
-                actual: encoded_len,
             });
         }
 
@@ -194,10 +208,9 @@ impl<T> RecordWriter<File, T> {
 
 pub struct Writer<T> {
     ledger: Arc<Ledger>,
+    config: BufferConfig,
     writer: Option<RecordWriter<File, T>>,
     data_file_size: u64,
-    target_data_file_size: u64,
-    max_record_size: usize,
     _t: PhantomData<T>,
 }
 
@@ -205,17 +218,13 @@ impl<T> Writer<T>
 where
     T: Bufferable,
 {
-    pub(crate) fn new(
-        ledger: Arc<Ledger>,
-        target_data_file_size: u64,
-        max_record_size: usize,
-    ) -> Self {
+    pub(crate) fn new(ledger: Arc<Ledger>) -> Self {
+        let config = ledger.config().clone();
         Writer {
             ledger,
+            config,
             writer: None,
             data_file_size: 0,
-            target_data_file_size,
-            max_record_size,
             _t: PhantomData,
         }
     }
@@ -226,7 +235,7 @@ where
     }
 
     fn can_write(&mut self) -> bool {
-        self.data_file_size < self.target_data_file_size
+        self.data_file_size < self.config.max_data_file_size
     }
 
     fn reset(&mut self) {
@@ -394,7 +403,7 @@ where
                             .await?;
                         let metadata = data_file.metadata().await?;
                         let file_len = metadata.len();
-                        if file_len >= self.target_data_file_size {
+                        if file_len >= self.config.max_data_file_size {
                             None
                         } else {
                             Some((data_file, file_len))
@@ -411,7 +420,7 @@ where
                     // Make sure the file is flushed to disk, especially if we just created it.
                     data_file.sync_all().await?;
 
-                    self.writer = Some(RecordWriter::new(data_file, self.max_record_size));
+                    self.writer = Some(RecordWriter::new(data_file, self.config.max_record_size));
                     self.data_file_size = data_file_size;
 
                     // If we opened the "next" data file, we need to increment the current writer

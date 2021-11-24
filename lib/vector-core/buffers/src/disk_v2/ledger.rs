@@ -1,8 +1,8 @@
 use std::{
     fmt, io,
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::atomic::{AtomicU16, AtomicU64, Ordering},
-    time::{Duration, Instant},
+    time::Instant,
 };
 
 use bytecheck::CheckBytes;
@@ -14,7 +14,7 @@ use rkyv::{with::Atomic, Archive, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{fs::OpenOptions, io::AsyncWriteExt, sync::Notify};
 
-use super::{backed_archive::BackedArchive, ser::SerializeError};
+use super::{backed_archive::BackedArchive, common::BufferConfig, ser::SerializeError};
 
 #[derive(Debug, Snafu)]
 pub enum LedgerLoadCreateError {
@@ -148,8 +148,8 @@ impl ArchivedLedgerState {
 }
 
 pub struct Ledger {
-    // Path to the data directory.
-    data_dir: PathBuf,
+    // Buffer configuration.
+    config: BufferConfig,
     // Advisory lock for this buffer directory.
     ledger_lock: LockFile,
     // Ledger state.
@@ -160,14 +160,13 @@ pub struct Ledger {
     writer_notify: Notify,
     // Last flush of all unflushed files: ledger, data file, etc.
     last_flush: AtomicCell<Instant>,
-    // How often flushes should occur.
-    //
-    // Flushes may occur more often as a data file filling up forcefully triggers a flush so that
-    // all data is on-disk before moving on to the next data file.
-    flush_interval: Duration,
 }
 
 impl Ledger {
+    pub fn config(&self) -> &BufferConfig {
+        &self.config
+    }
+
     pub fn state(&self) -> &ArchivedLedgerState {
         self.state.get_archive_ref()
     }
@@ -185,7 +184,9 @@ impl Ledger {
     }
 
     pub fn get_data_file_path(&self, file_id: u16) -> PathBuf {
-        self.data_dir.join(format!("buffer-data-{}.dat", file_id))
+        self.config
+            .data_dir
+            .join(format!("buffer-data-{}.dat", file_id))
     }
 
     /// Waits for a signal from the reader that an entire data file has been read and subsequently deleted.
@@ -216,7 +217,7 @@ impl Ledger {
     /// receives `true` is responsible for flushing the necessary files.
     pub fn should_flush(&self) -> bool {
         let last_flush = self.last_flush.load();
-        if last_flush.elapsed() > self.flush_interval {
+        if last_flush.elapsed() > self.config.flush_interval {
             if self
                 .last_flush
                 .compare_exchange(last_flush, Instant::now())
@@ -241,24 +242,18 @@ impl Ledger {
         self.state.get_backing_ref().flush()
     }
 
-    pub async fn load_or_create<P>(
-        data_dir: P,
-        flush_interval: Duration,
-    ) -> Result<Ledger, LedgerLoadCreateError>
-    where
-        P: AsRef<Path>,
-    {
+    pub async fn load_or_create(config: BufferConfig) -> Result<Ledger, LedgerLoadCreateError> {
         // Acquire an exclusive lock on our lock file, which prevents another Vector process from
         // loading this buffer and clashing with us.  Specifically, though: this does _not_ prevent
         // another process from messing with our ledger files, or any of the data files, etc.
-        let ledger_lock_path = data_dir.as_ref().join("buffer.lock");
+        let ledger_lock_path = config.data_dir.join("buffer.lock");
         let mut ledger_lock = LockFile::open(&ledger_lock_path).context(Io)?;
         if !ledger_lock.try_lock().context(Io)? {
             return Err(LedgerLoadCreateError::LedgerLockAlreadyHeld);
         }
 
         // Open the ledger file, which may involve creating it if it doesn't yet exist.
-        let ledger_path = data_dir.as_ref().join("buffer.db");
+        let ledger_path = config.data_dir.join("buffer.db");
         let mut ledger_handle = OpenOptions::new()
             .read(true)
             .write(true)
@@ -308,13 +303,12 @@ impl Ledger {
         };
 
         Ok(Ledger {
-            data_dir: data_dir.as_ref().to_owned(),
+            config,
             ledger_lock,
             state: ledger_state,
             reader_notify: Notify::new(),
             writer_notify: Notify::new(),
             last_flush: AtomicCell::new(Instant::now()),
-            flush_interval,
         })
     }
 }
@@ -322,13 +316,12 @@ impl Ledger {
 impl fmt::Debug for Ledger {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Ledger")
-            .field("data_dir", &self.data_dir)
+            .field("config", &self.config)
             .field("ledger_lock", &self.ledger_lock)
             .field("state", &self.state.get_archive_ref())
             .field("reader_notify", &self.reader_notify)
             .field("writer_notify", &self.writer_notify)
             .field("last_flush", &self.last_flush)
-            .field("flush_interval", &self.flush_interval)
             .finish()
     }
 }
