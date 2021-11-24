@@ -206,6 +206,7 @@ source = """
 type = "console"
 inputs = ["change_fields"]
 target = "stdout"
+encoding.codec = "json"
 ```
 
 We can extract the `syslog` source in the file `/etc/vector/sources/syslog.toml`
