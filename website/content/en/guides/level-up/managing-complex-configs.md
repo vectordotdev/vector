@@ -194,7 +194,6 @@ type = "syslog"
 address = "0.0.0.0:514"
 max_length = 42000
 mode = "tcp"
-path = "/path/to/socket"
 
 [transforms.change_fields]
 type = "remap"
@@ -216,7 +215,6 @@ type = "syslog"
 address = "0.0.0.0:514"
 max_length = 42000
 mode = "tcp"
-path = "/path/to/socket"
 ```
 
 The `change_fields` transform in the file `/etc/vector/transforms/change_fields.toml`
