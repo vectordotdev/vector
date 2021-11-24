@@ -144,21 +144,19 @@ impl Display for LevelTimeHistogram {
     }
 }
 
-/// An accumulating histogram that mirrors that of a Prometheus aggregated histogram.
+/// A histogram with user-defined, variable-width buckets.
 ///
-/// As values are recorded, they are added to all buckets where they satisfy the "value <= bucket
-/// upper limit" predicate.
+/// Values are only recorded into the bucket that the value is less than or equal to.
 #[derive(Debug)]
-pub struct AccumulatingHistogram {
+pub struct VariableHistogram {
     buckets: Vec<(f64, u32)>,
     count: u32,
     sum: f64,
 }
 
-impl AccumulatingHistogram {
+impl VariableHistogram {
     pub fn new(upper_limits: &[f64]) -> Self {
         let mut buckets = upper_limits.iter().map(|v| (*v, 0)).collect::<Vec<_>>();
-        buckets.push((f64::INFINITY, 0));
 
         // Clear out any duplicate buckets, and sort them from smallest to largest.
         buckets.dedup_by_key(|(upper_limit, _)| OrderedFloat(*upper_limit));
@@ -175,6 +173,7 @@ impl AccumulatingHistogram {
         for (bound, count) in self.buckets.iter_mut() {
             if value <= *bound {
                 *count += 1;
+                break;
             }
         }
 
