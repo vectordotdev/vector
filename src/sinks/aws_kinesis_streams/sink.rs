@@ -1,4 +1,3 @@
-use crate::buffers::Acker;
 use crate::event::{Event, LogEvent};
 use crate::sinks::aws_kinesis_streams::request_builder::{KinesisRequest, KinesisRequestBuilder};
 use crate::sinks::aws_kinesis_streams::service::KinesisResponse;
@@ -8,7 +7,7 @@ use futures::StreamExt;
 use rand::random;
 use std::num::NonZeroUsize;
 use tower::util::BoxService;
-use vector_core::partition::NullPartitioner;
+use vector_core::buffers::Acker;
 use vector_core::stream::BatcherSettings;
 
 use crate::sinks::util::processed_event::ProcessedEvent;
@@ -51,8 +50,7 @@ impl KinesisSink {
                     Ok(req) => Some(req),
                 }
             })
-            .batched(NullPartitioner::new(), self.batch_settings)
-            .map(|(_, batch)| batch)
+            .batched(self.batch_settings.into_byte_size_config())
             .into_driver(self.service, self.acker);
 
         sink.run().await

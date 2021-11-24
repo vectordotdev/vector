@@ -5,7 +5,6 @@ use super::{
     TowerRequestConfig, TowerRequestSettings,
 };
 use crate::{
-    buffers::Acker,
     event::Event,
     http::{HttpClient, HttpError},
     internal_events::EndpointBytesSent,
@@ -28,7 +27,7 @@ use std::{
     time::Duration,
 };
 use tower::Service;
-use vector_core::ByteSizeOf;
+use vector_core::{buffers::Acker, ByteSizeOf};
 
 #[async_trait::async_trait]
 pub trait HttpSink: Send + Sync + 'static {
@@ -554,6 +553,8 @@ impl RequestConfig {
 
 #[cfg(test)]
 mod test {
+    #![allow(clippy::print_stderr)] //tests
+
     use super::*;
     use crate::{config::ProxyConfig, test_util::next_addr};
     use futures::{future::ready, StreamExt};

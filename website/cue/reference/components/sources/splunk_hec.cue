@@ -52,6 +52,56 @@ components: sources: splunk_hec: {
 	}
 
 	configuration: {
+		acknowledgements: configuration._acknowledgements & {
+			type: object: {
+				options: {
+					max_number_of_ack_channels: {
+						common:      false
+						description: "The maximum number of Splunk HEC channels clients can use with this source. Minimum of `1`."
+						required:    false
+						type: uint: {
+							default: 1000000
+							unit:    null
+						}
+					}
+					max_pending_acks: {
+						common:      false
+						description: "The maximum number of ack statuses pending query across all channels. Equivalent to the `max_number_of_acked_requests_pending_query` Splunk HEC setting. Minimum of `1`."
+						required:    false
+						type: uint: {
+							default: 10000000
+							unit:    null
+						}
+					}
+					max_pending_acks_per_channel: {
+						common:      false
+						description: "The maximum number of ack statuses pending query for a single channel. Equivalent to the `max_number_of_acked_requests_pending_query_per_ack_channel` Splunk HEC setting. Minimum of `1`."
+						required:    false
+						type: uint: {
+							default: 1000000
+							unit:    null
+						}
+					}
+					ack_idle_cleanup: {
+						common:      false
+						description: "Whether or not to remove channels after idling for `max_idle_time` seconds. A channel is idling if it is not used for sending data or querying ack statuses."
+						required:    false
+						type: bool: {
+							default: false
+						}
+					}
+					max_idle_time: {
+						common:      false
+						description: "The amount of time a channel is allowed to idle before removal. Channels can potentially idle for longer than this setting but clients should not rely on such behavior. Minimum of `1`."
+						required:    false
+						type: uint: {
+							default: 300
+							unit:    "seconds"
+						}
+					}
+				}
+			}
+		}
 		address: {
 			common:      true
 			description: "The address to accept connections on."
@@ -105,5 +155,15 @@ components: sources: splunk_hec: {
 		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
 		http_request_errors_total:            components.sources.internal_metrics.output.metrics.http_request_errors_total
 		requests_received_total:              components.sources.internal_metrics.output.metrics.requests_received_total
+	}
+
+	how_it_works: {
+		indexer_acknowledgements: {
+			title: "Indexer Acknowledgements"
+			body: """
+				With acknowledgements enabled, the source uses the [Splunk HEC indexer acknowledgements protocol](https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/AboutHECIDXAck) to allow clients to verify data has been delivered to destination sinks.
+				To summarize the protocol, each request to the source is associated with an integer identifier (an ack id) that the client is given and can use to query for the status of the request.
+				"""
+		}
 	}
 }

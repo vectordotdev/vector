@@ -38,7 +38,7 @@ fn reduce(c: &mut Criterion) {
         // only benchmark the "proof of concept" configuration, demonstrating
         // that the benchmark does minimally work. Once we have soak tests with
         // reduces in them we should extend this array to include those
-        // configuratoins.
+        // configurations.
         Param {
             slug: "proof_of_concept",
             input: fixed_stream.clone(),

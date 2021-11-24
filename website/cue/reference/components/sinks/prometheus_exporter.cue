@@ -81,7 +81,7 @@ components: sinks: prometheus_exporter: {
 		}
 		flush_period_secs: {
 			common:      false
-			description: "Time interval between [set](\(urls.vector_data_model)/metric#set) values are reset."
+			description: "Time interval on which metrics are flushed. On the flush interval, if a metric has not been seen since the last flush interval, it is considered expired and is removed. Be sure to configure this value higher than your client's scrape interval."
 			required:    false
 			type: uint: {
 				default: 60

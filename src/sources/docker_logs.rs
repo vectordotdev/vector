@@ -778,7 +778,7 @@ impl ContainerLogInfo {
             - 1
     }
 
-    /// Expects timestamp at the beggining of message.
+    /// Expects timestamp at the beginning of message.
     /// Expects messages to be ordered by timestamps.
     fn new_event(
         &mut self,

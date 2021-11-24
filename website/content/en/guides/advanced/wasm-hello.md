@@ -247,7 +247,7 @@ Some things to note:
   }
   ```
 
-* Vector will reinitialize panicked modules, so panicing is safe so long as you're fine losing your working data.
+* Vector will reinitialize panicked modules, so panicking is safe so long as you're fine losing your working data.
 * By default, the heap size is 10MB.
 
 ## Understanding the Current Limitations {#limitations}

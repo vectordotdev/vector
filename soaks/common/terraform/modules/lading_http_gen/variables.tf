@@ -8,7 +8,12 @@ variable "namespace" {
   type        = string
 }
 
-variable "http-gen-toml" {
-  description = "The rendered http_gen.toml for this test"
+variable "http-gen-yaml" {
+  description = "The rendered http_gen.yaml for this test"
   type        = string
+}
+
+variable "lading_image" {
+  description = "The lading image to run"
+  type = string
 }

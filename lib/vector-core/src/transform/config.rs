@@ -1,4 +1,4 @@
-use crate::config::GlobalOptions;
+use crate::config::{ComponentKey, GlobalOptions};
 use async_trait::async_trait;
 use indexmap::IndexMap;
 
@@ -11,9 +11,10 @@ pub enum DataType {
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 pub enum ExpandType {
-    /// This way of expanding will duplicate the inputs for every expanded node.
-    /// If `aggregates` is set to `true`, then a `Noop` transform will be added
-    /// so that you can use the original component name as an input.
+    /// Chain components together one after another. Components will be named according
+    /// to this order (e.g. component_name.0 and so on). If alias is set to true,
+    /// then a Noop transform will be added as the last component and given the raw
+    /// component_name identifier so that it can be used as an input for other components.
     Parallel { aggregates: bool },
     /// This ways of expanding will take all the components and chain then in order.
     /// The first node will be renamed `component_name.0` and so on.
@@ -22,17 +23,15 @@ pub enum ExpandType {
     Serial { alias: bool },
 }
 
-#[cfg(feature = "vrl")]
 #[derive(Debug, Default)]
 pub struct TransformContext {
+    // This is optional because currently there are a lot of places we use `TransformContext` that
+    // may not have the relevant data available (e.g. tests). In the future it'd be nice to make it
+    // required somehow.
+    pub key: Option<ComponentKey>,
     pub globals: GlobalOptions,
+    #[cfg(feature = "vrl")]
     pub enrichment_tables: enrichment::TableRegistry,
-}
-
-#[cfg(not(feature = "vrl"))]
-#[derive(Debug, Default)]
-pub struct TransformContext {
-    pub globals: GlobalOptions,
 }
 
 impl TransformContext {

@@ -50,7 +50,7 @@ impl Decoder {
             let (result, read, written, had_errors) = self.inner.decode_to_utf8(
                 &input[total_read_from_input..],
                 &mut self.buffer,
-                false, // not last (since we are processing a continous stream)
+                false, // not last (since we are processing a continuous stream)
             );
 
             total_read_from_input += read;
@@ -158,7 +158,7 @@ impl Encoder {
             let (result, read, written, had_errors) = self.inner.encode_from_utf8(
                 &input[total_read_from_input..],
                 &mut self.buffer,
-                false, // not last (since we are processing a continous stream)
+                false, // not last (since we are processing a continuous stream)
             );
 
             total_read_from_input += read;

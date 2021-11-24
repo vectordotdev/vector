@@ -31,12 +31,12 @@ impl Function for ParseInt {
                 result: Ok("-42"),
             },
             Example {
-                title: "hexidecimal",
+                title: "hexadecimal",
                 source: r#"parse_int!("0x2a")"#,
                 result: Ok("42"),
             },
             Example {
-                title: "hexidecimal explicit",
+                title: "hexadecimal explicit",
                 source: r#"parse_int!("2a", base: 16)"#,
                 result: Ok("42"),
             },
@@ -130,13 +130,13 @@ mod tests {
              tdef: TypeDef::new().fallible().integer(),
         }
 
-        hexidecimal {
+        hexadecimal {
              args: func_args![value: "0x2a"],
              want: Ok(42),
              tdef: TypeDef::new().fallible().integer(),
         }
 
-        explicit_hexidecimal {
+        explicit_hexadecimal {
              args: func_args![value: "2a", base: 16],
              want: Ok(42),
              tdef: TypeDef::new().fallible().integer(),

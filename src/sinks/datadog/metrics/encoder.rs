@@ -22,7 +22,9 @@ use crate::{
     sinks::util::{encode_namespace, Compressor},
 };
 
-use super::config::{DatadogMetricsEndpoint, MAXIMUM_PAYLOAD_COMPRESSED_SIZ, MAXIMUM_PAYLOAD_SIZE};
+use super::config::{
+    DatadogMetricsEndpoint, MAXIMUM_PAYLOAD_COMPRESSED_SIZE, MAXIMUM_PAYLOAD_SIZE,
+};
 
 const SERIES_PAYLOAD_HEADER: &[u8] = b"{\"series\":[";
 const SERIES_PAYLOAD_FOOTER: &[u8] = b"]}";
@@ -135,7 +137,7 @@ impl DatadogMetricsEncoder {
             endpoint,
             default_namespace,
             MAXIMUM_PAYLOAD_SIZE,
-            MAXIMUM_PAYLOAD_COMPRESSED_SIZ,
+            MAXIMUM_PAYLOAD_COMPRESSED_SIZE,
         )
     }
 
@@ -302,7 +304,7 @@ impl DatadogMetricsEncoder {
 
     fn try_encode_pending(&mut self) -> Result<(), FinishError> {
         // The Datadog Agent uses a particular Protocol Buffers library to incrementally encode the
-        // DDSketch structures into a payload, similiar to how we incrementally encode the series
+        // DDSketch structures into a payload, similar to how we incrementally encode the series
         // metrics.  Unfortunately, there's no existing Rust crate that allows writing out Protocol
         // Buffers payloads by hand, so we have to cheat a little and buffer up the metrics until
         // the very end.

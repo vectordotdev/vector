@@ -7,11 +7,11 @@ use crate::{
     sinks::{
         self,
         util::{
-            batch::{BatchConfig, BatchSettings},
+            batch::BatchConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::HttpRetryLogic,
             EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
-            TowerRequestConfig,
+            SinkBatchSettings, TowerRequestConfig,
         },
     },
     template::Template,
@@ -23,9 +23,19 @@ use http::Uri;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use std::num::NonZeroU64;
 use std::task;
 use tower::ServiceBuilder;
 use vector_core::ByteSizeOf;
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct PrometheusRemoteWriteDefaultBatchSettings;
+
+impl SinkBatchSettings for PrometheusRemoteWriteDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(1_000);
+    const MAX_BYTES: Option<usize> = None;
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+}
 
 #[derive(Debug, Snafu)]
 enum Errors {
@@ -46,7 +56,7 @@ pub struct RemoteWriteConfig {
     pub quantiles: Vec<f64>,
 
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<PrometheusRemoteWriteDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
 
@@ -73,10 +83,7 @@ impl SinkConfig for RemoteWriteConfig {
     ) -> crate::Result<(sinks::VectorSink, sinks::Healthcheck)> {
         let endpoint = self.endpoint.parse::<Uri>().context(sinks::UriParseError)?;
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let batch = BatchSettings::default()
-            .events(1_000)
-            .timeout(1)
-            .parse_config(self.batch)?;
+        let batch = self.batch.into_batch_settings()?;
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let buckets = self.buckets.clone();
         let quantiles = self.quantiles.clone();

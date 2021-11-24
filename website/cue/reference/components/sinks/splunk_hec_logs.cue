@@ -20,7 +20,7 @@ components: sinks: splunk_hec_logs: {
 			batch: {
 				enabled:      true
 				common:       false
-				max_bytes:    1049000
+				max_bytes:    10_000_000
 				timeout_secs: 1
 			}
 			compression: {

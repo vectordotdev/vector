@@ -3,15 +3,15 @@ use crate::{
     codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
     common::datadog::{DatadogMetricType, DatadogSeriesMetric},
     config::{
-        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
-        SourceDescription,
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
+        SourceContext, SourceDescription,
     },
     event::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
     },
     internal_events::{EventsReceived, HttpBytesReceived, HttpDecompressError},
-    serde::{default_decoding, default_framing_message_based},
+    serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::{
         self,
         util::{ErrorMessage, TcpError},
@@ -55,6 +55,8 @@ pub struct DatadogAgentConfig {
     framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
     decoding: Box<dyn ParserConfig>,
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -75,6 +77,7 @@ impl GenerateConfig for DatadogAgentConfig {
             store_api_key: true,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
+            acknowledgements: AcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -90,13 +93,13 @@ impl SourceConfig for DatadogAgentConfig {
         let listener = tls.bind(&self.address).await?;
         let log_service = source
             .clone()
-            .event_service(cx.acknowledgements.enabled, cx.out.clone());
+            .event_service(self.acknowledgements.enabled, cx.out.clone());
         let series_v1_service = source
             .clone()
-            .series_v1_service(cx.acknowledgements.enabled, cx.out.clone());
+            .series_v1_service(self.acknowledgements.enabled, cx.out.clone());
         let sketches_service = source
             .clone()
-            .sketches_service(cx.acknowledgements.enabled, cx.out.clone());
+            .sketches_service(self.acknowledgements.enabled, cx.out.clone());
         let series_v2_service = source.series_v2_service();
 
         let shutdown = cx.shutdown;
@@ -696,8 +699,7 @@ mod tests {
     ) -> (impl Stream<Item = Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
-        let mut context = SourceContext::new_test(sender);
-        context.acknowledgements.enabled = acknowledgements;
+        let context = SourceContext::new_test(sender);
         tokio::spawn(async move {
             DatadogAgentConfig {
                 address,
@@ -705,6 +707,7 @@ mod tests {
                 store_api_key,
                 framing: default_framing_message_based(),
                 decoding: default_decoding(),
+                acknowledgements: acknowledgements.into(),
             }
             .build(context)
             .await

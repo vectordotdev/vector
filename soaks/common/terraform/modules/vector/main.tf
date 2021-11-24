@@ -16,8 +16,8 @@ resource "kubernetes_service" "vector" {
   }
   spec {
     selector = {
-      type      = var.type
-      soak_test = kubernetes_deployment.vector.metadata.0.labels.soak_test
+      app  = "vector"
+      type = var.type
     }
     session_affinity = "ClientIP"
     port {
@@ -40,8 +40,8 @@ resource "kubernetes_deployment" "vector" {
     name      = "vector"
     namespace = var.namespace
     labels = {
-      type      = var.type
-      soak_test = var.test_name
+      app  = "vector"
+      type = var.type
     }
   }
 
@@ -50,16 +50,16 @@ resource "kubernetes_deployment" "vector" {
 
     selector {
       match_labels = {
-        type      = var.type
-        soak_test = var.test_name
+        app  = "vector"
+        type = var.type
       }
     }
 
     template {
       metadata {
         labels = {
-          type      = var.type
-          soak_test = var.test_name
+          app  = "vector"
+          type = var.type
         }
         annotations = {
           "prometheus.io/scrape" = true
@@ -87,12 +87,14 @@ resource "kubernetes_deployment" "vector" {
           }
 
           resources {
+            # Because we do not have the ability to self-constrain vector's
+            # memory consumption we only make a request here on memory. This
+            # avoids vector crashing for want of a malloc.
             limits = {
-              cpu    = "4"
-              memory = "512Mi"
+              cpu = var.vector_cpus
             }
             requests = {
-              cpu    = "4"
+              cpu    = var.vector_cpus
               memory = "512Mi"
             }
           }

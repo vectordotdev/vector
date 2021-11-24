@@ -1,4 +1,3 @@
-use crate::buffers::Ackable;
 use crate::event::{EventFinalizers, EventStatus, Finalizable};
 use crate::sinks::{util::retries::RetryLogic, Healthcheck};
 use azure_core::prelude::*;
@@ -11,6 +10,7 @@ use futures::FutureExt;
 use http::StatusCode;
 use snafu::Snafu;
 use std::sync::Arc;
+use vector_core::buffers::Ackable;
 use vector_core::internal_event::EventsSent;
 use vector_core::stream::DriverResponse;
 

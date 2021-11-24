@@ -40,11 +40,17 @@ impl TransformConfig for ExpanderConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Any
+        self.inner
+            .first()
+            .map(|(_, item)| item.input_type())
+            .unwrap_or(DataType::Any)
     }
 
     fn output_type(&self) -> DataType {
-        DataType::Any
+        self.inner
+            .last()
+            .map(|(_, item)| item.output_type())
+            .unwrap_or(DataType::Any)
     }
 
     fn transform_type(&self) -> &'static str {

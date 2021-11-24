@@ -1169,6 +1169,8 @@ fn unescape_string_literal(mut s: &str) -> String {
 
 #[cfg(test)]
 mod test {
+    #![allow(clippy::print_stdout)] // tests
+
     use super::StringLiteral;
     use super::*;
     use crate::lex::Token::*;

@@ -1,8 +1,8 @@
 name = "foo"
 [input]
-  insert_at = "demo"
+  insert_at = "apache_parser"
   type = "log"
   [input.log_fields]
     "message" = "foo"
 [[outputs]]
-  extract_from = "demo"
+  extract_from = "apache_parser"

@@ -56,7 +56,7 @@ components: transforms: wasm: {
 		]
 		notices: [
 			"""
-			Please consider the [`remap` transform](\(urls.vector_remap_transform)) before using this tranform. The
+			Please consider the [`remap` transform](\(urls.vector_remap_transform)) before using this transform. The
 			[Vector Remap Language](\(urls.vrl_reference)) is designed for safe, performant, and easy data mapping. It
 			is intended to cover the vast majority of data mapping use cases leaving WASM for very advanced and
 			edge-case situations.

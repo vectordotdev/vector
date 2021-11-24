@@ -103,7 +103,7 @@ impl Subscription {
         Self { id, tx, client_tx }
     }
 
-    // Initalize the connection by sending a "GQL_CONNECTION_INIT" message.
+    // Initialize the connection by sending a "GQL_CONNECTION_INIT" message.
     fn init(&self) -> Result<(), tokio::sync::mpsc::error::SendError<Payload>> {
         self.client_tx.send(Payload::init(self.id))
     }
