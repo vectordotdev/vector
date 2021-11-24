@@ -37,7 +37,7 @@ async fn config() -> HecMetricsSinkConfig {
         batch,
         request: TowerRequestConfig::default(),
         tls: None,
-        acknowledgements: Some(HecClientAcknowledgementsConfig::default()),
+        acknowledgements: HecClientAcknowledgementsConfig::default(),
     }
 }
 

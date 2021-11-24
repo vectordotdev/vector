@@ -8,9 +8,7 @@ use crate::{
     http::HttpClient,
     sinks::{
         splunk_hec::common::{
-            acknowledgements::{
-                default_hec_client_acknowledgements_config, HecClientAcknowledgementsConfig,
-            },
+            acknowledgements::HecClientAcknowledgementsConfig,
             build_healthcheck, create_client, host_key,
             retry::HecRetryLogic,
             service::{HecService, HttpRequestBuilder},
@@ -44,8 +42,7 @@ pub struct HecMetricsSinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
-    #[serde(default = "default_hec_client_acknowledgements_config")]
-    pub acknowledgements: Option<HecClientAcknowledgementsConfig>,
+    pub acknowledgements: HecClientAcknowledgementsConfig,
 }
 
 impl GenerateConfig for HecMetricsSinkConfig {
@@ -62,7 +59,7 @@ impl GenerateConfig for HecMetricsSinkConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Some(HecClientAcknowledgementsConfig::default()),
+            acknowledgements: HecClientAcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -109,7 +106,7 @@ impl HecMetricsSinkConfig {
             .service(HecService::new(
                 client,
                 http_request_builder,
-                self.acknowledgements.clone(),
+                Some(self.acknowledgements.clone()),
             ));
 
         let batch_settings = self.batch.into_batcher_settings()?;
