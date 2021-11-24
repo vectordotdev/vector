@@ -16,7 +16,7 @@ use crate::{
             http::{HttpBatchService, HttpRetryLogic},
             sink,
             statistic::{validate_quantiles, DistributionStatistic},
-            BatchConfig, BatchSettings, EncodedEvent, TowerRequestConfig,
+            BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -28,6 +28,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
     future::ready,
+    num::NonZeroU64,
     task::Poll,
 };
 use tower::Service;
@@ -41,6 +42,15 @@ struct InfluxDbSvc {
     inner: HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>>,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct InfluxDbDefaultBatchSettings;
+
+impl SinkBatchSettings for InfluxDbDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(20);
+    const MAX_BYTES: Option<usize> = None;
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbConfig {
@@ -52,7 +62,7 @@ pub struct InfluxDbConfig {
     #[serde(flatten)]
     pub influxdb2_settings: Option<InfluxDb2Settings>,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<InfluxDbDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tags: Option<HashMap<String, String>>,
@@ -118,10 +128,7 @@ impl InfluxDbSvc {
         let token = settings.token();
         let protocol_version = settings.protocol_version();
 
-        let batch = BatchSettings::default()
-            .events(20)
-            .timeout(1)
-            .parse_config(config.batch)?;
+        let batch = config.batch.into_batch_settings()?;
         let request = config.request.unwrap_with(&TowerRequestConfig {
             retry_attempts: Some(5),
             ..Default::default()
@@ -253,7 +260,7 @@ fn encode_events(
 
         if let Err(error) = influx_line_protocol(
             protocol_version,
-            fullname,
+            &fullname,
             metric_type,
             tags,
             fields,

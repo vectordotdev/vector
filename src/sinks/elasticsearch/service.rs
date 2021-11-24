@@ -10,7 +10,7 @@ use std::task::{Context, Poll};
 use tower::ServiceExt;
 use vector_core::buffers::Ackable;
 
-use crate::rusoto::AwsCredentialsProvider;
+use crate::aws::rusoto::AwsCredentialsProvider;
 use crate::sinks::util::{Compression, ElementCount};
 use http::header::HeaderName;
 use hyper::header::HeaderValue;
@@ -213,7 +213,6 @@ impl Service<ElasticSearchRequest> for ElasticSearchService {
             let events_byte_size = req.events_byte_size;
             let http_response = http_service.call(req).await?;
             let event_status = get_event_status(&http_response);
-            println!("Event status: {:?}", event_status);
             Ok(ElasticSearchResponse {
                 event_status,
                 http_response,

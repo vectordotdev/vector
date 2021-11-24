@@ -7,7 +7,10 @@ use vector_core::{
     buffers::{Ackable, Acker},
     event::{Finalizable, Metric},
     partition::Partitioner,
-    stream::{Batcher, BatcherSettings, ConcurrentMap, Driver, ExpirationQueue},
+    stream::{
+        Batcher, BatcherSettings, ConcurrentMap, Driver, ExpirationQueue, ItemBatchSize,
+        PartitionedBatcher,
+    },
     ByteSizeOf,
 };
 
@@ -23,18 +26,32 @@ pub trait SinkBuilderExt: Stream {
     /// The stream will yield batches of events, with their partition key, when either a batch fills
     /// up or times out. [`Partitioner`] operates on a per-event basis, and has access to the event
     /// itself, and so can access any and all fields of an event.
-    fn batched<P>(
+    fn batched_partitioned<P>(
         self,
         partitioner: P,
         settings: BatcherSettings,
-    ) -> Batcher<Self, P, ExpirationQueue<P::Key>>
+    ) -> PartitionedBatcher<Self, P, ExpirationQueue<P::Key>>
     where
         Self: Stream<Item = P::Item> + Sized,
         P: Partitioner + Unpin,
         P::Key: Eq + Hash + Clone,
         P::Item: ByteSizeOf,
     {
-        Batcher::new(self, partitioner, settings)
+        PartitionedBatcher::new(self, partitioner, settings)
+    }
+
+    /// Batches the stream based on the given batch settings and item size calculator.
+    ///
+    /// The stream will yield batches of events, when either a batch fills
+    /// up or times out. The `item_size_calculator` determines the "size" of each input
+    /// in a batch. The units of "size" are intentionally not defined, so you can choose
+    /// whatever is needed.
+    fn batched<T>(self, settings: BatcherSettings, item_size_calculator: T) -> Batcher<Self, T>
+    where
+        T: ItemBatchSize<Self::Item>,
+        Self: Sized,
+    {
+        Batcher::new(self, settings, item_size_calculator)
     }
 
     /// Maps the items in the stream concurrently, up to the configured limit.

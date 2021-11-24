@@ -54,7 +54,7 @@ impl<T> TopologyBuilder<T> {
     /// - a stage cannot use the "block" or "drop newest" mode when there is a subsequent stage, and
     ///   must user the "overflow" mode
     ///
-    /// Any occurence of either of these scenarios will result in an error during build.
+    /// Any occurrence of either of these scenarios will result in an error during build.
     pub fn stage<S>(&mut self, stage: S, when_full: WhenFull) -> &mut Self
     where
         S: IntoBuffer<T>,

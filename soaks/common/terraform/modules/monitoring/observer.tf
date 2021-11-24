@@ -19,6 +19,7 @@ resource "kubernetes_config_map" "observer" {
 }
 
 resource "kubernetes_deployment" "observer" {
+  depends_on = [kubernetes_deployment.prometheus]
   metadata {
     name      = "observer"
     namespace = kubernetes_namespace.monitoring.metadata[0].name
@@ -47,12 +48,12 @@ resource "kubernetes_deployment" "observer" {
         automount_service_account_token = false
         container {
           image_pull_policy = "IfNotPresent"
-          image             = "ghcr.io/vectordotdev/vector/soak-observer:sha-d108935d14ea7d3405567edb27f55ee03ef7b43d"
+          image             = "ghcr.io/vectordotdev/vector/soak-observer:sha-4521577dfbe823fba511ca0531270fda1814f68d"
           name              = "observer"
 
           volume_mount {
             mount_path = "/captures"
-            name = "captures"
+            name       = "captures"
           }
 
           volume_mount {

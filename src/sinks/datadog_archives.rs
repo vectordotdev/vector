@@ -2,6 +2,7 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     convert::TryFrom,
     io::{self, Write},
+    num::NonZeroU64,
     sync::{
         atomic::{AtomicU32, Ordering},
         Arc,
@@ -26,14 +27,17 @@ use vector_core::{
 use super::util::{
     batch::BatchError,
     encoding::{Encoder, StandardEncodings},
-    BatchSettings, Compression, RequestBuilder,
+    BatchConfig, Compression, RequestBuilder, SinkBatchSettings,
 };
+use crate::{
+    aws::{AwsAuthentication, RegionOrEndpoint},
+    http::HttpClient,
+    serde::to_string,
+};
+
 use crate::{
     config::GenerateConfig,
     config::{DataType, SinkConfig, SinkContext},
-    http::HttpClient,
-    rusoto::{AwsAuthentication, RegionOrEndpoint},
-    serde::to_string,
     sinks::{
         azure_common::{
             self,
@@ -69,6 +73,19 @@ use goauth::scopes::Scope;
 
 const DEFAULT_COMPRESSION: Compression = Compression::gzip_default();
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct DatadogArchivesDefaultBatchSettings;
+
+/// We should avoid producing many small batches - this might slow down Log Rehydration,
+/// these values are similar with how DataDog's Log Archives work internally:
+/// batch size - 100mb
+/// batch timeout - 15min
+impl SinkBatchSettings for DatadogArchivesDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = None;
+    const MAX_BYTES: Option<usize> = Some(100_000_000);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(900) };
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogArchivesSinkConfig {
@@ -84,6 +101,8 @@ pub struct DatadogArchivesSinkConfig {
     #[serde(default)]
     pub gcp_cloud_storage: Option<GcsConfig>,
     pub tls: Option<TlsOptions>,
+    #[serde(default, skip_serializing)]
+    batch: BatchConfig<DatadogArchivesDefaultBatchSettings>,
 }
 
 #[derive(Deserialize, Serialize, Default, Debug, Clone)]
@@ -138,6 +157,7 @@ impl GenerateConfig for DatadogArchivesSinkConfig {
             gcp_cloud_storage: None,
             tls: None,
             azure_blob: None,
+            batch: BatchConfig::default(),
         })
         .unwrap()
     }
@@ -154,16 +174,6 @@ enum ConfigError {
 }
 
 const KEY_TEMPLATE: &str = "/dt=%Y%m%d/hour=%H/";
-
-/// We should avoid producing many small batches - this might slow down Log Rehydration,
-/// these values are similar with how DataDog's Log Archives work internally:
-/// batch size - 100mb
-/// batch timeout - 15min
-const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = {
-    BatchSettings::const_default()
-        .bytes(100_000_000)
-        .timeout(900)
-};
 
 impl DatadogArchivesSinkConfig {
     async fn build_sink(
@@ -254,9 +264,8 @@ impl DatadogArchivesSinkConfig {
             _ => (),
         }
 
-        // We use the default batch settings directly as we don't support allowing users to change
-        // the batching behavior, as it could negatively impact performance.
-        let batcher_settings = DEFAULT_BATCH_SETTINGS
+        let batcher_settings = self
+            .batch
             .into_batcher_settings()
             .map_err(|source| ConfigError::InvalidBatchConfiguration { source })?;
 
@@ -284,7 +293,10 @@ impl DatadogArchivesSinkConfig {
     ) -> crate::Result<VectorSink> {
         let request = self.request.unwrap_with(&Default::default());
 
-        let batcher_settings = DEFAULT_BATCH_SETTINGS.into_batcher_settings()?;
+        let batcher_settings = self
+            .batch
+            .into_batcher_settings()
+            .map_err(|source| ConfigError::InvalidBatchConfiguration { source })?;
 
         let svc = ServiceBuilder::new()
             .settings(request, GcsRetryLogic)
@@ -337,11 +349,12 @@ impl DatadogArchivesSinkConfig {
         let service = ServiceBuilder::new()
             .settings(request_limits, AzureBlobRetryLogic)
             .service(AzureBlobService::new(client));
-        // We use the default batch settings directly as we don't support allowing users to change
-        // the batching behavior, as it could negatively impact performance.
-        let batcher_settings = DEFAULT_BATCH_SETTINGS
+
+        let batcher_settings = self
+            .batch
             .into_batcher_settings()
             .map_err(|source| ConfigError::InvalidBatchConfiguration { source })?;
+
         let partitioner = DatadogArchivesSinkConfig::build_partitioner();
         let request_builder = DatadogAzureRequestBuilder {
             container_name: self.bucket.clone(),
@@ -708,6 +721,8 @@ fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, 
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::print_stdout)] // tests
+
     use super::*;
     use crate::event::LogEvent;
     use chrono::DateTime;
@@ -950,6 +965,7 @@ mod tests {
                 azure_blob: None,
                 gcp_cloud_storage: None,
                 tls: None,
+                batch: BatchConfig::default(),
             };
 
             let res = config.build_sink(SinkContext::new_test()).await;

@@ -62,7 +62,7 @@ pub mod service_control {
             source: windows_service::Error,
         },
         #[snafu(display(
-            "Timeout occured after {:?} while waiting for state to become {:?}, but was {:?}",
+            "Timeout occurred after {:?} while waiting for state to become {:?}, but was {:?}",
             timeout,
             expected_state,
             state

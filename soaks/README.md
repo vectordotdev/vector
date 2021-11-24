@@ -87,8 +87,8 @@ the "Datadog Agent -> Remap -> Datadog Logs" soak in
 tests/datadog_agent_remap_datadog_logs
 ├── README.md
 └── terraform
-    ├── http_blackhole.toml
-    ├── http_gen.toml
+    ├── http_blackhole.yaml
+    ├── http_gen.yaml
     ├── main.tf
     ├── prometheus.tf
     ├── prometheus.yml
@@ -104,8 +104,8 @@ but the primary things you need to concern yourself with are:
 
 * `main.tf`
 * `vector.toml`
-* `http_blackhole.toml`
-* `http_gen.toml`
+* `http_blackhole.yaml`
+* `http_gen.yaml`
 
 The `main.tf` contents are:
 
@@ -135,7 +135,6 @@ module "vector" {
   type         = var.type
   vector_image = var.vector_image
   sha          = var.sha
-  test_name    = "datadog_agent_remap_datadog_logs"
   vector-toml  = file("${path.module}/vector.toml")
   namespace    = kubernetes_namespace.soak.metadata[0].name
   depends_on   = [module.http-blackhole]
@@ -143,13 +142,13 @@ module "vector" {
 module "http-blackhole" {
   source              = "../../../common/terraform/modules/lading_http_blackhole"
   type                = var.type
-  http-blackhole-toml = file("${path.module}/http_blackhole.toml")
+  http-blackhole-yaml = file("${path.module}/http_blackhole.yaml")
   namespace           = kubernetes_namespace.soak.metadata[0].name
 }
 module "http-gen" {
   source        = "../../../common/terraform/modules/lading_http_gen"
   type          = var.type
-  http-gen-toml = file("${path.module}/http_gen.toml")
+  http-gen-yaml = file("${path.module}/http_gen.yaml")
   namespace     = kubernetes_namespace.soak.metadata[0].name
 }
 ```
@@ -158,7 +157,7 @@ This sets up a kubernetes provider pegged to minikube, creates a namespace
 'soak' and installs three modules into that namespace: vector, http-blackhole
 and http-gen. The module definitions are in the `common/` directory but suffice
 to say they install vector and its lading test peers into 'soak', configuring
-with the `toml` files referenced above. There are a handful of modules available
+with the `yaml` files referenced above. There are a handful of modules available
 for use in soak testing; please add more as your infrastructure needs
 dictate. If at all possible do not require services external to the minikube.
 

@@ -24,6 +24,7 @@ components: sinks: vector: {
 			batch: {
 				enabled:      true
 				common:       false
+				max_bytes:    10_000_000
 				timeout_secs: 1
 			}
 			compression: enabled:       false

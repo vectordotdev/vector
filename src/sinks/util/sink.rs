@@ -19,7 +19,7 @@
 //! For more advanced use cases like HTTP based sinks, one should use the
 //! `BatchedHttpSink` type, which is a wrapper for `BatchSink` and `HttpSink`.
 //!
-//! # Driving to completetion
+//! # Driving to completion
 //!
 //! Each sink utility provided here strictly follows the patterns described in
 //! the `futures::Sink` docs. Each sink utility must be polled from a valid
@@ -667,8 +667,11 @@ mod tests {
         let (acker, ack_counter) = Acker::new_for_testing();
 
         let svc = tower::service_fn(|_| future::ok::<_, std::io::Error>(()));
-        let batch = BatchSettings::default().events(10).bytes(9999);
-        let buffered = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.bytes = 9999;
+        batch_settings.size.events = 10;
+
+        let buffered = BatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT, acker);
 
         let _ = buffered
             .sink_map_err(drop)
@@ -705,9 +708,11 @@ mod tests {
             Ok::<(), Infallible>(())
         });
 
-        let batch = BatchSettings::default().bytes(9999).events(1);
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.bytes = 9999;
+        batch_settings.size.events = 1;
 
-        let mut sink = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+        let mut sink = BatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT, acker);
 
         let mut cx = Context::from_waker(noop_waker_ref());
         assert!(matches!(
@@ -829,8 +834,11 @@ mod tests {
 
             future::ok::<_, std::io::Error>(())
         });
-        let batch = BatchSettings::default().bytes(9999).events(10);
-        let buffered = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.bytes = 9999;
+        batch_settings.size.events = 10;
+        let buffered = BatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT, acker);
 
         let _ = buffered
             .sink_map_err(drop)
@@ -860,8 +868,10 @@ mod tests {
             future::ok::<_, std::io::Error>(())
         });
 
-        let batch = BatchSettings::default().bytes(9999).events(10);
-        let mut buffered = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.bytes = 9999;
+        batch_settings.size.events = 10;
+        let mut buffered = BatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT, acker);
 
         let mut cx = Context::from_waker(noop_waker_ref());
         assert!(matches!(
@@ -898,8 +908,10 @@ mod tests {
             future::ok::<_, std::io::Error>(())
         });
 
-        let batch = BatchSettings::default().bytes(9999).events(10);
-        let mut buffered = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.bytes = 9999;
+        batch_settings.size.events = 10;
+        let mut buffered = BatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT, acker);
 
         let mut cx = Context::from_waker(noop_waker_ref());
         assert!(matches!(
@@ -943,8 +955,12 @@ mod tests {
             future::ok::<_, std::io::Error>(())
         });
 
-        let batch = BatchSettings::default().bytes(9999).events(10);
-        let sink = PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.bytes = 9999;
+        batch_settings.size.events = 10;
+
+        let sink =
+            PartitionBatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT, acker);
 
         sink.sink_map_err(drop)
             .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item, 0))))
@@ -973,8 +989,12 @@ mod tests {
             future::ok::<_, std::io::Error>(())
         });
 
-        let batch = BatchSettings::default().bytes(9999).events(1);
-        let sink = PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.bytes = 9999;
+        batch_settings.size.events = 1;
+
+        let sink =
+            PartitionBatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT, acker);
 
         let input = vec![Partitions::A, Partitions::B];
         sink.sink_map_err(drop)
@@ -998,8 +1018,12 @@ mod tests {
             future::ok::<_, std::io::Error>(())
         });
 
-        let batch = BatchSettings::default().bytes(9999).events(2);
-        let sink = PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.bytes = 9999;
+        batch_settings.size.events = 2;
+
+        let sink =
+            PartitionBatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT, acker);
 
         let input = vec![Partitions::A, Partitions::B, Partitions::A, Partitions::B];
         sink.sink_map_err(drop)
@@ -1029,8 +1053,12 @@ mod tests {
             future::ok::<_, std::io::Error>(())
         });
 
-        let batch = BatchSettings::default().bytes(9999).events(10);
-        let mut sink = PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.bytes = 9999;
+        batch_settings.size.events = 10;
+
+        let mut sink =
+            PartitionBatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT, acker);
 
         let mut cx = Context::from_waker(noop_waker_ref());
         assert!(matches!(
@@ -1125,8 +1153,12 @@ mod tests {
             }
         });
 
-        let batch = BatchSettings::default().bytes(9999).events(10);
-        let mut sink = PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.bytes = 9999;
+        batch_settings.size.events = 10;
+
+        let mut sink =
+            PartitionBatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT, acker);
         sink.ordered();
 
         let input = (0..20)

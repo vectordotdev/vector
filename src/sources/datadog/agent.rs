@@ -1,12 +1,12 @@
 use crate::{
     codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
     config::{
-        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
-        SourceDescription,
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
+        SourceContext, SourceDescription,
     },
     event::Event,
     internal_events::HttpDecompressError,
-    serde::{default_decoding, default_framing_message_based},
+    serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::{
         self,
         util::{ErrorMessage, TcpError},
@@ -48,6 +48,8 @@ pub struct DatadogAgentConfig {
     framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
     decoding: Box<dyn ParserConfig>,
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -68,6 +70,7 @@ impl GenerateConfig for DatadogAgentConfig {
             store_api_key: true,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
+            acknowledgements: AcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -82,7 +85,7 @@ impl SourceConfig for DatadogAgentConfig {
 
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let listener = tls.bind(&self.address).await?;
-        let service = source.event_service(cx.acknowledgements.enabled, cx.out.clone());
+        let service = source.event_service(self.acknowledgements.enabled, cx.out.clone());
 
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
@@ -427,8 +430,7 @@ mod tests {
     ) -> (impl Stream<Item = Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
-        let mut context = SourceContext::new_test(sender);
-        context.acknowledgements.enabled = acknowledgements;
+        let context = SourceContext::new_test(sender);
         tokio::spawn(async move {
             DatadogAgentConfig {
                 address,
@@ -436,6 +438,7 @@ mod tests {
                 store_api_key,
                 framing: default_framing_message_based(),
                 decoding: default_decoding(),
+                acknowledgements: acknowledgements.into(),
             }
             .build(context)
             .await

@@ -1,3 +1,5 @@
+#![allow(clippy::print_stderr)] // soak framework
+#![allow(clippy::print_stdout)] // soak framework
 use std::{
     sync::{
         atomic::{AtomicUsize, Ordering},

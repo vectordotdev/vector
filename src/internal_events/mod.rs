@@ -47,6 +47,8 @@ mod datadog_metrics;
 mod decoder;
 #[cfg(feature = "transforms-dedupe")]
 mod dedupe;
+#[cfg(feature = "sources-demo_logs")]
+mod demo_logs;
 #[cfg(feature = "sources-dnstap")]
 mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
@@ -61,8 +63,6 @@ mod exec;
 mod filter;
 #[cfg(feature = "sources-fluent")]
 mod fluent;
-#[cfg(feature = "sources-generator")]
-mod generator;
 #[cfg(feature = "transforms-geoip")]
 mod geoip;
 #[cfg(feature = "transforms-grok_parser")]
@@ -197,6 +197,8 @@ pub use self::datadog_metrics::*;
 pub use self::decoder::*;
 #[cfg(feature = "transforms-dedupe")]
 pub(crate) use self::dedupe::*;
+#[cfg(feature = "sources-demo_logs")]
+pub use self::demo_logs::*;
 #[cfg(feature = "sources-dnstap")]
 pub(crate) use self::dnstap::*;
 #[cfg(feature = "sources-docker_logs")]
@@ -217,8 +219,6 @@ pub use self::file::*;
 pub use self::filter::*;
 #[cfg(feature = "sources-fluent")]
 pub use self::fluent::*;
-#[cfg(feature = "sources-generator")]
-pub use self::generator::*;
 #[cfg(feature = "transforms-geoip")]
 pub(crate) use self::geoip::*;
 #[cfg(feature = "transforms-grok_parser")]

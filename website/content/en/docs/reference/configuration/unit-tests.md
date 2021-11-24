@@ -188,7 +188,7 @@ One important thing to note is that with this example configuration Vector is se
 logs from Docker images using the [`docker_logs`][docker_logs] source. If Vector were running in
 production, the `add_metadata` transform we're unit testing here would be modifying real log events.
 But that's *not* what we're testing here. Instead, the `insert_at = "add_metadata"` directive
-artifically inserts our test inputs into the `add_metadata` transform. You should think of Vector
+artificially inserts our test inputs into the `add_metadata` transform. You should think of Vector
 unit tests as a way of **mocking observability data sources** and ensuring that your transforms
 respond to those mock sources the way that you would expect.
 
@@ -283,6 +283,56 @@ Vector initially provided a `check_fields` condition type that enabled you to sp
 test conditions using a special configuration-based system. `check_fields` is now deprecated. We
 strongly recommend converting any existing `check_fields` tests to `vrl` conditions.
 {{< /danger >}}
+
+#### Asserting no output
+
+In some cases, you may need to assert that _no_ event is output by a transform. You can specify
+this at the root level of a specific test's configuration using the `no_outputs_from` parameter,
+which takes a list of transform names. Here's an example:
+
+```toml
+[[tests]]
+name = "Ensure no output"
+no_outputs_from = ["log_filter", "metric_filter"]
+```
+
+In this test configuration, Vector would expect that the `log_filter` and `metric_filter` transforms
+dont't output _any_ events.
+
+Some examples of use cases for `no_outputs_from`:
+
+* When testing a [`filter`][filter] transform, you may want to assert that the [input](#inputs)
+  event is filtered out
+* When testing a [`remap`][remap] transform, you may need to assert that VRL's `abort` function is
+  called when the supplied [VRL] program handles the input event
+
+Below is a full example of using `no_outputs_from` in a Vector unit test:
+
+```toml
+[transforms.log_filter]
+type = "filter"
+inputs = ["log_source"]
+condition = '.env == "production"'
+
+[[tests]]
+name = "Filter out non-production events"
+no_outputs_from = ["log_filter"]
+
+[[tests.inputs]]
+type = "log"
+insert_at = "log_filter"
+
+[tests.inputs.log_fields]
+message = "success"
+code = 202
+endpoint = "/transactions"
+method = "POST"
+env = "staging"
+```
+
+This unit test passes because the `env` field of the input event has a value of `staging`, which
+fails the `.env == "production"` filtering condition; because the condition fails, no event is
+output by the `log_filter` transform in this case.
 
 ### Event types
 
@@ -506,6 +556,7 @@ given that the `add_host_metadata` transform isn't included here:
 assert!(!exists(.tags.host), "host tag included")
 ```
 
+[abort]: /docs/reference/vrl/functions/#abort
 [assert]: /docs/reference/vrl/functions/#assert
 [assert_eq]: /docs/reference/vrl/functions/#assert_eq
 [assertions]: /docs/reference/vrl#assertions

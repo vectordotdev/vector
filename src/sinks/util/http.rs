@@ -553,6 +553,8 @@ impl RequestConfig {
 
 #[cfg(test)]
 mod test {
+    #![allow(clippy::print_stderr)] //tests
+
     use super::*;
     use crate::{config::ProxyConfig, test_util::next_addr};
     use futures::{future::ready, StreamExt};

@@ -103,7 +103,7 @@ impl AcknowledgementTracker {
     ///
     /// We accumulate that amount for every sequence number between calls to `consume_ack_depth`.
     /// Thus, a fresh instance of `AcknowledgementTracker` has an acknowledgement depth of 0.  If we
-    /// create five sequence numbers, and mark them all complete with an acknowledge ment of 10, our
+    /// create five sequence numbers, and mark them all complete with an acknowledge meant of 10, our
     /// depth would then be 50.  Calling this method would return `Some(50)`, and if this method was
     /// called again immediately after, it would return `None`.
     fn consume_ack_depth(&mut self) -> Option<NonZeroUsize> {

@@ -210,7 +210,7 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
                         // any reason, we fail that chunk entirely.
                         //
                         // TODO: In the future, when we have a way to incrementally write out
-                        // Protocol Buffers data, similiar to how the Datadog Agent does it with
+                        // Protocol Buffers data, similar to how the Datadog Agent does it with
                         // `molecule`, we can wrap all of the sketch encoding into the same
                         // incremental encoding paradigm and avoid this.
                         FinishError::TooLarge {

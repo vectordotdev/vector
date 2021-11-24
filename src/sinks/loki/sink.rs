@@ -10,7 +10,7 @@ use crate::internal_events::{
 };
 use crate::sinks::util::builder::SinkBuilderExt;
 use crate::sinks::util::encoding::{EncodingConfig, EncodingConfiguration};
-use crate::sinks::util::{BatchSettings, Compression, RequestBuilder};
+use crate::sinks::util::{Compression, RequestBuilder};
 use crate::template::Template;
 use futures::stream::BoxStream;
 use futures::StreamExt;
@@ -300,9 +300,7 @@ impl LokiSink {
                 remove_label_fields: config.remove_label_fields,
                 remove_timestamp: config.remove_timestamp,
             },
-            batch_settings: BatchSettings::<()>::default()
-                .parse_config(config.batch)?
-                .into_batcher_settings()?,
+            batch_settings: config.batch.into_batcher_settings()?,
             out_of_order_action: config.out_of_order_action,
             service: LokiService::new(client, config.endpoint, config.auth)?,
         })
@@ -322,7 +320,7 @@ impl LokiSink {
                 let res = filter.filter_record(record);
                 async { res }
             })
-            .batched(RecordPartitionner::default(), self.batch_settings)
+            .batched_partitioned(RecordPartitionner::default(), self.batch_settings)
             .request_builder(NonZeroUsize::new(1), self.request_builder)
             .filter_map(|request| async move {
                 match request {

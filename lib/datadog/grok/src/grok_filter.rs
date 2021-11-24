@@ -4,6 +4,7 @@ use crate::{
     parse_grok_rules::Error as GrokStaticError,
 };
 
+use crate::matchers::date::{apply_date_filter, DateFilter};
 use ordered_float::NotNan;
 use std::{convert::TryFrom, string::ToString};
 use strum_macros::Display;
@@ -11,6 +12,7 @@ use vrl_compiler::Value;
 
 #[derive(Debug, Display, Clone)]
 pub enum GrokFilter {
+    Date(DateFilter),
     Integer,
     IntegerExt,
     // with scientific notation support, e.g. 1e10
@@ -53,8 +55,10 @@ impl TryFrom<&Function> for GrokFilter {
                 .args
                 .as_ref()
                 .and_then(|args| {
-                    if let FunctionArgument::Arg(ref null_value) = args[0] {
-                        Some(GrokFilter::NullIf(null_value.to_string()))
+                    if let FunctionArgument::Arg(Value::Bytes(null_value)) = &args[0] {
+                        Some(GrokFilter::NullIf(
+                            String::from_utf8_lossy(null_value).to_string(),
+                        ))
                     } else {
                         None
                     }
@@ -141,8 +145,8 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
             )),
         },
         GrokFilter::NullIf(null_value) => match value {
-            Value::Bytes(_) => {
-                if value.to_string() == *null_value {
+            Value::Bytes(bytes) => {
+                if String::from_utf8_lossy(bytes) == *null_value {
                     Ok(Value::Null)
                 } else {
                     Ok(value.to_owned())
@@ -153,5 +157,6 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
                 value.to_string(),
             )),
         },
+        GrokFilter::Date(date_filter) => apply_date_filter(value, date_filter),
     }
 }
