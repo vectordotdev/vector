@@ -13,7 +13,14 @@ variable "http-gen-yaml" {
   type        = string
 }
 
+variable "http-gen-static-bootstrap" {
+  description = "Boostrap log to be used for static variant, mounted at /data/boostrap.log"
+  type        = string
+  default     = ""
+}
+
+
 variable "lading_image" {
   description = "The lading image to run"
-  type = string
+  type        = string
 }

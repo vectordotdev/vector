@@ -1,3 +1,14 @@
+resource "kubernetes_config_map" "lading_bootstrap" {
+  metadata {
+    name      = "lading-http-gen-bootstrap"
+    namespace = var.namespace
+  }
+
+  data = {
+    "bootstrap.log" = var.http-gen-static-bootstrap
+  }
+}
+
 resource "kubernetes_config_map" "lading" {
   metadata {
     name      = "lading-http-gen"
@@ -71,6 +82,11 @@ resource "kubernetes_deployment" "http-gen" {
           command           = ["/http_gen"]
 
           volume_mount {
+            mount_path = "/data"
+            name       = "data"
+            read_only  = true
+          }
+          volume_mount {
             mount_path = "/etc/lading"
             name       = "etc-lading"
             read_only  = true
@@ -104,6 +120,12 @@ resource "kubernetes_deployment" "http-gen" {
           name = "etc-lading"
           config_map {
             name = kubernetes_config_map.lading.metadata[0].name
+          }
+        }
+        volume {
+          name = "data"
+          config_map {
+            name = kubernetes_config_map.lading_bootstrap.metadata[0].name
           }
         }
       }

@@ -82,10 +82,12 @@ SOAK_CAPTURE_DIR="${CAPTURE_DIR}/${SOAK_NAME}"
 
 pushd "${__dir}"
 ./boot_minikube.sh --cpus "${SOAK_CPUS}" --memory "${SOAK_MEMORY}"
-mkdir -p "${SOAK_CAPTURE_DIR}"
+mkdir --parents "${SOAK_CAPTURE_DIR}"
+minikube image load "${IMAGE}"
+# Mount the capture directory. This is where the samples captured from inside
+# the minikube will be placed on the host.
 minikube mount "${SOAK_CAPTURE_DIR}:/captures" &
-minikube cache add "${IMAGE}"
-MOUNT_PID=$!
+CAPTURE_MOUNT_PID=$!
 popd
 
 pushd "${SOAK_ROOT}/tests/${SOAK_NAME}/terraform"
@@ -96,7 +98,7 @@ echo "[${VARIANT}] Sleeping for ${WARMUP_GRACE} seconds to allow warm-up"
 sleep "${WARMUP_GRACE}"
 echo "[${VARIANT}] Recording captures to ${SOAK_CAPTURE_DIR}"
 sleep "${TOTAL_SAMPLES}"
-kill "${MOUNT_PID}"
+kill "${CAPTURE_MOUNT_PID}"
 popd
 
 pushd "${__dir}"
