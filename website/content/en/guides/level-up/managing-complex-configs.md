@@ -181,7 +181,7 @@ individual files, each with its own unit tests.
 
 ## Splitting Configs
 
-If your components start to by used in multiple configuration files, having a
+If your components start to be used in multiple configuration files, having a
 dedicated place to define them can become interesting.
 
 With Vector you can define a component configuration inside a component type folder.
