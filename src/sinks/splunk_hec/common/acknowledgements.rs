@@ -66,13 +66,13 @@ impl HecAckClient {
         }
     }
 
-    /// Add an ack id to be queried
+    /// Adds an ack id to be queried
     fn add(&mut self, ack_id: u64, ack_event_status_sender: Sender<EventStatus>) {
         self.acks
             .insert(ack_id, (self.retry_limit, ack_event_status_sender));
     }
 
-    /// Query Splunk HEC and finalize events that are successfully acked
+    /// Queries Splunk HEC with stored ack ids and finalizes events that are successfully acked
     async fn run(&mut self) {
         let ack_query_body = self.get_ack_query_body();
         if !ack_query_body.acks.is_empty() {
@@ -112,7 +112,7 @@ impl HecAckClient {
         }
     }
 
-    /// Remove successfully acked ack ids and notify that the event has been Delivered
+    /// Removes successfully acked ack ids and finalizes associated events
     fn finalize_ack_ids(&mut self, ack_ids: &[u64]) {
         for ack_id in ack_ids {
             if let Some((_, ack_event_status_sender)) = self.acks.remove(ack_id) {
@@ -122,7 +122,7 @@ impl HecAckClient {
         }
     }
 
-    /// Builds an ack query body with the currently stored ack ids.
+    /// Builds an ack query body with stored ack ids
     fn get_ack_query_body(&mut self) -> HecAckStatusRequest {
         self.clear_expired_ack_ids();
         HecAckStatusRequest {
@@ -130,7 +130,7 @@ impl HecAckClient {
         }
     }
 
-    /// Decrements retry count on all ack ids by 1
+    /// Decrements retry count on all stored ack ids by 1
     fn decrement_retries(&mut self) {
         for (retries, _) in self.acks.values_mut() {
             *retries = retries.checked_sub(1).unwrap_or(0);
@@ -142,7 +142,7 @@ impl HecAckClient {
         self.acks.retain(|_, (retries, _)| *retries > 0);
     }
 
-    // Send an ack status query request to Splunk HEC
+    // Sends an ack status query request to Splunk HEC
     async fn send_ack_query_request(
         &mut self,
         request_body: &HecAckStatusRequest,
