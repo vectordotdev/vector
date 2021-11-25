@@ -988,6 +988,7 @@ mod integration_tests {
                 tls: None,
                 keepalive: None,
                 receive_buffer_bytes: None,
+                acknowledgements: false.into(),
             }
             .build(SourceContext::new_test(sender))
             .await

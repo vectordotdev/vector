@@ -789,6 +789,7 @@ output {
                 tls,
                 keepalive: None,
                 receive_buffer_bytes: None,
+                acknowledgements: false.into(),
             }
             .build(SourceContext::new_test(sender))
             .await
