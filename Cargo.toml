@@ -386,7 +386,7 @@ vendor-libz = ["libz-sys/static"]
 # transforms and sinks should depend on this feature.
 kubernetes = ["k8s-openapi", "evmap"]
 
-docker = ["bollard", "dirs-next"]
+docker = ["bollard", "dirs-next", "uuid"]
 
 # API
 api = [
