@@ -8,11 +8,16 @@ name = "observer"
 path = "src/bin/observer.rs"
 
 [dependencies]
-toml = "0.5"
 snafu = "0.6"
 http = "0.2"
 tracing = "0.1"
 tracing-subscriber = "0.2"
+serde_yaml = "0.8"
+ndarray = "0.15"
+ndarray-stats = "0.5"
+tabled = "0.3"
+bytesize = "1.1"
+noisy_float = "0.2"
 
 [dependencies.reqwest]
 version = "0.11"

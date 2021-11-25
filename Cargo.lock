@@ -4715,6 +4715,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "papergrid"
+version = "0.1.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6fe93a33fc67c8a9d21f3fefa54c4a991e08d2eba5f2fd6f327ca520862eddfb"
+dependencies = [
+ "unicode-width",
+]
+
+[[package]]
 name = "parking"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6700,13 +6709,18 @@ name = "soak"
 version = "0.1.0"
 dependencies = [
  "argh",
+ "bytesize",
  "http",
+ "ndarray",
+ "ndarray-stats",
+ "noisy_float",
  "reqwest",
  "serde",
  "serde_json",
+ "serde_yaml",
  "snafu",
+ "tabled",
  "tokio",
- "toml",
  "tracing 0.1.29",
  "tracing-subscriber",
 ]
@@ -7001,6 +7015,27 @@ checksum = "8417c2dcaef3d8016608956f3a5b70ad9cf4efe44b5546c93ca4934903c16749"
 dependencies = [
  "chrono",
  "nom 7.1.0",
+]
+
+[[package]]
+name = "tabled"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "465c45048a4b177eee43527a3741866dd66839f15c3223b5047dbc43d8a5076e"
+dependencies = [
+ "papergrid",
+ "tabled_derive",
+]
+
+[[package]]
+name = "tabled_derive"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b366a04a152b687a209b2459f29da3650b74bc859390308949305211e28af4b9"
+dependencies = [
+ "proc-macro2 1.0.30",
+ "quote 1.0.10",
+ "syn 1.0.80",
 ]
 
 [[package]]
