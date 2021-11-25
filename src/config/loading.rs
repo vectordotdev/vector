@@ -141,7 +141,7 @@ impl LoadableConfig for ConfigBuilder {
                 if name.starts_with('.') {
                     Ok(Vec::new())
                 } else {
-                    Err(vec![format!(
+                    Ok(vec![format!(
                         "Couldn't identify component type for folder {:?}",
                         path
                     )])
@@ -435,12 +435,12 @@ mod tests {
     fn load_namespacing_failing() {
         let path = PathBuf::from(".").join("tests").join("namespacing-fail");
         let configs = vec![ConfigPath::Dir(path.clone())];
-        let errors = load_builder_from_paths(&configs).unwrap_err();
-        assert_eq!(errors.len(), 1);
+        let (_, warns) = load_builder_from_paths(&configs).unwrap();
+        assert_eq!(warns.len(), 1);
         let msg = format!(
             "Couldn't identify component type for folder {:?}",
             path.join("foo")
         );
-        assert_eq!(errors[0], msg);
+        assert_eq!(warns[0], msg);
     }
 }
