@@ -55,7 +55,7 @@ struct IsArrayFn {
 
 impl Expression for IsArrayFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.value.resolve(ctx).map(|v| value!(v.is_array()))
+        self.value.resolve(ctx).map(|v| shared_value!(v.is_array()))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

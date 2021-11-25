@@ -55,7 +55,7 @@ struct IsNullFn {
 
 impl Expression for IsNullFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.value.resolve(ctx).map(|v| value!(v.is_null()))
+        self.value.resolve(ctx).map(|v| shared_value!(v.is_null()))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

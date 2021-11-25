@@ -52,8 +52,10 @@ struct FloatFn {
 
 impl Expression for FloatFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        match self.value.resolve(ctx)? {
-            v @ Value::Float(_) => Ok(v),
+        let value = self.value.resolve(ctx)?;
+        let borrowed = value.borrow();
+        match &*borrowed {
+            Value::Float(_) => Ok(value.clone()),
             v => Err(format!(r#"expected "float", got {}"#, v.kind()).into()),
         }
     }

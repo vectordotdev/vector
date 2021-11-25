@@ -52,8 +52,10 @@ struct ArrayFn {
 
 impl Expression for ArrayFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        match self.value.resolve(ctx)? {
-            v @ Value::Array(_) => Ok(v),
+        let value = self.value.resolve(ctx)?;
+        let borrowed = value.borrow();
+        match &*borrowed {
+            Value::Array(_) => Ok(value.clone()),
             v => Err(format!(r#"expected "array", got {}"#, v.kind()).into()),
         }
     }

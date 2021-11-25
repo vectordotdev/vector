@@ -54,19 +54,19 @@ struct DecodeBase64Fn {
 
 impl Expression for DecodeBase64Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_bytes()?;
+        let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
+        let value = value.try_bytes()?;
 
-        let charset = self
-            .charset
-            .as_ref()
-            .map(|c| {
-                c.resolve(ctx)
-                    .and_then(|v| Value::try_bytes(v).map_err(Into::into))
-            })
-            .transpose()?
-            .map(|c| Base64Charset::from_str(&String::from_utf8_lossy(&c)))
-            .transpose()?
-            .unwrap_or_default();
+        let charset = match &self.charset {
+            Some(charset) => {
+                let charset = charset.resolve(ctx)?;
+                let charset = charset.borrow();
+                let charset = Value::try_bytes(&charset)?;
+                Base64Charset::from_str(&String::from_utf8_lossy(&charset))
+            }
+            None => Ok(Default::default()),
+        }?;
 
         let config = match charset {
             Base64Charset::Standard => base64::STANDARD,
@@ -74,7 +74,7 @@ impl Expression for DecodeBase64Fn {
         };
 
         match base64::decode_config(value, config) {
-            Ok(s) => Ok(Value::from(s)),
+            Ok(s) => Ok(SharedValue::from(s)),
             Err(_) => Err("unable to decode value to base64".into()),
         }
     }

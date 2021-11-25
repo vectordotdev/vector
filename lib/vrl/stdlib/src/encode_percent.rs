@@ -119,7 +119,7 @@ struct EncodePercentFn {
 impl Expression for EncodePercentFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-
+        let value = value.borrow();
         let string = value.try_bytes_utf8_lossy()?;
 
         let ascii_set = match self.ascii_set.as_ref() {

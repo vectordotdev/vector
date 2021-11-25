@@ -108,16 +108,19 @@ pub struct GetFn {
 
 impl Expression for GetFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let path = match self.path.resolve(ctx)? {
+        let path = self.path.resolve(ctx)?;
+        let path = path.borrow();
+        let path = match &*path {
             Value::Array(path) => {
                 let mut get = LookupBuf::root();
 
                 for segment in path {
-                    let segment = match segment {
+                    let segment = segment.borrow();
+                    let segment = match &*segment {
                         Value::Bytes(field) => {
                             SegmentBuf::Field(String::from_utf8_lossy(&field).into_owned().into())
                         }
-                        Value::Integer(index) => SegmentBuf::Index(index as isize),
+                        Value::Integer(index) => SegmentBuf::Index(*index as isize),
                         value => {
                             return Err(format!(
                                 r#"path segment must be either "string" or "integer", not {}"#,
@@ -141,7 +144,11 @@ impl Expression for GetFn {
             }
         };
 
-        Ok(self.value.resolve(ctx)?.get(&path)?.unwrap_or(Value::Null))
+        Ok(self
+            .value
+            .resolve(ctx)?
+            .get(&path)?
+            .unwrap_or_else(|| SharedValue::from(Value::Null)))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

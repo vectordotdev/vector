@@ -52,10 +52,12 @@ struct IntegerFn {
 
 impl Expression for IntegerFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        match self.value.resolve(ctx)? {
-            v @ Value::Integer(_) => Ok(v),
+        let value = self.value.resolve(ctx)?;
+        let result = match &*value.borrow() {
+            Value::Integer(_) => Ok(value.clone()),
             v => Err(format!(r#"expected "integer", got {}"#, v.kind()).into()),
-        }
+        };
+        result
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

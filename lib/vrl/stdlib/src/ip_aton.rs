@@ -45,9 +45,9 @@ struct IpAtonFn {
 
 impl Expression for IpAtonFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let ip: Ipv4Addr = self
-            .value
-            .resolve(ctx)?
+        let ip = self.value.resolve(ctx)?;
+        let ip = ip.borrow();
+        let ip: Ipv4Addr = ip
             .try_bytes_utf8_lossy()?
             .parse()
             .map_err(|err| format!("unable to parse IPv4 address: {}", err))?;

@@ -54,9 +54,13 @@ struct FormatTimestampFn {
 
 impl Expression for FormatTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.format.resolve(ctx)?.try_bytes()?;
+        let bytes = self.format.resolve(ctx)?;
+        let bytes = bytes.borrow();
+        let bytes = bytes.try_bytes()?;
         let format = String::from_utf8_lossy(&bytes);
-        let ts = self.value.resolve(ctx)?.try_timestamp()?;
+        let ts = self.value.resolve(ctx)?;
+        let ts = ts.borrow();
+        let ts = ts.try_timestamp()?;
 
         try_format(&ts, &format).map(Into::into)
     }

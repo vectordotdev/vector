@@ -59,7 +59,9 @@ struct IncludesFn {
 
 impl Expression for IncludesFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let list = self.value.resolve(ctx)?.try_array()?;
+        let list = self.value.resolve(ctx)?;
+        let list = list.borrow();
+        let list = list.try_array()?;
         let item = self.item.resolve(ctx)?;
 
         let included = list.iter().any(|i| i == &item);

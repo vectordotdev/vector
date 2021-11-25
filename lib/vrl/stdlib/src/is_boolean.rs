@@ -55,7 +55,9 @@ struct IsBooleanFn {
 
 impl Expression for IsBooleanFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.value.resolve(ctx).map(|v| value!(v.is_boolean()))
+        self.value
+            .resolve(ctx)
+            .map(|v| shared_value!(v.is_boolean()))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

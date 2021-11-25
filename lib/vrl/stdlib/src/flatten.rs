@@ -1,4 +1,4 @@
-use std::collections::btree_map;
+use std::collections::BTreeMap;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -50,15 +50,11 @@ struct FlattenFn {
 
 impl Expression for FlattenFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        match self.value.resolve(ctx)? {
-            Value::Array(arr) => Ok(Value::Array(
-                ArrayFlatten::new(arr.iter()).cloned().collect(),
-            )),
-            Value::Object(map) => Ok(Value::Object(
-                MapFlatten::new(map.iter())
-                    .map(|(k, v)| (k, v.clone()))
-                    .collect(),
-            )),
+        let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
+        match &*value {
+            Value::Array(arr) => Ok(SharedValue::from(Value::Array(flatten_array(arr)))),
+            Value::Object(map) => Ok(SharedValue::from(Value::Object(flatten_object(None, map)))),
             value => Err(value::Error::Expected {
                 got: value.kind(),
                 expected: Kind::Array | Kind::Object,
@@ -78,109 +74,46 @@ impl Expression for FlattenFn {
     }
 }
 
-/// An iterator to walk over maps allowing us to flatten nested maps to a single level.
-struct MapFlatten<'a> {
-    values: btree_map::Iter<'a, String, Value>,
-    inner: Option<Box<MapFlatten<'a>>>,
+fn flatten_array(arr: &[SharedValue]) -> Vec<SharedValue> {
+    let mut result = Vec::new();
+
+    for value in arr {
+        let borrowed = value.borrow();
+        match &*borrowed {
+            Value::Array(inner) => result.append(&mut flatten_array(inner)),
+            _ => result.push(value.clone()),
+        }
+    }
+
+    result
+}
+
+/// Returns the key with the parent prepended.
+fn new_key(parent: Option<&str>, key: &str) -> String {
+    match parent {
+        None => key.to_string(),
+        Some(ref parent) => format!("{}.{}", parent, key),
+    }
+}
+
+fn flatten_object(
     parent: Option<String>,
-}
+    obj: &BTreeMap<String, SharedValue>,
+) -> BTreeMap<String, SharedValue> {
+    let mut result = BTreeMap::new();
 
-impl<'a> MapFlatten<'a> {
-    fn new(values: btree_map::Iter<'a, String, Value>) -> Self {
-        Self {
-            values,
-            inner: None,
-            parent: None,
-        }
-    }
-
-    fn new_from_parent(parent: String, values: btree_map::Iter<'a, String, Value>) -> Self {
-        Self {
-            values,
-            inner: None,
-            parent: Some(parent),
-        }
-    }
-
-    /// Returns the key with the parent prepended.
-    fn new_key(&self, key: &str) -> String {
-        match self.parent {
-            None => key.to_string(),
-            Some(ref parent) => format!("{}.{}", parent, key),
-        }
-    }
-}
-
-impl<'a> std::iter::Iterator for MapFlatten<'a> {
-    type Item = (String, &'a Value);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(ref mut inner) = self.inner {
-            let next = inner.next();
-            match next {
-                Some(_) => return next,
-                None => self.inner = None,
+    for (key, value) in obj {
+        let key = new_key(parent.as_ref().map(|key| key.as_ref()), key);
+        let borrowed = value.borrow();
+        match &*borrowed {
+            Value::Object(inner) => result.append(&mut flatten_object(Some(key), inner)),
+            _ => {
+                result.insert(key, value.clone());
             }
         }
-
-        let next = self.values.next();
-        match next {
-            Some((key, Value::Object(value))) => {
-                self.inner = Some(Box::new(MapFlatten::new_from_parent(
-                    self.new_key(key),
-                    value.iter(),
-                )));
-                self.next()
-            }
-            Some((key, value)) => Some((self.new_key(key), value)),
-            None => None,
-        }
     }
-}
 
-/// Create an iterator that can walk a tree of Array values.
-/// This can be used to flatten the array.
-struct ArrayFlatten<'a> {
-    values: std::slice::Iter<'a, Value>,
-    inner: Option<Box<ArrayFlatten<'a>>>,
-}
-
-impl<'a> ArrayFlatten<'a> {
-    fn new(values: std::slice::Iter<'a, Value>) -> Self {
-        ArrayFlatten {
-            values,
-            inner: None,
-        }
-    }
-}
-
-impl<'a> std::iter::Iterator for ArrayFlatten<'a> {
-    type Item = &'a Value;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        // Iterate over our inner list first.
-        if let Some(ref mut inner) = self.inner {
-            let next = inner.next();
-            match next {
-                Some(_) => return next,
-                None => {
-                    // The inner list has been exhausted.
-                    self.inner = None;
-                }
-            }
-        }
-
-        // Then iterate over our values.
-        let next = self.values.next();
-        match next {
-            Some(Value::Array(next)) => {
-                // Create a new iterator for this child list.
-                self.inner = Some(Box::new(ArrayFlatten::new(next.iter())));
-                self.next()
-            }
-            _ => next,
-        }
-    }
+    result
 }
 
 #[cfg(test)]

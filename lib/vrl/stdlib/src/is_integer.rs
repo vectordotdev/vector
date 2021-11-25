@@ -55,7 +55,9 @@ struct IsIntegerFn {
 
 impl Expression for IsIntegerFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.value.resolve(ctx).map(|v| value!(v.is_integer()))
+        self.value
+            .resolve(ctx)
+            .map(|v| shared_value!(v.is_integer()))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

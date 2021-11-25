@@ -63,31 +63,42 @@ struct FindFn {
 }
 
 impl FindFn {
-    fn find_regex_in_str(value: &str, regex: Regex, offset: usize) -> Option<usize> {
+    fn find_regex_in_str(value: &str, regex: &Regex, offset: usize) -> Option<usize> {
         regex.find_at(value, offset).map(|found| found.start())
     }
 
-    fn find_bytes_in_bytes(value: Bytes, pattern: Bytes, offset: usize) -> Option<usize> {
+    fn find_bytes_in_bytes(value: &Bytes, pattern: &Bytes, offset: usize) -> Option<usize> {
         if pattern.len() > value.len() {
             return None;
         }
         for from in offset..(value.len() - pattern.len() + 1) {
             let to = from + pattern.len();
-            if value[from..to] == pattern {
+            if &value[from..to] == pattern {
                 return Some(from);
             }
         }
         None
     }
 
-    fn find(value: Value, pattern: Value, offset: usize) -> Result<Option<usize>> {
-        match pattern {
-            Value::Bytes(bytes) => Ok(Self::find_bytes_in_bytes(value.try_bytes()?, bytes, offset)),
-            Value::Regex(regex) => Ok(Self::find_regex_in_str(
-                &value.try_bytes_utf8_lossy()?,
-                regex,
-                offset,
-            )),
+    fn find(value: SharedValue, pattern: SharedValue, offset: usize) -> Result<Option<usize>> {
+        let pattern = pattern.borrow();
+        match &*pattern {
+            Value::Bytes(bytes) => {
+                let value = value.borrow();
+                Ok(Self::find_bytes_in_bytes(
+                    &value.try_bytes()?,
+                    bytes,
+                    offset,
+                ))
+            }
+            Value::Regex(regex) => {
+                let value = value.borrow();
+                Ok(Self::find_regex_in_str(
+                    &value.try_bytes_utf8_lossy()?,
+                    regex,
+                    offset,
+                ))
+            }
             other => Err(value::Error::Expected {
                 got: other.kind(),
                 expected: Kind::Bytes | Kind::Regex,
@@ -107,8 +118,8 @@ impl Expression for FindFn {
         } as usize;
 
         Ok(Self::find(value, pattern, from)?
-            .map(|value| Value::Integer(value as i64))
-            .unwrap_or_else(|| Value::Integer(-1)))
+            .map(|value| SharedValue::from(Value::Integer(value as i64)))
+            .unwrap_or_else(|| SharedValue::from(Value::Integer(-1))))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

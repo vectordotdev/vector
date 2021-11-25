@@ -127,12 +127,13 @@ impl Default for CompactOptions {
 
 impl CompactOptions {
     /// Check if the value is empty according to the given options
-    fn is_empty(&self, value: &Value) -> bool {
+    fn is_empty(&self, value: &SharedValue) -> bool {
         if self.nullish && util::is_nullish(value) {
             return true;
         }
 
-        match value {
+        let value = value.borrow();
+        match &*value {
             Value::Bytes(bytes) => self.string && bytes.len() == 0,
             Value::Null => self.null,
             Value::Object(map) => self.map && map.is_empty(),
@@ -176,9 +177,11 @@ impl Expression for CompactFn {
             },
         };
 
-        match self.value.resolve(ctx)? {
-            Value::Object(map) => Ok(Value::from(compact_map(map, &options))),
-            Value::Array(arr) => Ok(Value::from(compact_array(arr, &options))),
+        let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
+        match &*value {
+            Value::Object(map) => Ok(SharedValue::from(compact_map(map, &options))),
+            Value::Array(arr) => Ok(SharedValue::from(compact_array(arr, &options))),
             value => Err(value::Error::Expected {
                 got: value.kind(),
                 expected: Kind::Array | Kind::Object,
@@ -199,32 +202,38 @@ impl Expression for CompactFn {
 }
 
 /// Compact the value if we are recursing - otherwise, just return the value untouched.
-fn recurse_compact(value: Value, options: &CompactOptions) -> Value {
-    match value {
-        Value::Array(array) if options.recursive => Value::from(compact_array(array, options)),
-        Value::Object(map) if options.recursive => Value::from(compact_map(map, options)),
-        _ => value,
+fn recurse_compact(value: SharedValue, options: &CompactOptions) -> SharedValue {
+    let borrowed = value.borrow();
+    match &*borrowed {
+        Value::Array(array) if options.recursive => {
+            SharedValue::from(compact_array(array, options))
+        }
+        Value::Object(map) if options.recursive => SharedValue::from(compact_map(map, options)),
+        _ => value.clone(),
     }
 }
 
-fn compact_map(map: BTreeMap<String, Value>, options: &CompactOptions) -> BTreeMap<String, Value> {
+fn compact_map(
+    map: &BTreeMap<String, SharedValue>,
+    options: &CompactOptions,
+) -> BTreeMap<String, SharedValue> {
     map.into_iter()
         .filter_map(|(key, value)| {
-            let value = recurse_compact(value, options);
+            let value = recurse_compact(value.clone(), options);
             if options.is_empty(&value) {
                 None
             } else {
-                Some((key, value))
+                Some((key.clone(), value))
             }
         })
         .collect()
 }
 
-fn compact_array(array: Vec<Value>, options: &CompactOptions) -> Vec<Value> {
+fn compact_array(array: &[SharedValue], options: &CompactOptions) -> Vec<SharedValue> {
     array
         .into_iter()
         .filter_map(|value| {
-            let value = recurse_compact(value, options);
+            let value = recurse_compact(value.clone(), options);
             if options.is_empty(&value) {
                 None
             } else {
@@ -243,8 +252,8 @@ mod test {
     fn test_compacted_array() {
         let cases = vec![
             (
-                vec!["".into(), "".into()],              // expected
-                vec!["".into(), Value::Null, "".into()], // original
+                vec!["".into(), "".into()],                      // expected
+                vec!["".into(), SharedValue::null(), "".into()], // original
                 CompactOptions {
                     string: false,
                     ..Default::default()
@@ -252,14 +261,22 @@ mod test {
             ),
             (
                 vec![1.into(), 2.into()],
-                vec![1.into(), Value::Array(vec![]), 2.into()],
+                vec![1.into(), SharedValue::from(Value::Array(vec![])), 2.into()],
                 Default::default(),
             ),
             (
-                vec![1.into(), Value::Array(vec![3.into()]), 2.into()],
                 vec![
                     1.into(),
-                    Value::Array(vec![Value::Null, 3.into(), Value::Null]),
+                    SharedValue::from(Value::Array(vec![3.into()])),
+                    2.into(),
+                ],
+                vec![
+                    1.into(),
+                    SharedValue::from(Value::Array(vec![
+                        SharedValue::null(),
+                        3.into(),
+                        SharedValue::null(),
+                    ])),
                     2.into(),
                 ],
                 Default::default(),
@@ -268,17 +285,21 @@ mod test {
                 vec![1.into(), 2.into()],
                 vec![
                     1.into(),
-                    Value::Array(vec![Value::Null, Value::Null]),
+                    SharedValue::from(Value::Array(vec![SharedValue::null(), SharedValue::null()])),
                     2.into(),
                 ],
                 Default::default(),
             ),
             (
-                vec![1.into(), Value::Object(map!["field2": 2]), 2.into()],
                 vec![
                     1.into(),
-                    Value::Object(map!["field1": Value::Null,
-                                    "field2": 2]),
+                    SharedValue::from(Value::Object(map!["field2": 2])),
+                    2.into(),
+                ],
+                vec![
+                    1.into(),
+                    SharedValue::from(Value::Object(map!["field1": SharedValue::null(),
+                                                         "field2": 2])),
                     2.into(),
                 ],
                 Default::default(),
@@ -286,7 +307,7 @@ mod test {
         ];
 
         for (expected, original, options) in cases {
-            assert_eq!(expected, compact_array(original, &options))
+            assert_eq!(expected, compact_array(&original, &options))
         }
     }
 
@@ -300,7 +321,7 @@ mod test {
                 }, // expected
                 btreemap! {
                     "key1" => "",
-                    "key2" => Value::Null,
+                    "key2" => SharedValue::null(),
                     "key3" => "",
                 }, // original
                 CompactOptions {
@@ -310,39 +331,41 @@ mod test {
             ),
             (
                 btreemap! {
-                    "key1" => Value::from(1),
-                    "key3" => Value::from(2),
+                    "key1" => SharedValue::from(1),
+                    "key3" => SharedValue::from(2),
                 },
                 btreemap! {
-                    "key1" => Value::from(1),
-                    "key2" => Value::Array(vec![]),
-                    "key3" => Value::from(2),
+                    "key1" => SharedValue::from(1),
+                    "key2" => SharedValue::from(Value::Array(vec![])),
+                    "key3" => SharedValue::from(2),
                 },
                 Default::default(),
             ),
             (
-                map!["key1": Value::from(1),
-                     "key2": Value::Object(map!["key2": Value::from(3)]),
-                     "key3": Value::from(2),
+                map!["key1": SharedValue::from(1),
+                     "key2": SharedValue::from(Value::Object(map!["key2": Value::from(3)])),
+                     "key3": SharedValue::from(2),
                 ],
                 map![
-                    "key1": Value::from(1),
-                    "key2": Value::Object(map!["key1": Value::Null,
-                                            "key2": Value::from(3),
-                                            "key3": Value::Null]),
-                    "key3": Value::from(2),
+                    "key1": SharedValue::from(1),
+                    "key2": SharedValue::from(
+                        Value::Object(
+                            map!["key1": SharedValue::null(),
+                                 "key2": SharedValue::from(3),
+                                 "key3": SharedValue::null()])),
+                    "key3": SharedValue::from(2),
                 ],
                 Default::default(),
             ),
             (
-                map!["key1": Value::from(1),
-                     "key2": Value::Object(map!["key1": Value::Null,]),
-                     "key3": Value::from(2),
+                map!["key1": SharedValue::from(1),
+                     "key2": SharedValue::from(Value::Object(map!["key1": SharedValue::null(),])),
+                     "key3": SharedValue::from(2),
                 ],
                 map![
-                    "key1": Value::from(1),
-                    "key2": Value::Object(map!["key1": Value::Null,]),
-                    "key3": Value::from(2),
+                    "key1": SharedValue::from(1),
+                    "key2": SharedValue::from(Value::Object(map!["key1": SharedValue::null(),])),
+                    "key3": SharedValue::from(2),
                 ],
                 CompactOptions {
                     recursive: false,
@@ -350,33 +373,33 @@ mod test {
                 },
             ),
             (
-                map!["key1": Value::from(1),
-                     "key3": Value::from(2),
+                map!["key1": SharedValue::from(1),
+                     "key3": SharedValue::from(2),
                 ],
                 map![
-                    "key1": Value::from(1),
-                    "key2": Value::Object(map!["key1": Value::Null,]),
-                    "key3": Value::from(2),
+                    "key1": SharedValue::from(1),
+                    "key2": SharedValue::from(Value::Object(map!["key1": SharedValue::null(),])),
+                    "key3": SharedValue::from(2),
                 ],
                 Default::default(),
             ),
             (
                 btreemap! {
-                    "key1" => Value::from(1),
-                    "key2" => Value::Array(vec![2.into()]),
-                    "key3" => Value::from(2),
+                    "key1" => SharedValue::from(1),
+                    "key2" => SharedValue::from(Value::Array(vec![2.into()])),
+                    "key3" => SharedValue::from(2),
                 },
                 btreemap! {
-                    "key1" => Value::from(1),
-                    "key2" => Value::Array(vec![Value::Null, 2.into(), Value::Null]),
-                    "key3" => Value::from(2),
+                    "key1" => SharedValue::from(1),
+                    "key2" => SharedValue::from(Value::Array(vec![SharedValue::null(), 2.into(), SharedValue::null()])),
+                    "key3" => SharedValue::from(2),
                 },
                 Default::default(),
             ),
         ];
 
         for (expected, original, options) in cases {
-            assert_eq!(expected, compact_map(original, &options))
+            assert_eq!(expected, compact_map(&original, &options))
         }
     }
 
@@ -384,17 +407,17 @@ mod test {
         compact => Compact;
 
         with_map {
-            args: func_args![value: map!["key1": Value::Null,
+            args: func_args![value: map!["key1": SharedValue::null(),
                                          "key2": 1,
                                          "key3": "",
             ]],
-            want: Ok(Value::Object(map!["key2": 1])),
+            want: Ok(SharedValue::from(Value::Object(map!["key2": 1]))),
             tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
         }
 
         with_array {
-            args: func_args![value: vec![Value::Null, Value::from(1), Value::from(""),]],
-            want: Ok(Value::Array(vec![Value::from(1)])),
+            args: func_args![value: vec![SharedValue::null(), SharedValue::from(1), SharedValue::from(""),]],
+            want: Ok(Value::Array(vec![SharedValue::from(1)])),
             tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
         }
 

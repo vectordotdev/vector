@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]

@@ -78,7 +78,9 @@ impl Expression for EndsWithFn {
         let case_sensitive = self.case_sensitive.resolve(ctx)?.try_boolean()?;
 
         let substring = {
-            let bytes = self.substring.resolve(ctx)?.try_bytes()?;
+            let bytes = self.substring.resolve(ctx)?;
+            let bytes = bytes.borrow();
+            let bytes = bytes.try_bytes()?;
             let string = String::from_utf8_lossy(&bytes);
 
             match case_sensitive {
@@ -89,6 +91,7 @@ impl Expression for EndsWithFn {
 
         let value = {
             let value = self.value.resolve(ctx)?;
+            let value = value.borrow();
             let string = value.try_bytes_utf8_lossy()?;
 
             match case_sensitive {

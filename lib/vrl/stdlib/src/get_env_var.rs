@@ -44,6 +44,7 @@ struct GetEnvVarFn {
 impl Expression for GetEnvVarFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.name.resolve(ctx)?;
+        let value = value.borrow();
         let name = value.try_bytes_utf8_lossy()?;
 
         std::env::var(name.as_ref())

@@ -1,5 +1,3 @@
-use std::{cell::RefCell, rc::Rc};
-
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -49,9 +47,7 @@ impl Expression for DowncaseFn {
         let bytes = bytes.borrow();
         let bytes = bytes.as_bytes().unwrap();
 
-        Ok(Rc::new(RefCell::new(
-            String::from_utf8_lossy(&bytes).to_lowercase().into(),
-        )))
+        Ok(String::from_utf8_lossy(&bytes).to_lowercase().into())
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

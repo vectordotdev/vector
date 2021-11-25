@@ -45,7 +45,9 @@ struct DecodePercentFn {
 
 impl Expression for DecodePercentFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_bytes()?;
+        let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
+        let value = value.try_bytes()?;
 
         Ok(percent_decode(&value)
             .decode_utf8_lossy()

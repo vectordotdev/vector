@@ -1,4 +1,5 @@
 use crate::value::error::Error;
+use serde::Serialize;
 use std::borrow::Cow;
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
@@ -18,6 +19,15 @@ impl std::hash::Hash for SharedValue {
     }
 }
 
+impl Serialize for SharedValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.0.borrow().serialize(serializer)
+    }
+}
+
 impl Eq for SharedValue {}
 
 impl std::fmt::Display for SharedValue {
@@ -27,6 +37,11 @@ impl std::fmt::Display for SharedValue {
 }
 
 impl SharedValue {
+    /// Returns an instance of SharedValue(Value::Null)
+    pub fn null() -> Self {
+        Self::from(Value::Null)
+    }
+
     pub fn borrow(&self) -> Ref<Value> {
         self.0.borrow()
     }

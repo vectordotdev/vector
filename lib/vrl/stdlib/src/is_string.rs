@@ -55,7 +55,7 @@ struct IsStringFn {
 
 impl Expression for IsStringFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.value.resolve(ctx).map(|v| value!(v.is_bytes()))
+        self.value.resolve(ctx).map(|v| shared_value!(v.is_bytes()))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

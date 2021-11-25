@@ -66,19 +66,18 @@ impl Expression for AssertFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         match self.condition.resolve(ctx)?.try_boolean()? {
             true => Ok(true.into()),
-            false => Err(self
-                .message
-                .as_ref()
-                .map(|m| {
-                    m.resolve(ctx)
-                        .and_then(|v| Ok(v.try_bytes_utf8_lossy()?.into_owned()))
-                })
-                .transpose()?
-                .unwrap_or_else(|| match self.condition.format() {
+            false => Err(match &self.message {
+                Some(message) => {
+                    let message = message.resolve(ctx)?;
+                    let message = message.borrow();
+                    message.try_bytes_utf8_lossy()?.into_owned().into()
+                }
+                None => match self.condition.format() {
                     Some(string) => format!("assertion failed: {}", string),
                     None => "assertion failed".to_owned(),
-                })
-                .into()),
+                }
+                .into(),
+            }),
         }
     }
 

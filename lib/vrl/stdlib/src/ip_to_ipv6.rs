@@ -45,9 +45,9 @@ struct IpToIpv6Fn {
 
 impl Expression for IpToIpv6Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let ip: IpAddr = self
-            .value
-            .resolve(ctx)?
+        let ip = self.value.resolve(ctx)?;
+        let ip = ip.borrow();
+        let ip: IpAddr = ip
             .try_bytes_utf8_lossy()?
             .parse()
             .map_err(|err| format!("unable to parse IP address: {}", err))?;

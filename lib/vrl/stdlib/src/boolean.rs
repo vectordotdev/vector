@@ -52,8 +52,10 @@ struct BooleanFn {
 
 impl Expression for BooleanFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        match self.value.resolve(ctx)? {
-            v @ Value::Boolean(_) => Ok(v),
+        let value = self.value.resolve(ctx)?;
+        let borrowed = value.borrow();
+        match &*borrowed {
+            Value::Boolean(_) => Ok(value.clone()),
             v => Err(format!(r#"expected "boolean", got {}"#, v.kind()).into()),
         }
     }

@@ -83,16 +83,14 @@ impl Expression for AssertEqFn {
         if left == right {
             Ok(true.into())
         } else {
-            Err(self
-                .message
-                .as_ref()
-                .map(|m| {
-                    m.resolve(ctx)
-                        .and_then(|v| Ok(v.try_bytes_utf8_lossy()?.into_owned()))
-                })
-                .transpose()?
-                .unwrap_or_else(|| format!("assertion failed: {} == {}", left, right))
-                .into())
+            Err(match &self.message {
+                Some(message) => {
+                    let message = message.resolve(ctx)?;
+                    let message = message.borrow();
+                    message.try_bytes_utf8_lossy()?.into_owned().into()
+                }
+                None => format!("assertion failed: {} == {}", left, right).into(),
+            })
         }
     }
 

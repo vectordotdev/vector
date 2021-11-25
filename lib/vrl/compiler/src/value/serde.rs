@@ -21,8 +21,8 @@ impl Serialize for Value {
             Integer(v) => serializer.serialize_i64(*v),
             Float(v) => serializer.serialize_f64(v.into_inner()),
             Boolean(v) => serializer.serialize_bool(*v),
-            Object(v) => todo!(), // serializer.collect_map(v),
-            Array(v) => todo!(),  // serializer.collect_seq(v),
+            Object(v) => serializer.collect_map(v),
+            Array(v) => serializer.collect_seq(v),
             Timestamp(v) => {
                 serializer.serialize_str(&v.to_rfc3339_opts(SecondsFormat::AutoSi, true))
             }

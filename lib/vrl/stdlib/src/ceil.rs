@@ -58,9 +58,11 @@ impl Expression for CeilFn {
             None => 0,
         };
 
-        match self.value.resolve(ctx)? {
-            Value::Float(f) => Ok(round_to_precision(*f, precision, f64::ceil).into()),
-            value @ Value::Integer(_) => Ok(value),
+        let value = self.value.resolve(ctx)?;
+        let borrowed = value.borrow();
+        match &*borrowed {
+            Value::Float(f) => Ok(round_to_precision(**f, precision, f64::ceil).into()),
+            Value::Integer(_) => Ok(value.clone()),
             value => Err(value::Error::Expected {
                 got: value.kind(),
                 expected: Kind::Float | Kind::Integer,

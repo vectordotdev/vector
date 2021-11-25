@@ -55,7 +55,9 @@ struct IsTimestampFn {
 
 impl Expression for IsTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.value.resolve(ctx).map(|v| value!(v.is_timestamp()))
+        self.value
+            .resolve(ctx)
+            .map(|v| shared_value!(v.is_timestamp()))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

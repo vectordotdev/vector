@@ -67,8 +67,8 @@ pub(crate) fn regex_type_def(
 }
 
 #[cfg(any(feature = "is_nullish", feature = "compact"))]
-pub(crate) fn is_nullish(value: &vrl::Value) -> bool {
-    match value {
+pub(crate) fn is_nullish(value: &vrl::SharedValue) -> bool {
+    match &*value.borrow() {
         vrl::Value::Bytes(v) => {
             let s = &String::from_utf8_lossy(v)[..];
 

@@ -65,29 +65,29 @@ struct EncodeBase64Fn {
 
 impl Expression for EncodeBase64Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_bytes()?;
+        let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
+        let value = value.try_bytes()?;
 
         let padding = self
             .padding
             .as_ref()
             .map(|p| {
                 p.resolve(ctx)
-                    .and_then(|v| Value::try_boolean(v).map_err(Into::into))
+                    .and_then(|v| SharedValue::try_boolean(&v).map_err(Into::into))
             })
             .transpose()?
             .unwrap_or(true);
 
-        let charset = self
-            .charset
-            .as_ref()
-            .map(|c| {
-                c.resolve(ctx)
-                    .and_then(|v| Value::try_bytes(v).map_err(Into::into))
-            })
-            .transpose()?
-            .map(|c| Base64Charset::from_str(&String::from_utf8_lossy(&c)))
-            .transpose()?
-            .unwrap_or_default();
+        let charset = match &self.charset {
+            Some(charset) => {
+                let charset = charset.resolve(ctx)?;
+                let charset = charset.borrow();
+                let charset = Value::try_bytes(&charset)?;
+                Base64Charset::from_str(&String::from_utf8_lossy(&charset))
+            }
+            None => Ok(Default::default()),
+        }?;
 
         let config = base64::Config::new(charset.into(), padding);
 

@@ -100,11 +100,13 @@ pub(crate) struct EncodeKeyValueFn {
     pub(crate) flatten_boolean: Box<dyn Expression>,
 }
 
-fn resolve_fields(fields: Value) -> Result<Vec<String>, ExpressionError> {
+fn resolve_fields(fields: SharedValue) -> Result<Vec<String>, ExpressionError> {
+    let fields = fields.borrow();
     let arr = fields.try_array()?;
     arr.iter()
         .enumerate()
         .map(|(idx, v)| {
+            let v = v.borrow();
             v.try_bytes_utf8_lossy()
                 .map(|v| v.to_string())
                 .map_err(|e| format!("invalid field value type at index {}: {}", idx, e).into())
@@ -114,7 +116,6 @@ fn resolve_fields(fields: Value) -> Result<Vec<String>, ExpressionError> {
 
 impl Expression for EncodeKeyValueFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
         let fields = match &self.fields {
             None => Ok(vec![]),
             Some(expr) => {
@@ -123,12 +124,16 @@ impl Expression for EncodeKeyValueFn {
             }
         }?;
 
-        let object = value.try_object()?;
+        let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
+        let object = value.try_object()?.clone();
 
         let value = self.key_value_delimiter.resolve(ctx)?;
+        let value = value.borrow();
         let key_value_delimiter = value.try_bytes_utf8_lossy()?;
 
         let value = self.field_delimiter.resolve(ctx)?;
+        let value = value.borrow();
         let field_delimiter = value.try_bytes_utf8_lossy()?;
         let flatten_boolean = self.flatten_boolean.resolve(ctx)?.try_boolean()?;
 

@@ -76,6 +76,7 @@ impl Expression for IpCidrContainsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = {
             let value = self.value.resolve(ctx)?;
+            let value = value.borrow();
 
             value
                 .try_bytes_utf8_lossy()?
@@ -85,6 +86,7 @@ impl Expression for IpCidrContainsFn {
 
         let cidr = {
             let value = self.cidr.resolve(ctx)?;
+            let value = value.borrow();
             let cidr = value.try_bytes_utf8_lossy()?;
 
             IpCidr::from_str(cidr).map_err(|err| format!("unable to parse CIDR: {}", err))?

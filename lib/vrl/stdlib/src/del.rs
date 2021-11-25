@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -106,28 +104,27 @@ impl Expression for DelFn {
                 .remove(path, false)
                 .ok()
                 .flatten()
-                .unwrap_or_else(|| Rc::new(RefCell::new(Value::Null))));
+                .unwrap_or_else(|| SharedValue::null()));
         }
 
         if let Some(ident) = self.query.variable_ident() {
             return match ctx.state_mut().variable_mut(ident) {
                 Some(value) => {
-                    let new_value = Value::get_by_path(Rc::clone(&value), path);
-                    Value::remove_by_path(value, path, false);
-                    Ok(new_value.unwrap_or_else(|| Rc::new(RefCell::new(Value::Null))))
+                    let new_value = SharedValue::get_by_path(value.clone(), path);
+                    SharedValue::remove_by_path(value, path, false);
+                    Ok(new_value.unwrap_or_else(|| SharedValue::null()))
                 }
-                None => Ok(Rc::new(RefCell::new(Value::Null))),
+                None => Ok(SharedValue::null()),
             };
         }
 
         if let Some(expr) = self.query.expression_target() {
             let value = expr.resolve(ctx)?;
 
-            return Ok(Value::get_by_path(value, path)
-                .unwrap_or_else(|| Rc::new(RefCell::new(Value::Null))));
+            return Ok(SharedValue::get_by_path(value, path).unwrap_or_else(|| SharedValue::null()));
         }
 
-        Ok(Rc::new(RefCell::new(Value::Null)))
+        Ok(SharedValue::null())
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
@@ -160,13 +157,13 @@ mod tests {
             (
                 // String field exists
                 btreemap! { "exists" => "value" },
-                Ok(value!("value")),
+                Ok(shared_value!("value")),
                 DelFn::new("exists"),
             ),
             (
                 // String field doesn't exist
                 btreemap! { "exists" => "value" },
-                Ok(value!(null)),
+                Ok(shared_value!(null)),
                 DelFn::new("does_not_exist"),
             ),
             (
@@ -178,31 +175,31 @@ mod tests {
             (
                 // Null field exists
                 btreemap! { "exists" => value!(null) },
-                Ok(value!(null)),
+                Ok(shared_value!(null)),
                 DelFn::new("exists"),
             ),
             (
                 // Map field exists
                 btreemap! {"exists" => btreemap! { "foo" => "bar" }},
-                Ok(value!(btreemap! {"foo" => "bar" })),
+                Ok(shared_value!(btreemap! {"foo" => "bar" })),
                 DelFn::new("exists"),
             ),
             (
                 // Integer field exists
                 btreemap! { "exists" => 127 },
-                Ok(value!(127)),
+                Ok(shared_value!(127)),
                 DelFn::new("exists"),
             ),
             (
                 // Array field exists
                 btreemap! {"exists" => shared_value!([1, 2, 3]) },
-                Ok(value!(2)),
+                Ok(shared_value!(2)),
                 DelFn::new(".exists[1]"),
             ),
         ];
         let tz = TimeZone::default();
         for (object, exp, func) in cases {
-            let mut object: SharedValue = SharedValue::from(object.into());
+            let mut object: SharedValue = SharedValue::from(Value::from(object));
             let mut runtime_state = vrl::state::Runtime::default();
             let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
             let got = func

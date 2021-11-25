@@ -72,9 +72,11 @@ struct FormatNumberFn {
 
 impl Expression for FormatNumberFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value: Decimal = match self.value.resolve(ctx)? {
-            Value::Integer(v) => v.into(),
-            Value::Float(v) => Decimal::from_f64(*v).expect("not NaN"),
+        let value = self.value.resolve(ctx)?;
+        let value = value.borrow();
+        let value: Decimal = match &*value {
+            Value::Integer(v) => (*v).into(),
+            Value::Float(v) => Decimal::from_f64(**v).expect("not NaN"),
             value => {
                 return Err(value::Error::Expected {
                     got: value.kind(),
@@ -90,12 +92,20 @@ impl Expression for FormatNumberFn {
         };
 
         let grouping_separator = match &self.grouping_separator {
-            Some(expr) => Some(expr.resolve(ctx)?.try_bytes()?),
+            Some(expr) => {
+                let separator = expr.resolve(ctx)?;
+                let separator = separator.borrow();
+                Some(separator.try_bytes()?)
+            }
             None => None,
         };
 
         let decimal_separator = match &self.decimal_separator {
-            Some(expr) => expr.resolve(ctx)?.try_bytes()?,
+            Some(expr) => {
+                let separator = expr.resolve(ctx)?;
+                let separator = separator.borrow();
+                separator.try_bytes()?
+            }
             None => ".".into(),
         };
 
