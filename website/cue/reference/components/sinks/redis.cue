@@ -119,32 +119,32 @@ components: sinks: redis: {
 			type: object: {
 				examples: []
 				options: {
-    				field: {
-        				description: "The field used to publish the message when `data_type` is `stream`."
-        				required:    true
-        				type: string: {
+					field: {
+						description: "The field used to publish the message when `data_type` is `stream`."
+						required:    true
+						type: string: {
 							examples: ["message"]
 						}
-    				}
-    				maxlen: {
-        				common:      false
-        				description: "Object containing maximum length settings for the Redis `stream`."
-        				required:    false
-        				type: object: {
-            				examples: []
-            				options: {
-                				type: {
-	                    			common:      false
-                    				description: "Type of stream [trimming method](\(urls.redis_stream_trimming)) to use."
-                    				required:    false
-                    				type: string: {
-	                        			default: "equals"
-    	                    			enum: {
-                            				equals: "Use exact trimming for this stream."
-                            				approx: "Use almost exact trimming for this stream."
-                        				}
-                    				}
-                				}
+					}
+					maxlen: {
+						common:      false
+						description: "Object containing maximum length settings for the Redis `stream`."
+						required:    false
+						type: object: {
+							examples: []
+							options: {
+								type: {
+									common:      false
+									description: "Type of stream [trimming method](\(urls.redis_stream_trimming)) to use."
+									required:    false
+									type: string: {
+										default: "equals"
+										enum: {
+											equals: "Use exact trimming for this stream."
+											approx: "Use almost exact trimming for this stream."
+										}
+									}
+								}
 								threshold: {
 									description: "Threshold to be used for trimming."
 									required: true
@@ -153,8 +153,8 @@ components: sinks: redis: {
 										examples: [1000]
 									}
 								}
-            				}
-        				}
+							}
+						}
 					}
 				}
 			}
