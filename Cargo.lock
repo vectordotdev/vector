@@ -6299,6 +6299,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-toml-merge"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb3dff5ebeeb667cfd6180fdcbd4afb28701ef29704e4dc66d7832af035e8342"
+dependencies = [
+ "toml",
+]
+
+[[package]]
 name = "serde-value"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8076,6 +8085,7 @@ dependencies = [
  "security-framework",
  "semver 1.0.4",
  "serde",
+ "serde-toml-merge",
  "serde_bytes",
  "serde_json",
  "serde_with",

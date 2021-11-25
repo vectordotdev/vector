@@ -9,7 +9,7 @@ use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use std::{
     collections::HashMap,
-    fs::File,
+    fs::{File, ReadDir},
     path::{Path, PathBuf},
     sync::Mutex,
 };
@@ -37,36 +37,58 @@ lazy_static! {
     pub static ref CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::default();
 }
 
-fn component_name(path: &Path) -> Result<String, Vec<String>> {
+pub(super) fn read_dir(path: &Path) -> Result<ReadDir, Vec<String>> {
+    path.read_dir()
+        .map_err(|err| vec![format!("Could not read config dir: {:?}, {}.", path, err)])
+}
+
+pub(super) fn component_name(path: &Path) -> Result<String, Vec<String>> {
     path.file_stem()
         .and_then(|name| name.to_str())
         .map(|name| name.to_string())
         .ok_or_else(|| vec![format!("Couldn't get component name for file: {:?}", path)])
 }
 
-trait LoadableConfig: Sized + serde::de::DeserializeOwned {
-    fn load_from_file(
-        path: &Path,
-    ) -> Result<Option<(ComponentKey, Self, Vec<String>)>, Vec<String>> {
-        let name = component_name(path).map(ComponentKey::from)?;
-        if let Some(file) = open_config(path) {
-            let format = Format::from_path(path).ok();
-            let (component, warnings): (Self, Vec<String>) = load(file, format)?;
-            Ok(Some((name, component, warnings)))
-        } else {
-            Ok(None)
+pub(super) fn open_file(path: &Path) -> Option<File> {
+    match File::open(path) {
+        Ok(f) => Some(f),
+        Err(error) => {
+            if let std::io::ErrorKind::NotFound = error.kind() {
+                error!(message = "Config file not found in path.", ?path);
+                None
+            } else {
+                error!(message = "Error opening config file.", %error, ?path);
+                None
+            }
         }
+    }
+}
+
+fn load_from_file<T: serde::de::DeserializeOwned>(
+    path: &Path,
+) -> Result<Option<(String, T, Vec<String>)>, Vec<String>> {
+    let name = component_name(path)?;
+    if let (Some(file), Ok(format)) = (open_file(path), Format::from_path(path)) {
+        let (component, warnings): (T, Vec<String>) = load(file, Some(format))?;
+        Ok(Some((name, component, warnings)))
+    } else {
+        Ok(None)
+    }
+}
+
+trait LoadableConfig: Sized + serde::de::DeserializeOwned {
+    fn load_from_file(path: &Path) -> Result<Option<(String, Self, Vec<String>)>, Vec<String>> {
+        load_from_file(path)
     }
 
     fn load_from_dir(
         path: &Path,
     ) -> Result<(IndexMap<ComponentKey, Self>, Vec<String>), Vec<String>> {
         let mut result = IndexMap::new();
-        let readdir = path
-            .read_dir()
-            .map_err(|err| vec![format!("Could not read config dir: {:?}, {}.", path, err)])?;
+        let readdir = read_dir(path)?;
         let mut warnings = Vec::new();
         let mut errors = Vec::new();
+
         for res in readdir {
             match res {
                 Ok(direntry) => {
@@ -74,7 +96,7 @@ trait LoadableConfig: Sized + serde::de::DeserializeOwned {
                     if entry_path.is_file() {
                         match Self::load_from_file(&entry_path) {
                             Ok(Some((name, component, warns))) => {
-                                result.insert(name, component);
+                                result.insert(ComponentKey::from(name), component);
                                 warnings.extend(warns);
                             }
                             Ok(None) => (),
@@ -90,6 +112,7 @@ trait LoadableConfig: Sized + serde::de::DeserializeOwned {
                 }
             }
         }
+
         if errors.is_empty() {
             Ok((result, warnings))
         } else {
@@ -102,39 +125,65 @@ trait LoadableConfig: Sized + serde::de::DeserializeOwned {
     }
 }
 
-impl LoadableConfig for EnrichmentTableOuter {}
-impl LoadableConfig for TransformOuter<String> {}
-impl LoadableConfig for SinkOuter<String> {}
-impl LoadableConfig for SourceOuter {}
-impl LoadableConfig for TestDefinition {}
-
 impl LoadableConfig for ConfigBuilder {
     fn load_subfolder(&mut self, path: &Path) -> Result<Vec<String>, Vec<String>> {
         match path.file_name().and_then(|name| name.to_str()) {
             Some("enrichment_tables") => {
-                let (tables, warnings) = EnrichmentTableOuter::load_from_dir(path)?;
-                self.enrichment_tables.extend(tables);
-                Ok(warnings)
+                let (value, warnings) = super::recursive::load_dir(path)?;
+                match toml::Value::Table(value)
+                    .try_into::<IndexMap<ComponentKey, EnrichmentTableOuter>>()
+                {
+                    Ok(inner) => {
+                        self.enrichment_tables.extend(inner);
+                        Ok(warnings)
+                    }
+                    Err(err) => Err(vec![format!(
+                        "Unable to decode enrichment table folder: {:?}",
+                        err
+                    )]),
+                }
             }
             Some("sinks") => {
-                let (sinks, warnings) = SinkOuter::load_from_dir(path)?;
-                self.sinks.extend(sinks);
-                Ok(warnings)
+                let (value, warnings) = super::recursive::load_dir(path)?;
+                match toml::Value::Table(value).try_into::<IndexMap<ComponentKey, SinkOuter<_>>>() {
+                    Ok(inner) => {
+                        self.sinks.extend(inner);
+                        Ok(warnings)
+                    }
+                    Err(err) => Err(vec![format!("Unable to decode sink folder: {:?}", err)]),
+                }
             }
             Some("sources") => {
-                let (sources, warnings) = SourceOuter::load_from_dir(path)?;
-                self.sources.extend(sources);
-                Ok(warnings)
+                let (value, warnings) = super::recursive::load_dir(path)?;
+                match toml::Value::Table(value).try_into::<IndexMap<ComponentKey, SourceOuter>>() {
+                    Ok(inner) => {
+                        self.sources.extend(inner);
+                        Ok(warnings)
+                    }
+                    Err(err) => Err(vec![format!("Unable to decode source folder: {:?}", err)]),
+                }
             }
             Some("tests") => {
-                let (tests, warnings) = TestDefinition::load_from_dir(path)?;
-                self.tests.extend(tests.into_iter().map(|(_, value)| value));
-                Ok(warnings)
+                let (value, warnings) = super::recursive::load_dir(path)?;
+                match toml::Value::Table(value).try_into::<IndexMap<String, TestDefinition>>() {
+                    Ok(inner) => {
+                        self.tests.extend(inner.into_iter().map(|(_, value)| value));
+                        Ok(warnings)
+                    }
+                    Err(err) => Err(vec![format!("Unable to test folder: {:?}", err)]),
+                }
             }
             Some("transforms") => {
-                let (transforms, warnings) = TransformOuter::load_from_dir(path)?;
-                self.transforms.extend(transforms);
-                Ok(warnings)
+                let (value, warnings) = super::recursive::load_dir(path)?;
+                match toml::Value::Table(value)
+                    .try_into::<IndexMap<ComponentKey, TransformOuter<_>>>()
+                {
+                    Ok(inner) => {
+                        self.transforms.extend(inner);
+                        Ok(warnings)
+                    }
+                    Err(err) => Err(vec![format!("Unable to test folder: {:?}", err)]),
+                }
             }
             Some(name) => {
                 // ignore hidden folders
@@ -254,7 +303,7 @@ fn load_builder_from_file(
     path: &Path,
     builder: &mut ConfigBuilder,
 ) -> Result<Vec<String>, Vec<String>> {
-    match ConfigBuilder::load_from_file(path)? {
+    match load_from_file(path)? {
         Some((_, loaded, warnings)) => {
             builder.append(loaded)?;
             Ok(warnings)
@@ -369,28 +418,7 @@ fn load_from_inputs(
     }
 }
 
-fn open_config(path: &Path) -> Option<File> {
-    match File::open(path) {
-        Ok(f) => Some(f),
-        Err(error) => {
-            if let std::io::ErrorKind::NotFound = error.kind() {
-                error!(message = "Config file not found in path.", ?path);
-                None
-            } else {
-                error!(message = "Error opening config file.", %error, ?path);
-                None
-            }
-        }
-    }
-}
-
-pub fn load<T>(
-    mut input: impl std::io::Read,
-    format: FormatHint,
-) -> Result<(T, Vec<String>), Vec<String>>
-where
-    T: serde::de::DeserializeOwned,
-{
+pub fn prepare_input<R: std::io::Read>(mut input: R) -> Result<(String, Vec<String>), Vec<String>> {
     let mut source_string = String::new();
     input
         .read_to_string(&mut source_string)
@@ -402,7 +430,17 @@ where
             vars.insert("HOSTNAME".into(), hostname);
         }
     }
-    let (with_vars, warnings) = vars::interpolate(&source_string, &vars);
+    Ok(vars::interpolate(&source_string, &vars))
+}
+
+pub fn load<R: std::io::Read, T>(
+    input: R,
+    format: FormatHint,
+) -> Result<(T, Vec<String>), Vec<String>>
+where
+    T: serde::de::DeserializeOwned,
+{
+    let (with_vars, warnings) = prepare_input(input)?;
 
     format::deserialize(&with_vars, format).map(|builder| (builder, warnings))
 }
