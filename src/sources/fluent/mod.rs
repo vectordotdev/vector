@@ -837,7 +837,7 @@ mod tests {
         let chunk = with_chunk.then(|| base64::encode(uuid::Uuid::new_v4().as_bytes()));
         let req = FluentMessage::MessageWithOptions(
             tag.into(),
-            FluentTimestamp::Unix(Utc::now().into()),
+            FluentTimestamp::Unix(Utc::now()),
             record,
             FluentMessageOptions {
                 chunk,
