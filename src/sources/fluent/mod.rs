@@ -445,7 +445,7 @@ impl From<FluentFrame> for LogEvent {
 mod tests {
     use super::{message::FluentMessageOptions, *};
     use crate::config::{SourceConfig, SourceContext};
-    use crate::test_util::{self, next_addr_for_ip, trace_init, wait_for_tcp};
+    use crate::test_util::{self, next_addr, trace_init, wait_for_tcp};
     use crate::{event::EventStatus, Pipeline};
     use bytes::BytesMut;
     use chrono::{DateTime, Utc};
@@ -788,7 +788,7 @@ mod tests {
         trace_init();
 
         let (sender, recv) = Pipeline::new_test_finalize(status);
-        let address = next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
+        let address = next_addr();
         let source = FluentConfig {
             address: address.into(),
             tls: None,

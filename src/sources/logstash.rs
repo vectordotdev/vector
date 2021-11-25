@@ -544,7 +544,7 @@ impl From<LogstashEventFrame> for SmallVec<[Event; 1]> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_util::{next_addr_for_ip, spawn_collect_n, wait_for_tcp};
+    use crate::test_util::{next_addr, spawn_collect_n, wait_for_tcp};
     use crate::{event::EventStatus, Pipeline};
     use bytes::BufMut;
     use rand::{thread_rng, Rng};
@@ -567,7 +567,7 @@ mod test {
 
     async fn test_protocol(status: EventStatus, sends_ack: bool) {
         let (sender, recv) = Pipeline::new_test_finalize(status);
-        let address = next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
+        let address = next_addr();
         let source = LogstashConfig {
             address: address.into(),
             tls: None,
