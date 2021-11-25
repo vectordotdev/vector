@@ -682,7 +682,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn redis_sink_list_stream() {
+    async fn redis_sink_stream() {
         trace_init();
 
         let key = format!("test-stream-key-{}", random_string(10));
@@ -753,7 +753,7 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn redis_sink_list_stream_maxlen() {
+    async fn redis_sink_stream_maxlen() {
         trace_init();
 
         let key = format!("test-stream-key-{}", random_string(10));
