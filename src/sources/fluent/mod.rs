@@ -443,10 +443,16 @@ impl From<FluentFrame> for LogEvent {
 
 #[cfg(test)]
 mod tests {
-    use crate::sources::fluent::{DecodeError, FluentConfig, FluentDecoder};
+    use super::{message::FluentMessageOptions, *};
+    use crate::config::{SourceConfig, SourceContext};
+    use crate::test_util::{self, next_addr_for_ip, trace_init, wait_for_tcp};
+    use crate::{event::EventStatus, Pipeline};
     use bytes::BytesMut;
-    use chrono::DateTime;
+    use chrono::{DateTime, Utc};
+    use rmp_serde::Serializer;
     use shared::{assert_event_data_eq, btreemap};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::time::{error::Elapsed, timeout, Duration};
     use tokio_util::codec::Decoder;
     use vector_core::event::{LogEvent, Value};
 
@@ -746,12 +752,107 @@ mod tests {
         }
         Ok(frames)
     }
+
+    #[tokio::test]
+    async fn ack_delivered_without_chunk() {
+        let (result, output) = check_acknowledgements(EventStatus::Delivered, false).await;
+        assert!(matches!(result, Err(_))); // the `_` inside this error is `Elapsed`
+        assert!(output.is_empty());
+    }
+
+    #[tokio::test]
+    async fn ack_delivered_with_chunk() {
+        let (result, output) = check_acknowledgements(EventStatus::Delivered, true).await;
+        assert_eq!(result.unwrap().unwrap(), output.len());
+        assert!(output.starts_with(b"{\"ack\":"));
+    }
+
+    #[tokio::test]
+    async fn ack_failed_without_chunk() {
+        let (result, output) = check_acknowledgements(EventStatus::Failed, false).await;
+        assert_eq!(result.unwrap().unwrap(), output.len());
+        assert!(output.is_empty());
+    }
+
+    #[tokio::test]
+    async fn ack_failed_with_chunk() {
+        let (result, output) = check_acknowledgements(EventStatus::Failed, true).await;
+        assert_eq!(result.unwrap().unwrap(), output.len());
+        assert_eq!(output, &b"{}"[..]);
+    }
+
+    async fn check_acknowledgements(
+        status: EventStatus,
+        with_chunk: bool,
+    ) -> (Result<Result<usize, std::io::Error>, Elapsed>, Bytes) {
+        trace_init();
+
+        let (sender, recv) = Pipeline::new_test_finalize(status);
+        let address = next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
+        let source = FluentConfig {
+            address: address.into(),
+            tls: None,
+            keepalive: None,
+            receive_buffer_bytes: None,
+            acknowledgements: true.into(),
+        }
+        .build(SourceContext::new_test(sender))
+        .await
+        .unwrap();
+        tokio::spawn(source);
+        wait_for_tcp(address).await;
+
+        let msg = uuid::Uuid::new_v4().to_string();
+        let tag = uuid::Uuid::new_v4().to_string();
+        let req = build_req(&tag, &[("field", &msg)], with_chunk);
+
+        let sender = tokio::spawn(async move {
+            let mut socket = tokio::net::TcpStream::connect(address).await.unwrap();
+            socket.write_all(&req).await.unwrap();
+
+            let mut output = BytesMut::new();
+            (
+                timeout(Duration::from_millis(250), socket.read_buf(&mut output)).await,
+                output,
+            )
+        });
+        let events = test_util::collect_n(recv, 1).await;
+        let (result, output) = sender.await.unwrap();
+
+        assert_eq!(events.len(), 1);
+        let log = events[0].as_log();
+        assert_eq!(log.get("field").unwrap(), &msg.into());
+        assert!(matches!(log.get("host").unwrap(), Value::Bytes(_)));
+        assert!(matches!(log.get("timestamp").unwrap(), Value::Timestamp(_)));
+        assert_eq!(log.get("tag").unwrap(), &tag.into());
+
+        (result, output.into())
+    }
+
+    fn build_req(tag: &str, fields: &[(&str, &str)], with_chunk: bool) -> Vec<u8> {
+        let mut record = FluentRecord::default();
+        for (tag, value) in fields {
+            record.insert((*tag).into(), rmpv::Value::String((*value).into()).into());
+        }
+        let chunk = with_chunk.then(|| base64::encode(uuid::Uuid::new_v4().as_bytes()));
+        let req = FluentMessage::MessageWithOptions(
+            tag.into(),
+            FluentTimestamp::Unix(Utc::now().into()),
+            record,
+            FluentMessageOptions {
+                chunk,
+                ..Default::default()
+            },
+        );
+        let mut buf = Vec::new();
+        req.serialize(&mut Serializer::new(&mut buf)).unwrap();
+        buf
+    }
 }
 
 #[cfg(all(test, feature = "fluent-integration-tests"))]
 mod integration_tests {
-    use crate::config::SourceConfig;
-    use crate::config::SourceContext;
+    use crate::config::{SourceConfig, SourceContext};
     use crate::docker::Container;
     use crate::sources::fluent::FluentConfig;
     use crate::test_util::{collect_ready, next_addr_for_ip, trace_init, wait_for_tcp};
