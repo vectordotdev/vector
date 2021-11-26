@@ -512,7 +512,7 @@ mod tests {
         smoke_test(
             r#"database = "my-database""#,
             StatusCode::BAD_REQUEST,
-            BatchStatus::Failed,
+            BatchStatus::Rejected,
         )
         .await;
     }
@@ -545,7 +545,7 @@ mod tests {
             token = "my-token"
         "#},
             StatusCode::BAD_REQUEST,
-            BatchStatus::Failed,
+            BatchStatus::Rejected,
         )
         .await;
     }

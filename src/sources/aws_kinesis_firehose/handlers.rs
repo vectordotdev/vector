@@ -87,7 +87,7 @@ pub async fn firehose(
                     if let Some(receiver) = receiver {
                         match receiver.await {
                             BatchStatus::Delivered => Ok(()),
-                            BatchStatus::Failed => {
+                            BatchStatus::Rejected => {
                                 Err(warp::reject::custom(RequestError::DeliveryFailed {
                                     request_id: request_id.clone(),
                                 }))

@@ -401,7 +401,7 @@ mod tests {
     async fn logplex_handles_failures() {
         let auth = make_auth();
 
-        let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Failed, true).await;
+        let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Rejected, true).await;
 
         let events = spawn_collect_n(
             async move {
@@ -423,7 +423,7 @@ mod tests {
     async fn logplex_ignores_disabled_acknowledgements() {
         let auth = make_auth();
 
-        let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Failed, false).await;
+        let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Rejected, false).await;
 
         let events = spawn_collect_n(
             async move {

@@ -189,7 +189,7 @@ impl DatadogAgentSource {
                             StatusCode::INTERNAL_SERVER_ERROR,
                             "Error delivering contents to sink".into(),
                         ))),
-                        BatchStatus::Failed => Err(warp::reject::custom(ErrorMessage::new(
+                        BatchStatus::Rejected => Err(warp::reject::custom(ErrorMessage::new(
                             StatusCode::BAD_REQUEST,
                             "Contents failed to deliver to sink".into(),
                         ))),
@@ -767,7 +767,7 @@ mod tests {
     #[tokio::test]
     async fn delivery_failure() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Failed, true, true).await;
+        let (rx, addr) = source(EventStatus::Rejected, true, true).await;
 
         spawn_collect_n(
             async move {
@@ -800,7 +800,7 @@ mod tests {
     #[tokio::test]
     async fn ignores_disabled_acknowledgements() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Failed, false, true).await;
+        let (rx, addr) = source(EventStatus::Rejected, false, true).await;
 
         let events = spawn_collect_n(
             async move {

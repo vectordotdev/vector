@@ -172,7 +172,7 @@ mod tests {
         delivered: bool,
     ) -> (impl Stream<Item = Event>, SocketAddr) {
         use EventStatus::*;
-        let status = if delivered { Delivered } else { Failed };
+        let status = if delivered { Delivered } else { Rejected };
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
         let cx = SourceContext::new_test(sender);

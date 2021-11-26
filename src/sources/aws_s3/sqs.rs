@@ -502,7 +502,7 @@ impl IngestorProcess {
                         Some(receiver) => match receiver.await {
                             BatchStatus::Delivered => Ok(()),
                             BatchStatus::Errored => Err(ProcessingError::ErrorAcknowledgement),
-                            BatchStatus::Failed => {
+                            BatchStatus::Rejected => {
                                 error!(
                                     message = "Sink reported events were rejected.",
                                     internal_log_rate_secs = 5
