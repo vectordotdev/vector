@@ -62,9 +62,15 @@ different path that other plain metrics/logs received from a core agent. Thus it
 `datadog-agent` source according to the following points (Additional details on what exactly are "Datadog Agents" can be
 found in the trace support [RFC][trace-support-pr] and may provide relevant context for undermentionned points):
 
-* Keep one Vector source per kind of Datadog Agent
-* Then we would have the following Vector sources:
-  * `datadog-core`: would be the current `datadog-agent` sources, it would receive the data sent by the Datadog "core" Agent (the agent that collects logs & metrics). Note that renaming this source is probably optional, but documentation update would be required anyway.
+* Keep a single `datadog-agent` source and add a settings to switch between agent kind: `agent: <TYPE>` where `<TYPE>`
+  could be  `core` (would support metrics & logs - we could optionnally add `logs` & `metrics` to only allow logs or
+  metrics, along with `core` that would allow both), `trace` and could be extended to support `process`, `security` and
+  so on.
+* Another solution would be to keep one Vector source per kind of Datadog Agent an then we would have the following
+  Vector sources:
+  * `datadog-core`: would be the current `datadog-agent` sources, it would receive the data sent by the Datadog "core"
+    Agent (the agent that collects logs & metrics). Note that renaming this source is probably optional, but
+    documentation update would be required anyway.
   * `datadog-trace`: would support all data sent by the `trace-agent`
   * And so on as the support list grow:
     * `datadog-process` source for the Datadog `process-agent`
@@ -91,52 +97,52 @@ None identified so far.
 
 ### In scope
 
-- Decode APM request (protobuf) received from the trace agent
-- Convert those into a Vector internal representation
-- Enable the passthrough use case (trace-agent -> Vector -> Datadog) in a lossless fashion
+* Decode APM request (protobuf) received from the trace agent
+* Convert those into a Vector internal representation
+* Enable the passthrough use case (trace-agent -> Vector -> Datadog) in a lossless fashion
 
 ### Out of scope
 
-- Compute APM stats in Vector, but this should be kept in mind as a valuable feature for third party traces
-- Any support for other kind of traces
+* Compute APM stats in Vector, but this should be kept in mind as a valuable feature for third party traces
+* Any support for other kind of traces
 
 ## Pain
 
-- Vector has no trace support
-- Datadog traces support without APM stats makes the whole APM product much less powerful.
+* Vector has no trace support
+* Datadog traces support without APM stats makes the whole APM product much less powerful.
 
 ## Proposal
 
 ### User Experience
 
-- The Vector source will accept APM stats (along with traces), and emit Vector event (logs or metrics depending on the
-  implementation)including all metadata as tags/fields, so filtering could be done later in the topology on both APM
-  stats and traces.
-- The `datadog-trace` sink will receive those event (metrics and/or log depending on the implementation) and do the
+* The Vector `datadog-agent` source configured with `agent: trace` will accept APM stats (along with traces), and emit
+  Vector event (logs or metrics depending on the implementation)including all metadata as tags/fields, so filtering
+  could be done later in the topology on both APM stats and traces.
+* The `datadog-trace` sink will receive those event (metrics and/or log depending on the implementation) and do the
   opposite conversion, pending that expected tags will be there.
-- Regarding the Datadog trace-agent config, the APM stats endpoint is the same as the trace one (`apm_config.apm_dd_url`
+* Regarding the Datadog trace-agent config, the APM stats endpoint is the same as the trace one (`apm_config.apm_dd_url`
   config key), there will be nothing else to configure.
-- API key management will be the same as it is for other Datadog sources/sinks.
+* API key management will be the same as it is for other Datadog sources/sinks.
 
 ### Implementation
 
-- Import all APM stats as standard vector metrics in the new variation of the `datadog-agent` source that would be
-  called `datadog-trace` or `datadog-trace-agent`:
-  - This would trigger a refactor of the current `datadog-agent` source with a `DatadogAgent<T>` implementing every
-    common behaviour and `T` would have to implement a `DatadogAgentDecoder` trait, reflecting the kind of agent the
-    source would actually be facing (`CoreAgent`, `TraceAgent`, and other in the future: `ProcessAgent`, `SecurityAgent`
-    and so on)
-  - Turn each [`ClientGroupedStats`][client-grouped-stats-proto] into a one log eventwith all possible metadata to allow
-    the lossless pass-through scenario and the same level of filtering/routing we can achieve for traces. Sketches would
-    then be kepts undecoded as raw bytes, they would have to be store in a new metadata property. It would materialise
-    as a string/bytes map. We could possbily store it in `Value::Bytes` field but this may really be unsafe (**TBC**).
-- The upcoming `datadog-trace` sink would then receive incoming APM stats log events that will be reaggregated according
+* Import all APM stats as standard vector metrics in the new variation of the `datadog-agent` source that would support
+  a new settings named `agent` (or `agent_type`, `agent_kind`, etc.) that would default to `core` (hence keeping the
+  existing behaviour)
+  * The existing `DatadogAgentConfig` struct will get a new field `agent: Box<dyn AgentKind>` with relevant serde wiring
+    and wrap specific code behind that trait and keep a generic code in `DatadogAgentConfig` & `DatadogAgentSource`.
+  * Turn each [`ClientGroupedStats`][client-grouped-stats-proto] into a one log event with all possible metadata to
+    allow the lossless pass-through scenario and the same level of filtering/routing we can achieve for traces. Sketches
+    would then be kepts undecoded as raw bytes, they would have to be store in a new metadata property. It would
+    materialise as a string/bytes map. We could possbily store it in `Value::Bytes` field but this may really be unsafe
+    (**TBC**).
+* The upcoming `datadog-trace` sink would then receive incoming APM stats log events that will be reaggregated according
   to the relevant dimensions using the `Partitioner` trait to rebuild [APM stats payloads][apm-stats-proto].
 
 ## Rationale
 
-- We should Keep valuable metrics relevant to end-user
-- Dropping APM stats would cause current user to loose some insight on execution time.
+* We should Keep valuable metrics relevant to end-user
+* Dropping APM stats would cause current user to loose some insight on execution time.
 
 ## Drawbacks
 
@@ -144,14 +150,14 @@ None identified so far.
 
 ## Prior Art
 
-- Metrics link
+N/A.
 
 ## Alternatives
 
 Regarding the fact that we could ignore/drop incoming APM stats:
 
-- Either completely drop APM stats, but this is not really an option as it would lead to user experience degradation
-- Or disable sampling on the `trace-agent` side and compute APM stats in the `datadog-trace` sink, this could work but
+* Either completely drop APM stats, but this is not really an option as it would lead to user experience degradation
+* Or disable sampling on the `trace-agent` side and compute APM stats in the `datadog-trace` sink, this could work but
   this is a lot for a initial implementation (it would required plain ddsketch suppor on top of the computation logic)
   and to match the accuracy of current APM stats, Vector would have to receive 100% of traces, which may not always be
   possible. But this would pave the wayfor generic APM stats computation wherever the traces come from.
@@ -160,10 +166,10 @@ Regarding the internal representation, APM stats could be represented either by 
 metrics caracterising a given excution chunk it could be extracted as several metric event rather that keeping all those
 metrics in a log event. In that case, in the `datadog-traces` sink the following
 
-- Incoming metrics will be buffered, and populate a struct matching the [APM stats base
+* Incoming metrics will be buffered, and populate a struct matching the [APM stats base
   object][client-grouped-stats-proto], those struct will be stored in a map according to the very same kind of
   [keys][trace-stats-agg-key] used by the trace-agent.
-- And every 10 seconds (this is the sending interval of the trace-agent) serializing and flushing those to Datadog. To
+* And every 10 seconds (this is the sending interval of the trace-agent) serializing and flushing those to Datadog. To
   account for late metrics the sink would have to keep 2 or 3 buckets in the past and delay flushing accordingly. This
   would rely on the [bucket timestamp][btime] kept by the trace agent and [stored in APM stats payload][csb-start].
 
@@ -172,19 +178,19 @@ metrics in a log event. In that case, in the `datadog-traces` sink the following
 
 ## Outstanding Questions
 
-- Confirms `datadog-agent` source re-arrangement, including having a new `datadog-trace` one, or even opt for a more
-  verbose naming : `datadog-trace-agent` /  `datadog-core-agent` sources)
-- The choice between opaque storage for APM Stats sketches (and represent APM stats as log event) and full sketches
+* Confirms `datadog-agent` source re-arrangement, and the introduction of a new settings to switch between agent type.
+* The choice between opaque storage for APM Stats sketches (and represent APM stats as log event) and full sketches
   conversion (and represent APM stats as a set of metrics).
 
 ## Plan Of Attack
 
-- [ ] Rework the Datadog agent source to make it more generic
-- [ ] Implement APM stats decoding in a new source leveraging the aforementionned point
-- [ ] Implement a `datadog-trace` sinks that re-aggregate the metrics from the preivous step into APM stats payloads
+* [ ] Rework the Datadog agent source to make it more generic
+* [ ] Implement APM stats decoding in a new source leveraging the aforementionned point
+* [ ] Implement a `datadog-trace` sinks that re-aggregate the metrics from the preivous step into APM stats payloads
 
 ## Future Improvements
 
-- Compute APM stats in the `datadog-trace` sink for any trace format.
-- Overall all most improvement from the Datadog trace [RFC][trace-support-pr] applies here, but having constraints on the schema use (in the case we represent APM stats as log event) would be very useful here.
+* Compute APM stats in the `datadog-trace` sink for any trace format.
+* Overall all most improvement from the Datadog trace [RFC][trace-support-pr] applies here, but having constraints on
+  the schema use (in the case we represent APM stats as log event) would be very useful here.
 
