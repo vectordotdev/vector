@@ -22,7 +22,7 @@ interpreted as described in [RFC 2119].
    1. [Batching](#batching)
    1. [Events](#events)
       1. [BytesReceived](#bytesreceived)
-      1. [EventsRecevied](#eventsrecevied)
+      1. [EventsReceived](#eventsrecevied)
       1. [EventsSent](#eventssent)
       1. [BytesSent](#bytessent)
       1. [Error](#error)
@@ -42,7 +42,7 @@ outline these rules to guide new component development and ongoing maintenance.
 This specification addresses _direct_ component development and does not cover
 aspects that components inherit "for free". For example, this specification does
 not cover global context, such as `component_id`, that all components receive in
-their telemetry by nature of being a Vector compoent.
+their telemetry by nature of being a Vector component.
 
 ## How to read this document
 
@@ -114,8 +114,9 @@ There is leeway in the implementation of these events:
 
 #### BytesReceived
 
-*Sources* MUST emit a `BytesReceived` event immediately after receiving bytes
-from the upstream source and before the creation of a Vector event.
+*Sources* MUST emit a `BytesReceived` event immediately after receiving
+and (optionally) filtering bytes from the upstream source and before the
+creation of a Vector event.
 
 * Properties
   * `byte_size`
@@ -136,7 +137,7 @@ from the upstream source and before the creation of a Vector event.
   * MUST log a `Bytes received.` message at the `trace` level with the
     defined properties as key-value pairs. It MUST NOT be rate limited.
 
-#### EventsRecevied
+#### EventsReceived
 
 *All components* MUST emit an `EventsReceived` event immediately after creating
 or receiving one or more Vector events.

@@ -142,6 +142,8 @@ mod parse_duration;
 mod parse_glog;
 #[cfg(feature = "parse_grok")]
 mod parse_grok;
+#[cfg(feature = "parse_groks")]
+mod parse_groks;
 #[cfg(feature = "parse_int")]
 mod parse_int;
 #[cfg(feature = "parse_json")]
@@ -212,6 +214,8 @@ mod strip_whitespace;
 mod tag_types_externally;
 #[cfg(feature = "tally")]
 mod tally;
+#[cfg(feature = "tally_value")]
+mod tally_value;
 #[cfg(feature = "timestamp")]
 mod timestamp;
 #[cfg(feature = "to_bool")]
@@ -383,6 +387,8 @@ pub use parse_duration::ParseDuration;
 pub use parse_glog::ParseGlog;
 #[cfg(feature = "parse_grok")]
 pub use parse_grok::ParseGrok;
+#[cfg(feature = "parse_groks")]
+pub use parse_groks::ParseGroks;
 #[cfg(feature = "parse_int")]
 pub use parse_int::ParseInt;
 #[cfg(feature = "parse_json")]
@@ -453,6 +459,8 @@ pub use strip_whitespace::StripWhitespace;
 pub use tag_types_externally::TagTypesExternally;
 #[cfg(feature = "tally")]
 pub use tally::Tally;
+#[cfg(feature = "tally_value")]
+pub use tally_value::TallyValue;
 #[cfg(feature = "timestamp")]
 pub use timestamp::Timestamp;
 #[cfg(feature = "to_bool")]
@@ -626,6 +634,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseGlog),
         #[cfg(feature = "parse_grok")]
         Box::new(ParseGrok),
+        #[cfg(feature = "parse_groks")]
+        Box::new(ParseGroks),
         #[cfg(feature = "parse_int")]
         Box::new(ParseInt),
         #[cfg(feature = "parse_json")]
@@ -694,6 +704,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(StripWhitespace),
         #[cfg(feature = "tally")]
         Box::new(Tally),
+        #[cfg(feature = "tally_value")]
+        Box::new(TallyValue),
         #[cfg(feature = "tag_types_externally")]
         Box::new(TagTypesExternally),
         #[cfg(feature = "timestamp")]

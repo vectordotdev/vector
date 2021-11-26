@@ -181,6 +181,8 @@ async fn create_subscription(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::print_stdout)] //tests
+
     use super::*;
 
     #[test]
@@ -192,6 +194,8 @@ mod tests {
 #[cfg(feature = "nats-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    #![allow(clippy::print_stdout)] //tests
+
     use super::*;
     use crate::test_util::{collect_n, random_string};
 

@@ -84,6 +84,10 @@ use std::{fmt::Debug, io, sync::Arc};
 
 pub trait Encoder<T> {
     /// Encodes the input into the provided writer.
+    ///
+    /// # Errors
+    ///
+    /// If an I/O error is encountered while encoding the input, an error variant will be returned.
     fn encode_input(&self, input: T, writer: &mut dyn io::Write) -> io::Result<usize>;
 }
 
@@ -196,27 +200,58 @@ pub trait EncodingConfiguration {
     }
 }
 
-impl<E> Encoder<Event> for E
+// These types of traits will likely move into some kind of event container once the
+// event layout is refactored, but trying it out here for now.
+// Ideally this would return an iterator, but that's not the easiest thing to make generic
+pub trait VisitLogMut {
+    fn visit_logs_mut<F>(&mut self, func: F)
+    where
+        F: Fn(&mut LogEvent);
+}
+
+impl<T> VisitLogMut for Vec<T>
 where
-    E: EncodingConfiguration,
-    E::Codec: Encoder<Event>,
+    T: VisitLogMut,
 {
-    fn encode_input(&self, mut event: Event, writer: &mut dyn io::Write) -> io::Result<usize> {
-        self.apply_rules(&mut event);
-        self.codec().encode_input(event, writer)
+    fn visit_logs_mut<F>(&mut self, func: F)
+    where
+        F: Fn(&mut LogEvent),
+    {
+        for item in self {
+            item.visit_logs_mut(&func);
+        }
     }
 }
 
-impl<E> Encoder<Vec<Event>> for E
+impl VisitLogMut for Event {
+    fn visit_logs_mut<F>(&mut self, func: F)
+    where
+        F: Fn(&mut LogEvent),
+    {
+        if let Event::Log(log_event) = self {
+            func(log_event)
+        }
+    }
+}
+impl VisitLogMut for LogEvent {
+    fn visit_logs_mut<F>(&mut self, func: F)
+    where
+        F: Fn(&mut LogEvent),
+    {
+        func(self);
+    }
+}
+
+impl<E, T> Encoder<T> for E
 where
     E: EncodingConfiguration,
-    E::Codec: Encoder<Vec<Event>>,
+    E::Codec: Encoder<T>,
+    T: VisitLogMut,
 {
-    fn encode_input(&self, mut input: Vec<Event>, writer: &mut dyn io::Write) -> io::Result<usize> {
-        for event in input.iter_mut() {
-            self.apply_rules(event);
-        }
-
+    fn encode_input(&self, mut input: T, writer: &mut dyn io::Write) -> io::Result<usize> {
+        input.visit_logs_mut(|log| {
+            self.apply_rules(log);
+        });
         self.codec().encode_input(input, writer)
     }
 }

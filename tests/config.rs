@@ -451,7 +451,7 @@ async fn bad_s3_region() {
         encoding = "text"
         bucket = "asdf"
         key_prefix = "logs/"
-        endpoint = "this shoudlnt work"
+        endpoint = "this shouldnt work"
 
         [sinks.out4.batch]
         max_bytes = 100000

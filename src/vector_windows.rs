@@ -1,5 +1,6 @@
 use crate::app::Application;
-use std::{ffi::OsString, sync::mpsc, time::Duration};
+use crate::signal::SignalTo;
+use std::{ffi::OsString, time::Duration};
 use windows_service::service::{
     ServiceControl, ServiceExitCode, ServiceState, ServiceStatus, ServiceType,
 };
@@ -61,7 +62,7 @@ pub mod service_control {
             source: windows_service::Error,
         },
         #[snafu(display(
-            "Timeout occured after {:?} while waiting for state to become {:?}, but was {:?}",
+            "Timeout occurred after {:?} while waiting for state to become {:?}, but was {:?}",
             timeout,
             expected_state,
             state
@@ -362,29 +363,28 @@ pub fn run() -> Result<()> {
 }
 
 fn run_service(_arguments: Vec<OsString>) -> Result<()> {
-    let (shutdown_tx, shutdown_rx) = mpsc::channel();
-
-    let event_handler = move |control_event| -> ServiceControlHandlerResult {
-        match control_event {
-            // Notifies a service to report its current status information to the service
-            // control manager. Always return NoError even if not implemented.
-            ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
-
-            // Handle stop
-            ServiceControl::Stop => {
-                shutdown_tx.send(()).unwrap();
-                ServiceControlHandlerResult::NoError
-            }
-
-            _ => ServiceControlHandlerResult::NotImplemented,
-        }
-    };
-    let status_handle =
-        windows_service::service_control_handler::register(SERVICE_NAME, event_handler)?;
-
-    let application = Application::prepare();
-    let code = match application {
+    match Application::prepare() {
         Ok(app) => {
+            let signal_tx = app.config.signal_handler.clone_tx();
+            let event_handler = move |control_event| -> ServiceControlHandlerResult {
+                match control_event {
+                    // Notifies a service to report its current status information to the service
+                    // control manager. Always return NoError even if not implemented.
+                    ServiceControl::Interrogate => ServiceControlHandlerResult::NoError,
+
+                    // Handle stop
+                    ServiceControl::Stop => {
+                        while let Err(_) = signal_tx.try_send(SignalTo::Shutdown) {}
+                        ServiceControlHandlerResult::NoError
+                    }
+
+                    _ => ServiceControlHandlerResult::NotImplemented,
+                }
+            };
+
+            let status_handle =
+                windows_service::service_control_handler::register(SERVICE_NAME, event_handler)?;
+
             status_handle.set_service_status(ServiceStatus {
                 service_type: SERVICE_TYPE,
                 current_state: ServiceState::Running,
@@ -395,28 +395,21 @@ fn run_service(_arguments: Vec<OsString>) -> Result<()> {
                 process_id: None,
             })?;
 
-            let rt = app.runtime;
-            let topology = app.config.topology;
+            app.run();
 
-            rt.block_on(async move {
-                shutdown_rx.recv().unwrap();
-                topology.stop().await;
-                ServiceExitCode::Win32(NO_ERROR)
-            })
+            // Tell the system that service has stopped.
+            status_handle.set_service_status(ServiceStatus {
+                service_type: SERVICE_TYPE,
+                current_state: ServiceState::Stopped,
+                controls_accepted: ServiceControlAccept::empty(),
+                exit_code: ServiceExitCode::Win32(NO_ERROR),
+                checkpoint: 0,
+                wait_hint: Duration::default(),
+                process_id: None,
+            })?;
+
+            Ok(())
         }
-        Err(e) => ServiceExitCode::ServiceSpecific(e as u32),
-    };
-
-    // Tell the system that service has stopped.
-    status_handle.set_service_status(ServiceStatus {
-        service_type: SERVICE_TYPE,
-        current_state: ServiceState::Stopped,
-        controls_accepted: ServiceControlAccept::empty(),
-        exit_code: code,
-        checkpoint: 0,
-        wait_hint: Duration::default(),
-        process_id: None,
-    })?;
-
-    Ok(())
+        _ => Ok(()),
+    }
 }

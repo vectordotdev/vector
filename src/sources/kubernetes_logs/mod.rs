@@ -91,7 +91,7 @@ pub struct Config {
 
     /// Max amount of bytes to read from a single file before switching over
     /// to the next file.
-    /// This allows distributing the reads more or less evenly accross
+    /// This allows distributing the reads more or less evenly across
     /// the files.
     max_read_bytes: usize,
 
@@ -122,6 +122,10 @@ pub struct Config {
     /// Optional path to a kubeconfig file readable by Vector. If not set,
     /// Vector will try to connect to Kubernetes using in-cluster configuration.
     kube_config_file: Option<PathBuf>,
+
+    /// How long to delay removing entries from our map when we receive a deletion
+    /// event from the watched stream.
+    delay_deletion_ms: usize,
 }
 
 inventory::submit! {
@@ -157,6 +161,7 @@ impl Default for Config {
             ingestion_timestamp_field: None,
             timezone: None,
             kube_config_file: None,
+            delay_deletion_ms: default_delay_deletion_ms(),
         }
     }
 }
@@ -200,6 +205,7 @@ struct Source {
     glob_minimum_cooldown: Duration,
     ingestion_timestamp_field: Option<String>,
     timezone: TimeZone,
+    delay_deletion: Duration,
 }
 
 impl Source {
@@ -228,6 +234,13 @@ impl Source {
                 "unable to convert glob_minimum_cooldown_ms from usize to u64 without data loss",
             ));
 
+        let delay_deletion = Duration::from_millis(
+            config
+                .delay_deletion_ms
+                .try_into()
+                .expect("unable to convert delay_deletion_ms from usize to u64 without data loss"),
+        );
+
         Ok(Self {
             client,
             data_dir,
@@ -243,6 +256,7 @@ impl Source {
             glob_minimum_cooldown,
             ingestion_timestamp_field: config.ingestion_timestamp_field.clone(),
             timezone,
+            delay_deletion,
         })
     }
 
@@ -266,6 +280,7 @@ impl Source {
             glob_minimum_cooldown,
             ingestion_timestamp_field,
             timezone,
+            delay_deletion,
         } = self;
 
         let watcher =
@@ -278,8 +293,7 @@ impl Source {
             HashKey::Uid,
         );
         let state_writer = k8s::state::instrumenting::Writer::new(state_writer);
-        let state_writer =
-            k8s::state::delayed_delete::Writer::new(state_writer, Duration::from_secs(60));
+        let state_writer = k8s::state::delayed_delete::Writer::new(state_writer, delay_deletion);
 
         let mut reflector = k8s::reflector::Reflector::new(
             watcher,
@@ -303,7 +317,7 @@ impl Source {
         );
         let ns_state_writer = k8s::state::instrumenting::Writer::new(ns_state_writer);
         let ns_state_writer =
-            k8s::state::delayed_delete::Writer::new(ns_state_writer, Duration::from_secs(60));
+            k8s::state::delayed_delete::Writer::new(ns_state_writer, delay_deletion);
 
         let mut ns_reflector = k8s::reflector::Reflector::new(
             ns_watcher,
@@ -327,7 +341,7 @@ impl Source {
             paths_provider,
             // Max amount of bytes to read from a single file before switching
             // over to the next file.
-            // This allows distributing the reads more or less evenly accross
+            // This allows distributing the reads more or less evenly across
             // the files.
             max_read_bytes,
             // We want to use checkpoining mechanism, and resume from where we
@@ -369,7 +383,7 @@ impl Source {
             // last log file is currently picked. Thus there's no need for
             // ordering, as each logical log stream is guaranteed to start with
             // just one file, makis it impossible to interleave with other
-            // relevant log lines in the absense of such relevant log lines.
+            // relevant log lines in the absence of such relevant log lines.
             oldest_first: false,
             // We do not remove the log files, `kubelet` is responsible for it.
             remove_after: None,
@@ -545,6 +559,10 @@ const fn default_fingerprint_lines() -> usize {
     1
 }
 
+const fn default_delay_deletion_ms() -> usize {
+    60_000
+}
+
 // This function constructs the patterns we exclude from file watching, created
 // from the defaults or user provided configuration.
 fn prepare_exclude_paths(config: &Config) -> crate::Result<Vec<glob::Pattern>> {
@@ -669,7 +687,7 @@ mod tests {
     fn prepare_field_selector() {
         let cases = vec![
             // We're not testing `Config::default()` or empty `self_node_name`
-            // as passing env vars in the concurrent tests is diffucult.
+            // as passing env vars in the concurrent tests is difficult.
             (
                 Config {
                     self_node_name: "qwe".to_owned(),

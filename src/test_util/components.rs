@@ -1,3 +1,5 @@
+#![allow(clippy::print_stdout)] // tests
+#![allow(clippy::print_stderr)] // tests
 #![deny(missing_docs)]
 
 //! This is a framework for testing components for their compliance with
@@ -8,16 +10,10 @@
 use crate::event::{Event, Metric, MetricValue};
 use crate::metrics::{self, Controller};
 use crate::sinks::VectorSink;
-use futures::{stream, SinkExt, Stream};
+use futures::{stream, SinkExt, Stream, StreamExt};
 use lazy_static::lazy_static;
-use std::cell::RefCell;
-use std::collections::HashSet;
 use std::env;
-
-thread_local!(
-    /// A buffer for recording internal events emitted by a single test.
-    static EVENTS_RECORDED: RefCell<HashSet<String>> = RefCell::new(Default::default());
-);
+use vector_core::event_test_util;
 
 /// The standard set of tags for sources that poll connections over HTTP.
 pub const HTTP_PULL_SOURCE_TAGS: [&str; 2] = ["endpoint", "protocol"];
@@ -33,6 +29,9 @@ pub const FILE_SINK_TAGS: [&str; 2] = ["file", "protocol"];
 
 /// The standard set of tags for all `HttpSink`-based sinks.
 pub const HTTP_SINK_TAGS: [&str; 2] = ["endpoint", "protocol"];
+
+/// The standard set of tags for all `AWS`-based sinks.
+pub const AWS_SINK_TAGS: [&str; 2] = ["protocol", "region"];
 
 /// This struct is used to describe a set of component tests.
 pub struct ComponentTests {
@@ -90,28 +89,14 @@ impl ComponentTests {
 /// Initialize the necessary bits needed to run a component test specification.
 pub fn init_test() {
     super::trace_init();
-    EVENTS_RECORDED.with(|er| er.borrow_mut().clear());
+    event_test_util::clear_recorded_events();
+
     // Handle multiple initializations.
     if let Err(error) = metrics::init_test() {
         if error != metrics::Error::AlreadyInitialized {
             panic!("Failed to initialize metrics recorder: {:?}", error);
         }
     }
-}
-
-/// Record an emitted internal event. This is somewhat dumb at this
-/// point, just recording the pure string value of the `emit!` call
-/// parameter. At some point, making all internal events implement
-/// `Debug` or `Serialize` might allow for more sophistication here, but
-/// this is good enough for these tests. This should only be used by the
-/// test `emit!` macro. The `check-events` script will test that emitted
-/// events contain the right fields, etc.
-pub fn record_internal_event(event: &str) {
-    // Remove leading '&'
-    // Remove trailing '{fields…}'
-    let event = event.strip_prefix('&').unwrap_or(event);
-    let event = event.find('{').map(|par| &event[..par]).unwrap_or(event);
-    EVENTS_RECORDED.with(|er| er.borrow_mut().insert(event.into()));
 }
 
 /// Tests if the given metric contains all the given tag names
@@ -133,11 +118,7 @@ impl ComponentTester {
         let mut metrics: Vec<_> = Controller::get().unwrap().capture_metrics().collect();
 
         if env::var("DEBUG_COMPONENT_COMPLIANCE").is_ok() {
-            EVENTS_RECORDED.with(|events| {
-                for event in events.borrow().iter() {
-                    println!("{}", event);
-                }
-            });
+            event_test_util::debug_print_events();
             metrics.sort_by(|a, b| a.name().cmp(b.name()));
             for metric in &metrics {
                 println!("{}", metric);
@@ -166,9 +147,7 @@ impl ComponentTester {
 
     fn emitted_all_events(&mut self, names: &[&str]) {
         for name in names {
-            if !EVENTS_RECORDED
-                .with(|events| events.borrow().iter().any(|event| event.ends_with(name)))
-            {
+            if !event_test_util::contains_name(name) {
                 self.errors.push(format!("Missing emitted event {}", name));
             }
         }
@@ -206,9 +185,19 @@ where
     S: Stream<Item = Result<Event, ()>> + Send + Unpin,
 {
     init_test();
-    sink.into_sink()
-        .send_all(&mut events)
-        .await
-        .expect("Sending event stream to sink failed");
+    match sink {
+        VectorSink::Sink(mut sink) => {
+            sink.send_all(&mut events)
+                .await
+                .expect("Sending event stream to sink failed");
+        }
+        VectorSink::Stream(stream) => {
+            let events = events.filter_map(|x| async move { x.ok() }).boxed();
+            stream
+                .run(events)
+                .await
+                .expect("Sending event stream to sink failed");
+        }
+    }
     SINK_TESTS.assert(tags);
 }

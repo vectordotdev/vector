@@ -203,7 +203,7 @@ Lets take a look at what that might look like:
 
 ```toml title="vector.toml"
 [sinks.output]
-  inputs = ["demo"]
+  inputs = ["demo_logs"]
   type = "kafka"
 
   # Put events in the host specific topic.

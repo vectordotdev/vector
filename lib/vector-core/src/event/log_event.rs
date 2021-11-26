@@ -2,7 +2,7 @@ use super::{
     finalization::{BatchNotifier, EventFinalizer},
     legacy_lookup::Segment,
     metadata::EventMetadata,
-    util, Lookup, PathComponent, Value,
+    util, EventFinalizers, Finalizable, Lookup, PathComponent, Value,
 };
 use crate::event::MaybeAsLogMut;
 use crate::{config::log_schema, ByteSizeOf};
@@ -47,6 +47,12 @@ impl ByteSizeOf for LogEvent {
     }
 }
 
+impl Finalizable for LogEvent {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.metadata.take_finalizers()
+    }
+}
+
 impl LogEvent {
     #[must_use]
     pub fn new_with_metadata(metadata: EventMetadata) -> Self {
@@ -78,6 +84,11 @@ impl LogEvent {
 
     pub fn with_batch_notifier(mut self, batch: &Arc<BatchNotifier>) -> Self {
         self.metadata = self.metadata.with_batch_notifier(batch);
+        self
+    }
+
+    pub fn with_batch_notifier_option(mut self, batch: &Option<Arc<BatchNotifier>>) -> Self {
+        self.metadata = self.metadata.with_batch_notifier_option(batch);
         self
     }
 

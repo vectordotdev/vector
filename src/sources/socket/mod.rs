@@ -614,7 +614,6 @@ mod test {
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out: sender,
-                acknowledgements: false,
                 proxy: Default::default(),
             })
             .await

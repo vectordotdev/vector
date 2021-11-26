@@ -52,7 +52,7 @@ over simply `Id` as `Id` has special semantics within the GraphQL ecosystem and 
 In previous versions of vector it was possible to configure the Datadog logs
 sink to send in 'text' or 'json' encoding. While the logs ingest API does accept
 text format the native format for that API is json. Sending text comes with
-limitations and is only useful for backward compatability with older clients.
+limitations and is only useful for backward compatibility with older clients.
 
 We no longer allow you to set the encoding of the payloads in the Datadog logs
 sink. For instance, if your configuration looks like so:

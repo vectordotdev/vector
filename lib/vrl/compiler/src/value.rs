@@ -95,6 +95,29 @@ impl fmt::Display for Value {
     }
 }
 
+impl From<serde_json::Value> for Value {
+    fn from(json_value: serde_json::Value) -> Self {
+        match json_value {
+            serde_json::Value::Bool(b) => Value::Boolean(b),
+            serde_json::Value::Number(n) if n.is_i64() => n.as_i64().unwrap().into(),
+            serde_json::Value::Number(n) if n.is_f64() => n.as_f64().unwrap().into(),
+            serde_json::Value::Number(n) => n.to_string().into(),
+            serde_json::Value::String(s) => Value::Bytes(Bytes::from(s)),
+            serde_json::Value::Object(obj) => Value::Object(
+                obj.into_iter()
+                    .map(|(key, value)| (key, SharedValue::from(Value::from(value))))
+                    .collect(),
+            ),
+            serde_json::Value::Array(arr) => Value::Array(
+                arr.into_iter()
+                    .map(|value| SharedValue::from(Value::from(value)))
+                    .collect(),
+            ),
+            serde_json::Value::Null => Value::Null,
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::SharedValue;

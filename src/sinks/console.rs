@@ -1,5 +1,4 @@
 use crate::{
-    buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     internal_events::{ConsoleEventProcessed, ConsoleFieldNotFound},
@@ -17,6 +16,7 @@ use futures::{
 use serde::{Deserialize, Serialize};
 
 use tokio::io::{self, AsyncWriteExt};
+use vector_core::buffers::Acker;
 
 #[derive(Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]

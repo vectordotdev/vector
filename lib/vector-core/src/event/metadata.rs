@@ -42,6 +42,14 @@ impl EventMetadata {
         self.with_finalizer(EventFinalizer::new(Arc::clone(batch)))
     }
 
+    /// Replace the finalizer with a new one created from the given optional batch notifier.
+    pub fn with_batch_notifier_option(self, batch: &Option<Arc<BatchNotifier>>) -> Self {
+        match batch {
+            Some(batch) => self.with_finalizer(EventFinalizer::new(Arc::clone(batch))),
+            None => self,
+        }
+    }
+
     /// Merge the other `EventMetadata` into this.
     /// If a Datadog API key is not set in `self`, the one from `other` will be used.
     pub fn merge(&mut self, other: Self) {
@@ -69,6 +77,11 @@ impl EventMetadata {
     /// Swap the finalizers list with an empty list and return the original.
     pub fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
+    }
+
+    /// Merges the given finalizers into the existing set of finalizers.
+    pub fn merge_finalizers(&mut self, finalizers: EventFinalizers) {
+        self.finalizers.merge(finalizers);
     }
 }
 

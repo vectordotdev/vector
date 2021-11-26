@@ -49,7 +49,10 @@ pub(crate) fn run(mut objects: Vec<SharedValue>, timezone: &TimeZone) {
     let mut rl = Editor::<Repl>::new();
     rl.set_helper(Some(Repl::new()));
 
-    println!("{}", BANNER_TEXT);
+    #[allow(clippy::print_stdout)]
+    {
+        println!("{}", BANNER_TEXT);
+    }
 
     loop {
         let readline = rl.readline("$ ");
@@ -110,12 +113,18 @@ pub(crate) fn run(mut objects: Vec<SharedValue>, timezone: &TimeZone) {
                     Err(v) => v.to_string(),
                 };
 
-                println!("{}\n", string);
+                #[allow(clippy::print_stdout)]
+                {
+                    println!("{}\n", string);
+                }
             }
             Err(ReadlineError::Interrupted) => break,
             Err(ReadlineError::Eof) => break,
             Err(err) => {
-                println!("unable to read line: {}", err);
+                #[allow(clippy::print_stdout)]
+                {
+                    println!("unable to read line: {}", err);
+                }
                 break;
             }
         }
@@ -296,16 +305,22 @@ fn print_function_list() {
 }
 
 fn print_help_text() {
-    println!("{}", HELP_TEXT);
+    #[allow(clippy::print_stdout)]
+    {
+        println!("{}", HELP_TEXT);
+    }
 }
 
 fn open_url(url: &str) {
     if let Err(err) = webbrowser::open(url) {
-        println!(
-            "couldn't open default web browser: {}\n\
+        #[allow(clippy::print_stdout)]
+        {
+            println!(
+                "couldn't open default web browser: {}\n\
             you can access the desired documentation at {}",
-            err, url
-        );
+                err, url
+            );
+        }
     }
 }
 
@@ -319,7 +334,10 @@ fn show_func_docs(line: &str, pattern: &Regex) {
         let func_url = format!("{}/functions/#{}", DOCS_URL, func_name);
         open_url(&func_url);
     } else {
-        println!("function name {} not recognized", func_name);
+        #[allow(clippy::print_stdout)]
+        {
+            println!("function name {} not recognized", func_name);
+        }
     }
 }
 
@@ -332,7 +350,10 @@ fn show_error_docs(line: &str, pattern: &Regex) {
         let error_code_url = format!("{}/{}", ERRORS_URL_ROOT, error_code);
         open_url(&error_code_url);
     } else {
-        println!("error code {} not recognized", error_code);
+        #[allow(clippy::print_stdout)]
+        {
+            println!("error code {} not recognized", error_code);
+        }
     }
 }
 

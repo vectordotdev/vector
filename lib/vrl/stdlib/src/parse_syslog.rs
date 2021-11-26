@@ -135,9 +135,9 @@ fn message_to_value(message: Message<&str>) -> Value {
     }
 
     for element in message.structured_data.into_iter() {
-        for (name, value) in element.params.into_iter() {
+        for (name, value) in element.params() {
             let key = format!("{}.{}", element.id, name);
-            result.insert(key, value.to_string().into());
+            result.insert(key, value.into());
         }
     }
 
@@ -258,6 +258,54 @@ mod tests {
                 "severity" => "err",
                 "timestamp" => chrono::Utc.ymd(2021, 6, 8).and_hms_milli(11, 54, 8, 0),
                 "message" => "[Tue Jun 08 11:54:08.929301 2021] [php7:emerg] [pid 1374899] [client 95.223.77.60:41888] rest of message",
+            }),
+            tdef: TypeDef::new().fallible().object(type_def()),
+        }
+
+        escapes_in_structured_data_quote {
+            args: func_args![value: r#"<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 key="hello \"test\""] An application event log entry..."#],
+            want: Ok(btreemap!{
+                "appname" => "evntslog",
+                "exampleSDID@32473.key" => r#"hello "test""#,
+                "facility" => "local4",
+                "hostname" => "mymachine.example.com",
+                "message" => "An application event log entry...",
+                "msgid" => "ID47",
+                "severity" => "notice",
+                "timestamp" => chrono::Utc.ymd(2003, 10, 11).and_hms_milli(22,14,15,3),
+                "version" => 1
+            }),
+            tdef: TypeDef::new().fallible().object(type_def()),
+        }
+
+        escapes_in_structured_data_slash {
+            args: func_args![value: r#"<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 key="hello a\\b"] An application event log entry..."#],
+            want: Ok(btreemap!{
+                "appname" => "evntslog",
+                "exampleSDID@32473.key" => r#"hello a\b"#,
+                "facility" => "local4",
+                "hostname" => "mymachine.example.com",
+                "message" => "An application event log entry...",
+                "msgid" => "ID47",
+                "severity" => "notice",
+                "timestamp" => chrono::Utc.ymd(2003, 10, 11).and_hms_milli(22,14,15,3),
+                "version" => 1
+            }),
+            tdef: TypeDef::new().fallible().object(type_def()),
+        }
+
+        escapes_in_structured_data_bracket {
+            args: func_args![value: r#"<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 key="hello [bye\]"] An application event log entry..."#],
+            want: Ok(btreemap!{
+                "appname" => "evntslog",
+                "exampleSDID@32473.key" => "hello [bye]",
+                "facility" => "local4",
+                "hostname" => "mymachine.example.com",
+                "message" => "An application event log entry...",
+                "msgid" => "ID47",
+                "severity" => "notice",
+                "timestamp" => chrono::Utc.ymd(2003,10,11).and_hms_milli(22,14,15,3),
+                "version" => 1
             }),
             tdef: TypeDef::new().fallible().object(type_def()),
         }

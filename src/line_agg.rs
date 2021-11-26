@@ -673,7 +673,7 @@ mod tests {
     async fn timeout_resets_on_new_line() {
         // Tests if multiline aggregation updates
         // it's timeout every time it get's a new line.
-        // To test this we are emmiting a single large
+        // To test this we are emitting a single large
         // multiline but drip feeding it into the aggreagator
         // with 1ms delay.
 

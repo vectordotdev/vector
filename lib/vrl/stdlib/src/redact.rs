@@ -170,7 +170,6 @@ impl TryFrom<SharedValue> for Filter {
                     .get("type")
                     .ok_or("filters specified as objects must have type paramater")?;
                 let r#type = r#type.borrow();
-
                 let r#type = match &*r#type {
                     Value::Bytes(bytes) => Ok(bytes.clone()),
                     _ => Err("type key in filters must be a string"),

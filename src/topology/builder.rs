@@ -4,12 +4,11 @@ use super::{
     BuiltBuffer, ConfigDiff,
 };
 use crate::{
-    buffers,
     config::{
         ComponentKey, DataType, OutputId, ProxyConfig, SinkContext, SourceContext, TransformContext,
     },
     event::Event,
-    internal_events::{EventsReceived, EventsSent},
+    internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
     transforms::Transform,
     Pipeline,
@@ -21,6 +20,7 @@ use std::{
     collections::HashMap,
     future::ready,
     sync::{Arc, Mutex},
+    time::Instant,
 };
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::{
@@ -28,6 +28,10 @@ use tokio::{
     time::{timeout, Duration},
 };
 use vector_core::ByteSizeOf;
+use vector_core::{
+    buffers::{BufferInputCloner, BufferType},
+    internal_event::EventsSent,
+};
 
 lazy_static! {
     static ref ENRICHMENT_TABLES: enrichment::TableRegistry = enrichment::TableRegistry::default();
@@ -90,7 +94,7 @@ pub async fn load_enrichment_tables<'a>(
 }
 
 pub struct Pieces {
-    pub inputs: HashMap<ComponentKey, (buffers::BufferInputCloner<Event>, Vec<OutputId>)>,
+    pub inputs: HashMap<ComponentKey, (BufferInputCloner<Event>, Vec<OutputId>)>,
     pub outputs: HashMap<ComponentKey, HashMap<Option<String>, fanout::ControlChannel>>,
     pub tasks: HashMap<ComponentKey, Task>,
     pub source_tasks: HashMap<ComponentKey, Task>,
@@ -137,7 +141,6 @@ pub async fn build_pieces(
             globals: config.global.clone(),
             shutdown: shutdown_signal,
             out: pipeline,
-            acknowledgements: source.acknowledgements,
             proxy: ProxyConfig::merge_with_env(&config.global.proxy, &source.proxy),
         };
         let server = match source.inner.build(context).await {
@@ -182,17 +185,18 @@ pub async fn build_pieces(
         source_tasks.insert(key.clone(), server);
     }
 
-    let context = TransformContext {
-        globals: config.global.clone(),
-        enrichment_tables: enrichment_tables.clone(),
-    };
-
     // Build transforms
     for (key, transform) in config
         .transforms
         .iter()
         .filter(|(key, _)| diff.transforms.contains_new(key))
     {
+        let context = TransformContext {
+            key: Some(key.clone()),
+            globals: config.global.clone(),
+            enrichment_tables: enrichment_tables.clone(),
+        };
+
         let trans_inputs = &transform.inputs;
 
         let typetag = transform.inner.transform_type();
@@ -217,41 +221,54 @@ pub async fn build_pieces(
             tracing::Span::none(),
         )
         .unwrap();
-        let mut input_rx = crate::utilization::wrap(Pin::new(input_rx));
 
         let task = match transform {
             Transform::Function(mut t) => {
-                let (output, control) = Fanout::new();
+                let (mut output, control) = Fanout::new();
 
-                let transform = input_rx
+                let mut input_rx = input_rx
                     .filter(move |event| ready(filter_event_type(event, input_type)))
-                    .ready_chunks(128) // 128 is an arbitrary, smallish constant
-                    .inspect(|events| {
+                    .ready_chunks(128); // 128 is an arbitrary, smallish constant
+
+                let mut timer = crate::utilization::Timer::new();
+                let mut last_report = Instant::now();
+
+                let transform = async move {
+                    timer.start_wait();
+                    while let Some(events) = input_rx.next().await {
+                        let stopped = timer.stop_wait();
+                        if stopped.duration_since(last_report).as_secs() >= 5 {
+                            timer.report();
+                            last_report = stopped;
+                        }
+
                         emit!(&EventsReceived {
                             count: events.len(),
                             byte_size: events.size_of(),
                         });
-                    })
-                    .flat_map(move |events| {
-                        let mut output = Vec::with_capacity(events.len());
+
+                        let mut output_buf = Vec::with_capacity(events.len());
                         let mut buf = Vec::with_capacity(4); // also an arbitrary,
                                                              // smallish constant
                         for v in events {
                             t.transform(&mut buf, v);
-                            output.append(&mut buf);
+                            output_buf.append(&mut buf);
                         }
-                        emit!(&EventsSent {
-                            count: output.len(),
-                            byte_size: output.size_of(),
-                        });
-                        stream::iter(output.into_iter()).map(Ok)
-                    })
-                    .forward(output)
-                    .boxed()
-                    .map_ok(|_| {
-                        debug!("Finished.");
-                        TaskOutput::Transform
-                    });
+
+                        let count = output_buf.len();
+                        let byte_size = output_buf.size_of();
+
+                        timer.start_wait();
+                        output
+                            .send_all(&mut stream::iter(output_buf.into_iter()).map(Ok))
+                            .await?;
+
+                        emit!(&EventsSent { count, byte_size });
+                    }
+                    debug!("Finished.");
+                    Ok(TaskOutput::Transform)
+                }
+                .boxed();
 
                 outputs.insert(OutputId::from(key), control);
 
@@ -261,34 +278,53 @@ pub async fn build_pieces(
                 let (mut output, control) = Fanout::new();
                 let (mut errors_output, errors_control) = Fanout::new();
 
+                let mut input_rx = input_rx
+                    .filter(move |event| ready(filter_event_type(event, input_type)))
+                    .ready_chunks(128); // 128 is an arbitrary, smallish constant
+
+                let mut timer = crate::utilization::Timer::new();
+                let mut last_report = Instant::now();
+
                 let transform = async move {
-                    while let Some(event) = input_rx.next().await {
-                        if !filter_event_type(&event, input_type) {
-                            continue;
+                    timer.start_wait();
+                    while let Some(events) = input_rx.next().await {
+                        let stopped = timer.stop_wait();
+                        if stopped.duration_since(last_report).as_secs() >= 5 {
+                            timer.report();
+                            last_report = stopped;
                         }
+
                         emit!(&EventsReceived {
-                            count: 1,
-                            byte_size: event.size_of(),
+                            count: events.len(),
+                            byte_size: events.size_of(),
                         });
 
+                        let mut output_buf = Vec::with_capacity(events.len());
                         let mut buf = Vec::with_capacity(1);
+                        let mut err_output_buf = Vec::with_capacity(1);
                         let mut err_buf = Vec::with_capacity(1);
 
-                        t.transform(&mut buf, &mut err_buf, event);
-                        // TODO: account for error outputs separately?
-                        emit!(&EventsSent {
-                            count: buf.len() + err_buf.len(),
-                            byte_size: buf.size_of() + err_buf.size_of(),
-                        });
+                        for v in events {
+                            t.transform(&mut buf, &mut err_buf, v);
+                            output_buf.append(&mut buf);
+                            err_output_buf.append(&mut err_buf);
+                        }
 
-                        for event in buf {
+                        // TODO: account for error outputs separately?
+                        let count = output_buf.len() + err_output_buf.len();
+                        let byte_size = output_buf.size_of() + err_output_buf.size_of();
+
+                        timer.start_wait();
+                        for event in output_buf {
                             output.feed(event).await.expect("unit error");
                         }
                         output.flush().await.expect("unit error");
-                        for event in err_buf {
+                        for event in err_output_buf {
                             errors_output.feed(event).await.expect("unit error");
                         }
                         errors_output.flush().await.expect("unit error");
+
+                        emit!(&EventsSent { count, byte_size });
                     }
 
                     debug!("Finished.");
@@ -309,6 +345,8 @@ pub async fn build_pieces(
             }
             Transform::Task(t) => {
                 let (output, control) = Fanout::new();
+
+                let input_rx = crate::utilization::wrap(Pin::new(input_rx));
 
                 let filtered = input_rx
                     .filter(move |event| ready(filter_event_type(event, input_type)))
@@ -360,10 +398,10 @@ pub async fn build_pieces(
         let (tx, rx, acker) = if let Some(buffer) = buffers.remove(key) {
             buffer
         } else {
-            let buffer_type = match sink.buffer {
-                buffers::BufferConfig::Memory { .. } => "memory",
+            let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
+                BufferType::Memory { .. } => "memory",
                 #[cfg(feature = "disk-buffer")]
-                buffers::BufferConfig::Disk { .. } => "disk",
+                BufferType::Disk { .. } => "disk",
             };
             let buffer_span = error_span!(
                 "sink",
@@ -374,7 +412,9 @@ pub async fn build_pieces(
                 component_name = %key.id(),
                 buffer_type = buffer_type,
             );
-            let buffer = sink.buffer.build(&config.global.data_dir, key, buffer_span);
+            let buffer = sink
+                .buffer
+                .build(&config.global.data_dir, key.to_string(), buffer_span);
             match buffer {
                 Err(error) => {
                     errors.push(format!("Sink \"{}\": {}", key, error));

@@ -5,16 +5,13 @@ set -o pipefail
 set -o nounset
 #set -o xtrace
 
-# We need to build two copies of vector with the same flags, one for the
-# baseline SHA and the other for current. Baseline is either 'master' or
-# whatever the user sets.
-
 __dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SOAK_ROOT="${__dir}/.."
-PATCH_DIR="${SOAK_ROOT}/patches"
+ROOT="${__dir}/../../"
+SOAK_ROOT="${__dir}/../"
 
 display_usage() {
-	echo -e "\nUsage: \$0 SOAK_NAME COMMIT_SHA\n"
+    echo ""
+    echo "Usage: $0 COMMIT_SHA IMAGE_NAME"
 }
 
 build_vector() {
@@ -29,11 +26,14 @@ build_vector() {
         git remote add origin https://github.com/vectordotdev/vector.git
         git fetch --depth 1 origin "${SHA}"
         git checkout FETCH_HEAD
-        git apply "${PATCH_DIR}/blank_global_dockerfileignore.patch"
+        # Overwrite any .dockerignore in the build context. Docker can't, uh,
+        # ignore its own ignore file and older vectors had an overly strict
+        # ignore file, meaning we can't build vector in that setup.
+        cp "${ROOT}/.dockerignore" .
         popd
     fi
 
-    docker build --file "${SOAK_ROOT}/Dockerfile" --build-arg=VECTOR_FEATURES="${FEATURES}" --tag "${IMAGE}" "${BUILD_DIR}"
+    docker build --file "${SOAK_ROOT}/Dockerfile" --tag "${IMAGE}" "${BUILD_DIR}"
     rm -rf "${BUILD_DIR}"
 }
 
@@ -43,11 +43,7 @@ then
     exit 1
 fi
 
-SOAK_NAME="${1:-}"
-COMMIT_SHA="${2:-}"
+COMMIT_SHA="${1:-}"
+IMAGE="${2:-}"
 
-# shellcheck source=/dev/null
-. "${SOAK_ROOT}/${SOAK_NAME}/FEATURES"
-
-IMAGE=$(./bin/container_name.sh "${SOAK_NAME}" "${COMMIT_SHA}")
 docker image inspect "${IMAGE}" > /dev/null || build_vector "${IMAGE}" "${COMMIT_SHA}"

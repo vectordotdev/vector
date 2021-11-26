@@ -28,7 +28,6 @@ use std::{
 };
 use tracing::{error, info};
 use vector::{
-    buffers::Acker,
     config::{
         DataType, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
         TransformContext,
@@ -43,6 +42,7 @@ use vector::{
     transforms::{FunctionTransform, Transform},
     Pipeline,
 };
+use vector_core::buffers::Acker;
 
 pub fn sink(channel_size: usize) -> (mpsc::Receiver<Event>, MockSinkConfig<Pipeline>) {
     let (tx, rx) = Pipeline::new_with_buffer(channel_size, vec![]);
@@ -251,6 +251,7 @@ impl FunctionTransform for MockTransform {
                     }
                     MetricValue::AggregatedHistogram { .. } => None,
                     MetricValue::AggregatedSummary { .. } => None,
+                    MetricValue::Sketch { .. } => None,
                     MetricValue::Set { .. } => {
                         let mut values = BTreeSet::new();
                         values.insert(self.suffix.clone());

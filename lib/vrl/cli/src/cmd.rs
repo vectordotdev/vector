@@ -81,7 +81,10 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     match run(opts) {
         Ok(_) => exitcode::OK,
         Err(err) => {
-            eprintln!("{}", err);
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!("{}", err);
+            }
             exitcode::SOFTWARE
         }
     }
@@ -116,6 +119,8 @@ fn run(opts: &Opts) -> Result<(), Error> {
                 }
             });
 
+            #[allow(clippy::print_stdout)]
+            #[allow(clippy::print_stderr)]
             match result {
                 Ok(ok) => println!("{}", ok),
                 Err(err) => eprintln!("{}", err),
@@ -126,13 +131,15 @@ fn run(opts: &Opts) -> Result<(), Error> {
     }
 }
 
+#[cfg(feature = "repl")]
 fn repl(objects: Vec<SharedValue>, timezone: &TimeZone) -> Result<(), Error> {
-    if cfg!(feature = "repl") {
-        repl::run(objects, timezone);
-        Ok(())
-    } else {
-        Err(Error::ReplFeature)
-    }
+    repl::run(objects, timezone);
+    Ok(())
+}
+
+#[cfg(not(feature = "repl"))]
+fn repl(_objects: Vec<SharedValue>, _timezone: &TimeZone) -> Result<(), Error> {
+    Err(Error::ReplFeature)
 }
 
 fn execute(
