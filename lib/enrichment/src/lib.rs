@@ -6,7 +6,7 @@ pub mod tables;
 mod test_util;
 mod vrl_util;
 use dyn_clone::DynClone;
-use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
+use std::collections::BTreeMap;
 use vrl_core::Value;
 
 pub use tables::{TableRegistry, TableSearch};

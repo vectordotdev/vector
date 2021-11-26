@@ -2,7 +2,7 @@ use crate::{
     vrl_util::{self, add_index, evaluate_condition},
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
 };
-use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
+use std::collections::BTreeMap;
 use vrl_core::prelude::*;
 
 #[derive(Clone, Copy, Debug)]

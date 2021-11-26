@@ -200,9 +200,7 @@ impl FallibleFunctionTransform for Remap {
 
         match result {
             Ok(_) => {
-                for event in target.into_events() {
-                    output.push(event)
-                }
+                target.into_events(output);
             }
             Err(Terminate::Abort(error)) => {
                 emit!(&RemapMappingAbort {

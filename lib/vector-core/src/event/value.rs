@@ -4,13 +4,11 @@ use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use lookup::{Field, FieldBuf, Lookup, LookupBuf, Segment, SegmentBuf};
 use serde::{Deserialize, Serialize, Serializer};
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
-use std::rc::Rc;
 use toml::value::Value as TomlValue;
 use vrl_core::SharedValue;
 

@@ -121,10 +121,10 @@ pub enum MetricKind {
 }
 
 #[cfg(feature = "vrl")]
-impl TryFrom<vrl_core::Value> for MetricKind {
+impl TryFrom<&vrl_core::Value> for MetricKind {
     type Error = String;
 
-    fn try_from(value: vrl_core::Value) -> Result<Self, Self::Error> {
+    fn try_from(value: &vrl_core::Value) -> Result<Self, Self::Error> {
         let value = value.try_bytes().map_err(|e| e.to_string())?;
         match std::str::from_utf8(&value).map_err(|e| e.to_string())? {
             "incremental" => Ok(Self::Incremental),
