@@ -35,12 +35,12 @@ pub struct Query {
 /// Main configuration struct for this program
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    /// The time to sleep prior to beginning query scrapes
-    pub startup_delay_seconds: u64,
     /// Location to scrape prometheus
     pub prometheus: String,
     /// The name of the experiment being observed
     pub experiment_name: String,
+    /// The variant of the experiment, generally 'baseline' or 'comparison'
+    pub variant: String,
     /// The vector ID associated with the experiment
     pub vector_id: String,
     /// The queries to make of the experiment
@@ -130,8 +130,8 @@ struct QueryResponse {
 struct Worker {
     vector_id: String,
     experiment_name: String,
+    variant: String,
     queries: Vec<(Query, Url)>,
-    startup_delay: u64,
     capture_path: String,
 }
 
@@ -147,8 +147,8 @@ impl Worker {
         Self {
             vector_id: config.vector_id,
             experiment_name: config.experiment_name,
+            variant: config.variant,
             queries,
-            startup_delay: config.startup_delay_seconds,
             capture_path: config.capture_path,
         }
     }
@@ -157,14 +157,6 @@ impl Worker {
         let client: reqwest::Client = reqwest::Client::new();
 
         let mut file = File::create(self.capture_path).await?;
-
-        info!(
-            "observing startup delay sleep of {} seconds",
-            self.startup_delay
-        );
-        sleep(Duration::from_secs(self.startup_delay)).await;
-        info!("finished with sleep");
-
         for fetch_index in 0..u64::max_value() {
             for (query, url) in &self.queries {
                 let request = client.get(url.clone()).build()?;
@@ -180,6 +172,7 @@ impl Worker {
                     let value = body.data.result[0].value.value.parse::<f64>()?;
                     let output = serde_json::to_string(&soak::Output {
                         experiment: Cow::Borrowed(&self.experiment_name),
+                        variant: Cow::Borrowed(&self.variant),
                         vector_id: Cow::Borrowed(&self.vector_id),
                         time,
                         query: soak::Query {

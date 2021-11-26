@@ -28,6 +28,8 @@ pub struct Output<'a> {
     #[serde(borrow)]
     pub experiment: Cow<'a, str>,
     #[serde(borrow)]
+    pub variant: Cow<'a, str>,
+    #[serde(borrow)]
     pub vector_id: Cow<'a, str>,
     pub time: f64,
     pub fetch_index: u64,
