@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 use crate::Value;
 
+mod arithmetic;
 mod convert;
 mod path;
 mod target;

@@ -1,4 +1,3 @@
-mod arithmetic;
 mod convert;
 pub mod error;
 pub mod kind;
