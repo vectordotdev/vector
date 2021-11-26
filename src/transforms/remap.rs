@@ -182,6 +182,7 @@ impl FallibleFunctionTransform for Remap {
         // any mutations made by VRL will be ignored regardless. If they hav configured
         // `reroute_dropped`, however, we still need to do the clone to ensure that we can forward
         // the event to the `dropped` output.
+        /*
         let forward_on_error = !self.drop_on_error || self.reroute_dropped;
         let forward_on_abort = !self.drop_on_abort || self.reroute_dropped;
         let original_event = if (self.program.can_fail() && forward_on_error)
@@ -191,6 +192,7 @@ impl FallibleFunctionTransform for Remap {
         } else {
             None
         };
+        */
 
         let mut target = VrlTarget::new(&event);
 
@@ -208,9 +210,10 @@ impl FallibleFunctionTransform for Remap {
                 });
 
                 if !self.drop_on_abort {
-                    output.push(original_event.expect("event will be set"))
+                    output.push(event)
                 } else if self.reroute_dropped {
-                    let mut event = original_event.expect("event will be set");
+                    let mut event = event;
+                    // TODO This event should be the event from the target that VRL has mutated.
                     self.annotate_dropped(&mut event, "abort", error);
                     err_output.push(event)
                 }
@@ -222,9 +225,9 @@ impl FallibleFunctionTransform for Remap {
                 });
 
                 if !self.drop_on_error {
-                    output.push(original_event.expect("event will be set"))
+                    output.push(event)
                 } else if self.reroute_dropped {
-                    let mut event = original_event.expect("event will be set");
+                    let mut event = event;
                     self.annotate_dropped(&mut event, "error", error);
                     err_output.push(event)
                 }
