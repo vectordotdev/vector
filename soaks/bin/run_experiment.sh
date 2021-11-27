@@ -92,7 +92,10 @@ popd
 
 pushd "${SOAK_ROOT}/tests/${SOAK_NAME}/terraform"
 terraform init
-terraform apply -var "type=${VARIANT}" -var "vector_image=${IMAGE}" -var "vector_cpus=${VECTOR_CPUS}" -var "lading_image=ghcr.io/blt/lading:sha-0da91906d56acc899b829cea971d79f13e712e21" -auto-approve -compact-warnings -input=false -no-color
+terraform apply -var "experiment_name=${SOAK_NAME}" -var "type=${VARIANT}" \
+          -var "vector_image=${IMAGE}" -var "vector_cpus=${VECTOR_CPUS}" \
+          -var "lading_image=ghcr.io/blt/lading:sha-0da91906d56acc899b829cea971d79f13e712e21" \
+          -auto-approve -compact-warnings -input=false -no-color
 echo "[${VARIANT}] Captures will be recorded into ${SOAK_CAPTURE_DIR}"
 echo "[${VARIANT}] Sleeping for ${WARMUP_GRACE} seconds to allow warm-up"
 sleep "${WARMUP_GRACE}"

@@ -283,8 +283,8 @@ jobs:
     needs: [compute-soak-meta, soak-baseline, soak-comparison]
 
     steps:
-      - name: Install 'miller'
-        run: sudo apt-get install -y miller
+      - name: Install dependencies
+        run: sudo apt-get install -y python-scipy python3-pandas
 
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
@@ -323,10 +323,14 @@ jobs:
           	fi
           done
           popd
-          ./soaks/bin/analyze_experiment.sh --capture-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures \
-                                            --baseline ${{ needs.compute-soak-meta.outputs.baseline-sha }} \
-                                            --comparison ${{ needs.compute-soak-meta.outputs.comparison-sha }} \
-                                            --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} > /tmp/${{ github.event.number}}-${{ github.run_attempt }}-analysis
+          awk 'FNR==1 && NR!=1{next;}{print}' "${{ github.event.number }}-${{ github.run_attempt }}-captures/aggregate.captures/**/*.captures" | \
+              sed '/^$/d' > "${{ github.event.number }}-${{ github.run_attempt }}-captures/aggregate.captures"
+          ./soaks/bin/analyze_experiment.sh --capture ${{ github.event.number }}-${{ github.run_attempt }}-captures/aggregate.captures \
+                                            --baseline-sha ${{ needs.compute-soak-meta.outputs.baseline-sha }} \
+                                            --comparison-sha ${{ needs.compute-soak-meta.outputs.comparison-sha }} \
+                                            --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
+                                            --warmup-seconds 90 \
+                                            --p-value 0.05 > /tmp/${{ github.event.number}}-${{ github.run_attempt }}-analysis
 
       - name: Read analysis file
         id: read-analysis

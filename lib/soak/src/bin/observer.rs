@@ -13,7 +13,7 @@ use tokio::time::sleep;
 use tracing::{debug, error, info};
 
 fn default_config_path() -> String {
-    "/etc/vector/soak/observer.toml".to_string()
+    "/etc/vector/soak/observer.yaml".to_string()
 }
 
 #[derive(FromArgs)]

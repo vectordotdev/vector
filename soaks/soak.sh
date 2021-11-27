@@ -105,13 +105,13 @@ echo "Captures will be recorded into ${capture_dir}"
                   --vector-cpus "${VECTOR_CPUS}"
 
 # Aggregate all captures and analyze them.
-aws 'FNR==1 && NR!=1{next;}{print}' "${capture_dir}/**/*.captures" | \
+awk 'FNR==1 && NR!=1{next;}{print}' "${capture_dir}/**/*.captures" | \
     sed '/^$/d' > "${capture_dir}/aggregate.captures"
 ./bin/analyze_experiment --capture "${capture_dir}/aggregate.captures" \
                          --baseline-sha "${BASELINE}" \
                          --comparison-sha "${COMPARISON}" \
                          --vector-cpus "${VECTOR_CPUS}" \
-                         --warmup-seconds 30 \
+                         --warmup-seconds 90 \
                          --p-value 0.05 # 5% confidence
 
 popd
