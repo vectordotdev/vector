@@ -18,6 +18,9 @@ ndarray-stats = "0.5"
 tabled = "0.3"
 bytesize = "1.1"
 noisy_float = "0.2"
+rand_distr = "0.4"
+rand = "0.8"
+csv = "1.1"
 
 [dependencies.reqwest]
 version = "0.11"

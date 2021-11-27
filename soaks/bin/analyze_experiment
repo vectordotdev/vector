@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+
+import pandas as pd
+import scipy.stats
+import argparse
+import math
+
+def human_bytes(b):
+    if b < 1:
+        return "0B"
+    names = ("B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB")
+    i = int(math.floor(math.log(b, 1024)))
+    p = math.pow(1024, i)
+    s = round(b / p, 2)
+    return "%s %s" % (s, names[i])
+
+
+parser = argparse.ArgumentParser(description='t-test experiments with Welch method')
+parser.add_argument('--captures', type=str, help='the captures csv to analyze')
+parser.add_argument('--warmup-seconds', type=int, help='the number of seconds to treat as warmup')
+parser.add_argument('--baseline-sha', type=str, help='the sha of the baseline experiment')
+parser.add_argument('--comparison-sha', type=str, help='the sha of the comparison experiment')
+parser.add_argument('--vector-cpus', type=int, help='the total number of CPUs given to vector during the experiment')
+parser.add_argument('--p-value', type=float, default=0.05, help='the p-value for comparing with t-test results, the smaller the more certain')
+args = parser.parse_args()
+
+csv = pd.read_csv(args.captures)
+fetch_index_past_warmup = csv['fetch_index'] > args.warmup_seconds
+csv = csv[fetch_index_past_warmup]
+csv['value'] = csv['value'].div(args.vector_cpus)
+
+print("# Soak Test Results")
+print("Baseline: {}".format(args.baseline_sha))
+print("Comparison: {}".format(args.comparison_sha))
+print("Total Vector CPUs: {}".format(args.vector_cpus))
+print("")
+print("What follows is a statistical summary of the soak captures between the")
+print("SHAs given above. Units are bytes/second/CPU, except for 'skewness'. The")
+print("further 'skewness' is from 0.0 the more indication that vector lacks")
+print("consistency in behavior, making predictions of fitness in the field")
+print("challenging.")
+print("")
+
+ttest_results = []
+for exp in csv.experiment.unique():
+    experiment = csv[csv['experiment'] == exp]
+
+    baseline = experiment[experiment['variant'] == 'baseline']
+    comparison = experiment[experiment['variant'] == 'comparison']
+    diff =  comparison['value'].mean() - baseline['value'].mean()
+
+    res = scipy.stats.ttest_ind(baseline['value'], comparison['value'])
+    ttest_results.append({'experiment': exp, 'Δ mean': diff, 't-statistic': res.statistic, 'p-value': res.pvalue })
+
+ttest_results = pd.DataFrame.from_records(ttest_results)
+print("## Change Detection")
+print("")
+print("The following table lists those experiments that have experienced a")
+print("statistically significant change in their throughput performance between")
+print("baseline and comparision SHAs, with {}% confidence.".format((1.0 - args.p_value) * 100))
+print("")
+
+p_value_violation = ttest_results['p-value'] < args.p_value
+summary_mean_diff = ttest_results[p_value_violation]
+summary_mean_diff = summary_mean_diff.drop(labels=['p-value', 't-statistic'], axis=1)
+summary_mean_diff['Δ mean'] = summary_mean_diff['Δ mean'].apply(human_bytes)
+print(summary_mean_diff.to_markdown(index=False, tablefmt='github'))
+
+print("")
+print("<details>")
+print("<summary>Fine details of change detection per experiment.</summary>")
+print("### Details")
+print("")
+print(ttest_results.to_markdown(index=False, tablefmt='github'))
+print("")
+print("</details>")
+
+print("")
+print("## Detailed Results")
+print("<details>")
+print("<summary>Fine details of each soak run.</summary>")
+print("")
+describe = csv.groupby(['experiment', 'variant'])['value'].describe(percentiles=[0.90, 0.95, 0.99])
+describe = describe.rename(columns={'50%': 'average', '95%': 'p95', '90%': 'p90', '99%': 'p99'})
+describe['skewness'] = csv.groupby(['experiment', 'variant'])['value'].skew()
+describe['mean'] = describe['mean'].apply(human_bytes)
+describe['std'] = describe['std'].apply(human_bytes)
+describe['min'] = describe['min'].apply(human_bytes)
+describe['average'] = describe['average'].apply(human_bytes)
+describe['p90'] = describe['p90'].apply(human_bytes)
+describe['p95'] = describe['p95'].apply(human_bytes)
+describe['p99'] = describe['p99'].apply(human_bytes)
+describe['max'] = describe['max'].apply(human_bytes)
+print(describe.to_markdown(index=True,
+                           tablefmt='github',
+                           headers=['(experiment, variant)', 'total samples',
+                                    'mean', 'std', 'min', 'average',
+                                    'p90', 'p95', 'p99', 'max', 'skewness']))
+print("")
+print("</details>")

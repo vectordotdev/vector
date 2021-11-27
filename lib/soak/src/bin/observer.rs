@@ -40,7 +40,7 @@ pub struct Config {
     /// The name of the experiment being observed
     pub experiment_name: String,
     /// The variant of the experiment, generally 'baseline' or 'comparison'
-    pub variant: String,
+    pub variant: soak::Variant,
     /// The vector ID associated with the experiment
     pub vector_id: String,
     /// The queries to make of the experiment
@@ -130,7 +130,7 @@ struct QueryResponse {
 struct Worker {
     vector_id: String,
     experiment_name: String,
-    variant: String,
+    variant: soak::Variant,
     queries: Vec<(Query, Url)>,
     capture_path: String,
 }
@@ -172,15 +172,13 @@ impl Worker {
                     let value = body.data.result[0].value.value.parse::<f64>()?;
                     let output = serde_json::to_string(&soak::Output {
                         experiment: Cow::Borrowed(&self.experiment_name),
-                        variant: Cow::Borrowed(&self.variant),
+                        variant: self.variant,
                         vector_id: Cow::Borrowed(&self.vector_id),
                         time,
-                        query: soak::Query {
-                            id: Cow::Borrowed(&query.id),
-                            query: Cow::Borrowed(&query.query),
-                            value,
-                            unit: query.unit,
-                        },
+                        query_id: Cow::Borrowed(&query.id),
+                        query: Cow::Borrowed(&query.query),
+                        value,
+                        unit: query.unit,
                         fetch_index,
                     })?;
                     info!("{}", output);
