@@ -87,8 +87,8 @@ Examples:
 ## Goals
 
 Design goals are explicit factors of user experience that are priotizied in
-all decisions. Other aspects of user experience should be sacrificed to optimize
-for these goals.
+all decisions. Other aspects of user experience, like complete functionality or
+engineering purity, should be sacrificed to optimize these goals.
 
 ### Performance
 
