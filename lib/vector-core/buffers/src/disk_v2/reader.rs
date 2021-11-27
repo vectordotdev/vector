@@ -1,5 +1,5 @@
 use std::{
-    cmp,
+    cmp, fmt,
     io::{self, ErrorKind},
     marker::PhantomData,
     sync::Arc,
@@ -71,6 +71,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub struct RecordReader<R, T> {
     reader: BufReader<R>,
     aligned_buf: AlignedVec,
@@ -81,7 +82,7 @@ pub struct RecordReader<R, T> {
 
 impl<R, T> RecordReader<R, T>
 where
-    R: AsyncRead + Unpin,
+    R: AsyncRead + Unpin + fmt::Debug,
     T: Bufferable,
 {
     pub fn new(reader: R) -> Self {
@@ -94,6 +95,7 @@ where
         }
     }
 
+    #[instrument(skip(self), level = "trace")]
     async fn read_length_delimiter(&mut self) -> Result<Option<usize>, ReaderError<T>> {
         loop {
             if self.reader.buffer().len() >= 4 {
@@ -113,6 +115,7 @@ where
         }
     }
 
+    #[instrument(skip(self), level = "trace")]
     async fn try_next_record(&mut self) -> Result<Option<ReadToken>, ReaderError<T>> {
         let record_len = match self.read_length_delimiter().await? {
             Some(len) => len,
@@ -148,7 +151,7 @@ where
         }
     }
 
-    async fn read_record(&mut self, token: ReadToken) -> Result<T, ReaderError<T>> {
+    fn read_record(&mut self, token: ReadToken) -> Result<T, ReaderError<T>> {
         if token.1 != self.current_record_id {
             panic!("using expired read token");
         }
@@ -168,6 +171,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub struct Reader<T> {
     ledger: Arc<Ledger>,
     reader: Option<RecordReader<File, T>>,
@@ -203,10 +207,12 @@ where
 
         if self.ready_to_read {
             self.ledger.track_read(record_size);
+            self.ledger.notify_reader_waiters();
         }
     }
 
     /// Switches the reader over to the next data file to read.
+    #[instrument(skip(self), level = "trace")]
     async fn roll_to_next_data_file(&mut self) -> io::Result<()> {
         // Try and grab the file size once we're ready to roll over.  We use this to figure out if
         // we need to subtract some more bytes from the total buffer size.  If we rolled over due to
@@ -245,6 +251,7 @@ where
     }
 
     /// Ensures this reader is ready to attempt reading the next record.
+    #[instrument(skip(self), level = "trace")]
     async fn ensure_ready_for_read(&mut self) -> io::Result<()> {
         // We have nothing to do if we already have a data file open.
         if self.reader.is_some() {
@@ -298,9 +305,15 @@ where
                 // If `n` is equal to `record_id`, that means the process restarted and we're
                 // seeking to the last record that we marked ourselves as having read, so no issues.
                 if n != record_id {
-                    let corrupted_events = id_delta - 1;
+                    // TODO: should this actually be returned by the call to `next` as an error so
+                    // we can decouple the need to emit telemetry that is event-specific from the
+                    // buffer itself?
+                    let corrupted_records = id_delta - 1;
+                    self.ledger
+                        .state()
+                        .decrement_total_records(corrupted_records);
                     emit(&EventsCorrupted {
-                        count: corrupted_events,
+                        count: corrupted_records,
                     });
                 }
             }
@@ -320,15 +333,17 @@ where
     /// beginning, essentially pointed at the wrong record.  We read out records here until we
     /// reach a point where we've read up to the record right before `get_last_reader_record_id`.
     /// This ensures that a subsequent call to `next` is ready to read the correct record.
+    #[instrument(skip(self), level = "trace")]
     pub(crate) async fn seek_to_next_record(&mut self) -> Result<(), ReaderError<T>> {
         // We rely on `next` to close out the data file if we've actually reached the end, and we
         // also rely on it to reset the data file before trying to read, and we _also_ rely on it to
         // update `self.last_reader_record_id`, so basically... just keep reading records until we
         // get to the one we left off with last time.
         let last_reader_record_id = self.ledger.state().get_last_reader_record_id();
-        println!(
+        trace!(
             "self.last_reader_record_id = {}, seeking to {} (per ledger)",
-            self.last_reader_record_id, last_reader_record_id
+            self.last_reader_record_id,
+            last_reader_record_id
         );
 
         while self.last_reader_record_id < last_reader_record_id {
@@ -341,9 +356,11 @@ where
     }
 
     /// Reads a record.
-    pub async fn next(&mut self) -> Result<T, ReaderError<T>> {
+    #[instrument(skip(self), level = "trace")]
+    pub async fn next(&mut self) -> Result<Option<T>, ReaderError<T>> {
         let token = loop {
             self.ensure_ready_for_read().await.context(Io)?;
+
             let reader = self
                 .reader
                 .as_mut()
@@ -397,22 +414,31 @@ where
                 }
             };
 
-            // Fundamentally, when `try_read_record` returns `None`, there's two possible scenarios:
+            // Fundamentally, when `try_read_record` returns `None`, there's three possible
+            // scenarios:
             //
             // 1. we are entirely caught up to the writer
             // 2. we've hit the end of the data file and need to go to the next one
+            // 3. the writer has closed/dropped/finished/etc
             //
-            // When we're in this state, we first "wait" for the writer to wake us up.  This might
-            // be an existing buffered wakeup, or we might actually be waiting for the next wakeup.
-            // Regardless of which type of wakeup it is, we still end up checking if the reader and
-            // writer file IDs that we loaded originally match.
+            // When we're at this point, we first "wait" for the writer to wake us up.  This might
+            // be an existing buffered wake-up, or we might actually be waiting for the next
+            // wake-up.  Regardless of which type of wakeup it is, we wait for a wake up.  The
+            // writer will always issue a wake-up when it finishes any major operation: creating a
+            // new data file, flushing, closing, etc.
             //
-            // If the file IDs were identical, it would imply that reader is still on the writer's
-            // current data file.  We simply continue the loop in this case.  It may lead to the
-            // same thing, `try_read_record` returning `None` with an identical reader/writer file
-            // ID, but that's OK, because it would mean we were actually waiting for the writer to
-            // make progress now.  If the wakeup was valid, due to writer progress, then, well...
-            // we'd actually be able to read data.
+            // After that, we check to see if the writer is done: this means the writer has
+            // explicitly closed itself and will send no more messages to this specific
+            // reader/writer pair.  We only return `None` ourselves if we've also drained all
+            // remaining records from the buffer.
+            //
+            // After that, we check the reader/writer file IDs.  If the file IDs were identical, it
+            // would imply that reader is still on the writer's current data file.  We simply
+            // continue the loop in this case.  It may lead to the same thing --`try_read_record`
+            // returning `None` with an identical reader/writer file ID -- but that's OK, because it
+            // would mean we were actually waiting for the writer to make progress now.  If the
+            // wake-up was valid, due to writer progress, then, well...  we'd actually be able to
+            // read data.
             //
             // If the file IDs were not identical, we now know the writer has moved on.  Crucially,
             // since we always flush our writes before waking up, including before moving to a new
@@ -420,6 +446,23 @@ where
             // loop, and `try_read_record` returned `None`, that we have hit the actual end of the
             // reader's current data file, and need to move on.
             self.ledger.wait_for_writer().await;
+
+            if self.ledger.is_writer_done() && self.ledger.state().get_total_buffer_size() == 0 {
+                // NOTE: We specifically check the total buffer size as it gets updated sooner -- in
+                // `roll_to_next_data_file` -- versus total records, which needs a successful read
+                // to catch any inconsistencies in the record IDs.
+                //
+                // This means that if we encountered a corrupted record as the last record we had to
+                // read before the above if condition would be met, our `next` call would hit the
+                // corrupted record, detect that, roll to the next file, which would do the buffer
+                // size adjustments, and then the following call to `next` would fallthrough to
+                // here.
+                //
+                // The same scenario with total records would be stuck waiting as we would have no
+                // more records to read to drive the check that fixes total records when we detect
+                // skipping record IDs.
+                return Ok(None);
+            }
 
             if current_writer_file_id != current_reader_file_id {
                 self.roll_to_next_data_file().await.context(Io)?;
@@ -434,6 +477,21 @@ where
             .reader
             .as_mut()
             .expect("reader should exist after ensure_ready_for_read");
-        reader.read_record(token).await
+        reader.read_record(token).map(|record| Some(record))
+    }
+}
+
+#[cfg(test)]
+impl<T> Reader<T> {
+    pub fn get_total_records(&self) -> u64 {
+        self.ledger.state().get_total_records()
+    }
+
+    pub fn get_total_buffer_size(&self) -> u64 {
+        self.ledger.state().get_total_buffer_size()
+    }
+
+    pub fn get_current_reader_file_id(&self) -> u16 {
+        self.ledger.state().get_current_reader_file_id()
     }
 }

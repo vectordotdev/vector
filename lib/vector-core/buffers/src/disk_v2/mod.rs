@@ -91,14 +91,10 @@
 //!
 //! # Implementation TODOs:
 //!
-//! - make file size limits configurable for testing purposes (we could easily write 2-3x of the
-//!   128MB target under test, but it'd be faster if we didn't have to, and doing that would take a
-//!   while to exercise certain logic like file ID wraparound)
-//! - actually limit the total file usage size (add logic to update the total file size in the ledger)
 //! - test what happens on file ID rollover
 //! - test what happens on writer wrapping and wanting to open current data file being read by reader
 //! - test what happens when record ID rolls over
-use std::{marker::PhantomData, path::Path, sync::Arc, time::Duration};
+use std::{marker::PhantomData, sync::Arc};
 
 use snafu::{ResultExt, Snafu};
 
@@ -110,10 +106,13 @@ mod record;
 mod ser;
 mod writer;
 
+#[cfg(test)]
+mod tests;
+
 use crate::Bufferable;
 
-use self::{
-    common::BufferConfig,
+pub use self::{
+    common::{DiskBufferConfig, DiskBufferConfigBuilder},
     ledger::{Ledger, LedgerLoadCreateError},
     reader::{Reader, ReaderError},
     writer::{Writer, WriterError},
@@ -141,7 +140,7 @@ where
     T: Bufferable,
 {
     pub async fn from_config(
-        config: BufferConfig,
+        config: DiskBufferConfig,
     ) -> Result<(Writer<T>, Reader<T>), BufferError<T>> {
         let ledger = Ledger::load_or_create(config).await.context(LedgerError)?;
         let ledger = Arc::new(ledger);

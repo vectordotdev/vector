@@ -1,4 +1,8 @@
-use std::{cmp, path::PathBuf, time::Duration};
+use std::{
+    cmp,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 // We don't want data files to be bigger than 128MB, but we might end up overshooting slightly.
 pub const DEFAULT_MAX_DATA_FILE_SIZE: u64 = 128 * 1024 * 1024;
@@ -6,7 +10,7 @@ pub const DEFAULT_MAX_DATA_FILE_SIZE: u64 = 128 * 1024 * 1024;
 pub const DEFAULT_MAX_RECORD_SIZE: usize = 8 * 1024 * 1024;
 
 #[derive(Clone, Debug)]
-pub struct BufferConfig {
+pub struct DiskBufferConfig {
     /// Directory where this buffer will write its files.
     ///
     /// Must be unique from all other buffers, whether within the same process or other Vector
@@ -45,10 +49,13 @@ pub struct BufferConfig {
     pub(crate) flush_interval: Duration,
 }
 
-impl BufferConfig {
-    pub fn from_path(data_dir: PathBuf) -> BufferConfigBuilder {
-        BufferConfigBuilder {
-            data_dir,
+impl DiskBufferConfig {
+    pub fn from_path<P>(data_dir: P) -> DiskBufferConfigBuilder
+    where
+        P: AsRef<Path>,
+    {
+        DiskBufferConfigBuilder {
+            data_dir: data_dir.as_ref().to_path_buf(),
             max_buffer_size: None,
             max_data_file_size: None,
             max_record_size: None,
@@ -57,7 +64,7 @@ impl BufferConfig {
     }
 }
 
-pub struct BufferConfigBuilder {
+pub struct DiskBufferConfigBuilder {
     data_dir: PathBuf,
     max_buffer_size: Option<u64>,
     max_data_file_size: Option<u64>,
@@ -65,7 +72,7 @@ pub struct BufferConfigBuilder {
     flush_interval: Option<Duration>,
 }
 
-impl BufferConfigBuilder {
+impl DiskBufferConfigBuilder {
     /// Sets the maximum size, in bytes, that the buffer can consume.
     ///
     /// The actual maximum on-disk buffer size is this amount rounded up to the next multiple of
@@ -122,7 +129,7 @@ impl BufferConfigBuilder {
     }
 
     /// Consumes this builder and constructs a `BufferConfig`.
-    pub fn build(self) -> BufferConfig {
+    pub fn build(self) -> DiskBufferConfig {
         let max_data_file_size = self
             .max_data_file_size
             .unwrap_or(DEFAULT_MAX_DATA_FILE_SIZE);
@@ -141,7 +148,7 @@ impl BufferConfigBuilder {
         let max_buffer_size = max_buffer_size - (max_buffer_size % max_data_file_size);
         let max_buffer_size = cmp::max(max_buffer_size, max_data_file_size);
 
-        BufferConfig {
+        DiskBufferConfig {
             data_dir: self.data_dir,
             max_buffer_size,
             max_data_file_size,

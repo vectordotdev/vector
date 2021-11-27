@@ -32,7 +32,7 @@ use crate::{
     Bufferable,
 };
 
-use super::{backed_archive::BackedArchive, common::BufferConfig};
+use super::{backed_archive::BackedArchive, common::DiskBufferConfig};
 
 #[derive(Debug, Snafu)]
 pub enum WriterError<R>
@@ -99,6 +99,7 @@ where
     /// If there is an I/O error while writing the record, an error variant will be returned
     /// describing the error.  Additionally, if there is an error while serializing the record, an
     /// error variant will be returned describing the serialization error.
+    #[instrument(skip(self), level = "trace")]
     pub async fn write_record(&mut self, id: u64, record: T) -> Result<usize, WriterError<T>> {
         self.encode_buf.clear();
         self.ser_buf.clear();
@@ -187,6 +188,7 @@ where
     ///
     /// If there is an I/O error while flushing either the buffered writer or the underlying writer,
     /// an error variant will be returned describing the error.
+    #[instrument(skip(self), level = "trace")]
     pub async fn flush(&mut self) -> io::Result<()> {
         self.writer.flush().await
     }
@@ -208,7 +210,7 @@ impl<T> RecordWriter<File, T> {
 
 pub struct Writer<T> {
     ledger: Arc<Ledger>,
-    config: BufferConfig,
+    config: DiskBufferConfig,
     writer: Option<RecordWriter<File, T>>,
     data_file_size: u64,
     _t: PhantomData<T>,
@@ -244,6 +246,7 @@ where
     }
 
     /// Validates that the last write in the current writer data file matches the ledger.
+    #[instrument(skip(self), level = "trace")]
     pub async fn validate_last_write(&mut self) -> Result<(), WriterError<T>> {
         self.ensure_ready_for_write().await.context(Io)?;
 
@@ -328,7 +331,22 @@ where
     }
 
     /// Ensures this writer is ready to attempt writer the next record.
+    #[instrument(skip(self), level = "trace")]
     pub async fn ensure_ready_for_write(&mut self) -> io::Result<()> {
+        // Check the overall size of the buffer and figure out if we can write.
+        loop {
+            // If we haven't yet exceeded the maximum buffer size, then we can proceed.  Otherwise,
+            // wait for the reader to signal that they've made some progress.
+            let total_buffer_size = self.ledger.state().get_total_buffer_size();
+            let max_buffer_size = self.config.max_buffer_size;
+
+            if total_buffer_size <= max_buffer_size {
+                break;
+            }
+
+            self.ledger.wait_for_reader().await;
+        }
+
         // If our data file is already open, and it has room left, then we're good here.  Otherwise,
         // flush everything and reset ourselves so that we can open the next data file for writing.
         let mut should_open_next = false;
@@ -345,7 +363,7 @@ where
             //
             // We still flush ourselves to disk, etc, to make sure all of the data is there.
             should_open_next = true;
-            self.flush().await?;
+            self.flush_inner(true).await?;
 
             self.reset();
         }
@@ -371,6 +389,7 @@ where
             } else {
                 self.ledger.get_current_writer_data_file_path()
             };
+
             let maybe_data_file = OpenOptions::new()
                 .append(true)
                 .read(true)
@@ -440,6 +459,7 @@ where
     }
 
     /// Writes a record.
+    #[instrument(skip(self), level = "trace")]
     pub async fn write_record(&mut self, record: T) -> Result<usize, WriterError<T>> {
         self.ensure_ready_for_write().await.context(Io)?;
 
@@ -461,14 +481,8 @@ where
         Ok(n)
     }
 
-    /// Flushes the writer.
-    ///
-    /// This must be called for the reader to be able to make progress.
-    ///
-    /// This does not ensure that the data is fully synchronized (i.e. `fsync`) to disk, however it
-    /// may sometimes perform a full synchronization if the time since the last full synchronization
-    /// occurred has exceeded a configured limit.
-    pub async fn flush(&mut self) -> io::Result<()> {
+    #[instrument(skip(self), level = "trace")]
+    pub async fn flush_inner(&mut self, force_full_flush: bool) -> io::Result<()> {
         // We always flush the `BufWriter` when this is called, but we don't always flush to disk or
         // flush the ledger.  This is enough for readers on Linux since the file ends up in the page
         // cache, as we don't do any O_DIRECT fanciness, and the new contents can be immediately
@@ -481,7 +495,7 @@ where
             self.ledger.notify_writer_waiters();
         }
 
-        if self.ledger.should_flush() {
+        if self.ledger.should_flush() || force_full_flush {
             if let Some(writer) = self.writer.as_mut() {
                 writer.sync_all().await?;
             }
@@ -491,8 +505,48 @@ where
             Ok(())
         }
     }
+    /// Flushes the writer.
+    ///
+    /// This must be called for the reader to be able to make progress.
+    ///
+    /// This does not ensure that the data is fully synchronized (i.e. `fsync`) to disk, however it
+    /// may sometimes perform a full synchronization if the time since the last full synchronization
+    /// occurred has exceeded a configured limit.
+    #[instrument(skip(self), level = "trace")]
+    pub async fn flush(&mut self) -> io::Result<()> {
+        self.flush_inner(false).await
+    }
 
     pub fn get_ledger_state(&self) -> String {
         format!("{:#?}", self.ledger.state())
+    }
+}
+
+impl<T> Writer<T> {
+    pub fn close(&mut self) {
+        if self.ledger.mark_writer_done() {
+            self.ledger.notify_writer_waiters();
+        }
+    }
+}
+
+impl<T> Drop for Writer<T> {
+    fn drop(&mut self) {
+        self.close()
+    }
+}
+
+#[cfg(test)]
+impl<T> Writer<T> {
+    pub fn get_total_records(&self) -> u64 {
+        self.ledger.state().get_total_records()
+    }
+
+    pub fn get_total_buffer_size(&self) -> u64 {
+        self.ledger.state().get_total_buffer_size()
+    }
+
+    pub fn get_current_writer_file_id(&self) -> u16 {
+        self.ledger.state().get_current_writer_file_id()
     }
 }

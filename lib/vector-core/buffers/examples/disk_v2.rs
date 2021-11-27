@@ -8,7 +8,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use buffers::{disk_v2::Buffer, helpers::VariableMessage};
+use buffers::{
+    disk_v2::{Buffer, DiskBufferConfig},
+    helpers::VariableMessage,
+};
 use hdrhistogram::Histogram;
 use human_bytes::human_bytes;
 use rand::Rng;
@@ -72,7 +75,9 @@ fn main() {
 
         // Now create the writer and reader and their associated tasks.
         let start = Instant::now();
-        let (mut writer, mut reader) = Buffer::from_path("/tmp/vector/disk-v2-testing")
+        let config = DiskBufferConfig::from_path("/tmp/vector/disk-v2-testing")
+            .build();
+        let (mut writer, mut reader) = Buffer::from_config(config)
             .await
             .expect("failed to open buffer");
 
@@ -122,7 +127,7 @@ fn main() {
             for _ in 0..reader_count {
                 let rx_start = Instant::now();
 
-                let record = reader.next().await.expect("read should not fail");
+                let record = reader.next().await.expect("read should not fail").expect("record should not be none");
 
                 let elapsed = rx_start.elapsed().as_nanos() as u64;
                 rx_histo.record(elapsed).expect("should not fail");

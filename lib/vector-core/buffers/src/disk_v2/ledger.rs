@@ -1,7 +1,7 @@
 use std::{
     fmt, io,
     path::PathBuf,
-    sync::atomic::{AtomicU16, AtomicU64, Ordering},
+    sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering},
     time::Instant,
 };
 
@@ -14,7 +14,7 @@ use rkyv::{with::Atomic, Archive, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{fs::OpenOptions, io::AsyncWriteExt, sync::Notify};
 
-use super::{backed_archive::BackedArchive, common::BufferConfig, ser::SerializeError};
+use super::{backed_archive::BackedArchive, common::DiskBufferConfig, ser::SerializeError};
 
 #[derive(Debug, Snafu)]
 pub enum LedgerLoadCreateError {
@@ -86,19 +86,31 @@ impl Default for LedgerState {
 
 impl ArchivedLedgerState {
     pub fn increment_records(&self, record_size: u64) {
-        self.total_records.fetch_add(1, Ordering::Relaxed);
+        self.total_records.fetch_add(1, Ordering::AcqRel);
         self.total_buffer_size
-            .fetch_add(record_size, Ordering::Relaxed);
+            .fetch_add(record_size, Ordering::AcqRel);
     }
 
     pub fn decrement_records(&self, record_size: u64) {
-        self.total_records.fetch_sub(1, Ordering::Relaxed);
+        self.total_records.fetch_sub(1, Ordering::AcqRel);
         self.total_buffer_size
-            .fetch_sub(record_size, Ordering::Relaxed);
+            .fetch_sub(record_size, Ordering::AcqRel);
+    }
+
+    pub fn get_total_buffer_size(&self) -> u64 {
+        self.total_buffer_size.load(Ordering::Acquire)
+    }
+
+    pub fn get_total_records(&self) -> u64 {
+        self.total_records.load(Ordering::Acquire)
     }
 
     pub fn decrement_total_buffer_size(&self, amount: u64) {
         self.total_buffer_size.fetch_sub(amount, Ordering::AcqRel);
+    }
+
+    pub fn decrement_total_records(&self, amount: u64) {
+        self.total_records.fetch_sub(amount, Ordering::AcqRel);
     }
 
     pub fn get_next_writer_record_id(&self) -> u64 {
@@ -149,7 +161,7 @@ impl ArchivedLedgerState {
 
 pub struct Ledger {
     // Buffer configuration.
-    config: BufferConfig,
+    config: DiskBufferConfig,
     // Advisory lock for this buffer directory.
     ledger_lock: LockFile,
     // Ledger state.
@@ -158,12 +170,14 @@ pub struct Ledger {
     reader_notify: Notify,
     // Notifier for writer-related progress.
     writer_notify: Notify,
+    // Tracks when writer has fully shutdown.
+    writer_done: AtomicBool,
     // Last flush of all unflushed files: ledger, data file, etc.
     last_flush: AtomicCell<Instant>,
 }
 
 impl Ledger {
-    pub fn config(&self) -> &BufferConfig {
+    pub fn config(&self) -> &DiskBufferConfig {
         &self.config
     }
 
@@ -190,24 +204,28 @@ impl Ledger {
     }
 
     /// Waits for a signal from the reader that an entire data file has been read and subsequently deleted.
+    #[instrument(skip(self), level = "trace")]
     pub async fn wait_for_reader(&self) {
         self.reader_notify.notified().await;
     }
 
     /// Waits for a signal from the writer that data has been written to a data file, or that a new
     /// data file has been created.
+    #[instrument(skip(self), level = "trace")]
     pub async fn wait_for_writer(&self) {
         self.writer_notify.notified().await;
     }
 
     /// Notifies all tasks waiting on progress by the reader.
+    #[instrument(skip(self), level = "trace")]
     pub fn notify_reader_waiters(&self) {
-        self.reader_notify.notify_waiters();
+        self.reader_notify.notify_one();
     }
 
     /// Notifies all tasks waiting on progress by the writer.
+    #[instrument(skip(self), level = "trace")]
     pub fn notify_writer_waiters(&self) {
-        self.writer_notify.notify_waiters();
+        self.writer_notify.notify_one();
     }
 
     /// Determines whether or not all files should be flushed/fsync'd to disk.
@@ -217,7 +235,7 @@ impl Ledger {
     /// receives `true` is responsible for flushing the necessary files.
     pub fn should_flush(&self) -> bool {
         let last_flush = self.last_flush.load();
-        if last_flush.elapsed() > self.config.flush_interval {
+        if true || last_flush.elapsed() > self.config.flush_interval {
             if self
                 .last_flush
                 .compare_exchange(last_flush, Instant::now())
@@ -238,11 +256,22 @@ impl Ledger {
         self.state().decrement_records(record_size);
     }
 
+    pub fn mark_writer_done(&self) -> bool {
+        self.writer_done
+            .compare_exchange_weak(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
+    }
+
+    pub fn is_writer_done(&self) -> bool {
+        self.writer_done.load(Ordering::Acquire)
+    }
+
     pub fn flush(&self) -> io::Result<()> {
         self.state.get_backing_ref().flush()
     }
 
-    pub async fn load_or_create(config: BufferConfig) -> Result<Ledger, LedgerLoadCreateError> {
+    #[instrument(level = "trace")]
+    pub async fn load_or_create(config: DiskBufferConfig) -> Result<Ledger, LedgerLoadCreateError> {
         // Acquire an exclusive lock on our lock file, which prevents another Vector process from
         // loading this buffer and clashing with us.  Specifically, though: this does _not_ prevent
         // another process from messing with our ledger files, or any of the data files, etc.
@@ -308,6 +337,7 @@ impl Ledger {
             state: ledger_state,
             reader_notify: Notify::new(),
             writer_notify: Notify::new(),
+            writer_done: AtomicBool::new(false),
             last_flush: AtomicCell::new(Instant::now()),
         })
     }
@@ -321,6 +351,7 @@ impl fmt::Debug for Ledger {
             .field("state", &self.state.get_archive_ref())
             .field("reader_notify", &self.reader_notify)
             .field("writer_notify", &self.writer_notify)
+            .field("writer_done", &self.writer_done.load(Ordering::Acquire))
             .field("last_flush", &self.last_flush)
             .finish()
     }
