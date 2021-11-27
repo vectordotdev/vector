@@ -91,7 +91,6 @@
 //!
 //! # Implementation TODOs:
 //!
-//! - test what happens on file ID rollover
 //! - test what happens on writer wrapping and wanting to open current data file being read by reader
 //! - test what happens when record ID rolls over
 use std::{marker::PhantomData, sync::Arc};
@@ -139,6 +138,7 @@ impl<T> Buffer<T>
 where
     T: Bufferable,
 {
+    #[cfg_attr(test, instrument(level = "trace"))]
     pub async fn from_config(
         config: DiskBufferConfig,
     ) -> Result<(Writer<T>, Reader<T>), BufferError<T>> {

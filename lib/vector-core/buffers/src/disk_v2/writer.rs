@@ -100,6 +100,7 @@ where
     /// describing the error.  Additionally, if there is an error while serializing the record, an
     /// error variant will be returned describing the serialization error.
     #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn write_record(&mut self, id: u64, record: T) -> Result<usize, WriterError<T>> {
         self.encode_buf.clear();
         self.ser_buf.clear();
@@ -189,6 +190,7 @@ where
     /// If there is an I/O error while flushing either the buffered writer or the underlying writer,
     /// an error variant will be returned describing the error.
     #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn flush(&mut self) -> io::Result<()> {
         self.writer.flush().await
     }
@@ -246,7 +248,7 @@ where
     }
 
     /// Validates that the last write in the current writer data file matches the ledger.
-    #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn validate_last_write(&mut self) -> Result<(), WriterError<T>> {
         self.ensure_ready_for_write().await.context(Io)?;
 
@@ -331,7 +333,7 @@ where
     }
 
     /// Ensures this writer is ready to attempt writer the next record.
-    #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn ensure_ready_for_write(&mut self) -> io::Result<()> {
         // Check the overall size of the buffer and figure out if we can write.
         loop {
@@ -459,7 +461,7 @@ where
     }
 
     /// Writes a record.
-    #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn write_record(&mut self, record: T) -> Result<usize, WriterError<T>> {
         self.ensure_ready_for_write().await.context(Io)?;
 
@@ -481,7 +483,7 @@ where
         Ok(n)
     }
 
-    #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn flush_inner(&mut self, force_full_flush: bool) -> io::Result<()> {
         // We always flush the `BufWriter` when this is called, but we don't always flush to disk or
         // flush the ledger.  This is enough for readers on Linux since the file ends up in the page
@@ -512,7 +514,7 @@ where
     /// This does not ensure that the data is fully synchronized (i.e. `fsync`) to disk, however it
     /// may sometimes perform a full synchronization if the time since the last full synchronization
     /// occurred has exceeded a configured limit.
-    #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn flush(&mut self) -> io::Result<()> {
         self.flush_inner(false).await
     }

@@ -1,6 +1,6 @@
 use tokio_test::{assert_pending, assert_ready, task::spawn};
 
-use super::common::{
+use super::{
     create_buffer_with_max_buffer_size, create_buffer_with_max_data_file_size,
     create_buffer_with_max_record_size, with_temp_dir, SizedRecord,
 };

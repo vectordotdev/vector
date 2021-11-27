@@ -14,7 +14,11 @@ use rkyv::{with::Atomic, Archive, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{fs::OpenOptions, io::AsyncWriteExt, sync::Notify};
 
-use super::{backed_archive::BackedArchive, common::DiskBufferConfig, ser::SerializeError};
+use super::{
+    backed_archive::BackedArchive,
+    common::{DiskBufferConfig, MAX_FILE_ID},
+    ser::SerializeError,
+};
 
 #[derive(Debug, Snafu)]
 pub enum LedgerLoadCreateError {
@@ -136,15 +140,13 @@ impl ArchivedLedgerState {
 
     /// Gets the next writer file ID.
     pub fn get_next_writer_file_id(&self) -> u16 {
-        self.writer_current_data_file_id
-            .load(Ordering::Acquire)
-            .wrapping_add(1)
+        (self.writer_current_data_file_id.load(Ordering::Acquire) + 1) % MAX_FILE_ID
     }
 
     /// Increments the current writer file ID.
     pub fn increment_writer_file_id(&self) {
         self.writer_current_data_file_id
-            .fetch_add(1, Ordering::AcqRel);
+            .store(self.get_next_writer_file_id(), Ordering::Release);
     }
 
     /// Gets the current reader file ID.
@@ -152,10 +154,15 @@ impl ArchivedLedgerState {
         self.reader_current_data_file_id.load(Ordering::Acquire)
     }
 
+    /// Gets the next reader file ID.
+    pub fn get_next_reader_file_id(&self) -> u16 {
+        (self.reader_current_data_file_id.load(Ordering::Acquire) + 1) % MAX_FILE_ID
+    }
+
     /// Increments the current reader file ID.
     pub fn increment_reader_file_id(&self) {
         self.reader_current_data_file_id
-            .fetch_add(1, Ordering::AcqRel);
+            .store(self.get_next_reader_file_id(), Ordering::Release);
     }
 }
 
@@ -204,26 +211,26 @@ impl Ledger {
     }
 
     /// Waits for a signal from the reader that an entire data file has been read and subsequently deleted.
-    #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn wait_for_reader(&self) {
         self.reader_notify.notified().await;
     }
 
     /// Waits for a signal from the writer that data has been written to a data file, or that a new
     /// data file has been created.
-    #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn wait_for_writer(&self) {
         self.writer_notify.notified().await;
     }
 
     /// Notifies all tasks waiting on progress by the reader.
-    #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub fn notify_reader_waiters(&self) {
         self.reader_notify.notify_one();
     }
 
     /// Notifies all tasks waiting on progress by the writer.
-    #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub fn notify_writer_waiters(&self) {
         self.writer_notify.notify_one();
     }
@@ -235,7 +242,7 @@ impl Ledger {
     /// receives `true` is responsible for flushing the necessary files.
     pub fn should_flush(&self) -> bool {
         let last_flush = self.last_flush.load();
-        if true || last_flush.elapsed() > self.config.flush_interval {
+        if last_flush.elapsed() > self.config.flush_interval {
             if self
                 .last_flush
                 .compare_exchange(last_flush, Instant::now())
@@ -270,7 +277,7 @@ impl Ledger {
         self.state.get_backing_ref().flush()
     }
 
-    #[instrument(level = "trace")]
+    #[cfg_attr(test, instrument(level = "trace"))]
     pub async fn load_or_create(config: DiskBufferConfig) -> Result<Ledger, LedgerLoadCreateError> {
         // Acquire an exclusive lock on our lock file, which prevents another Vector process from
         // loading this buffer and clashing with us.  Specifically, though: this does _not_ prevent

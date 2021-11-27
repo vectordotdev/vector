@@ -9,6 +9,11 @@ pub const DEFAULT_MAX_DATA_FILE_SIZE: u64 = 128 * 1024 * 1024;
 // There's no particular reason that _has_ to be 8MB, it's just a simple default we've chosen here.
 pub const DEFAULT_MAX_RECORD_SIZE: usize = 8 * 1024 * 1024;
 
+#[cfg(not(test))]
+pub const MAX_FILE_ID: u16 = u16::MAX;
+#[cfg(test)]
+pub const MAX_FILE_ID: u16 = 32;
+
 #[derive(Clone, Debug)]
 pub struct DiskBufferConfig {
     /// Directory where this buffer will write its files.

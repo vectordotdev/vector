@@ -95,7 +95,7 @@ where
         }
     }
 
-    #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     async fn read_length_delimiter(&mut self) -> Result<Option<usize>, ReaderError<T>> {
         loop {
             if self.reader.buffer().len() >= 4 {
@@ -115,7 +115,7 @@ where
         }
     }
 
-    #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     async fn try_next_record(&mut self) -> Result<Option<ReadToken>, ReaderError<T>> {
         let record_len = match self.read_length_delimiter().await? {
             Some(len) => len,
@@ -212,7 +212,7 @@ where
     }
 
     /// Switches the reader over to the next data file to read.
-    #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     async fn roll_to_next_data_file(&mut self) -> io::Result<()> {
         // Try and grab the file size once we're ready to roll over.  We use this to figure out if
         // we need to subtract some more bytes from the total buffer size.  If we rolled over due to
@@ -251,7 +251,7 @@ where
     }
 
     /// Ensures this reader is ready to attempt reading the next record.
-    #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     async fn ensure_ready_for_read(&mut self) -> io::Result<()> {
         // We have nothing to do if we already have a data file open.
         if self.reader.is_some() {
@@ -333,7 +333,7 @@ where
     /// beginning, essentially pointed at the wrong record.  We read out records here until we
     /// reach a point where we've read up to the record right before `get_last_reader_record_id`.
     /// This ensures that a subsequent call to `next` is ready to read the correct record.
-    #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub(crate) async fn seek_to_next_record(&mut self) -> Result<(), ReaderError<T>> {
         // We rely on `next` to close out the data file if we've actually reached the end, and we
         // also rely on it to reset the data file before trying to read, and we _also_ rely on it to
@@ -356,7 +356,7 @@ where
     }
 
     /// Reads a record.
-    #[instrument(skip(self), level = "trace")]
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn next(&mut self) -> Result<Option<T>, ReaderError<T>> {
         let token = loop {
             self.ensure_ready_for_read().await.context(Io)?;
