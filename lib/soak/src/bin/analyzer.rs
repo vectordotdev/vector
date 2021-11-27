@@ -1,7 +1,7 @@
 //! `analyzer` is a program that reads the capture file written by `observer`
 //! and reports on the findings therein.
 use argh::FromArgs;
-use bytesize::ByteSize;
+use bytesize::{to_string, ByteSize};
 use ndarray::{ArrayBase, Axis};
 use ndarray_stats::interpolate::Nearest;
 use ndarray_stats::{QuantileExt, SummaryStatisticsExt};
@@ -156,6 +156,33 @@ impl ops::Mul<f64> for StatValue {
     }
 }
 
+impl ops::Div<f64> for StatValue {
+    type Output = Self;
+
+    fn div(self, rhs: f64) -> Self::Output {
+        match self {
+            StatValue::Raw { original: lo, .. } => StatValue::new(lo / rhs, soak::Unit::Raw),
+            StatValue::Byte { original: lo, .. } => StatValue::new(lo / rhs, soak::Unit::Bytes),
+        }
+    }
+}
+
+impl ops::Mul<StatValue> for StatValue {
+    type Output = Self;
+
+    fn mul(self, rhs: StatValue) -> Self::Output {
+        match (self, rhs) {
+            (StatValue::Raw { original: lo, .. }, StatValue::Raw { original: ro, .. }) => {
+                StatValue::new(lo * ro, soak::Unit::Raw)
+            }
+            (StatValue::Byte { original: lo, .. }, StatValue::Byte { original: ro, .. }) => {
+                StatValue::new(lo * ro, soak::Unit::Bytes)
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
 impl StatValue {
     fn new(inner: f64, unit: soak::Unit) -> Self {
         match unit {
@@ -167,6 +194,20 @@ impl StatValue {
                 original: inner,
                 converted: inner as u64,
             },
+        }
+    }
+
+    fn sqrt(&self) -> Self {
+        match self {
+            StatValue::Raw { original: lo, .. } => StatValue::new(lo.sqrt(), soak::Unit::Raw),
+            StatValue::Byte { original: lo, .. } => StatValue::new(lo.sqrt(), soak::Unit::Bytes),
+        }
+    }
+
+    fn as_inner(&self) -> f64 {
+        match self {
+            StatValue::Raw { original, .. } => *original,
+            StatValue::Byte { original, .. } => *original,
         }
     }
 }
@@ -184,20 +225,83 @@ impl fmt::Display for StatValue {
     }
 }
 
-#[derive(Debug, Tabled)]
+#[derive(Debug, Tabled, Clone)]
 struct Statistics {
     experiment: String,
     variant: String,
     query: String,
+    mean: StatValue,
+    stdev: StatValue,
+    min: StatValue,
+    max: StatValue,
     p50: StatValue,
     p75: StatValue,
     p90: StatValue,
     p99: StatValue,
-    max: StatValue,
     skewness: f64,
     kurtosis: f64,
     iqr: StatValue,
     outliers: bool,
+    total_samples: usize,
+}
+
+#[derive(Debug, Tabled, Clone, Copy)]
+enum Change {
+    /// The baseline is faster than comparison
+    Regression,
+    /// There is no statistically interesting change between the means of baseline and comparison
+    NoChange,
+    /// The comparison is faster than baseline
+    Improvement,
+}
+
+#[derive(Debug, Tabled, Clone)]
+struct SecondOrderStatistics {
+    experiment: String,
+    change: Change,
+    t_value: f64,
+}
+
+#[derive(Debug, Default)]
+struct ExperimentalPair {
+    baseline: Option<Statistics>,
+    comparison: Option<Statistics>,
+}
+
+impl ExperimentalPair {
+    /// Implements Welch's t-test, https://en.wikipedia.org/wiki/Welch%27s_t-test
+    fn t_test(&self) -> (f64, f64) {
+        let baseline = self.baseline.as_ref().unwrap();
+        let comparison = self.comparison.as_ref().unwrap();
+
+        let baseline_total_samples = baseline.total_samples as f64;
+        let baseline_degrees_freedom = baseline_total_samples - 1.0;
+        let baseline_stdev = baseline.stdev.as_inner();
+
+        let comparison_total_samples = comparison.total_samples as f64;
+        let comparison_degrees_freedom = comparison_total_samples - 1.0;
+        let comparison_stdev = comparison.stdev.as_inner();
+
+        let t_statistic = {
+            let diff_mean: f64 = (baseline.mean - comparison.mean).as_inner();
+            let baseline_std_error: f64 = baseline_stdev / baseline_total_samples.sqrt();
+            let comparison_std_error: f64 = comparison_stdev / comparison_total_samples.sqrt();
+            let denominator = (baseline_std_error + comparison_std_error).sqrt();
+            diff_mean / denominator
+        };
+
+        let degrees_of_freedom = {
+            let numerator = ((baseline_stdev.powf(2.0) / baseline_total_samples)
+                + (comparison_stdev.powf(2.0) / comparison_total_samples))
+                .powf(2.0);
+            let denominator = (baseline_stdev.powf(4.0) / baseline_degrees_freedom.powf(2.0))
+                + (comparison_stdev.powf(4.0) / comparison_degrees_freedom.powf(2.0));
+
+            numerator / denominator
+        };
+
+        (t_statistic, degrees_of_freedom)
+    }
 }
 
 fn main() {
@@ -234,8 +338,14 @@ fn main() {
             .push(sample);
     }
 
+    // Compute first-order statistics, those that are done per
+    // experiment/variant.
+    let mut experimental_pairs = HashMap::new();
     let mut statistics = Vec::with_capacity(capture.experiments.len());
     for (experiment_id, exp) in capture.experiments.into_iter() {
+        let ep = experimental_pairs
+            .entry(experiment_id.clone())
+            .or_insert(ExperimentalPair::default());
         for ((variant, query_id), samples) in exp.samples.into_iter() {
             let unit = samples[0].unit;
             let mut raw_array: ndarray::Array1<f64> =
@@ -244,6 +354,17 @@ fn main() {
                 ArrayBase::from_iter(samples.iter().map(|s| StatValue::new(s.value, unit)));
             let skewness = raw_array.skewness().unwrap();
             let kurtosis = raw_array.kurtosis().unwrap();
+            let mean = StatValue::new(raw_array.mean().unwrap(), unit);
+            // standard deviation
+            let mut base = StatValue::new(0.0, unit);
+            for sv in array.iter() {
+                let distance_from_mean = *sv - mean;
+                let square_dfm = distance_from_mean * distance_from_mean;
+                base = base + square_dfm;
+            }
+            let variance = base / (raw_array.len() as f64);
+            let stdev = variance.sqrt();
+
             let min = array[array.argmin().unwrap()];
             let max = array[array.argmax().unwrap()];
             let p25 = *array
@@ -275,13 +396,14 @@ fn main() {
             let tukey_bound = iqr * 1.5;
             let lower = p25 - tukey_bound;
             let upper = p75 + tukey_bound;
-            println!("{}, {}, {}", tukey_bound, lower, upper);
             let outliers = (min < lower) || (max > upper);
-            statistics.push(Statistics {
+            let stat = Statistics {
                 experiment: experiment_id.clone(),
-                variant,
-                query: query_id,
+                variant: variant.clone(),
+                query: experiment_id.clone(),
+                mean,
                 max,
+                min,
                 p50,
                 p75,
                 p90,
@@ -290,9 +412,33 @@ fn main() {
                 kurtosis,
                 iqr,
                 outliers,
-            });
+                stdev,
+                total_samples: raw_array.len(),
+            };
+            statistics.push(stat.clone());
+            // TODO make this an enum
+            if variant.eq("baseline") {
+                ep.baseline = Some(stat)
+            } else {
+                ep.comparison = Some(stat)
+            }
         }
     }
+
+    // Compute second-order statistics, those that are done per experiment
+    // between variants.
+    let mut second_order_statistics = Vec::with_capacity(experimental_pairs.len());
+    for (experiment_id, p) in experimental_pairs.iter() {
+        let (t_statistic, degrees_of_freedom) = p.t_test();
+        // let change = if t_value < 0.05 {
+        // }
+        // SecondOrderStatistics {
+
+        // }
+        unimplemented!()
+    }
+    println!("{:?}", experimental_pairs);
+
     let table = Table::new(statistics)
         .with(Style::github_markdown())
         .to_string();
