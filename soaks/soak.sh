@@ -104,9 +104,14 @@ echo "Captures will be recorded into ${capture_dir}"
                   --memory "${SOAK_MEMORY}" \
                   --vector-cpus "${VECTOR_CPUS}"
 
-./bin/analyze_experiment.sh --capture-dir "${capture_dir}" \
-                            --baseline "${BASELINE}" \
-                            --comparison "${COMPARISON}" \
-                            --vector-cpus "${VECTOR_CPUS}"
+# Aggregate all captures and analyze them.
+aws 'FNR==1 && NR!=1{next;}{print}' "${capture_dir}/**/*.captures" | \
+    sed '/^$/d' > "${capture_dir}/aggregate.captures"
+./bin/analyze_experiment --capture "${capture_dir}/aggregate.captures" \
+                         --baseline-sha "${BASELINE}" \
+                         --comparison-sha "${COMPARISON}" \
+                         --vector-cpus "${VECTOR_CPUS}" \
+                         --warmup-seconds 30 \
+                         --p-value 0.05 # 5% confidence
 
 popd
