@@ -286,7 +286,7 @@ jobs:
 
     steps:
       - name: Install dependencies
-        run: sudo apt-get install -y python-scipy python3-pandas
+        run: sudo apt-get install -y python-scipy python3-pandas python-tabulate
 
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
