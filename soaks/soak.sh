@@ -27,6 +27,7 @@ USE_LOCAL_IMAGE="true"
 SOAK_CPUS="7"
 SOAK_MEMORY="8g"
 VECTOR_CPUS="4"
+WARMUP_SECONDS="30"
 
 while [[ $# -gt 0 ]]; do
   key="$1"
@@ -94,7 +95,8 @@ echo "Captures will be recorded into ${capture_dir}"
                   --capture-dir "${capture_dir}" \
                   --cpus "${SOAK_CPUS}" \
                   --memory "${SOAK_MEMORY}" \
-                  --vector-cpus "${VECTOR_CPUS}"
+                  --vector-cpus "${VECTOR_CPUS}" \
+                  --warmup-seconds "${WARMUP_SECONDS}"
 ./bin/soak_one.sh --local-image "${USE_LOCAL_IMAGE}" \
                   --soak "${SOAK_NAME}" \
                   --variant "comparison" \
@@ -102,16 +104,17 @@ echo "Captures will be recorded into ${capture_dir}"
                   --capture-dir "${capture_dir}" \
                   --cpus "${SOAK_CPUS}" \
                   --memory "${SOAK_MEMORY}" \
-                  --vector-cpus "${VECTOR_CPUS}"
+                  --vector-cpus "${VECTOR_CPUS}" \
+                  --warmup-seconds "${WARMUP_SECONDS}"
 
 # Aggregate all captures and analyze them.
-awk 'FNR==1 && NR!=1{next;}{print}' "${capture_dir}/**/*.captures" | \
+find "${capture_dir}" -name '*.captures' -exec awk 'FNR==1 && NR!=1{next;}{print}' {} + | \
     sed '/^$/d' > "${capture_dir}/aggregate.captures"
 ./bin/analyze_experiment --capture "${capture_dir}/aggregate.captures" \
                          --baseline-sha "${BASELINE}" \
                          --comparison-sha "${COMPARISON}" \
                          --vector-cpus "${VECTOR_CPUS}" \
-                         --warmup-seconds 90 \
+                         --warmup-seconds "${WARMUP_SECONDS}" \
                          --p-value 0.05 # 5% confidence
 
 popd

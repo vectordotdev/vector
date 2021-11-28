@@ -22,6 +22,7 @@ display_usage() {
     echo "  --cpus: the total number of CPUs to dedicate to the soak minikube, default 7"
     echo "  --memory: the total amount of memory dedicate to the soak minikube, default 8g"
     echo "  --vector-cpus: the total number of CPUs to give to soaked vector"
+    echo "  --warmup-seconds: the total number seconds to pause waiting for vector to warm up"
     echo ""
 }
 
@@ -54,6 +55,11 @@ while [[ $# -gt 0 ]]; do
           shift # past argument
           shift # past value
           ;;
+      --warmup-seconds)
+          WARMUP_SECONDS=$2
+          shift # past argument
+          shift # past value
+          ;;
       --cpus)
           SOAK_CPUS=$2
           shift # past argument
@@ -76,7 +82,6 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-WARMUP_GRACE=90
 TOTAL_SAMPLES=120
 SOAK_CAPTURE_DIR="${CAPTURE_DIR}/${SOAK_NAME}"
 
@@ -97,8 +102,8 @@ terraform apply -var "experiment_name=${SOAK_NAME}" -var "type=${VARIANT}" \
           -var "lading_image=ghcr.io/blt/lading:sha-0da91906d56acc899b829cea971d79f13e712e21" \
           -auto-approve -compact-warnings -input=false -no-color
 echo "[${VARIANT}] Captures will be recorded into ${SOAK_CAPTURE_DIR}"
-echo "[${VARIANT}] Sleeping for ${WARMUP_GRACE} seconds to allow warm-up"
-sleep "${WARMUP_GRACE}"
+echo "[${VARIANT}] Sleeping for ${WARMUP_SECONDS} seconds to allow warm-up"
+sleep "${WARMUP_SECONDS}"
 echo "[${VARIANT}] Recording captures to ${SOAK_CAPTURE_DIR}"
 sleep "${TOTAL_SAMPLES}"
 kill "${CAPTURE_MOUNT_PID}"

@@ -230,7 +230,8 @@ jobs:
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --capture-dir /tmp/${{ github.event.number }}-${{ github.run_attempt }}
+                                  --capture-dir /tmp/${{ github.event.number }}-${{ github.run_attempt }} \
+                                  --warmup-seconds 30
 
       - name: Upload timing captures
         uses: actions/upload-artifact@v1
@@ -264,7 +265,8 @@ jobs:
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --capture-dir /tmp/${{ github.event.number }}-${{ github.run_attempt }}
+                                  --capture-dir /tmp/${{ github.event.number }}-${{ github.run_attempt }} \
+                                  --warmup-seconds 30
 
       - name: Upload timing captures
         uses: actions/upload-artifact@v1
@@ -323,13 +325,13 @@ jobs:
           	fi
           done
           popd
-          awk 'FNR==1 && NR!=1{next;}{print}' "${{ github.event.number }}-${{ github.run_attempt }}-captures/aggregate.captures/**/*.captures" | \
+          find "${{ github.event.number }}-${{ github.run_attempt }}-captures" -name '*.captures' -exec awk 'FNR==1 && NR!=1{next;}{print}' {} + | \
               sed '/^$/d' > "${{ github.event.number }}-${{ github.run_attempt }}-captures/aggregate.captures"
           ./soaks/bin/analyze_experiment.sh --capture ${{ github.event.number }}-${{ github.run_attempt }}-captures/aggregate.captures \
                                             --baseline-sha ${{ needs.compute-soak-meta.outputs.baseline-sha }} \
                                             --comparison-sha ${{ needs.compute-soak-meta.outputs.comparison-sha }} \
                                             --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                            --warmup-seconds 90 \
+                                            --warmup-seconds 30 \
                                             --p-value 0.05 > /tmp/${{ github.event.number}}-${{ github.run_attempt }}-analysis
 
       - name: Read analysis file

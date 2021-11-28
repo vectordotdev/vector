@@ -20,7 +20,8 @@ provider "kubernetes" {
 # understand what vector et al's running behavior is.
 module "monitoring" {
   source       = "../../../common/terraform/modules/monitoring"
-  type         = var.type
+  experiment_name = var.experiment_name
+  variant         = var.type
   vector_image = var.vector_image
 }
 

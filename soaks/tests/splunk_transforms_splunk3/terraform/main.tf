@@ -11,12 +11,19 @@ provider "kubernetes" {
   config_path = "~/.kube/config"
 }
 
+# Setup background monitoring details. These are needed by the soak control to
+# understand what vector et al's running behavior is.
 module "monitoring" {
   source       = "../../../common/terraform/modules/monitoring"
-  type         = var.type
+  experiment_name = var.experiment_name
+  variant         = var.type
   vector_image = var.vector_image
 }
 
+# Setup the soak pieces
+#
+# This soak config sets up a vector soak with lading/http-gen feeding into vector,
+# lading/http-blackhole receiving.
 resource "kubernetes_namespace" "soak" {
   metadata {
     name = "soak"
