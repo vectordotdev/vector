@@ -7,6 +7,7 @@ use dyn_clone::DynClone;
 use lookup_lib::{parser::parse_lookup, LookupBuf};
 use regex::Regex;
 use std::borrow::Cow;
+use vrl::prelude::fmt::Formatter;
 
 #[derive(Clone, Copy, Debug)]
 pub struct MatchDatadogQuery;
@@ -104,7 +105,7 @@ fn type_def() -> TypeDef {
     TypeDef::new().infallible().boolean()
 }
 
-trait Query: DynClone {
+trait Query: DynClone + Send + Sync {
     fn exists(&self, obj: &Value) -> bool;
 }
 
@@ -226,14 +227,20 @@ trait MatchRunner: DynClone + std::fmt::Debug {
 
 dyn_clone::clone_trait_object!(MatchRunner);
 
-#[derive(Debug, Clone)]
-struct Container<T: Fn(&Value) -> bool + Send + Sync + Clone + std::fmt::Debug> {
+#[derive(Clone)]
+struct Container<T: Fn(&Value) -> bool + Send + Sync + Clone> {
     func: T,
 }
 
-impl<T: Fn(&Value) -> bool + Send + Sync + Clone + std::fmt::Debug> MatchRunner for Container<T> {
+impl<T: Fn(&Value) -> bool + Send + Sync + Clone> MatchRunner for Container<T> {
     fn run(&self, obj: &Value) -> bool {
         (self.func)(obj)
+    }
+}
+
+impl<T: Fn(&Value) -> bool + Send + Sync + Clone> std::fmt::Debug for Container<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "Datadog matcher fn")
     }
 }
 
@@ -262,6 +269,12 @@ fn build_matcher(node: &QueryNode) -> Box<dyn MatchRunner + Send + Sync> {
     match node {
         QueryNode::MatchNoDocs => Box::new(false),
         QueryNode::MatchAllDocs => Box::new(true),
+        QueryNode::AttributeExists { attr } => {
+            let queries = attr_to_queries(attr);
+            Box::new(Container {
+                func: move |obj| queries.iter().any(|q| q.exists(obj)),
+            })
+        }
         _ => unreachable!("todo"),
     }
 }
