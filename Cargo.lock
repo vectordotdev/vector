@@ -6700,7 +6700,6 @@ name = "soak"
 version = "0.1.0"
 dependencies = [
  "argh",
- "bytesize",
  "csv",
  "http",
  "rand 0.8.4",
