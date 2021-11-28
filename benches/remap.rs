@@ -224,6 +224,66 @@ fn benchmark_remap(c: &mut Criterion) {
         );
     });
 
+    let remap_runner = |tform: &mut Box<dyn FunctionTransform>, event: Event| {
+        let mut result = Vec::with_capacity(1);
+        tform.transform(&mut result, event);
+        let output_1 = result[0].as_log();
+
+        debug_assert_eq!(output_1.get("nong").unwrap(), &Value::from("VECTOR"));
+        debug_assert_eq!(
+            output_1.get("matches.name").unwrap(),
+            &Value::from("my event")
+        );
+        debug_assert_eq!(output_1.get("matches.num").unwrap(), &Value::from("2"));
+        debug_assert_eq!(
+            output_1.get("origin").unwrap(),
+            &Value::from("VECTOR/my event/2")
+        );
+
+        result
+    };
+
+    group.bench_function("remap/remap", |b| {
+        let mut tform: Box<dyn FunctionTransform> = Box::new(
+            Remap::new(
+                RemapConfig {
+                    source: Some(
+                        indoc! {r#"
+                    .hostname = "vector"
+
+                    if .status == "warning" {
+                        .thing = upcase(.hostname)
+                    } else if .status == "notice" {
+                        .thung = downcase(.hostname)
+                    } else {
+                        .nong = upcase(.hostname)
+                    }
+                    
+                    .matches = { "name": .message, "num": "2" }
+                    .origin, .err = .hostname + "/" + .matches.name + "/" + .matches.num
+                "#}
+                        .to_owned(),
+                    ),
+                    file: None,
+                    timezone: TimeZone::default(),
+                    drop_on_error: true,
+                    drop_on_abort: true,
+                    ..Default::default()
+                },
+                &Default::default(),
+            )
+            .unwrap(),
+        );
+
+        let mut event = Event::from("my event");
+
+        b.iter_batched(
+            || event.clone(),
+            |event| remap_runner(&mut tform, event),
+            BatchSize::SmallInput,
+        );
+    });
+
     group.bench_function("coerce/native", |b| {
         let mut tform: Box<dyn FunctionTransform> = rt
             .block_on(async move {
