@@ -1,9 +1,9 @@
 use vrl::prelude::*;
 
-use cached::{proc_macro::cached, SizedCache};
 use datadog_search_syntax::{
     normalize_fields, parse, BooleanType, Comparison, ComparisonValue, Field, QueryNode,
 };
+use dyn_clone::DynClone;
 use lookup_lib::{parser::parse_lookup, LookupBuf};
 use regex::Regex;
 use std::borrow::Cow;
@@ -60,7 +60,10 @@ impl Function for MatchDatadogQuery {
             Box::new(ExpressionError::from(e.to_string())) as Box<dyn DiagnosticError>
         })?;
 
-        Ok(Box::new(MatchDatadogQueryFn { value, node }))
+        // Build the matcher function that accepts a VRL event value, based on the current node.
+        let match_fn = build_matcher(&node);
+
+        Ok(Box::new(MatchDatadogQueryFn { value, match_fn }))
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -82,14 +85,14 @@ impl Function for MatchDatadogQuery {
 #[derive(Debug, Clone)]
 struct MatchDatadogQueryFn {
     value: Box<dyn Expression>,
-    node: QueryNode,
+    match_fn: Box<dyn MatchRunner + Send + Sync>,
 }
 
 impl Expression for MatchDatadogQueryFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?.try_object()?;
 
-        Ok(matches_vrl_object(&self.node, &Value::Object(value)).into())
+        Ok(self.match_fn.run(&Value::Object(value)).into())
     }
 
     fn type_def(&self, _state: &state::Compiler) -> TypeDef {
@@ -101,12 +104,177 @@ fn type_def() -> TypeDef {
     TypeDef::new().infallible().boolean()
 }
 
+trait Query: DynClone {
+    fn exists(&self, obj: &Value) -> bool;
+}
+
+dyn_clone::clone_trait_object!(Query);
+
+#[derive(Clone)]
+struct DefaultField {
+    name: String,
+    buf: LookupBuf,
+}
+
+impl DefaultField {
+    fn new(name: String, buf: LookupBuf) -> Self {
+        Self { name, buf }
+    }
+}
+
+impl Query for DefaultField {
+    fn exists(&self, obj: &Value) -> bool {
+        obj.get_by_path(&self.buf).is_some()
+    }
+}
+
+#[derive(Clone)]
+struct FacetField {
+    name: String,
+    buf: LookupBuf,
+}
+
+impl FacetField {
+    fn new(name: String, buf: LookupBuf) -> Self {
+        Self { name, buf }
+    }
+}
+
+impl Query for FacetField {
+    fn exists(&self, obj: &Value) -> bool {
+        obj.get_by_path(&self.buf).is_some()
+    }
+}
+
+#[derive(Clone)]
+struct ReservedField {
+    name: String,
+    buf: LookupBuf,
+}
+
+impl ReservedField {
+    fn new(name: String, buf: LookupBuf) -> Self {
+        Self { name, buf }
+    }
+}
+
+impl Query for ReservedField {
+    fn exists(&self, obj: &Value) -> bool {
+        let value = match obj.get_by_path(&self.buf) {
+            Some(v) => v,
+            _ => return false,
+        };
+
+        if self.name == "tags" {
+            return match value {
+                Value::Array(v) => v.iter().any(|v| v == obj),
+                _ => false,
+            };
+        }
+
+        true
+    }
+}
+
+#[derive(Clone)]
+struct TagField {
+    tag: String,
+    tag_with_suffix: String,
+    buf: LookupBuf,
+}
+
+impl TagField {
+    fn new(tag: String, buf: LookupBuf) -> Self {
+        let tag_with_suffix = format!("{}:", tag);
+
+        Self {
+            tag,
+            tag_with_suffix,
+            buf,
+        }
+    }
+}
+
+impl Query for TagField {
+    fn exists(&self, obj: &Value) -> bool {
+        let value = match obj.get_by_path(&self.buf) {
+            Some(v) => v,
+            _ => return false,
+        };
+
+        match value {
+            Value::Array(v) => v.iter().any(|v| {
+                let str_value = string_value(v);
+
+                // The tag matches using either 'key' or 'key:value' syntax.
+                str_value == self.tag || str_value.starts_with(&self.tag_with_suffix)
+            }),
+            _ => false,
+        }
+    }
+}
+
+impl Query for Vec<Box<dyn Query>> {
+    fn exists(&self, obj: &Value) -> bool {
+        self.iter().any(|query| query.exists(obj))
+    }
+}
+
+trait MatchRunner: DynClone + std::fmt::Debug {
+    fn run(&self, obj: &Value) -> bool;
+}
+
+dyn_clone::clone_trait_object!(MatchRunner);
+
+#[derive(Debug, Clone)]
+struct Container<T: Fn(&Value) -> bool + Send + Sync + Clone + std::fmt::Debug> {
+    func: T,
+}
+
+impl<T: Fn(&Value) -> bool + Send + Sync + Clone + std::fmt::Debug> MatchRunner for Container<T> {
+    fn run(&self, obj: &Value) -> bool {
+        (self.func)(obj)
+    }
+}
+
+/// Returns a vector of queryable fields based on the normalized field type.
+fn attr_to_queries<T: AsRef<str>>(attr: T) -> Vec<Box<dyn Query>> {
+    normalize_fields(attr)
+        .into_iter()
+        .filter_map(|field| {
+            lookup_field(&field).map(move |buf| match field {
+                Field::Default(name) => Box::new(DefaultField::new(name, buf)) as Box<dyn Query>,
+                Field::Reserved(name) => Box::new(ReservedField::new(name, buf)),
+                Field::Facet(name) => Box::new(FacetField::new(name, buf)),
+                Field::Tag(tag) => Box::new(TagField::new(tag, buf)),
+            })
+        })
+        .collect()
+}
+
+impl MatchRunner for bool {
+    fn run(&self, _obj: &Value) -> bool {
+        *self
+    }
+}
+
+fn build_matcher(node: &QueryNode) -> Box<dyn MatchRunner + Send + Sync> {
+    match node {
+        QueryNode::MatchNoDocs => Box::new(false),
+        QueryNode::MatchAllDocs => Box::new(true),
+        _ => unreachable!("todo"),
+    }
+}
+
 /// Match the parsed node against the provided VRL `Value`, per the query type.
 fn matches_vrl_object(node: &QueryNode, obj: &Value) -> bool {
     match node {
         QueryNode::MatchNoDocs => false,
         QueryNode::MatchAllDocs => true,
-        QueryNode::AttributeExists { attr } => exists(attr, obj),
+        QueryNode::AttributeExists { attr } => {
+            let queries = attr_to_queries(attr);
+            exists(attr, obj)
+        }
         QueryNode::AttributeMissing { attr } => !exists(attr, obj),
         QueryNode::AttributeTerm { attr, value }
         | QueryNode::QuotedAttribute {
@@ -281,11 +449,6 @@ fn match_compare<T: AsRef<str>>(
     })
 }
 
-#[cached(
-    type = "SizedCache<String, Regex>",
-    create = "{ SizedCache::with_size(10) }",
-    convert = r#"{ to_match.to_owned() }"#
-)]
 /// Returns compiled word boundary regex. Cached to avoid recompilation in hot paths.
 fn word_regex(to_match: &str) -> Regex {
     Regex::new(&format!(
@@ -295,11 +458,6 @@ fn word_regex(to_match: &str) -> Regex {
     .expect("invalid wildcard regex")
 }
 
-#[cached(
-    type = "SizedCache<String, Regex>",
-    create = "{ SizedCache::with_size(10) }",
-    convert = r#"{ to_match.to_owned() }"#
-)]
 /// Returns compiled wildcard regex. Cached to avoid recompilation in hot paths.
 fn wildcard_regex(to_match: &str) -> Regex {
     Regex::new(&format!(
