@@ -19,10 +19,10 @@ provider "kubernetes" {
 # Setup background monitoring details. These are needed by the soak control to
 # understand what vector et al's running behavior is.
 module "monitoring" {
-  source       = "../../../common/terraform/modules/monitoring"
+  source          = "../../../common/terraform/modules/monitoring"
   experiment_name = var.experiment_name
   variant         = var.type
-  vector_image = var.vector_image
+  vector_image    = var.vector_image
 }
 
 # Setup the soak pieces
@@ -45,9 +45,9 @@ module "vector" {
   depends_on   = [module.monitoring]
 }
 module "http-gen" {
-  source                    = "../../../common/terraform/modules/lading_http_gen"
-  type                      = var.type
-  http-gen-yaml             = file("${path.module}/http_gen.yaml")
+  source        = "../../../common/terraform/modules/lading_http_gen"
+  type          = var.type
+  http-gen-yaml = file("${path.module}/http_gen.yaml")
   # This is a hack. Ultimately this creates a configmap in the minikube, where
   # we would _prefer_ to simply mount a directory into the kube. This is not
   # possible, pending introductoin of

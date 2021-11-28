@@ -19,10 +19,10 @@ provider "kubernetes" {
 # Setup background monitoring details. These are needed by the soak control to
 # understand what vector et al's running behavior is.
 module "monitoring" {
-  source       = "../../../common/terraform/modules/monitoring"
+  source          = "../../../common/terraform/modules/monitoring"
   experiment_name = var.experiment_name
   variant         = var.type
-  vector_image = var.vector_image
+  vector_image    = var.vector_image
 }
 
 # Setup the soak pieces
