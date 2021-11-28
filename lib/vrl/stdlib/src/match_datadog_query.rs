@@ -672,12 +672,6 @@ mod test {
             tdef: type_def(),
         }
 
-        message_missing {
-            args: func_args![value: value!({"text": "test message"}), query: "_missing_:message"],
-            want: Ok(true),
-            tdef: type_def(),
-        }
-
         facet_exists {
             args: func_args![value: value!({"custom": {"a": "value" }}), query: "_exists_:@a"],
             want: Ok(true),
@@ -756,41 +750,41 @@ mod test {
         //     tdef: type_def(),
         // }
         //
-        // message_missing {
-        //     args: func_args![value: value!({}), query: "_missing_:message"],
-        //     want: Ok(true),
-        //     tdef: type_def(),
-        // }
-        //
-        // not_message_missing {
-        //     args: func_args![value: value!({}), query: "NOT _missing_:message"],
-        //     want: Ok(false),
-        //     tdef: type_def(),
-        // }
-        //
-        // negate_message_missing {
-        //     args: func_args![value: value!({}), query: "-_missing_:message"],
-        //     want: Ok(false),
-        //     tdef: type_def(),
-        // }
-        //
-        // facet_missing {
-        //     args: func_args![value: value!({"custom": {"b": "value" }}), query: "_missing_:@a"],
-        //     want: Ok(true),
-        //     tdef: type_def(),
-        // }
-        //
-        // not_facet_missing {
-        //     args: func_args![value: value!({"custom": {"b": "value" }}), query: "NOT _missing_:@a"],
-        //     want: Ok(false),
-        //     tdef: type_def(),
-        // }
-        //
-        // negate_facet_missing {
-        //     args: func_args![value: value!({"custom": {"b": "value" }}), query: "-_missing_:@a"],
-        //     want: Ok(false),
-        //     tdef: type_def(),
-        // }
+        message_missing {
+            args: func_args![value: value!({}), query: "_missing_:message"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_message_missing {
+            args: func_args![value: value!({}), query: "NOT _missing_:message"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_message_missing {
+            args: func_args![value: value!({}), query: "-_missing_:message"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        facet_missing {
+            args: func_args![value: value!({"custom": {"b": "value" }}), query: "_missing_:@a"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_facet_missing {
+            args: func_args![value: value!({"custom": {"b": "value" }}), query: "NOT _missing_:@a"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_facet_missing {
+            args: func_args![value: value!({"custom": {"b": "value" }}), query: "-_missing_:@a"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
         //
         // tag_bare_missing {
         //     args: func_args![value: value!({"tags": ["b","c"]}), query: "_missing_:a"],
