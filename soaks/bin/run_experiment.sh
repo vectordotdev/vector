@@ -82,7 +82,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-TOTAL_SAMPLES=120
+TOTAL_SAMPLES=180
 SOAK_CAPTURE_DIR="${CAPTURE_DIR}/${SOAK_NAME}"
 
 pushd "${__dir}"

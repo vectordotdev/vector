@@ -37,7 +37,7 @@ module "vector" {
   vector-toml  = file("${path.module}/vector.toml")
   namespace    = kubernetes_namespace.soak.metadata[0].name
   vector_cpus  = var.vector_cpus
-  depends_on   = [module.monitoring, module.http-blackhole]
+  depends_on   = [module.http-blackhole]
 }
 module "http-blackhole" {
   source              = "../../../common/terraform/modules/lading_http_blackhole"
@@ -45,7 +45,6 @@ module "http-blackhole" {
   http-blackhole-yaml = file("${path.module}/../../../common/configs/http_blackhole.yaml")
   namespace           = kubernetes_namespace.soak.metadata[0].name
   lading_image        = var.lading_image
-  depends_on          = [module.monitoring]
 }
 module "tcp-gen" {
   source       = "../../../common/terraform/modules/lading_tcp_gen"
@@ -53,5 +52,5 @@ module "tcp-gen" {
   tcp-gen-yaml = file("${path.module}/../../../common/configs/tcp_gen_syslog_source.yaml")
   namespace    = kubernetes_namespace.soak.metadata[0].name
   lading_image = var.lading_image
-  depends_on   = [module.monitoring, module.vector]
+  depends_on   = [module.vector]
 }

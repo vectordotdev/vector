@@ -27,7 +27,7 @@ USE_LOCAL_IMAGE="true"
 SOAK_CPUS="7"
 SOAK_MEMORY="8g"
 VECTOR_CPUS="4"
-WARMUP_SECONDS="30"
+WARMUP_SECONDS="60"
 
 while [[ $# -gt 0 ]]; do
   key="$1"
@@ -113,6 +113,6 @@ echo "Captures will be recorded into ${capture_dir}"
                          --comparison-sha "${COMPARISON}" \
                          --vector-cpus "${VECTOR_CPUS}" \
                          --warmup-seconds "${WARMUP_SECONDS}" \
-                         --p-value 0.05 # 5% confidence
+                         --p-value 0.05 # 95% confidence
 
 popd

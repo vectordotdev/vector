@@ -42,7 +42,6 @@ module "vector" {
   vector-toml  = file("${path.module}/vector.toml")
   namespace    = kubernetes_namespace.soak.metadata[0].name
   vector_cpus  = var.vector_cpus
-  depends_on   = [module.monitoring]
 }
 module "http-gen" {
   source        = "../../../common/terraform/modules/lading_http_gen"
@@ -57,5 +56,5 @@ module "http-gen" {
   http-gen-static-bootstrap = file("${path.module}/data/http_gen_bootstrap.log")
   namespace                 = kubernetes_namespace.soak.metadata[0].name
   lading_image              = var.lading_image
-  depends_on                = [module.monitoring, module.vector]
+  depends_on                = [module.vector]
 }

@@ -7,7 +7,7 @@ import glob
 import os
 
 def human_bytes(b):
-    if b < 1:
+    if (b < 1 and b >= 0) or (b > -1 and b <= 0):
         return "0B"
     names = ("B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB")
     i = int(math.floor(math.log(b, 1024)))
@@ -47,6 +47,8 @@ print("consistency in behavior, making predictions of fitness in the field")
 print("challenging.")
 print("")
 
+adjust_per_cpu = lambda b: b/args.vector_cpus
+
 ttest_results = []
 for exp in csv.experiment.unique():
     experiment = csv[csv['experiment'] == exp]
@@ -69,7 +71,7 @@ print("")
 p_value_violation = ttest_results['p-value'] < args.p_value
 summary_mean_diff = ttest_results[p_value_violation]
 summary_mean_diff = summary_mean_diff.drop(labels=['p-value', 't-statistic'], axis=1)
-summary_mean_diff['Δ mean'] = summary_mean_diff['Δ mean'].apply(human_bytes)
+summary_mean_diff['Δ mean'] = summary_mean_diff['Δ mean'].apply(adjust_per_cpu).apply(human_bytes)
 print(summary_mean_diff.to_markdown(index=False, tablefmt='github'))
 
 print("")
@@ -77,6 +79,7 @@ print("<details>")
 print("<summary>Fine details of change detection per experiment.</summary>")
 print("### Details")
 print("")
+ttest_results['Δ mean'] = ttest_results['Δ mean'].apply(adjust_per_cpu).apply(human_bytes)
 print(ttest_results.to_markdown(index=False, tablefmt='github'))
 print("")
 print("</details>")
@@ -89,14 +92,14 @@ print("")
 describe = csv.groupby(['experiment', 'variant'])['value'].describe(percentiles=[0.90, 0.95, 0.99])
 describe = describe.rename(columns={'50%': 'average', '95%': 'p95', '90%': 'p90', '99%': 'p99'})
 describe['skewness'] = csv.groupby(['experiment', 'variant'])['value'].skew()
-describe['mean'] = describe['mean'].apply(human_bytes)
-describe['std'] = describe['std'].apply(human_bytes)
-describe['min'] = describe['min'].apply(human_bytes)
-describe['average'] = describe['average'].apply(human_bytes)
-describe['p90'] = describe['p90'].apply(human_bytes)
-describe['p95'] = describe['p95'].apply(human_bytes)
-describe['p99'] = describe['p99'].apply(human_bytes)
-describe['max'] = describe['max'].apply(human_bytes)
+describe['mean'] = describe['mean'].apply(adjust_per_cpu).apply(human_bytes)
+describe['std'] = describe['std'].apply(adjust_per_cpu).apply(human_bytes)
+describe['min'] = describe['min'].apply(adjust_per_cpu).apply(human_bytes)
+describe['average'] = describe['average'].apply(adjust_per_cpu).apply(human_bytes)
+describe['p90'] = describe['p90'].apply(adjust_per_cpu).apply(human_bytes)
+describe['p95'] = describe['p95'].apply(adjust_per_cpu).apply(human_bytes)
+describe['p99'] = describe['p99'].apply(adjust_per_cpu).apply(human_bytes)
+describe['max'] = describe['max'].apply(adjust_per_cpu).apply(human_bytes)
 print(describe.to_markdown(index=True,
                            tablefmt='github',
                            headers=['(experiment, variant)', 'total samples',
