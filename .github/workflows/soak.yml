@@ -302,7 +302,7 @@ jobs:
         run: ls -R
         working-directory: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
 
-      - name: Create aggregate captures
+      - name: Coerce captures into directory structure
         run: |
           # convert the individual artifacts into a folder for each
           # soak test (containing both comparison/baseline files)
@@ -325,25 +325,18 @@ jobs:
           	  rm -rf $dir
           	fi
           done
-          find . -name '*.captures' -exec awk 'FNR==1 && NR!=1{next;}{print}' {} + | sed '/^$/d' > aggregate.captures
           popd
-
-      - name: Upload aggregate captures
-        uses: actions/upload-artifact@v1
-        with:
-          name: ${{ github.event.number }}-${{ github.run_attempt }}-${{ matrix.target }}-aggregate.captures
-          path: ${{ github.event.number }}-${{ github.run_attempt }}-captures/aggregate.captures
 
       - name: Analyze captures
         run: |
           # convert the individual artifacts into a folder for each
           # soak test (containing both comparison/baseline files)
-          ./soaks/bin/analyze_experiment.sh --capture ${{ github.event.number }}-${{ github.run_attempt }}-captures/aggregate.captures \
-                                            --baseline-sha ${{ needs.compute-soak-meta.outputs.baseline-sha }} \
-                                            --comparison-sha ${{ needs.compute-soak-meta.outputs.comparison-sha }} \
-                                            --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                            --warmup-seconds 30 \
-                                            --p-value 0.05 > /tmp/${{ github.event.number}}-${{ github.run_attempt }}-analysis
+          ./soaks/bin/analyze_experiment --capture-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures/ \
+                                         --baseline-sha ${{ needs.compute-soak-meta.outputs.baseline-sha }} \
+                                         --comparison-sha ${{ needs.compute-soak-meta.outputs.comparison-sha }} \
+                                         --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
+                                         --warmup-seconds 30 \
+                                         --p-value 0.05 > /tmp/${{ github.event.number}}-${{ github.run_attempt }}-analysis
 
       - name: Read analysis file
         id: read-analysis

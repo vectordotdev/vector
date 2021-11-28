@@ -108,9 +108,7 @@ echo "Captures will be recorded into ${capture_dir}"
                   --warmup-seconds "${WARMUP_SECONDS}"
 
 # Aggregate all captures and analyze them.
-find "${capture_dir}" -name '*.captures' -exec awk 'FNR==1 && NR!=1{next;}{print}' {} + | \
-    sed '/^$/d' > "${capture_dir}/aggregate.captures"
-./bin/analyze_experiment --capture "${capture_dir}/aggregate.captures" \
+./bin/analyze_experiment --capture-dir "${capture_dir}" \
                          --baseline-sha "${BASELINE}" \
                          --comparison-sha "${COMPARISON}" \
                          --vector-cpus "${VECTOR_CPUS}" \

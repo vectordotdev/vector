@@ -3,6 +3,8 @@ import pandas as pd
 import scipy.stats
 import argparse
 import math
+import glob
+import os
 
 def human_bytes(b):
     if b < 1:
@@ -15,7 +17,7 @@ def human_bytes(b):
 
 
 parser = argparse.ArgumentParser(description='t-test experiments with Welch method')
-parser.add_argument('--captures', type=str, help='the captures csv to analyze')
+parser.add_argument('--capture-dir', type=str, help='the directory to search for capture csv files')
 parser.add_argument('--warmup-seconds', type=int, help='the number of seconds to treat as warmup')
 parser.add_argument('--baseline-sha', type=str, help='the sha of the baseline experiment')
 parser.add_argument('--comparison-sha', type=str, help='the sha of the comparison experiment')
@@ -23,7 +25,12 @@ parser.add_argument('--vector-cpus', type=int, help='the total number of CPUs gi
 parser.add_argument('--p-value', type=float, default=0.05, help='the p-value for comparing with t-test results, the smaller the more certain')
 args = parser.parse_args()
 
-csv = pd.read_csv(args.captures)
+capture_paths = glob.glob(os.path.join(args.capture_dir, "*.captures"))
+captures = []
+for f in capture_paths:
+    captures.append(pd.read_csv(f))
+csv = pd.concat(captures)
+
 fetch_index_past_warmup = csv['fetch_index'] > args.warmup_seconds
 csv = csv[fetch_index_past_warmup]
 csv['value'] = csv['value'].div(args.vector_cpus)
