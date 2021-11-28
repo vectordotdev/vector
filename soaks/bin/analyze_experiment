@@ -25,7 +25,8 @@ parser.add_argument('--vector-cpus', type=int, help='the total number of CPUs gi
 parser.add_argument('--p-value', type=float, default=0.05, help='the p-value for comparing with t-test results, the smaller the more certain')
 args = parser.parse_args()
 
-capture_paths = glob.glob(os.path.join(args.capture_dir, "*.captures"))
+capture_paths = glob.glob(os.path.join(args.capture_dir, "**/*.captures"))
+print(capture_paths)
 captures = []
 for f in capture_paths:
     captures.append(pd.read_csv(f))
