@@ -5,9 +5,7 @@ use reqwest::Url;
 use serde::Deserialize;
 use snafu::Snafu;
 use std::time::Duration;
-use std::{borrow::Cow, io::Read};
-use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
+use std::{borrow::Cow, fs, io::Read};
 use tokio::runtime::Builder;
 use tokio::time::sleep;
 use tracing::{debug, error, info};
@@ -61,6 +59,8 @@ enum Error {
     ParseFloat { error: std::num::ParseFloatError },
     #[snafu(display("Could not serialize output: {}", error))]
     Json { error: serde_json::Error },
+    // #[snafu(display("Could not serialize output: {}", error))]
+    // Csv { error: Csv::Error },
 }
 
 impl From<reqwest::Error> for Error {
@@ -68,6 +68,12 @@ impl From<reqwest::Error> for Error {
         Self::Reqwest { error }
     }
 }
+
+// impl From<csv::Error> for Error {
+//     fn from(error: csv::Error) -> Self {
+//         Self::Csv { error }
+//     }
+// }
 
 impl From<http::uri::InvalidUri> for Error {
     fn from(error: http::uri::InvalidUri) -> Self {
@@ -156,7 +162,8 @@ impl Worker {
     async fn run(self) -> Result<(), Error> {
         let client: reqwest::Client = reqwest::Client::new();
 
-        let mut file = File::create(self.capture_path).await?;
+        let file = fs::File::create(self.capture_path)?;
+        let mut wtr = csv::Writer::from_writer(file);
         for fetch_index in 0..u64::max_value() {
             for (query, url) in &self.queries {
                 let request = client.get(url.clone()).build()?;
@@ -170,7 +177,7 @@ impl Worker {
                 if !body.data.result.is_empty() {
                     let time = body.data.result[0].value.time;
                     let value = body.data.result[0].value.value.parse::<f64>()?;
-                    let output = serde_json::to_string(&soak::Output {
+                    let output = soak::Output {
                         experiment: Cow::Borrowed(&self.experiment_name),
                         variant: self.variant,
                         vector_id: Cow::Borrowed(&self.vector_id),
@@ -180,11 +187,13 @@ impl Worker {
                         value,
                         unit: query.unit,
                         fetch_index,
-                    })?;
-                    info!("{}", output);
-                    file.write_all(output.as_bytes()).await?;
-                    file.write_all(b"\n").await?;
-                    file.flush().await?;
+                    };
+                    // info!("{}", output);
+                    wtr.serialize(&output).expect("could not serialize");
+                    wtr.flush()?;
+                    // file.write_all(output.as_bytes()).await?;
+                    // file.write_all(b"\n").await?;
+                    // file.flush().await?;
                 } else {
                     error!("failed to request body: {:?}", body.data);
                 }
