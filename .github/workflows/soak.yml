@@ -31,6 +31,22 @@ jobs:
           access_token: ${{ secrets.GITHUB_TOKEN }}
           all_but_latest: true # can cancel workflows scheduled later
 
+  test-python-deps-install:
+    name: Test Python Deps Install
+    if: ${{ github.actor != 'dependabot[bot]' }}
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Set up Python3
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install scipy pandas tabulate
+
   compute-test-plan:
     name: Compute soak test plan
     runs-on: ubuntu-20.04
@@ -287,8 +303,15 @@ jobs:
     needs: [compute-soak-meta, soak-baseline, soak-comparison]
 
     steps:
+      - name: Set up Python3
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
       - name: Install dependencies
-        run: sudo apt-get install -y python3-scipy python3-pandas python3-tabulate
+        run: |
+          python -m pip install --upgrade pip
+          pip install scipy pandas tabulate
 
       - name: Check out the repo
         uses: actions/checkout@v2.4.0
