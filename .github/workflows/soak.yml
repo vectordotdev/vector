@@ -302,11 +302,10 @@ jobs:
         run: ls -R
         working-directory: ${{ github.event.number }}-${{ github.run_attempt }}-captures/
 
-      - name: Analyze captures
+      - name: Create aggregate captures
         run: |
           # convert the individual artifacts into a folder for each
           # soak test (containing both comparison/baseline files)
-
           pushd ${{ github.event.number }}-${{ github.run_attempt }}-captures
           prefix="./${{ github.event.number }}-${{ github.run_attempt }}-"
           echo "Prefix: $prefix"
@@ -326,9 +325,19 @@ jobs:
           	  rm -rf $dir
           	fi
           done
+          find . -name '*.captures' -exec awk 'FNR==1 && NR!=1{next;}{print}' {} + | sed '/^$/d' > aggregate.captures
           popd
-          find "${{ github.event.number }}-${{ github.run_attempt }}-captures" -name '*.captures' -exec awk 'FNR==1 && NR!=1{next;}{print}' {} + | \
-              sed '/^$/d' > "${{ github.event.number }}-${{ github.run_attempt }}-captures/aggregate.captures"
+
+      - name: Upload aggregate captures
+        uses: actions/upload-artifact@v1
+        with:
+          name: ${{ github.event.number }}-${{ github.run_attempt }}-${{ matrix.target }}-aggregate.captures
+          path: ${{ github.event.number }}-${{ github.run_attempt }}-captures/aggregate.captures
+
+      - name: Analyze captures
+        run: |
+          # convert the individual artifacts into a folder for each
+          # soak test (containing both comparison/baseline files)
           ./soaks/bin/analyze_experiment.sh --capture ${{ github.event.number }}-${{ github.run_attempt }}-captures/aggregate.captures \
                                             --baseline-sha ${{ needs.compute-soak-meta.outputs.baseline-sha }} \
                                             --comparison-sha ${{ needs.compute-soak-meta.outputs.comparison-sha }} \
