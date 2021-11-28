@@ -282,6 +282,24 @@ fn build_matcher(node: &QueryNode) -> Box<dyn MatchRunner + Send + Sync> {
                 func: move |obj| queries.iter().all(|q| !q.exists(obj)),
             })
         }
+        QueryNode::NegatedNode { node } => {
+            let func = build_matcher(node);
+            Box::new(Container {
+                func: move |obj| !func.run(obj),
+            })
+        }
+        QueryNode::Boolean { oper, nodes } => {
+            let funcs = nodes.iter().map(build_matcher).collect::<Vec<_>>();
+
+            match oper {
+                BooleanType::And => Box::new(Container {
+                    func: move |obj| funcs.iter().all(|func| func.run(obj)),
+                }),
+                BooleanType::Or => Box::new(Container {
+                    func: move |obj| funcs.iter().any(|func| func.run(obj)),
+                }),
+            }
+        }
         _ => unreachable!("todo"),
     }
 }
@@ -642,17 +660,17 @@ mod test {
             tdef: type_def(),
         }
 
-        // not_message_exists {
-        //     args: func_args![value: value!({"message": "test message"}), query: "NOT _exists_:message"],
-        //     want: Ok(false),
-        //     tdef: type_def(),
-        // }
-        //
-        // negate_message_exists {
-        //     args: func_args![value: value!({"message": "test message"}), query: "-_exists_:message"],
-        //     want: Ok(false),
-        //     tdef: type_def(),
-        // }
+        not_message_exists {
+            args: func_args![value: value!({"message": "test message"}), query: "NOT _exists_:message"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_message_exists {
+            args: func_args![value: value!({"message": "test message"}), query: "-_exists_:message"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
 
         message_missing {
             args: func_args![value: value!({"text": "test message"}), query: "_missing_:message"],
@@ -666,17 +684,17 @@ mod test {
             tdef: type_def(),
         }
 
-        // not_facet_exists {
-        //     args: func_args![value: value!({"custom": {"a": "value" }}), query: "NOT _exists_:@a"],
-        //     want: Ok(false),
-        //     tdef: type_def(),
-        // }
-        //
-        // negate_facet_exists {
-        //     args: func_args![value: value!({"custom": {"a": "value" }}), query: "-_exists_:@a"],
-        //     want: Ok(false),
-        //     tdef: type_def(),
-        // }
+        not_facet_exists {
+            args: func_args![value: value!({"custom": {"a": "value" }}), query: "NOT _exists_:@a"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_facet_exists {
+            args: func_args![value: value!({"custom": {"a": "value" }}), query: "-_exists_:@a"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
         //
         // tag_bare {
         //     args: func_args![value: value!({"tags": ["a","b","c"]}), query: "tags:a"],
