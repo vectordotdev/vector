@@ -59,8 +59,6 @@ enum Error {
     ParseFloat { error: std::num::ParseFloatError },
     #[snafu(display("Could not serialize output: {}", error))]
     Json { error: serde_json::Error },
-    // #[snafu(display("Could not serialize output: {}", error))]
-    // Csv { error: Csv::Error },
 }
 
 impl From<reqwest::Error> for Error {
@@ -68,12 +66,6 @@ impl From<reqwest::Error> for Error {
         Self::Reqwest { error }
     }
 }
-
-// impl From<csv::Error> for Error {
-//     fn from(error: csv::Error) -> Self {
-//         Self::Csv { error }
-//     }
-// }
 
 impl From<http::uri::InvalidUri> for Error {
     fn from(error: http::uri::InvalidUri) -> Self {
@@ -188,12 +180,9 @@ impl Worker {
                         unit: query.unit,
                         fetch_index,
                     };
-                    // info!("{}", output);
+                    info!("{}", serde_json::to_string(&output)?);
                     wtr.serialize(&output).expect("could not serialize");
                     wtr.flush()?;
-                    // file.write_all(output.as_bytes()).await?;
-                    // file.write_all(b"\n").await?;
-                    // file.flush().await?;
                 } else {
                     error!("failed to request body: {:?}", body.data);
                 }
