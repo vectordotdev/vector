@@ -390,7 +390,10 @@ mod tests {
 
     #[test]
     fn load_namespacing_folder() {
-        let path = PathBuf::from("./tests/namespacing");
+        let path = PathBuf::from(".")
+            .join("tests")
+            .join("namespacing")
+            .join("success");
         let configs = vec![ConfigPath::Dir(path)];
         let (builder, warnings) = load_builder_from_paths(&configs).unwrap();
         assert!(warnings.is_empty());
@@ -423,7 +426,10 @@ mod tests {
 
     #[test]
     fn load_namespacing_ignore_invalid() {
-        let path = PathBuf::from(".").join("tests").join("namespacing-fail");
+        let path = PathBuf::from(".")
+            .join("tests")
+            .join("namespacing")
+            .join("fail");
         let configs = vec![ConfigPath::Dir(path)];
         let (_, warns) = load_builder_from_paths(&configs).unwrap();
         assert!(warns.is_empty());
