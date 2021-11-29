@@ -42,6 +42,7 @@ impl RequestBuilder<Vec<HecProcessedEvent>> for HecMetricsRequestBuilder {
             finalizers,
             events_count,
             events_byte_size,
+            passthrough_token: None,
         }
     }
 }
