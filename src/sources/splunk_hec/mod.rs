@@ -411,9 +411,11 @@ impl SplunkSource {
                 let valid_credentials = valid_credentials.clone();
                 async move {
                     match (token, valid_credentials.is_empty()) {
-                        (token, true) => Ok(token),
+                        // Remove the "Splunk " prefix if present as it is not
+                        // part of the token itself
+                        (token, true) => Ok(token.map(|t| t.replacen("Splunk ", "", 1))),
                         (Some(token), false) if valid_credentials.contains(&token) => {
-                            Ok(Some(token))
+                            Ok(Some(token.replacen("Splunk ", "", 1)))
                         }
                         (Some(_), false) => Err(Rejection::from(ApiError::InvalidAuthorization)),
                         (None, false) => Err(Rejection::from(ApiError::MissingAuthorization)),
@@ -986,13 +988,14 @@ mod tests {
     async fn source(
         acknowledgements: Option<HecAcknowledgementsConfig>,
     ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
-        source_with(Some(TOKEN.to_owned()), None, acknowledgements).await
+        source_with(Some(TOKEN.to_owned()), None, acknowledgements, false).await
     }
 
     async fn source_with(
         token: Option<String>,
         valid_tokens: Option<&[&str]>,
         acknowledgements: Option<HecAcknowledgementsConfig>,
+        store_hec_token: bool,
     ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
         components::init_test();
         let (sender, recv) = Pipeline::new_test_finalize(EventStatus::Delivered);
@@ -1007,6 +1010,7 @@ mod tests {
                 valid_tokens,
                 tls: None,
                 acknowledgements: acknowledgements.unwrap_or_default(),
+                store_hec_token,
             }
             .build(cx)
             .await
@@ -1158,6 +1162,7 @@ mod tests {
             event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
         );
+        assert!(event.metadata().splunk_hec_token().is_none());
     }
 
     #[tokio::test]
@@ -1173,6 +1178,7 @@ mod tests {
             event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
         );
+        assert!(event.metadata().splunk_hec_token().is_none());
     }
 
     #[tokio::test]
@@ -1192,6 +1198,7 @@ mod tests {
                 event.as_log()[log_schema().source_type_key()],
                 "splunk_hec".into()
             );
+            assert!(event.metadata().splunk_hec_token().is_none());
         }
     }
 
@@ -1208,6 +1215,7 @@ mod tests {
             event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
         );
+        assert!(event.metadata().splunk_hec_token().is_none());
     }
 
     #[tokio::test]
@@ -1227,6 +1235,7 @@ mod tests {
                 event.as_log()[log_schema().source_type_key()],
                 "splunk_hec".into()
             );
+            assert!(event.metadata().splunk_hec_token().is_none());
         }
     }
 
@@ -1247,6 +1256,7 @@ mod tests {
             event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
         );
+        assert!(event.metadata().splunk_hec_token().is_none());
     }
 
     #[tokio::test]
@@ -1259,6 +1269,7 @@ mod tests {
 
         let event = collect_n(source, 1).await.remove(0);
         assert_eq!(event.as_log()[log_schema().message_key()], "hello".into());
+        assert!(event.metadata().splunk_hec_token().is_none());
     }
 
     #[tokio::test]
@@ -1277,6 +1288,7 @@ mod tests {
             event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
         );
+        assert!(event.metadata().splunk_hec_token().is_none());
     }
 
     #[tokio::test]
@@ -1405,7 +1417,7 @@ mod tests {
     #[tokio::test]
     async fn secondary_token() {
         let message = r#"{"event":"first", "color": "blue"}"#;
-        let (_source, address) = source_with(None, Some(VALID_TOKENS), None).await;
+        let (_source, address) = source_with(None, Some(VALID_TOKENS), None, false).await;
         let options = SendWithOpts {
             channel: None,
             forwarded_for: None,
@@ -1426,9 +1438,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn no_authorization() {
-        let message = "no_authorization";
-        let (source, address) = source_with(None, None, None).await;
+    async fn event_service_token_passthrough_enabled() {
+        let message = "passthrough_token_enabled";
+        let (source, address) = source_with(None, Some(VALID_TOKENS), None, true).await;
         let (sink, health) = sink(address, HecLogsEncoder::Text, Compression::gzip_default()).await;
         assert!(health.await.is_ok());
 
@@ -1436,6 +1448,63 @@ mod tests {
 
         SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
         assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+        assert_eq!(
+            &event.metadata().splunk_hec_token().as_ref().unwrap()[..],
+            TOKEN
+        );
+    }
+
+    #[tokio::test]
+    async fn raw_service_token_passthrough_enabled() {
+        let message = "raw";
+        let (source, address) = source_with(None, Some(VALID_TOKENS), None, true).await;
+
+        assert_eq!(200, post(address, "services/collector/raw", message).await);
+
+        let event = collect_n(source, 1).await.remove(0);
+        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
+        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+        assert_eq!(event.as_log()[&super::CHANNEL], "channel".into());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
+        assert_eq!(
+            event.as_log()[log_schema().source_type_key()],
+            "splunk_hec".into()
+        );
+        assert_eq!(
+            &event.metadata().splunk_hec_token().as_ref().unwrap()[..],
+            TOKEN
+        );
+    }
+
+    #[tokio::test]
+    async fn no_authorization() {
+        let message = "no_authorization";
+        let (source, address) = source_with(None, None, None, false).await;
+        let (sink, health) = sink(address, HecLogsEncoder::Text, Compression::gzip_default()).await;
+        assert!(health.await.is_ok());
+
+        let event = channel_n(vec![message], sink, source).await.remove(0);
+
+        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
+        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+        assert!(event.metadata().splunk_hec_token().is_none())
+    }
+
+    #[tokio::test]
+    async fn no_authorization_token_passthrough_enabled() {
+        let message = "no_authorization";
+        let (source, address) = source_with(None, None, None, true).await;
+        let (sink, health) = sink(address, HecLogsEncoder::Text, Compression::gzip_default()).await;
+        assert!(health.await.is_ok());
+
+        let event = channel_n(vec![message], sink, source).await.remove(0);
+
+        SOURCE_TESTS.assert(&HTTP_PUSH_SOURCE_TAGS);
+        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+        assert_eq!(
+            &event.metadata().splunk_hec_token().as_ref().unwrap()[..],
+            TOKEN
+        );
     }
 
     #[tokio::test]
