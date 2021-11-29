@@ -237,6 +237,96 @@ fn build_equals(field: Field, to_match: String) -> Box<dyn MatchRunner> {
     }
 }
 
+fn build_compare(
+    field: Field,
+    comparator: Comparison,
+    comparison_value: ComparisonValue,
+) -> Box<dyn MatchRunner> {
+    let rhs = Cow::from(comparison_value.to_string());
+
+    match field {
+        // Facets are compared numerically if the value is numeric, or as strings otherwise.
+        Field::Facet(_) => {
+            Box::new(Func {
+                func: move |value| match (value, &comparison_value) {
+                    // Integers.
+                    (Value::Integer(lhs), ComparisonValue::Integer(rhs)) => match comparator {
+                        Comparison::Lt => *lhs < *rhs,
+                        Comparison::Lte => *lhs <= *rhs,
+                        Comparison::Gt => *lhs > *rhs,
+                        Comparison::Gte => *lhs >= *rhs,
+                    },
+                    // Floats.
+                    (Value::Float(lhs), ComparisonValue::Float(rhs)) => {
+                        let lhs = lhs.into_inner();
+                        match comparator {
+                            Comparison::Lt => lhs < *rhs,
+                            Comparison::Lte => lhs <= *rhs,
+                            Comparison::Gt => lhs > *rhs,
+                            Comparison::Gte => lhs >= *rhs,
+                        }
+                    }
+                    // Where the rhs is a string ref, the lhs is coerced into a string.
+                    (_, ComparisonValue::String(rhs)) => {
+                        let lhs = string_value(value);
+                        let rhs = Cow::from(rhs);
+
+                        match comparator {
+                            Comparison::Lt => lhs < rhs,
+                            Comparison::Lte => lhs <= rhs,
+                            Comparison::Gt => lhs > rhs,
+                            Comparison::Gte => lhs >= rhs,
+                        }
+                    }
+                    // Otherwise, compare directly as strings.
+                    _ => {
+                        let lhs = string_value(value);
+
+                        match comparator {
+                            Comparison::Lt => lhs < rhs,
+                            Comparison::Lte => lhs <= rhs,
+                            Comparison::Gt => lhs > rhs,
+                            Comparison::Gte => lhs >= rhs,
+                        }
+                    }
+                },
+            })
+        }
+        // Tag values need extracting by "key:value" to be compared.
+        Field::Tag(_) => Box::new(Func {
+            func: move |value| match value {
+                Value::Array(v) => v.iter().any(|v| match string_value(v).split_once(":") {
+                    Some((_, lhs)) => {
+                        let lhs = Cow::from(lhs);
+
+                        match comparator {
+                            Comparison::Lt => lhs < rhs,
+                            Comparison::Lte => lhs <= rhs,
+                            Comparison::Gt => lhs > rhs,
+                            Comparison::Gte => lhs >= rhs,
+                        }
+                    }
+                    _ => false,
+                }),
+                _ => false,
+            },
+        }),
+        // All other tag types are compared by string.
+        _ => Box::new(Func {
+            func: move |value| {
+                let lhs = string_value(value);
+
+                match comparator {
+                    Comparison::Lt => lhs < rhs,
+                    Comparison::Lte => lhs <= rhs,
+                    Comparison::Gt => lhs > rhs,
+                    Comparison::Gte => lhs >= rhs,
+                }
+            },
+        }),
+    }
+}
+
 fn any(queries: Vec<Box<dyn MatchRunner>>) -> Box<dyn MatchRunner> {
     let func = move |obj: &Value| queries.iter().any(|func| func.run(obj));
     Func::boxed(func)
@@ -275,6 +365,20 @@ fn build_matcher(node: &QueryNode) -> Box<dyn MatchRunner> {
             let queries = attr_to_lookup_fields(attr)
                 .into_iter()
                 .map(|(field, buf)| resolve_value(buf, build_equals(field, value.clone())))
+                .collect::<Vec<_>>();
+
+            any(queries)
+        }
+        QueryNode::AttributeComparison {
+            attr,
+            comparator,
+            value,
+        } => {
+            let queries = attr_to_lookup_fields(attr)
+                .into_iter()
+                .map(|(field, buf)| {
+                    resolve_value(buf, build_compare(field, *comparator, value.clone()))
+                })
                 .collect::<Vec<_>>();
 
             any(queries)
