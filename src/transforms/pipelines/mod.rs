@@ -82,6 +82,13 @@ pub struct PipelineConfig {
     transforms: Vec<Box<dyn TransformConfig>>,
 }
 
+#[cfg(test)]
+impl PipelineConfig {
+    pub fn transforms(&self) -> &Vec<Box<dyn TransformConfig>> {
+        &self.transforms
+    }
+}
+
 impl Clone for PipelineConfig {
     fn clone(&self) -> Self {
         // This is a hack around the issue of cloning
@@ -122,6 +129,17 @@ pub struct EventTypeConfig {
     #[serde(default)]
     order: Option<Vec<String>>,
     pipelines: IndexMap<String, PipelineConfig>,
+}
+
+#[cfg(test)]
+impl EventTypeConfig {
+    pub fn order(&self) -> &Option<Vec<String>> {
+        &self.order
+    }
+
+    pub fn pipelines(&self) -> &IndexMap<String, PipelineConfig> {
+        &self.pipelines
+    }
 }
 
 impl EventTypeConfig {
@@ -165,6 +183,17 @@ pub struct PipelinesConfig {
     logs: EventTypeConfig,
     #[serde(default)]
     metrics: EventTypeConfig,
+}
+
+#[cfg(test)]
+impl PipelinesConfig {
+    pub fn logs(&self) -> &EventTypeConfig {
+        &self.logs
+    }
+
+    pub fn metrics(&self) -> &EventTypeConfig {
+        &self.metrics
+    }
 }
 
 impl PipelinesConfig {

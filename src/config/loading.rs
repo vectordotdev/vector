@@ -385,6 +385,7 @@ where
 mod tests {
     use super::load_builder_from_paths;
     use crate::config::{ComponentKey, ConfigPath};
+    use crate::transforms::pipelines::PipelinesConfig;
     use std::path::PathBuf;
 
     #[test]
@@ -397,12 +398,27 @@ mod tests {
             .transforms
             .contains_key(&ComponentKey::from("apache_parser")));
         assert!(builder
+            .transforms
+            .contains_key(&ComponentKey::from("processing")));
+        assert!(builder
             .sources
             .contains_key(&ComponentKey::from("apache_logs")));
         assert!(builder
             .sinks
             .contains_key(&ComponentKey::from("es_cluster")));
         assert_eq!(builder.tests.len(), 2);
+        let processing = builder
+            .transforms
+            .get(&ComponentKey::from("processing"))
+            .unwrap();
+        let output = serde_json::to_string_pretty(&processing.inner).unwrap();
+        let processing: PipelinesConfig = serde_json::from_str(&output).unwrap();
+        assert!(processing.logs().order().is_some());
+        assert!(processing.metrics().order().is_none());
+        assert!(processing.metrics().pipelines().is_empty());
+        let logs = processing.logs().pipelines();
+        let first = logs.get("first").unwrap();
+        assert_eq!(first.transforms().len(), 2);
     }
 
     #[test]
