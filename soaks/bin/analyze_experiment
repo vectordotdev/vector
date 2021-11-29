@@ -7,12 +7,18 @@ import glob
 import os
 
 def human_bytes(b):
-    if (b < 1 and b >= 0) or (b > -1 and b <= 0):
+    is_negative = False
+    if b < 0:
+        is_negative = True
+        b = -b
+    if b < 1 and b >= 0:
         return "0B"
     names = ("B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB")
     i = int(math.floor(math.log(b, 1024)))
     p = math.pow(1024, i)
     s = round(b / p, 2)
+    if is_negative:
+        s = -s
     return "%s %s" % (s, names[i])
 
 
@@ -55,22 +61,34 @@ for exp in csv.experiment.unique():
 
     baseline = experiment[experiment['variant'] == 'baseline']
     comparison = experiment[experiment['variant'] == 'comparison']
-    diff =  comparison['value'].mean() - baseline['value'].mean()
+    baseline_mean = baseline['value'].mean()
+    baseline_stdev = baseline['value'].std()
+    comparison_mean = comparison['value'].mean()
+    comparison_stdev = comparison['value'].std()
+    diff =  comparison_mean - baseline_mean
 
     res = scipy.stats.ttest_ind(baseline['value'], comparison['value'])
-    ttest_results.append({'experiment': exp, 'Δ mean': diff, 't-statistic': res.statistic, 'p-value': res.pvalue })
+    ttest_results.append({'experiment': exp, 'Δ mean': diff.mean(),
+                          'baseline mean': baseline_mean,
+                          'baseline stdev': baseline_stdev,
+                          'comparison mean': comparison_mean,
+                          'comparison stdev': comparison_stdev,
+                          't-statistic': res.statistic, 'p-value': res.pvalue })
 
 ttest_results = pd.DataFrame.from_records(ttest_results)
 print("## Change Detection")
 print("")
 print("The following table lists those experiments that have experienced a")
 print("statistically significant change in their throughput performance between")
-print("baseline and comparision SHAs, with {}% confidence.".format((1.0 - args.p_value) * 100))
+print("baseline and comparision SHAs, with {}% confidence. Negative values mean".format((1.0 - args.p_value) * 100))
+print("that baseline is faster, positive comparison.")
 print("")
 
 p_value_violation = ttest_results['p-value'] < args.p_value
 summary_mean_diff = ttest_results[p_value_violation]
-summary_mean_diff = summary_mean_diff.drop(labels=['p-value', 't-statistic'], axis=1)
+summary_mean_diff = summary_mean_diff.drop(labels=['t-statistic', 'p-value', 'baseline mean',
+                                                   'baseline stdev', 'comparison mean',
+                                                   'comparison stdev'], axis=1)
 summary_mean_diff['Δ mean'] = summary_mean_diff['Δ mean'].apply(adjust_per_cpu).apply(human_bytes)
 print(summary_mean_diff.to_markdown(index=False, tablefmt='github'))
 
@@ -80,6 +98,10 @@ print("<summary>Fine details of change detection per experiment.</summary>")
 print("### Details")
 print("")
 ttest_results['Δ mean'] = ttest_results['Δ mean'].apply(adjust_per_cpu).apply(human_bytes)
+ttest_results['baseline mean'] = ttest_results['baseline mean'].apply(adjust_per_cpu).apply(human_bytes)
+ttest_results['baseline stdev'] = ttest_results['baseline stdev'].apply(adjust_per_cpu).apply(human_bytes)
+ttest_results['comparison mean'] = ttest_results['comparison mean'].apply(adjust_per_cpu).apply(human_bytes)
+ttest_results['comparison stdev'] = ttest_results['comparison stdev'].apply(adjust_per_cpu).apply(human_bytes)
 print(ttest_results.to_markdown(index=False, tablefmt='github'))
 print("")
 print("</details>")
