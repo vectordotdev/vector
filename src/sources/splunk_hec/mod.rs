@@ -58,6 +58,8 @@ pub struct SplunkConfig {
     /// Splunk HEC indexer acknowledgement settings
     #[serde(deserialize_with = "bool_or_struct")]
     acknowledgements: HecAcknowledgementsConfig,
+    /// Splunk HEC token passthrough
+    store_hec_token: bool
 }
 
 inventory::submit! {
@@ -84,6 +86,7 @@ impl Default for SplunkConfig {
             valid_tokens: None,
             tls: None,
             acknowledgements: HecAcknowledgementsConfig::default(),
+            store_hec_token: false,
         }
     }
 }
