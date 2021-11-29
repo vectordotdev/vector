@@ -1,4 +1,3 @@
-use std::num::NonZeroU64;
 use crate::{
     http::HttpClient,
     internal_events::TemplateRenderingFailed,
@@ -9,6 +8,7 @@ use crate::{
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use snafu::{ResultExt, Snafu};
+use std::num::NonZeroU64;
 use vector_core::{config::proxy::ProxyConfig, event::EventRef};
 
 #[derive(Clone, Copy, Debug, Default)]
