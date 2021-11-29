@@ -196,6 +196,47 @@ fn build_exists(field: Field) -> Box<dyn MatchRunner> {
     }
 }
 
+/// Returns true if the provided VRL `Value` matches the `to_match` string.
+fn build_equals(field: Field, to_match: String) -> Box<dyn MatchRunner> {
+    match field {
+        // Default fields are compared by word boundary.
+        Field::Default(_) => {
+            let re = word_regex(&to_match);
+
+            Box::new(Func {
+                func: move |value| match value {
+                    Value::Bytes(val) => re.is_match(&String::from_utf8_lossy(val)),
+                    _ => false,
+                },
+            })
+        }
+        // A literal "tags" field should match by key.
+        Field::Reserved(f) if f == "tags" => Box::new(Func {
+            func: move |value| match value {
+                Value::Array(v) => {
+                    v.contains(&Value::Bytes(Bytes::copy_from_slice(to_match.as_bytes())))
+                }
+                _ => false,
+            },
+        }),
+        // Individual tags are compared by element key:value.
+        Field::Tag(tag) => {
+            let value_bytes = Value::Bytes(format!("{}:{}", tag, to_match).into());
+
+            Box::new(Func {
+                func: move |value| match value {
+                    Value::Array(v) => v.contains(&value_bytes),
+                    _ => false,
+                },
+            })
+        }
+        // Everything else is matched by string equality.
+        _ => Box::new(Func {
+            func: move |value| string_value(value) == to_match,
+        }),
+    }
+}
+
 fn any(queries: Vec<Box<dyn MatchRunner>>) -> Box<dyn MatchRunner> {
     let func = move |obj: &Value| queries.iter().any(|func| func.run(obj));
     Func::boxed(func)
@@ -226,11 +267,18 @@ fn build_matcher(node: &QueryNode) -> Box<dyn MatchRunner> {
 
             all(queries)
         }
-        // QueryNode::AttributeTerm { attr, value }
-        // | QueryNode::QuotedAttribute {
-        //     attr,
-        //     phrase: value,
-        // } => equals(attr, obj, value),
+        QueryNode::AttributeTerm { attr, value }
+        | QueryNode::QuotedAttribute {
+            attr,
+            phrase: value,
+        } => {
+            let queries = attr_to_lookup_fields(attr)
+                .into_iter()
+                .map(|(field, buf)| resolve_value(buf, build_equals(field, value.clone())))
+                .collect::<Vec<_>>();
+
+            any(queries)
+        }
         QueryNode::NegatedNode { node } => build_not(build_matcher(node)),
         QueryNode::Boolean { oper, nodes } => {
             let funcs = nodes.iter().map(build_matcher).collect::<Vec<_>>();
@@ -766,42 +814,42 @@ mod test {
         //     tdef: type_def(),
         // }
         //
-        // equals_message {
-        //     args: func_args![value: value!({"message": "match by word boundary"}), query: "match"],
-        //     want: Ok(true),
-        //     tdef: type_def(),
-        // }
-        //
-        // not_equals_message {
-        //     args: func_args![value: value!({"message": "match by word boundary"}), query: "NOT match"],
-        //     want: Ok(false),
-        //     tdef: type_def(),
-        // }
-        //
-        // negate_equals_message {
-        //     args: func_args![value: value!({"message": "match by word boundary"}), query: "-match"],
-        //     want: Ok(false),
-        //     tdef: type_def(),
-        // }
-        //
-        // equals_message_no_match {
-        //     args: func_args![value: value!({"message": "another value"}), query: "match"],
-        //     want: Ok(false),
-        //     tdef: type_def(),
-        // }
-        //
-        // not_equals_message_no_match {
-        //     args: func_args![value: value!({"message": "another value"}), query: "NOT match"],
-        //     want: Ok(true),
-        //     tdef: type_def(),
-        // }
-        //
-        // negate_equals_message_no_match {
-        //     args: func_args![value: value!({"message": "another value"}), query: "-match"],
-        //     want: Ok(true),
-        //     tdef: type_def(),
-        // }
-        //
+        equals_message {
+            args: func_args![value: value!({"message": "match by word boundary"}), query: "match"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_equals_message {
+            args: func_args![value: value!({"message": "match by word boundary"}), query: "NOT match"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_equals_message {
+            args: func_args![value: value!({"message": "match by word boundary"}), query: "-match"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        equals_message_no_match {
+            args: func_args![value: value!({"message": "another value"}), query: "match"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        not_equals_message_no_match {
+            args: func_args![value: value!({"message": "another value"}), query: "NOT match"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        negate_equals_message_no_match {
+            args: func_args![value: value!({"message": "another value"}), query: "-match"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
         // equals_tag {
         //     args: func_args![value: value!({"tags": ["x:1", "y:2", "z:3"]}), query: "y:2"],
         //     want: Ok(true),
