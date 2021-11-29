@@ -1159,6 +1159,7 @@ dependencies = [
  "tokio-test",
  "tokio-util",
  "tracing 0.1.29",
+ "tracing-fluent-assertions",
  "tracing-subscriber",
 ]
 
@@ -7725,6 +7726,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f4ed65637b8390770814083d20756f87bfa2c21bf2f110babdc5438351746e4"
 dependencies = [
  "lazy_static",
+]
+
+[[package]]
+name = "tracing-fluent-assertions"
+version = "0.1.0"
+dependencies = [
+ "tracing 0.1.29",
+ "tracing-core 0.1.21",
+ "tracing-subscriber",
 ]
 
 [[package]]

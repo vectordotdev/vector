@@ -224,9 +224,6 @@ where
             let file = reader.into_inner();
             let metadata = file.metadata().await?;
 
-            // TODO: figure out if we ever hit a wraparound on file_size - self.bytes_read because
-            // the equal read/write count on disk_v2_controlled_progress ending with ~0.8GB leftover
-            // makes no sense at all.
             let file_size = metadata.len();
             let size_delta = file_size - self.bytes_read;
             if size_delta > 0 {

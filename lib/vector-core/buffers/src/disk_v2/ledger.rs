@@ -140,7 +140,7 @@ impl ArchivedLedgerState {
 
     /// Gets the next writer file ID.
     pub fn get_next_writer_file_id(&self) -> u16 {
-        (self.writer_current_data_file_id.load(Ordering::Acquire) + 1) % MAX_FILE_ID
+        (self.get_current_writer_file_id() + 1) % MAX_FILE_ID
     }
 
     /// Increments the current writer file ID.
@@ -156,7 +156,7 @@ impl ArchivedLedgerState {
 
     /// Gets the next reader file ID.
     pub fn get_next_reader_file_id(&self) -> u16 {
-        (self.reader_current_data_file_id.load(Ordering::Acquire) + 1) % MAX_FILE_ID
+        (self.get_current_reader_file_id() + 1) % MAX_FILE_ID
     }
 
     /// Increments the current reader file ID.

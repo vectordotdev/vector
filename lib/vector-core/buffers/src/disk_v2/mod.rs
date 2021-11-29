@@ -91,8 +91,13 @@
 //!
 //! # Implementation TODOs:
 //!
-//! - test what happens on writer wrapping and wanting to open current data file being read by reader
 //! - test what happens when record ID rolls over
+//! - test what happens when reader is waiting for writer to open next data file (i'm not even sure
+//!   this is actually possible since we always ensure the writer is ready to write while
+//!   constructing the buffer, which means a file will be present, but technically our code could
+//!   handle it if the timing was right i.e. we called ensure_ready_to_read before
+//!   ensure_ready_to_write... we could probably brute force test it using Reader/Writer directly...
+//!   *shrug*)
 use std::{marker::PhantomData, sync::Arc};
 
 use snafu::{ResultExt, Snafu};

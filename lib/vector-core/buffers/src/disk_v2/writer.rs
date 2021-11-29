@@ -99,7 +99,6 @@ where
     /// If there is an I/O error while writing the record, an error variant will be returned
     /// describing the error.  Additionally, if there is an error while serializing the record, an
     /// error variant will be returned describing the serialization error.
-    #[instrument(skip(self), level = "trace")]
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn write_record(&mut self, id: u64, record: T) -> Result<usize, WriterError<T>> {
         self.encode_buf.clear();
@@ -189,7 +188,6 @@ where
     ///
     /// If there is an I/O error while flushing either the buffered writer or the underlying writer,
     /// an error variant will be returned describing the error.
-    #[instrument(skip(self), level = "trace")]
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn flush(&mut self) -> io::Result<()> {
         self.writer.flush().await
@@ -205,6 +203,7 @@ impl<T> RecordWriter<File, T> {
     ///
     /// If there is an I/O error while syncing the file, an error variant will be returned
     /// describing the error.
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn sync_all(&mut self) -> io::Result<()> {
         self.writer.get_mut().sync_all().await
     }
