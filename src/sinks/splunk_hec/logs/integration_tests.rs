@@ -108,7 +108,7 @@ async fn config(
         batch,
         request: TowerRequestConfig::default(),
         tls: None,
-        acknowledgements: Some(HecClientAcknowledgementsConfig::default()),
+        acknowledgements: Some(Default::default()),
     }
 }
 

@@ -286,7 +286,7 @@ mod tests {
 
         let acknowledgements_config = HecClientAcknowledgementsConfig {
             query_interval: NonZeroU8::new(1).unwrap(),
-            ..HecClientAcknowledgementsConfig::default()
+            ..Default::default()
         };
         let mut service = get_hec_service(mock_server.uri(), acknowledgements_config);
 
@@ -305,7 +305,7 @@ mod tests {
 
         let acknowledgements_config = HecClientAcknowledgementsConfig {
             query_interval: NonZeroU8::new(1).unwrap(),
-            ..HecClientAcknowledgementsConfig::default()
+            ..Default::default()
         };
         let mut service = get_hec_service(mock_server.uri(), acknowledgements_config);
 

@@ -929,7 +929,6 @@ mod tests {
         event::Event,
         sinks::{
             splunk_hec::{
-                common::acknowledgements::HecClientAcknowledgementsConfig,
                 logs::{config::HecSinkLogsConfig, encoder::HecLogsEncoder},
             },
             util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
@@ -1013,7 +1012,7 @@ mod tests {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Some(HecClientAcknowledgementsConfig::default()),
+            acknowledgements: Some(Default::default()),
         }
         .build(SinkContext::new_test())
         .await

@@ -4,9 +4,7 @@ use crate::{
     config::{SinkConfig, SinkContext},
     event::{Metric, MetricKind},
     sinks::{
-        splunk_hec::common::{
-            acknowledgements::HecClientAcknowledgementsConfig, integration_test_helpers::get_token,
-        },
+        splunk_hec::common::integration_test_helpers::get_token,
         util::{BatchConfig, Compression, TowerRequestConfig},
     },
     test_util::components::{self, HTTP_SINK_TAGS},
@@ -37,7 +35,7 @@ async fn config() -> HecMetricsSinkConfig {
         batch,
         request: TowerRequestConfig::default(),
         tls: None,
-        acknowledgements: HecClientAcknowledgementsConfig::default(),
+        acknowledgements: Default::default(),
     }
 }
 

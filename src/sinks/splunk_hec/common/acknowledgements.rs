@@ -25,7 +25,7 @@ impl Default for HecClientAcknowledgementsConfig {
 }
 
 pub fn default_hec_client_acknowledgements_config() -> Option<HecClientAcknowledgementsConfig> {
-    Some(HecClientAcknowledgementsConfig::default())
+    Some(Default::default())
 }
 
 #[derive(Deserialize, Serialize, Eq, PartialEq, Debug)]

@@ -71,7 +71,7 @@ impl GenerateConfig for HecSinkLogsConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Some(HecClientAcknowledgementsConfig::default()),
+            acknowledgements: Some(Default::default()),
         })
         .unwrap()
     }

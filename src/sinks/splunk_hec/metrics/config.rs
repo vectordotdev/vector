@@ -1,8 +1,4 @@
-use futures_util::FutureExt;
-use serde::{Deserialize, Serialize};
-use tower::ServiceBuilder;
-use vector_core::transform::DataType;
-
+use super::{request_builder::HecMetricsRequestBuilder, sink::HecMetricsSink};
 use crate::{
     config::{GenerateConfig, SinkConfig, SinkContext},
     http::HttpClient,
@@ -20,9 +16,11 @@ use crate::{
     template::Template,
     tls::TlsOptions,
 };
+use futures_util::FutureExt;
+use serde::{Deserialize, Serialize};
+use tower::ServiceBuilder;
 use vector_core::sink::VectorSink;
-
-use super::{request_builder::HecMetricsRequestBuilder, sink::HecMetricsSink};
+use vector_core::transform::DataType;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -60,7 +58,7 @@ impl GenerateConfig for HecMetricsSinkConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: HecClientAcknowledgementsConfig::default(),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
