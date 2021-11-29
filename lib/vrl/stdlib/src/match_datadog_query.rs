@@ -117,26 +117,26 @@ trait Matcher: DynClone + std::fmt::Debug + Send + Sync {
 
 dyn_clone::clone_trait_object!(Matcher);
 
-/// A `Func` is a container for holding a thread-safe function type that can receive a VRL
+/// Ccontainer for holding a thread-safe function type that can receive a VRL
 /// `Value`, and return true/false some internal expression.
 #[derive(Clone)]
-struct Func<T: Fn(&Value) -> bool + Send + Sync + Clone> {
+struct Match<T: Fn(&Value) -> bool + Send + Sync + Clone> {
     func: T,
 }
 
-impl<T: Fn(&Value) -> bool + Send + Sync + Clone> Func<T> {
+impl<T: Fn(&Value) -> bool + Send + Sync + Clone> Match<T> {
     fn boxed(func: T) -> Box<Self> {
         Box::new(Self { func })
     }
 }
 
-impl<T: Fn(&Value) -> bool + Send + Sync + Clone> Matcher for Func<T> {
+impl<T: Fn(&Value) -> bool + Send + Sync + Clone> Matcher for Match<T> {
     fn run(&self, obj: &Value) -> bool {
         (self.func)(obj)
     }
 }
 
-impl<T: Fn(&Value) -> bool + Send + Sync + Clone> std::fmt::Debug for Func<T> {
+impl<T: Fn(&Value) -> bool + Send + Sync + Clone> std::fmt::Debug for Match<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "Datadog matcher fn")
     }
@@ -161,7 +161,7 @@ fn resolve_value(buf: LookupBuf, match_fn: Box<dyn Matcher>) -> Box<dyn Matcher>
         match_fn.run(value)
     };
 
-    Func::boxed(func)
+    Match::boxed(func)
 }
 
 impl Matcher for bool {
@@ -171,7 +171,7 @@ impl Matcher for bool {
 }
 
 fn build_not(func: Box<dyn Matcher>) -> Box<dyn Matcher> {
-    Func::boxed(move |obj| !func.run(obj))
+    Match::boxed(move |obj| !func.run(obj))
 }
 
 fn build_exists(field: Field) -> Box<dyn Matcher> {
@@ -180,7 +180,7 @@ fn build_exists(field: Field) -> Box<dyn Matcher> {
         Field::Tag(tag) => {
             let starts_with = format!("{}:", tag);
 
-            Func::boxed(move |obj| match obj {
+            Match::boxed(move |obj| match obj {
                 Value::Array(v) => v.iter().any(|v| {
                     let str_value = string_value(v);
 
@@ -191,7 +191,7 @@ fn build_exists(field: Field) -> Box<dyn Matcher> {
             })
         }
         // Literal field 'tags' needs to be compared by key.
-        Field::Reserved(f) if f == "tags" => Func::boxed(|obj| match obj {
+        Field::Reserved(f) if f == "tags" => Match::boxed(|obj| match obj {
             Value::Array(v) => v.iter().any(|v| v == obj),
             _ => false,
         }),
@@ -207,13 +207,13 @@ fn build_equals(field: Field, to_match: String) -> Box<dyn Matcher> {
         Field::Default(_) => {
             let re = word_regex(&to_match);
 
-            Func::boxed(move |value| match value {
+            Match::boxed(move |value| match value {
                 Value::Bytes(val) => re.is_match(&String::from_utf8_lossy(val)),
                 _ => false,
             })
         }
         // A literal "tags" field should match by key.
-        Field::Reserved(f) if f == "tags" => Func::boxed(move |value| match value {
+        Field::Reserved(f) if f == "tags" => Match::boxed(move |value| match value {
             Value::Array(v) => {
                 v.contains(&Value::Bytes(Bytes::copy_from_slice(to_match.as_bytes())))
             }
@@ -223,13 +223,13 @@ fn build_equals(field: Field, to_match: String) -> Box<dyn Matcher> {
         Field::Tag(tag) => {
             let value_bytes = Value::Bytes(format!("{}:{}", tag, to_match).into());
 
-            Func::boxed(move |value| match value {
+            Match::boxed(move |value| match value {
                 Value::Array(v) => v.contains(&value_bytes),
                 _ => false,
             })
         }
         // Everything else is matched by string equality.
-        _ => Func::boxed(move |value| string_value(value) == to_match),
+        _ => Match::boxed(move |value| string_value(value) == to_match),
     }
 }
 
@@ -245,7 +245,7 @@ fn compare(
     match field {
         // Facets are compared numerically if the value is numeric, or as strings otherwise.
         Field::Facet(_) => {
-            Func::boxed(move |value| match (value, &comparison_value) {
+            Match::boxed(move |value| match (value, &comparison_value) {
                 // Integers.
                 (Value::Integer(lhs), ComparisonValue::Integer(rhs)) => match comparator {
                     Comparison::Lt => *lhs < *rhs,
@@ -289,7 +289,7 @@ fn compare(
             })
         }
         // Tag values need extracting by "key:value" to be compared.
-        Field::Tag(_) => Func::boxed(move |value| match value {
+        Field::Tag(_) => Match::boxed(move |value| match value {
             Value::Array(v) => v.iter().any(|v| match string_value(v).split_once(":") {
                 Some((_, lhs)) => {
                     let lhs = Cow::from(lhs);
@@ -306,7 +306,7 @@ fn compare(
             _ => false,
         }),
         // All other tag types are compared by string.
-        _ => Func::boxed(move |value| {
+        _ => Match::boxed(move |value| {
             let lhs = string_value(value);
 
             match comparator {
@@ -369,7 +369,7 @@ fn range(
             let lower_func = compare(field.clone(), lower_op, lower);
             let upper_func = compare(field, upper_op, upper);
 
-            Func::boxed(move |value| lower_func.run(value) && upper_func.run(value))
+            Match::boxed(move |value| lower_func.run(value) && upper_func.run(value))
         }
     }
 }
@@ -381,19 +381,19 @@ fn wildcard_with_prefix(field: Field, prefix: String) -> Box<dyn Matcher> {
         Field::Default(_) => {
             let re = word_regex(&format!("{}*", prefix));
 
-            Func::boxed(move |value| re.is_match(&string_value(value)))
+            Match::boxed(move |value| re.is_match(&string_value(value)))
         }
         // Tags are recursed until a match is found.
         Field::Tag(tag) => {
             let starts_with = format!("{}:{}", tag, prefix);
 
-            Func::boxed(move |value| match value {
+            Match::boxed(move |value| match value {
                 Value::Array(v) => v.iter().any(|v| string_value(v).starts_with(&starts_with)),
                 _ => false,
             })
         }
         // All other field types are compared by complete value.
-        _ => Func::boxed(move |value| string_value(value).starts_with(&prefix)),
+        _ => Match::boxed(move |value| string_value(value).starts_with(&prefix)),
     }
 }
 
@@ -402,12 +402,12 @@ fn build_wildcard(field: Field, wildcard: &str) -> Box<dyn Matcher> {
         Field::Default(_) => {
             let re = word_regex(wildcard);
 
-            Func::boxed(move |value| re.is_match(&string_value(value)))
+            Match::boxed(move |value| re.is_match(&string_value(value)))
         }
         Field::Tag(tag) => {
             let re = wildcard_regex(&format!("{}:{}", tag, wildcard));
 
-            Func::boxed(move |value| match value {
+            Match::boxed(move |value| match value {
                 Value::Array(v) => v.iter().any(|v| re.is_match(&string_value(v))),
                 _ => false,
             })
@@ -415,19 +415,19 @@ fn build_wildcard(field: Field, wildcard: &str) -> Box<dyn Matcher> {
         _ => {
             let re = wildcard_regex(wildcard);
 
-            Func::boxed(move |value| re.is_match(&string_value(value)))
+            Match::boxed(move |value| re.is_match(&string_value(value)))
         }
     }
 }
 
 fn any(queries: Vec<Box<dyn Matcher>>) -> Box<dyn Matcher> {
     let func = move |obj: &Value| queries.iter().any(|func| func.run(obj));
-    Func::boxed(func)
+    Match::boxed(func)
 }
 
 fn all(queries: Vec<Box<dyn Matcher>>) -> Box<dyn Matcher> {
     let func = move |obj: &Value| queries.iter().all(|func| func.run(obj));
-    Func::boxed(func)
+    Match::boxed(func)
 }
 
 fn build_matcher(node: &QueryNode) -> Box<dyn Matcher> {
