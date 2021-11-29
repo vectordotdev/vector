@@ -507,12 +507,8 @@ fn build_matcher(node: &QueryNode) -> Box<dyn MatchRunner> {
             let funcs = nodes.iter().map(build_matcher).collect::<Vec<_>>();
 
             match oper {
-                BooleanType::And => Box::new(Func {
-                    func: move |obj| funcs.iter().all(|func| func.run(obj)),
-                }),
-                BooleanType::Or => Box::new(Func {
-                    func: move |obj| funcs.iter().any(|func| func.run(obj)),
-                }),
+                BooleanType::And => all(funcs),
+                BooleanType::Or => any(funcs),
             }
         }
         _ => unreachable!("todo"),
