@@ -4,7 +4,29 @@ use std::collections::HashMap;
 /// (result, warnings)
 pub fn interpolate(input: &str, vars: &HashMap<String, String>) -> (String, Vec<String>) {
     let mut warnings = Vec::new();
-    let re = Regex::new(r"\$\$|\$(\w+)|\$\{(\w+)(?::-([^}]+)?)?\}").unwrap();
+    // Environment variable names can have any characters from the Portable Character Set other
+    // than NUL
+    //
+    // For simplicity, we just let them be anything **other** than:
+    //
+    // * Whitespace when the form $FOO is used. This lets us delimit the end of the variable name.
+    // * A colon, dash, or right-bracket when the form ${FOO} or ${FOO:-default} is used. This is
+    //   similar to shell handling of environment variables.
+    //
+    // This is somewhat a hybrid of what is generally supported and what shells support for
+    // environment variable names. It isn't exactly correct, but should support all uses in
+    // practice.
+    //
+    // https://pubs.opengroup.org/onlinepubs/000095399/basedefs/xbd_chap08.html
+    let re = Regex::new(
+        r"(?x)
+        \$\$|
+        \$([^{[:space:]]\S+)|
+        \$\{([^}:\-]+)(?::-([^}]+)?)?\}
+        ",
+    )
+    //let re = Regex::new(r"\$\$|\$(\w+)|\$\{(\w+)(?::-([^}]+)?)?\}").unwrap();
+    .unwrap();
     let interpolated = re
         .replace_all(input, |caps: &Captures<'_>| {
             caps.get(1)
@@ -33,6 +55,8 @@ mod test {
         let vars = vec![
             ("FOO".into(), "dogs".into()),
             ("FOOBAR".into(), "cats".into()),
+            // Java commonly uses .s in env var names
+            ("FOO.BAR".into(), "turtles".into()),
         ]
         .into_iter()
         .collect();
@@ -45,7 +69,8 @@ mod test {
         assert_eq!("$ x", interpolate("$ x", &vars).0);
         assert_eq!("$FOO", interpolate("$$FOO", &vars).0);
         assert_eq!("", interpolate("$NOT_FOO", &vars).0);
-        assert_eq!("-FOO", interpolate("$NOT-FOO", &vars).0);
+        assert_eq!("", interpolate("$FOO-BAR", &vars).0);
+        assert_eq!("turtles", interpolate("$FOO.BAR", &vars).0);
         assert_eq!("${FOO x", interpolate("${FOO x", &vars).0);
         assert_eq!("${}", interpolate("${}", &vars).0);
         assert_eq!("dogs", interpolate("${FOO:-cats}", &vars).0);
