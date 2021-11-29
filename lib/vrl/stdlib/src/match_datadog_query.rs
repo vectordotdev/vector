@@ -180,24 +180,20 @@ fn build_exists(field: Field) -> Box<dyn Matcher> {
         Field::Tag(tag) => {
             let starts_with = format!("{}:", tag);
 
-            Box::new(Func {
-                func: move |obj| match obj {
-                    Value::Array(v) => v.iter().any(|v| {
-                        let str_value = string_value(v);
+            Func::boxed(move |obj| match obj {
+                Value::Array(v) => v.iter().any(|v| {
+                    let str_value = string_value(v);
 
-                        // The tag matches using either 'key' or 'key:value' syntax.
-                        str_value == tag || str_value.starts_with(&starts_with)
-                    }),
-                    _ => false,
-                },
+                    // The tag matches using either 'key' or 'key:value' syntax.
+                    str_value == tag || str_value.starts_with(&starts_with)
+                }),
+                _ => false,
             })
         }
         // Literal field 'tags' needs to be compared by key.
-        Field::Reserved(f) if f == "tags" => Box::new(Func {
-            func: |obj| match obj {
-                Value::Array(v) => v.iter().any(|v| v == obj),
-                _ => false,
-            },
+        Field::Reserved(f) if f == "tags" => Func::boxed(|obj| match obj {
+            Value::Array(v) => v.iter().any(|v| v == obj),
+            _ => false,
         }),
         // Other field types have already resolved at this point, so just return true.
         _ => Box::new(true),
@@ -211,37 +207,29 @@ fn build_equals(field: Field, to_match: String) -> Box<dyn Matcher> {
         Field::Default(_) => {
             let re = word_regex(&to_match);
 
-            Box::new(Func {
-                func: move |value| match value {
-                    Value::Bytes(val) => re.is_match(&String::from_utf8_lossy(val)),
-                    _ => false,
-                },
+            Func::boxed(move |value| match value {
+                Value::Bytes(val) => re.is_match(&String::from_utf8_lossy(val)),
+                _ => false,
             })
         }
         // A literal "tags" field should match by key.
-        Field::Reserved(f) if f == "tags" => Box::new(Func {
-            func: move |value| match value {
-                Value::Array(v) => {
-                    v.contains(&Value::Bytes(Bytes::copy_from_slice(to_match.as_bytes())))
-                }
-                _ => false,
-            },
+        Field::Reserved(f) if f == "tags" => Func::boxed(move |value| match value {
+            Value::Array(v) => {
+                v.contains(&Value::Bytes(Bytes::copy_from_slice(to_match.as_bytes())))
+            }
+            _ => false,
         }),
         // Individual tags are compared by element key:value.
         Field::Tag(tag) => {
             let value_bytes = Value::Bytes(format!("{}:{}", tag, to_match).into());
 
-            Box::new(Func {
-                func: move |value| match value {
-                    Value::Array(v) => v.contains(&value_bytes),
-                    _ => false,
-                },
+            Func::boxed(move |value| match value {
+                Value::Array(v) => v.contains(&value_bytes),
+                _ => false,
             })
         }
         // Everything else is matched by string equality.
-        _ => Box::new(Func {
-            func: move |value| string_value(value) == to_match,
-        }),
+        _ => Func::boxed(move |value| string_value(value) == to_match),
     }
 }
 
@@ -257,82 +245,76 @@ fn compare(
     match field {
         // Facets are compared numerically if the value is numeric, or as strings otherwise.
         Field::Facet(_) => {
-            Box::new(Func {
-                func: move |value| match (value, &comparison_value) {
-                    // Integers.
-                    (Value::Integer(lhs), ComparisonValue::Integer(rhs)) => match comparator {
-                        Comparison::Lt => *lhs < *rhs,
-                        Comparison::Lte => *lhs <= *rhs,
-                        Comparison::Gt => *lhs > *rhs,
-                        Comparison::Gte => *lhs >= *rhs,
-                    },
-                    // Floats.
-                    (Value::Float(lhs), ComparisonValue::Float(rhs)) => {
-                        let lhs = lhs.into_inner();
-                        match comparator {
-                            Comparison::Lt => lhs < *rhs,
-                            Comparison::Lte => lhs <= *rhs,
-                            Comparison::Gt => lhs > *rhs,
-                            Comparison::Gte => lhs >= *rhs,
-                        }
-                    }
-                    // Where the rhs is a string ref, the lhs is coerced into a string.
-                    (_, ComparisonValue::String(rhs)) => {
-                        let lhs = string_value(value);
-                        let rhs = Cow::from(rhs);
-
-                        match comparator {
-                            Comparison::Lt => lhs < rhs,
-                            Comparison::Lte => lhs <= rhs,
-                            Comparison::Gt => lhs > rhs,
-                            Comparison::Gte => lhs >= rhs,
-                        }
-                    }
-                    // Otherwise, compare directly as strings.
-                    _ => {
-                        let lhs = string_value(value);
-
-                        match comparator {
-                            Comparison::Lt => lhs < rhs,
-                            Comparison::Lte => lhs <= rhs,
-                            Comparison::Gt => lhs > rhs,
-                            Comparison::Gte => lhs >= rhs,
-                        }
-                    }
+            Func::boxed(move |value| match (value, &comparison_value) {
+                // Integers.
+                (Value::Integer(lhs), ComparisonValue::Integer(rhs)) => match comparator {
+                    Comparison::Lt => *lhs < *rhs,
+                    Comparison::Lte => *lhs <= *rhs,
+                    Comparison::Gt => *lhs > *rhs,
+                    Comparison::Gte => *lhs >= *rhs,
                 },
+                // Floats.
+                (Value::Float(lhs), ComparisonValue::Float(rhs)) => {
+                    let lhs = lhs.into_inner();
+                    match comparator {
+                        Comparison::Lt => lhs < *rhs,
+                        Comparison::Lte => lhs <= *rhs,
+                        Comparison::Gt => lhs > *rhs,
+                        Comparison::Gte => lhs >= *rhs,
+                    }
+                }
+                // Where the rhs is a string ref, the lhs is coerced into a string.
+                (_, ComparisonValue::String(rhs)) => {
+                    let lhs = string_value(value);
+                    let rhs = Cow::from(rhs);
+
+                    match comparator {
+                        Comparison::Lt => lhs < rhs,
+                        Comparison::Lte => lhs <= rhs,
+                        Comparison::Gt => lhs > rhs,
+                        Comparison::Gte => lhs >= rhs,
+                    }
+                }
+                // Otherwise, compare directly as strings.
+                _ => {
+                    let lhs = string_value(value);
+
+                    match comparator {
+                        Comparison::Lt => lhs < rhs,
+                        Comparison::Lte => lhs <= rhs,
+                        Comparison::Gt => lhs > rhs,
+                        Comparison::Gte => lhs >= rhs,
+                    }
+                }
             })
         }
         // Tag values need extracting by "key:value" to be compared.
-        Field::Tag(_) => Box::new(Func {
-            func: move |value| match value {
-                Value::Array(v) => v.iter().any(|v| match string_value(v).split_once(":") {
-                    Some((_, lhs)) => {
-                        let lhs = Cow::from(lhs);
+        Field::Tag(_) => Func::boxed(move |value| match value {
+            Value::Array(v) => v.iter().any(|v| match string_value(v).split_once(":") {
+                Some((_, lhs)) => {
+                    let lhs = Cow::from(lhs);
 
-                        match comparator {
-                            Comparison::Lt => lhs < rhs,
-                            Comparison::Lte => lhs <= rhs,
-                            Comparison::Gt => lhs > rhs,
-                            Comparison::Gte => lhs >= rhs,
-                        }
+                    match comparator {
+                        Comparison::Lt => lhs < rhs,
+                        Comparison::Lte => lhs <= rhs,
+                        Comparison::Gt => lhs > rhs,
+                        Comparison::Gte => lhs >= rhs,
                     }
-                    _ => false,
-                }),
+                }
                 _ => false,
-            },
+            }),
+            _ => false,
         }),
         // All other tag types are compared by string.
-        _ => Box::new(Func {
-            func: move |value| {
-                let lhs = string_value(value);
+        _ => Func::boxed(move |value| {
+            let lhs = string_value(value);
 
-                match comparator {
-                    Comparison::Lt => lhs < rhs,
-                    Comparison::Lte => lhs <= rhs,
-                    Comparison::Gt => lhs > rhs,
-                    Comparison::Gte => lhs >= rhs,
-                }
-            },
+            match comparator {
+                Comparison::Lt => lhs < rhs,
+                Comparison::Lte => lhs <= rhs,
+                Comparison::Gt => lhs > rhs,
+                Comparison::Gte => lhs >= rhs,
+            }
         }),
     }
 }
@@ -387,9 +369,7 @@ fn range(
             let lower_func = compare(field.clone(), lower_op, lower);
             let upper_func = compare(field, upper_op, upper);
 
-            Box::new(Func {
-                func: move |value| lower_func.run(value) && upper_func.run(value),
-            })
+            Func::boxed(move |value| lower_func.run(value) && upper_func.run(value))
         }
     }
 }
@@ -401,25 +381,19 @@ fn wildcard_with_prefix(field: Field, prefix: String) -> Box<dyn Matcher> {
         Field::Default(_) => {
             let re = word_regex(&format!("{}*", prefix));
 
-            Box::new(Func {
-                func: move |value| re.is_match(&string_value(value)),
-            })
+            Func::boxed(move |value| re.is_match(&string_value(value)))
         }
         // Tags are recursed until a match is found.
         Field::Tag(tag) => {
             let starts_with = format!("{}:{}", tag, prefix);
 
-            Box::new(Func {
-                func: move |value| match value {
-                    Value::Array(v) => v.iter().any(|v| string_value(v).starts_with(&starts_with)),
-                    _ => false,
-                },
+            Func::boxed(move |value| match value {
+                Value::Array(v) => v.iter().any(|v| string_value(v).starts_with(&starts_with)),
+                _ => false,
             })
         }
         // All other field types are compared by complete value.
-        _ => Box::new(Func {
-            func: move |value| string_value(value).starts_with(&prefix),
-        }),
+        _ => Func::boxed(move |value| string_value(value).starts_with(&prefix)),
     }
 }
 
@@ -428,26 +402,20 @@ fn build_wildcard(field: Field, wildcard: &str) -> Box<dyn Matcher> {
         Field::Default(_) => {
             let re = word_regex(wildcard);
 
-            Box::new(Func {
-                func: move |value| re.is_match(&string_value(value)),
-            })
+            Func::boxed(move |value| re.is_match(&string_value(value)))
         }
         Field::Tag(tag) => {
             let re = wildcard_regex(&format!("{}:{}", tag, wildcard));
 
-            Box::new(Func {
-                func: move |value| match value {
-                    Value::Array(v) => v.iter().any(|v| re.is_match(&string_value(v))),
-                    _ => false,
-                },
+            Func::boxed(move |value| match value {
+                Value::Array(v) => v.iter().any(|v| re.is_match(&string_value(v))),
+                _ => false,
             })
         }
         _ => {
             let re = wildcard_regex(wildcard);
 
-            Box::new(Func {
-                func: move |value| re.is_match(&string_value(value)),
-            })
+            Func::boxed(move |value| re.is_match(&string_value(value)))
         }
     }
 }
