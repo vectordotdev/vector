@@ -67,7 +67,22 @@ for exp in csv.experiment.unique():
     comparison_stdev = comparison['value'].std()
     diff =  comparison_mean - baseline_mean
 
-    res = scipy.stats.ttest_ind(baseline['value'], comparison['value'])
+    # The t-test here is calculating whether the expected mean of our two
+    # distributions is equal, or, put another way, whether the samples we have
+    # here are from identical distributions. The higher the returned p-value by
+    # ttest_ind the more likely it is that the samples _do_ have the same
+    # expected mean.
+    #
+    # If the p-value is below our threshold then it is _unlikely_ that the two
+    # samples actually have the same mean -- are from the same distribution --
+    # and so there's some statistically interesting difference between the two
+    # samples. For our purposes here that implies that performance has changed.
+    #
+    # TODO we don't currently detect outliers in the samples, which can
+    # contaminate the result here. Yuen's test is supported by this
+    # function. Detect outliers using Tukey's method, then flip between Welch's
+    # method and Yuen depending on outlier existence.
+    res = scipy.stats.ttest_ind(baseline['value'], comparison['value'], equal_var=False)
     ttest_results.append({'experiment': exp, 'Δ mean': diff.mean(),
                           'baseline mean': baseline_mean,
                           'baseline stdev': baseline_stdev,
