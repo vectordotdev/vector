@@ -24,15 +24,6 @@ use crate::{http::HttpClient, sinks::util::Compression};
 
 use super::acknowledgements::{run_acknowledgements, HecClientAcknowledgementsConfig};
 
-// A Splunk channel must be a GUID/UUID formatted value
-// https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/AboutHECIDXAck#About_channels_and_sending_data
-lazy_static::lazy_static! {
-    static ref SPLUNK_CHANNEL: String = {
-        let mut buf = Uuid::encode_buffer();
-        Uuid::new_v4().to_hyphenated().encode_lower(&mut buf).to_string()
-    };
-}
-
 #[derive(Clone)]
 pub struct HecService {
     pub batch_service:
@@ -145,9 +136,22 @@ pub struct HttpRequestBuilder {
     pub endpoint: String,
     pub token: String,
     pub compression: Compression,
+    // A Splunk channel must be a GUID/UUID formatted value
+    // https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/AboutHECIDXAck#About_channels_and_sending_data
+    pub channel: String,
 }
 
 impl HttpRequestBuilder {
+    pub fn new(endpoint: String, token: String, compression: Compression) -> Self {
+        let channel = Uuid::new_v4().to_hyphenated().to_string();
+        Self {
+            endpoint,
+            token,
+            compression,
+            channel,
+        }
+    }
+
     pub fn build_request(
         &self,
         body: Vec<u8>,
@@ -158,7 +162,7 @@ impl HttpRequestBuilder {
         let mut builder = Request::post(uri)
             .header("Content-Type", "application/json")
             .header("Authorization", format!("Splunk {}", self.token.as_str()))
-            .header("X-Splunk-Request-Channel", SPLUNK_CHANNEL.as_str());
+            .header("X-Splunk-Request-Channel", self.channel.as_str());
 
         if let Some(ce) = self.compression.content_encoding() {
             builder = builder.header("Content-Encoding", ce);
@@ -209,11 +213,8 @@ mod tests {
         acknowledgements_config: HecClientAcknowledgementsConfig,
     ) -> HecService {
         let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
-        let http_request_builder = HttpRequestBuilder {
-            endpoint,
-            token: String::from(TOKEN),
-            compression: Compression::default(),
-        };
+        let http_request_builder =
+            HttpRequestBuilder::new(endpoint, String::from(TOKEN), Compression::default());
         HecService::new(client, http_request_builder, Some(acknowledgements_config))
     }
 
@@ -245,9 +246,7 @@ mod tests {
             .respond_with(move |_: &Request| {
                 let ack_id =
                     acknowledgements_enabled.then(|| ACK_ID.fetch_add(1, Ordering::Relaxed));
-                ResponseTemplate::new(200).set_body_json(HecAckResponseBody {
-                    ack_id,
-                })
+                ResponseTemplate::new(200).set_body_json(HecAckResponseBody { ack_id })
             })
             .mount(&mock_server)
             .await;

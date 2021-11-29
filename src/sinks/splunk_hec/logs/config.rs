@@ -110,11 +110,8 @@ impl HecSinkLogsConfig {
         };
 
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-        let http_request_builder = HttpRequestBuilder {
-            endpoint: self.endpoint.clone(),
-            token: self.token.clone(),
-            compression: self.compression,
-        };
+        let http_request_builder =
+            HttpRequestBuilder::new(self.endpoint.clone(), self.token.clone(), self.compression);
         let service = ServiceBuilder::new()
             .settings(request_settings, HecRetryLogic)
             .service(HecService::new(

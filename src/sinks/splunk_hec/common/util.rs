@@ -181,11 +181,8 @@ mod tests {
         let token = "token";
         let compression = Compression::None;
         let events = "events".as_bytes().to_vec();
-        let http_request_builder = HttpRequestBuilder {
-            endpoint: String::from(endpoint),
-            token: String::from(token),
-            compression,
-        };
+        let http_request_builder =
+            HttpRequestBuilder::new(String::from(endpoint), String::from(token), compression);
 
         let request = http_request_builder
             .build_request(events.clone(), "/services/collector/event")
@@ -217,11 +214,8 @@ mod tests {
         let token = "token";
         let compression = Compression::gzip_default();
         let events = "events".as_bytes().to_vec();
-        let http_request_builder = HttpRequestBuilder {
-            endpoint: String::from(endpoint),
-            token: String::from(token),
-            compression,
-        };
+        let http_request_builder =
+            HttpRequestBuilder::new(String::from(endpoint), String::from(token), compression);
 
         let request = http_request_builder
             .build_request(events.clone(), "/services/collector/event")
@@ -256,11 +250,8 @@ mod tests {
         let token = "token";
         let compression = Compression::gzip_default();
         let events = "events".as_bytes().to_vec();
-        let http_request_builder = HttpRequestBuilder {
-            endpoint: String::from(endpoint),
-            token: String::from(token),
-            compression,
-        };
+        let http_request_builder =
+            HttpRequestBuilder::new(String::from(endpoint), String::from(token), compression);
 
         let err = http_request_builder
             .build_request(events, "/services/collector/event")

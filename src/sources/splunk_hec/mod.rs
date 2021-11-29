@@ -928,9 +928,7 @@ mod tests {
         config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
         event::Event,
         sinks::{
-            splunk_hec::{
-                logs::{config::HecSinkLogsConfig, encoder::HecLogsEncoder},
-            },
+            splunk_hec::logs::{config::HecSinkLogsConfig, encoder::HecLogsEncoder},
             util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
             Healthcheck, VectorSink,
         },
