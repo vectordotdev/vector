@@ -86,7 +86,7 @@ impl Function for MatchDatadogQuery {
 #[derive(Debug, Clone)]
 struct MatchDatadogQueryFn {
     value: Box<dyn Expression>,
-    match_fn: Box<dyn MatchRunner + Send + Sync>,
+    match_fn: Box<dyn MatchRunner>,
 }
 
 impl Expression for MatchDatadogQueryFn {
@@ -105,158 +105,55 @@ fn type_def() -> TypeDef {
     TypeDef::new().infallible().boolean()
 }
 
-trait Query: DynClone + Send + Sync {
-    fn exists(&self, obj: &Value) -> bool;
-}
-
-dyn_clone::clone_trait_object!(Query);
-
-#[derive(Clone)]
-struct DefaultField {
-    name: String,
-    buf: LookupBuf,
-}
-
-impl DefaultField {
-    fn new(name: String, buf: LookupBuf) -> Self {
-        Self { name, buf }
-    }
-}
-
-impl Query for DefaultField {
-    fn exists(&self, obj: &Value) -> bool {
-        obj.get_by_path(&self.buf).is_some()
-    }
-}
-
-#[derive(Clone)]
-struct FacetField {
-    name: String,
-    buf: LookupBuf,
-}
-
-impl FacetField {
-    fn new(name: String, buf: LookupBuf) -> Self {
-        Self { name, buf }
-    }
-}
-
-impl Query for FacetField {
-    fn exists(&self, obj: &Value) -> bool {
-        obj.get_by_path(&self.buf).is_some()
-    }
-}
-
-#[derive(Clone)]
-struct ReservedField {
-    name: String,
-    buf: LookupBuf,
-}
-
-impl ReservedField {
-    fn new(name: String, buf: LookupBuf) -> Self {
-        Self { name, buf }
-    }
-}
-
-impl Query for ReservedField {
-    fn exists(&self, obj: &Value) -> bool {
-        let value = match obj.get_by_path(&self.buf) {
-            Some(v) => v,
-            _ => return false,
-        };
-
-        if self.name == "tags" {
-            return match value {
-                Value::Array(v) => v.iter().any(|v| v == obj),
-                _ => false,
-            };
-        }
-
-        true
-    }
-}
-
-#[derive(Clone)]
-struct TagField {
-    tag: String,
-    tag_with_suffix: String,
-    buf: LookupBuf,
-}
-
-impl TagField {
-    fn new(tag: String, buf: LookupBuf) -> Self {
-        let tag_with_suffix = format!("{}:", tag);
-
-        Self {
-            tag,
-            tag_with_suffix,
-            buf,
-        }
-    }
-}
-
-impl Query for TagField {
-    fn exists(&self, obj: &Value) -> bool {
-        let value = match obj.get_by_path(&self.buf) {
-            Some(v) => v,
-            _ => return false,
-        };
-
-        match value {
-            Value::Array(v) => v.iter().any(|v| {
-                let str_value = string_value(v);
-
-                // The tag matches using either 'key' or 'key:value' syntax.
-                str_value == self.tag || str_value.starts_with(&self.tag_with_suffix)
-            }),
-            _ => false,
-        }
-    }
-}
-
-impl Query for Vec<Box<dyn Query>> {
-    fn exists(&self, obj: &Value) -> bool {
-        self.iter().any(|query| query.exists(obj))
-    }
-}
-
-trait MatchRunner: DynClone + std::fmt::Debug {
+trait MatchRunner: DynClone + std::fmt::Debug + Send + Sync {
     fn run(&self, obj: &Value) -> bool;
 }
 
 dyn_clone::clone_trait_object!(MatchRunner);
 
 #[derive(Clone)]
-struct Container<T: Fn(&Value) -> bool + Send + Sync + Clone> {
+struct Func<T: Fn(&Value) -> bool + Send + Sync + Clone> {
     func: T,
 }
 
-impl<T: Fn(&Value) -> bool + Send + Sync + Clone> MatchRunner for Container<T> {
+impl<T: Fn(&Value) -> bool + Send + Sync + Clone> Func<T> {
+    fn boxed(func: T) -> Box<Self> {
+        Box::new(Self { func })
+    }
+}
+
+impl<T: Fn(&Value) -> bool + Send + Sync + Clone> MatchRunner for Func<T> {
     fn run(&self, obj: &Value) -> bool {
         (self.func)(obj)
     }
 }
 
-impl<T: Fn(&Value) -> bool + Send + Sync + Clone> std::fmt::Debug for Container<T> {
+impl<T: Fn(&Value) -> bool + Send + Sync + Clone> std::fmt::Debug for Func<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "Datadog matcher fn")
     }
 }
 
-/// Returns a vector of queryable fields based on the normalized field type.
-fn attr_to_queries<T: AsRef<str>>(attr: T) -> Vec<Box<dyn Query>> {
+/// Returns a vector of lookup fields based on the normalized field type.
+fn attr_to_lookup_fields<T: AsRef<str>>(attr: T) -> Vec<(Field, LookupBuf)> {
     normalize_fields(attr)
         .into_iter()
-        .filter_map(|field| {
-            lookup_field(&field).map(move |buf| match field {
-                Field::Default(name) => Box::new(DefaultField::new(name, buf)) as Box<dyn Query>,
-                Field::Reserved(name) => Box::new(ReservedField::new(name, buf)),
-                Field::Facet(name) => Box::new(FacetField::new(name, buf)),
-                Field::Tag(tag) => Box::new(TagField::new(tag, buf)),
-            })
-        })
+        .filter_map(|field| lookup_field(&field).map(move |buf| (field, buf)))
         .collect()
+}
+
+fn resolve_value(buf: LookupBuf, match_fn: Box<dyn MatchRunner>) -> Box<dyn MatchRunner> {
+    let func = move |obj: &Value| {
+        // Get the value by path, or return early with `false` if it doesn't exist.
+        let value = match obj.get_by_path(&buf) {
+            Some(v) => v,
+            _ => return false,
+        };
+
+        match_fn.run(value)
+    };
+
+    Func::boxed(func)
 }
 
 impl MatchRunner for bool {
@@ -265,37 +162,84 @@ impl MatchRunner for bool {
     }
 }
 
-fn build_matcher(node: &QueryNode) -> Box<dyn MatchRunner + Send + Sync> {
+fn build_not(func: Box<dyn MatchRunner>) -> Box<dyn MatchRunner> {
+    Func::boxed(move |obj| !func.run(obj))
+}
+
+fn build_exists(field: Field) -> Box<dyn MatchRunner> {
+    match field {
+        // Tags need to check the element value.
+        Field::Tag(tag) => {
+            let starts_with = format!("{}:", tag);
+
+            Box::new(Func {
+                func: move |obj| match obj {
+                    Value::Array(v) => v.iter().any(|v| {
+                        let str_value = string_value(v);
+
+                        // The tag matches using either 'key' or 'key:value' syntax.
+                        str_value == tag || str_value.starts_with(&starts_with)
+                    }),
+                    _ => false,
+                },
+            })
+        }
+        // Literal field 'tags' needs to be compared by key.
+        Field::Reserved(f) if f == "tags" => Box::new(Func {
+            func: |obj| match obj {
+                Value::Array(v) => v.iter().any(|v| v == obj),
+                _ => false,
+            },
+        }),
+        // Other field types have already resolved at this point, so just return true.
+        _ => Box::new(true),
+    }
+}
+
+fn any(queries: Vec<Box<dyn MatchRunner>>) -> Box<dyn MatchRunner> {
+    let func = move |obj: &Value| queries.iter().any(|func| func.run(obj));
+    Func::boxed(func)
+}
+
+fn all(queries: Vec<Box<dyn MatchRunner>>) -> Box<dyn MatchRunner> {
+    let func = move |obj: &Value| queries.iter().all(|func| func.run(obj));
+    Func::boxed(func)
+}
+
+fn build_matcher(node: &QueryNode) -> Box<dyn MatchRunner> {
     match node {
         QueryNode::MatchNoDocs => Box::new(false),
         QueryNode::MatchAllDocs => Box::new(true),
         QueryNode::AttributeExists { attr } => {
-            let queries = attr_to_queries(attr);
-            Box::new(Container {
-                func: move |obj| queries.iter().any(|q| q.exists(obj)),
-            })
+            let queries = attr_to_lookup_fields(attr)
+                .into_iter()
+                .map(|(field, buf)| resolve_value(buf, build_exists(field)))
+                .collect::<Vec<_>>();
+
+            any(queries)
         }
         QueryNode::AttributeMissing { attr } => {
-            let queries = attr_to_queries(attr);
+            let queries = attr_to_lookup_fields(attr)
+                .into_iter()
+                .map(|(field, buf)| build_not(resolve_value(buf, build_exists(field))))
+                .collect::<Vec<_>>();
 
-            Box::new(Container {
-                func: move |obj| queries.iter().all(|q| !q.exists(obj)),
-            })
+            all(queries)
         }
-        QueryNode::NegatedNode { node } => {
-            let func = build_matcher(node);
-            Box::new(Container {
-                func: move |obj| !func.run(obj),
-            })
-        }
+        // QueryNode::AttributeTerm { attr, value }
+        // | QueryNode::QuotedAttribute {
+        //     attr,
+        //     phrase: value,
+        // } => equals(attr, obj, value),
+        QueryNode::NegatedNode { node } => build_not(build_matcher(node)),
         QueryNode::Boolean { oper, nodes } => {
             let funcs = nodes.iter().map(build_matcher).collect::<Vec<_>>();
 
             match oper {
-                BooleanType::And => Box::new(Container {
+                BooleanType::And => Box::new(Func {
                     func: move |obj| funcs.iter().all(|func| func.run(obj)),
                 }),
-                BooleanType::Or => Box::new(Container {
+                BooleanType::Or => Box::new(Func {
                     func: move |obj| funcs.iter().any(|func| func.run(obj)),
                 }),
             }
