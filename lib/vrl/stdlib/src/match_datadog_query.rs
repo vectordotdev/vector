@@ -117,7 +117,7 @@ trait Matcher: DynClone + std::fmt::Debug + Send + Sync {
 
 dyn_clone::clone_trait_object!(Matcher);
 
-/// Ccontainer for holding a thread-safe function type that can receive a VRL
+/// Container for holding a thread-safe function type that can receive a VRL
 /// `Value`, and return true/false some internal expression.
 #[derive(Clone)]
 struct Match<T: Fn(&Value) -> bool + Send + Sync + Clone> {
