@@ -383,6 +383,34 @@ fn build_range(
     }
 }
 
+fn build_wildcard_with_prefix(field: Field, prefix: String) -> Box<dyn MatchRunner> {
+    match field {
+        // Default fields are matched by word boundary.
+        Field::Default(_) => {
+            let re = word_regex(&format!("{}*", prefix));
+
+            Box::new(Func {
+                func: move |value| re.is_match(&string_value(value)),
+            })
+        }
+        // Tags are recursed until a match is found.
+        Field::Tag(tag) => {
+            let starts_with = format!("{}:{}", tag, prefix);
+
+            Box::new(Func {
+                func: move |value| match value {
+                    Value::Array(v) => v.iter().any(|v| string_value(v).starts_with(&starts_with)),
+                    _ => false,
+                },
+            })
+        }
+        // All other field types are compared by complete value.
+        _ => Box::new(Func {
+            func: move |value| string_value(value).starts_with(&prefix),
+        }),
+    }
+}
+
 fn any(queries: Vec<Box<dyn MatchRunner>>) -> Box<dyn MatchRunner> {
     let func = move |obj: &Value| queries.iter().any(|func| func.run(obj));
     Func::boxed(func)
@@ -434,6 +462,16 @@ fn build_matcher(node: &QueryNode) -> Box<dyn MatchRunner> {
                 .into_iter()
                 .map(|(field, buf)| {
                     resolve_value(buf, build_compare(field, *comparator, value.clone()))
+                })
+                .collect::<Vec<_>>();
+
+            any(queries)
+        }
+        QueryNode::AttributePrefix { attr, prefix } => {
+            let queries = attr_to_lookup_fields(attr)
+                .into_iter()
+                .map(|(field, buf)| {
+                    resolve_value(buf, build_wildcard_with_prefix(field, prefix.clone()))
                 })
                 .collect::<Vec<_>>();
 
