@@ -136,18 +136,7 @@ impl LoadableConfig for ConfigBuilder {
                 self.transforms.extend(transforms);
                 Ok(warnings)
             }
-            Some(name) => {
-                // ignore hidden folders
-                if name.starts_with('.') {
-                    Ok(Vec::new())
-                } else {
-                    Ok(vec![format!(
-                        "Couldn't identify component type for folder {:?}",
-                        path
-                    )])
-                }
-            }
-            None => Ok(Vec::new()),
+            _ => Ok(Vec::new()),
         }
     }
 }
@@ -432,15 +421,9 @@ mod tests {
     }
 
     #[test]
-    fn load_namespacing_failing() {
+    fn load_namespacing_unknown_folders() {
         let path = PathBuf::from(".").join("tests").join("namespacing-fail");
-        let configs = vec![ConfigPath::Dir(path.clone())];
-        let (_, warns) = load_builder_from_paths(&configs).unwrap();
-        assert_eq!(warns.len(), 1);
-        let msg = format!(
-            "Couldn't identify component type for folder {:?}",
-            path.join("foo")
-        );
-        assert_eq!(warns[0], msg);
+        let configs = vec![ConfigPath::Dir(path)];
+        assert!(load_builder_from_paths(&configs).is_ok());
     }
 }
