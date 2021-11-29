@@ -59,7 +59,7 @@ pub struct SplunkConfig {
     #[serde(deserialize_with = "bool_or_struct")]
     acknowledgements: HecAcknowledgementsConfig,
     /// Splunk HEC token passthrough
-    store_hec_token: bool
+    store_hec_token: bool,
 }
 
 inventory::submit! {
@@ -216,6 +216,7 @@ impl SplunkSource {
             .and(warp::path::full())
             .and_then(
                 move |_,
+                      token: Option<String>,
                       channel: Option<String>,
                       remote: Option<SocketAddr>,
                       xff: Option<String>,
@@ -288,6 +289,7 @@ impl SplunkSource {
             .and(warp::path::full())
             .and_then(
                 move |_,
+                      token: Option<String>,
                       channel_id: String,
                       remote: Option<SocketAddr>,
                       xff: Option<String>,
@@ -356,7 +358,7 @@ impl SplunkSource {
             .and(self.authorization())
             .and(SplunkSource::required_channel())
             .and(warp::body::json())
-            .and_then(move |channel_id: String, body: HecAckStatusRequest| {
+            .and_then(move |_, channel_id: String, body: HecAckStatusRequest| {
                 let idx_ack = idx_ack.clone();
                 async move {
                     if let Some(idx_ack) = idx_ack {
@@ -393,21 +395,22 @@ impl SplunkSource {
     }
 
     /// Authorize request
-    fn authorization(&self) -> BoxedFilter<()> {
+    fn authorization(&self) -> BoxedFilter<(Option<String>,)> {
         let valid_credentials = self.valid_credentials.clone();
         warp::header::optional("Authorization")
             .and_then(move |token: Option<String>| {
                 let valid_credentials = valid_credentials.clone();
                 async move {
                     match (token, valid_credentials.is_empty()) {
-                        (_, true) => Ok(()),
-                        (Some(token), false) if valid_credentials.contains(&token) => Ok(()),
+                        (token, true) => Ok(token),
+                        (Some(token), false) if valid_credentials.contains(&token) => {
+                            Ok(Some(token))
+                        }
                         (Some(_), false) => Err(Rejection::from(ApiError::InvalidAuthorization)),
                         (None, false) => Err(Rejection::from(ApiError::MissingAuthorization)),
                     }
                 }
             })
-            .untuple_one()
             .boxed()
     }
 
