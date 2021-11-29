@@ -54,17 +54,19 @@ impl Function for MatchDatadogQuery {
         // Query should always be a string.
         let query = query_value
             .try_bytes_utf8_lossy()
-            .expect("datadog search query not bytes");
+            .expect("datadog search query should be a UTF8 string");
 
         // Compile the Datadog search query to AST.
         let node = parse(&query).map_err(|e| {
             Box::new(ExpressionError::from(e.to_string())) as Box<dyn DiagnosticError>
         })?;
 
-        // Build the matcher function that accepts a VRL event value, based on the current node.
-        let match_fn = build_matcher(&node);
+        // Build the matcher function that accepts a VRL event value. This will parse the `node`
+        // at boot-time and return a boxed func that contains just the logic required to match a
+        // VRL `Value` against the Datadog Search Syntax literal.
+        let matcher = build_matcher(&node);
 
-        Ok(Box::new(MatchDatadogQueryFn { value, match_fn }))
+        Ok(Box::new(MatchDatadogQueryFn { value, matcher }))
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -86,14 +88,16 @@ impl Function for MatchDatadogQuery {
 #[derive(Debug, Clone)]
 struct MatchDatadogQueryFn {
     value: Box<dyn Expression>,
-    match_fn: Box<dyn MatchRunner>,
+    matcher: Box<dyn Matcher>,
 }
 
 impl Expression for MatchDatadogQueryFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?.try_object()?;
 
-        Ok(self.match_fn.run(&Value::Object(value)).into())
+        // Provide the current VRL event `Value` to the matcher function to determine
+        // whether the data matches the given Datadog Search syntax literal.
+        Ok(self.matcher.run(&Value::Object(value)).into())
     }
 
     fn type_def(&self, _state: &state::Compiler) -> TypeDef {
@@ -105,12 +109,16 @@ fn type_def() -> TypeDef {
     TypeDef::new().infallible().boolean()
 }
 
-trait MatchRunner: DynClone + std::fmt::Debug + Send + Sync {
+/// A `Matcher` contains a single method ("run") which is passed a VRL value, and returns
+/// `true` if matches an expression determined by the Matcher implementor.
+trait Matcher: DynClone + std::fmt::Debug + Send + Sync {
     fn run(&self, obj: &Value) -> bool;
 }
 
-dyn_clone::clone_trait_object!(MatchRunner);
+dyn_clone::clone_trait_object!(Matcher);
 
+/// A `Func` is a container for holding a thread-safe function type that can receive a VRL
+/// `Value`, and return true/false some internal expression.
 #[derive(Clone)]
 struct Func<T: Fn(&Value) -> bool + Send + Sync + Clone> {
     func: T,
@@ -122,7 +130,7 @@ impl<T: Fn(&Value) -> bool + Send + Sync + Clone> Func<T> {
     }
 }
 
-impl<T: Fn(&Value) -> bool + Send + Sync + Clone> MatchRunner for Func<T> {
+impl<T: Fn(&Value) -> bool + Send + Sync + Clone> Matcher for Func<T> {
     fn run(&self, obj: &Value) -> bool {
         (self.func)(obj)
     }
@@ -142,7 +150,7 @@ fn attr_to_lookup_fields<T: AsRef<str>>(attr: T) -> Vec<(Field, LookupBuf)> {
         .collect()
 }
 
-fn resolve_value(buf: LookupBuf, match_fn: Box<dyn MatchRunner>) -> Box<dyn MatchRunner> {
+fn resolve_value(buf: LookupBuf, match_fn: Box<dyn Matcher>) -> Box<dyn Matcher> {
     let func = move |obj: &Value| {
         // Get the value by path, or return early with `false` if it doesn't exist.
         let value = match obj.get_by_path(&buf) {
@@ -156,17 +164,17 @@ fn resolve_value(buf: LookupBuf, match_fn: Box<dyn MatchRunner>) -> Box<dyn Matc
     Func::boxed(func)
 }
 
-impl MatchRunner for bool {
+impl Matcher for bool {
     fn run(&self, _obj: &Value) -> bool {
         *self
     }
 }
 
-fn build_not(func: Box<dyn MatchRunner>) -> Box<dyn MatchRunner> {
+fn build_not(func: Box<dyn Matcher>) -> Box<dyn Matcher> {
     Func::boxed(move |obj| !func.run(obj))
 }
 
-fn build_exists(field: Field) -> Box<dyn MatchRunner> {
+fn build_exists(field: Field) -> Box<dyn Matcher> {
     match field {
         // Tags need to check the element value.
         Field::Tag(tag) => {
@@ -197,7 +205,7 @@ fn build_exists(field: Field) -> Box<dyn MatchRunner> {
 }
 
 /// Returns true if the provided VRL `Value` matches the `to_match` string.
-fn build_equals(field: Field, to_match: String) -> Box<dyn MatchRunner> {
+fn build_equals(field: Field, to_match: String) -> Box<dyn Matcher> {
     match field {
         // Default fields are compared by word boundary.
         Field::Default(_) => {
@@ -237,11 +245,13 @@ fn build_equals(field: Field, to_match: String) -> Box<dyn MatchRunner> {
     }
 }
 
-fn build_compare(
+/// Returns a boxed `Matcher` that compares a VRL `Value` with a Datadog Search Syntax value.
+/// Compatible with all value comparison operators. Handles strings and numeric values.
+fn compare(
     field: Field,
     comparator: Comparison,
     comparison_value: ComparisonValue,
-) -> Box<dyn MatchRunner> {
+) -> Box<dyn Matcher> {
     let rhs = Cow::from(comparison_value.to_string());
 
     match field {
@@ -327,14 +337,15 @@ fn build_compare(
     }
 }
 
-/// Returns true if the provided `Value` matches on the lower and upper bound.
-fn build_range(
+/// Returns a boxed `Matcher` that determines whether a VRL value falls within a provided
+/// Datadog Search Syntax value range. Handles strings and numeric values.
+fn range(
     field: Field,
     lower: ComparisonValue,
     lower_inclusive: bool,
     upper: ComparisonValue,
     upper_inclusive: bool,
-) -> Box<dyn MatchRunner> {
+) -> Box<dyn Matcher> {
     match (&lower, &upper) {
         // If both bounds are wildcards, just check that the field exists to catch the
         // special case for "tags".
@@ -347,7 +358,7 @@ fn build_range(
                 Comparison::Lt
             };
 
-            build_compare(field, op, upper)
+            compare(field, op, upper)
         }
         // Unbounded upper.
         (_, ComparisonValue::Unbounded) => {
@@ -357,7 +368,7 @@ fn build_range(
                 Comparison::Gt
             };
 
-            build_compare(field, op, lower)
+            compare(field, op, lower)
         }
         // Definitive range.
         _ => {
@@ -373,8 +384,8 @@ fn build_range(
                 Comparison::Lt
             };
 
-            let lower_func = build_compare(field.clone(), lower_op, lower);
-            let upper_func = build_compare(field, upper_op, upper);
+            let lower_func = compare(field.clone(), lower_op, lower);
+            let upper_func = compare(field, upper_op, upper);
 
             Box::new(Func {
                 func: move |value| lower_func.run(value) && upper_func.run(value),
@@ -383,7 +394,8 @@ fn build_range(
     }
 }
 
-fn build_wildcard_with_prefix(field: Field, prefix: String) -> Box<dyn MatchRunner> {
+/// Returns a boxed `Matcher`
+fn wildcard_with_prefix(field: Field, prefix: String) -> Box<dyn Matcher> {
     match field {
         // Default fields are matched by word boundary.
         Field::Default(_) => {
@@ -411,7 +423,7 @@ fn build_wildcard_with_prefix(field: Field, prefix: String) -> Box<dyn MatchRunn
     }
 }
 
-fn build_wildcard(field: Field, wildcard: &str) -> Box<dyn MatchRunner> {
+fn build_wildcard(field: Field, wildcard: &str) -> Box<dyn Matcher> {
     match field {
         Field::Default(_) => {
             let re = word_regex(wildcard);
@@ -440,17 +452,17 @@ fn build_wildcard(field: Field, wildcard: &str) -> Box<dyn MatchRunner> {
     }
 }
 
-fn any(queries: Vec<Box<dyn MatchRunner>>) -> Box<dyn MatchRunner> {
+fn any(queries: Vec<Box<dyn Matcher>>) -> Box<dyn Matcher> {
     let func = move |obj: &Value| queries.iter().any(|func| func.run(obj));
     Func::boxed(func)
 }
 
-fn all(queries: Vec<Box<dyn MatchRunner>>) -> Box<dyn MatchRunner> {
+fn all(queries: Vec<Box<dyn Matcher>>) -> Box<dyn Matcher> {
     let func = move |obj: &Value| queries.iter().all(|func| func.run(obj));
     Func::boxed(func)
 }
 
-fn build_matcher(node: &QueryNode) -> Box<dyn MatchRunner> {
+fn build_matcher(node: &QueryNode) -> Box<dyn Matcher> {
     match node {
         QueryNode::MatchNoDocs => Box::new(false),
         QueryNode::MatchAllDocs => Box::new(true),
@@ -489,9 +501,7 @@ fn build_matcher(node: &QueryNode) -> Box<dyn MatchRunner> {
         } => {
             let queries = attr_to_lookup_fields(attr)
                 .into_iter()
-                .map(|(field, buf)| {
-                    resolve_value(buf, build_compare(field, *comparator, value.clone()))
-                })
+                .map(|(field, buf)| resolve_value(buf, compare(field, *comparator, value.clone())))
                 .collect::<Vec<_>>();
 
             any(queries)
@@ -499,9 +509,7 @@ fn build_matcher(node: &QueryNode) -> Box<dyn MatchRunner> {
         QueryNode::AttributePrefix { attr, prefix } => {
             let queries = attr_to_lookup_fields(attr)
                 .into_iter()
-                .map(|(field, buf)| {
-                    resolve_value(buf, build_wildcard_with_prefix(field, prefix.clone()))
-                })
+                .map(|(field, buf)| resolve_value(buf, wildcard_with_prefix(field, prefix.clone())))
                 .collect::<Vec<_>>();
 
             any(queries)
@@ -526,7 +534,7 @@ fn build_matcher(node: &QueryNode) -> Box<dyn MatchRunner> {
                 .map(|(field, buf)| {
                     resolve_value(
                         buf,
-                        build_range(
+                        range(
                             field,
                             lower.clone(),
                             *lower_inclusive,
