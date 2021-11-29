@@ -327,6 +327,62 @@ fn build_compare(
     }
 }
 
+/// Returns true if the provided `Value` matches on the lower and upper bound.
+fn build_range<T: AsRef<str> + Copy>(
+    field: Field,
+    lower: ComparisonValue,
+    lower_inclusive: bool,
+    upper: ComparisonValue,
+    upper_inclusive: bool,
+) -> Box<dyn MatchRunner> {
+    match (&lower, &upper) {
+        // If both bounds are wildcards, just check that the field exists to catch the
+        // special case for "tags".
+        (ComparisonValue::Unbounded, ComparisonValue::Unbounded) => build_exists(field),
+        // Unbounded lower.
+        (ComparisonValue::Unbounded, _) => {
+            let op = if upper_inclusive {
+                Comparison::Lte
+            } else {
+                Comparison::Lt
+            };
+
+            build_compare(field, op, upper)
+        }
+        // Unbounded upper.
+        (_, ComparisonValue::Unbounded) => {
+            let op = if lower_inclusive {
+                Comparison::Gte
+            } else {
+                Comparison::Gt
+            };
+
+            build_compare(field, op, lower)
+        }
+        // Definitive range.
+        _ => {
+            let lower_op = if lower_inclusive {
+                Comparison::Gte
+            } else {
+                Comparison::Gt
+            };
+
+            let upper_op = if upper_inclusive {
+                Comparison::Lte
+            } else {
+                Comparison::Lt
+            };
+
+            let lower_func = build_compare(field.clone(), lower_op, lower);
+            let upper_func = build_compare(field, upper_op, upper);
+
+            Box::new(Func {
+                func: move |value| lower_func.run(value) && upper_func.run(value),
+            })
+        }
+    }
+}
+
 fn any(queries: Vec<Box<dyn MatchRunner>>) -> Box<dyn MatchRunner> {
     let func = move |obj: &Value| queries.iter().any(|func| func.run(obj));
     Func::boxed(func)
