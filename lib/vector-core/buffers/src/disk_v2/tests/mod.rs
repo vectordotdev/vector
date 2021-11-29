@@ -1,5 +1,6 @@
 use std::io;
 use std::path::Path;
+use std::sync::Arc;
 
 use bytes::{Buf, BufMut};
 use core_common::byte_size_of::ByteSizeOf;
@@ -9,6 +10,8 @@ use temp_dir::TempDir;
 use crate::bytes::{DecodeBytes, EncodeBytes};
 use crate::disk_v2::{Buffer, DiskBufferConfig, Reader, Writer};
 use crate::Bufferable;
+
+use super::Ledger;
 
 mod basic;
 mod invariants;
@@ -66,12 +69,12 @@ impl DecodeBytes<SizedRecord> for SizedRecord {
     }
 }
 
-pub(crate) async fn create_default_buffer<P, R>(data_dir: P) -> (Writer<R>, Reader<R>)
+pub(crate) async fn create_default_buffer<P, R>(data_dir: P) -> (Writer<R>, Reader<R>, Arc<Ledger>)
 where
     P: AsRef<Path>,
     R: Bufferable,
 {
-    Buffer::from_config(DiskBufferConfig::from_path(data_dir).build())
+    Buffer::from_config_inner(DiskBufferConfig::from_path(data_dir).build())
         .await
         .expect("should not fail to create buffer")
 }
@@ -79,7 +82,7 @@ where
 pub(crate) async fn create_buffer_with_max_buffer_size<P, R>(
     data_dir: P,
     max_buffer_size: u64,
-) -> (Writer<R>, Reader<R>)
+) -> (Writer<R>, Reader<R>, Arc<Ledger>)
 where
     P: AsRef<Path>,
     R: Bufferable,
@@ -89,7 +92,7 @@ where
     let mut config = DiskBufferConfig::from_path(data_dir).build();
     config.max_buffer_size = max_buffer_size;
 
-    Buffer::from_config(config)
+    Buffer::from_config_inner(config)
         .await
         .expect("should not fail to create buffer")
 }
@@ -97,7 +100,7 @@ where
 pub(crate) async fn create_buffer_with_max_record_size<P, R>(
     data_dir: P,
     max_record_size: usize,
-) -> (Writer<R>, Reader<R>)
+) -> (Writer<R>, Reader<R>, Arc<Ledger>)
 where
     P: AsRef<Path>,
     R: Bufferable,
@@ -106,7 +109,7 @@ where
         .max_record_size(max_record_size)
         .build();
 
-    Buffer::from_config(config)
+    Buffer::from_config_inner(config)
         .await
         .expect("should not fail to create buffer")
 }
@@ -114,7 +117,7 @@ where
 pub(crate) async fn create_buffer_with_max_data_file_size<P, R>(
     data_dir: P,
     max_data_file_size: u64,
-) -> (Writer<R>, Reader<R>)
+) -> (Writer<R>, Reader<R>, Arc<Ledger>)
 where
     P: AsRef<Path>,
     R: Bufferable,
@@ -123,7 +126,7 @@ where
         .max_data_file_size(max_data_file_size)
         .build();
 
-    Buffer::from_config(config)
+    Buffer::from_config_inner(config)
         .await
         .expect("should not fail to create buffer")
 }

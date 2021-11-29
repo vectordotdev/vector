@@ -16,7 +16,7 @@ async fn writer_error_when_record_is_over_the_limit() {
             //
             // The sizes are different so that we can assert that we got back the expected record at
             // each read we perform.
-            let (mut writer, reader) = create_buffer_with_max_record_size(data_dir, 100).await;
+            let (mut writer, reader, _) = create_buffer_with_max_record_size(data_dir, 100).await;
             let first_write_size = 95;
             let second_write_size = 97;
 
@@ -84,7 +84,8 @@ async fn writer_waits_when_buffer_is_full() {
             //
             // The sizes are different so that we can assert that we got back the expected record at
             // each read we perform.
-            let (mut writer, mut reader) = create_buffer_with_max_buffer_size(data_dir, 100).await;
+            let (mut writer, mut reader, _) =
+                create_buffer_with_max_buffer_size(data_dir, 100).await;
             let first_write_size = 92;
             let second_write_size = 96;
 
@@ -181,7 +182,7 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded() {
             //
             // The sizes are different so that we can assert that we got back the expected record at
             // each read we perform.
-            let (mut writer, mut reader) =
+            let (mut writer, mut reader, _) =
                 create_buffer_with_max_data_file_size(data_dir, 100).await;
             let first_write_size = 92;
             let second_write_size = 96;

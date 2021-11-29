@@ -7,7 +7,7 @@ async fn basic_read_write_loop() {
 
         async move {
             // Create a regular buffer, no customizations required.
-            let (mut writer, mut reader) = create_default_buffer(data_dir).await;
+            let (mut writer, mut reader, _) = create_default_buffer(data_dir).await;
 
             assert_eq!(reader.get_total_records(), 0);
             assert_eq!(reader.get_total_buffer_size(), 0);

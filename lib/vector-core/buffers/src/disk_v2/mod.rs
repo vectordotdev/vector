@@ -91,7 +91,6 @@
 //!
 //! # Implementation TODOs:
 //!
-//! - test what happens when record ID rolls over
 //! - test what happens when reader is waiting for writer to open next data file (i'm not even sure
 //!   this is actually possible since we always ensure the writer is ready to write while
 //!   constructing the buffer, which means a file will be present, but technically our code could
@@ -115,9 +114,11 @@ mod tests;
 
 use crate::Bufferable;
 
+pub(crate) use self::ledger::Ledger;
+
 pub use self::{
     common::{DiskBufferConfig, DiskBufferConfigBuilder},
-    ledger::{Ledger, LedgerLoadCreateError},
+    ledger::LedgerLoadCreateError,
     reader::{Reader, ReaderError},
     writer::{Writer, WriterError},
 };
@@ -144,9 +145,9 @@ where
     T: Bufferable,
 {
     #[cfg_attr(test, instrument(level = "trace"))]
-    pub async fn from_config(
+    pub(crate) async fn from_config_inner(
         config: DiskBufferConfig,
-    ) -> Result<(Writer<T>, Reader<T>), BufferError<T>> {
+    ) -> Result<(Writer<T>, Reader<T>, Arc<Ledger>), BufferError<T>> {
         let ledger = Ledger::load_or_create(config).await.context(LedgerError)?;
         let ledger = Arc::new(ledger);
 
@@ -156,11 +157,20 @@ where
             .await
             .context(WriterSeekFailed)?;
 
-        let mut reader = Reader::new(ledger);
+        let mut reader = Reader::new(Arc::clone(&ledger));
         reader
             .seek_to_next_record()
             .await
             .context(ReaderSeekFailed)?;
+
+        Ok((writer, reader, ledger))
+    }
+
+    #[cfg_attr(test, instrument(level = "trace"))]
+    pub async fn from_config(
+        config: DiskBufferConfig,
+    ) -> Result<(Writer<T>, Reader<T>), BufferError<T>> {
+        let (writer, reader, _) = Self::from_config_inner(config).await?;
 
         Ok((writer, reader))
     }

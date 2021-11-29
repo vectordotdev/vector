@@ -1,8 +1,8 @@
-use tokio_test::{assert_pending, assert_ready, task::spawn};
+use tokio_test::{assert_pending, task::spawn};
 use tracing_fluent_assertions::{Controller, FluentAssertionsLayer};
-use tracing_subscriber::{layer::SubscriberExt, EnvFilter, Registry};
+use tracing_subscriber::{layer::SubscriberExt, Registry};
 
-use crate::disk_v2::common::MAX_FILE_ID;
+use crate::disk_v2::{common::MAX_FILE_ID, tests::create_default_buffer};
 
 use super::{create_buffer_with_max_data_file_size, with_temp_dir, SizedRecord};
 
@@ -16,7 +16,7 @@ async fn file_id_wraps_around_when_max_file_id_hit() {
 
             // Create our buffer with an arbitrarily low max data file size, which will let us
             // quickly run through the file ID range.
-            let (mut writer, mut reader) =
+            let (mut writer, mut reader, _) =
                 create_buffer_with_max_data_file_size(data_dir, record_size as u64).await;
 
             assert_eq!(reader.get_total_records(), 0);
@@ -96,7 +96,7 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
 
             // Create our buffer with an arbitrarily low max data file size, which will let us
             // quickly run through the file ID range.
-            let (mut writer, mut reader) =
+            let (mut writer, mut reader, _) =
                 create_buffer_with_max_data_file_size(data_dir, record_size as u64).await;
 
             assert_eq!(reader.get_total_records(), 0);
@@ -181,6 +181,87 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
             assert_eq!(reader.get_current_reader_file_id(), 1);
             assert_eq!(writer.get_total_records(), 31);
             assert_eq!(writer.get_current_writer_file_id(), 0);
+        }
+    })
+    .await
+}
+
+#[tokio::test]
+async fn reader_still_works_when_record_id_wraps_around() {
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            // Create a simple buffer.
+            let (_, _, ledger) = create_default_buffer::<_, SizedRecord>(data_dir.clone()).await;
+
+            assert_eq!(ledger.state().get_total_records(), 0);
+            assert_eq!(ledger.state().get_total_buffer_size(), 0);
+            assert_eq!(ledger.state().get_current_reader_file_id(), 0);
+            assert_eq!(ledger.state().get_current_writer_file_id(), 0);
+
+            // Adjust the record IDs manually so they comes right before the rollover event.
+            //
+            // We have to adjust both the writer and reader record ID markers.
+            unsafe {
+                ledger.state().unsafe_set_writer_next_record_id(u64::MAX);
+            }
+            unsafe {
+                ledger
+                    .state()
+                    .unsafe_set_reader_last_record_id(u64::MAX - 1);
+            }
+
+            ledger.flush().expect("ledger should not fail to flush");
+            assert_eq!(u64::MAX, ledger.state().get_next_writer_record_id());
+            assert_eq!(u64::MAX - 1, ledger.state().get_last_reader_record_id());
+
+            // We know that the reader will get angry when it goes to read a record, because at
+            // startup it determined that the next record it reads should have a record ID of 1.
+            //
+            // The final step to get our ledger into the correct state is to simply reload the
+            // buffer entirely, so the reader and writer initialize themselves with the ledger
+            // stating that we're close to having written 2^64 records already.
+            drop(ledger);
+
+            let (mut writer, mut reader, ledger) = create_default_buffer(data_dir).await;
+
+            // Now we do two writes: one which uses u64::MAX, and another which will get the rolled
+            // over value and go back to 0.
+            let first_record_size = 14;
+            let bytes_written = writer
+                .write_record(SizedRecord(first_record_size))
+                .await
+                .expect("should not be error");
+            // `SizedRecord` has a 4-byte header for the payload length.
+            assert!(bytes_written > first_record_size as usize + 4);
+            assert_eq!(0, ledger.state().get_next_writer_record_id());
+
+            writer.flush().await.expect("writer flush should not fail");
+
+            let second_record_size = 256;
+            let bytes_written = writer
+                .write_record(SizedRecord(second_record_size))
+                .await
+                .expect("should not be error");
+            // `SizedRecord` has a 4-byte header for the payload length.
+            assert!(bytes_written > second_record_size as usize + 4);
+            assert_eq!(1, ledger.state().get_next_writer_record_id());
+
+            writer.flush().await.expect("writer flush should not fail");
+
+            assert_eq!(ledger.state().get_total_records(), 2);
+
+            // Now we should be able to read both records without the reader getting angry.
+            let first_record_read = reader.next().await.expect("read should not fail");
+            assert_eq!(first_record_read, Some(SizedRecord(first_record_size)));
+            assert_eq!(u64::MAX, ledger.state().get_last_reader_record_id());
+            assert_eq!(ledger.state().get_total_records(), 1);
+
+            let second_record_read = reader.next().await.expect("read should not fail");
+            assert_eq!(second_record_read, Some(SizedRecord(second_record_size)));
+            assert_eq!(0, ledger.state().get_last_reader_record_id());
+            assert_eq!(ledger.state().get_total_records(), 0);
         }
     })
     .await

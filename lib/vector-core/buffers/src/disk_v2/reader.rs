@@ -287,7 +287,7 @@ where
             return;
         }
 
-        let id_delta = record_id - previous_id;
+        let id_delta = record_id.wrapping_sub(previous_id);
         match id_delta {
             // IDs should always move forward by one.
             0 => panic!("delta should always be one or more"),
@@ -332,19 +332,32 @@ where
     /// This ensures that a subsequent call to `next` is ready to read the correct record.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub(crate) async fn seek_to_next_record(&mut self) -> Result<(), ReaderError<T>> {
+        // We don't try seeking again once we're all caught up.
+        if self.ready_to_read {
+            return Ok(());
+        }
+
         // We rely on `next` to close out the data file if we've actually reached the end, and we
         // also rely on it to reset the data file before trying to read, and we _also_ rely on it to
         // update `self.last_reader_record_id`, so basically... just keep reading records until we
         // get to the one we left off with last time.
-        let last_reader_record_id = self.ledger.state().get_last_reader_record_id();
+        let starting_self_last = self.last_reader_record_id;
+        let ledger_last = self.ledger.state().get_last_reader_record_id();
         trace!(
             "self.last_reader_record_id = {}, seeking to {} (per ledger)",
             self.last_reader_record_id,
-            last_reader_record_id
+            ledger_last
         );
 
-        while self.last_reader_record_id < last_reader_record_id {
-            let _ = self.next().await?;
+        while self.last_reader_record_id < ledger_last {
+            if self.next().await?.is_none() && starting_self_last == self.last_reader_record_id {
+                // The reader told us that they've hit the end of whatever file they're current on.
+                // If `self.last_reader_record_id` hasn't moved at all, compared to when we started
+                // (starting_last_reader_record_id), then we know that we're caught up, and we just
+                // need to set `self.last_reader_record_id` to match what the ledger has.
+                self.update_reader_last_record_id(ledger_last);
+                break;
+            }
         }
 
         self.ready_to_read = true;
@@ -442,22 +455,31 @@ where
             // file, then we know that if the reader/writer were not identical at the start the
             // loop, and `try_read_record` returned `None`, that we have hit the actual end of the
             // reader's current data file, and need to move on.
-            self.ledger.wait_for_writer().await;
+            if self.ready_to_read {
+                self.ledger.wait_for_writer().await;
 
-            if self.ledger.is_writer_done() && self.ledger.state().get_total_buffer_size() == 0 {
-                // NOTE: We specifically check the total buffer size as it gets updated sooner -- in
-                // `roll_to_next_data_file` -- versus total records, which needs a successful read
-                // to catch any inconsistencies in the record IDs.
-                //
-                // This means that if we encountered a corrupted record as the last record we had to
-                // read before the above if condition would be met, our `next` call would hit the
-                // corrupted record, detect that, roll to the next file, which would do the buffer
-                // size adjustments, and then the following call to `next` would fallthrough to
-                // here.
-                //
-                // The same scenario with total records would be stuck waiting as we would have no
-                // more records to read to drive the check that fixes total records when we detect
-                // skipping record IDs.
+                if self.ledger.is_writer_done() && self.ledger.state().get_total_buffer_size() == 0
+                {
+                    // NOTE: We specifically check the total buffer size as it gets updated sooner -- in
+                    // `roll_to_next_data_file` -- versus total records, which needs a successful read
+                    // to catch any inconsistencies in the record IDs.
+                    //
+                    // This means that if we encountered a corrupted record as the last record we had to
+                    // read before the above if condition would be met, our `next` call would hit the
+                    // corrupted record, detect that, roll to the next file, which would do the buffer
+                    // size adjustments, and then the following call to `next` would fallthrough to
+                    // here.
+                    //
+                    // The same scenario with total records would be stuck waiting as we would have no
+                    // more records to read to drive the check that fixes total records when we detect
+                    // skipping record IDs.
+                    return Ok(None);
+                }
+            } else {
+                // We're currently just seeking to where we left off the last time this buffer was
+                // running, which might mean there's no records for us to read at all because we
+                // were already caught up.  All we can do is signal to `seek_to_next_record` that
+                // we're caught up.
                 return Ok(None);
             }
 

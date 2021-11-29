@@ -164,6 +164,38 @@ impl ArchivedLedgerState {
         self.reader_current_data_file_id
             .store(self.get_next_reader_file_id(), Ordering::Release);
     }
+
+    #[cfg(test)]
+    pub unsafe fn unsafe_set_writer_next_record_id(&self, id: u64) {
+        // UNSAFETY:
+        // The atomic operation itself is inherently safe, but adjusting the record IDs manually is
+        // _unsafe_ because it messes with the continuity of record IDs from the perspective of the
+        // reader.
+        //
+        // This is exclusively used under test to make it possible to check certain edge cases, as
+        // writing enough records to actually increment it to the maximum value would take longer
+        // than any of us will be alive.
+        //
+        // Despite it being test-only, we're really amping up the "this is only for testing!" factor
+        // by making it an actual `unsafe` function, and putting "unsafe" in the name. :)
+        self.writer_next_record_id.store(id, Ordering::Release)
+    }
+
+    #[cfg(test)]
+    pub unsafe fn unsafe_set_reader_last_record_id(&self, id: u64) {
+        // UNSAFETY:
+        // The atomic operation itself is inherently safe, but adjusting the record IDs manually is
+        // _unsafe_ because it messes with the continuity of record IDs from the perspective of the
+        // reader.
+        //
+        // This is exclusively used under test to make it possible to check certain edge cases, as
+        // writing enough records to actually increment it to the maximum value would take longer
+        // than any of us will be alive.
+        //
+        // Despite it being test-only, we're really amping up the "this is only for testing!" factor
+        // by making it an actual `unsafe` function, and putting "unsafe" in the name. :)
+        self.reader_last_record_id.store(id, Ordering::Release)
+    }
 }
 
 pub struct Ledger {
