@@ -33,9 +33,9 @@ components: sinks: _splunk_hec: {
 	how_it_works: {
 		indexer_acknowledgements: {
 			title: "Indexer Acknowledgements"
-			body: """
+			body:  """
 				For more accurate end-to-end acknowledgements, this sink will automatically integrate with
-				[Splunk HEC indexer acknowledgements](https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/AboutHECIDXAck)
+				[Splunk HEC indexer acknowledgements](\(urls.splunk_hec_indexer_acknowledgements))
 				if the provided Splunk HEC token has the feature enabled. In other words, if `ackID`'s are present in Splunk
 				HEC responses, this sink will store and query for the status of said `ackID`'s to confirm that data has been successfully
 				delivered.
