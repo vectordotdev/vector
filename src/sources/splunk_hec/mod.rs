@@ -166,6 +166,7 @@ struct SplunkSource {
     valid_credentials: Vec<String>,
     protocol: &'static str,
     idx_ack: Option<Arc<IndexerAcknowledgement>>,
+    store_hec_token: bool,
 }
 
 impl SplunkSource {
@@ -190,6 +191,7 @@ impl SplunkSource {
                 .collect(),
             protocol,
             idx_ack,
+            store_hec_token: config.store_hec_token,
         }
     }
 
@@ -204,6 +206,7 @@ impl SplunkSource {
 
         let protocol = self.protocol;
         let idx_ack = self.idx_ack.clone();
+        let store_hec_token = self.store_hec_token;
 
         warp::post()
             .and(path!("event").or(path!("event" / "1.0")))
@@ -261,6 +264,7 @@ impl SplunkSource {
                             remote,
                             xff,
                             batch,
+                            token.filter(|_| store_hec_token).map(Into::into),
                         ));
 
                         let res = out.send_all(&mut events).await;
@@ -277,6 +281,7 @@ impl SplunkSource {
     fn raw_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
         let protocol = self.protocol;
         let idx_ack = self.idx_ack.clone();
+        let store_hec_token = self.store_hec_token;
 
         warp::post()
             .and(path!("raw" / "1.0").or(path!("raw")))
@@ -317,7 +322,10 @@ impl SplunkSource {
                             ),
                             _ => None,
                         };
-                        let event = raw_event(body, gzip, channel_id, remote, xff, batch)?;
+                        let mut event = raw_event(body, gzip, channel_id, remote, xff, batch)?;
+                        event.metadata_mut().set_splunk_hec_token(
+                            token.filter(|_| store_hec_token).map(Into::into),
+                        );
 
                         let res = out.send(event).await;
                         res.map(|_| maybe_ack_id)
@@ -329,6 +337,7 @@ impl SplunkSource {
     }
 
     fn health_service(&self) -> BoxedFilter<(Response,)> {
+        // todo: use self.authorization() here
         let valid_credentials = self.valid_credentials.clone();
         let authorize =
             warp::header::optional("Authorization").and_then(move |token: Option<String>| {
@@ -457,6 +466,8 @@ struct EventIterator<'de, R: JsonRead<'de>> {
     extractors: [DefaultExtractor; 4],
     /// Event finalization
     batch: Option<Arc<BatchNotifier>>,
+    /// Splunk HEC Token for passthrough
+    token: Option<Arc<str>>,
 }
 
 impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
@@ -466,6 +477,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         remote: Option<SocketAddr>,
         remote_addr: Option<String>,
         batch: Option<Arc<BatchNotifier>>,
+        token: Option<Arc<str>>,
     ) -> Self {
         EventIterator {
             deserializer,
@@ -489,6 +501,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
                 DefaultExtractor::new("sourcetype", SOURCETYPE),
             ],
             batch,
+            token,
         }
     }
 
@@ -586,6 +599,13 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         for de in self.extractors.iter_mut() {
             de.extract(log, &mut json);
         }
+
+        // Add passthrough token if present
+        if let Some(token) = &self.token {
+            log.metadata_mut()
+                .set_splunk_hec_token(Some(Arc::clone(token)));
+        }
+
         if let Some(batch) = self.batch.clone() {
             event.add_batch_notifier(batch);
         }
