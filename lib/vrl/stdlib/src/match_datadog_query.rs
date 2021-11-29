@@ -411,6 +411,35 @@ fn build_wildcard_with_prefix(field: Field, prefix: String) -> Box<dyn MatchRunn
     }
 }
 
+fn build_wildcard(field: Field, wildcard: &str) -> Box<dyn MatchRunner> {
+    match field {
+        Field::Default(_) => {
+            let re = word_regex(wildcard);
+
+            Box::new(Func {
+                func: move |value| re.is_match(&string_value(value)),
+            })
+        }
+        Field::Tag(tag) => {
+            let re = wildcard_regex(&format!("{}:{}", tag, wildcard));
+
+            Box::new(Func {
+                func: move |value| match value {
+                    Value::Array(v) => v.iter().any(|v| re.is_match(&string_value(v))),
+                    _ => false,
+                },
+            })
+        }
+        _ => {
+            let re = wildcard_regex(wildcard);
+
+            Box::new(Func {
+                func: move |value| re.is_match(&string_value(value)),
+            })
+        }
+    }
+}
+
 fn any(queries: Vec<Box<dyn MatchRunner>>) -> Box<dyn MatchRunner> {
     let func = move |obj: &Value| queries.iter().any(|func| func.run(obj));
     Func::boxed(func)
@@ -473,6 +502,14 @@ fn build_matcher(node: &QueryNode) -> Box<dyn MatchRunner> {
                 .map(|(field, buf)| {
                     resolve_value(buf, build_wildcard_with_prefix(field, prefix.clone()))
                 })
+                .collect::<Vec<_>>();
+
+            any(queries)
+        }
+        QueryNode::AttributeWildcard { attr, wildcard } => {
+            let queries = attr_to_lookup_fields(attr)
+                .into_iter()
+                .map(|(field, buf)| resolve_value(buf, build_wildcard(field, wildcard)))
                 .collect::<Vec<_>>();
 
             any(queries)
