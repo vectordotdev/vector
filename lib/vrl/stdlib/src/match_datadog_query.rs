@@ -990,24 +990,24 @@ mod test {
         //     tdef: type_def(),
         // }
         //
-        // equals_facet {
-        //     args: func_args![value: value!({"custom": {"z": 1}}), query: "@z:1"],
-        //     want: Ok(true),
-        //     tdef: type_def(),
-        // }
-        //
-        // not_equals_facet {
-        //     args: func_args![value: value!({"custom": {"z": 1}}), query: "NOT @z:1"],
-        //     want: Ok(false),
-        //     tdef: type_def(),
-        // }
-        //
-        // negate_equals_facet {
-        //     args: func_args![value: value!({"custom": {"z": 1}}), query: "-@z:1"],
-        //     want: Ok(false),
-        //     tdef: type_def(),
-        // }
-        //
+        equals_facet {
+            args: func_args![value: value!({"custom": {"z": 1}}), query: "@z:1"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        not_equals_facet {
+            args: func_args![value: value!({"custom": {"z": 1}}), query: "NOT @z:1"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        negate_equals_facet {
+            args: func_args![value: value!({"custom": {"z": 1}}), query: "-@z:1"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
         // wildcard_prefix_message {
         //     args: func_args![value: value!({"message": "vector"}), query: "*tor"],
         //     want: Ok(true),
