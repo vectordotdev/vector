@@ -76,131 +76,6 @@ fn load_from_file<T: serde::de::DeserializeOwned>(
     }
 }
 
-trait LoadableConfig: Sized + serde::de::DeserializeOwned {
-    fn load_from_file(path: &Path) -> Result<Option<(String, Self, Vec<String>)>, Vec<String>> {
-        load_from_file(path)
-    }
-
-    fn load_from_dir(
-        path: &Path,
-    ) -> Result<(IndexMap<ComponentKey, Self>, Vec<String>), Vec<String>> {
-        let mut result = IndexMap::new();
-        let readdir = read_dir(path)?;
-        let mut warnings = Vec::new();
-        let mut errors = Vec::new();
-
-        for res in readdir {
-            match res {
-                Ok(direntry) => {
-                    let entry_path = direntry.path();
-                    if entry_path.is_file() {
-                        match Self::load_from_file(&entry_path) {
-                            Ok(Some((name, component, warns))) => {
-                                result.insert(ComponentKey::from(name), component);
-                                warnings.extend(warns);
-                            }
-                            Ok(None) => (),
-                            Err(errs) => errors.extend(errs),
-                        }
-                    }
-                }
-                Err(err) => {
-                    errors.push(format!(
-                        "Could not read file in config dir: {:?}, {}.",
-                        path, err
-                    ));
-                }
-            }
-        }
-
-        if errors.is_empty() {
-            Ok((result, warnings))
-        } else {
-            Err(errors)
-        }
-    }
-
-    fn load_subfolder(&mut self, _path: &Path) -> Result<Vec<String>, Vec<String>> {
-        Ok(Vec::new())
-    }
-}
-
-impl LoadableConfig for ConfigBuilder {
-    fn load_subfolder(&mut self, path: &Path) -> Result<Vec<String>, Vec<String>> {
-        match path.file_name().and_then(|name| name.to_str()) {
-            Some("enrichment_tables") => {
-                let (value, warnings) = super::recursive::load_dir(path)?;
-                match toml::Value::Table(value)
-                    .try_into::<IndexMap<ComponentKey, EnrichmentTableOuter>>()
-                {
-                    Ok(inner) => {
-                        self.enrichment_tables.extend(inner);
-                        Ok(warnings)
-                    }
-                    Err(err) => Err(vec![format!(
-                        "Unable to decode enrichment table folder: {:?}",
-                        err
-                    )]),
-                }
-            }
-            Some("sinks") => {
-                let (value, warnings) = super::recursive::load_dir(path)?;
-                match toml::Value::Table(value).try_into::<IndexMap<ComponentKey, SinkOuter<_>>>() {
-                    Ok(inner) => {
-                        self.sinks.extend(inner);
-                        Ok(warnings)
-                    }
-                    Err(err) => Err(vec![format!("Unable to decode sink folder: {:?}", err)]),
-                }
-            }
-            Some("sources") => {
-                let (value, warnings) = super::recursive::load_dir(path)?;
-                match toml::Value::Table(value).try_into::<IndexMap<ComponentKey, SourceOuter>>() {
-                    Ok(inner) => {
-                        self.sources.extend(inner);
-                        Ok(warnings)
-                    }
-                    Err(err) => Err(vec![format!("Unable to decode source folder: {:?}", err)]),
-                }
-            }
-            Some("tests") => {
-                let (value, warnings) = super::recursive::load_dir(path)?;
-                match toml::Value::Table(value).try_into::<IndexMap<String, TestDefinition>>() {
-                    Ok(inner) => {
-                        self.tests.extend(inner.into_iter().map(|(_, value)| value));
-                        Ok(warnings)
-                    }
-                    Err(err) => Err(vec![format!("Unable to test folder: {:?}", err)]),
-                }
-            }
-            Some("transforms") => {
-                let (value, warnings) = super::recursive::load_dir(path)?;
-                match toml::Value::Table(value)
-                    .try_into::<IndexMap<ComponentKey, TransformOuter<_>>>()
-                {
-                    Ok(inner) => {
-                        self.transforms.extend(inner);
-                        Ok(warnings)
-                    }
-                    Err(err) => Err(vec![format!("Unable to test folder: {:?}", err)]),
-                }
-            }
-            Some(name) => {
-                // ignore hidden folders
-                if name.starts_with('.') {
-                    Ok(Vec::new())
-                } else {
-                    Ok(vec![format!(
-                        "Couldn't identify component type for folder {:?}",
-                        path
-                    )])
-                }
-            }
-            None => Ok(Vec::new()),
-        }
-    }
-}
-
 /// Merge the paths coming from different cli flags with different formats into
 /// a unified list of paths with formats.
 pub fn merge_path_lists(
@@ -330,11 +205,6 @@ fn load_builder_from_dir(
                         Ok(warns) => warnings.extend(warns),
                         Err(errs) => errors.extend(errs),
                     }
-                } else if entry_path.is_dir() {
-                    match builder.load_subfolder(&entry_path) {
-                        Ok(warns) => warnings.extend(warns),
-                        Err(errs) => errors.extend(errs),
-                    }
                 }
             }
             Err(err) => {
@@ -345,6 +215,72 @@ fn load_builder_from_dir(
             }
         }
     }
+
+    let subfolder = path.join("enrichment_tables");
+    if subfolder.exists() && subfolder.is_dir() {
+        let (value, warns) = super::recursive::load_dir(&subfolder)?;
+        warnings.extend(warns);
+        match toml::Value::Table(value).try_into::<IndexMap<ComponentKey, EnrichmentTableOuter>>() {
+            Ok(inner) => {
+                builder.enrichment_tables.extend(inner);
+            }
+            Err(err) => errors.push(format!(
+                "Unable to decode enrichment table folder: {:?}",
+                err
+            )),
+        }
+    }
+
+    let subfolder = path.join("sinks");
+    if subfolder.exists() && subfolder.is_dir() {
+        let (value, warns) = super::recursive::load_dir(&subfolder)?;
+        warnings.extend(warns);
+        match toml::Value::Table(value).try_into::<IndexMap<ComponentKey, SinkOuter<_>>>() {
+            Ok(inner) => {
+                builder.sinks.extend(inner);
+            }
+            Err(err) => errors.push(format!("Unable to decode sink folder: {:?}", err)),
+        }
+    }
+
+    let subfolder = path.join("sources");
+    if subfolder.exists() && subfolder.is_dir() {
+        let (value, warns) = super::recursive::load_dir(&subfolder)?;
+        warnings.extend(warns);
+        match toml::Value::Table(value).try_into::<IndexMap<ComponentKey, SourceOuter>>() {
+            Ok(inner) => {
+                builder.sources.extend(inner);
+            }
+            Err(err) => errors.push(format!("Unable to decode source folder: {:?}", err)),
+        }
+    }
+
+    let subfolder = path.join("tests");
+    if subfolder.exists() && subfolder.is_dir() {
+        let (value, warns) = super::recursive::load_dir(&subfolder)?;
+        warnings.extend(warns);
+        match toml::Value::Table(value).try_into::<IndexMap<ComponentKey, TestDefinition>>() {
+            Ok(inner) => {
+                builder
+                    .tests
+                    .extend(inner.into_iter().map(|(_, value)| value));
+            }
+            Err(err) => errors.push(format!("Unable to decode test folder: {:?}", err)),
+        }
+    }
+
+    let subfolder = path.join("transforms");
+    if subfolder.exists() && subfolder.is_dir() {
+        let (value, warns) = super::recursive::load_dir(&subfolder)?;
+        warnings.extend(warns);
+        match toml::Value::Table(value).try_into::<IndexMap<ComponentKey, TransformOuter<_>>>() {
+            Ok(inner) => {
+                builder.transforms.extend(inner);
+            }
+            Err(err) => errors.push(format!("Unable to decode transform folder: {:?}", err)),
+        }
+    }
+
     if errors.is_empty() {
         Ok(warnings)
     } else {
@@ -470,15 +406,10 @@ mod tests {
     }
 
     #[test]
-    fn load_namespacing_failing() {
+    fn load_namespacing_ignore_invalid() {
         let path = PathBuf::from(".").join("tests").join("namespacing-fail");
-        let configs = vec![ConfigPath::Dir(path.clone())];
+        let configs = vec![ConfigPath::Dir(path)];
         let (_, warns) = load_builder_from_paths(&configs).unwrap();
-        assert_eq!(warns.len(), 1);
-        let msg = format!(
-            "Couldn't identify component type for folder {:?}",
-            path.join("foo")
-        );
-        assert_eq!(warns[0], msg);
+        assert!(warns.is_empty());
     }
 }
