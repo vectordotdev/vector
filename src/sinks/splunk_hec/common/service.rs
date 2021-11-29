@@ -1,16 +1,20 @@
-use std::{
-    sync::Arc,
-    task::{Context, Poll},
-};
-
-use crate::sinks::{
-    splunk_hec::common::{build_uri, request::HecRequest, response::HecResponse},
-    util::http::HttpBatchService,
+use super::acknowledgements::{run_acknowledgements, HecClientAcknowledgementsConfig};
+use crate::{
+    http::HttpClient,
+    sinks::{
+        splunk_hec::common::{build_uri, request::HecRequest, response::HecResponse},
+        util::{http::HttpBatchService, Compression},
+        UriParseError,
+    },
 };
 use futures_util::future::BoxFuture;
 use http::Request;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
+use std::{
+    sync::Arc,
+    task::{Context, Poll},
+};
 use tokio::sync::{
     mpsc::{self, UnboundedSender},
     oneshot::{self, Sender},
@@ -18,11 +22,6 @@ use tokio::sync::{
 use tower::{Service, ServiceExt};
 use uuid::Uuid;
 use vector_core::event::EventStatus;
-
-use crate::sinks::UriParseError;
-use crate::{http::HttpClient, sinks::util::Compression};
-
-use super::acknowledgements::{run_acknowledgements, HecClientAcknowledgementsConfig};
 
 #[derive(Clone)]
 pub struct HecService {
@@ -174,13 +173,12 @@ impl HttpRequestBuilder {
 
 #[cfg(test)]
 mod tests {
+    use futures_util::{stream::FuturesUnordered, StreamExt};
     use std::{
         collections::HashMap,
         num::NonZeroU8,
         sync::atomic::{AtomicU64, Ordering},
     };
-
-    use futures_util::{stream::FuturesUnordered, StreamExt};
     use tower::Service;
     use vector_core::{
         config::proxy::ProxyConfig,

@@ -1,13 +1,10 @@
-use std::{collections::HashMap, num::NonZeroU8, sync::Arc, time::Duration};
-
+use super::service::HttpRequestBuilder;
+use crate::http::HttpClient;
 use hyper::Body;
 use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, num::NonZeroU8, sync::Arc, time::Duration};
 use tokio::sync::{mpsc::UnboundedReceiver, oneshot::Sender};
 use vector_core::event::EventStatus;
-
-use crate::http::HttpClient;
-
-use super::service::HttpRequestBuilder;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct HecClientAcknowledgementsConfig {

@@ -1,5 +1,4 @@
 use std::num::NonZeroU64;
-
 use crate::{
     http::HttpClient,
     internal_events::TemplateRenderingFailed,
