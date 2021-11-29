@@ -133,11 +133,11 @@ pub struct EventTypeConfig {
 
 #[cfg(test)]
 impl EventTypeConfig {
-    pub fn order(&self) -> &Option<Vec<String>> {
+    pub const fn order(&self) -> &Option<Vec<String>> {
         &self.order
     }
 
-    pub fn pipelines(&self) -> &IndexMap<String, PipelineConfig> {
+    pub const fn pipelines(&self) -> &IndexMap<String, PipelineConfig> {
         &self.pipelines
     }
 }
@@ -187,11 +187,11 @@ pub struct PipelinesConfig {
 
 #[cfg(test)]
 impl PipelinesConfig {
-    pub fn logs(&self) -> &EventTypeConfig {
+    pub const fn logs(&self) -> &EventTypeConfig {
         &self.logs
     }
 
-    pub fn metrics(&self) -> &EventTypeConfig {
+    pub const fn metrics(&self) -> &EventTypeConfig {
         &self.metrics
     }
 }
