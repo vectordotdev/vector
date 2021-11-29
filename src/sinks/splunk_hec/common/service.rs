@@ -43,8 +43,6 @@ pub struct HecService {
 
 #[derive(Deserialize, Serialize, Debug)]
 struct HecAckResponseBody {
-    text: String,
-    code: u8,
     #[serde(alias = "ackId")]
     ack_id: Option<u64>,
 }
@@ -248,8 +246,6 @@ mod tests {
                 let ack_id =
                     acknowledgements_enabled.then(|| ACK_ID.fetch_add(1, Ordering::Relaxed));
                 ResponseTemplate::new(200).set_body_json(HecAckResponseBody {
-                    text: String::from("Success"),
-                    code: 0,
                     ack_id,
                 })
             })
