@@ -66,6 +66,8 @@ echo "Total Vector CPUs: ${VECTOR_CPUS}"
 echo ""
 echo "What follows is a statistical summary of the soak captures between the SHAs given above. Units are bytes/second/CPU, except for 'skewness' and 'kurtosis'. Higher numbers in 'comparison' is generally better. Higher skewness or kurtosis numbers indicate a lack of consistency in behavior, making predictions of fitness in the field challenging."
 echo ""
+echo "<details>"
+echo "  <summary>Click to expand!</summary>"
 for soak_dir in "${CAPTURE_DIR}"/*; do
     SOAK_NAME=$(basename "${soak_dir}")
     echo " --- "
@@ -90,3 +92,4 @@ for soak_dir in "${CAPTURE_DIR}"/*; do
     echo "| --- | --- | --- | --- | --- | --- | --- |"
     echo "${BODY}"   | sed 's/,/\ \|\ /g' | sed 's/^/|\ /g' | sed 's/$/\ |/g'
 done
+echo "</details>"
