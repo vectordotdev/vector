@@ -10,7 +10,7 @@ badges:
   type: breaking change
 ---
 
-Vector's 0.17.0 release includes five **breaking changes**:
+Vector's 0.17.0 release includes several **breaking changes**:
 
 1. [Blackhole sink configuration changes](#blackhole)
 1. [Datadog Logs sink loses `batch.max_bytes` setting](#datadog_logs_max_bytes)
@@ -19,6 +19,7 @@ Vector's 0.17.0 release includes five **breaking changes**:
 1. [The deprecated `wasm` transform was removed](#wasm)
 1. [The `exec` source now has a `decoding` setting](#exec_source)
 1. [The algorithm underlying ARC has been optimized](#arc)
+1. [The `events_processed_total` metric was removed](#events_processed_total)
 
 We cover them below to help you upgrade quickly:
 
@@ -101,3 +102,7 @@ the scale factor applied to this value.
 
 [arc]: /docs/about/under-the-hood/networking/arc/
 [rtt_deviation_scale]: /docs/reference/configuration/sinks/http/#request.adaptive_concurrency.rtt_deviation_scale
+
+### The `events_processed_total` metric was removed {#events_processed_total}
+
+This deprecated metric has been replaced by `component_events_sent_total`.

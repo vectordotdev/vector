@@ -118,7 +118,7 @@ impl Service<HecRequest> for HecService {
             } else if response.status().is_server_error() {
                 EventStatus::Errored
             } else {
-                EventStatus::Failed
+                EventStatus::Rejected
             };
 
             Ok(HecResponse {
