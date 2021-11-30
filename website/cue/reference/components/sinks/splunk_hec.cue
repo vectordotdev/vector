@@ -46,6 +46,13 @@ components: sinks: _splunk_hec: {
 				}
 			}
 		}
+		default_token: {
+			description: "Your Splunk HEC token."
+			required:    true
+			type: string: {
+				examples: ["${SPLUNK_HEC_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
+			}
+		}
 	}
 	how_it_works: {
 		indexer_acknowledgements: {
