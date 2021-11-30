@@ -280,42 +280,6 @@ jobs:
           minikube delete --all --purge
           docker system prune --all --volumes --force
 
-  soak-baseline-r3:
-    name: Soak (${{ matrix.target }}) - baseline - replica 3
-    if: ${{ github.actor != 'dependabot[bot]' }}
-    runs-on: [self-hosted, linux, x64, soak]
-    needs: [compute-soak-meta, compute-test-plan, build-baseline-image]
-    strategy:
-      matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
-    steps:
-      - name: Check out the repo
-        uses: actions/checkout@v2.4.0
-
-      - name: Run baseline experiment
-        run: |
-          rm -rf /tmp/${{ github.event.number }}-${{ github.run_attempt }}/
-          mkdir -p /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
-          ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
-                                  --local-image "false" \
-                                  --variant "baseline" \
-                                  --tag ${{ needs.compute-soak-meta.outputs.baseline-tag }} \
-                                  --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
-                                  --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
-                                  --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --capture-dir /tmp/${{ github.event.number }}-${{ github.run_attempt }} \
-                                  --warmup-seconds 30
-
-      - name: Upload timing captures
-        uses: actions/upload-artifact@v1
-        with:
-          name: ${{ github.event.number }}-${{ github.run_attempt }}-${{ matrix.target }}-replica_3-baseline
-          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/baseline.captures
-
-      - name: Clear up unused images
-        run: |
-          minikube delete --all --purge
-          docker system prune --all --volumes --force
-
   soak-comparison-r1:
     name: Soak (${{ matrix.target }}) - comparison - replica 1
     if: ${{ github.actor != 'dependabot[bot]' }}
@@ -388,42 +352,6 @@ jobs:
           minikube delete --all --purge
           docker system prune --all --volumes --force
 
-  soak-comparison-r3:
-    name: Soak (${{ matrix.target }}) - comparison - replica 3
-    if: ${{ github.actor != 'dependabot[bot]' }}
-    runs-on: [self-hosted, linux, x64, soak]
-    needs: [compute-soak-meta, compute-test-plan, build-comparison-image]
-    strategy:
-      matrix: ${{ fromJson(needs.compute-test-plan.outputs.matrix) }}
-    steps:
-      - name: Check out the repo
-        uses: actions/checkout@v2.4.0
-
-      - name: Run comparison experiment
-        run: |
-          rm -rf /tmp/${{ github.event.number }}-${{ github.run_attempt }}/
-          mkdir -p /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/
-          ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
-                                  --local-image "false" \
-                                  --variant "comparison" \
-                                  --tag ${{ needs.compute-soak-meta.outputs.comparison-tag }} \
-                                  --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
-                                  --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
-                                  --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                  --capture-dir /tmp/${{ github.event.number }}-${{ github.run_attempt }} \
-                                  --warmup-seconds 30
-
-      - name: Upload timing captures
-        uses: actions/upload-artifact@v1
-        with:
-          name: ${{ github.event.number }}-${{ github.run_attempt }}-${{ matrix.target }}-replica_3-comparison
-          path: /tmp/${{ github.event.number }}-${{ github.run_attempt }}/${{ matrix.target }}/comparison.captures
-
-      - name: Clear up unused images
-        run: |
-          minikube delete --all --purge
-          docker system prune --all --volumes --force
-
   analyze-results:
     name: Soak analysis
     if: ${{ github.actor != 'dependabot[bot]' }}
@@ -432,10 +360,8 @@ jobs:
       - compute-soak-meta
       - soak-baseline-r1
       - soak-baseline-r2
-      - soak-baseline-r3
       - soak-comparison-r1
       - soak-comparison-r2
-      - soak-comparison-r3
 
     steps:
       - name: Set up Python3
