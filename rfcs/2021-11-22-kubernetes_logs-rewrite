@@ -1,0 +1,86 @@
+# RFC <issue#> - 2021-11-22 - `kubernetes_logs` Rewrite
+
+Rewriting the `kubernetes_logs` source to leverage the "official" Rust client for Kubernetes.
+
+## Context
+
+- [`kubernetes_logs` error handling RFC](https://github.com/vectordotdev/vector/issues/7527)
+- [`kubernetes_logs` source fixes](https://github.com/vectordotdev/vector/issues/10016)
+
+## Scope
+
+### In scope
+
+- List work being directly addressed with this RFC.
+
+### Out of scope
+
+- List work that is completely out of scope. Use this to keep discussions focused. Please note the "future changes" section at the bottom.
+
+## Pain
+
+- What internal or external *pain* are we solving?
+- Do not cover benefits of your change, this is covered in the "Rationale" section.
+
+## Proposal
+
+### User Experience
+
+- Explain your change as if you were describing it to a Vector user. We should be able to share this section with a Vector user to solicit feedback.
+- Does this change break backward compatibility? If so, what should users do to upgrade?
+
+### Implementation
+
+[Kube-RS](https://docs.rs/kube/*/kube/)
+- Explain your change as if you were presenting it to the Vector team.
+- When possible, demonstrate with pseudo code not text.
+- Be specific. Be opinionated. Avoid ambiguity.
+
+## Rationale
+
+- Why is this change worth it?
+- What is the impact of not doing this?
+- How does this position us for success in the future?
+
+## Drawbacks
+
+## Prior Art
+
+- [Vector `kubernetes_logs` source](https://github.com/vectordotdev/vector/tree/master/src/sources/kubernetes_logs)
+- [Datadog Kubelet provider](https://github.com/DataDog/datadog-agent/blob/main/pkg/autodiscovery/providers/kubelet.go)
+- [Fluent-Bit Kubernetes filter](https://github.com/fluent/fluent-bit/tree/master/plugins/filter_kubernetes)
+
+## Alternatives
+
+### Not do this at all
+
+Troubleshooting and maintaining the existing source has been challenging, and there is
+a clear lack of understanding of the current implementation. The source is an important
+part of our OSS offering and frequently used with the Agent role. Not doing this impairs
+our ability to support Vector running as an Agent in Kubernetes and reflects poorly on
+our overall reputation.
+
+### Rewrite to interface with the Kubelet API
+
+This avenue was recommended internally, but is a departure from our existing implementation,
+and thus contains more unknowns and increases the likelihood of breaking changes to the
+existing source.
+
+### Replace existing source with an enrichment transform
+
+This option is capable of being used regardless of what role Vector has been deployed
+in, but it is a larger change to implement and a larger update for users too. Longer
+term the source can be decoupled and introduced as a standalone enrichment component.
+
+## Outstanding Questions
+
+## Plan Of Attack
+
+- [ ] Submit a PR with spike-level code _roughly_ demonstrating the change.
+- [ ] Incremental change #1
+- [ ] Incremental change #2
+- [ ] ...
+
+## Future Improvements
+
+-
