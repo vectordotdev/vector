@@ -21,11 +21,10 @@ pub fn interpolate(input: &str, vars: &HashMap<String, String>) -> (String, Vec<
     let re = Regex::new(
         r"(?x)
         \$\$|
-        \$([^{[:space:]]\S+)|
-        \$\{([^}:\-]+)(?::-([^}]+)?)?\}
+        \$([^{[:space:]=][^[:space:]=]+)|
+        \$\{([^}=:\-]+)(?::-([^}]+)?)?\}
         ",
     )
-    //let re = Regex::new(r"\$\$|\$(\w+)|\$\{(\w+)(?::-([^}]+)?)?\}").unwrap();
     .unwrap();
     let interpolated = re
         .replace_all(input, |caps: &Captures<'_>| {
@@ -68,6 +67,7 @@ mod test {
         assert_eq!("x", interpolate("x$FOOBARy", &vars).0);
         assert_eq!("$ x", interpolate("$ x", &vars).0);
         assert_eq!("$FOO", interpolate("$$FOO", &vars).0);
+        assert_eq!("dogs=bar", interpolate("$FOO=bar", &vars).0);
         assert_eq!("", interpolate("$NOT_FOO", &vars).0);
         assert_eq!("", interpolate("$FOO-BAR", &vars).0);
         assert_eq!("turtles", interpolate("$FOO.BAR", &vars).0);
