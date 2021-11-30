@@ -466,7 +466,7 @@ mod integration_tests {
             None,
             logs.join("\n").into_bytes(),
             logs,
-            Failed,
+            Rejected,
         )
         .await;
     }

@@ -84,7 +84,7 @@ impl Service<DatadogEventsRequest> for DatadogEventsService {
             } else if http_response.is_transient() {
                 EventStatus::Errored
             } else {
-                EventStatus::Failed
+                EventStatus::Rejected
             };
             Ok(DatadogEventsResponse {
                 event_status,
