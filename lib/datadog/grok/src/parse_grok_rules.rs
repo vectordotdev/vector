@@ -223,7 +223,6 @@ fn parse_grok_rule(
         {
             if let Some(ref filter) = filter_fn {
                 let filter = GrokFilter::try_from(filter)?;
-                println!("path: {}", path.to_string());
                 fields
                     .entry(path.to_string())
                     .and_modify(|v| v.filters.push(filter.clone()))
