@@ -67,8 +67,8 @@ fn load_from_file<T: serde::de::DeserializeOwned>(
     path: &Path,
 ) -> Result<Option<(String, T, Vec<String>)>, Vec<String>> {
     let name = component_name(path)?;
-    if let (Some(file), Ok(format)) = (open_file(path), Format::from_path(path)) {
-        let (component, warnings): (T, Vec<String>) = load(file, Some(format))?;
+    if let Some(file) = open_file(path) {
+        let (component, warnings): (T, Vec<String>) = load(file, Format::from_path(path).ok())?;
         Ok(Some((name, component, warnings)))
     } else {
         Ok(None)
