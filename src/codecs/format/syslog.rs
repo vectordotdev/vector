@@ -1,5 +1,5 @@
 use crate::{
-    codecs::{BoxedParser, Parser, ParserConfig},
+    codecs::decoding::{BoxedDeserializer, Deserializer, DeserializerConfig},
     config::log_schema,
     event::{Event, Value},
     internal_events::SyslogConvertUtf8Error,
@@ -10,22 +10,23 @@ use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 
-/// Config used to build a `SyslogParser`.
+/// Config used to build a `SyslogDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct SyslogParserConfig;
+pub struct SyslogDeserializerConfig;
 
 #[typetag::serde(name = "syslog")]
-impl ParserConfig for SyslogParserConfig {
-    fn build(&self) -> crate::Result<BoxedParser> {
-        Ok(Box::new(SyslogParser))
+impl DeserializerConfig for SyslogDeserializerConfig {
+    fn build(&self) -> crate::Result<BoxedDeserializer> {
+        Ok(Box::new(SyslogDeserializer))
     }
 }
 
-/// Parser that builds an `Event` from a byte frame containing a syslog message.
+/// Deserializer that builds an `Event` from a byte frame containing a syslog
+/// message.
 #[derive(Debug, Clone)]
-pub struct SyslogParser;
+pub struct SyslogDeserializer;
 
-impl Parser for SyslogParser {
+impl Deserializer for SyslogDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
         let line = std::str::from_utf8(&bytes).map_err(|error| {
             emit!(&SyslogConvertUtf8Error { error });

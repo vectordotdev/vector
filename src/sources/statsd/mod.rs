@@ -1,7 +1,7 @@
 use crate::sources::statsd::parser::ParseError;
 use crate::udp;
 use crate::{
-    codecs::{self, NewlineDelimitedCodec, Parser},
+    codecs::{self, decoding::Deserializer, NewlineDelimitedDecoder},
     config::{self, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
@@ -137,9 +137,9 @@ impl SourceConfig for StatsdConfig {
 }
 
 #[derive(Debug, Clone)]
-pub struct StatsdParser;
+pub struct StatsdDeserializer;
 
-impl Parser for StatsdParser {
+impl Deserializer for StatsdDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
         match std::str::from_utf8(&bytes)
             .map_err(ParseError::InvalidUtf8)
@@ -184,8 +184,8 @@ async fn statsd_udp(
     );
 
     let codec = codecs::Decoder::new(
-        Box::new(NewlineDelimitedCodec::new()),
-        Box::new(StatsdParser),
+        Box::new(NewlineDelimitedDecoder::new()),
+        Box::new(StatsdDeserializer),
     );
     let mut stream = UdpFramed::new(socket, codec).take_until(shutdown);
     while let Some(frame) = stream.next().await {
@@ -211,14 +211,14 @@ async fn statsd_udp(
 struct StatsdTcpSource;
 
 impl TcpSource for StatsdTcpSource {
-    type Error = codecs::Error;
+    type Error = codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
     type Decoder = codecs::Decoder;
 
     fn decoder(&self) -> Self::Decoder {
         codecs::Decoder::new(
-            Box::new(NewlineDelimitedCodec::new()),
-            Box::new(StatsdParser),
+            Box::new(NewlineDelimitedDecoder::new()),
+            Box::new(StatsdDeserializer),
         )
     }
 }

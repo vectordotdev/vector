@@ -1,10 +1,10 @@
-use crate::codecs::{BoxedFramer, BoxedFramingError, FramingConfig};
+use crate::codecs::decoding::{BoxedFramer, BoxedFramingError, FramingConfig};
 use bytes::{Buf, Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 use std::io;
 use tokio_util::codec::{LinesCodec, LinesCodecError};
 
-/// Config used to build a `OctetCountingCodec`.
+/// Config used to build a `OctetCountingDecoder`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct OctetCountingDecoderConfig {
     #[serde(
@@ -14,7 +14,7 @@ pub struct OctetCountingDecoderConfig {
     octet_counting: OctetCountingDecoderOptions,
 }
 
-/// Options for building a `OctetCountingCodec`.
+/// Options for building a `OctetCountingDecoder`.
 #[derive(Debug, Clone, Derivative, Deserialize, Serialize, PartialEq)]
 #[derivative(Default)]
 pub struct OctetCountingDecoderOptions {
@@ -26,11 +26,11 @@ pub struct OctetCountingDecoderOptions {
 impl FramingConfig for OctetCountingDecoderConfig {
     fn build(&self) -> crate::Result<BoxedFramer> {
         if let Some(max_length) = self.octet_counting.max_length {
-            Ok(Box::new(OctetCountingCodec::new_with_max_length(
+            Ok(Box::new(OctetCountingDecoder::new_with_max_length(
                 max_length,
             )))
         } else {
-            Ok(Box::new(OctetCountingCodec::new()))
+            Ok(Box::new(OctetCountingDecoder::new()))
         }
     }
 }
@@ -38,7 +38,7 @@ impl FramingConfig for OctetCountingDecoderConfig {
 /// Codec using the `Octet Counting` format as specified in
 /// https://tools.ietf.org/html/rfc6587#section-3.4.1.
 #[derive(Clone, Debug)]
-pub struct OctetCountingCodec {
+pub struct OctetCountingDecoder {
     other: LinesCodec,
     octet_decoding: Option<State>,
 }
@@ -50,8 +50,8 @@ pub enum State {
     DiscardingToEol,
 }
 
-impl OctetCountingCodec {
-    /// Creates a new `OctetCountingCodec`.
+impl OctetCountingDecoder {
+    /// Creates a new `OctetCountingDecoder`.
     pub fn new() -> Self {
         Self {
             other: LinesCodec::new(),
@@ -59,7 +59,7 @@ impl OctetCountingCodec {
         }
     }
 
-    /// Creates a `OctetCountingCodec` with a maximum frame length limit.
+    /// Creates a `OctetCountingDecoder` with a maximum frame length limit.
     pub fn new_with_max_length(max_length: usize) -> Self {
         Self {
             other: LinesCodec::new_with_max_length(max_length),
@@ -246,13 +246,13 @@ impl OctetCountingCodec {
     }
 }
 
-impl Default for OctetCountingCodec {
+impl Default for OctetCountingDecoder {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl tokio_util::codec::Decoder for OctetCountingCodec {
+impl tokio_util::codec::Decoder for OctetCountingDecoder {
     type Item = Bytes;
     type Error = BoxedFramingError;
 
@@ -291,7 +291,7 @@ mod tests {
 
     #[test]
     fn non_octet_decode_works_with_multiple_frames() {
-        let mut decoder = OctetCountingCodec::new_with_max_length(128);
+        let mut decoder = OctetCountingDecoder::new_with_max_length(128);
         let mut buffer = BytesMut::with_capacity(16);
 
         buffer.put(&b"<57>Mar 25 21:47:46 gleichner6005 quaerat[2444]: There were "[..]);
@@ -308,7 +308,7 @@ mod tests {
 
     #[test]
     fn octet_decode_works_with_multiple_frames() {
-        let mut decoder = OctetCountingCodec::new_with_max_length(30);
+        let mut decoder = OctetCountingDecoder::new_with_max_length(30);
         let mut buffer = BytesMut::with_capacity(16);
 
         buffer.put(&b"28 abcdefghijklm"[..]);
@@ -327,7 +327,7 @@ mod tests {
 
     #[test]
     fn octet_decode_moves_past_invalid_length() {
-        let mut decoder = OctetCountingCodec::new_with_max_length(16);
+        let mut decoder = OctetCountingDecoder::new_with_max_length(16);
         let mut buffer = BytesMut::with_capacity(16);
 
         // An invalid syslog message that starts with a digit so we think it is starting with the len.
@@ -340,7 +340,7 @@ mod tests {
 
     #[test]
     fn octet_decode_moves_past_invalid_utf8() {
-        let mut decoder = OctetCountingCodec::new_with_max_length(16);
+        let mut decoder = OctetCountingDecoder::new_with_max_length(16);
         let mut buffer = BytesMut::with_capacity(16);
 
         // An invalid syslog message containing invalid utf8 bytes.
@@ -353,7 +353,7 @@ mod tests {
 
     #[test]
     fn octet_decode_moves_past_exceeded_frame_length() {
-        let mut decoder = OctetCountingCodec::new_with_max_length(16);
+        let mut decoder = OctetCountingDecoder::new_with_max_length(16);
         let mut buffer = BytesMut::with_capacity(32);
 
         buffer.put(&b"32thisshouldbelongerthanthmaxframeasizewhichmeansthesyslogparserwillnotbeabletodecodeit\n"[..]);
@@ -365,7 +365,7 @@ mod tests {
 
     #[test]
     fn octet_decode_rejects_exceeded_frame_length() {
-        let mut decoder = OctetCountingCodec::new_with_max_length(16);
+        let mut decoder = OctetCountingDecoder::new_with_max_length(16);
         let mut buffer = BytesMut::with_capacity(32);
 
         buffer.put(&b"26 abcdefghijklmnopqrstuvwxyzand here we are"[..]);
@@ -379,7 +379,7 @@ mod tests {
 
     #[test]
     fn octet_decode_rejects_exceeded_frame_length_multiple_frames() {
-        let mut decoder = OctetCountingCodec::new_with_max_length(16);
+        let mut decoder = OctetCountingDecoder::new_with_max_length(16);
         let mut buffer = BytesMut::with_capacity(32);
 
         buffer.put(&b"26 abc"[..]);
@@ -395,7 +395,7 @@ mod tests {
 
     #[test]
     fn octet_decode_moves_past_exceeded_frame_length_multiple_frames() {
-        let mut decoder = OctetCountingCodec::new_with_max_length(16);
+        let mut decoder = OctetCountingDecoder::new_with_max_length(16);
         let mut buffer = BytesMut::with_capacity(32);
 
         buffer.put(&b"32thisshouldbelongerthanthmaxframeasizewhichmeansthesyslogparserwillnotbeabletodecodeit"[..]);

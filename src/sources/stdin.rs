@@ -1,5 +1,5 @@
 use crate::{
-    codecs::{DecodingConfig, FramingConfig, ParserConfig},
+    codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
     config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
     internal_events::StdinEventsReceived,
     serde::{default_decoding, default_framing_stream_based},
@@ -24,7 +24,7 @@ pub struct StdinConfig {
     #[serde(default = "default_framing_stream_based")]
     pub framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
-    pub decoding: Box<dyn ParserConfig>,
+    pub decoding: Box<dyn DeserializerConfig>,
 }
 
 impl Default for StdinConfig {

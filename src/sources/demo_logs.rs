@@ -1,5 +1,8 @@
 use crate::{
-    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
+    codecs::{
+        self,
+        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+    },
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     internal_events::DemoLogsEventProcessed,
     serde::{default_decoding, default_framing_message_based},
@@ -32,7 +35,7 @@ pub struct DemoLogsConfig {
     #[derivative(Default(value = "default_framing_message_based()"))]
     framing: Box<dyn FramingConfig>,
     #[derivative(Default(value = "default_decoding()"))]
-    decoding: Box<dyn ParserConfig>,
+    decoding: Box<dyn DeserializerConfig>,
 }
 
 const fn default_interval() -> f64 {

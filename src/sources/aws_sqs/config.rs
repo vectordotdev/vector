@@ -1,5 +1,5 @@
 use crate::aws::auth::AwsAuthentication;
-use crate::codecs::{DecodingConfig, FramingConfig, ParserConfig};
+use crate::codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig};
 use crate::config::{AcknowledgementsConfig, DataType, SourceConfig, SourceContext};
 use crate::serde::{bool_or_struct, default_decoding, default_framing_message_based};
 use crate::sources::aws_sqs::source::SqsSource;
@@ -33,8 +33,7 @@ pub struct AwsSqsConfig {
     pub framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
-    pub decoding: Box<dyn ParserConfig>,
-
+    pub decoding: Box<dyn DeserializerConfig>,
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: AcknowledgementsConfig,
 }
