@@ -29,7 +29,7 @@ parser.add_argument('--baseline-sha', type=str, help='the sha of the baseline ex
 parser.add_argument('--comparison-sha', type=str, help='the sha of the comparison experiment')
 parser.add_argument('--vector-cpus', type=int, help='the total number of CPUs given to vector during the experiment')
 parser.add_argument('--p-value', type=float, default=0.05, help='the p-value for comparing with t-test results, the smaller the more certain')
-parser.add_argument('--mean-drift-percentage', type=float, default=5.00, help='the percentage of mean drift we allow in an experiment, expressed as a value from 0 to 100')
+parser.add_argument('--mean-drift-percentage', type=float, default=8.87, help='the percentage of mean drift we allow in an experiment, expressed as a value from 0 to 100, default 9th percentile')
 args = parser.parse_args()
 
 capture_paths = glob.glob(os.path.join(args.capture_dir, "**/*.captures"))
