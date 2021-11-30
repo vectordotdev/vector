@@ -104,7 +104,7 @@ this area.
 
 Examples:
 
-* Choosing a fast language yet more difficult language, like Rust, to build
+* Choosing a fast, yet more difficult, language, like Rust, to build
   Vector in.
 * Investing into performance-realted infrastructure for regression control and
   analysis.
