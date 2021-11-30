@@ -69,7 +69,7 @@ your editor to give them better IDs, e.g. `s/transform2/scrub_emails/g`.
 
 ## Testing Configs
 
-Test driven Configurationn is a paradigm we just made up, so there's still time
+Test driven Configuration is a paradigm we just made up, so there's still time
 for you to adopt it _before_ it's cool. Vector supports complementing your
 configs with [unit tests][guides.unit-testing], and as it turns out
 they're also pretty useful during the building stage.
@@ -181,7 +181,7 @@ individual files, each with its own unit tests.
 
 ## Splitting Configs
 
-If your components start to by used in multiple configuration files, having a
+If your components start to be used in multiple configuration files, having a
 dedicated place to define them can become interesting.
 
 With Vector you can define a component configuration inside a component type folder.
@@ -194,7 +194,6 @@ type = "syslog"
 address = "0.0.0.0:514"
 max_length = 42000
 mode = "tcp"
-path = "/path/to/socket"
 
 [transforms.change_fields]
 type = "remap"
@@ -207,6 +206,7 @@ source = """
 type = "console"
 inputs = ["change_fields"]
 target = "stdout"
+encoding.codec = "json"
 ```
 
 We can extract the `syslog` source in the file `/etc/vector/sources/syslog.toml`
@@ -216,7 +216,6 @@ type = "syslog"
 address = "0.0.0.0:514"
 max_length = 42000
 mode = "tcp"
-path = "/path/to/socket"
 ```
 
 The `change_fields` transform in the file `/etc/vector/transforms/change_fields.toml`

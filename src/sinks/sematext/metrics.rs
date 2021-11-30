@@ -249,7 +249,7 @@ fn encode_events(
 
         if let Err(error) = influx_line_protocol(
             ProtocolVersion::V1,
-            namespace,
+            &namespace,
             metric_type,
             Some(tags),
             Some(fields),

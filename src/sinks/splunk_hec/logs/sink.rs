@@ -7,7 +7,6 @@ use vector_core::stream::DriverResponse;
 use vector_core::{
     config::log_schema,
     event::{Event, LogEvent, Value},
-    partition::NullPartitioner,
     sink::StreamSink,
     stream::BatcherSettings,
     ByteSizeOf,
@@ -64,8 +63,7 @@ where
                     indexed_fields,
                 ))
             })
-            .batched(NullPartitioner::new(), self.batch_settings)
-            .map(|(_, batch)| batch)
+            .batched(self.batch_settings.into_byte_size_config())
             .request_builder(builder_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {

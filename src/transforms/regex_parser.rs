@@ -66,7 +66,7 @@ impl TransformConfig for RegexParserConfig {
 #[derive(Clone, Debug)]
 pub struct RegexParser {
     regexset: RegexSet,
-    patterns: Vec<CompiledRegex>, // indexes correspend to RegexSet
+    patterns: Vec<CompiledRegex>, // indexes correspond to RegexSet
     field: String,
     drop_field: bool,
     drop_failed: bool,

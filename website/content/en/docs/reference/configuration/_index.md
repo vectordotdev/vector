@@ -297,10 +297,10 @@ ignore_older = 86400                         # 1 day
 ```
 
 {{< /tab >}}
-{{< tab title="transforms/remap.toml" >}}
+{{< tab title="transforms/apache_parser.toml" >}}
 
 ```toml
-# Structure and parse via Timber's Remap Language
+# Structure and parse via Vector Remap Language
 inputs = ["apache_logs"]
 type   = "remap"
 source = '''

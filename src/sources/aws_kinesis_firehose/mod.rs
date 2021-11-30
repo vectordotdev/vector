@@ -1,7 +1,10 @@
 use crate::{
-    codecs::{DecodingConfig, FramingConfig, ParserConfig},
-    config::{DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
-    serde::{default_decoding, default_framing_message_based},
+    codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+    config::{
+        AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
+        SourceDescription,
+    },
+    serde::{bool_or_struct, default_decoding, default_framing_message_based},
     tls::{MaybeTlsSettings, TlsConfig},
 };
 use futures::FutureExt;
@@ -23,7 +26,9 @@ pub struct AwsKinesisFirehoseConfig {
     #[serde(default = "default_framing_message_based")]
     framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
-    decoding: Box<dyn ParserConfig>,
+    decoding: Box<dyn DeserializerConfig>,
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -56,7 +61,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
             self.access_key.clone(),
             self.record_compression.unwrap_or_default(),
             decoder,
-            cx.acknowledgements.enabled,
+            self.acknowledgements.enabled,
             cx.out,
         );
 
@@ -102,6 +107,7 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
             record_compression: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
+            acknowledgements: AcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -109,6 +115,8 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::print_stdout)] //tests
+
     use super::*;
     use crate::{
         event::{Event, EventStatus},
@@ -167,8 +175,7 @@ mod tests {
         let status = if delivered { Delivered } else { Failed };
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
-        let mut cx = SourceContext::new_test(sender);
-        cx.acknowledgements.enabled = true;
+        let cx = SourceContext::new_test(sender);
         tokio::spawn(async move {
             AwsKinesisFirehoseConfig {
                 address,
@@ -177,6 +184,7 @@ mod tests {
                 record_compression,
                 framing: default_framing_message_based(),
                 decoding: default_decoding(),
+                acknowledgements: true.into(),
             }
             .build(cx)
             .await

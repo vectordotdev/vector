@@ -57,14 +57,17 @@
 /// expansion, a `Noop` transform will be added to use the `pipeline` name as an alias
 /// (`my_pipelines.logs.transforms.foo`).
 mod expander;
+mod filter;
 mod router;
 
+use crate::conditions::AnyCondition;
 use crate::config::{
     DataType, ExpandType, GenerateConfig, TransformConfig, TransformContext, TransformDescription,
 };
 use crate::transforms::Transform;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 inventory::submit! {
     TransformDescription::new::<PipelinesConfig>("pipelines")
@@ -75,6 +78,7 @@ inventory::submit! {
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct PipelineConfig {
     name: String,
+    filter: Option<AnyCondition>,
     transforms: Vec<Box<dyn TransformConfig>>,
 }
 
@@ -93,14 +97,21 @@ impl Clone for PipelineConfig {
 impl PipelineConfig {
     /// Expands a single pipeline into a series of its transforms.
     fn serial(&self) -> Box<dyn TransformConfig> {
-        let pipelines: IndexMap<String, Box<dyn TransformConfig>> = self
+        let transforms: IndexMap<String, Box<dyn TransformConfig>> = self
             .transforms
             .iter()
             .enumerate()
             .map(|(index, config)| (index.to_string(), config.clone()))
             .collect();
-
-        Box::new(expander::ExpanderConfig::serial(pipelines))
+        let transforms = Box::new(expander::ExpanderConfig::serial(transforms));
+        if let Some(ref filter) = self.filter {
+            Box::new(filter::PipelineFilterConfig::new(
+                filter.clone(),
+                transforms,
+            ))
+        } else {
+            transforms
+        }
     }
 }
 
@@ -208,6 +219,11 @@ impl TransformConfig for PipelinesConfig {
     fn transform_type(&self) -> &'static str {
         "pipelines"
     }
+
+    /// The pipelines transform shouldn't be embedded in another pipelines transform.
+    fn nestable(&self, parents: &HashSet<&'static str>) -> bool {
+        !parents.contains(&self.transform_type())
+    }
 }
 
 impl GenerateConfig for PipelinesConfig {
@@ -218,6 +234,10 @@ impl GenerateConfig for PipelinesConfig {
 
             [logs.pipelines.foo]
             name = "foo pipeline"
+
+            [logs.pipelines.foo.filter]
+            type = "datadog_search"
+            source = "source:s3"
 
             [[logs.pipelines.foo.transforms]]
             type = "filter"
@@ -251,6 +271,7 @@ mod tests {
     use super::{GenerateConfig, PipelinesConfig};
     use crate::config::{ComponentKey, TransformOuter};
     use indexmap::IndexMap;
+    use std::collections::HashSet;
 
     #[test]
     fn generate_config() {
@@ -279,10 +300,10 @@ mod tests {
         let name = ComponentKey::global("foo");
         let mut transforms = IndexMap::new();
         let mut expansions = IndexMap::new();
+        let parents = HashSet::new();
         outer
-            .expand(name, &mut transforms, &mut expansions)
+            .expand(name, &parents, &mut transforms, &mut expansions)
             .unwrap();
-        assert_eq!(transforms.len(), 9);
         assert_eq!(
             transforms
                 .keys()
@@ -290,12 +311,16 @@ mod tests {
                 .collect::<Vec<String>>(),
             vec![
                 "foo.logs.filter",
-                "foo.logs.transforms.foo.0",
-                "foo.logs.transforms.foo.1",
-                "foo.logs.transforms.foo",
-                "foo.logs.transforms.bar.0",
-                "foo.logs.transforms.bar",
-                "foo.logs.transforms",
+                "foo.logs.pipelines.foo.truthy.filter",
+                "foo.logs.pipelines.foo.truthy.transforms.0",
+                "foo.logs.pipelines.foo.truthy.transforms.1",
+                "foo.logs.pipelines.foo.truthy.transforms",
+                "foo.logs.pipelines.foo.truthy",
+                "foo.logs.pipelines.foo.falsy",
+                "foo.logs.pipelines.foo",
+                "foo.logs.pipelines.bar.0",
+                "foo.logs.pipelines.bar",
+                "foo.logs.pipelines",
                 "foo.logs",
                 "foo"
             ],

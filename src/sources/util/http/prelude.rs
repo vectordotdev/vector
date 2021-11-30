@@ -4,7 +4,7 @@ use super::{
     error::ErrorMessage,
 };
 use crate::{
-    config::SourceContext,
+    config::{AcknowledgementsConfig, SourceContext},
     internal_events::{HttpBadRequest, HttpBytesReceived, HttpEventsReceived},
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
@@ -40,6 +40,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         tls: &Option<TlsConfig>,
         auth: &Option<HttpSourceAuthConfig>,
         cx: SourceContext,
+        acknowledgements: AcknowledgementsConfig,
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let protocol = tls.http_protocol_name();
@@ -102,7 +103,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                 events
                             });
 
-                        handle_request(events, cx.acknowledgements.enabled, cx.out.clone())
+                        handle_request(events, acknowledgements.enabled, cx.out.clone())
                     },
                 )
                 .with(warp::trace(move |_info| span.clone()));

@@ -230,7 +230,7 @@ mod tests {
                 // check fails you might look there and see if we've allowed
                 // users to set their own bucket widths.
                 assert_eq!(buckets[9].count, 1);
-                assert_eq!(buckets[10].count, 2);
+                assert_eq!(buckets[10].count, 1);
                 assert_eq!(*count, 2);
                 assert_eq!(*sum, 16.1);
             }

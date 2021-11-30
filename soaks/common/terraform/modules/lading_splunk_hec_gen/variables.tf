@@ -8,12 +8,12 @@ variable "namespace" {
   type        = string
 }
 
-variable "splunk-hec-gen-toml" {
-  description = "The rendered splunk_hec_gen.toml for this test"
+variable "splunk-hec-gen-yaml" {
+  description = "The rendered splunk_hec_gen.yaml for this test"
   type        = string
 }
 
 variable "lading_image" {
   description = "The lading image to run"
-  type = string
+  type        = string
 }

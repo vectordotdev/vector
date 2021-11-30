@@ -3,7 +3,6 @@ use crate::sinks::util::{Compression, SinkBuilderExt, StreamSink};
 use futures::stream::BoxStream;
 use std::num::NonZeroUsize;
 use vector_core::buffers::Acker;
-use vector_core::partition::NullPartitioner;
 
 use crate::event::Value;
 use crate::sinks::elasticsearch::encoder::ProcessedEvent;
@@ -63,8 +62,7 @@ impl ElasticSearchSink {
             })
             .filter_map(|x| async move { x })
             .filter_map(move |log| future::ready(process_log(log, &mode, &id_key_field)))
-            .batched(NullPartitioner::new(), self.batch_settings)
-            .map(|(_, batch)| batch)
+            .batched(self.batch_settings.into_byte_size_config())
             .request_builder(request_builder_concurrency_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {

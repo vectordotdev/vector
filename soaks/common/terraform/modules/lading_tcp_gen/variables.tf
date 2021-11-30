@@ -8,12 +8,12 @@ variable "namespace" {
   type        = string
 }
 
-variable "tcp-gen-toml" {
-  description = "The rendered tcp_gen.toml for this test"
+variable "tcp-gen-yaml" {
+  description = "The rendered tcp_gen.yaml for this test"
   type        = string
 }
 
 variable "lading_image" {
   description = "The lading image to run"
-  type = string
+  type        = string
 }
