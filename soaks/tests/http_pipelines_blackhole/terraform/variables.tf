@@ -3,14 +3,14 @@ variable "type" {
   type        = string
 }
 
-variable "namespace" {
-  description = "The namespace in which to run"
+variable "vector_image" {
+  description = "The image of vector to use in this investigation"
   type        = string
 }
 
-variable "splunk-hec-gen-yaml" {
-  description = "The rendered splunk_hec_gen.yaml for this test"
-  type        = string
+variable "vector_cpus" {
+  description = "The total number of CPUs to give to vector"
+  type        = number
 }
 
 variable "lading_image" {
