@@ -138,6 +138,7 @@ else:
 
 print("<details>")
 print("<summary>Fine details of change detection per experiment.</summary>")
+print("")
 ttest_results = ttest_results.sort_values('Δ mean', ascending=False)
 ttest_results['Δ mean'] = ttest_results['Δ mean'].apply(adjust_per_cpu).apply(human_bytes)
 ttest_results['baseline mean'] = ttest_results['baseline mean'].apply(adjust_per_cpu).apply(human_bytes)
@@ -149,6 +150,7 @@ print("</details>")
 
 print("<details>")
 print("<summary>Fine details of each soak run.</summary>")
+print("")
 describe = csv.groupby(['experiment', 'variant'])['value'].describe(percentiles=[0.90, 0.95, 0.99])
 describe = describe.rename(columns={'50%': 'average', '95%': 'p95', '90%': 'p90', '99%': 'p99'})
 describe = describe.sort_values('mean', ascending=False)
