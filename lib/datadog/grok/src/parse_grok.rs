@@ -3,7 +3,6 @@ use itertools::{
     Itertools,
 };
 
-use lookup::LookupBuf;
 use shared::btreemap;
 
 use crate::parse_grok_rules::ParsedField;
