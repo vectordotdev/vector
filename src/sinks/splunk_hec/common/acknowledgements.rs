@@ -123,7 +123,6 @@ impl HecAckClient {
 
     /// Builds an ack query body with stored ack ids
     fn get_ack_query_body(&mut self) -> HecAckStatusRequest {
-        // self.clear_expired_ack_ids();
         HecAckStatusRequest {
             acks: self.acks.keys().copied().collect::<Vec<u64>>(),
         }
