@@ -9,7 +9,7 @@ use crate::{
     internal_events::{ExecCommandExecuted, ExecEventsReceived, ExecFailed, ExecTimeout},
     serde::{default_decoding, default_framing_stream_based},
     shutdown::ShutdownSignal,
-    sources::util::TcpError,
+    sources::util::StreamDecodingError,
     Pipeline,
 };
 use bytes::Bytes;

@@ -10,7 +10,7 @@ use crate::{
     internal_events::NatsEventsReceived,
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    sources::util::TcpError,
+    sources::util::StreamDecodingError,
     Pipeline,
 };
 use bytes::Bytes;

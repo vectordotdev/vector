@@ -4,7 +4,7 @@ use crate::{
     internal_events::StdinEventsReceived,
     serde::{default_decoding, default_framing_stream_based},
     shutdown::ShutdownSignal,
-    sources::util::TcpError,
+    sources::util::StreamDecodingError,
     Pipeline,
 };
 use async_stream::stream;

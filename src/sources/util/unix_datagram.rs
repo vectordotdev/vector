@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     internal_events::{SocketMode, SocketReceiveError, UnixSocketFileDeleteError},
     shutdown::ShutdownSignal,
-    sources::{util::tcp_error::TcpError, Source},
+    sources::{util::codecs::StreamDecodingError, Source},
     Pipeline,
 };
 use bytes::{Bytes, BytesMut};

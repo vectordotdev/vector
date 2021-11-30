@@ -3,7 +3,7 @@ use crate::config::log_schema;
 use crate::event::BatchStatus;
 use crate::event::{BatchNotifier, Event};
 use crate::shutdown::ShutdownSignal;
-use crate::sources::util::TcpError;
+use crate::sources::util::StreamDecodingError;
 use crate::Pipeline;
 use aws_sdk_sqs::model::{DeleteMessageBatchRequestEntry, MessageSystemAttributeName};
 use std::collections::HashMap;
