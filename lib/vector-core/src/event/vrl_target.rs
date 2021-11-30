@@ -43,8 +43,7 @@ impl VrlTarget {
     pub fn into_events(self, output: &mut Vec<Event>) {
         match self {
             VrlTarget::LogEvent(value, metadata) => {
-                let value = value.borrow();
-                for event in value_into_log_events(&*value, metadata) {
+                for event in value_into_log_events(value, metadata) {
                     output.push(event);
                 }
             }
@@ -282,27 +281,28 @@ impl vrl_core::Target for VrlTarget {
 //   * If an element is an object, create an event using that as fields.
 //   * If an element is anything else, assign to the `message` key.
 // * If `.` is anything else, assign to the `message` key.
-fn value_into_log_events<'a>(
-    value: &'a vrl_core::Value,
+fn value_into_log_events(
+    value: SharedValue,
     metadata: EventMetadata,
-) -> impl Iterator<Item = Event> + 'a {
+) -> impl Iterator<Item = Event> {
+    let value = vrl_core::Value::from(value);
     match value {
         vrl_core::Value::Object(object) => {
             Box::new(std::iter::once(Event::from(LogEvent::from_parts(
                 object
-                    .iter()
-                    .map(|(k, v)| (k.clone(), v.borrow().clone().into()))
+                    .into_iter()
+                    .map(|(k, v)| (k, vrl_core::Value::from(v).into()))
                     .collect(),
                 metadata,
             )))) as Box<dyn Iterator<Item = Event>>
         }
         vrl_core::Value::Array(values) => Box::new(values.into_iter().map(move |v| {
-            let v = v.borrow();
-            match &*v {
+            let v = vrl_core::Value::from(v);
+            match v {
                 vrl_core::Value::Object(object) => Event::from(LogEvent::from_parts(
                     object
-                        .iter()
-                        .map(|(k, v)| (k.clone(), v.borrow().clone().into()))
+                        .into_iter()
+                        .map(|(k, v)| (k, vrl_core::Value::from(v).into()))
                         .collect(),
                     metadata.clone(),
                 )),
@@ -334,6 +334,7 @@ enum MetricPathError<'a> {
 mod test {
     use super::super::{metric::MetricTags, MetricValue};
     use super::*;
+    use crate::event::Value;
     use chrono::{offset::TimeZone, Utc};
     use pretty_assertions::assert_eq;
     use shared::btreemap;
@@ -497,7 +498,10 @@ mod test {
                 result
             );
             assert_eq!(vrl_core::Target::get(&target, &path), Ok(Some(value)));
-            assert_eq!(target.into_events().next().unwrap(), Event::Log(expect));
+
+            let mut output = Vec::new();
+            target.into_events(&mut output);
+            assert_eq!(output[0], Event::Log(expect));
         }
     }
 
@@ -640,8 +644,11 @@ mod test {
 
             vrl_core::Target::insert(&mut target, &LookupBuf::root(), value).unwrap();
 
+            let mut output = Vec::new();
+            target.into_events(&mut output);
+
             assert_eq!(
-                target.into_events().collect::<Vec<_>>(),
+                output,
                 expect
                     .into_iter()
                     .map(|v| Event::Log(LogEvent::from_parts(v, metadata.clone())))

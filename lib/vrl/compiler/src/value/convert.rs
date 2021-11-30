@@ -451,12 +451,6 @@ impl<T: Into<Value>> From<Vec<T>> for Value {
     }
 }
 
-impl From<Vec<SharedValue>> for Value {
-    fn from(v: Vec<SharedValue>) -> Self {
-        Value::Array(v)
-    }
-}
-
 impl FromIterator<SharedValue> for Value {
     fn from_iter<I: IntoIterator<Item = SharedValue>>(iter: I) -> Self {
         Value::Array(iter.into_iter().collect::<Vec<_>>())

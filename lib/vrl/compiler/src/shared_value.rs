@@ -122,3 +122,18 @@ impl SharedValue {
         self.borrow().is_array()
     }
 }
+
+impl From<SharedValue> for Value {
+    /// Extracts the value from the shared value.
+    /// If there is only one reference to the value we can extract the
+    /// value directly. Otherwise we need to return a clone.
+    fn from(value: SharedValue) -> Self {
+        match Rc::try_unwrap(value.0) {
+            Ok(value) => value.into_inner(),
+            Err(value) => {
+                println!("Cloning");
+                value.borrow().clone()
+            }
+        }
+    }
+}

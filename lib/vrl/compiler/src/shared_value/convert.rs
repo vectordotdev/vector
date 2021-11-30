@@ -139,12 +139,6 @@ impl<T: Into<Value>> From<Vec<T>> for SharedValue {
     }
 }
 
-impl From<Vec<SharedValue>> for SharedValue {
-    fn from(v: Vec<SharedValue>) -> Self {
-        SharedValue::from(Value::from(v))
-    }
-}
-
 impl From<BTreeMap<String, SharedValue>> for SharedValue {
     fn from(v: BTreeMap<String, SharedValue>) -> Self {
         SharedValue::from(Value::from(v))
