@@ -97,7 +97,7 @@ impl Service<HecRequest> for HecService {
                             if let Some(ack_id) = body.ack_id {
                                 let (tx, rx) = oneshot::channel();
                                 match ack_finalizer_tx.send((ack_id, tx)) {
-                                    Ok(_) => rx.await.unwrap_or(EventStatus::Failed),
+                                    Ok(_) => rx.await.unwrap_or(EventStatus::Rejected),
                                     // If we cannot send ack ids to the ack client, fall back to default behavior
                                     Err(_) => EventStatus::Delivered,
                                 }
@@ -329,7 +329,7 @@ mod tests {
 
         let request = get_hec_request();
         let response = service.call(request).await.unwrap();
-        assert_eq!(EventStatus::Failed, response.event_status)
+        assert_eq!(EventStatus::Rejected, response.event_status)
     }
 
     #[tokio::test]

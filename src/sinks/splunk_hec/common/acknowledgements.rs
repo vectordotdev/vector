@@ -84,7 +84,7 @@ impl HecAckClient {
                         .filter_map(|(ack_id, ack_status)| ack_status.then(|| *ack_id))
                         .collect::<Vec<u64>>();
                     self.finalize_delivered_ack_ids(acked_ack_ids.as_slice());
-                    self.expire_ack_ids_with_status(EventStatus::Failed);
+                    self.expire_ack_ids_with_status(EventStatus::Rejected);
                 }
                 Err(error) => {
                     match error {
@@ -279,7 +279,7 @@ mod tests {
         ack_request_body.acks.sort_unstable();
         assert_eq!(ack_ids, ack_request_body.acks);
         ack_client.decrement_retries();
-        ack_client.expire_ack_ids_with_status(EventStatus::Failed);
+        ack_client.expire_ack_ids_with_status(EventStatus::Rejected);
 
         let ack_request_body = ack_client.get_ack_query_body();
         assert!(ack_request_body.acks.is_empty())
@@ -305,10 +305,10 @@ mod tests {
         let ack_status_rxs = populate_ack_client(&mut ack_client, &ack_ids);
 
         ack_client.decrement_retries();
-        ack_client.expire_ack_ids_with_status(EventStatus::Failed);
+        ack_client.expire_ack_ids_with_status(EventStatus::Rejected);
         let mut statuses = ack_status_rxs.into_iter().collect::<FuturesUnordered<_>>();
         while let Some(status) = statuses.next().await {
-            assert_eq!(EventStatus::Failed, status.unwrap());
+            assert_eq!(EventStatus::Rejected, status.unwrap());
         }
     }
 }
