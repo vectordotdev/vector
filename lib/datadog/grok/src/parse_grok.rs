@@ -6,6 +6,7 @@ use itertools::{
 use lookup::LookupBuf;
 use shared::btreemap;
 
+use crate::parse_grok_rules::ParsedField;
 use crate::{grok_filter::apply_filter, parse_grok_rules::GrokRule};
 use vrl_compiler::{Target, Value};
 
@@ -45,48 +46,44 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
     let mut parsed = Value::from(btreemap! {});
 
     if let Some(ref matches) = grok_rule.pattern.match_against(source) {
-        for (name, value) in matches.iter() {
-            let path: LookupBuf = if name == "." {
-                LookupBuf::root()
-            } else {
-                name.parse().expect("path should always be valid")
-            };
-
+        for (mut name, value) in matches.iter() {
             let mut value = Some(Value::from(value));
 
-            // apply filters
-            if let Some(filters) = grok_rule.filters.get(&path) {
+            if name == "." {
+                name = ""; // root
+            }
+            if let Some(ParsedField { field, filters }) = grok_rule.fields.get(name) {
                 filters.iter().for_each(|filter| {
                     if let Some(ref v) = value {
                         match apply_filter(v, filter) {
                             Ok(v) => value = Some(v),
                             Err(error) => {
-                                warn!(message = "Error applying filter", path = %path, filter = %filter, %error);
+                                warn!(message = "Error applying filter", field = %field, filter = %filter, %error);
                                 value = None;
                             }
                         }
                     }
                 });
-            };
 
-            if let Some(value) = value {
-                match value {
-                    // root-level maps must be merged
-                    Value::Object(map) if path.is_root() || path.segments[0].is_index() => {
-                        parsed.as_object_mut().expect("root is object").extend(map);
-                    }
-                    // anything else at the root leve must be ignored
-                    _ if path.is_root() || path.segments[0].is_index() => {}
-                    // ignore empty strings if necessary
-                    Value::Bytes(b) if remove_empty && b.is_empty() => {}
-                    // otherwise just apply VRL lookup insert logic
-                    _ => {
-                        parsed.insert(&path, value).unwrap_or_else(
-                                |error| warn!(message = "Error updating field value", path = %path, %error)
+                if let Some(value) = value {
+                    match value {
+                        // root-level maps must be merged
+                        Value::Object(map) if field.is_root() || field.segments[0].is_index() => {
+                            parsed.as_object_mut().expect("root is object").extend(map);
+                        }
+                        // anything else at the root leve must be ignored
+                        _ if field.is_root() || field.segments[0].is_index() => {}
+                        // ignore empty strings if necessary
+                        Value::Bytes(b) if remove_empty && b.is_empty() => {}
+                        // otherwise just apply VRL lookup insert logic
+                        _ => {
+                            parsed.insert(&field, value).unwrap_or_else(
+                                |error| warn!(message = "Error updating field value", field = %field, %error)
                             );
-                    }
-                };
-            }
+                        }
+                    };
+                }
+            };
         }
 
         Ok(parsed)
