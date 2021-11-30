@@ -1,11 +1,15 @@
 use std::io;
 use std::path::Path;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use bytes::{Buf, BufMut};
 use core_common::byte_size_of::ByteSizeOf;
 use std::future::Future;
 use temp_dir::TempDir;
+use tracing_fluent_assertions::{AssertionRegistry, AssertionsLayer};
+use tracing_subscriber::{filter::LevelFilter, Layer};
+use tracing_subscriber::{layer::SubscriberExt, Registry};
 
 use crate::bytes::{DecodeBytes, EncodeBytes};
 use crate::disk_v2::{Buffer, DiskBufferConfig, Reader, Writer};
@@ -138,4 +142,26 @@ where
 {
     let buf_dir = TempDir::new().expect("creating temp dir should never fail");
     f(buf_dir.path()).await
+}
+
+pub fn install_tracing_assertions() -> AssertionRegistry {
+    let assertion_registry = AssertionRegistry::default();
+    let assertions_layer = AssertionsLayer::new(&assertion_registry);
+
+    // Constrain the actual output layer to the normal RUST_LOG-based control mechanism, so that
+    // assertions can run unfettered but without also spamming the console with logs.
+    let fmt_filter = std::env::var("RUST_LOG")
+        .map_err(|_| ())
+        .and_then(|s| LevelFilter::from_str(s.as_str()).map_err(|_| ()))
+        .unwrap_or(LevelFilter::OFF);
+    let fmt_layer = tracing_subscriber::fmt::layer()
+        .with_span_events(tracing_subscriber::fmt::format::FmtSpan::FULL)
+        .with_test_writer()
+        .with_filter(fmt_filter);
+
+    let base_subscriber = Registry::default();
+    let subscriber = base_subscriber.with(assertions_layer).with(fmt_layer);
+
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+    assertion_registry
 }

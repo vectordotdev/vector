@@ -7730,7 +7730,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-fluent-assertions"
-version = "0.1.0"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a3046852f71598717b608049713333ffa54ab2f4429a6dedd070e73b7210dd28"
 dependencies = [
  "tracing 0.1.29",
  "tracing-core 0.1.21",

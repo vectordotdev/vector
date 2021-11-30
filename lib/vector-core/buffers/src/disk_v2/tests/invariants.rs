@@ -1,10 +1,11 @@
 use tokio_test::{assert_pending, task::spawn};
-use tracing_fluent_assertions::{Controller, FluentAssertionsLayer};
-use tracing_subscriber::{layer::SubscriberExt, Registry};
+use tracing::Instrument;
 
 use crate::disk_v2::{common::MAX_FILE_ID, tests::create_default_buffer};
 
-use super::{create_buffer_with_max_data_file_size, with_temp_dir, SizedRecord};
+use super::{
+    create_buffer_with_max_data_file_size, install_tracing_assertions, with_temp_dir, SizedRecord,
+};
 
 #[tokio::test]
 async fn file_id_wraps_around_when_max_file_id_hit() {
@@ -72,23 +73,16 @@ async fn file_id_wraps_around_when_max_file_id_hit() {
 
 #[tokio::test]
 async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
-    // TODO: This works, but, it's a bit heavy at the moment.  We should try and clean this up at
-    // least into a helper method, and see if we can figure out some way to make it more
-    // stable/resilient to other tests running if _they_ wanted to also take part.  Obviously, the
-    // thread-local nature of the tracing dispatcher makes this tricky, but maybe there's a way!
+    // TODO: This installs the assertions layer globally, so all tests will run through it.  This is
+    // why we end up having to constrain our span matcher to the unique span lineage we wrap around
+    // the test method itself, otherwise we would be testing all occurences of the `wait_for_reader`
+    // span across all concurrent test runs... which would almost certainly mess with this.
     //
-    // One idea could be some sort of tracing field-based approach where we associate the controller
-    // with a specific root span so that it only captures spans which originate from that span
-    // specifically, based on... a field value? Maybe a sentinel value we store in the span's data?
-    //
-    // None of that addresses how to create and set the subscriber to ensure we have our fluent
-    // assertion layer present, or how to pass in the controller instance.... but baby steps!
-    let controller = Controller::new();
-    let registry = Registry::default();
-    let subscriber = registry.with(FluentAssertionsLayer::new(&controller));
-    tracing::subscriber::set_global_default(subscriber).unwrap();
+    // It'd be nice if `tracing-fluent-assertions` could provide a helper macro, or something to
+    // make this easier... but this should do for now.
+    let assertion_registry = install_tracing_assertions();
 
-    with_temp_dir(|dir| {
+    let fut = with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 
         async move {
@@ -128,8 +122,12 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
             assert_eq!(writer.get_total_records(), 32);
             assert_eq!(writer.get_current_writer_file_id(), 31);
 
-            //reload_handle.reload(EnvFilter::new("trace")).expect("failed to reload envfilter");
-            let assertion = controller.add_entry("wait_for_reader");
+            let assertion = assertion_registry
+                .build()
+                .with_name("wait_for_reader")
+                .with_parent_name("writer_stops_when_hitting_file_that_reader_is_still_on")
+                .was_entered()
+                .finalize();
 
             // Now we should be consuming all data files, and our next write should block trying to
             // open the "first" data file until we do a read.
@@ -138,7 +136,7 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
                 writer.write_record(record).await
             });
 
-            while !assertion.was_entered() {
+            while !assertion.try_assert() {
                 assert_pending!(blocked_write.poll());
             }
             assert_pending!(blocked_write.poll());
@@ -182,8 +180,11 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
             assert_eq!(writer.get_total_records(), 31);
             assert_eq!(writer.get_current_writer_file_id(), 0);
         }
-    })
-    .await
+    });
+
+    let parent = trace_span!("writer_stops_when_hitting_file_that_reader_is_still_on");
+    let _enter = parent.enter();
+    fut.in_current_span().await
 }
 
 #[tokio::test]
