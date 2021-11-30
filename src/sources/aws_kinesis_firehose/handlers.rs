@@ -2,7 +2,7 @@ use super::errors::{ParseRecords, RequestError};
 use super::models::{EncodedFirehoseRecord, FirehoseRequest, FirehoseResponse};
 use super::Compression;
 use crate::codecs;
-use crate::sources::util::TcpError;
+use crate::sources::util::StreamDecodingError;
 use crate::{
     config::log_schema,
     event::{BatchStatus, Event},
@@ -87,7 +87,7 @@ pub async fn firehose(
                     if let Some(receiver) = receiver {
                         match receiver.await {
                             BatchStatus::Delivered => Ok(()),
-                            BatchStatus::Failed => {
+                            BatchStatus::Rejected => {
                                 Err(warp::reject::custom(RequestError::DeliveryFailed {
                                     request_id: request_id.clone(),
                                 }))

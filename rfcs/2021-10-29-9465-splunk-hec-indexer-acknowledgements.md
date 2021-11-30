@@ -245,7 +245,7 @@ Second, we describe implementation details for channel behavior.
         match receiver.await {
             BatchStatus::Delivered => // update ackId -> true,
             BatchStatus::Errored => // leave ackId -> false,
-            BatchStatus::Failed => // leave ackId -> false,
+            BatchStatus::Rejected => // leave ackId -> false,
         }
     }
     ```
@@ -343,7 +343,7 @@ fn call(&mut self, req: HecRequest) -> Self::Future {
             let event_status = match rx.await {
                 Ok(EventStatus::Delivered) => EventStatus::Delivered,
                 Ok(_) => EventStatus::Dropped,
-                Err(_) => EventStatus::Failed,
+                Err(_) => EventStatus::Rejected,
             }
             ...
 
@@ -353,7 +353,7 @@ fn call(&mut self, req: HecRequest) -> Self::Future {
             } else if response.status().is_server_error() {
                 EventStatus::Errored
             } else {
-                EventStatus::Failed
+                EventStatus::Rejected
             };
 
             ...

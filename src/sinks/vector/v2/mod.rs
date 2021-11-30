@@ -118,7 +118,7 @@ mod tests {
 
         sink.run(events).await.unwrap();
         drop(trigger);
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Failed));
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
     }
 
     #[test]

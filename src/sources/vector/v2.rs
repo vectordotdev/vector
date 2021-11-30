@@ -78,7 +78,7 @@ async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<()
 
     match status {
         BatchStatus::Errored => Err(Status::internal("Delivery error")),
-        BatchStatus::Failed => Err(Status::data_loss("Delivery failed")),
+        BatchStatus::Rejected => Err(Status::data_loss("Delivery failed")),
         BatchStatus::Delivered => Ok(()),
     }
 }

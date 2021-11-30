@@ -184,7 +184,7 @@ async fn handle_batch_status(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Error delivering contents to sink".into(),
             ))),
-            BatchStatus::Failed => Err(warp::reject::custom(ErrorMessage::new(
+            BatchStatus::Rejected => Err(warp::reject::custom(ErrorMessage::new(
                 StatusCode::BAD_REQUEST,
                 "Contents failed to deliver to sink".into(),
             ))),

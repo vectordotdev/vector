@@ -1,9 +1,12 @@
-use crate::codecs::{BoxedFramer, BoxedFramingError, CharacterDelimitedCodec, FramingConfig};
+use crate::codecs::{
+    decoding::{BoxedFramer, BoxedFramingError, FramingConfig},
+    CharacterDelimitedDecoder,
+};
 use bytes::{Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder;
 
-/// Config used to build a `NewlineDelimitedCodec`.
+/// Config used to build a `NewlineDelimitedDecoder`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
 pub struct NewlineDelimitedDecoderConfig {
     #[serde(
@@ -13,7 +16,7 @@ pub struct NewlineDelimitedDecoderConfig {
     newline_delimited: NewlineDelimitedDecoderOptions,
 }
 
-/// Options for building a `NewlineDelimitedCodec`.
+/// Options for building a `NewlineDelimitedDecoder`.
 #[derive(Debug, Clone, Derivative, Deserialize, Serialize, PartialEq)]
 #[derivative(Default)]
 pub struct NewlineDelimitedDecoderOptions {
@@ -39,7 +42,7 @@ impl NewlineDelimitedDecoderConfig {
         Default::default()
     }
 
-    /// Creates a `NewlineDelimitedCodec` with a maximum frame length limit.
+    /// Creates a `NewlineDelimitedDecoder` with a maximum frame length limit.
     pub const fn new_with_max_length(max_length: usize) -> Self {
         Self {
             newline_delimited: { NewlineDelimitedDecoderOptions::new_with_max_length(max_length) },
@@ -51,42 +54,42 @@ impl NewlineDelimitedDecoderConfig {
 impl FramingConfig for NewlineDelimitedDecoderConfig {
     fn build(&self) -> crate::Result<BoxedFramer> {
         if let Some(max_length) = self.newline_delimited.max_length {
-            Ok(Box::new(NewlineDelimitedCodec::new_with_max_length(
+            Ok(Box::new(NewlineDelimitedDecoder::new_with_max_length(
                 max_length,
             )))
         } else {
-            Ok(Box::new(NewlineDelimitedCodec::new()))
+            Ok(Box::new(NewlineDelimitedDecoder::new()))
         }
     }
 }
 
 /// A codec for handling bytes that are delimited by (a) newline(s).
 #[derive(Debug, Clone)]
-pub struct NewlineDelimitedCodec(CharacterDelimitedCodec);
+pub struct NewlineDelimitedDecoder(CharacterDelimitedDecoder);
 
-impl NewlineDelimitedCodec {
-    /// Creates a new `NewlineDelimitedCodec`.
+impl NewlineDelimitedDecoder {
+    /// Creates a new `NewlineDelimitedDecoder`.
     pub const fn new() -> Self {
-        Self(CharacterDelimitedCodec::new('\n'))
+        Self(CharacterDelimitedDecoder::new('\n'))
     }
 
-    /// Creates a `NewlineDelimitedCodec` with a maximum frame length limit.
+    /// Creates a `NewlineDelimitedDecoder` with a maximum frame length limit.
     ///
     /// Any frames longer than `max_length` bytes will be discarded entirely.
     pub const fn new_with_max_length(max_length: usize) -> Self {
-        Self(CharacterDelimitedCodec::new_with_max_length(
+        Self(CharacterDelimitedDecoder::new_with_max_length(
             '\n', max_length,
         ))
     }
 }
 
-impl Default for NewlineDelimitedCodec {
+impl Default for NewlineDelimitedDecoder {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Decoder for NewlineDelimitedCodec {
+impl Decoder for NewlineDelimitedDecoder {
     type Item = Bytes;
     type Error = BoxedFramingError;
 
@@ -106,7 +109,7 @@ mod tests {
     #[test]
     fn decode_bytes_with_newlines() {
         let mut input = BytesMut::from("foo\nbar\nbaz");
-        let mut decoder = NewlineDelimitedCodec::new();
+        let mut decoder = NewlineDelimitedDecoder::new();
 
         assert_eq!(decoder.decode(&mut input).unwrap().unwrap(), "foo");
         assert_eq!(decoder.decode(&mut input).unwrap().unwrap(), "bar");
@@ -116,7 +119,7 @@ mod tests {
     #[test]
     fn decode_bytes_with_newlines_trailing() {
         let mut input = BytesMut::from("foo\nbar\nbaz\n");
-        let mut decoder = NewlineDelimitedCodec::new();
+        let mut decoder = NewlineDelimitedDecoder::new();
 
         assert_eq!(decoder.decode(&mut input).unwrap().unwrap(), "foo");
         assert_eq!(decoder.decode(&mut input).unwrap().unwrap(), "bar");
@@ -127,7 +130,7 @@ mod tests {
     #[test]
     fn decode_bytes_with_newlines_and_max_length() {
         let mut input = BytesMut::from("foo\nbarbara\nbaz\n");
-        let mut decoder = NewlineDelimitedCodec::new_with_max_length(3);
+        let mut decoder = NewlineDelimitedDecoder::new_with_max_length(3);
 
         assert_eq!(decoder.decode(&mut input).unwrap().unwrap(), "foo");
         assert_eq!(decoder.decode(&mut input).unwrap(), None);
@@ -138,7 +141,7 @@ mod tests {
     #[test]
     fn decode_eof_bytes_with_newlines() {
         let mut input = BytesMut::from("foo\nbar\nbaz");
-        let mut decoder = NewlineDelimitedCodec::new();
+        let mut decoder = NewlineDelimitedDecoder::new();
 
         assert_eq!(decoder.decode_eof(&mut input).unwrap().unwrap(), "foo");
         assert_eq!(decoder.decode_eof(&mut input).unwrap().unwrap(), "bar");
@@ -148,7 +151,7 @@ mod tests {
     #[test]
     fn decode_eof_bytes_with_newlines_trailing() {
         let mut input = BytesMut::from("foo\nbar\nbaz\n");
-        let mut decoder = NewlineDelimitedCodec::new();
+        let mut decoder = NewlineDelimitedDecoder::new();
 
         assert_eq!(decoder.decode_eof(&mut input).unwrap().unwrap(), "foo");
         assert_eq!(decoder.decode_eof(&mut input).unwrap().unwrap(), "bar");
@@ -159,7 +162,7 @@ mod tests {
     #[test]
     fn decode_eof_bytes_with_newlines_and_max_length() {
         let mut input = BytesMut::from("foo\nbarbara\nbaz\n");
-        let mut decoder = NewlineDelimitedCodec::new_with_max_length(3);
+        let mut decoder = NewlineDelimitedDecoder::new_with_max_length(3);
 
         assert_eq!(decoder.decode_eof(&mut input).unwrap().unwrap(), "foo");
         assert_eq!(decoder.decode_eof(&mut input).unwrap(), None);

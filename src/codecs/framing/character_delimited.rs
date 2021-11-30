@@ -1,16 +1,16 @@
-use crate::codecs::{BoxedFramer, BoxedFramingError, FramingConfig};
+use crate::codecs::decoding::{BoxedFramer, BoxedFramingError, FramingConfig};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 use std::{cmp, io, usize};
 use tokio_util::codec::{Decoder, Encoder};
 
-/// Config used to build a `CharacterDelimitedCodec`.
+/// Config used to build a `CharacterDelimitedDecoder`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CharacterDelimitedDecoderConfig {
     character_delimited: CharacterDelimitedDecoderOptions,
 }
 
-/// Options for building a `CharacterDelimitedCodec`.
+/// Options for building a `CharacterDelimitedDecoder`.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct CharacterDelimitedDecoderOptions {
     /// The character that delimits byte sequences.
@@ -26,21 +26,21 @@ pub struct CharacterDelimitedDecoderOptions {
 impl FramingConfig for CharacterDelimitedDecoderConfig {
     fn build(&self) -> crate::Result<BoxedFramer> {
         if let Some(max_length) = self.character_delimited.max_length {
-            Ok(Box::new(CharacterDelimitedCodec::new_with_max_length(
+            Ok(Box::new(CharacterDelimitedDecoder::new_with_max_length(
                 self.character_delimited.delimiter,
                 max_length,
             )))
         } else {
-            Ok(Box::new(CharacterDelimitedCodec::new(
+            Ok(Box::new(CharacterDelimitedDecoder::new(
                 self.character_delimited.delimiter,
             )))
         }
     }
 }
 
-/// A codec for handling bytes that are delimited by (a) chosen character(s).
+/// A decoder for handling bytes that are delimited by (a) chosen character(s).
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct CharacterDelimitedCodec {
+pub struct CharacterDelimitedDecoder {
     /// The delimiter used to separate byte sequences.
     delimiter: char,
     /// The maximum length of the byte buffer.
@@ -52,10 +52,10 @@ pub struct CharacterDelimitedCodec {
     next_index: usize,
 }
 
-impl CharacterDelimitedCodec {
-    /// Creates a `CharacterDelimitedCodec` with the specified delimiter.
+impl CharacterDelimitedDecoder {
+    /// Creates a `CharacterDelimitedDecoder` with the specified delimiter.
     pub const fn new(delimiter: char) -> Self {
-        CharacterDelimitedCodec {
+        CharacterDelimitedDecoder {
             delimiter,
             max_length: usize::MAX,
             is_discarding: false,
@@ -63,13 +63,13 @@ impl CharacterDelimitedCodec {
         }
     }
 
-    /// Creates a `CharacterDelimitedCodec` with a maximum frame length limit.
+    /// Creates a `CharacterDelimitedDecoder` with a maximum frame length limit.
     ///
     /// Any frames longer than `max_length` bytes will be discarded entirely.
     pub const fn new_with_max_length(delimiter: char, max_length: usize) -> Self {
-        CharacterDelimitedCodec {
+        CharacterDelimitedDecoder {
             max_length,
-            ..CharacterDelimitedCodec::new(delimiter)
+            ..CharacterDelimitedDecoder::new(delimiter)
         }
     }
 
@@ -79,7 +79,7 @@ impl CharacterDelimitedCodec {
     }
 }
 
-impl Decoder for CharacterDelimitedCodec {
+impl Decoder for CharacterDelimitedDecoder {
     type Item = Bytes;
     type Error = BoxedFramingError;
 
@@ -163,7 +163,7 @@ impl Decoder for CharacterDelimitedCodec {
     }
 }
 
-impl<T> Encoder<T> for CharacterDelimitedCodec
+impl<T> Encoder<T> for CharacterDelimitedDecoder
 where
     T: AsRef<[u8]>,
 {
@@ -186,7 +186,7 @@ mod tests {
 
     #[test]
     fn character_delimited_decode() {
-        let mut codec = CharacterDelimitedCodec::new('\n');
+        let mut codec = CharacterDelimitedDecoder::new('\n');
         let buf = &mut BytesMut::new();
         buf.put_slice(b"abc\n");
         assert_eq!(Some("abc".into()), codec.decode(buf).unwrap());
@@ -194,7 +194,7 @@ mod tests {
 
     #[test]
     fn character_delimited_encode() {
-        let mut codec = CharacterDelimitedCodec::new('\n');
+        let mut codec = CharacterDelimitedDecoder::new('\n');
 
         let mut buf = BytesMut::new();
         codec.encode(b"abc", &mut buf).unwrap();
@@ -206,7 +206,7 @@ mod tests {
     fn decode_max_length() {
         const MAX_LENGTH: usize = 6;
 
-        let mut codec = CharacterDelimitedCodec::new_with_max_length('\n', MAX_LENGTH);
+        let mut codec = CharacterDelimitedDecoder::new_with_max_length('\n', MAX_LENGTH);
         let buf = &mut BytesMut::new();
 
         buf.reserve(200);
@@ -225,7 +225,7 @@ mod tests {
     fn decoder_discard_repeat() {
         const MAX_LENGTH: usize = 1;
 
-        let mut codec = CharacterDelimitedCodec::new_with_max_length('\n', MAX_LENGTH);
+        let mut codec = CharacterDelimitedDecoder::new_with_max_length('\n', MAX_LENGTH);
         let buf = &mut BytesMut::new();
 
         buf.reserve(200);
@@ -244,7 +244,7 @@ mod tests {
         let mut bytes = serde_json::to_vec(&input).unwrap();
         bytes.push(b'\n');
 
-        let mut codec = CharacterDelimitedCodec::new('\n');
+        let mut codec = CharacterDelimitedDecoder::new('\n');
         let buf = &mut BytesMut::new();
 
         buf.reserve(bytes.len());
@@ -312,7 +312,7 @@ mod tests {
             {"log":"2019-01-18 07:53:06.419 [               ]  INFO 1 --- [vent-bus.prod-1] c.t.listener.CommonListener              : warehousing Dailywarehousing.daily\n","stream":"stdout","time":"2019-01-18T07:53:06.420527437Z"}
         "#};
 
-        let mut codec = CharacterDelimitedCodec::new('\n');
+        let mut codec = CharacterDelimitedDecoder::new('\n');
         let buf = &mut BytesMut::new();
 
         buf.extend(events.to_string().as_bytes());

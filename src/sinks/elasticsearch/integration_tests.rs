@@ -262,7 +262,7 @@ async fn insert_events_with_failure() {
             ..config()
         },
         true,
-        BatchStatus::Failed,
+        BatchStatus::Rejected,
     )
     .await;
 }

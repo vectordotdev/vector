@@ -1,4 +1,4 @@
-use super::{AfterReadExt as _, TcpError};
+use super::{AfterReadExt as _, StreamDecodingError};
 use crate::{
     config::Resource,
     event::Event,
@@ -65,7 +65,7 @@ where
 {
     // Should be default: `std::io::Error`.
     // Right now this is unstable: https://github.com/rust-lang/rust/issues/29661
-    type Error: From<io::Error> + TcpError + std::fmt::Debug + std::fmt::Display + Send;
+    type Error: From<io::Error> + StreamDecodingError + std::fmt::Debug + std::fmt::Display + Send;
     type Item: Into<SmallVec<[Event; 1]>> + Send;
     type Decoder: Decoder<Item = (Self::Item, usize), Error = Self::Error> + Send + 'static;
 
@@ -266,7 +266,7 @@ async fn handle_stream<T>(
                         }
                     }
                     Some(Err(error)) => {
-                        if !<<T as TcpSource>::Error as TcpError>::can_continue(&error) {
+                        if !<<T as TcpSource>::Error as StreamDecodingError>::can_continue(&error) {
                             warn!(message = "Failed to read data from TCP source.", %error);
                             break;
                         }
