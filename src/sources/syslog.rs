@@ -1,7 +1,7 @@
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
 use crate::{
-    codecs::{self, BytesCodec, OctetCountingCodec, SyslogParser},
+    codecs::{self, BytesDecoder, OctetCountingDecoder, SyslogDeserializer},
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
@@ -133,8 +133,8 @@ impl SourceConfig for SyslogConfig {
             #[cfg(unix)]
             Mode::Unix { path } => {
                 let decoder = Decoder::new(
-                    Box::new(OctetCountingCodec::new_with_max_length(self.max_length)),
-                    Box::new(SyslogParser),
+                    Box::new(OctetCountingDecoder::new_with_max_length(self.max_length)),
+                    Box::new(SyslogDeserializer),
                 );
 
                 Ok(build_unix_stream_source(
@@ -175,15 +175,15 @@ struct SyslogTcpSource {
 }
 
 impl TcpSource for SyslogTcpSource {
-    type Error = codecs::Error;
+    type Error = codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
     type Decoder = codecs::Decoder;
     type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
         codecs::Decoder::new(
-            Box::new(OctetCountingCodec::new_with_max_length(self.max_length)),
-            Box::new(SyslogParser),
+            Box::new(OctetCountingDecoder::new_with_max_length(self.max_length)),
+            Box::new(SyslogDeserializer),
         )
     }
 
@@ -225,7 +225,7 @@ pub fn udp(
 
         UdpFramed::new(
             socket,
-            codecs::Decoder::new(Box::new(BytesCodec::new()), Box::new(SyslogParser)),
+            codecs::Decoder::new(Box::new(BytesDecoder::new()), Box::new(SyslogDeserializer)),
         )
         .take_until(shutdown)
         .filter_map(|frame| {
@@ -302,7 +302,7 @@ fn enrich_syslog_event(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{codecs::Parser, config::log_schema, event::Event};
+    use crate::{codecs::decoding::Deserializer, config::log_schema, event::Event};
     use chrono::prelude::*;
     use shared::assert_event_data_eq;
 
@@ -312,7 +312,7 @@ mod test {
         bytes: Bytes,
     ) -> Option<Event> {
         let byte_size = bytes.len();
-        let parser = SyslogParser;
+        let parser = SyslogDeserializer;
         let mut events = parser.parse(bytes).ok()?;
         handle_events(&mut events, host_key, default_host, byte_size);
         Some(events.remove(0))

@@ -16,9 +16,16 @@ releases: "0.18.0": {
 		transition from the old charts.
 
 		## Known Issues
-		- The `elasticsearch` sink incorrectly prints a message for each delivered event
-		- A change to internal telemetry causes aggregated histograms emitted by the
-		`prometheus_exporter` and `prometheus_remote_write` sinks to be incorrectly tallied.
+		- The `elasticsearch` sink incorrectly prints a message for each
+		  delivered event. Fixed in v0.18.1.
+		- A change to internal telemetry causes aggregated histograms emitted by
+		  the `prometheus_exporter` and `prometheus_remote_write` sinks to be
+		  incorrectly tallied. Fixed in v0.18.1.
+		- The new automatic namespacing feature broke running Vector from the
+		  published RPM due to it trying to load directories from `/etc/vector`
+		  that are not valid. Fixed in v0.18.1.
+		- The new `reroute_dropped` feature of `remap` always creates the
+		  `dropped` output even if `reroute_dropped = false`. Fixed in v0.18.1.
 
 		## Features
 

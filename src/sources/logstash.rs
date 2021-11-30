@@ -1,4 +1,4 @@
-use super::util::{SocketListenAddr, TcpError, TcpSource, TcpSourceAck, TcpSourceAcker};
+use super::util::{SocketListenAddr, StreamDecodingError, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
@@ -188,7 +188,7 @@ pub enum DecodeError {
     DecompressionFailed { source: io::Error },
 }
 
-impl TcpError for DecodeError {
+impl StreamDecodingError for DecodeError {
     fn can_continue(&self) -> bool {
         use DecodeError::*;
 

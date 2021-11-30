@@ -117,7 +117,7 @@ impl DriverResponse for DatadogMetricsResponse {
         if self.status_code.is_success() {
             EventStatus::Delivered
         } else if self.status_code.is_client_error() {
-            EventStatus::Failed
+            EventStatus::Rejected
         } else {
             EventStatus::Errored
         }

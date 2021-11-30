@@ -6,7 +6,7 @@ mod unix;
 #[cfg(unix)]
 use crate::serde::default_framing_message_based;
 use crate::{
-    codecs::{DecodingConfig, NewlineDelimitedDecoderConfig},
+    codecs::{decoding::DecodingConfig, NewlineDelimitedDecoderConfig},
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,

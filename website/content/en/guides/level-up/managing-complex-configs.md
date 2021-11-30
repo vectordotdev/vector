@@ -147,8 +147,10 @@ output in order to turn it into a regression test:
   [[tests.outputs]]
     extract_from = "foo"
     [[tests.outputs.conditions]]
-      type = "check_fields"
-      "message.equals" = "Sorry, I'm busy this week Cecil"
+      type = "vrl"
+      source = """
+        assert_eq!(.message, "Sorry, I'm busy this week Cecil")
+      """
 
   # And we add a new output without conditions for inspecting
   # a new transform

@@ -1,5 +1,5 @@
 use crate::{
-    codecs::{self, LengthDelimitedCodec, Parser},
+    codecs::{self, decoding::Deserializer, LengthDelimitedDecoder},
     config::{DataType, GenerateConfig, Resource, SourceContext},
     event::{proto, Event},
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
@@ -82,9 +82,9 @@ impl VectorConfig {
 }
 
 #[derive(Debug, Clone)]
-struct VectorParser;
+struct VectorDeserializer;
 
-impl Parser for VectorParser {
+impl Deserializer for VectorDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
         let byte_size = bytes.len();
         match proto::EventWrapper::decode(bytes).map(Event::from) {
@@ -104,15 +104,15 @@ impl Parser for VectorParser {
 struct VectorSource;
 
 impl TcpSource for VectorSource {
-    type Error = codecs::Error;
+    type Error = codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
     type Decoder = codecs::Decoder;
     type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
         codecs::Decoder::new(
-            Box::new(LengthDelimitedCodec::new()),
-            Box::new(VectorParser),
+            Box::new(LengthDelimitedDecoder::new()),
+            Box::new(VectorDeserializer),
         )
     }
 

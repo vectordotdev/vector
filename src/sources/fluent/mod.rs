@@ -1,4 +1,4 @@
-use super::util::{SocketListenAddr, TcpError, TcpSource, TcpSourceAck, TcpSourceAcker};
+use super::util::{SocketListenAddr, StreamDecodingError, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
@@ -133,7 +133,7 @@ impl std::fmt::Display for DecodeError {
     }
 }
 
-impl TcpError for DecodeError {
+impl StreamDecodingError for DecodeError {
     fn can_continue(&self) -> bool {
         match self {
             DecodeError::IO(_) => false,

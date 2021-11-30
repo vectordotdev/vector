@@ -1,3 +1,8 @@
+variable "experiment_name" {
+  description = "The name of the vector experiment"
+  type        = string
+}
+
 variable "type" {
   description = "The type of the vector install, whether 'baseline' or 'comparison'"
   type        = string
