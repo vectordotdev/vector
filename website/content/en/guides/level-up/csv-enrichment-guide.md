@@ -1,5 +1,5 @@
 ---
-title: Enrich your observability data 
+title: Enrich your observability data
 short: Enrichment
 description: Learn how to use CSV enrichment to provide more context to your data
 author_github: https://github.com/barieom
@@ -26,7 +26,7 @@ A key component that drives that flexibility is enriching your data from differe
 sources. Vector now offers initial support for enriching events from external data
 sources, which is currently powered by a powerful Vector concept,
 [enrichment tables][Enrichment tables]. For now, our support for enrichment
-through external data sources is limited to `csv` files, but we're  looking to
+through external data sources is limited to `csv` files, but we're looking to
 add support for more data sources.
 
 This guide walks through how you can start enriching your observability by
@@ -188,7 +188,7 @@ To:
   "host":"my.host.com",
   "timestamp":"2019-11-01T21:15:47+00:00",
   ...
-  "alert": { 
+  "alert": {
     "type":"alert",
     "severity":"medium"
   }
