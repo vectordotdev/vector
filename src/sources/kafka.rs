@@ -1,6 +1,9 @@
 use super::util::finalizer::OrderedFinalizer;
 use crate::{
-    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
+    codecs::{
+        self,
+        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+    },
     config::{
         log_schema, AcknowledgementsConfig, DataType, SourceConfig, SourceContext,
         SourceDescription,
@@ -74,7 +77,7 @@ pub struct KafkaSourceConfig {
     framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
-    decoding: Box<dyn ParserConfig>,
+    decoding: Box<dyn DeserializerConfig>,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }

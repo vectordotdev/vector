@@ -1,5 +1,8 @@
 use crate::{
-    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
+    codecs::{
+        self,
+        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+    },
     config::{
         log_schema, DataType, GenerateConfig, SourceConfig, SourceContext, SourceDescription,
     },
@@ -39,7 +42,7 @@ pub struct NatsSourceConfig {
     framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
-    decoding: Box<dyn ParserConfig>,
+    decoding: Box<dyn DeserializerConfig>,
 }
 
 inventory::submit! {

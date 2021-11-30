@@ -1,5 +1,9 @@
 use crate::{
-    codecs::{self, Decoder, FramingConfig, ParserConfig},
+    codecs::{
+        self,
+        decoding::{DeserializerConfig, FramingConfig},
+        Decoder,
+    },
     config::log_schema,
     event::Event,
     internal_events::{SocketEventsReceived, SocketMode, SocketReceiveError},
@@ -35,7 +39,7 @@ pub struct UdpConfig {
     framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
     #[get = "pub"]
-    decoding: Box<dyn ParserConfig>,
+    decoding: Box<dyn DeserializerConfig>,
 }
 
 impl UdpConfig {
@@ -87,7 +91,7 @@ pub fn udp(
             tokio::select! {
                 recv = socket.recv_from(&mut buf) => {
                     let (byte_size, address) = recv.map_err(|error| {
-                        let error = codecs::Error::FramingError(error.into());
+                        let error = codecs::decoding::Error::FramingError(error.into());
                         emit!(&SocketReceiveError {
                             mode: SocketMode::Udp,
                             error: &error
