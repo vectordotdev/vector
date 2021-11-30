@@ -280,13 +280,14 @@ mod tests {
         ack_request_body.acks.sort_unstable();
         assert_eq!(ack_ids, ack_request_body.acks);
         ack_client.decrement_retries();
+        ack_client.expire_ack_ids_with_status(EventStatus::Failed);
 
         let ack_request_body = ack_client.get_ack_query_body();
         assert!(ack_request_body.acks.is_empty())
     }
 
     #[tokio::test]
-    async fn test_finalize_ack_ids() {
+    async fn test_finalize_delivered_ack_ids() {
         let mut ack_client = get_ack_client(1);
         let ack_ids = (0..100).collect::<Vec<u64>>();
         let ack_status_rxs = populate_ack_client(&mut ack_client, &ack_ids);
@@ -295,6 +296,20 @@ mod tests {
         let mut statuses = ack_status_rxs.into_iter().collect::<FuturesUnordered<_>>();
         while let Some(status) = statuses.next().await {
             assert_eq!(EventStatus::Delivered, status.unwrap());
+        }
+    }
+
+    #[tokio::test]
+    async fn test_expire_ack_ids_with_status() {
+        let mut ack_client = get_ack_client(1);
+        let ack_ids = (0..100).collect::<Vec<u64>>();
+        let ack_status_rxs = populate_ack_client(&mut ack_client, &ack_ids);
+
+        ack_client.decrement_retries();
+        ack_client.expire_ack_ids_with_status(EventStatus::Failed);
+        let mut statuses = ack_status_rxs.into_iter().collect::<FuturesUnordered<_>>();
+        while let Some(status) = statuses.next().await {
+            assert_eq!(EventStatus::Failed, status.unwrap());
         }
     }
 }
