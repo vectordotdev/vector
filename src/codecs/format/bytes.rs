@@ -69,7 +69,7 @@ impl SerializerConfig for BytesSerializerConfig {
     }
 }
 
-/// Serializer that converts bytes to an `Event`.
+/// Serializer that converts an `Event` to bytes.
 ///
 /// This serializer can be considered as the no-op action for input where no
 /// further encoding has been specified.
