@@ -19,13 +19,13 @@ Before you begin, this guide assumes the following:
 {{< /requirement >}}
 
 
-It's important for any organization maintaining an observability pipelines to
+It's important for any organization maintaining observability pipelines to
 have flexibility to manipulate their observability data — whether it be appending
 better context to an event or triggering alerts when there is a potential threat.
 A key component that drives that flexibility is enriching your data from different
 sources. Vector now offers initial support for enriching events from external data
 sources, which is currently powered by a powerful Vector concept,
-[`enrichment tables`][Enrichment tables]. For now, our support for enrichment
+[enrichment tables][Enrichment tables]. For now, our support for enrichment
 through external data sources is limited to `csv` files, but we're  looking to
 add support for more data sources.
 
@@ -57,7 +57,7 @@ status_code,status_message
 ```
 
 To enrich your observability data, you can use ['get_enrichment_table_record'][get_enrichment_table_record].
-Assuming that your `csv` files is called `iot_status.csv`, the following
+Assuming that your `csv` file is called `iot_status.csv`, the following
 illustrates the required Vector configuration:
 
 ``` toml
@@ -86,7 +86,7 @@ source = '''
 
 status_code = del(.status_code)
 
-row = get_enrichment_table_record(iot_status, {"status_code" : status_code})
+row = get_enrichment_table_record!("iot_status", {"status_code" : status_code})
 
 .status = row.status_message
 '''
@@ -96,10 +96,10 @@ Your observability data, assuming it was in JSON, now has been transformed from:
 
 ```json
 {
-  "host": "my.host.com",
-  "timestamp": "2019-11-01T21:15:47+00:00",
+  "host":"my.host.com",
+  "timestamp":"2019-11-01T21:15:47+00:00",
   ...
-  "status_code": 1,
+  "status_code":1,
 }
 ```
 
@@ -107,10 +107,10 @@ To:
 
 ```json
 {
-  "host": "my.host.com",
-  "timestamp": "2019-11-01T21:15:47+00:00",
+  "host":"my.host.com",
+  "timestamp":"2019-11-01T21:15:47+00:00",
   ...
-  "status": "device status transmission complete",
+  "status":"device status transmission complete",
 }
 ```
 
@@ -122,7 +122,7 @@ observability pipeline.
 
 In this example, you are dealing with a system where attempted access from
 specific identifiers, such as a blacklisted IP address, must automatically trigger
-alerts to relevant personnel on your team. You can leverage an external database
+alerts to relevant personnel on your team. You can use an external database
 (though Vector's current solution is limited to `csv` files) that contain
 a list of blacklisted IP address and enrich the data so that whatever downstream
 log management solution your team may be using, such as
@@ -143,10 +143,10 @@ that case, you can set your `csv` file, let's call it  similarly to below:
 
 ``` csv
 ip,alert_type,severity
-192.0.2.0, "alert", "high"
-198.51.100.0, "alert", "medium"
+"192.0.2.0", "alert", "high"
+"198.51.100.0", "alert", "medium"
 ...
-203.0.113.0, "warn", "medium"
+"203.0.113.0", "warn", "medium"
 ```
 
 Assuming you set the `enrichment_tables` similarly to the configuration in Use
@@ -162,7 +162,7 @@ source = '''
 
 ip = del(.ip)
 
-row = get_enrichment_table_record(ip_info, { "ip" : ip })
+row = get_enrichment_table_record!("ip_info", { "ip" : ip })
 
 .alert.type = row.alert_type
 .alert.severity = row.severity
@@ -174,10 +174,10 @@ Your observability data, assuming it was in JSON, now has been transformed from:
 
 ```json
 {
-  "host": "my.host.com",
-  "timestamp": "2019-11-01T21:15:47+00:00",
+  "host":"my.host.com",
+  "timestamp":"2019-11-01T21:15:47+00:00",
   ...
-  "ip": 192.0.2.0,
+  "ip":"192.0.2.0",
 }
 ```
 
@@ -185,12 +185,12 @@ To:
 
 ```json
 {
-  "host": "my.host.com",
-  "timestamp": "2019-11-01T21:15:47+00:00",
+  "host":"my.host.com",
+  "timestamp":"2019-11-01T21:15:47+00:00",
   ...
   "alert": { 
-    "type" : "alert",
-    "severity" : "medium"
+    "type":"alert",
+    "severity":"medium"
   }
 }
 ```
