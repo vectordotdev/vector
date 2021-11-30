@@ -2,12 +2,9 @@
 
 use tokio_util::codec::LinesCodecError;
 
-// TODO: Rename to reflect that this error can generally appear in stream based
-// decoding operations rather than only in TCP streams.
-//
-/// An error that occurs in the context of TCP connections.
-pub trait TcpError {
-    /// Whether it is reasonable to assume that continuing to read from the TCP
+/// An error that occurs while decoding a stream.
+pub trait StreamDecodingError {
+    /// Whether it is reasonable to assume that continuing to read from the
     /// stream in which this error occurred will not result in an indefinite
     /// hang up.
     ///
@@ -16,7 +13,7 @@ pub trait TcpError {
     fn can_continue(&self) -> bool;
 }
 
-impl TcpError for LinesCodecError {
+impl StreamDecodingError for LinesCodecError {
     fn can_continue(&self) -> bool {
         match self {
             LinesCodecError::MaxLineLengthExceeded => true,
@@ -25,7 +22,7 @@ impl TcpError for LinesCodecError {
     }
 }
 
-impl TcpError for std::io::Error {
+impl StreamDecodingError for std::io::Error {
     fn can_continue(&self) -> bool {
         false
     }

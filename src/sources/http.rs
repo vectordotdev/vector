@@ -1,7 +1,9 @@
 use crate::{
     codecs::{
-        self, BytesDecoderConfig, BytesParserConfig, DecodingConfig, FramingConfig,
-        JsonParserConfig, NewlineDelimitedDecoderConfig, ParserConfig,
+        self,
+        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+        BytesDecoderConfig, BytesDeserializerConfig, JsonDeserializerConfig,
+        NewlineDelimitedDecoderConfig,
     },
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
@@ -41,7 +43,7 @@ pub struct SimpleHttpConfig {
     #[serde(default = "default_path_key")]
     path_key: String,
     framing: Option<Box<dyn FramingConfig>>,
-    decoding: Option<Box<dyn ParserConfig>>,
+    decoding: Option<Box<dyn DeserializerConfig>>,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -142,19 +144,19 @@ impl SourceConfig for SimpleHttpConfig {
             match encoding {
                 Encoding::Text => (
                     Box::new(NewlineDelimitedDecoderConfig::new()) as Box<dyn FramingConfig>,
-                    Box::new(BytesParserConfig::new()) as Box<dyn ParserConfig>,
+                    Box::new(BytesDeserializerConfig::new()) as Box<dyn DeserializerConfig>,
                 ),
                 Encoding::Json => (
                     Box::new(BytesDecoderConfig::new()) as Box<dyn FramingConfig>,
-                    Box::new(JsonParserConfig::new()) as Box<dyn ParserConfig>,
+                    Box::new(JsonDeserializerConfig::new()) as Box<dyn DeserializerConfig>,
                 ),
                 Encoding::Ndjson => (
                     Box::new(NewlineDelimitedDecoderConfig::new()) as Box<dyn FramingConfig>,
-                    Box::new(JsonParserConfig::new()) as Box<dyn ParserConfig>,
+                    Box::new(JsonDeserializerConfig::new()) as Box<dyn DeserializerConfig>,
                 ),
                 Encoding::Binary => (
                     Box::new(BytesDecoderConfig::new()) as Box<dyn FramingConfig>,
-                    Box::new(BytesParserConfig::new()) as Box<dyn ParserConfig>,
+                    Box::new(BytesDeserializerConfig::new()) as Box<dyn DeserializerConfig>,
                 ),
             }
         } else {
@@ -166,7 +168,7 @@ impl SourceConfig for SimpleHttpConfig {
                 match self.decoding.as_ref() {
                     Some(decoding) => decoding.clone(),
                     None => default_decoding(),
-                } as Box<dyn ParserConfig>,
+                } as Box<dyn DeserializerConfig>,
             )
         };
 
@@ -226,7 +228,10 @@ fn add_headers(events: &mut [Event], headers_config: &[String], headers: HeaderM
 mod tests {
     use super::SimpleHttpConfig;
     use crate::{
-        codecs::{BytesDecoderConfig, FramingConfig, JsonParserConfig, ParserConfig},
+        codecs::{
+            decoding::{DeserializerConfig, FramingConfig},
+            BytesDecoderConfig, JsonDeserializerConfig,
+        },
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus, Value},
         test_util::{components, next_addr, spawn_collect_n, trace_init, wait_for_tcp},
@@ -257,7 +262,7 @@ mod tests {
         status: EventStatus,
         acknowledgements: bool,
         framing: Option<Box<dyn FramingConfig>>,
-        decoding: Option<Box<dyn ParserConfig>>,
+        decoding: Option<Box<dyn DeserializerConfig>>,
     ) -> (impl Stream<Item = Event> + 'a, SocketAddr) {
         components::init_test();
         let (sender, recv) = Pipeline::new_test_finalize(status);
@@ -476,7 +481,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(Box::new(JsonParserConfig::new())),
+            Some(Box::new(JsonDeserializerConfig::new())),
         )
         .await;
 
@@ -517,7 +522,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(Box::new(JsonParserConfig::new())),
+            Some(Box::new(JsonDeserializerConfig::new())),
         )
         .await;
 
@@ -561,7 +566,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(Box::new(JsonParserConfig::new())),
+            Some(Box::new(JsonDeserializerConfig::new())),
         )
         .await;
 
@@ -604,7 +609,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(Box::new(JsonParserConfig::new())),
+            Some(Box::new(JsonDeserializerConfig::new())),
         )
         .await;
 
@@ -679,7 +684,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(Box::new(JsonParserConfig::new())),
+            Some(Box::new(JsonDeserializerConfig::new())),
         )
         .await;
 
@@ -718,7 +723,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(Box::new(JsonParserConfig::new())),
+            Some(Box::new(JsonDeserializerConfig::new())),
         )
         .await;
 
@@ -793,7 +798,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(Box::new(JsonParserConfig::new())),
+            Some(Box::new(JsonDeserializerConfig::new())),
         )
         .await;
 
@@ -825,7 +830,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(Box::new(JsonParserConfig::new())),
+            Some(Box::new(JsonDeserializerConfig::new())),
         )
         .await;
 
@@ -875,7 +880,7 @@ mod tests {
             EventStatus::Delivered,
             true,
             None,
-            Some(Box::new(JsonParserConfig::new())),
+            Some(Box::new(JsonDeserializerConfig::new())),
         )
         .await;
 

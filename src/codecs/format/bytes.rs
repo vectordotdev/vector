@@ -1,5 +1,5 @@
 use crate::{
-    codecs::{BoxedParser, Parser, ParserConfig},
+    codecs::decoding::{BoxedDeserializer, Deserializer, DeserializerConfig},
     config::log_schema,
     event::{Event, LogEvent},
 };
@@ -7,39 +7,39 @@ use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 
-/// Config used to build a `BytesParser`.
+/// Config used to build a `BytesDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct BytesParserConfig;
+pub struct BytesDeserializerConfig;
 
-impl BytesParserConfig {
-    /// Creates a new `BytesParserConfig`.
+impl BytesDeserializerConfig {
+    /// Creates a new `BytesDeserializerConfig`.
     pub const fn new() -> Self {
         Self
     }
 }
 
 #[typetag::serde(name = "bytes")]
-impl ParserConfig for BytesParserConfig {
-    fn build(&self) -> crate::Result<BoxedParser> {
-        Ok(Box::new(BytesParser))
+impl DeserializerConfig for BytesDeserializerConfig {
+    fn build(&self) -> crate::Result<BoxedDeserializer> {
+        Ok(Box::new(BytesDeserializer))
     }
 }
 
-/// Parser that converts bytes to an `Event`.
+/// Deserializer that converts bytes to an `Event`.
 ///
-/// This parser can be considered as the no-op action for input where no further
-/// decoding has been specified.
+/// This deserializer can be considered as the no-op action for input where no
+/// further decoding has been specified.
 #[derive(Debug, Clone)]
-pub struct BytesParser;
+pub struct BytesDeserializer;
 
-impl BytesParser {
-    /// Creates a new `BytesParser`.
+impl BytesDeserializer {
+    /// Creates a new `BytesDeserializer`.
     pub const fn new() -> Self {
         Self
     }
 }
 
-impl Parser for BytesParser {
+impl Deserializer for BytesDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
         let mut log = LogEvent::default();
         log.insert(log_schema().message_key(), bytes);
@@ -55,9 +55,9 @@ mod tests {
     #[test]
     fn parse_bytes() {
         let input = Bytes::from("foo");
-        let parser = BytesParser;
+        let deserializer = BytesDeserializer;
 
-        let events = parser.parse(input).unwrap();
+        let events = deserializer.parse(input).unwrap();
         let mut events = events.into_iter();
 
         {

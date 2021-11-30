@@ -1,5 +1,5 @@
 use crate::{
-    codecs::{BoxedParser, Parser, ParserConfig},
+    codecs::decoding::{BoxedDeserializer, Deserializer, DeserializerConfig},
     config::log_schema,
     event::Event,
 };
@@ -9,36 +9,36 @@ use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::convert::TryInto;
 
-/// Config used to build a `JsonParser`.
+/// Config used to build a `JsonDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct JsonParserConfig;
+pub struct JsonDeserializerConfig;
 
 #[typetag::serde(name = "json")]
-impl ParserConfig for JsonParserConfig {
-    fn build(&self) -> crate::Result<BoxedParser> {
-        Ok(Box::new(Into::<JsonParser>::into(self)))
+impl DeserializerConfig for JsonDeserializerConfig {
+    fn build(&self) -> crate::Result<BoxedDeserializer> {
+        Ok(Box::new(Into::<JsonDeserializer>::into(self)))
     }
 }
 
-impl JsonParserConfig {
-    /// Creates a new `JsonParserConfig`.
+impl JsonDeserializerConfig {
+    /// Creates a new `JsonDeserializerConfig`.
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-/// Parser that builds `Event`s from a byte frame containing JSON.
+/// Deserializer that builds `Event`s from a byte frame containing JSON.
 #[derive(Debug, Clone, Default)]
-pub struct JsonParser;
+pub struct JsonDeserializer;
 
-impl JsonParser {
-    /// Creates a new `JsonParser`.
+impl JsonDeserializer {
+    /// Creates a new `JsonDeserializer`.
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl Parser for JsonParser {
+impl Deserializer for JsonDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
         // It's common to receive empty frames when parsing NDJSON, since it
         // allows multiple empty newlines. We proceed without a warning here.
@@ -72,8 +72,8 @@ impl Parser for JsonParser {
     }
 }
 
-impl From<&JsonParserConfig> for JsonParser {
-    fn from(_: &JsonParserConfig) -> Self {
+impl From<&JsonDeserializerConfig> for JsonDeserializer {
+    fn from(_: &JsonDeserializerConfig) -> Self {
         Self
     }
 }
@@ -86,9 +86,9 @@ mod tests {
     #[test]
     fn parse_json() {
         let input = Bytes::from(r#"{ "foo": 123 }"#);
-        let parser = JsonParser::new();
+        let deserializer = JsonDeserializer::new();
 
-        let events = parser.parse(input).unwrap();
+        let events = deserializer.parse(input).unwrap();
         let mut events = events.into_iter();
 
         {
@@ -104,9 +104,9 @@ mod tests {
     #[test]
     fn parse_json_array() {
         let input = Bytes::from(r#"[{ "foo": 123 }, { "bar": 456 }]"#);
-        let parser = JsonParser::new();
+        let deserializer = JsonDeserializer::new();
 
-        let events = parser.parse(input).unwrap();
+        let events = deserializer.parse(input).unwrap();
         let mut events = events.into_iter();
 
         {
@@ -129,9 +129,9 @@ mod tests {
     #[test]
     fn skip_empty() {
         let input = Bytes::from("");
-        let parser = JsonParser::new();
+        let deserializer = JsonDeserializer::new();
 
-        let events = parser.parse(input).unwrap();
+        let events = deserializer.parse(input).unwrap();
         let mut events = events.into_iter();
 
         assert_eq!(events.next(), None);
@@ -140,8 +140,8 @@ mod tests {
     #[test]
     fn error_invalid_json() {
         let input = Bytes::from("{ foo");
-        let parser = JsonParser::new();
+        let deserializer = JsonDeserializer::new();
 
-        assert!(parser.parse(input).is_err());
+        assert!(deserializer.parse(input).is_err());
     }
 }
