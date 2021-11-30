@@ -1,5 +1,5 @@
 use crate::{
-    codecs::{DecodingConfig, FramingConfig, ParserConfig},
+    codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
@@ -26,7 +26,7 @@ pub struct AwsKinesisFirehoseConfig {
     #[serde(default = "default_framing_message_based")]
     framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
-    decoding: Box<dyn ParserConfig>,
+    decoding: Box<dyn DeserializerConfig>,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }
