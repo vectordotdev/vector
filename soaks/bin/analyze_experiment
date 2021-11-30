@@ -19,7 +19,7 @@ def human_bytes(b):
     s = round(b / p, 2)
     if is_negative:
         s = -s
-    return "%s %s" % (s, names[i])
+    return "%s%s" % (s, names[i])
 
 
 parser = argparse.ArgumentParser(description='t-test experiments with Welch method')
