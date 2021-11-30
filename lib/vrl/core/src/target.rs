@@ -52,11 +52,11 @@ pub trait Target: std::fmt::Debug {
     /// left behind, it should be removed as well, cascading up to the root.
     fn remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String>;
 
-    fn get_metadata(&self, key: &str) -> Result<Option<vrl_core::Value>, String> {
+    fn get_metadata(&self, _key: &str) -> Result<Option<vrl_core::Value>, String> {
         Err("metadata not available".to_string())
     }
 
-    fn set_metadata(&mut self, key: &str, value: String) -> Result<(), String> {
+    fn set_metadata(&mut self, _key: &str, _value: String) -> Result<(), String> {
         Err("metadata not available".to_string())
     }
 }
