@@ -461,7 +461,7 @@ mod tests {
         let path = PathBuf::from(".")
             .join("tests")
             .join("namespacing")
-            .join("fail");
+            .join("ignore-invalid");
         let configs = vec![ConfigPath::Dir(path)];
         let (_, warns) = load_builder_from_paths(&configs).unwrap();
         assert!(warns.is_empty());
