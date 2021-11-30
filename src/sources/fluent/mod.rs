@@ -390,14 +390,11 @@ impl FluentAcker {
 }
 
 impl TcpSourceAcker for FluentAcker {
-    fn build_ack(self, ack: TcpSourceAck) -> Bytes {
-        match self.chunk {
-            None => Bytes::new(),
-            Some(chunk) => match ack {
-                TcpSourceAck::Ack => format!(r#"{{"ack": "{}"}}"#, chunk).into(),
-                _ => "{}".into(),
-            },
-        }
+    fn build_ack(self, ack: TcpSourceAck) -> Option<Bytes> {
+        self.chunk.map(|chunk| match ack {
+            TcpSourceAck::Ack => format!(r#"{{"ack": "{}"}}"#, chunk).into(),
+            _ => "{}".into(),
+        })
     }
 }
 
