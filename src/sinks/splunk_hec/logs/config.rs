@@ -29,8 +29,10 @@ use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sin
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct HecSinkLogsConfig {
-    pub token: String,
+pub struct HecLogsSinkConfig {
+    // Deprecated name
+    #[serde(alias = "token")]
+    pub default_token: String,
     // Deprecated name
     #[serde(alias = "host")]
     pub endpoint: String,
@@ -55,10 +57,10 @@ pub struct HecSinkLogsConfig {
     pub timestamp_nanos_key: Option<String>,
 }
 
-impl GenerateConfig for HecSinkLogsConfig {
+impl GenerateConfig for HecLogsSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned(),
+            default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned(),
             endpoint: "endpoint".to_owned(),
             host_key: host_key(),
             indexed_fields: vec![],
@@ -79,11 +81,15 @@ impl GenerateConfig for HecSinkLogsConfig {
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "splunk_hec_logs")]
-impl SinkConfig for HecSinkLogsConfig {
+impl SinkConfig for HecLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = create_client(&self.tls, cx.proxy())?;
-        let healthcheck =
-            build_healthcheck(self.endpoint.clone(), self.token.clone(), client.clone()).boxed();
+        let healthcheck = build_healthcheck(
+            self.endpoint.clone(),
+            self.default_token.clone(),
+            client.clone(),
+        )
+        .boxed();
         let sink = self.build_processor(client, cx)?;
 
         Ok((sink, healthcheck))
@@ -98,7 +104,7 @@ impl SinkConfig for HecSinkLogsConfig {
     }
 }
 
-impl HecSinkLogsConfig {
+impl HecLogsSinkConfig {
     pub fn build_processor(
         &self,
         client: HttpClient,
@@ -110,8 +116,11 @@ impl HecSinkLogsConfig {
         };
 
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-        let http_request_builder =
-            HttpRequestBuilder::new(self.endpoint.clone(), self.token.clone(), self.compression);
+        let http_request_builder = HttpRequestBuilder::new(
+            self.endpoint.clone(),
+            self.default_token.clone(),
+            self.compression,
+        );
         let service = ServiceBuilder::new()
             .settings(request_settings, HecRetryLogic)
             .service(HecService::new(
@@ -144,7 +153,7 @@ impl HecSinkLogsConfig {
 #[serde(deny_unknown_fields)]
 struct HecSinkCompatConfig {
     #[serde(flatten)]
-    config: HecSinkLogsConfig,
+    config: HecLogsSinkConfig,
 }
 
 #[async_trait::async_trait]
@@ -165,10 +174,10 @@ impl SinkConfig for HecSinkCompatConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::HecSinkLogsConfig;
+    use super::HecLogsSinkConfig;
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<HecSinkLogsConfig>();
+        crate::test_util::test_generate_config::<HecLogsSinkConfig>();
     }
 }

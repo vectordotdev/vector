@@ -2,7 +2,7 @@ use super::sink::HecProcessedEvent;
 use crate::{
     config::{SinkConfig, SinkContext},
     sinks::{
-        splunk_hec::logs::{config::HecSinkLogsConfig, encoder::HecLogsEncoder, sink::process_log},
+        splunk_hec::logs::{config::HecLogsSinkConfig, encoder::HecLogsEncoder, sink::process_log},
         util::{test::build_test_server, Compression},
     },
     template::Template,
@@ -152,8 +152,8 @@ fn splunk_encode_log_event_text() {
 #[tokio::test]
 async fn splunk_passthrough_token() {
     let addr = next_addr();
-    let config = HecSinkLogsConfig {
-        token: "token".into(),
+    let config = HecLogsSinkConfig {
+        default_token: "token".into(),
         endpoint: format!("http://{}", addr),
         host_key: "host".into(),
         indexed_fields: Vec::new(),

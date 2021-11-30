@@ -318,7 +318,7 @@ fn test_encode_event_gauge_overridden_namespace_returns_expected_json() {
 async fn splunk_passthrough_token() {
     let addr = next_addr();
     let config = HecMetricsSinkConfig {
-        token: "token".into(),
+        default_token: "token".into(),
         endpoint: format!("http://{}", addr),
         host_key: "host".into(),
         index: None,
