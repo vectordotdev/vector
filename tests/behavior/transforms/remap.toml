@@ -2255,3 +2255,23 @@ schema.id = "integer"
                    {"id": 7, "tree": "yew"}]
       '''
 
+[transforms.remap_metadata]
+  inputs = []
+  type = "remap"
+  source = '''
+      set_event_metadata("datadog_api_key", "iamanapikey")
+      .key = get_event_metadata("datadog_api_key")
+  '''
+[[tests]]
+  name = "remap_metadata"
+  [tests.input]
+    insert_at = "remap_metadata"
+    type = "log"
+    [tests.input.log_fields]
+  [[tests.outputs]]
+    extract_from = "remap_metadata"
+    [[tests.outputs.conditions]]
+      "type" = "vrl"
+      source = '''
+        .key == "iamanapikey"
+      '''

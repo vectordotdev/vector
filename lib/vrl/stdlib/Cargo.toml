@@ -78,6 +78,7 @@ default = [
     "format_timestamp",
     "get",
     "get_env_var",
+    "get_event_metadata",
     "get_hostname",
     "includes",
     "integer",
@@ -142,6 +143,7 @@ default = [
     "reverse_dns",
     "round",
     "set",
+    "set_event_metadata",
     "sha1",
     "sha2",
     "sha3",
@@ -201,6 +203,7 @@ format_number = ["rust_decimal"]
 format_timestamp = ["chrono"]
 get = []
 get_env_var = []
+get_event_metadata = []
 get_hostname = ["hostname"]
 includes = []
 integer = []
@@ -265,6 +268,7 @@ replace = []
 reverse_dns = ["dns-lookup"]
 round = []
 set = ["shared/btreemap"]
+set_event_metadata = []
 sha1 = ["sha-1", "hex"]
 sha2 = ["sha-2", "hex"]
 sha3 = ["sha-3", "hex"]
