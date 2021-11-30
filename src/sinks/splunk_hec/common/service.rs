@@ -364,7 +364,7 @@ mod tests {
 
         let request = get_hec_request();
         let response = service.call(request).await.unwrap();
-        assert_eq!(EventStatus::Failed, response.event_status)
+        assert_eq!(EventStatus::Errored, response.event_status)
     }
 
     #[tokio::test]

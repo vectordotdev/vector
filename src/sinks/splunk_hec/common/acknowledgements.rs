@@ -83,7 +83,8 @@ impl HecAckClient {
                         .iter()
                         .filter_map(|(ack_id, ack_status)| ack_status.then(|| *ack_id))
                         .collect::<Vec<u64>>();
-                    self.finalize_ack_ids(acked_ack_ids.as_slice());
+                    self.finalize_delivered_ack_ids(acked_ack_ids.as_slice());
+                    self.expire_ack_ids_with_status(EventStatus::Failed);
                 }
                 Err(error) => {
                     match error {
@@ -94,14 +95,15 @@ impl HecAckClient {
                             // versions), log an error and fall back to default
                             // behavior.
                             error!(message = "Unable to parse ack query response. Acknowledging based on initial 200 OK.");
-                            self.finalize_ack_ids(
+                            self.finalize_delivered_ack_ids(
                                 self.acks.keys().copied().collect::<Vec<_>>().as_slice(),
-                            )
+                            );
                         }
                         _ => {
                             // Otherwise, errors may be recoverable, log an error
                             // and proceed with retries.
                             error!(message = "Unable to send ack query request");
+                            self.expire_ack_ids_with_status(EventStatus::Errored);
                         }
                     }
                 }
@@ -110,7 +112,7 @@ impl HecAckClient {
     }
 
     /// Removes successfully acked ack ids and finalizes associated events
-    fn finalize_ack_ids(&mut self, ack_ids: &[u64]) {
+    fn finalize_delivered_ack_ids(&mut self, ack_ids: &[u64]) {
         for ack_id in ack_ids {
             if let Some((_, ack_event_status_sender)) = self.acks.remove(ack_id) {
                 let _ = ack_event_status_sender.send(EventStatus::Delivered);
@@ -121,7 +123,7 @@ impl HecAckClient {
 
     /// Builds an ack query body with stored ack ids
     fn get_ack_query_body(&mut self) -> HecAckStatusRequest {
-        self.clear_expired_ack_ids();
+        // self.clear_expired_ack_ids();
         HecAckStatusRequest {
             acks: self.acks.keys().copied().collect::<Vec<u64>>(),
         }
@@ -134,9 +136,19 @@ impl HecAckClient {
         }
     }
 
-    /// Removes all expired ack ids (those with a retry count of 0).
-    fn clear_expired_ack_ids(&mut self) {
-        self.acks.retain(|_, (retries, _)| *retries > 0);
+    /// Removes all expired ack ids (those with a retry count of 0) and
+    /// finalizes associated events with the given status
+    fn expire_ack_ids_with_status(&mut self, status: EventStatus) {
+        let expired_ack_ids = self
+            .acks
+            .iter()
+            .filter_map(|(ack_id, (retries, _))| (*retries == 0).then(|| *ack_id))
+            .collect::<Vec<_>>();
+        for ack_id in expired_ack_ids {
+            if let Some((_, ack_event_status_sender)) = self.acks.remove(&ack_id) {
+                let _ = ack_event_status_sender.send(status);
+            }
+        }
     }
 
     // Sends an ack status query request to Splunk HEC
@@ -279,7 +291,7 @@ mod tests {
         let ack_ids = (0..100).collect::<Vec<u64>>();
         let ack_status_rxs = populate_ack_client(&mut ack_client, &ack_ids);
 
-        ack_client.finalize_ack_ids(ack_ids.as_slice());
+        ack_client.finalize_delivered_ack_ids(ack_ids.as_slice());
         let mut statuses = ack_status_rxs.into_iter().collect::<FuturesUnordered<_>>();
         while let Some(status) = statuses.next().await {
             assert_eq!(EventStatus::Delivered, status.unwrap());
