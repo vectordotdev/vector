@@ -2,15 +2,14 @@ use std::{fmt, future::Future, hash::Hash, num::NonZeroUsize, pin::Pin, sync::Ar
 
 use futures_util::{stream::Map, Stream, StreamExt};
 use tower::Service;
+use vector_core::stream::batcher::config::BatchConfig;
+use vector_core::stream::batcher::Batcher;
 use vector_core::stream::DriverResponse;
 use vector_core::{
     buffers::{Ackable, Acker},
     event::{Finalizable, Metric},
     partition::Partitioner,
-    stream::{
-        Batcher, BatcherSettings, ConcurrentMap, Driver, ExpirationQueue, ItemBatchSize,
-        PartitionedBatcher,
-    },
+    stream::{BatcherSettings, ConcurrentMap, Driver, ExpirationQueue, PartitionedBatcher},
     ByteSizeOf,
 };
 
@@ -46,12 +45,12 @@ pub trait SinkBuilderExt: Stream {
     /// up or times out. The `item_size_calculator` determines the "size" of each input
     /// in a batch. The units of "size" are intentionally not defined, so you can choose
     /// whatever is needed.
-    fn batched<T>(self, settings: BatcherSettings, item_size_calculator: T) -> Batcher<Self, T>
+    fn batched<C>(self, config: C) -> Batcher<Self, C>
     where
-        T: ItemBatchSize<Self::Item>,
+        C: BatchConfig<Self::Item>,
         Self: Sized,
     {
-        Batcher::new(self, settings, item_size_calculator)
+        Batcher::new(self, config)
     }
 
     /// Maps the items in the stream concurrently, up to the configured limit.

@@ -721,6 +721,8 @@ fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, 
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::print_stdout)] // tests
+
     use super::*;
     use crate::event::LogEvent;
     use chrono::DateTime;

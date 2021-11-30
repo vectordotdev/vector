@@ -9,7 +9,7 @@ use crate::Error;
 use futures::stream::BoxStream;
 use tower::util::BoxService;
 use vector_core::sink::StreamSink;
-use vector_core::stream::{BatcherSettings, ByteSizeOfItemSize};
+use vector_core::stream::BatcherSettings;
 
 use crate::sinks::util::SinkBuilderExt;
 use async_trait::async_trait;
@@ -43,7 +43,7 @@ impl KinesisSink {
                     Ok(req) => Some(req),
                 }
             })
-            .batched(self.batch_settings, ByteSizeOfItemSize)
+            .batched(self.batch_settings.into_byte_size_config())
             .into_driver(self.service, self.acker);
 
         sink.run().await

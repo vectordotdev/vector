@@ -327,11 +327,14 @@ fn generate_example(
     }
 
     if file.is_some() {
+        #[allow(clippy::print_stdout)]
         match write_config(file.as_ref().unwrap(), &builder) {
-            Ok(_) => println!(
-                "Config file written to {:?}",
-                &file.as_ref().unwrap().join("\n")
-            ),
+            Ok(_) => {
+                println!(
+                    "Config file written to {:?}",
+                    &file.as_ref().unwrap().join("\n")
+                )
+            }
             Err(e) => errs.push(format!("failed to write to file: {}", e)),
         };
     };
@@ -346,11 +349,17 @@ fn generate_example(
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     match generate_example(!opts.fragment, &opts.expression, &opts.file) {
         Ok(s) => {
-            println!("{}", s);
+            #[allow(clippy::print_stdout)]
+            {
+                println!("{}", s);
+            }
             exitcode::OK
         }
         Err(errs) => {
-            errs.iter().for_each(|e| eprintln!("{}", e.red()));
+            #[allow(clippy::print_stderr)]
+            {
+                errs.iter().for_each(|e| eprintln!("{}", e.red()));
+            }
             exitcode::SOFTWARE
         }
     }
@@ -405,7 +414,10 @@ mod tests {
         }
 
         for (component, error) in &errors {
-            println!("{:?} : {}", component, error);
+            #[allow(clippy::print_stdout)]
+            {
+                println!("{:?} : {}", component, error);
+            }
         }
         assert!(errors.is_empty());
     }

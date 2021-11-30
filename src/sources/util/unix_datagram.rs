@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     internal_events::{SocketMode, SocketReceiveError, UnixSocketFileDeleteError},
     shutdown::ShutdownSignal,
-    sources::{util::tcp_error::TcpError, Source},
+    sources::{util::codecs::StreamDecodingError, Source},
     Pipeline,
 };
 use bytes::{Bytes, BytesMut};
@@ -58,7 +58,7 @@ async fn listen(
         tokio::select! {
             recv = socket.recv_from(&mut buf) => {
                 let (byte_size, address) = recv.map_err(|error| {
-                    let error = codecs::Error::FramingError(error.into());
+                    let error = codecs::decoding::Error::FramingError(error.into());
                     emit!(&SocketReceiveError {
                         mode: SocketMode::Unix,
                         error: &error

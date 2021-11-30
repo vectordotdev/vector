@@ -1,6 +1,8 @@
 use super::util::MultilineConfig;
 use crate::aws::auth::AwsAuthentication;
 use crate::aws::rusoto::{self, RegionOrEndpoint};
+use crate::config::AcknowledgementsConfig;
+use crate::serde::bool_or_struct;
 use crate::{
     config::{DataType, ProxyConfig, SourceConfig, SourceContext, SourceDescription},
     line_agg,
@@ -53,6 +55,9 @@ struct AwsS3Config {
     auth: AwsAuthentication,
 
     multiline: Option<MultilineConfig>,
+
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -75,7 +80,7 @@ impl SourceConfig for AwsS3Config {
             Strategy::Sqs => Ok(Box::pin(
                 self.create_sqs_ingestor(multiline_config, &cx.proxy)
                     .await?
-                    .run(cx),
+                    .run(cx, self.acknowledgements),
             )),
         }
     }
@@ -479,6 +484,7 @@ mod integration_tests {
                 client_concurrency: 1,
                 ..Default::default()
             }),
+            acknowledgements: true.into(),
             ..Default::default()
         }
     }
@@ -517,8 +523,7 @@ mod integration_tests {
         assert_eq!(count_messages(&sqs, &queue).await, 1);
 
         let (tx, rx) = Pipeline::new_test_finalize(status);
-        let mut cx = SourceContext::new_test(tx);
-        cx.acknowledgements.enabled = true;
+        let cx = SourceContext::new_test(tx);
         let source = config.build(cx).await.unwrap();
         tokio::spawn(async move { source.await.unwrap() });
 

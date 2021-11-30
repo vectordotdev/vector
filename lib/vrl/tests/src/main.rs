@@ -1,3 +1,6 @@
+#![allow(clippy::print_stdout)] // tests
+#![allow(clippy::print_stderr)] // tests
+
 mod test_enrichment;
 
 use ansi_term::Colour;

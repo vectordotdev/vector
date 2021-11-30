@@ -21,6 +21,7 @@ display_usage() {
     echo "  --cpus: the total number of CPUs to dedicate to the soak minikube, default 7"
     echo "  --memory: the total amount of memory dedicate to the soak minikube, default 8g"
     echo "  --vector-cpus: the total number of CPUs to give to soaked vector"
+    echo "  --warmup-seconds: the total number seconds to pause waiting for vector to warm up"
     echo ""
 }
 
@@ -58,6 +59,11 @@ while [[ $# -gt 0 ]]; do
           ;;
       --vector-cpus)
           VECTOR_CPUS=$2
+          shift # past argument
+          shift # past value
+          ;;
+      --warmup-seconds)
+          WARMUP_SECONDS=$2
           shift # past argument
           shift # past value
           ;;
@@ -102,6 +108,7 @@ fi
                     --soak "${SOAK_NAME}" \
                     --cpus "${SOAK_CPUS}" \
                     --memory "${SOAK_MEMORY}" \
-                    --vector-cpus "${VECTOR_CPUS}"
+                    --vector-cpus "${VECTOR_CPUS}" \
+                    --warmup-seconds "${WARMUP_SECONDS}"
 
 popd

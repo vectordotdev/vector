@@ -1,8 +1,12 @@
 use super::parser;
 use crate::{
-    config::{self, GenerateConfig, SourceConfig, SourceContext, SourceDescription},
+    config::{
+        self, AcknowledgementsConfig, GenerateConfig, SourceConfig, SourceContext,
+        SourceDescription,
+    },
     event::Event,
     internal_events::PrometheusRemoteWriteParseError,
+    serde::bool_or_struct,
     sources::{
         self,
         util::{decode, ErrorMessage, HttpSource, HttpSourceAuthConfig},
@@ -25,6 +29,9 @@ struct PrometheusRemoteWriteConfig {
     tls: Option<TlsConfig>,
 
     auth: Option<HttpSourceAuthConfig>,
+
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -37,6 +44,7 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
             address: "127.0.0.1:9090".parse().unwrap(),
             tls: None,
             auth: None,
+            acknowledgements: AcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -47,7 +55,15 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
 impl SourceConfig for PrometheusRemoteWriteConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let source = RemoteWriteSource;
-        source.run(self.address, "", true, &self.tls, &self.auth, cx)
+        source.run(
+            self.address,
+            "",
+            true,
+            &self.tls,
+            &self.auth,
+            cx,
+            self.acknowledgements,
+        )
     }
 
     fn output_type(&self) -> crate::config::DataType {
@@ -145,6 +161,7 @@ mod test {
             address,
             auth: None,
             tls: tls.clone(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         let source = source.build(SourceContext::new_test(tx)).await.unwrap();
         tokio::spawn(source);
@@ -236,6 +253,7 @@ mod integration_tests {
             address: PROMETHEUS_RECEIVE_ADDRESS.parse().unwrap(),
             auth: None,
             tls: None,
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let (tx, rx) = Pipeline::new_test();

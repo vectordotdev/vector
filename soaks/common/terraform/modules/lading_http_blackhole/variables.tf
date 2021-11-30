@@ -8,12 +8,12 @@ variable "namespace" {
   type        = string
 }
 
-variable "http-blackhole-toml" {
-  description = "The rendered http_blackhole.toml for this test"
+variable "http-blackhole-yaml" {
+  description = "The rendered http_blackhole.yaml for this test"
   type        = string
 }
 
 variable "lading_image" {
   description = "The lading image to run"
-  type = string
+  type        = string
 }

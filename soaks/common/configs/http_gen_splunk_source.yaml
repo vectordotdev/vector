@@ -1,0 +1,14 @@
+worker_threads: 2
+prometheus_addr: "0.0.0.0:9090"
+
+targets:
+  vector:
+    headers:
+      dd-api-key: "DEADBEEF"
+    target_uri: "http://vector:8282/services/collector/event/1.0"
+    bytes_per_second: "120 Mb"
+    parallel_connections: 50
+    method:
+      post:
+        variant: "splunk_hec"
+        maximum_prebuild_cache_size_bytes: "256 Mb"

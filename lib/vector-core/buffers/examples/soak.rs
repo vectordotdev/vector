@@ -1,3 +1,6 @@
+#![allow(clippy::print_stderr)] // soak framework
+#![allow(clippy::print_stdout)] // soak framework
+
 #[cfg(feature = "disk-buffer")]
 use std::path::PathBuf;
 use std::{env, fmt, process, time::Duration};

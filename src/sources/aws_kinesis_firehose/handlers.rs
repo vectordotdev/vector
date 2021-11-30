@@ -2,7 +2,7 @@ use super::errors::{ParseRecords, RequestError};
 use super::models::{EncodedFirehoseRecord, FirehoseRequest, FirehoseResponse};
 use super::Compression;
 use crate::codecs;
-use crate::sources::util::TcpError;
+use crate::sources::util::StreamDecodingError;
 use crate::{
     config::log_schema,
     event::{BatchStatus, Event},
