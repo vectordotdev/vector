@@ -15,7 +15,7 @@ use crate::{
             BatchError, BatchSize
         },
         encoding::{
-            Encoder, EncodingConfigWithDefault
+            Encoder, EncodingConfigFixed
         },
         Batch, PushResult, BatchConfig, BatchSettings, Compression, TowerRequestConfig, StreamSink, RequestBuilder
     },
@@ -77,7 +77,7 @@ pub enum Encoding {
     Default,
 }
 
-impl Encoder<Result<NewRelicApiModel, &'static str>> for EncodingConfigWithDefault<Encoding> {
+impl Encoder<Result<NewRelicApiModel, &'static str>> for EncodingConfigFixed<Encoding> {
     fn encode_input(&self, input: Result<NewRelicApiModel, &'static str>, writer: &mut dyn io::Write) -> io::Result<usize> {
         if let Ok(api_model) = input {
             let json = match api_model {
@@ -428,7 +428,7 @@ pub struct NewRelicConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: EncodingConfigFixed<Encoding>,
     #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
@@ -628,7 +628,7 @@ impl RetryLogic for NewRelicApiRetry {
 }
 
 struct NewRelicRequestBuilder {
-    encoding: EncodingConfigWithDefault<Encoding>,
+    encoding: EncodingConfigFixed<Encoding>,
     compression: Compression,
     credentials: Arc<NewRelicCredentials>
 }
@@ -636,7 +636,7 @@ struct NewRelicRequestBuilder {
 impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
     type Metadata = (Arc<NewRelicCredentials>, usize, EventFinalizers);
     type Events = Result<NewRelicApiModel, &'static str>;
-    type Encoder = EncodingConfigWithDefault<Encoding>;
+    type Encoder = EncodingConfigFixed<Encoding>;
     type Payload = Vec<u8>;
     type Request = NewRelicApiRequest;
     type Error = std::io::Error;
@@ -696,7 +696,7 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
 struct NewRelicSink<S> {
     pub service: S,
     pub acker: Acker,
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: EncodingConfigFixed<Encoding>,
     pub credentials: Arc<NewRelicCredentials>,
     pub compression: Compression,
     pub batcher_settings: BatcherSettings,
