@@ -217,24 +217,33 @@ fn parse_grok_rule(
     // collect all filters to apply later
     for pattern in &grok_patterns {
         if let GrokPattern {
-            destination: Some(Destination { filter_fn, path }),
+            destination: Some(destination),
             ..
         } = pattern
         {
-            if let Some(ref filter) = filter_fn {
-                let filter = GrokFilter::try_from(filter)?;
-                fields
-                    .entry(path.to_string())
-                    .and_modify(|v| v.filters.push(filter.clone()))
-                    .or_insert_with(|| GrokField {
+            match &destination {
+                Destination {
+                    filter_fn: Some(filter),
+                    path,
+                } => {
+                    let filter = GrokFilter::try_from(filter)?;
+                    fields
+                        .entry(destination.to_grok_field_name())
+                        .and_modify(|v| v.filters.push(filter.clone()))
+                        .or_insert_with(|| GrokField {
+                            lookup: path.clone(),
+                            filters: vec![filter.clone()],
+                        });
+                }
+                Destination {
+                    filter_fn: None,
+                    path,
+                } => {
+                    fields.entry(path.to_string()).or_insert_with(|| GrokField {
                         lookup: path.clone(),
-                        filters: vec![filter.clone()],
+                        filters: vec![],
                     });
-            } else {
-                fields.entry(path.to_string()).or_insert_with(|| GrokField {
-                    lookup: path.clone(),
-                    filters: vec![],
-                });
+                }
             }
         }
     }
@@ -334,7 +343,7 @@ fn purify_grok_pattern(
             // these patterns will be converted to named capture groups e.g. (?<http.status_code>[0-9]{3})
             if let Some(destination) = &pattern.destination {
                 res.push_str("(?<");
-                res.push_str(destination.path.to_string().as_str());
+                res.push_str(destination.to_grok_field_name().as_str());
                 res.push('>');
             } else {
                 res.push_str("(?:"); // non-capturing group
@@ -361,6 +370,15 @@ fn purify_grok_pattern(
     Ok(res)
 }
 
+impl Destination {
+    fn to_grok_field_name(&self) -> String {
+        match &self.path {
+            p if p.is_empty() => ".".to_string(), // grok does not support empty field names,
+            p => p.to_string(),
+        }
+    }
+}
+
 /// Process a match function from a given pattern:
 /// - returns a grok expression(a grok pattern or a regular expression) corresponding to a given match function
 /// - some match functions(e.g. number) implicitly introduce a filter to be applied to an extracted value - stores it to `filters`.
@@ -382,7 +400,7 @@ fn resolves_match_function(
         "integer" => {
             if let Some(destination) = &pattern.destination {
                 fields.insert(
-                    destination.path.to_string(),
+                    destination.to_grok_field_name(),
                     GrokField {
                         lookup: destination.path.clone(),
                         filters: vec![GrokFilter::Integer],
@@ -394,7 +412,7 @@ fn resolves_match_function(
         "integerExt" => {
             if let Some(destination) = &pattern.destination {
                 fields.insert(
-                    destination.path.to_string(),
+                    destination.to_grok_field_name(),
                     GrokField {
                         lookup: destination.path.clone(),
                         filters: vec![GrokFilter::IntegerExt],
@@ -406,7 +424,7 @@ fn resolves_match_function(
         "number" => {
             if let Some(destination) = &pattern.destination {
                 fields.insert(
-                    destination.path.to_string(),
+                    destination.to_grok_field_name(),
                     GrokField {
                         lookup: destination.path.clone(),
                         filters: vec![GrokFilter::Number],
@@ -418,7 +436,7 @@ fn resolves_match_function(
         "numberExt" => {
             if let Some(destination) = &pattern.destination {
                 fields.insert(
-                    destination.path.to_string(),
+                    destination.to_grok_field_name(),
                     GrokField {
                         lookup: destination.path.clone(),
                         filters: vec![GrokFilter::NumberExt],
@@ -470,7 +488,7 @@ fn resolves_match_function(
                             })?;
                         if let Some(destination) = &pattern.destination {
                             fields.insert(
-                                destination.path.to_string(),
+                                destination.to_grok_field_name(),
                                 GrokField {
                                     lookup: destination.path.clone(),
                                     filters: vec![filter],

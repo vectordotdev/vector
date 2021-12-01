@@ -48,9 +48,6 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
         for (mut name, value) in matches.iter() {
             let mut value = Some(Value::from(value));
 
-            if name == "." {
-                name = ""; // root
-            }
             if let Some(GrokField {
                 lookup: field,
                 filters,
