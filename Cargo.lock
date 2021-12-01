@@ -1876,6 +1876,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ee2393c4a91429dffb4bedf19f4d6abf27d8a732c8ce4980305d782e5426d57"
 
 [[package]]
+name = "datadog-filter"
+version = "0.1.0"
+dependencies = [
+ "datadog-search-syntax",
+ "dyn-clone",
+ "regex",
+]
+
+[[package]]
 name = "datadog-grok"
 version = "0.1.0"
 dependencies = [
@@ -8273,6 +8282,7 @@ dependencies = [
  "cidr-utils",
  "criterion",
  "csv",
+ "datadog-filter",
  "datadog-grok",
  "datadog-search-syntax",
  "dns-lookup",
@@ -8281,6 +8291,7 @@ dependencies = [
  "hex",
  "hostname",
  "indexmap",
+ "itertools",
  "lazy_static",
  "lookup",
  "md-5",
