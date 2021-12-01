@@ -49,10 +49,6 @@ impl Task {
         self.key.id()
     }
 
-    pub fn scope(&self) -> &str {
-        self.key.scope()
-    }
-
     pub fn typetag(&self) -> &str {
         &self.typetag
     }
@@ -71,7 +67,6 @@ impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Task")
             .field("id", &self.key.id().to_string())
-            .field("scope", &self.scope().to_string())
             .field("typetag", &self.typetag)
             .finish()
     }

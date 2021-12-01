@@ -7,12 +7,9 @@ use std::{
     fmt,
 };
 
-pub const GLOBAL_SCOPE: &str = "global";
-
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ComponentKey {
     id: String,
-    scope_len: usize,
 }
 
 impl ComponentKey {
@@ -20,41 +17,16 @@ impl ComponentKey {
         &self.id
     }
 
-    pub fn name(&self) -> &str {
-        if self.is_global() {
-            &self.id
-        } else {
-            &self.id[(self.scope_len + 1)..]
-        }
-    }
-
-    pub fn scope(&self) -> &str {
-        if self.is_global() {
-            GLOBAL_SCOPE
-        } else {
-            &self.id[0..self.scope_len]
-        }
-    }
-
-    pub fn is_global(&self) -> bool {
-        self.scope_len == 0
-    }
-
     pub fn create_child(&self, name: &str) -> Self {
         Self {
             id: format!("{}.{}", self.id, name),
-            scope_len: self.id.len(),
         }
     }
 }
 
 impl From<String> for ComponentKey {
-    fn from(value: String) -> Self {
-        let scope_len = value.rfind('.').unwrap_or(0);
-        Self {
-            id: value,
-            scope_len,
-        }
+    fn from(id: String) -> Self {
+        Self { id }
     }
 }
 
@@ -81,17 +53,7 @@ impl Serialize for ComponentKey {
 
 impl Ord for ComponentKey {
     fn cmp(&self, other: &Self) -> Ordering {
-        let self_scope = self.scope();
-        let other_scope = other.scope();
-        if self_scope == other_scope {
-            self.id.cmp(&other.id)
-        } else if self.is_global() {
-            Ordering::Greater
-        } else if other.is_global() {
-            Ordering::Less
-        } else {
-            self_scope.cmp(other_scope)
-        }
+        self.id.cmp(&other.id)
     }
 }
 
