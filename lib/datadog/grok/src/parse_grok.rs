@@ -45,7 +45,7 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
     let mut parsed = Value::from(btreemap! {});
 
     if let Some(ref matches) = grok_rule.pattern.match_against(source) {
-        for (mut name, value) in matches.iter() {
+        for (name, value) in matches.iter() {
             let mut value = Some(Value::from(value));
 
             if let Some(GrokField {
