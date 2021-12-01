@@ -13,7 +13,10 @@ use http::Request;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::{
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     task::{Context, Poll},
 };
 use tokio::sync::{
@@ -29,6 +32,8 @@ pub struct HecService {
     pub batch_service:
         HttpBatchService<BoxFuture<'static, Result<Request<Vec<u8>>, crate::Error>>, HecRequest>,
     ack_finalizer_tx: Option<mpsc::Sender<(u64, oneshot::Sender<EventStatus>)>>,
+    max_pending_acks: u64,
+    max_pending_acks_reached: Arc<AtomicBool>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -46,6 +51,7 @@ impl HecService {
         let event_client = client.clone();
         let ack_client = client;
         let http_request_builder = Arc::new(http_request_builder);
+        let max_pending_acks = indexer_acknowledgements.max_pending_acks.get();
         let tx = if indexer_acknowledgements.indexer_acknowledgements_enabled {
             let (tx, rx) = mpsc::channel(indexer_acknowledgements.max_pending_acks.get() as usize);
             tokio::spawn(run_acknowledgements(
@@ -70,6 +76,8 @@ impl HecService {
         Self {
             batch_service,
             ack_finalizer_tx: tx,
+            max_pending_acks,
+            max_pending_acks_reached: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -80,12 +88,18 @@ impl Service<HecRequest> for HecService {
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context) -> std::task::Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
+        if self.max_pending_acks_reached.load(Ordering::Relaxed) {
+            Poll::Pending
+        } else {
+            Poll::Ready(Ok(()))
+        }
     }
 
     fn call(&mut self, req: HecRequest) -> Self::Future {
         let mut http_service = self.batch_service.clone();
         let ack_finalizer_tx = self.ack_finalizer_tx.clone();
+        let max_pending_acks = self.max_pending_acks;
+        let max_pending_acks_reached = Arc::clone(&self.max_pending_acks_reached);
         Box::pin(async move {
             http_service.ready().await?;
             let events_count = req.events_count;
@@ -99,7 +113,14 @@ impl Service<HecRequest> for HecService {
                             if let Some(ack_id) = body.ack_id {
                                 let (tx, rx) = oneshot::channel();
                                 match ack_finalizer_tx.send((ack_id, tx)).await {
-                                    Ok(_) => rx.await.unwrap_or(EventStatus::Rejected),
+                                    Ok(_) => {
+                                        max_pending_acks_reached.store(
+                                            (ack_finalizer_tx.capacity() as u64)
+                                                == max_pending_acks,
+                                            Ordering::Relaxed,
+                                        );
+                                        rx.await.unwrap_or(EventStatus::Rejected)
+                                    }
                                     // If we cannot send ack ids to the ack client, fall back to default behavior
                                     Err(_) => {
                                         emit!(&SplunkIndexerAcknowledgementUnavailableError);
