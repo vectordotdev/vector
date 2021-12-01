@@ -130,10 +130,7 @@ impl From<SharedValue> for Value {
     fn from(value: SharedValue) -> Self {
         match Rc::try_unwrap(value.0) {
             Ok(value) => value.into_inner(),
-            Err(value) => {
-                println!("Cloning");
-                value.borrow().clone()
-            }
+            Err(value) => value.borrow().clone(),
         }
     }
 }
