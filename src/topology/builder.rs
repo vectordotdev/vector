@@ -10,7 +10,7 @@ use crate::{
     event::Event,
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
-    transforms::Transform,
+    transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs},
     Pipeline,
 };
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
@@ -412,8 +412,6 @@ const fn filter_event_type(event: &Event, data_type: DataType) -> bool {
     }
 }
 
-use crate::transforms::{FallibleFunctionTransform, FunctionTransform, TaskTransform};
-
 // 128 is an arbitrary, smallish constant
 const TRANSFORM_BATCH_SIZE: usize = 128;
 
@@ -450,117 +448,6 @@ fn build_transform(
         ),
         Transform::Task(t) => {
             build_task_transform(t, input_rx, node.input_type, node.typetag, &node.key)
-        }
-    }
-}
-
-struct TransformOutputs {
-    primary_buffer: Vec<Event>,
-    named_buffers: HashMap<String, Vec<Event>>,
-    primary_output: Fanout,
-    named_outputs: HashMap<String, Fanout>,
-}
-
-impl TransformOutputs {
-    fn new(
-        named_outputs_in: Vec<String>,
-    ) -> (Self, HashMap<Option<String>, fanout::ControlChannel>) {
-        let mut named_buffers = HashMap::new();
-        let mut named_outputs = HashMap::new();
-        let mut controls = HashMap::new();
-
-        for name in named_outputs_in {
-            let (fanout, control) = Fanout::new();
-            named_outputs.insert(name.clone(), fanout);
-            controls.insert(Some(name.clone()), control);
-            named_buffers.insert(name.clone(), Vec::new());
-        }
-
-        let (primary_output, control) = Fanout::new();
-        let me = Self {
-            primary_buffer: Vec::with_capacity(TRANSFORM_BATCH_SIZE),
-            named_buffers,
-            primary_output,
-            named_outputs,
-        };
-        controls.insert(None, control);
-
-        (me, controls)
-    }
-
-    fn append(&mut self, slice: &mut Vec<Event>) {
-        self.primary_buffer.append(slice)
-    }
-
-    fn append_named(&mut self, name: &str, slice: &mut Vec<Event>) {
-        self.named_buffers
-            .get_mut(name)
-            .expect("unknown output")
-            .append(slice)
-    }
-
-    fn len(&self) -> usize {
-        self.primary_buffer.len()
-            + self
-                .named_buffers
-                .iter()
-                .map(|(_, buf)| buf.len())
-                .sum::<usize>()
-    }
-
-    async fn flush(&mut self) {
-        flush_inner(&mut self.primary_buffer, &mut self.primary_output).await;
-        for (key, buf) in self.named_buffers.iter_mut() {
-            flush_inner(
-                buf,
-                self.named_outputs.get_mut(key).expect("unknown output"),
-            )
-            .await;
-        }
-    }
-}
-
-async fn flush_inner(buf: &mut Vec<Event>, output: &mut Fanout) {
-    for event in buf.drain(..) {
-        output.feed(event).await.expect("unit error")
-    }
-}
-
-impl ByteSizeOf for TransformOutputs {
-    fn allocated_bytes(&self) -> usize {
-        self.primary_buffer.size_of()
-            + self
-                .named_buffers
-                .iter()
-                .map(|(_, buf)| buf.size_of())
-                .sum::<usize>()
-    }
-}
-
-trait SyncTransform: Send + Sync {
-    fn run(&mut self, events: Vec<Event>, outputs: &mut TransformOutputs);
-}
-
-impl SyncTransform for Box<dyn FallibleFunctionTransform> {
-    fn run(&mut self, events: Vec<Event>, outputs: &mut TransformOutputs) {
-        let mut buf = Vec::with_capacity(1);
-        let mut err_buf = Vec::with_capacity(1);
-
-        for v in events {
-            self.transform(&mut buf, &mut err_buf, v);
-            outputs.append(&mut buf);
-            outputs.append_named("dropped", &mut err_buf);
-        }
-    }
-}
-
-impl SyncTransform for Box<dyn FunctionTransform> {
-    fn run(&mut self, events: Vec<Event>, outputs: &mut TransformOutputs) {
-        let mut buf = Vec::with_capacity(4); // also an arbitrary,
-                                             // smallish constant
-        for v in events {
-            self.transform(&mut buf, v);
-            outputs.append(&mut buf);
         }
     }
 }
@@ -616,7 +503,8 @@ fn build_sync_transform(
     key: &ComponentKey,
     named_outputs: Vec<String>,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
-    let (mut outputs, controls) = TransformOutputs::new(named_outputs);
+    let (mut outputs, controls) =
+        TransformOutputs::new_with_capacity(named_outputs, TRANSFORM_BATCH_SIZE);
 
     let mut input_rx = input_rx
         .filter(move |event| ready(filter_event_type(event, input_type)))
