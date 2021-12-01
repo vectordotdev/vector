@@ -8,6 +8,14 @@ components: sinks: _splunk_hec: {
 			required:    false
 			type: object: {
 				options: {
+					indexer_acknowledgements_enabled: {
+						common:      false
+						description: "Controls if the sink will integrate with [Splunk HEC indexer acknowledgements](\(urls.splunk_hec_indexer_acknowledgements)) for end-to-end acknowledgements."
+						required:    false
+						type: bool: {
+							default: true
+						}
+					}
 					query_interval: {
 						common:      false
 						description: "The amount of time to wait in between queries to the Splunk HEC indexer acknowledgement endpoint. Minimum of `1`."
@@ -34,7 +42,7 @@ components: sinks: _splunk_hec: {
 		indexer_acknowledgements: {
 			title: "Indexer Acknowledgements"
 			body:  """
-				To provide more accurate end-to-end acknowledgements, this sink will automatically integrate with
+				To provide more accurate end-to-end acknowledgements, this sink will automatically integrate (unless explicitly disabled) with
 				[Splunk HEC indexer acknowledgements](\(urls.splunk_hec_indexer_acknowledgements))
 				if the provided Splunk HEC token has the feature enabled. In other words, if `ackID`'s are present in Splunk
 				HEC responses, this sink will store and query for the status of said `ackID`'s to confirm that data has been successfully
