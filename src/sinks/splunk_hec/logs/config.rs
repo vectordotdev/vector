@@ -40,7 +40,6 @@ pub struct HecSinkLogsConfig {
     pub index: Option<Template>,
     pub sourcetype: Option<Template>,
     pub source: Option<Template>,
-    pub timestamp_nanos_key: Option<String>,
     pub encoding: EncodingConfig<HecLogsEncoder>,
     #[serde(default)]
     pub compression: Compression,
@@ -49,8 +48,8 @@ pub struct HecSinkLogsConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
+    pub timestamp_nanos_key: Option<String>,
 }
-
 
 impl GenerateConfig for HecSinkLogsConfig {
     fn generate_config() -> toml::Value {
@@ -62,12 +61,12 @@ impl GenerateConfig for HecSinkLogsConfig {
             index: None,
             sourcetype: None,
             source: None,
-            timestamp_nanos_key: None,
             encoding: HecLogsEncoder::Text.into(),
             compression: Compression::default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
+            timestamp_nanos_key: None,
         })
         .unwrap()
     }

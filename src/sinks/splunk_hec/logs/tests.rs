@@ -2,7 +2,7 @@ use crate::event::Event;
 use crate::sinks::splunk_hec::logs::encoder::HecLogsEncoder;
 use crate::sinks::splunk_hec::logs::sink::process_log;
 use crate::template::Template;
-use chrono::{Utc, TimeZone};
+use chrono::{TimeZone, Utc};
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
@@ -46,7 +46,10 @@ fn get_processed_event() -> HecProcessedEvent {
     event.as_mut_log().insert("event_field2", "test_value2");
     event.as_mut_log().insert("key", "value");
     event.as_mut_log().insert("int_val", 123);
-    event.as_mut_log().insert(log_schema().timestamp_key(), Utc.timestamp_nanos(1638366107111456123));
+    event.as_mut_log().insert(
+        log_schema().timestamp_key(),
+        Utc.timestamp_nanos(1638366107111456123),
+    );
     let event_byte_size = event.size_of();
 
     let sourcetype = Template::try_from("{{ event_sourcetype }}".to_string()).ok();
@@ -107,7 +110,10 @@ fn splunk_encode_log_event_json() {
     assert_eq!(hec_data.fields.get("event_field1").unwrap(), "test_value1");
 
     assert_eq!(hec_data.time, 1638366107.111);
-    assert_eq!(event.get("ts_nanos_key").unwrap(), &serde_json::Value::from(456123));
+    assert_eq!(
+        event.get("ts_nanos_key").unwrap(),
+        &serde_json::Value::from(456123)
+    );
 }
 
 #[test]
