@@ -13,7 +13,7 @@ use crate::{
     transforms::Transform,
     Pipeline,
 };
-use futures::{stream, FutureExt, SinkExt, Stream, StreamExt, TryFutureExt};
+use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use std::pin::Pin;
 use std::{
@@ -29,7 +29,7 @@ use tokio::{
 };
 use vector_core::ByteSizeOf;
 use vector_core::{
-    buffers::{BufferInputCloner, BufferType},
+    buffers::{BufferInputCloner, BufferStream, BufferType},
     internal_event::EventsSent,
 };
 
@@ -247,37 +247,12 @@ pub async fn build_pieces(
                 built.task
             }
             Transform::Task(t) => {
-                let (output, control) = Fanout::new();
+                let built = build_task_transform(t, input_rx, input_type, typetag, key);
 
-                let input_rx = crate::utilization::wrap(Pin::new(input_rx));
+                outputs.extend(built.outputs);
 
-                let filtered = input_rx
-                    .filter(move |event| ready(filter_event_type(event, input_type)))
-                    .inspect(|event| {
-                        emit!(&EventsReceived {
-                            count: 1,
-                            byte_size: event.size_of(),
-                        })
-                    });
-                let transform = t
-                    .transform(Box::pin(filtered))
-                    .map(Ok)
-                    .forward(output.with(|event: Event| async {
-                        emit!(&EventsSent {
-                            count: 1,
-                            byte_size: event.size_of(),
-                        });
-                        Ok(event)
-                    }))
-                    .boxed()
-                    .map_ok(|_| {
-                        debug!("Finished.");
-                        TaskOutput::Transform
-                    });
-
-                outputs.insert(OutputId::from(key), control);
-
-                Task::new(key.clone(), typetag, transform)
+                // Task::new(key.clone(), typetag, transform)
+                built.task
             }
         };
 
@@ -471,11 +446,11 @@ struct BuiltTransform {
     task: Task,
 }
 
-use crate::transforms::{FallibleFunctionTransform, FunctionTransform};
+use crate::transforms::{FallibleFunctionTransform, FunctionTransform, TaskTransform};
 
 fn build_function_transform(
     mut t: Box<dyn FunctionTransform>,
-    input_rx: impl Stream<Item = Event> + Unpin + Send + 'static,
+    input_rx: BufferStream<Event>,
     input_type: DataType,
     typetag: &str,
     key: &ComponentKey,
@@ -536,7 +511,7 @@ fn build_function_transform(
 
 fn build_fallible_function_transform(
     mut t: Box<dyn FallibleFunctionTransform>,
-    input_rx: impl Stream<Item = Event> + Unpin + Send + 'static,
+    input_rx: BufferStream<Event>,
     input_type: DataType,
     typetag: &str,
     key: &ComponentKey,
@@ -608,6 +583,49 @@ fn build_fallible_function_transform(
         OutputId::from((key, named_outputs.remove(0))),
         errors_control,
     );
+
+    let task = Task::new(key.clone(), typetag, transform);
+
+    BuiltTransform { outputs, task }
+}
+
+fn build_task_transform(
+    t: Box<dyn TaskTransform>,
+    input_rx: BufferStream<Event>,
+    input_type: DataType,
+    typetag: &str,
+    key: &ComponentKey,
+) -> BuiltTransform {
+    let (output, control) = Fanout::new();
+
+    let input_rx = crate::utilization::wrap(Pin::new(input_rx));
+
+    let filtered = input_rx
+        .filter(move |event| ready(filter_event_type(event, input_type)))
+        .inspect(|event| {
+            emit!(&EventsReceived {
+                count: 1,
+                byte_size: event.size_of(),
+            })
+        });
+    let transform = t
+        .transform(Box::pin(filtered))
+        .map(Ok)
+        .forward(output.with(|event: Event| async {
+            emit!(&EventsSent {
+                count: 1,
+                byte_size: event.size_of(),
+            });
+            Ok(event)
+        }))
+        .boxed()
+        .map_ok(|_| {
+            debug!("Finished.");
+            TaskOutput::Transform
+        });
+
+    let mut outputs = HashMap::new();
+    outputs.insert(OutputId::from(key), control);
 
     let task = Task::new(key.clone(), typetag, transform);
 
