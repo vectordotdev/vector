@@ -38,6 +38,7 @@ remap: {
 		"Debug",
 		"Enrichment",
 		"Enumerate",
+		"Event",
 		"Path",
 		"Hash",
 		"IP",
