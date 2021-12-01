@@ -201,7 +201,7 @@ pub async fn build_pieces(
 
         let typetag = transform.inner.transform_type();
 
-        let mut named_outputs = transform.inner.named_outputs();
+        let named_outputs = transform.inner.named_outputs();
 
         let input_type = transform.inner.input_type();
         let transform = match transform.inner.build(&context).await {
@@ -231,74 +231,20 @@ pub async fn build_pieces(
                 // Task::new(key.clone(), typetag, transform)
                 built.task
             }
-            Transform::FallibleFunction(mut t) => {
-                let (mut output, control) = Fanout::new();
-                let (mut errors_output, errors_control) = Fanout::new();
-
-                let mut input_rx = input_rx
-                    .filter(move |event| ready(filter_event_type(event, input_type)))
-                    .ready_chunks(128); // 128 is an arbitrary, smallish constant
-
-                let mut timer = crate::utilization::Timer::new();
-                let mut last_report = Instant::now();
-
-                let transform = async move {
-                    timer.start_wait();
-                    while let Some(events) = input_rx.next().await {
-                        let stopped = timer.stop_wait();
-                        if stopped.duration_since(last_report).as_secs() >= 5 {
-                            timer.report();
-                            last_report = stopped;
-                        }
-
-                        emit!(&EventsReceived {
-                            count: events.len(),
-                            byte_size: events.size_of(),
-                        });
-
-                        let mut output_buf = Vec::with_capacity(events.len());
-                        let mut buf = Vec::with_capacity(1);
-                        let mut err_output_buf = Vec::with_capacity(1);
-                        let mut err_buf = Vec::with_capacity(1);
-
-                        for v in events {
-                            t.transform(&mut buf, &mut err_buf, v);
-                            output_buf.append(&mut buf);
-                            err_output_buf.append(&mut err_buf);
-                        }
-
-                        // TODO: account for error outputs separately?
-                        let count = output_buf.len() + err_output_buf.len();
-                        let byte_size = output_buf.size_of() + err_output_buf.size_of();
-
-                        timer.start_wait();
-                        for event in output_buf {
-                            output.feed(event).await.expect("unit error");
-                        }
-                        output.flush().await.expect("unit error");
-                        for event in err_output_buf {
-                            errors_output.feed(event).await.expect("unit error");
-                        }
-                        errors_output.flush().await.expect("unit error");
-
-                        emit!(&EventsSent { count, byte_size });
-                    }
-
-                    debug!("Finished.");
-                    Ok(TaskOutput::Transform)
-                }
-                .boxed();
-
-                outputs.insert(OutputId::from(key), control);
-                // TODO: actually drive fanout creation from transform output declaration instead
-                // of relying on the one fallible function pattern we currently have
-                assert_eq!(1, named_outputs.len());
-                outputs.insert(
-                    OutputId::from((key, named_outputs.remove(0))),
-                    errors_control,
+            Transform::FallibleFunction(t) => {
+                let built = build_fallible_function_transform(
+                    t,
+                    input_rx,
+                    input_type,
+                    typetag,
+                    key,
+                    named_outputs,
                 );
 
-                Task::new(key.clone(), typetag, transform)
+                outputs.extend(built.outputs);
+
+                // Task::new(key.clone(), typetag, transform)
+                built.task
             }
             Transform::Task(t) => {
                 let (output, control) = Fanout::new();
@@ -525,7 +471,7 @@ struct BuiltTransform {
     task: Task,
 }
 
-use crate::transforms::FunctionTransform;
+use crate::transforms::{FallibleFunctionTransform, FunctionTransform};
 
 fn build_function_transform(
     mut t: Box<dyn FunctionTransform>,
@@ -582,6 +528,86 @@ fn build_function_transform(
 
     let mut outputs = HashMap::new();
     outputs.insert(OutputId::from(key), control);
+
+    let task = Task::new(key.clone(), typetag, transform);
+
+    BuiltTransform { outputs, task }
+}
+
+fn build_fallible_function_transform(
+    mut t: Box<dyn FallibleFunctionTransform>,
+    input_rx: impl Stream<Item = Event> + Unpin + Send + 'static,
+    input_type: DataType,
+    typetag: &str,
+    key: &ComponentKey,
+    mut named_outputs: Vec<String>,
+) -> BuiltTransform {
+    let (mut output, control) = Fanout::new();
+    let (mut errors_output, errors_control) = Fanout::new();
+
+    let mut input_rx = input_rx
+        .filter(move |event| ready(filter_event_type(event, input_type)))
+        .ready_chunks(128); // 128 is an arbitrary, smallish constant
+
+    let mut timer = crate::utilization::Timer::new();
+    let mut last_report = Instant::now();
+
+    let transform = async move {
+        timer.start_wait();
+        while let Some(events) = input_rx.next().await {
+            let stopped = timer.stop_wait();
+            if stopped.duration_since(last_report).as_secs() >= 5 {
+                timer.report();
+                last_report = stopped;
+            }
+
+            emit!(&EventsReceived {
+                count: events.len(),
+                byte_size: events.size_of(),
+            });
+
+            let mut output_buf = Vec::with_capacity(events.len());
+            let mut buf = Vec::with_capacity(1);
+            let mut err_output_buf = Vec::with_capacity(1);
+            let mut err_buf = Vec::with_capacity(1);
+
+            for v in events {
+                t.transform(&mut buf, &mut err_buf, v);
+                output_buf.append(&mut buf);
+                err_output_buf.append(&mut err_buf);
+            }
+
+            // TODO: account for error outputs separately?
+            let count = output_buf.len() + err_output_buf.len();
+            let byte_size = output_buf.size_of() + err_output_buf.size_of();
+
+            timer.start_wait();
+            for event in output_buf {
+                output.feed(event).await.expect("unit error");
+            }
+            output.flush().await.expect("unit error");
+            for event in err_output_buf {
+                errors_output.feed(event).await.expect("unit error");
+            }
+            errors_output.flush().await.expect("unit error");
+
+            emit!(&EventsSent { count, byte_size });
+        }
+
+        debug!("Finished.");
+        Ok(TaskOutput::Transform)
+    }
+    .boxed();
+
+    let mut outputs = HashMap::new();
+    outputs.insert(OutputId::from(key), control);
+    // TODO: actually drive fanout creation from transform output declaration instead
+    // of relying on the one fallible function pattern we currently have
+    assert_eq!(1, named_outputs.len());
+    outputs.insert(
+        OutputId::from((key, named_outputs.remove(0))),
+        errors_control,
+    );
 
     let task = Task::new(key.clone(), typetag, transform);
 
