@@ -48,6 +48,7 @@ pub struct HecSinkLogsConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
+    // This settings is relevant only for the `humio_logs` sink and should be left to None everywhere else
     pub timestamp_nanos_key: Option<String>,
 }
 
