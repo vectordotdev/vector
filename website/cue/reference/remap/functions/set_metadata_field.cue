@@ -1,7 +1,7 @@
 package metadata
 
 remap: functions: set_metadata_field: {
-	category: "System"
+	category: "Event"
 	description: """
 		Sets the given field in the event metadata to the provided value.
 		"""

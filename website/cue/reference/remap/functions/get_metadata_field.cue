@@ -1,7 +1,7 @@
 package metadata
 
 remap: functions: get_metadata_field: {
-	category: "System"
+	category: "Event"
 	description: """
 		Returns the value of the given field from the event metadata.
 		"""
