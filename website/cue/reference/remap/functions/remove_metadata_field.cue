@@ -16,6 +16,7 @@ remap: functions: remove_metadata_field: {
 			enum: {
 				"datadog_api_key": '''
 					   The Datadog API key.
+
 					   This field will be used by the  `datadog_*` sinks as the API key to send the events with.
 					'''
 			}
