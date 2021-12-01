@@ -1,9 +1,9 @@
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server, StatusCode};
 use std::collections::HashMap;
-use std::net::SocketAddr;
-use std::sync::Arc;
-use tokio::sync::{mpsc, Mutex};
+use std::{net::SocketAddr, sync::Arc};
+use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::task::JoinHandle;
 use tokio::time::{timeout, Duration};
 use vector::config::{self, ConfigDiff, Format};
 use vector::test_util::{next_addr, wait_for_tcp};
@@ -51,6 +51,26 @@ pub async fn http_server(
     rx
 }
 
+pub fn http_client(
+    address: SocketAddr,
+    body: impl Into<String>,
+) -> (oneshot::Receiver<()>, JoinHandle<reqwest::Response>) {
+    let body = body.into();
+    let (tx, rx) = oneshot::channel();
+
+    let sender = tokio::spawn(async move {
+        let result = reqwest::Client::new()
+            .post(&format!("http://{}/", address))
+            .body(body)
+            .send()
+            .await
+            .expect("Error receiving response from HTTP sink");
+        tx.send(()).unwrap();
+        result
+    });
+    (rx, sender)
+}
+
 #[cfg(all(feature = "sources-http", feature = "sinks-http"))]
 async fn http_to_http(status: StatusCode, response: StatusCode) {
     let address1 = next_addr();
@@ -87,33 +107,29 @@ uri = "http://{address2}/"
 
     let mutex = Arc::new(Mutex::new(()));
     let pause = mutex.lock().await;
-    let mut rx = http_server(address2, Arc::clone(&mutex), status).await;
+    let mut rx_server = http_server(address2, Arc::clone(&mutex), status).await;
 
     // The expected flow is this:
     // 0. Nothing is ready to continue.
-    assert!(matches!(rx.try_recv(), Err(_)));
+    assert!(matches!(rx_server.try_recv(), Err(_)));
     // 1. We send an event to the HTTP source server.
-    let send = reqwest::Client::new()
-        .post(&format!("http://{}/", address1))
-        .body("test".to_owned())
-        .send();
-    let sender = tokio::spawn(send);
-    // 2. It sends to the HTTP sink sender. `rx` is activated.
-    timeout(Duration::from_secs(4), rx.recv())
+    let (mut rx_client, sender) = http_client(address1, "test");
+    // 2. It sends to the HTTP sink sender. `rx` is activated, but no response yet.
+    timeout(Duration::from_secs(4), rx_server.recv())
         .await
         .expect("Timed out waiting to receive event from HTTP sink")
         .expect("Error receiving event from HTTP sink");
+    assert!(matches!(rx_client.try_recv(), Err(_)));
     // 3. Our test HTTP server waits for the mutex lock.
     drop(pause);
-    assert!(matches!(rx.try_recv(), Err(_)));
+    assert!(matches!(rx_server.try_recv(), Err(_)));
     // 4. Our test HTTP server responds.
     // 5. The acknowledgement is returned to the source.
     // 6. The source responds to our initial send.
     let result = timeout(Duration::from_secs(1), sender)
         .await
         .expect("Timed out waiting to receive result fro HTTP source")
-        .expect("Error receiving result from tokio task")
-        .expect("Error receiving response from HTTP source");
+        .expect("Error receiving result from tokio task");
     assert_eq!(result.status(), response);
 }
 
