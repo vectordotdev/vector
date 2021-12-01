@@ -3,82 +3,116 @@
 set -o errexit
 set -o pipefail
 set -o nounset
-set -o xtrace
+#set -o xtrace
 
 __dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 display_usage() {
-	echo -e "\nUsage: \$0 SOAK_NAME BASELINE_SHA COMPARISON_SHA\n"
+    echo ""
+    echo "Usage: soak [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --help: display this information"
+    echo "  --soak: the experiment to run"
+    echo "  --remote-image|--local-image: whether to use a local vector image or remote"
+    echo "  --baseline: the baseline SHA to compare against"
+    echo "  --comparison: the SHA to compare against 'baseline'"
+    echo "  --cpus: the total number of CPUs to dedicate to the soak minikube, default 7"
+    echo "  --memory: the total amount of memory dedicate to the soak minikube, default 8g"
+    echo "  --vector-cpus: the total number of CPUs to give to soaked vector, default 4"
+    echo ""
 }
 
-if [  $# -le 1 ]
-then
-    display_usage
-    exit 1
-fi
+USE_LOCAL_IMAGE="true"
+SOAK_CPUS="7"
+SOAK_MEMORY="8g"
+VECTOR_CPUS="4"
+WARMUP_SECONDS="60"
 
-SOAK_NAME="${1:-}"
-BASELINE="${2:-}"
-COMPARISON="${3:-}"
-WARMUP_GRACE=90
-TOTAL_SAMPLES=120
+while [[ $# -gt 0 ]]; do
+  key="$1"
+
+  case $key in
+      --soak)
+          SOAK_NAME=$2
+          shift # past argument
+          shift # past value
+          ;;
+      --baseline)
+          BASELINE=$2
+          shift # past argument
+          shift # past value
+          ;;
+      --comparison)
+          COMPARISON=$2
+          shift # past argument
+          shift # past value
+          ;;
+      --remote-image)
+          USE_LOCAL_IMAGE="false"
+          shift # past argument
+          ;;
+      --local-image)
+          USE_LOCAL_IMAGE="true"
+          shift # past argument
+          ;;
+      --vector-cpus)
+          VECTOR_CPUS=$2
+          shift # past argument
+          shift # past value
+          ;;
+      --cpus)
+          SOAK_CPUS=$2
+          shift # past argument
+          shift # past value
+          ;;
+      --memory)
+          SOAK_MEMORY=$2
+          shift # past argument
+          shift # past value
+          ;;
+      --help)
+          display_usage
+          exit 0
+          ;;
+      *)
+          echo "unknown option"
+          display_usage
+          exit 1
+          ;;
+  esac
+done
 
 pushd "${__dir}"
-./bin/build_container.sh "${SOAK_NAME}" "${BASELINE}"
-./bin/build_container.sh "${SOAK_NAME}" "${COMPARISON}"
-BASELINE_IMAGE=$(./bin/container_name.sh "${SOAK_NAME}" "${BASELINE}")
-COMPARISON_IMAGE=$(./bin/container_name.sh "${SOAK_NAME}" "${COMPARISON}")
 
-capture_dir=$(mktemp -d /tmp/"${SOAK_NAME}".XXXXXX)
+capture_dir=$(mktemp -d /tmp/soak-captures.XXXXXX)
 echo "Captures will be recorded into ${capture_dir}"
 
-#
-# BASELINE
-#
-./bin/boot_minikube.sh "${BASELINE_IMAGE}"
-minikube mount "${capture_dir}:/captures" &
-MOUNT_PID=$!
+./bin/soak_one.sh --local-image "${USE_LOCAL_IMAGE}" \
+                  --soak "${SOAK_NAME}" \
+                  --variant "baseline" \
+                  --tag "${BASELINE}" \
+                  --capture-dir "${capture_dir}" \
+                  --cpus "${SOAK_CPUS}" \
+                  --memory "${SOAK_MEMORY}" \
+                  --vector-cpus "${VECTOR_CPUS}" \
+                  --warmup-seconds "${WARMUP_SECONDS}"
+./bin/soak_one.sh --local-image "${USE_LOCAL_IMAGE}" \
+                  --soak "${SOAK_NAME}" \
+                  --variant "comparison" \
+                  --tag "${COMPARISON}" \
+                  --capture-dir "${capture_dir}" \
+                  --cpus "${SOAK_CPUS}" \
+                  --memory "${SOAK_MEMORY}" \
+                  --vector-cpus "${VECTOR_CPUS}" \
+                  --warmup-seconds "${WARMUP_SECONDS}"
 
-pushd "${__dir}/${SOAK_NAME}/terraform"
-terraform init
-terraform apply -var 'type=baseline' -var 'type=baseline' -var "vector_image=${BASELINE_IMAGE}" --auto-approve
-echo "Captures will be recorded into ${capture_dir}"
-echo "Sleeping for ${WARMUP_GRACE} seconds to allow warm-up"
-sleep "${WARMUP_GRACE}"
-echo "Recording 'baseline' captures to ${capture_dir}"
-sleep "${TOTAL_SAMPLES}"
-kill "${MOUNT_PID}"
-popd
-./bin/shutdown_minikube.sh
-
-
-#
-# COMPARISON
-#
-./bin/boot_minikube.sh "${COMPARISON_IMAGE}"
-minikube mount "${capture_dir}:/captures" &
-MOUNT_PID=$!
-
-pushd "${__dir}/${SOAK_NAME}/terraform"
-terraform init
-terraform apply -var 'type=comparison' -var 'type=comparison' -var "vector_image=${COMPARISON_IMAGE}" --auto-approve
-echo "Captures will be recorded into ${capture_dir}"
-echo "Sleeping for ${WARMUP_GRACE} seconds to allow warm-up"
-sleep "${WARMUP_GRACE}"
-echo "Recording 'comparison' captures to ${capture_dir}"
-sleep "${TOTAL_SAMPLES}"
-kill "${MOUNT_PID}"
-popd
-./bin/shutdown_minikube.sh
+# Aggregate all captures and analyze them.
+./bin/analyze_experiment --capture-dir "${capture_dir}" \
+                         --baseline-sha "${BASELINE}" \
+                         --comparison-sha "${COMPARISON}" \
+                         --vector-cpus "${VECTOR_CPUS}" \
+                         --warmup-seconds "${WARMUP_SECONDS}" \
+                         --p-value 0.05 # 95% confidence
 
 popd
-
-echo "Captures recorded into ${capture_dir}"
-echo ""
-echo "Here is a statistical summary of that file. Units are bytes."
-echo "Higher numbers in the 'comparison' is better."
-echo ""
-mlr --tsv \
-    --from "${capture_dir}/baseline.captures" \
-    --from "${capture_dir}/comparison.captures" \
-    stats1 -a 'min,p90,p99,max,skewness,kurtosis' -g EXPERIMENT -f VALUE

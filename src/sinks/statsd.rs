@@ -9,7 +9,7 @@ use crate::{
         encode_namespace,
         tcp::TcpSinkConfig,
         udp::{UdpService, UdpSinkConfig},
-        BatchConfig, BatchSettings, BatchSink, Buffer, Compression, EncodedEvent,
+        BatchConfig, BatchSink, Buffer, Compression, EncodedEvent,
     },
 };
 use futures::{future, stream, FutureExt, SinkExt, TryFutureExt};
@@ -17,10 +17,13 @@ use serde::{Deserialize, Serialize};
 use std::{
     fmt::Display,
     net::{IpAddr, Ipv4Addr, SocketAddr},
+    num::NonZeroU64,
     task::{Context, Poll},
 };
 use tower::{Service, ServiceBuilder};
 use vector_core::ByteSizeOf;
+
+use super::util::SinkBatchSettings;
 
 pub struct StatsdSvc {
     inner: UdpService,
@@ -45,13 +48,22 @@ pub enum Mode {
     Unix(UnixSinkConfig),
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct StatsdDefaultBatchSettings;
+
+impl SinkBatchSettings for StatsdDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(1000);
+    const MAX_BYTES: Option<usize> = Some(1300);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct StatsdUdpConfig {
     #[serde(flatten)]
     pub udp: UdpSinkConfig,
 
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<StatsdDefaultBatchSettings>,
 }
 
 inventory::submit! {
@@ -95,11 +107,7 @@ impl SinkConfig for StatsdSinkConfig {
                 // However we need to leave some space for +1 extra trailing event in the buffer.
                 // Also one might keep an eye on server side limitations, like
                 // mentioned here https://github.com/DataDog/dd-agent/issues/2638
-                let batch = BatchSettings::default()
-                    .bytes(1300)
-                    .events(1000)
-                    .timeout(1)
-                    .parse_config(config.batch)?;
+                let batch = config.batch.into_batch_settings()?;
                 let (service, healthcheck) = config.udp.build_service(cx.clone())?;
                 let service = StatsdSvc { inner: service };
                 let sink = BatchSink::new(
@@ -394,15 +402,13 @@ mod test {
         trace_init();
 
         let addr = next_addr();
+        let mut batch = BatchConfig::default();
+        batch.max_bytes = Some(512);
 
         let config = StatsdSinkConfig {
             default_namespace: Some("ns".into()),
             mode: Mode::Udp(StatsdUdpConfig {
-                batch: BatchConfig {
-                    max_bytes: Some(512),
-                    timeout_secs: Some(1),
-                    ..Default::default()
-                },
+                batch,
                 udp: UdpSinkConfig::from_address(addr.to_string()),
             }),
         };

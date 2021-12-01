@@ -262,7 +262,7 @@ async fn insert_events_with_failure() {
             ..config()
         },
         true,
-        BatchStatus::Failed,
+        BatchStatus::Rejected,
     )
     .await;
 }
@@ -430,11 +430,11 @@ async fn create_data_stream(common: &ElasticSearchCommon, name: &str) -> crate::
 }
 
 fn config() -> ElasticSearchConfig {
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(1);
+
     ElasticSearchConfig {
-        batch: BatchConfig {
-            max_events: Some(1),
-            ..Default::default()
-        },
+        batch,
         ..Default::default()
     }
 }

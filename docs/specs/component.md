@@ -22,7 +22,7 @@ interpreted as described in [RFC 2119].
    1. [Batching](#batching)
    1. [Events](#events)
       1. [BytesReceived](#bytesreceived)
-      1. [EventsRecevied](#eventsrecevied)
+      1. [EventsReceived](#eventsrecevied)
       1. [EventsSent](#eventssent)
       1. [BytesSent](#bytessent)
       1. [Error](#error)
@@ -42,7 +42,7 @@ outline these rules to guide new component development and ongoing maintenance.
 This specification addresses _direct_ component development and does not cover
 aspects that components inherit "for free". For example, this specification does
 not cover global context, such as `component_id`, that all components receive in
-their telemetry by nature of being a Vector compoent.
+their telemetry by nature of being a Vector component.
 
 ## How to read this document
 
@@ -114,8 +114,9 @@ There is leeway in the implementation of these events:
 
 #### BytesReceived
 
-*Sources* MUST emit a `BytesReceived` event immediately after receiving bytes
-from the upstream source and before the creation of a Vector event.
+*Sources* MUST emit a `BytesReceived` event immediately after receiving
+and (optionally) filtering bytes from the upstream source and before the
+creation of a Vector event.
 
 * Properties
   * `byte_size`
@@ -136,7 +137,7 @@ from the upstream source and before the creation of a Vector event.
   * MUST log a `Bytes received.` message at the `trace` level with the
     defined properties as key-value pairs. It MUST NOT be rate limited.
 
-#### EventsRecevied
+#### EventsReceived
 
 *All components* MUST emit an `EventsReceived` event immediately after creating
 or receiving one or more Vector events.
@@ -155,8 +156,12 @@ or receiving one or more Vector events.
 
 #### EventsSent
 
-*All components* MUST emit an `EventsSent` event immediately after
-sending the events down stream, if the transmission was successful.
+*All components* that send events down stream, and delete them in Vector, MUST
+emit an `EventsSent` event immediately after sending, if the transmission was
+successful.
+
+Note that for sinks that simply expose data, but don't delete the data after
+sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
 
 * Properties
   * `count` - The count of Vector events.
@@ -172,8 +177,12 @@ sending the events down stream, if the transmission was successful.
 
 #### BytesSent
 
-*Sinks* MUST emit a `BytesSent` event immediately after sending bytes to the
-downstream target, if the transmission was successful.
+*Sinks* that send events down stream, and delete them in Vector, MUST emit
+a `BytesSent` event immediately after sending bytes to the downstream target, if
+the transmission was successful.
+
+Note that for sinks that simply expose data, but don't delete the data after
+sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
 
 * Properties
   * `byte_size`

@@ -8,12 +8,14 @@
 //! what this module provides. The definition is inspired by the types from
 //! `prost::Message`, though split into an encode and decode side as serde
 //! does.
+use std::fmt::{Debug, Display};
+
 use bytes::{Buf, BufMut};
 
 /// Encode a `T` into a `bytes` buffer, possibly unsuccessfully
 pub trait EncodeBytes<T> {
     /// The type returned when `encode` fails
-    type Error;
+    type Error: Debug;
 
     /// Attempt to encode a `T` into `B` buffer
     ///
@@ -37,7 +39,7 @@ pub trait EncodeBytes<T> {
 /// Decode a `T` from a `bytes` buffer, possibly unsuccessfully
 pub trait DecodeBytes<T> {
     /// The type returned when `decode` fails
-    type Error;
+    type Error: Debug + Display;
 
     /// Attempt to decode a `T` from `B` buffer
     ///

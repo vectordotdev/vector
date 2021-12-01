@@ -1,9 +1,9 @@
 use super::{host_key, Encoding};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    sinks::splunk_hec::logs::HecSinkLogsConfig,
+    sinks::splunk_hec::logs::config::HecSinkLogsConfig,
     sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
-    sinks::{Healthcheck, VectorSink},
+    sinks::{splunk_hec::common::SplunkHecDefaultBatchSettings, Healthcheck, VectorSink},
     template::Template,
     tls::TlsOptions,
 };
@@ -31,7 +31,7 @@ pub struct HumioLogsConfig {
     #[serde(default)]
     pub(in crate::sinks::humio) request: TowerRequestConfig,
     #[serde(default)]
-    pub(in crate::sinks::humio) batch: BatchConfig,
+    pub(in crate::sinks::humio) batch: BatchConfig<SplunkHecDefaultBatchSettings>,
     pub(in crate::sinks::humio) tls: Option<TlsOptions>,
 }
 
@@ -99,46 +99,10 @@ impl HumioLogsConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::Event;
-    use crate::sinks::util::{http::HttpSink, test::load_sink};
-    use chrono::Utc;
-    use serde::Deserialize;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<HumioLogsConfig>();
-    }
-
-    #[derive(Deserialize, Debug)]
-    struct HecEventJson {
-        time: f64,
-    }
-
-    #[test]
-    fn humio_valid_time_field() {
-        let event = Event::from("hello world");
-
-        let (config, _cx) = load_sink::<HumioLogsConfig>(
-            r#"
-            token = "alsdkfjaslkdfjsalkfj"
-            host = "https://127.0.0.1"
-            encoding = "json"
-        "#,
-        )
-        .unwrap();
-        let config = config.build_hec_config();
-
-        let bytes = config.encode_event(event).unwrap();
-        let hec_event = serde_json::from_slice::<HecEventJson>(&bytes[..]).unwrap();
-
-        let now = Utc::now().timestamp_millis() as f64 / 1000f64;
-        assert!(
-            (hec_event.time - now).abs() < 0.2,
-            "hec_event.time = {}, now = {}",
-            hec_event.time,
-            now
-        );
-        assert_eq!((hec_event.time * 1000f64).fract(), 0f64);
     }
 }
 
@@ -278,6 +242,9 @@ mod integration_tests {
 
     /// create a new test config with the given ingest token
     fn config(token: &str) -> super::HumioLogsConfig {
+        let mut batch = BatchConfig::default();
+        batch.max_events = Some(1);
+
         HumioLogsConfig {
             token: token.to_string(),
             endpoint: Some(HOST.to_string()),
@@ -289,10 +256,7 @@ mod integration_tests {
             index: None,
             compression: Compression::None,
             request: TowerRequestConfig::default(),
-            batch: BatchConfig {
-                max_events: Some(1),
-                ..Default::default()
-            },
+            batch,
             tls: None,
         }
     }

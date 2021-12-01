@@ -1,3 +1,6 @@
+#![allow(clippy::print_stderr)] // test framework
+#![allow(clippy::print_stdout)] // test framework
+
 use std::collections::HashSet;
 
 /// This helper function issues an HTTP request to the Prometheus-exposition

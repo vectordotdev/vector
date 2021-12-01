@@ -12,6 +12,8 @@ components: sinks: datadog_logs: {
 			batch: {
 				enabled:      true
 				common:       false
+				max_bytes:    4_250_000
+				max_events:   1000
 				timeout_secs: 5
 			}
 			compression: {
@@ -63,7 +65,6 @@ components: sinks: datadog_logs: {
 			warnings: []
 			type: string: {
 				examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
-				syntax: "literal"
 			}
 		}
 		endpoint: sinks._datadog.configuration.endpoint

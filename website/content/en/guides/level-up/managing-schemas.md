@@ -142,14 +142,12 @@ type = "json_parser"
 [transforms.not_gdpr]
 type = "filter"
 inputs = ["parse"]
-condition.type = "check_fields"
-condition."gdpr.eq" = "false"
+condition = ".gdpr == false"
 
 [transforms.gdpr_to_strip]
 type = "filter"
 inputs = ["parse"]
-condition.type = "check_fields"
-condition."gdpr.eq" = "true"
+condition = ".gdpr == true"
 
 [transforms.gdpr_stripped]
 type = "remap"
@@ -203,7 +201,7 @@ Lets take a look at what that might look like:
 
 ```toml title="vector.toml"
 [sinks.output]
-  inputs = ["demo"]
+  inputs = ["demo_logs"]
   type = "kafka"
 
   # Put events in the host specific topic.

@@ -19,9 +19,7 @@ pub use encoder::ElasticSearchEncoder;
 
 use crate::{
     config::SinkDescription,
-    emit,
     internal_events::TemplateRenderingFailed,
-    rusoto::{self, AwsAuthentication},
     template::{Template, TemplateParseError},
 };
 use http::{
@@ -36,6 +34,7 @@ use serde::{Deserialize, Serialize};
 
 use snafu::{ResultExt, Snafu};
 
+use crate::aws::rusoto::{self, AwsAuthentication};
 use std::convert::TryFrom;
 
 use crate::event::{EventRef, LogEvent};

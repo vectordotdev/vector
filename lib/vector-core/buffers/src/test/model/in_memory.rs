@@ -43,7 +43,7 @@ impl Model for InMemory {
                 }
                 Progress::Advanced
             }
-            WhenFull::Block => {
+            WhenFull::Block | WhenFull::Overflow => {
                 if self.inner.len() >= (self.capacity + self.num_senders) {
                     Progress::Blocked(item)
                 } else {

@@ -1,5 +1,7 @@
 use super::util::finalizer::OrderedFinalizer;
 use super::util::{EncodingConfig, MultilineConfig};
+use crate::config::AcknowledgementsConfig;
+use crate::serde::bool_or_struct;
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     encoding_transcode::{Decoder, Encoder},
@@ -91,6 +93,8 @@ pub struct FileConfig {
     pub remove_after_secs: Option<u64>,
     pub line_delimiter: String,
     pub encoding: Option<EncodingConfig>,
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
@@ -192,6 +196,7 @@ impl Default for FileConfig {
             remove_after_secs: None,
             line_delimiter: "\n".to_string(),
             encoding: None,
+            acknowledgements: AcknowledgementsConfig::default(),
         }
     }
 }
@@ -233,7 +238,7 @@ impl SourceConfig for FileConfig {
             data_dir,
             cx.shutdown,
             cx.out,
-            cx.acknowledgements,
+            self.acknowledgements.enabled,
         ))
     }
 

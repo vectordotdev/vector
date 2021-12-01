@@ -384,7 +384,7 @@ mod test {
     use warp::Filter;
 
     #[test]
-    fn genreate_config() {
+    fn generate_config() {
         crate::test_util::test_generate_config::<PrometheusScrapeConfig>();
     }
 

@@ -32,9 +32,15 @@ extern {
     }
 }
 
-pub GrokFilter: GrokPattern = "%{" <match_fn:FunctionOrRef> <fp:(DestinationAndFilter)?> "}" => GrokPattern{ match_fn, destination: fp };
+pub GrokFilter: GrokPattern = {
+ "%{" <match_fn:FunctionOrRef> <fp:(DestinationAndFilter)?> "}" => GrokPattern{ match_fn, destination: fp },
+ "%{" <match_fn:FunctionOrRef> ":" "}" => GrokPattern{ match_fn, destination: None },
+}
 
-DestinationAndFilter: Destination = ":" <path:Lookup> <filter_fn:(FilterFn)?> => Destination {path: path, filter_fn};
+DestinationAndFilter: Destination = {
+    ":" <path:Lookup> <filter_fn:(FilterFn)?> => Destination {path: path, filter_fn},
+    ":" <filter_fn:(FilterFn)> => Destination {path: LookupBuf::root(), filter_fn: Some(filter_fn)}
+}
 
 FilterFn: Function = ":" <FunctionOrRef>;
 

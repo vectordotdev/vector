@@ -1,5 +1,3 @@
-use crate::buffers::Ackable;
-
 use crate::event::{EventFinalizers, EventStatus, Finalizable};
 use crate::http::{Auth, HttpClient};
 use crate::sinks::util::http::{HttpBatchService, RequestConfig};
@@ -10,9 +8,9 @@ use hyper::service::Service;
 use hyper::{Body, Request};
 use std::task::{Context, Poll};
 use tower::ServiceExt;
+use vector_core::buffers::Ackable;
 
-use crate::internal_events::EventsSent;
-use crate::rusoto::AwsCredentialsProvider;
+use crate::aws::rusoto::AwsCredentialsProvider;
 use crate::sinks::util::{Compression, ElementCount};
 use http::header::HeaderName;
 use hyper::header::HeaderValue;
@@ -21,6 +19,8 @@ use rusoto_core::signature::{SignedRequest, SignedRequestPayload};
 use rusoto_core::Region;
 use std::collections::HashMap;
 use std::sync::Arc;
+use vector_core::internal_event::EventsSent;
+use vector_core::stream::DriverResponse;
 use vector_core::ByteSizeOf;
 
 #[derive(Clone)]
@@ -179,11 +179,20 @@ fn sign_request(
 pub struct ElasticSearchResponse {
     pub http_response: Response<Bytes>,
     pub event_status: EventStatus,
+    pub batch_size: usize,
+    pub events_byte_size: usize,
 }
 
-impl AsRef<EventStatus> for ElasticSearchResponse {
-    fn as_ref(&self) -> &EventStatus {
-        &self.event_status
+impl DriverResponse for ElasticSearchResponse {
+    fn event_status(&self) -> EventStatus {
+        self.event_status
+    }
+
+    fn events_sent(&self) -> EventsSent {
+        EventsSent {
+            count: self.batch_size,
+            byte_size: self.events_byte_size,
+        }
     }
 }
 
@@ -201,18 +210,14 @@ impl Service<ElasticSearchRequest> for ElasticSearchService {
         Box::pin(async move {
             http_service.ready().await?;
             let batch_size = req.batch_size;
-            let byte_size = req.events_byte_size;
+            let events_byte_size = req.events_byte_size;
             let http_response = http_service.call(req).await?;
             let event_status = get_event_status(&http_response);
-            if event_status == EventStatus::Delivered {
-                emit!(&EventsSent {
-                    count: batch_size,
-                    byte_size
-                });
-            }
             Ok(ElasticSearchResponse {
-                http_response,
                 event_status,
+                http_response,
+                batch_size,
+                events_byte_size,
             })
         })
     }
@@ -223,7 +228,7 @@ fn get_event_status(response: &Response<Bytes>) -> EventStatus {
         let body = String::from_utf8_lossy(response.body());
         if body.contains("\"errors\":true") {
             error!(message = "Response contained errors.", ?response);
-            EventStatus::Failed
+            EventStatus::Rejected
         } else {
             trace!(message = "Response successful.", ?response);
             EventStatus::Delivered
@@ -233,6 +238,6 @@ fn get_event_status(response: &Response<Bytes>) -> EventStatus {
         EventStatus::Errored
     } else {
         error!(message = "Response failed.", ?response);
-        EventStatus::Failed
+        EventStatus::Rejected
     }
 }

@@ -1,8 +1,8 @@
 #[cfg(feature = "aws-s3-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    use crate::aws::rusoto::RegionOrEndpoint;
     use crate::config::SinkContext;
-    use crate::rusoto::RegionOrEndpoint;
     use crate::sinks::aws_s3::S3SinkConfig;
     use crate::sinks::s3_common::config::S3Options;
     use crate::sinks::util::encoding::StandardEncodings;
@@ -24,14 +24,15 @@ mod integration_tests {
     use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
 
     #[tokio::test]
-    async fn s3_insert_message_into() {
+    async fn s3_insert_message_into_with_flat_key_prefix() {
         let cx = SinkContext::new_test();
 
         let bucket = uuid::Uuid::new_v4().to_string();
 
         create_bucket(&bucket, false).await;
 
-        let config = config(&bucket, 1000000);
+        let mut config = config(&bucket, 1000000);
+        config.key_prefix = Some("test-prefix".to_string());
         let prefix = config.key_prefix.clone();
         let service = config.create_service(&cx.globals.proxy).unwrap();
         let sink = config.build_processor(service, cx).unwrap();
@@ -44,6 +45,43 @@ mod integration_tests {
         assert_eq!(keys.len(), 1);
 
         let key = keys[0].clone();
+        let key_parts = key.split('/');
+        assert!(key_parts.count() == 1);
+        assert!(key.starts_with("test-prefix"));
+        assert!(key.ends_with(".log"));
+
+        let obj = get_object(&bucket, key).await;
+        assert_eq!(obj.content_encoding, Some("identity".to_string()));
+
+        let response_lines = get_lines(obj).await;
+        assert_eq!(lines, response_lines);
+    }
+
+    #[tokio::test]
+    async fn s3_insert_message_into_with_folder_key_prefix() {
+        let cx = SinkContext::new_test();
+
+        let bucket = uuid::Uuid::new_v4().to_string();
+
+        create_bucket(&bucket, false).await;
+
+        let mut config = config(&bucket, 1000000);
+        config.key_prefix = Some("test-prefix/".to_string());
+        let prefix = config.key_prefix.clone();
+        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let sink = config.build_processor(service, cx).unwrap();
+
+        let (lines, events, receiver) = make_events_batch(100, 10);
+        sink.run(events).await.unwrap();
+        assert_eq!(receiver.await, BatchStatus::Delivered);
+
+        let keys = get_keys(&bucket, prefix.unwrap()).await;
+        assert_eq!(keys.len(), 1);
+
+        let key = keys[0].clone();
+        let key_parts = key.split('/').collect::<Vec<_>>();
+        assert!(key_parts.len() == 2);
+        assert!(*key_parts.get(0).unwrap() == "test-prefix");
         assert!(key.ends_with(".log"));
 
         let obj = get_object(&bucket, key).await;
@@ -220,7 +258,7 @@ mod integration_tests {
 
         let (_lines, events, receiver) = make_events_batch(1, 1);
         sink.run(events).await.unwrap();
-        assert_eq!(receiver.await, BatchStatus::Failed);
+        assert_eq!(receiver.await, BatchStatus::Rejected);
 
         let objects = list_objects(&bucket, prefix.unwrap()).await;
         assert_eq!(objects, None);
@@ -264,6 +302,10 @@ mod integration_tests {
     }
 
     fn config(bucket: &str, batch_size: usize) -> S3SinkConfig {
+        let mut batch = BatchConfig::default();
+        batch.max_events = Some(batch_size);
+        batch.timeout_secs = Some(5);
+
         S3SinkConfig {
             bucket: bucket.to_string(),
             key_prefix: Some(random_string(10) + "/date=%F"),
@@ -274,11 +316,7 @@ mod integration_tests {
             region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
             encoding: StandardEncodings::Text.into(),
             compression: Compression::None,
-            batch: BatchConfig {
-                max_events: Some(batch_size),
-                timeout_secs: Some(5),
-                ..Default::default()
-            },
+            batch,
             request: TowerRequestConfig::default(),
             assume_role: None,
             auth: Default::default(),

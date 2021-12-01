@@ -2,12 +2,11 @@ use super::service::LogApiRetry;
 use super::sink::{DatadogLogsJsonEncoding, LogSinkBuilder};
 use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
 use crate::http::HttpClient;
-use crate::sinks::datadog::logs::healthcheck::healthcheck;
 use crate::sinks::datadog::logs::service::LogApiService;
-use crate::sinks::datadog::Region;
+use crate::sinks::datadog::{get_api_validate_endpoint, healthcheck, Region};
 use crate::sinks::util::encoding::EncodingConfigFixed;
 use crate::sinks::util::service::ServiceBuilderExt;
-use crate::sinks::util::BatchSettings;
+use crate::sinks::util::SinkBatchSettings;
 use crate::sinks::util::{BatchConfig, Compression, TowerRequestConfig};
 use crate::sinks::{Healthcheck, VectorSink};
 use crate::tls::{MaybeTlsSettings, TlsConfig};
@@ -15,6 +14,7 @@ use futures::FutureExt;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
+use std::num::NonZeroU64;
 use std::sync::Arc;
 use tower::ServiceBuilder;
 use vector_core::config::proxy::ProxyConfig;
@@ -31,10 +31,15 @@ pub const BATCH_GOAL_BYTES: usize = 4_250_000;
 pub const BATCH_MAX_EVENTS: usize = 1_000;
 pub const BATCH_DEFAULT_TIMEOUT_SECS: u64 = 5;
 
-const DEFAULT_BATCH_SETTINGS: BatchSettings<()> = BatchSettings::const_default()
-    .bytes(BATCH_GOAL_BYTES)
-    .events(BATCH_MAX_EVENTS)
-    .timeout(BATCH_DEFAULT_TIMEOUT_SECS);
+#[derive(Clone, Copy, Debug, Default)]
+pub struct DatadogLogsDefaultBatchSettings;
+
+impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(BATCH_MAX_EVENTS);
+    const MAX_BYTES: Option<usize> = Some(BATCH_GOAL_BYTES);
+    const TIMEOUT_SECS: NonZeroU64 =
+        unsafe { NonZeroU64::new_unchecked(BATCH_DEFAULT_TIMEOUT_SECS) };
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -57,7 +62,7 @@ pub struct DatadogLogsConfig {
     compression: Option<Compression>,
 
     #[serde(default)]
-    batch: BatchConfig,
+    batch: BatchConfig<DatadogLogsDefaultBatchSettings>,
 
     #[serde(default)]
     request: TowerRequestConfig,
@@ -73,6 +78,8 @@ impl GenerateConfig for DatadogLogsConfig {
 }
 
 impl DatadogLogsConfig {
+    // TODO: We should probably hoist this type of base URI generation so that all DD sinks can
+    // utilize it, since it all follows the same pattern.
     fn get_uri(&self) -> http::Uri {
         let endpoint = self
             .endpoint
@@ -103,12 +110,11 @@ impl DatadogLogsConfig {
 
         // We forcefully cap the provided batch configuration to the size/log line limits imposed by
         // the Datadog Logs API, but we still allow them to be lowered if need be.
-        let limited_batch = self
+        let batch = self
             .batch
-            .limit_max_bytes(BATCH_GOAL_BYTES)
-            .limit_max_events(BATCH_MAX_EVENTS);
-        let batch = DEFAULT_BATCH_SETTINGS
-            .parse_config(limited_batch)?
+            .validate()?
+            .limit_max_bytes(BATCH_GOAL_BYTES)?
+            .limit_max_events(BATCH_MAX_EVENTS)?
             .into_batcher_settings()?;
 
         let service = ServiceBuilder::new()
@@ -127,8 +133,9 @@ impl DatadogLogsConfig {
     }
 
     pub fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
-        let healthcheck = healthcheck(client, self.get_uri(), self.default_api_key.clone()).boxed();
-        Ok(healthcheck)
+        let validate_endpoint =
+            get_api_validate_endpoint(self.endpoint.as_ref(), self.site.as_ref(), self.region)?;
+        Ok(healthcheck(client, validate_endpoint, self.default_api_key.clone()).boxed())
     }
 
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {

@@ -72,6 +72,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let config = match config::load_from_paths(&paths) {
         Ok(config) => config,
         Err(errs) => {
+            #[allow(clippy::print_stderr)]
             for err in errs {
                 eprintln!("{}", err);
             }
@@ -117,7 +118,10 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
 
     dot += "}";
 
-    println!("{}", dot);
+    #[allow(clippy::print_stdout)]
+    {
+        println!("{}", dot);
+    }
 
     exitcode::OK
 }

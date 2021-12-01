@@ -18,7 +18,7 @@ pub struct HashValue<T: Metadata<Ty = ObjectMeta>>(T);
 pub enum HashKey {
     /// metadata.uid
     Uid,
-    /// meatadata.name
+    /// metadata.name
     Name,
 }
 

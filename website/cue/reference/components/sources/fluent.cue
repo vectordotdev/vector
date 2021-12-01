@@ -40,16 +40,6 @@ components: sources: fluent: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -63,10 +53,8 @@ components: sources: fluent: {
 		address: {
 			description: "The address to listen for TCP connections on."
 			required:    true
-			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)"]
-				syntax: "literal"
 			}
 		}
 	}
@@ -79,7 +67,6 @@ components: sources: fluent: {
 				required:    true
 				type: string: {
 					examples: ["127.0.0.1"]
-					syntax: "literal"
 				}
 			}
 			timestamp: {
@@ -92,7 +79,6 @@ components: sources: fluent: {
 				required:    true
 				type: string: {
 					examples: ["dummy.0"]
-					syntax: "literal"
 				}
 			}
 			"*": {
@@ -100,7 +86,6 @@ components: sources: fluent: {
 				required:    true
 				type: string: {
 					examples: ["hello world"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -144,7 +129,7 @@ components: sources: fluent: {
 				"""
 		}
 
-		fluentd_configuartion: {
+		fluentd_configuration: {
 			title: "Fluentd configuration"
 			body: """
 				To configure Fluentd to forward to a Vector instance, you can use the following output configuration:

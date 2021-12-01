@@ -1,4 +1,4 @@
-use super::util::{SocketListenAddr, TcpError, TcpSource};
+use super::util::{SocketListenAddr, StreamDecodingError, TcpSource};
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
@@ -158,7 +158,7 @@ pub enum DecodeError {
     DecompressionFailed { source: io::Error },
 }
 
-impl TcpError for DecodeError {
+impl StreamDecodingError for DecodeError {
     fn can_continue(&self) -> bool {
         use DecodeError::*;
 
@@ -323,7 +323,7 @@ impl Decoder for LogstashDecoder {
                     }
                 }
                 // The window size indicates how many events the writer will send before waiting
-                // for acks. As we forward events as we get them, and ack as they are receieved, we
+                // for acks. As we forward events as we get them, and ack as they are received, we
                 // do not need to keep track of this.
                 //
                 // https://github.com/logstash-plugins/logstash-input-beats/blob/master/PROTOCOL.md#window-size-frame-type

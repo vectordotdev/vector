@@ -1,3 +1,14 @@
+resource "kubernetes_config_map" "lading_bootstrap" {
+  metadata {
+    name      = "lading-http-gen-bootstrap"
+    namespace = var.namespace
+  }
+
+  data = {
+    "bootstrap.log" = var.http-gen-static-bootstrap
+  }
+}
+
 resource "kubernetes_config_map" "lading" {
   metadata {
     name      = "lading-http-gen"
@@ -5,7 +16,7 @@ resource "kubernetes_config_map" "lading" {
   }
 
   data = {
-    "http_gen.toml" = var.http-gen-toml
+    "http_gen.yaml" = var.http-gen-yaml
   }
 }
 
@@ -66,10 +77,15 @@ resource "kubernetes_deployment" "http-gen" {
         automount_service_account_token = false
         container {
           image_pull_policy = "IfNotPresent"
-          image             = "ghcr.io/blt/lading:0.5.0"
+          image             = var.lading_image
           name              = "http-gen"
           command           = ["/http_gen"]
 
+          volume_mount {
+            mount_path = "/data"
+            name       = "data"
+            read_only  = true
+          }
           volume_mount {
             mount_path = "/etc/lading"
             name       = "etc-lading"
@@ -104,6 +120,12 @@ resource "kubernetes_deployment" "http-gen" {
           name = "etc-lading"
           config_map {
             name = kubernetes_config_map.lading.metadata[0].name
+          }
+        }
+        volume {
+          name = "data"
+          config_map {
+            name = kubernetes_config_map.lading_bootstrap.metadata[0].name
           }
         }
       }

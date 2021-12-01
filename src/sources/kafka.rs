@@ -1,13 +1,19 @@
 use super::util::finalizer::OrderedFinalizer;
 use crate::{
-    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
+    codecs::{
+        self,
+        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+    },
+    config::{
+        log_schema, AcknowledgementsConfig, DataType, SourceConfig, SourceContext,
+        SourceDescription,
+    },
     event::{BatchNotifier, Event, Value},
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::{KafkaAuthConfig, KafkaStatisticsContext},
-    serde::{default_decoding, default_framing_message_based},
+    serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    sources::util::TcpError,
+    sources::util::StreamDecodingError,
     Pipeline,
 };
 use bytes::Bytes;
@@ -71,7 +77,9 @@ pub struct KafkaSourceConfig {
     framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
-    decoding: Box<dyn ParserConfig>,
+    decoding: Box<dyn DeserializerConfig>,
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 const fn default_session_timeout_ms() -> u64 {
@@ -137,7 +145,7 @@ impl SourceConfig for KafkaSourceConfig {
             decoder,
             cx.shutdown,
             cx.out,
-            cx.acknowledgements,
+            self.acknowledgements.enabled,
         )))
     }
 

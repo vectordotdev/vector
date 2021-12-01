@@ -1,7 +1,7 @@
 # Experimental service configuration for a hardened Vector
 #
 # This has not been widely tested on all OSes and with all Vector
-# configuartions, but can be used as a basis for limiting the Vector service
+# configurations, but can be used as a basis for limiting the Vector service
 # capabilities
 
 [Unit]
