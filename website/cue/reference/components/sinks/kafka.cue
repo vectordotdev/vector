@@ -123,7 +123,7 @@ components: sinks: kafka: {
 				examples: ["topic-1234", "logs-{{unit}}-%Y-%m-%d"]
 			}
 		}
-		headers_key: {
+		headers_field: {
 			common:      false
 			description: "The log field name to use for the Kafka headers. If omitted, no headers will be written."
 			required:    false
