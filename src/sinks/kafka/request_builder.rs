@@ -10,7 +10,7 @@ use vector_core::ByteSizeOf;
 
 pub struct KafkaRequestBuilder {
     pub key_field: Option<String>,
-    pub headers_field: Option<String>,
+    pub headers_key: Option<String>,
     pub topic_template: Template,
     pub encoder: EncodingConfig<StandardEncodings>,
     pub log_schema: &'static LogSchema,
@@ -23,7 +23,7 @@ impl KafkaRequestBuilder {
             finalizers: event.take_finalizers(),
             key: get_key(&event, &self.key_field),
             timestamp_millis: get_timestamp_millis(&event, self.log_schema),
-            headers: get_headers(&event, &self.headers_field),
+            headers: get_headers(&event, &self.headers_key),
             topic,
         };
         let mut body = vec![];
@@ -58,10 +58,10 @@ fn get_timestamp_millis(event: &Event, log_schema: &'static LogSchema) -> Option
     .map(|ts| ts.timestamp_millis())
 }
 
-fn get_headers(event: &Event, headers_field: &Option<String>) -> Option<OwnedHeaders> {
-    headers_field.as_ref().and_then(|headers_field| {
+fn get_headers(event: &Event, headers_key: &Option<String>) -> Option<OwnedHeaders> {
+    headers_key.as_ref().and_then(|headers_key| {
         if let Event::Log(log) = event {
-            if let Some(headers) = log.get(headers_field) {
+            if let Some(headers) = log.get(headers_key) {
                 match headers {
                     Value::Map(headers_map) => {
                         let mut owned_headers = OwnedHeaders::new_with_capacity(headers_map.len());
@@ -70,7 +70,7 @@ fn get_headers(event: &Event, headers_field: &Option<String>) -> Option<OwnedHea
                                 owned_headers = owned_headers.add(key, value_bytes.as_ref());
                             } else {
                                 emit!(&KafkaHeaderExtractionFailed {
-                                    header_field: headers_field
+                                    header_field: headers_key
                                 });
                             }
                         }
@@ -78,7 +78,7 @@ fn get_headers(event: &Event, headers_field: &Option<String>) -> Option<OwnedHea
                     }
                     _ => {
                         emit!(&KafkaHeaderExtractionFailed {
-                            header_field: headers_field
+                            header_field: headers_key
                         });
                     }
                 }
