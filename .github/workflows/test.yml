@@ -2,8 +2,6 @@ name: Test Suite
 
 on:
   pull_request:
-    paths-ignore:
-      - "soaks/**"
   push:
     branches:
       - master
