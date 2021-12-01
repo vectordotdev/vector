@@ -413,7 +413,13 @@ where
     format::deserialize(&with_vars, format).map(|builder| (builder, warnings))
 }
 
-#[cfg(all(test, feature = "transforms-pipelines"))]
+#[cfg(all(
+    test,
+    feature = "sinks-elasticsearch",
+    feature = "transforms-pipelines",
+    feature = "transforms-regex_parser",
+    feature = "transforms-sample"
+))]
 mod tests {
     use super::load_builder_from_paths;
     use crate::config::{ComponentKey, ConfigPath};

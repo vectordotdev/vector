@@ -7,64 +7,32 @@ use std::{
     fmt,
 };
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum ComponentScope {
-    Global,
-}
-
-impl fmt::Display for ComponentScope {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Global => write!(f, "global"),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ComponentKey {
     id: String,
-    scope: ComponentScope,
 }
 
 impl ComponentKey {
-    pub fn global<T: Into<String>>(id: T) -> Self {
-        Self {
-            id: id.into(),
-            scope: ComponentScope::Global,
-        }
-    }
-
     pub fn id(&self) -> &str {
-        self.id.as_str()
+        &self.id
     }
 
-    pub const fn scope(&self) -> &ComponentScope {
-        &self.scope
-    }
-
-    pub const fn is_global(&self) -> bool {
-        matches!(self.scope, ComponentScope::Global)
+    pub fn join<D: fmt::Display>(&self, name: D) -> Self {
+        Self {
+            id: format!("{}.{}", self.id, name),
+        }
     }
 }
 
 impl From<String> for ComponentKey {
-    fn from(value: String) -> Self {
-        Self::from(value.as_str())
+    fn from(id: String) -> Self {
+        Self { id }
     }
 }
 
 impl From<&str> for ComponentKey {
     fn from(value: &str) -> Self {
-        Self {
-            id: value.to_string(),
-            scope: ComponentScope::Global,
-        }
-    }
-}
-
-impl<T: ToString> From<&T> for ComponentKey {
-    fn from(value: &T) -> Self {
-        Self::from(value.to_string())
+        Self::from(value.to_owned())
     }
 }
 
@@ -85,11 +53,7 @@ impl Serialize for ComponentKey {
 
 impl Ord for ComponentKey {
     fn cmp(&self, other: &Self) -> Ordering {
-        if self.scope == other.scope {
-            self.id.cmp(&other.id)
-        } else {
-            self.scope.cmp(&other.scope)
-        }
+        self.id.cmp(&other.id)
     }
 }
 
@@ -112,7 +76,7 @@ impl<'de> Visitor<'de> for ComponentKeyVisitor {
     where
         E: de::Error,
     {
-        Ok(ComponentKey::global(value))
+        Ok(ComponentKey::from(value))
     }
 }
 
@@ -132,7 +96,7 @@ mod tests {
     #[test]
     fn deserialize_string() {
         let result: ComponentKey = serde_json::from_str("\"foo\"").unwrap();
-        assert_eq!(result.id, "foo");
+        assert_eq!(result.id(), "foo");
     }
 
     #[test]
