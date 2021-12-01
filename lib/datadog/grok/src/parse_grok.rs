@@ -5,7 +5,7 @@ use itertools::{
 
 use shared::btreemap;
 
-use crate::parse_grok_rules::ParsedField;
+use crate::parse_grok_rules::GrokField;
 use crate::{grok_filter::apply_filter, parse_grok_rules::GrokRule};
 use vrl_compiler::{Target, Value};
 
@@ -51,7 +51,11 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
             if name == "." {
                 name = ""; // root
             }
-            if let Some(ParsedField { field, filters }) = grok_rule.fields.get(name) {
+            if let Some(GrokField {
+                lookup: field,
+                filters,
+            }) = grok_rule.fields.get(name)
+            {
                 filters.iter().for_each(|filter| {
                     if let Some(ref v) = value {
                         match apply_filter(v, filter) {
