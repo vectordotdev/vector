@@ -332,7 +332,7 @@ mod tests {
             "host=aws.cloud.eur", line_protocol.1,
             "metric_type tag should be excluded"
         );
-        assert_fields(line_protocol.2.to_string(), ["message=\"hello\""].to_vec());
+        assert_fields(line_protocol.2, ["message=\"hello\""].to_vec());
     }
 
     #[test]
