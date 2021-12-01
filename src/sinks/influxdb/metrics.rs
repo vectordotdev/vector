@@ -23,6 +23,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 use bytes::Bytes;
+use indoc::indoc;
 use futures::{future::BoxFuture, stream, SinkExt};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -408,6 +409,17 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<InfluxDbConfig>();
+    }
+
+    #[test]
+    fn test_config_with_tags() {
+        let config = indoc! {r#"
+            namespace = "vector"
+            endpoint = "http://localhost:9999"
+            tags = {region="us-west-1"}
+        "#};
+
+        toml::from_str::<InfluxDbConfig>(config).unwrap();
     }
 
     #[test]
