@@ -81,9 +81,9 @@ impl Encoder<Result<NewRelicApiModel, &'static str>> for EncodingConfigFixed<Enc
     fn encode_input(&self, input: Result<NewRelicApiModel, &'static str>, writer: &mut dyn io::Write) -> io::Result<usize> {
         if let Ok(api_model) = input {
             let json = match api_model {
-                NewRelicApiModel::Events(ev_api_model) => ev_api_model.to_json(),
-                NewRelicApiModel::Metrics(met_api_model) => met_api_model.to_json(),
-                NewRelicApiModel::Logs(log_api_model) => log_api_model.to_json(),
+                NewRelicApiModel::Events(ev_api_model) => to_json(&ev_api_model),
+                NewRelicApiModel::Metrics(met_api_model) => to_json(&met_api_model),
+                NewRelicApiModel::Logs(log_api_model) => to_json(&log_api_model),
             };
             if let Some(json) = json {
                 let size = writer.write(&json)?;
@@ -118,17 +118,15 @@ pub enum NewRelicApi {
     Logs
 }
 
-pub trait ToJSON : Serialize {
-    fn to_json(&self) -> Option<Vec<u8>> {
-        match serde_json::to_vec(self) {
-            Ok(mut json) => {
-                json.push(b'\n');
-                Some(json)
-            },
-            Err(error) => {
-                error!(message = "Failed generating JSON.", %error);
-                None
-            }
+pub fn to_json<T: Serialize>(model: &T) -> Option<Vec<u8>> {
+    match serde_json::to_vec(model) {
+        Ok(mut json) => {
+            json.push(b'\n');
+            Some(json)
+        },
+        Err(error) => {
+            error!(message = "Failed generating JSON.", %error);
+            None
         }
     }
 }
@@ -165,8 +163,6 @@ impl MetricsApiModel {
         Self(vec!(metric_store))
     }
 }
-
-impl ToJSON for MetricsApiModel {}
 
 impl TryFrom<Vec<Event>> for MetricsApiModel {
     type Error = &'static str;
@@ -221,8 +217,6 @@ impl EventsApiModel {
         Self(events_array)
     }
 }
-
-impl ToJSON for EventsApiModel {}
 
 impl TryFrom<Vec<Event>> for EventsApiModel {
     type Error = &'static str;
@@ -295,8 +289,6 @@ impl LogsApiModel {
         Self(vec!(logs_store))
     }
 }
-
-impl ToJSON for LogsApiModel {}
 
 impl TryFrom<Vec<Event>> for LogsApiModel {
     type Error = &'static str;
