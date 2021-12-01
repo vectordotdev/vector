@@ -1,5 +1,4 @@
 use futures::task::AtomicWaker;
-use metrics::counter;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
