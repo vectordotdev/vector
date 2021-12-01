@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
+use tokio::time::{timeout, Duration};
 use vector::config::{self, ConfigDiff, Format};
 use vector::test_util::{next_addr, wait_for_tcp};
 use vector::topology;
@@ -97,9 +98,10 @@ uri = "http://{address2}/"
         .body("test".to_owned())
         .send();
     let sender = tokio::spawn(send);
-    // 2. It sends to the HTTP sink sender. `rx` is sent, but `rx2` has not completed.
-    rx.recv()
+    // 2. It sends to the HTTP sink sender. `rx` is activated.
+    timeout(Duration::from_secs(4), rx.recv())
         .await
+        .expect("Timed out waiting to receive event from HTTP sink")
         .expect("Error receiving event from HTTP sink");
     // 3. Our test HTTP server waits for the mutex lock.
     drop(pause);
@@ -107,8 +109,9 @@ uri = "http://{address2}/"
     // 4. Our test HTTP server responds.
     // 5. The acknowledgement is returned to the source.
     // 6. The source responds to our initial send.
-    let result = sender
+    let result = timeout(Duration::from_secs(1), sender)
         .await
+        .expect("Timed out waiting to receive result fro HTTP source")
         .expect("Error receiving result from tokio task")
         .expect("Error receiving response from HTTP source");
     assert_eq!(result.status(), response);
