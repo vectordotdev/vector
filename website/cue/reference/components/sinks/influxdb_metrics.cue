@@ -56,8 +56,8 @@ components: sinks: influxdb_metrics: {
 			}
 		}
 		tags: {
-			required: false
-			common:   false
+			required:    false
+			common:      false
 			description: "A map of additional key-value pairs that will be attached to each LineProtocol as tags."
 			groups: ["v1", "v2"]
 			type: object: {

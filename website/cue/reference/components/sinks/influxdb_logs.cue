@@ -65,8 +65,8 @@ components: sinks: influxdb_logs: {
 			}
 		}
 		tags: {
-			required: false
-			common:   false
+			required:    false
+			common:      false
 			description: "The set of fields that will be attached to each LineProtocol as tags. Note: If the set of tag values has high cardinality this also increase cardinality in InfluxDB."
 			groups: ["v1", "v2"]
 			type: array: {
