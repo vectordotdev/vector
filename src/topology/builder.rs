@@ -13,7 +13,7 @@ use crate::{
     transforms::Transform,
     Pipeline,
 };
-use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use std::pin::Pin;
 use std::{
@@ -27,10 +27,10 @@ use tokio::{
     select,
     time::{timeout, Duration},
 };
-use vector_core::ByteSizeOf;
 use vector_core::{
     buffers::{BufferInputCloner, BufferStream, BufferType},
     internal_event::EventsSent,
+    ByteSizeOf,
 };
 
 lazy_static! {
@@ -414,6 +414,9 @@ const fn filter_event_type(event: &Event, data_type: DataType) -> bool {
 
 use crate::transforms::{FallibleFunctionTransform, FunctionTransform, TaskTransform};
 
+// 128 is an arbitrary, smallish constant
+const TRANSFORM_BATCH_SIZE: usize = 128;
+
 #[derive(Debug, Clone)]
 struct TransformNode {
     key: ComponentKey,
@@ -429,11 +432,16 @@ fn build_transform(
     input_rx: BufferStream<Event>,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     match transform {
-        Transform::Function(t) => {
-            build_function_transform(t, input_rx, node.input_type, node.typetag, &node.key)
-        }
-        Transform::FallibleFunction(t) => build_fallible_function_transform(
-            t,
+        Transform::Function(t) => build_sync_transform(
+            Box::new(t),
+            input_rx,
+            node.input_type,
+            node.typetag,
+            &node.key,
+            Vec::new(),
+        ),
+        Transform::FallibleFunction(t) => build_sync_transform(
+            Box::new(t),
             input_rx,
             node.input_type,
             node.typetag,
@@ -446,145 +454,115 @@ fn build_transform(
     }
 }
 
-fn build_function_transform(
-    mut t: Box<dyn FunctionTransform>,
-    input_rx: BufferStream<Event>,
-    input_type: DataType,
-    typetag: &str,
-    key: &ComponentKey,
-) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
-    let (mut output, control) = Fanout::new();
-
-    let mut input_rx = input_rx
-        .filter(move |event| ready(filter_event_type(event, input_type)))
-        .ready_chunks(128); // 128 is an arbitrary, smallish constant
-
-    let mut timer = crate::utilization::Timer::new();
-    let mut last_report = Instant::now();
-
-    let transform = async move {
-        timer.start_wait();
-        while let Some(events) = input_rx.next().await {
-            let stopped = timer.stop_wait();
-            if stopped.duration_since(last_report).as_secs() >= 5 {
-                timer.report();
-                last_report = stopped;
-            }
-
-            emit!(&EventsReceived {
-                count: events.len(),
-                byte_size: events.size_of(),
-            });
-
-            let mut output_buf = Vec::with_capacity(events.len());
-            let mut buf = Vec::with_capacity(4); // also an arbitrary,
-                                                 // smallish constant
-            for v in events {
-                t.transform(&mut buf, v);
-                output_buf.append(&mut buf);
-            }
-
-            let count = output_buf.len();
-            let byte_size = output_buf.size_of();
-
-            timer.start_wait();
-            output
-                .send_all(&mut stream::iter(output_buf.into_iter()).map(Ok))
-                .await?;
-
-            emit!(&EventsSent { count, byte_size });
-        }
-        debug!("Finished.");
-        Ok(TaskOutput::Transform)
-    }
-    .boxed();
-
-    let mut outputs = HashMap::new();
-    outputs.insert(OutputId::from(key), control);
-
-    let task = Task::new(key.clone(), typetag, transform);
-
-    (task, outputs)
+struct TransformOutputs {
+    primary_buffer: Vec<Event>,
+    named_buffers: HashMap<String, Vec<Event>>,
+    primary_output: Fanout,
+    named_outputs: HashMap<String, Fanout>,
 }
 
-fn build_fallible_function_transform(
-    mut t: Box<dyn FallibleFunctionTransform>,
-    input_rx: BufferStream<Event>,
-    input_type: DataType,
-    typetag: &str,
-    key: &ComponentKey,
-    mut named_outputs: Vec<String>,
-) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
-    let (mut output, control) = Fanout::new();
-    let (mut errors_output, errors_control) = Fanout::new();
+impl TransformOutputs {
+    fn new(
+        named_outputs_in: Vec<String>,
+    ) -> (Self, HashMap<Option<String>, fanout::ControlChannel>) {
+        let mut named_buffers = HashMap::new();
+        let mut named_outputs = HashMap::new();
+        let mut controls = HashMap::new();
 
-    let mut input_rx = input_rx
-        .filter(move |event| ready(filter_event_type(event, input_type)))
-        .ready_chunks(128); // 128 is an arbitrary, smallish constant
-
-    let mut timer = crate::utilization::Timer::new();
-    let mut last_report = Instant::now();
-
-    let transform = async move {
-        timer.start_wait();
-        while let Some(events) = input_rx.next().await {
-            let stopped = timer.stop_wait();
-            if stopped.duration_since(last_report).as_secs() >= 5 {
-                timer.report();
-                last_report = stopped;
-            }
-
-            emit!(&EventsReceived {
-                count: events.len(),
-                byte_size: events.size_of(),
-            });
-
-            let mut output_buf = Vec::with_capacity(events.len());
-            let mut buf = Vec::with_capacity(1);
-            let mut err_output_buf = Vec::with_capacity(1);
-            let mut err_buf = Vec::with_capacity(1);
-
-            for v in events {
-                t.transform(&mut buf, &mut err_buf, v);
-                output_buf.append(&mut buf);
-                err_output_buf.append(&mut err_buf);
-            }
-
-            // TODO: account for error outputs separately?
-            let count = output_buf.len() + err_output_buf.len();
-            let byte_size = output_buf.size_of() + err_output_buf.size_of();
-
-            timer.start_wait();
-            for event in output_buf {
-                output.feed(event).await.expect("unit error");
-            }
-            output.flush().await.expect("unit error");
-            for event in err_output_buf {
-                errors_output.feed(event).await.expect("unit error");
-            }
-            errors_output.flush().await.expect("unit error");
-
-            emit!(&EventsSent { count, byte_size });
+        for name in named_outputs_in {
+            let (fanout, control) = Fanout::new();
+            named_outputs.insert(name.clone(), fanout);
+            controls.insert(Some(name.clone()), control);
+            named_buffers.insert(name.clone(), Vec::new());
         }
 
-        debug!("Finished.");
-        Ok(TaskOutput::Transform)
+        let (primary_output, control) = Fanout::new();
+        let me = Self {
+            primary_buffer: Vec::with_capacity(TRANSFORM_BATCH_SIZE),
+            named_buffers,
+            primary_output,
+            named_outputs,
+        };
+        controls.insert(None, control);
+
+        (me, controls)
     }
-    .boxed();
 
-    let mut outputs = HashMap::new();
-    outputs.insert(OutputId::from(key), control);
-    // TODO: actually drive fanout creation from transform output declaration instead
-    // of relying on the one fallible function pattern we currently have
-    assert_eq!(1, named_outputs.len());
-    outputs.insert(
-        OutputId::from((key, named_outputs.remove(0))),
-        errors_control,
-    );
+    fn append(&mut self, slice: &mut Vec<Event>) {
+        self.primary_buffer.append(slice)
+    }
 
-    let task = Task::new(key.clone(), typetag, transform);
+    fn append_named(&mut self, name: &str, slice: &mut Vec<Event>) {
+        self.named_buffers
+            .get_mut(name)
+            .expect("unknown output")
+            .append(slice)
+    }
 
-    (task, outputs)
+    fn len(&self) -> usize {
+        self.primary_buffer.len()
+            + self
+                .named_buffers
+                .iter()
+                .map(|(_, buf)| buf.len())
+                .sum::<usize>()
+    }
+
+    async fn flush(&mut self) {
+        flush_inner(&mut self.primary_buffer, &mut self.primary_output).await;
+        for (key, buf) in self.named_buffers.iter_mut() {
+            flush_inner(
+                buf,
+                self.named_outputs.get_mut(key).expect("unknown output"),
+            )
+            .await;
+        }
+    }
+}
+
+async fn flush_inner(buf: &mut Vec<Event>, output: &mut Fanout) {
+    for event in buf.drain(..) {
+        output.feed(event).await.expect("unit error")
+    }
+}
+
+impl ByteSizeOf for TransformOutputs {
+    fn allocated_bytes(&self) -> usize {
+        self.primary_buffer.size_of()
+            + self
+                .named_buffers
+                .iter()
+                .map(|(_, buf)| buf.size_of())
+                .sum::<usize>()
+    }
+}
+
+trait SyncTransform: Send + Sync {
+    fn run(&mut self, events: Vec<Event>, outputs: &mut TransformOutputs);
+}
+
+impl SyncTransform for Box<dyn FallibleFunctionTransform> {
+    fn run(&mut self, events: Vec<Event>, outputs: &mut TransformOutputs) {
+        let mut buf = Vec::with_capacity(1);
+        let mut err_buf = Vec::with_capacity(1);
+
+        for v in events {
+            self.transform(&mut buf, &mut err_buf, v);
+            outputs.append(&mut buf);
+            outputs.append_named("dropped", &mut err_buf);
+        }
+    }
+}
+
+impl SyncTransform for Box<dyn FunctionTransform> {
+    fn run(&mut self, events: Vec<Event>, outputs: &mut TransformOutputs) {
+        let mut buf = Vec::with_capacity(4); // also an arbitrary,
+                                             // smallish constant
+        for v in events {
+            self.transform(&mut buf, v);
+            outputs.append(&mut buf);
+        }
+    }
 }
 
 fn build_task_transform(
@@ -624,6 +602,72 @@ fn build_task_transform(
 
     let mut outputs = HashMap::new();
     outputs.insert(OutputId::from(key), control);
+
+    let task = Task::new(key.clone(), typetag, transform);
+
+    (task, outputs)
+}
+
+fn build_sync_transform(
+    mut t: Box<dyn SyncTransform>,
+    input_rx: BufferStream<Event>,
+    input_type: DataType,
+    typetag: &str,
+    key: &ComponentKey,
+    named_outputs: Vec<String>,
+) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
+    let (mut outputs, controls) = TransformOutputs::new(named_outputs);
+
+    let mut input_rx = input_rx
+        .filter(move |event| ready(filter_event_type(event, input_type)))
+        .ready_chunks(TRANSFORM_BATCH_SIZE);
+
+    let mut timer = crate::utilization::Timer::new();
+    let mut last_report = Instant::now();
+
+    let transform = async move {
+        timer.start_wait();
+        while let Some(events) = input_rx.next().await {
+            let stopped = timer.stop_wait();
+            if stopped.duration_since(last_report).as_secs() >= 5 {
+                timer.report();
+                last_report = stopped;
+            }
+
+            emit!(&EventsReceived {
+                count: events.len(),
+                byte_size: events.size_of(),
+            });
+
+            t.run(events, &mut outputs);
+
+            // TODO: account for named outputs separately?
+            let count = outputs.len();
+            // TODO: do we only want allocated_bytes for events themselves?
+            let byte_size = outputs.size_of();
+
+            timer.start_wait();
+            outputs.flush().await;
+
+            emit!(&EventsSent { count, byte_size });
+        }
+
+        debug!("Finished.");
+        Ok(TaskOutput::Transform)
+    }
+    .boxed();
+
+    let mut outputs = HashMap::new();
+    for (name, control) in controls {
+        match name {
+            None => {
+                outputs.insert(OutputId::from(key), control);
+            }
+            Some(name) => {
+                outputs.insert(OutputId::from((key, name)), control);
+            }
+        }
+    }
 
     let task = Task::new(key.clone(), typetag, transform);
 
