@@ -149,7 +149,7 @@ impl GenerateConfig for KafkaSinkConfig {
             socket_timeout_ms: default_socket_timeout_ms(),
             message_timeout_ms: default_message_timeout_ms(),
             librdkafka_options: Default::default(),
-            headers_k: None,
+            headers_key: None,
         })
         .unwrap()
     }
