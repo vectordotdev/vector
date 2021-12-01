@@ -19,6 +19,12 @@ data_dir = "/var/lib/vector"
   [sinks.s3_archives.batch]
     max_bytes   = 10000000                      # 10mb uncompressed
 
+[sinks.console]
+  type = "console"
+  inputs = ["processing"]
+  target = "stdout"
+  encoding.codec = "json"
+
 [[tests]]
   name = "first"
   [tests.input]

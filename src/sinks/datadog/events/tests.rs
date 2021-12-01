@@ -96,7 +96,7 @@ async fn smoke() {
 
 #[tokio::test]
 async fn handles_failure() {
-    let (_expected, mut rx) = start_test(StatusCode::FORBIDDEN, BatchStatus::Failed).await;
+    let (_expected, mut rx) = start_test(StatusCode::FORBIDDEN, BatchStatus::Rejected).await;
 
     assert!(matches!(rx.try_next(), Err(TryRecvError { .. })));
 }

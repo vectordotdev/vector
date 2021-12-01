@@ -32,6 +32,7 @@ mod graph;
 mod id;
 mod loading;
 pub mod provider;
+mod recursive;
 mod unit_test;
 mod validation;
 mod vars;
