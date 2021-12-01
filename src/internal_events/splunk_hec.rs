@@ -2,7 +2,7 @@ use crate::{
     event::metric::{MetricKind, MetricValue},
     sinks::splunk_hec::common::acknowledgements::HecAckApiError,
 };
-use metrics::counter;
+use metrics::{counter, decrement_gauge, increment_gauge};
 use serde_json::Error;
 use vector_core::internal_event::InternalEvent;
 
@@ -109,6 +109,24 @@ impl InternalEvent for SplunkIndexerAcknowledgementUnavailableError {
             message = "Internal indexer acknowledgement client unavailable. Acknowledging based on initial 200 OK.",
             internal_log_rate_secs = 30,
         );
+    }
+}
+
+pub struct SplunkIndexerAcknowledgementAckAdded;
+
+impl InternalEvent for SplunkIndexerAcknowledgementAckAdded {
+    fn emit_metrics(&self) {
+        increment_gauge!("splunk_pending_acks", 1.0);
+    }
+}
+
+pub struct SplunkIndexerAcknowledgementAckRemoved {
+    pub count: f64,
+}
+
+impl InternalEvent for SplunkIndexerAcknowledgementAckRemoved {
+    fn emit_metrics(&self) {
+        decrement_gauge!("splunk_pending_acks", self.count);
     }
 }
 

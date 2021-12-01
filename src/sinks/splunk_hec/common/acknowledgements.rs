@@ -1,5 +1,11 @@
 use super::service::HttpRequestBuilder;
-use crate::{http::HttpClient, internal_events::SplunkIndexerAcknowledgementAPIError};
+use crate::{
+    http::HttpClient,
+    internal_events::{
+        SplunkIndexerAcknowledgementAPIError, SplunkIndexerAcknowledgementAckAdded,
+        SplunkIndexerAcknowledgementAckRemoved,
+    },
+};
 use hyper::Body;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, num::NonZeroU8, sync::Arc, time::Duration};
@@ -68,6 +74,7 @@ impl HecAckClient {
     fn add(&mut self, ack_id: u64, ack_event_status_sender: Sender<EventStatus>) {
         self.acks
             .insert(ack_id, (self.retry_limit, ack_event_status_sender));
+        emit!(&SplunkIndexerAcknowledgementAckAdded);
     }
 
     /// Queries Splunk HEC with stored ack ids and finalizes events that are successfully acked
@@ -105,7 +112,8 @@ impl HecAckClient {
                         }
                         _ => {
                             emit!(&SplunkIndexerAcknowledgementAPIError {
-                                message: "Unable to send acknowledgement query request. Will retry.",
+                                message:
+                                    "Unable to send acknowledgement query request. Will retry.",
                                 error,
                             });
                             self.expire_ack_ids_with_status(EventStatus::Errored);
@@ -118,12 +126,17 @@ impl HecAckClient {
 
     /// Removes successfully acked ack ids and finalizes associated events
     fn finalize_delivered_ack_ids(&mut self, ack_ids: &[u64]) {
+        let mut removed_count = 0.0;
         for ack_id in ack_ids {
             if let Some((_, ack_event_status_sender)) = self.acks.remove(ack_id) {
                 let _ = ack_event_status_sender.send(EventStatus::Delivered);
+                removed_count += 1.0;
                 debug!(message = "Finalized ack id", ?ack_id);
             }
         }
+        emit!(&SplunkIndexerAcknowledgementAckRemoved {
+            count: removed_count
+        });
     }
 
     /// Builds an ack query body with stored ack ids
@@ -148,11 +161,16 @@ impl HecAckClient {
             .iter()
             .filter_map(|(ack_id, (retries, _))| (*retries == 0).then(|| *ack_id))
             .collect::<Vec<_>>();
+        let mut removed_count = 0.0;
         for ack_id in expired_ack_ids {
             if let Some((_, ack_event_status_sender)) = self.acks.remove(&ack_id) {
                 let _ = ack_event_status_sender.send(status);
+                removed_count += 1.0;
             }
         }
+        emit!(&SplunkIndexerAcknowledgementAckRemoved {
+            count: removed_count
+        });
     }
 
     // Sends an ack status query request to Splunk HEC
