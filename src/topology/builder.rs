@@ -197,13 +197,14 @@ pub async fn build_pieces(
             enrichment_tables: enrichment_tables.clone(),
         };
 
-        let trans_inputs = &transform.inputs;
+        let node = TransformNode {
+            key: key.clone(),
+            typetag: transform.inner.transform_type(),
+            inputs: transform.inputs.clone(),
+            input_type: transform.inner.input_type(),
+            named_outputs: transform.inner.named_outputs(),
+        };
 
-        let typetag = transform.inner.transform_type();
-
-        let named_outputs = transform.inner.named_outputs();
-
-        let input_type = transform.inner.input_type();
         let transform = match transform.inner.build(&context).await {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", key, error));
@@ -222,42 +223,12 @@ pub async fn build_pieces(
         )
         .unwrap();
 
-        let task = match transform {
-            Transform::Function(t) => {
-                let built = build_function_transform(t, input_rx, input_type, typetag, key);
+        inputs.insert(key.clone(), (input_tx, node.inputs.clone()));
 
-                outputs.extend(built.outputs);
+        let (transform_task, transform_outputs) = build_transform(transform, node, input_rx);
 
-                // Task::new(key.clone(), typetag, transform)
-                built.task
-            }
-            Transform::FallibleFunction(t) => {
-                let built = build_fallible_function_transform(
-                    t,
-                    input_rx,
-                    input_type,
-                    typetag,
-                    key,
-                    named_outputs,
-                );
-
-                outputs.extend(built.outputs);
-
-                // Task::new(key.clone(), typetag, transform)
-                built.task
-            }
-            Transform::Task(t) => {
-                let built = build_task_transform(t, input_rx, input_type, typetag, key);
-
-                outputs.extend(built.outputs);
-
-                // Task::new(key.clone(), typetag, transform)
-                built.task
-            }
-        };
-
-        inputs.insert(key.clone(), (input_tx, trans_inputs.clone()));
-        tasks.insert(key.clone(), task);
+        outputs.extend(transform_outputs);
+        tasks.insert(key.clone(), transform_task);
     }
 
     // Build sinks
@@ -441,12 +412,39 @@ const fn filter_event_type(event: &Event, data_type: DataType) -> bool {
     }
 }
 
-struct BuiltTransform {
-    outputs: HashMap<OutputId, fanout::ControlChannel>,
-    task: Task,
+use crate::transforms::{FallibleFunctionTransform, FunctionTransform, TaskTransform};
+
+#[derive(Debug, Clone)]
+struct TransformNode {
+    key: ComponentKey,
+    typetag: &'static str,
+    inputs: Vec<OutputId>,
+    input_type: DataType,
+    named_outputs: Vec<String>,
 }
 
-use crate::transforms::{FallibleFunctionTransform, FunctionTransform, TaskTransform};
+fn build_transform(
+    transform: Transform,
+    node: TransformNode,
+    input_rx: BufferStream<Event>,
+) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
+    match transform {
+        Transform::Function(t) => {
+            build_function_transform(t, input_rx, node.input_type, node.typetag, &node.key)
+        }
+        Transform::FallibleFunction(t) => build_fallible_function_transform(
+            t,
+            input_rx,
+            node.input_type,
+            node.typetag,
+            &node.key,
+            node.named_outputs,
+        ),
+        Transform::Task(t) => {
+            build_task_transform(t, input_rx, node.input_type, node.typetag, &node.key)
+        }
+    }
+}
 
 fn build_function_transform(
     mut t: Box<dyn FunctionTransform>,
@@ -454,7 +452,7 @@ fn build_function_transform(
     input_type: DataType,
     typetag: &str,
     key: &ComponentKey,
-) -> BuiltTransform {
+) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (mut output, control) = Fanout::new();
 
     let mut input_rx = input_rx
@@ -506,7 +504,7 @@ fn build_function_transform(
 
     let task = Task::new(key.clone(), typetag, transform);
 
-    BuiltTransform { outputs, task }
+    (task, outputs)
 }
 
 fn build_fallible_function_transform(
@@ -516,7 +514,7 @@ fn build_fallible_function_transform(
     typetag: &str,
     key: &ComponentKey,
     mut named_outputs: Vec<String>,
-) -> BuiltTransform {
+) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (mut output, control) = Fanout::new();
     let (mut errors_output, errors_control) = Fanout::new();
 
@@ -586,7 +584,7 @@ fn build_fallible_function_transform(
 
     let task = Task::new(key.clone(), typetag, transform);
 
-    BuiltTransform { outputs, task }
+    (task, outputs)
 }
 
 fn build_task_transform(
@@ -595,7 +593,7 @@ fn build_task_transform(
     input_type: DataType,
     typetag: &str,
     key: &ComponentKey,
-) -> BuiltTransform {
+) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (output, control) = Fanout::new();
 
     let input_rx = crate::utilization::wrap(Pin::new(input_rx));
@@ -629,5 +627,5 @@ fn build_task_transform(
 
     let task = Task::new(key.clone(), typetag, transform);
 
-    BuiltTransform { outputs, task }
+    (task, outputs)
 }
