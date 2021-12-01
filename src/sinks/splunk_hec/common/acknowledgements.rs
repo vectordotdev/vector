@@ -8,8 +8,13 @@ use crate::{
 };
 use hyper::Body;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, num::NonZeroU8, sync::Arc, time::Duration};
-use tokio::sync::{mpsc::UnboundedReceiver, oneshot::Sender};
+use std::{
+    collections::HashMap,
+    num::{NonZeroU64, NonZeroU8},
+    sync::Arc,
+    time::Duration,
+};
+use tokio::sync::{mpsc::Receiver, oneshot::Sender};
 use vector_core::event::EventStatus;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -18,6 +23,7 @@ pub struct HecClientAcknowledgementsConfig {
     pub indexer_acknowledgements_enabled: bool,
     pub query_interval: NonZeroU8,
     pub retry_limit: NonZeroU8,
+    pub max_pending_acks: NonZeroU64,
 }
 
 impl Default for HecClientAcknowledgementsConfig {
@@ -26,6 +32,7 @@ impl Default for HecClientAcknowledgementsConfig {
             indexer_acknowledgements_enabled: true,
             query_interval: NonZeroU8::new(10).unwrap(),
             retry_limit: NonZeroU8::new(30).unwrap(),
+            max_pending_acks: NonZeroU64::new(1_000_000).unwrap(),
         }
     }
 }
@@ -51,6 +58,7 @@ pub enum HecAckApiError {
 struct HecAckClient {
     acks: HashMap<u64, (u8, Sender<EventStatus>)>,
     retry_limit: u8,
+    max_pending_acks: u64,
     client: HttpClient,
     http_request_builder: Arc<HttpRequestBuilder>,
 }
@@ -58,15 +66,22 @@ struct HecAckClient {
 impl HecAckClient {
     fn new(
         retry_limit: u8,
+        max_pending_acks: u64,
         client: HttpClient,
         http_request_builder: Arc<HttpRequestBuilder>,
     ) -> Self {
         Self {
             acks: HashMap::new(),
             retry_limit,
+            max_pending_acks,
             client,
             http_request_builder,
         }
+    }
+
+    /// Whether the ack client is able to accept additional ack ids
+    fn ready(&self) -> bool {
+        (self.acks.len() as u64) < self.max_pending_acks
     }
 
     /// Adds an ack id to be queried
@@ -207,7 +222,7 @@ impl HecAckClient {
 }
 
 pub async fn run_acknowledgements(
-    mut receiver: UnboundedReceiver<(u64, Sender<EventStatus>)>,
+    mut receiver: Receiver<(u64, Sender<EventStatus>)>,
     client: HttpClient,
     http_request_builder: Arc<HttpRequestBuilder>,
     indexer_acknowledgements: HecClientAcknowledgementsConfig,
@@ -217,6 +232,7 @@ pub async fn run_acknowledgements(
     ));
     let mut ack_client = HecAckClient::new(
         indexer_acknowledgements.retry_limit.get(),
+        indexer_acknowledgements.max_pending_acks.get(),
         client,
         http_request_builder,
     );
@@ -226,7 +242,7 @@ pub async fn run_acknowledgements(
             _ = interval.tick() => {
                 ack_client.run().await;
             },
-            ack_info = receiver.recv() => {
+            ack_info = receiver.recv(), if ack_client.ready() => {
                 match ack_info {
                     Some((ack_id, tx)) => {
                         ack_client.add(ack_id, tx);
@@ -263,7 +279,12 @@ mod tests {
         let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
         let http_request_builder =
             HttpRequestBuilder::new(String::from(""), String::from(""), Compression::default());
-        HecAckClient::new(retry_limit, client, Arc::new(http_request_builder))
+        HecAckClient::new(
+            retry_limit,
+            1_000_000u64,
+            client,
+            Arc::new(http_request_builder),
+        )
     }
 
     fn populate_ack_client(

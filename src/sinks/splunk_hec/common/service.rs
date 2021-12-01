@@ -17,8 +17,8 @@ use std::{
     task::{Context, Poll},
 };
 use tokio::sync::{
-    mpsc::{self, UnboundedSender},
-    oneshot::{self, Sender},
+    mpsc::{self},
+    oneshot,
 };
 use tower::{Service, ServiceExt};
 use uuid::Uuid;
@@ -28,7 +28,7 @@ use vector_core::event::EventStatus;
 pub struct HecService {
     pub batch_service:
         HttpBatchService<BoxFuture<'static, Result<Request<Vec<u8>>, crate::Error>>, HecRequest>,
-    ack_finalizer_tx: Option<UnboundedSender<(u64, Sender<EventStatus>)>>,
+    ack_finalizer_tx: Option<mpsc::Sender<(u64, oneshot::Sender<EventStatus>)>>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -47,7 +47,7 @@ impl HecService {
         let ack_client = client;
         let http_request_builder = Arc::new(http_request_builder);
         let tx = if indexer_acknowledgements.indexer_acknowledgements_enabled {
-            let (tx, rx) = mpsc::unbounded_channel();
+            let (tx, rx) = mpsc::channel(indexer_acknowledgements.max_pending_acks.get() as usize);
             tokio::spawn(run_acknowledgements(
                 rx,
                 ack_client,
@@ -98,7 +98,7 @@ impl Service<HecRequest> for HecService {
                         Ok(body) => {
                             if let Some(ack_id) = body.ack_id {
                                 let (tx, rx) = oneshot::channel();
-                                match ack_finalizer_tx.send((ack_id, tx)) {
+                                match ack_finalizer_tx.send((ack_id, tx)).await {
                                     Ok(_) => rx.await.unwrap_or(EventStatus::Rejected),
                                     // If we cannot send ack ids to the ack client, fall back to default behavior
                                     Err(_) => {

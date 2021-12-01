@@ -34,6 +34,15 @@ components: sinks: _splunk_hec: {
 							unit:    null
 						}
 					}
+					max_pending_acks: {
+						common:      false
+						description: "The maximum number of ack ids pending query. Once reached, the sink will begin applying backpressure."
+						required:    false
+						type: uint: {
+							default: 1_000_000
+							unit:    null
+						}
+					}
 				}
 			}
 		}
