@@ -1,4 +1,7 @@
-use crate::event::metric::{MetricKind, MetricValue};
+use crate::{
+    event::metric::{MetricKind, MetricValue},
+    sinks::splunk_hec::common::acknowledgements::HecAckApiError,
+};
 use metrics::counter;
 use serde_json::Error;
 use vector_core::internal_event::InternalEvent;
@@ -57,6 +60,55 @@ impl<'a> InternalEvent for SplunkInvalidMetricReceived<'a> {
 
     fn emit_metrics(&self) {
         counter!("processing_errors_total", 1, "error_type" => "invalid_metric_kind");
+    }
+}
+
+#[derive(Debug)]
+pub struct SplunkResponseParseError {
+    pub error: Error,
+}
+
+impl InternalEvent for SplunkResponseParseError {
+    fn emit_logs(&self) {
+        warn!(
+            message = "Unable to parse Splunk HEC response. Acknowledging based on initial 200 OK.",
+            error = ?self.error,
+            internal_log_rate_secs = 30,
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct SplunkIndexerAcknowledgementAPIError {
+    pub message: &'static str,
+    pub error: HecAckApiError,
+}
+
+impl InternalEvent for SplunkIndexerAcknowledgementAPIError {
+    fn emit_logs(&self) {
+        error!(
+            message = self.message,
+            error = ?self.error,
+            error_type = "acknowledgements_error",
+            stage = "sending",
+            internal_log_rate_secs = 30,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("component_errors_total", 1, "error_type" => "acknowledgements_error", "stage" => "sending");
+    }
+}
+
+#[derive(Debug)]
+pub struct SplunkIndexerAcknowledgementUnavailableError;
+
+impl InternalEvent for SplunkIndexerAcknowledgementUnavailableError {
+    fn emit_logs(&self) {
+        warn!(
+            message = "Internal indexer acknowledgement client unavailable. Acknowledging based on initial 200 OK.",
+            internal_log_rate_secs = 30,
+        );
     }
 }
 

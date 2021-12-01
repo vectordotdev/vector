@@ -1,5 +1,5 @@
 use super::service::HttpRequestBuilder;
-use crate::http::HttpClient;
+use crate::{http::HttpClient, internal_events::SplunkIndexerAcknowledgementAPIError};
 use hyper::Body;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, num::NonZeroU8, sync::Arc, time::Duration};
@@ -35,7 +35,8 @@ pub struct HecAckStatusResponse {
     pub acks: HashMap<u64, bool>,
 }
 
-enum HecAckApiError {
+#[derive(Debug)]
+pub enum HecAckApiError {
     ClientBuildRequest,
     ClientParseResponse,
     ClientSendQuery,
@@ -94,15 +95,19 @@ impl HecAckClient {
                             // request/response format changes in future
                             // versions), log an error and fall back to default
                             // behavior.
-                            error!(message = "Unable to parse ack query response. Acknowledging based on initial 200 OK.");
+                            emit!(&SplunkIndexerAcknowledgementAPIError {
+                                message: "Unable to use indexer acknowledgements. Acknowledging based on initial 200 OK.",
+                                error,
+                            });
                             self.finalize_delivered_ack_ids(
                                 self.acks.keys().copied().collect::<Vec<_>>().as_slice(),
                             );
                         }
                         _ => {
-                            // Otherwise, errors may be recoverable, log an error
-                            // and proceed with retries.
-                            error!(message = "Unable to send ack query request");
+                            emit!(&SplunkIndexerAcknowledgementAPIError {
+                                message: "Unable to send acknowledgement query request. Will retry.",
+                                error,
+                            });
                             self.expire_ack_ids_with_status(EventStatus::Errored);
                         }
                     }

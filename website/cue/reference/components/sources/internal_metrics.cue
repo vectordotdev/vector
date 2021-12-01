@@ -1135,6 +1135,7 @@ components: sources: internal_metrics: {
 			description: "The type of the error"
 			required:    true
 			enum: {
+				"acknowledgements_failed":     "The acknowledgement operation failed."
 				"delete_failed":               "The file deletion failed."
 				"encode_failed":               "The encode operation failed."
 				"field_missing":               "The event field was missing."

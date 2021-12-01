@@ -1,6 +1,7 @@
 use super::acknowledgements::{run_acknowledgements, HecClientAcknowledgementsConfig};
 use crate::{
     http::HttpClient,
+    internal_events::{SplunkIndexerAcknowledgementUnavailableError, SplunkResponseParseError},
     sinks::{
         splunk_hec::common::{build_uri, request::HecRequest, response::HecResponse},
         util::{http::HttpBatchService, Compression},
@@ -99,7 +100,10 @@ impl Service<HecRequest> for HecService {
                                 match ack_finalizer_tx.send((ack_id, tx)) {
                                     Ok(_) => rx.await.unwrap_or(EventStatus::Rejected),
                                     // If we cannot send ack ids to the ack client, fall back to default behavior
-                                    Err(_) => EventStatus::Delivered,
+                                    Err(_) => {
+                                        emit!(&SplunkIndexerAcknowledgementUnavailableError);
+                                        EventStatus::Delivered
+                                    }
                                 }
                             } else {
                                 // Default behavior if indexer acknowledgements is disabled
@@ -108,7 +112,7 @@ impl Service<HecRequest> for HecService {
                         }
                         Err(error) => {
                             // This may occur if Splunk changes the response format in future versions.
-                            error!(message = "Unable to parse Splunk HEC response", ?error);
+                            emit!(&SplunkResponseParseError { error });
                             EventStatus::Delivered
                         }
                     }
