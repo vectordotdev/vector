@@ -141,6 +141,18 @@ components: sinks: splunk_hec_logs: {
 				examples: ["${SPLUNK_HEC_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
 			}
 		}
+		timestamp_nanos_key: {
+			common:      false
+			description: """
+				The number of nanoseconds within the event timestamp millisecond will be added to the event
+				at the specified key value. If unset nothing happens.
+				"""
+			required:    false
+			type: string: {
+				default: null
+				examples: ["@timestamp.nanos"]
+			}
+		}
 	}
 
 	input: {

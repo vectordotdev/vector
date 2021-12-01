@@ -33,10 +33,16 @@ pub struct HumioLogsConfig {
     #[serde(default)]
     pub(in crate::sinks::humio) batch: BatchConfig<SplunkHecDefaultBatchSettings>,
     pub(in crate::sinks::humio) tls: Option<TlsOptions>,
+    #[serde(default = "timestamp_nanos_key")]
+    pub(in crate::sinks::humio) timestamp_nanos_key: Option<String>,
 }
 
 inventory::submit! {
     SinkDescription::new::<HumioLogsConfig>("humio_logs")
+}
+
+pub fn timestamp_nanos_key() -> Option<String> {
+    Some("@timestamp.nanos".to_string())
 }
 
 impl GenerateConfig for HumioLogsConfig {
@@ -54,6 +60,7 @@ impl GenerateConfig for HumioLogsConfig {
             request: TowerRequestConfig::default(),
             batch: BatchConfig::default(),
             tls: None,
+            timestamp_nanos_key: None,
         })
         .unwrap()
     }
@@ -87,6 +94,7 @@ impl HumioLogsConfig {
             index: self.index.clone(),
             sourcetype: self.event_type.clone(),
             source: self.source.clone(),
+            timestamp_nanos_key: self.timestamp_nanos_key.clone(),
             encoding: self.encoding.clone().into_encoding(),
             compression: self.compression,
             batch: self.batch,

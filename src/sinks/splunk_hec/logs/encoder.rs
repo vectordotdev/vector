@@ -65,6 +65,7 @@ impl HecLogsEncoder {
     pub fn encode_event(&self, processed_event: HecProcessedEvent) -> Option<Vec<u8>> {
         let log = processed_event.event;
         let metadata = processed_event.metadata;
+
         let event = match self {
             HecLogsEncoder::Json => HecEvent::Json(log),
             HecLogsEncoder::Text => HecEvent::Text(
