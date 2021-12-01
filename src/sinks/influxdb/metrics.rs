@@ -23,8 +23,8 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 use bytes::Bytes;
-use indoc::indoc;
 use futures::{future::BoxFuture, stream, SinkExt};
+use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},

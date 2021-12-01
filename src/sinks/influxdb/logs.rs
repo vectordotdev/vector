@@ -328,7 +328,10 @@ mod tests {
         let bytes = sink.encode_event(event.clone()).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
         let line_protocol = split_line_protocol(string);
-        assert_eq!("host=aws.cloud.eur", line_protocol.1, "metric_type tag should be excluded");
+        assert_eq!(
+            "host=aws.cloud.eur", line_protocol.1,
+            "metric_type tag should be excluded"
+        );
         assert_fields(line_protocol.2.to_string(), ["message=\"hello\""].to_vec());
     }
 
