@@ -56,8 +56,6 @@ mod format_timestamp;
 mod get;
 #[cfg(feature = "get_env_var")]
 mod get_env_var;
-#[cfg(feature = "get_event_metadata")]
-mod get_event_metadata;
 #[cfg(feature = "get_hostname")]
 mod get_hostname;
 #[cfg(feature = "includes")]
@@ -194,8 +192,6 @@ mod reverse_dns;
 mod round;
 #[cfg(feature = "set")]
 mod set;
-#[cfg(feature = "set_event_metadata")]
-mod set_event_metadata;
 #[cfg(feature = "sha1")]
 mod sha1;
 #[cfg(feature = "sha2")]
@@ -315,8 +311,6 @@ pub use format_timestamp::FormatTimestamp;
 pub use get::Get;
 #[cfg(feature = "get_env_var")]
 pub use get_env_var::GetEnvVar;
-#[cfg(feature = "get_event_metadata")]
-pub use get_event_metadata::GetEventMetadata;
 #[cfg(feature = "get_hostname")]
 pub use get_hostname::GetHostname;
 #[cfg(feature = "includes")]
@@ -445,8 +439,6 @@ pub use reverse_dns::ReverseDns;
 pub use round::Round;
 #[cfg(feature = "set")]
 pub use set::Set;
-#[cfg(feature = "set_event_metadata")]
-pub use set_event_metadata::SetEventMetadata;
 #[cfg(feature = "sha2")]
 pub use sha2::Sha2;
 #[cfg(feature = "sha3")]
@@ -558,8 +550,6 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(FormatTimestamp),
         #[cfg(feature = "get")]
         Box::new(Get),
-        #[cfg(feature = "get_event_metadata")]
-        Box::new(GetEventMetadata),
         #[cfg(feature = "get_env_var")]
         Box::new(GetEnvVar),
         #[cfg(feature = "get_hostname")]
@@ -694,8 +684,6 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Round),
         #[cfg(feature = "set")]
         Box::new(Set),
-        #[cfg(feature = "set_event_metadata")]
-        Box::new(SetEventMetadata),
         #[cfg(feature = "sha1")]
         Box::new(Sha1),
         #[cfg(feature = "sha2")]

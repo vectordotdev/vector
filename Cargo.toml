@@ -89,6 +89,7 @@ members = [
   "lib/vrl/stdlib",
   "lib/vrl/tests",
   "lib/vrl/proptests",
+  "lib/vector-vrl-functions",
   "lib/datadog/grok",
   "lib/datadog/search-syntax",
   "lib/soak"
@@ -107,6 +108,7 @@ tracing-limit = { path = "lib/tracing-limit" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
+vector-vrl-functions = { path = "lib/vector-vrl-functions" }
 datadog-search-syntax = { path = "lib/datadog/search-syntax", optional = true }
 
 # Tokio / Futures

@@ -278,6 +278,21 @@ impl vrl_core::Target for VrlTarget {
             _ => Err(format!("key {} not available", key)),
         }
     }
+
+    fn remove_metadata(&mut self, key: &str) -> Result<(), String> {
+        let metadata = match self {
+            VrlTarget::LogEvent(_, metadata) => metadata,
+            VrlTarget::Metric(metric) => metric.metadata_mut(),
+        };
+
+        match key {
+            "datadog_api_key" => {
+                metadata.set_datadog_api_key(None);
+                Ok(())
+            }
+            _ => Err(format!("key {} not available", key)),
+        }
+    }
 }
 
 impl From<Event> for VrlTarget {

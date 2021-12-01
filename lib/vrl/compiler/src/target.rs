@@ -59,4 +59,8 @@ pub trait Target: std::fmt::Debug {
     fn set_metadata(&mut self, _key: &str, _value: String) -> Result<(), String> {
         Err("metadata not available".to_string())
     }
+
+    fn remove_metadata(&mut self, _key: &str) -> Result<(), String> {
+        Err("metadata not available".to_string())
+    }
 }

@@ -1,6 +1,6 @@
 package metadata
 
-remap: functions: set_event_metadata: {
+remap: functions: set_metadata_field: {
 	category: "System"
 	description: """
 		Sets the given field in the event metadata to the provided value.
@@ -9,14 +9,17 @@ remap: functions: set_event_metadata: {
 	arguments: [
 		{
 			name:        "key"
-			description: "The name of the key to set in the metadata."
+			description: "The name of the field to set in the metadata."
 			required:    true
 			enum: {
-				"datadog_api_key": "The Datadog api key."
+				"datadog_api_key": '''
+					    The Datadog API key.
+					    This field will be used by the  `datadog_*` sinks as the API key to send the events with.
+					'''
 			}
 			type: ["string"]
 		},
-                {
+		{
 			name:        "value"
 			description: "The value to set the field to."
 			required:    true
@@ -29,11 +32,11 @@ remap: functions: set_event_metadata: {
 
 	examples: [
 		{
-			title: "Get the Datadog API key from the event metadata."
+			title: "Set the Datadog API key in the event metadata to the given value."
 			source: #"""
-				get_event_metadata!("datadog_api_key")
+				set_metadata_field!("datadog_api_key", "abc122")
 				"""#
-			return: "abc123"
+			return: "null"
 		},
 	]
 }

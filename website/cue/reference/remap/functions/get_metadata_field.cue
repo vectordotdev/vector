@@ -1,6 +1,6 @@
 package metadata
 
-remap: functions: get_event_metadata: {
+remap: functions: get_metadata_field: {
 	category: "System"
 	description: """
 		Returns the value of the given field from the event metadata.
@@ -8,11 +8,16 @@ remap: functions: get_event_metadata: {
 
 	arguments: [
 		{
-			name:        "key"
-			description: "The name of the key to look up in the metadata."
-			required:    true
+			name: "key"
+			description: '''
+				   The name of the field to look up in the metadata.
+				'''
+			required: true
 			enum: {
-				"datadog_api_key": "The Datadog api key."
+				"datadog_api_key": '''
+					   The Datadog API key.
+					   This exists if the `store_api_key` setting is true in the `datadog_agent` source.
+					'''
 			}
 			type: ["string"]
 		},
@@ -25,7 +30,7 @@ remap: functions: get_event_metadata: {
 		{
 			title: "Get the Datadog API key from the event metadata."
 			source: #"""
-				get_event_metadata!("datadog_api_key")
+				get_metadata_field!("datadog_api_key")
 				"""#
 			return: "abc123"
 		},
