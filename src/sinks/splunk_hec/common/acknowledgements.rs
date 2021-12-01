@@ -13,7 +13,9 @@ use tokio::sync::{mpsc::UnboundedReceiver, oneshot::Sender};
 use vector_core::event::EventStatus;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default)]
 pub struct HecClientAcknowledgementsConfig {
+    pub indexer_acknowledgements_enabled: bool,
     pub query_interval: NonZeroU8,
     pub retry_limit: NonZeroU8,
 }
@@ -21,14 +23,11 @@ pub struct HecClientAcknowledgementsConfig {
 impl Default for HecClientAcknowledgementsConfig {
     fn default() -> Self {
         Self {
+            indexer_acknowledgements_enabled: true,
             query_interval: NonZeroU8::new(10).unwrap(),
             retry_limit: NonZeroU8::new(30).unwrap(),
         }
     }
-}
-
-pub fn default_hec_client_acknowledgements_config() -> Option<HecClientAcknowledgementsConfig> {
-    Some(Default::default())
 }
 
 #[derive(Deserialize, Serialize, Eq, PartialEq, Debug)]

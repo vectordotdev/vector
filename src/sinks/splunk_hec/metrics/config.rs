@@ -102,7 +102,7 @@ impl HecMetricsSinkConfig {
             .service(HecService::new(
                 client,
                 http_request_builder,
-                Some(self.acknowledgements.clone()),
+                self.acknowledgements.clone(),
             ));
 
         let batch_settings = self.batch.into_batcher_settings()?;

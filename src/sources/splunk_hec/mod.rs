@@ -1010,7 +1010,7 @@ mod tests {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Some(Default::default()),
+            acknowledgements: Default::default(),
         }
         .build(SinkContext::new_test())
         .await

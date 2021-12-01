@@ -28,7 +28,6 @@ use vector_core::event::EventStatus;
 pub struct HecService {
     pub batch_service:
         HttpBatchService<BoxFuture<'static, Result<Request<Vec<u8>>, crate::Error>>, HecRequest>,
-    // Optional to turn off indexer acknowledgement behavior in Humio sinks
     ack_finalizer_tx: Option<UnboundedSender<(u64, Sender<EventStatus>)>>,
 }
 
@@ -42,12 +41,12 @@ impl HecService {
     pub fn new(
         client: HttpClient,
         http_request_builder: HttpRequestBuilder,
-        indexer_acknowledgements: Option<HecClientAcknowledgementsConfig>,
+        indexer_acknowledgements: HecClientAcknowledgementsConfig,
     ) -> Self {
         let event_client = client.clone();
         let ack_client = client;
         let http_request_builder = Arc::new(http_request_builder);
-        let tx = indexer_acknowledgements.map(|indexer_acknowledgements| {
+        let tx = if indexer_acknowledgements.indexer_acknowledgements_enabled {
             let (tx, rx) = mpsc::unbounded_channel();
             tokio::spawn(run_acknowledgements(
                 rx,
@@ -55,8 +54,10 @@ impl HecService {
                 Arc::clone(&http_request_builder),
                 indexer_acknowledgements,
             ));
-            tx
-        });
+            Some(tx)
+        } else {
+            None
+        };
 
         let batch_service = HttpBatchService::new(event_client, move |req: HecRequest| {
             let request_builder = Arc::clone(&http_request_builder);
@@ -217,7 +218,7 @@ mod tests {
         let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
         let http_request_builder =
             HttpRequestBuilder::new(endpoint, String::from(TOKEN), Compression::default());
-        HecService::new(client, http_request_builder, Some(acknowledgements_config))
+        HecService::new(client, http_request_builder, acknowledgements_config)
     }
 
     fn get_hec_request() -> HecRequest {
@@ -328,6 +329,7 @@ mod tests {
         let acknowledgements_config = HecClientAcknowledgementsConfig {
             query_interval: NonZeroU8::new(1).unwrap(),
             retry_limit: NonZeroU8::new(1).unwrap(),
+            ..Default::default()
         };
         let mut service = get_hec_service(mock_server.uri(), acknowledgements_config);
 
@@ -347,6 +349,7 @@ mod tests {
         let acknowledgements_config = HecClientAcknowledgementsConfig {
             query_interval: NonZeroU8::new(1).unwrap(),
             retry_limit: NonZeroU8::new(3).unwrap(),
+            ..Default::default()
         };
         let mut service = get_hec_service(mock_server.uri(), acknowledgements_config);
 
@@ -363,6 +366,7 @@ mod tests {
         let acknowledgements_config = HecClientAcknowledgementsConfig {
             query_interval: NonZeroU8::new(1).unwrap(),
             retry_limit: NonZeroU8::new(3).unwrap(),
+            ..Default::default()
         };
         let mut service = get_hec_service(mock_server.uri(), acknowledgements_config);
 
@@ -401,6 +405,7 @@ mod tests {
         let acknowledgements_config = HecClientAcknowledgementsConfig {
             query_interval: NonZeroU8::new(1).unwrap(),
             retry_limit: NonZeroU8::new(1).unwrap(),
+            ..Default::default()
         };
         let mut service = get_hec_service(mock_server.uri(), acknowledgements_config);
 
