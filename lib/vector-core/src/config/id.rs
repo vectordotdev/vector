@@ -17,7 +17,7 @@ impl ComponentKey {
         &self.id
     }
 
-    pub fn create_child(&self, name: &str) -> Self {
+    pub fn join<D: fmt::Display>(&self, name: D) -> Self {
         Self {
             id: format!("{}.{}", self.id, name),
         }

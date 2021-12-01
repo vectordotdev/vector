@@ -465,7 +465,7 @@ impl TransformOuter<String> {
             let mut inputs = self.inputs.clone();
 
             for (name, content) in expanded {
-                let full_name = key.create_child(name.as_str());
+                let full_name = key.join(name);
 
                 let child = TransformOuter {
                     inputs,
