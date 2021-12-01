@@ -9,16 +9,16 @@ remap: functions: remove_metadata_field: {
 	arguments: [
 		{
 			name: "key"
-			description: '''
-				   The name of the field to look up in the metadata.
-				'''
+			description: """
+				The name of the field to look up in the metadata.
+				"""
 			required: true
 			enum: {
-				"datadog_api_key": '''
-					   The Datadog API key.
+				datadog_api_key: """
+					The Datadog API key.
 
-					   This field will be used by the  `datadog_*` sinks as the API key to send the events with.
-					'''
+					This field will be used by the  `datadog_*` sinks as the API key to send the events with.
+					"""
 			}
 			type: ["string"]
 		},

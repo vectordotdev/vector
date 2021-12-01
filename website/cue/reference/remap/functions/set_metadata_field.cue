@@ -12,11 +12,11 @@ remap: functions: set_metadata_field: {
 			description: "The name of the field to set in the metadata."
 			required:    true
 			enum: {
-				"datadog_api_key": '''
-					    The Datadog API key.
+				datadog_api_key: """
+					The Datadog API key.
 
-					    This field will be used by the  `datadog_*` sinks as the API key to send the events with.
-					'''
+					This field will be used by the  `datadog_*` sinks as the API key to send the events with.
+					"""
 			}
 			type: ["string"]
 		},

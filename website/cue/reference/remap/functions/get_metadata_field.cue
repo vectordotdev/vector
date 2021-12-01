@@ -9,16 +9,16 @@ remap: functions: get_metadata_field: {
 	arguments: [
 		{
 			name: "key"
-			description: '''
-				   The name of the field to look up in the metadata.
-				'''
+			description: """
+				The name of the field to look up in the metadata.
+				"""
 			required: true
 			enum: {
-				"datadog_api_key": '''
-					   The Datadog API key.
+				datadog_api_key: """
+					The Datadog API key.
 
-					   This exists if the `store_api_key` setting is true in the `datadog_agent` source.
-					'''
+					This exists if the `store_api_key` setting is true in the `datadog_agent` source.
+					"""
 			}
 			type: ["string"]
 		},
