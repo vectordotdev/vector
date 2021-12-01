@@ -1,5 +1,4 @@
 use crate::{
-    buffers::Acker,
     config::{
         DataType, SinkConfig, SinkContext, SinkDescription
     },
@@ -8,28 +7,30 @@ use crate::{
     },
     http::HttpClient,
     sinks::util::{
+        SinkBatchSettings,
         service::ServiceBuilderExt,
         builder::SinkBuilderExt,
         retries::RetryLogic,
-        batch::{
-            BatchError, BatchSize
-        },
         encoding::{
             Encoder, EncodingConfigFixed
         },
-        Batch, PushResult, BatchConfig, BatchSettings, Compression, TowerRequestConfig, StreamSink, RequestBuilder
+        BatchConfig, Compression, TowerRequestConfig, StreamSink, RequestBuilder
     },
     tls::TlsSettings,
 };
 use hyper::Body;
 use tracing::Instrument;
 use vector_core::{
-    stream::BatcherSettings,
-    partition::NullPartitioner,
+    stream::{
+        BatcherSettings, DriverResponse
+    },
     event::{
         EventStatus, Finalizable, EventFinalizers
     },
-    buffers::Ackable
+    internal_event::EventsSent,
+    buffers::{
+        Ackable, Acker
+    }
 };
 use async_trait::async_trait;
 use futures::{
@@ -63,7 +64,8 @@ use std::{
         Context, Poll
     },
     num::NonZeroUsize,
-    sync::Arc
+    sync::Arc,
+    num::NonZeroU64
 };
 use tower::{
     Service, ServiceBuilder
@@ -355,56 +357,17 @@ impl std::error::Error for NewRelicSinkError {
     }
 }
 
-#[derive(Debug)]
-pub struct NewRelicBuffer {
-    buffer: Vec<Event>,
-    max_size: BatchSize<Self>
-}
-
-impl NewRelicBuffer {
-    pub const fn new(max_size: BatchSize<Self>) -> Self {
-        Self {
-            buffer: Vec::new(),
-            max_size
-        }
-    }
-}
-
-impl Batch for NewRelicBuffer {
-    type Input = Event;
-    type Output = Vec<Event>;
-
-    fn get_settings_defaults(
-        _config: BatchConfig,
-        defaults: BatchSettings<Self>,
-    ) -> Result<BatchSettings<Self>, BatchError> {
-        Ok(defaults)
-    }
-
-    fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
-        self.buffer.push(item);
-        PushResult::Ok(self.buffer.len() > self.max_size.events)
-    }
-
-    fn is_empty(&self) -> bool {
-        self.buffer.is_empty()
-    }
-
-    fn fresh(&self) -> Self {
-        Self::new(self.max_size.clone())
-    }
-
-    fn finish(self) -> Self::Output {
-        self.buffer
-    }
-
-    fn num_items(&self) -> usize {
-        self.buffer.len()
-    }
-}
-
 inventory::submit! {
     SinkDescription::new::<NewRelicConfig>("new_relic")
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct NewRelicDefaultBatchSettings;
+
+impl SinkBatchSettings for NewRelicDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(100);
+    const MAX_BYTES: Option<usize> = Some(1_000_000);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -422,7 +385,7 @@ pub struct NewRelicConfig {
     )]
     pub encoding: EncodingConfigFixed<Encoding>,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<NewRelicDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig
 }
@@ -456,16 +419,21 @@ pub struct NewRelicApiService {
 }
 
 #[derive(Debug)]
-pub enum NewRelicApiResponse {
-    Ok,
-    NotOk,
+pub struct NewRelicApiResponse {
+    event_status: EventStatus,
+    count: usize,
+    events_byte_size: usize
 }
 
-impl AsRef<EventStatus> for NewRelicApiResponse {
-    fn as_ref(&self) -> &EventStatus {
-        match self {
-            NewRelicApiResponse::Ok => &EventStatus::Delivered,
-            NewRelicApiResponse::NotOk => &EventStatus::Errored,
+impl DriverResponse for NewRelicApiResponse {
+    fn event_status(&self) -> EventStatus {
+        self.event_status
+    }
+
+    fn events_sent(&self) -> EventsSent {
+        EventsSent {
+            count: self.count,
+            byte_size: self.events_byte_size,
         }
     }
 }
@@ -497,14 +465,19 @@ impl Service<NewRelicApiRequest> for NewRelicApiService {
             http_request
         };
 
+        let payload_len = request.payload.len();
         let http_request = http_request
-            .header(CONTENT_LENGTH, request.payload.len())
+            .header(CONTENT_LENGTH, payload_len)
             .body(Body::from(request.payload))
             .expect("building HTTP request failed unexpectedly");
 
         Box::pin(async move {
             match client.call(http_request).in_current_span().await {
-                Ok(_) => Ok(NewRelicApiResponse::Ok),
+                Ok(_) => Ok(NewRelicApiResponse {
+                    event_status: EventStatus::Delivered,
+                    count: request.batch_size,
+                    events_byte_size: payload_len,
+                }),
                 Err(_) => Err(NewRelicSinkError::new("HTTP request error"))
             }
         })
@@ -564,10 +537,9 @@ impl SinkConfig for NewRelicConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let encoding = self.encoding.clone();
 
-        let batcher_settings = BatchSettings::<NewRelicBuffer>::default()
-            .events(self.batch.max_events.unwrap_or(50))
-            .timeout(self.batch.timeout_secs.unwrap_or(30))
-            .parse_config(self.batch)?
+        let batcher_settings = self.batch
+            .validate()?
+            .limit_max_events(self.batch.max_events.unwrap_or(50))?
             .into_batcher_settings()?;
 
         let request_limits = self.request.unwrap_with(&Default::default());
@@ -698,11 +670,10 @@ impl<S> NewRelicSink<S>
 where
     S: Service<NewRelicApiRequest> + Send + 'static,
     S::Future: Send + 'static,
-    S::Response: AsRef<EventStatus> + Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
     S::Error: Debug + Into<crate::Error> + Send,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let partitioner = NullPartitioner::new();
         let builder_limit = NonZeroUsize::new(64);
         let request_builder = NewRelicRequestBuilder {
             encoding: self.encoding,
@@ -711,8 +682,7 @@ where
         };
 
         let sink = input
-            .batched(partitioner, self.batcher_settings)
-            .map(|(_, batch)| batch)
+            .batched(self.batcher_settings.into_byte_size_config())
             .request_builder(builder_limit, request_builder)
             .filter_map(|request: Result<NewRelicApiRequest, std::io::Error>| async move {
                 match request {
@@ -734,13 +704,14 @@ impl<S> StreamSink for NewRelicSink<S>
 where
     S: Service<NewRelicApiRequest> + Send + 'static,
     S::Future: Send + 'static,
-    S::Response: AsRef<EventStatus> + Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
     S::Error: Debug + Into<crate::Error> + Send,
 {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }
 }
+
 
 #[cfg(test)]
 mod tests {
