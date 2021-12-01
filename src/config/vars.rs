@@ -5,25 +5,17 @@ use std::collections::HashMap;
 pub fn interpolate(input: &str, vars: &HashMap<String, String>) -> (String, Vec<String>) {
     let mut warnings = Vec::new();
     // Environment variable names can have any characters from the Portable Character Set other
-    // than NUL
-    //
-    // For simplicity, we just let them be anything **other** than:
-    //
-    // * Whitespace when the form $FOO is used. This lets us delimit the end of the variable name.
-    // * A colon, dash, or right-bracket when the form ${FOO} or ${FOO:-default} is used. This is
-    //   similar to shell handling of environment variables.
-    //
-    // This is somewhat a hybrid of what is generally supported and what shells support for
-    // environment variable names. It isn't exactly correct, but should support all uses in
-    // practice.
+    // than NUL.  However, for Vector's intepolation, we are closer to what a shell supports which
+    // is solely of uppercase letters, digits, and the '_' (that is, the `[:word:]` regex class).
+    // In addition to these characters, we allow `.` as this commonly appears in environment
+    // variable names when they come from a Java properties file.
     //
     // https://pubs.opengroup.org/onlinepubs/000095399/basedefs/xbd_chap08.html
     let re = Regex::new(
         r"(?x)
         \$\$|
-        \$([^{[:space:]=][^[:space:]=]+)|
-        \$\{([^}=:\-]+)(?::-([^}]+)?)?\}
-        ",
+        \$([[:word:]-.]+)|
+        \$\{([[:word:]-.]+)(?::-([^}]+)?)?\}",
     )
     .unwrap();
     let interpolated = re
@@ -69,7 +61,7 @@ mod test {
         assert_eq!("$FOO", interpolate("$$FOO", &vars).0);
         assert_eq!("dogs=bar", interpolate("$FOO=bar", &vars).0);
         assert_eq!("", interpolate("$NOT_FOO", &vars).0);
-        assert_eq!("", interpolate("$FOO-BAR", &vars).0);
+        assert_eq!("-FOO", interpolate("$NOT-FOO", &vars).0);
         assert_eq!("turtles", interpolate("$FOO.BAR", &vars).0);
         assert_eq!("${FOO x", interpolate("${FOO x", &vars).0);
         assert_eq!("${}", interpolate("${}", &vars).0);
