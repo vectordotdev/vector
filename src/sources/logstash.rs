@@ -562,7 +562,7 @@ mod test {
 
     #[tokio::test]
     async fn test_failed() {
-        test_protocol(EventStatus::Failed, false).await;
+        test_protocol(EventStatus::Rejected, false).await;
     }
 
     async fn test_protocol(status: EventStatus, sends_ack: bool) {

@@ -766,14 +766,14 @@ mod tests {
 
     #[tokio::test]
     async fn ack_failed_without_chunk() {
-        let (result, output) = check_acknowledgements(EventStatus::Failed, false).await;
+        let (result, output) = check_acknowledgements(EventStatus::Rejected, false).await;
         assert_eq!(result.unwrap().unwrap(), output.len());
         assert!(output.is_empty());
     }
 
     #[tokio::test]
     async fn ack_failed_with_chunk() {
-        let (result, output) = check_acknowledgements(EventStatus::Failed, true).await;
+        let (result, output) = check_acknowledgements(EventStatus::Rejected, true).await;
         assert_eq!(result.unwrap().unwrap(), output.len());
         assert_eq!(output, &b"{}"[..]);
     }
