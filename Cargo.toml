@@ -764,7 +764,7 @@ splunk-integration-tests = ["sinks-splunk_hec", "warp"]
 dnstap-integration-tests = ["sources-dnstap"]
 
 disable-resolv-conf = []
-shutdown-tests = ["rdkafka", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-log_to_metric", "transforms-lua", "unix"]
+shutdown-tests = ["rdkafka", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sinks-splunk_hec", "sources", "transforms-log_to_metric", "transforms-lua", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
 
 # grouping together features for benchmarks
