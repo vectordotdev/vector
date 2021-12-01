@@ -16,6 +16,7 @@ remap: functions: get_metadata_field: {
 			enum: {
 				"datadog_api_key": '''
 					   The Datadog API key.
+
 					   This exists if the `store_api_key` setting is true in the `datadog_agent` source.
 					'''
 			}
