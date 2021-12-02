@@ -1,6 +1,9 @@
 use super::sketch_parser::decode_ddsketch;
 use crate::{
-    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
+    codecs::{
+        self,
+        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+    },
     common::datadog::{DatadogMetricType, DatadogSeriesMetric},
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
@@ -14,7 +17,7 @@ use crate::{
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::{
         self,
-        util::{ErrorMessage, TcpError},
+        util::{ErrorMessage, StreamDecodingError},
     },
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
@@ -54,7 +57,7 @@ pub struct DatadogAgentConfig {
     #[serde(default = "default_framing_message_based")]
     framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
-    decoding: Box<dyn ParserConfig>,
+    decoding: Box<dyn DeserializerConfig>,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -220,7 +223,7 @@ impl DatadogAgentSource {
                             StatusCode::INTERNAL_SERVER_ERROR,
                             "Error delivering contents to sink".into(),
                         ))),
-                        BatchStatus::Failed => Err(warp::reject::custom(ErrorMessage::new(
+                        BatchStatus::Rejected => Err(warp::reject::custom(ErrorMessage::new(
                             StatusCode::BAD_REQUEST,
                             "Contents failed to deliver to sink".into(),
                         ))),
@@ -616,7 +619,7 @@ struct LogMsg {
 mod tests {
     use super::{DatadogAgentConfig, DatadogAgentSource, DatadogSeriesRequest, LogMsg};
     use crate::{
-        codecs::{self, BytesCodec, BytesParser},
+        codecs::{self, BytesDecoder, BytesDeserializer},
         common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
         config::{log_schema, SourceConfig, SourceContext},
         event::{
@@ -665,8 +668,10 @@ mod tests {
             let body = Bytes::from(serde_json::to_string(&msgs).unwrap());
             let api_key = None;
 
-            let decoder =
-                codecs::Decoder::new(Box::new(BytesCodec::new()), Box::new(BytesParser::new()));
+            let decoder = codecs::Decoder::new(
+                Box::new(BytesDecoder::new()),
+                Box::new(BytesDeserializer::new()),
+            );
             let source = DatadogAgentSource::new(true, decoder, "http");
             let events = source.decode_log_body(body, api_key).unwrap();
             assert_eq!(events.len(), msgs.len());
@@ -1036,7 +1041,7 @@ mod tests {
     #[tokio::test]
     async fn delivery_failure() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Failed, true, true).await;
+        let (rx, addr) = source(EventStatus::Rejected, true, true).await;
 
         spawn_collect_n(
             async move {
@@ -1069,7 +1074,7 @@ mod tests {
     #[tokio::test]
     async fn ignores_disabled_acknowledgements() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Failed, false, true).await;
+        let (rx, addr) = source(EventStatus::Rejected, false, true).await;
 
         let events = spawn_collect_n(
             async move {

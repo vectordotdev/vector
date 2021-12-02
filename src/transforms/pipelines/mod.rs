@@ -67,6 +67,7 @@ use crate::config::{
 use crate::transforms::Transform;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 inventory::submit! {
     TransformDescription::new::<PipelinesConfig>("pipelines")
@@ -79,6 +80,13 @@ pub struct PipelineConfig {
     name: String,
     filter: Option<AnyCondition>,
     transforms: Vec<Box<dyn TransformConfig>>,
+}
+
+#[cfg(test)]
+impl PipelineConfig {
+    pub fn transforms(&self) -> &Vec<Box<dyn TransformConfig>> {
+        &self.transforms
+    }
 }
 
 impl Clone for PipelineConfig {
@@ -123,6 +131,17 @@ pub struct EventTypeConfig {
     pipelines: IndexMap<String, PipelineConfig>,
 }
 
+#[cfg(test)]
+impl EventTypeConfig {
+    pub const fn order(&self) -> &Option<Vec<String>> {
+        &self.order
+    }
+
+    pub const fn pipelines(&self) -> &IndexMap<String, PipelineConfig> {
+        &self.pipelines
+    }
+}
+
 impl EventTypeConfig {
     fn is_empty(&self) -> bool {
         self.pipelines.is_empty()
@@ -164,6 +183,17 @@ pub struct PipelinesConfig {
     logs: EventTypeConfig,
     #[serde(default)]
     metrics: EventTypeConfig,
+}
+
+#[cfg(test)]
+impl PipelinesConfig {
+    pub const fn logs(&self) -> &EventTypeConfig {
+        &self.logs
+    }
+
+    pub const fn metrics(&self) -> &EventTypeConfig {
+        &self.metrics
+    }
 }
 
 impl PipelinesConfig {
@@ -218,6 +248,11 @@ impl TransformConfig for PipelinesConfig {
     fn transform_type(&self) -> &'static str {
         "pipelines"
     }
+
+    /// The pipelines transform shouldn't be embedded in another pipelines transform.
+    fn nestable(&self, parents: &HashSet<&'static str>) -> bool {
+        !parents.contains(&self.transform_type())
+    }
 }
 
 impl GenerateConfig for PipelinesConfig {
@@ -265,6 +300,7 @@ mod tests {
     use super::{GenerateConfig, PipelinesConfig};
     use crate::config::{ComponentKey, TransformOuter};
     use indexmap::IndexMap;
+    use std::collections::HashSet;
 
     #[test]
     fn generate_config() {
@@ -290,11 +326,12 @@ mod tests {
             inputs: Vec::<String>::new(),
             inner: Box::new(config),
         };
-        let name = ComponentKey::global("foo");
+        let name = ComponentKey::from("foo");
         let mut transforms = IndexMap::new();
         let mut expansions = IndexMap::new();
+        let parents = HashSet::new();
         outer
-            .expand(name, &mut transforms, &mut expansions)
+            .expand(name, &parents, &mut transforms, &mut expansions)
             .unwrap();
         assert_eq!(
             transforms

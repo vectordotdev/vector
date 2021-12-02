@@ -1,6 +1,6 @@
-use super::StatsdParser;
+use super::StatsdDeserializer;
 use crate::{
-    codecs::{Decoder, NewlineDelimitedCodec},
+    codecs::{Decoder, NewlineDelimitedDecoder},
     shutdown::ShutdownSignal,
     sources::util::build_unix_stream_source,
     sources::Source,
@@ -16,8 +16,8 @@ pub struct UnixConfig {
 
 pub fn statsd_unix(config: UnixConfig, shutdown: ShutdownSignal, out: Pipeline) -> Source {
     let decoder = Decoder::new(
-        Box::new(NewlineDelimitedCodec::new()),
-        Box::new(StatsdParser),
+        Box::new(NewlineDelimitedDecoder::new()),
+        Box::new(StatsdDeserializer),
     );
 
     build_unix_stream_source(

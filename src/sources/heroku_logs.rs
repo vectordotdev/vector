@@ -1,5 +1,8 @@
 use crate::{
-    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
+    codecs::{
+        self,
+        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+    },
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
         SourceContext, SourceDescription,
@@ -8,7 +11,7 @@ use crate::{
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::util::{
-        add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig, TcpError,
+        add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig, StreamDecodingError,
     },
     tls::TlsConfig,
 };
@@ -36,7 +39,7 @@ pub struct LogplexConfig {
     #[serde(default = "default_framing_message_based")]
     framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
-    decoding: Box<dyn ParserConfig>,
+    decoding: Box<dyn DeserializerConfig>,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -401,7 +404,7 @@ mod tests {
     async fn logplex_handles_failures() {
         let auth = make_auth();
 
-        let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Failed, true).await;
+        let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Rejected, true).await;
 
         let events = spawn_collect_n(
             async move {
@@ -423,7 +426,7 @@ mod tests {
     async fn logplex_ignores_disabled_acknowledgements() {
         let auth = make_auth();
 
-        let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Failed, false).await;
+        let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Rejected, false).await;
 
         let events = spawn_collect_n(
             async move {

@@ -32,6 +32,7 @@ mod graph;
 mod id;
 mod loading;
 pub mod provider;
+mod recursive;
 mod unit_test;
 mod validation;
 mod vars;
@@ -40,7 +41,7 @@ pub mod watcher;
 pub use builder::ConfigBuilder;
 pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
-pub use id::{ComponentKey, ComponentScope, OutputId};
+pub use id::{ComponentKey, OutputId};
 pub use loading::{
     load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
     merge_path_lists, process_paths, CONFIG_PATHS,
@@ -439,26 +440,38 @@ impl TransformOuter<String> {
     pub(crate) fn expand(
         mut self,
         key: ComponentKey,
+        parent_types: &HashSet<&'static str>,
         transforms: &mut IndexMap<ComponentKey, TransformOuter<String>>,
         expansions: &mut IndexMap<ComponentKey, Vec<ComponentKey>>,
     ) -> Result<(), String> {
+        if !self.inner.nestable(parent_types) {
+            return Err(format!(
+                "the component {} cannot be nested in {:?}",
+                self.inner.transform_type(),
+                parent_types
+            ));
+        }
+
         let expansion = self
             .inner
             .expand()
             .map_err(|err| format!("failed to expand transform '{}': {}", key, err))?;
+
+        let mut ptypes = parent_types.clone();
+        ptypes.insert(self.inner.transform_type());
 
         if let Some((expanded, expand_type)) = expansion {
             let mut children = Vec::new();
             let mut inputs = self.inputs.clone();
 
             for (name, content) in expanded {
-                let full_name = ComponentKey::global(format!("{}.{}", key, name));
+                let full_name = key.join(name);
 
                 let child = TransformOuter {
                     inputs,
                     inner: content,
                 };
-                child.expand(full_name.clone(), transforms, expansions)?;
+                child.expand(full_name.clone(), &ptypes, transforms, expansions)?;
                 children.push(full_name.clone());
 
                 inputs = match expand_type {
@@ -1137,5 +1150,51 @@ mod resource_tests {
             Some(Format::Toml),
         )
         .is_err());
+    }
+}
+
+#[cfg(all(
+    test,
+    feature = "sources-stdin",
+    feature = "sinks-console",
+    feature = "transforms-pipelines",
+    feature = "transforms-filter"
+))]
+mod pipelines_tests {
+    use super::{load_from_str, Format};
+    use indoc::indoc;
+
+    #[test]
+    fn forbid_pipeline_nesting() {
+        let res = load_from_str(
+            indoc! {r#"
+                [sources.in]
+                  type = "stdin"
+
+                [transforms.processing]
+                  inputs = ["in"]
+                  type = "pipelines"
+
+                  [transforms.processing.logs.pipelines.foo]
+                    name = "foo"
+
+                    [[transforms.processing.logs.pipelines.foo.transforms]]
+                      type = "pipelines"
+
+                      [transforms.processing.logs.pipelines.foo.transforms.logs.pipelines.bar]
+                        name = "bar"
+
+                          [[transforms.processing.logs.pipelines.foo.transforms.logs.pipelines.bar.transforms]]
+                            type = "filter"
+                            condition = ""
+
+                [sinks.out]
+                  type = "console"
+                  inputs = ["processing"]
+                  encoding = "json"
+            "#},
+            Some(Format::Toml),
+        );
+        assert!(res.is_err(), "should error");
     }
 }

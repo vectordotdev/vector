@@ -1,5 +1,8 @@
 use crate::{
-    codecs::{self, FramingConfig, ParserConfig},
+    codecs::{
+        self,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
     config::log_schema,
     event::Event,
     internal_events::{SocketEventsReceived, SocketMode},
@@ -35,7 +38,7 @@ pub struct TcpConfig {
     framing: Option<Box<dyn FramingConfig>>,
     #[serde(default = "default_decoding")]
     #[getset(get = "pub", set = "pub")]
-    decoding: Box<dyn ParserConfig>,
+    decoding: Box<dyn DeserializerConfig>,
 }
 
 const fn default_shutdown_timeout_secs() -> u64 {
@@ -52,7 +55,7 @@ impl TcpConfig {
         tls: Option<TlsConfig>,
         receive_buffer_bytes: Option<usize>,
         framing: Option<Box<dyn FramingConfig>>,
-        decoding: Box<dyn ParserConfig>,
+        decoding: Box<dyn DeserializerConfig>,
     ) -> Self {
         Self {
             address,
@@ -95,7 +98,7 @@ impl RawTcpSource {
 }
 
 impl TcpSource for RawTcpSource {
-    type Error = codecs::Error;
+    type Error = codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
     type Decoder = codecs::Decoder;
 

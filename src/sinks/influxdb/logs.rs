@@ -8,7 +8,6 @@ use crate::{
             InfluxDb1Settings, InfluxDb2Settings, ProtocolVersion,
         },
         util::{
-            encode_namespace,
             encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpSink},
             BatchConfig, Buffer, Compression, SinkBatchSettings, TowerRequestConfig,
@@ -38,7 +37,8 @@ impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbLogsConfig {
-    pub namespace: String,
+    pub namespace: Option<String>,
+    pub measurement: Option<String>,
     pub endpoint: String,
     #[serde(default)]
     pub tags: Vec<String>,
@@ -63,7 +63,7 @@ struct InfluxDbLogsSink {
     uri: Uri,
     token: String,
     protocol_version: ProtocolVersion,
-    namespace: String,
+    measurement: String,
     tags: HashSet<String>,
     encoding: EncodingConfig<Encoding>,
 }
@@ -98,6 +98,7 @@ impl GenerateConfig for InfluxDbLogsConfig {
 #[typetag::serde(name = "influxdb_logs")]
 impl SinkConfig for InfluxDbLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let measurement = self.get_measurement()?;
         let mut tags: HashSet<String> = self.tags.clone().into_iter().collect();
         tags.insert(log_schema().host_key().to_string());
         tags.insert(log_schema().source_type_key().to_string());
@@ -123,13 +124,12 @@ impl SinkConfig for InfluxDbLogsConfig {
 
         let token = settings.token();
         let protocol_version = settings.protocol_version();
-        let namespace = self.namespace.clone();
 
         let sink = InfluxDbLogsSink {
             uri,
             token,
             protocol_version,
-            namespace,
+            measurement,
             tags,
             encoding: self.encoding.clone().into(),
         };
@@ -165,14 +165,6 @@ impl HttpSink for InfluxDbLogsSink {
         self.encoding.apply_rules(&mut event);
         let mut event = event.into_log();
 
-        // Measurement
-        let name = "vector";
-        let measurement = encode_namespace(
-            Some(self.namespace.as_str()).filter(|namespace| !namespace.is_empty()),
-            '.',
-            name,
-        );
-
         // Timestamp
         let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key()) {
             Some(Value::Timestamp(ts)) => Some(ts),
@@ -193,7 +185,7 @@ impl HttpSink for InfluxDbLogsSink {
         let mut output = String::new();
         if let Err(error) = influx_line_protocol(
             self.protocol_version,
-            &measurement,
+            &self.measurement,
             "logs",
             Some(tags),
             Some(fields),
@@ -217,6 +209,25 @@ impl HttpSink for InfluxDbLogsSink {
 }
 
 impl InfluxDbLogsConfig {
+    fn get_measurement(&self) -> Result<String, &'static str> {
+        match (self.measurement.as_ref(), self.namespace.as_ref()) {
+            (Some(measure), Some(_)) => {
+                warn!("Option `namespace` has been superseded by `measurement`.");
+                Ok(measure.clone())
+            }
+            (Some(measure), None) => Ok(measure.clone()),
+            (None, Some(namespace)) => {
+                warn!(
+                    "Option `namespace` has been deprecated. Use `measurement` instead. \
+                       For example, you can use `measurement=<namespace>.vector` for the \
+                       same effect."
+                );
+                Ok(format!("{}.vector", namespace))
+            }
+            (None, None) => Err("The `measurement` option is required."),
+        }
+    }
+
     fn healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
         let config = self.clone();
 
@@ -278,6 +289,17 @@ mod tests {
     }
 
     #[test]
+    fn test_config_measurement_from_namespace() {
+        let config = indoc! {r#"
+            namespace = "ns"
+            endpoint = "http://localhost:9999"
+        "#};
+
+        let sink_config = toml::from_str::<InfluxDbLogsConfig>(config).unwrap();
+        assert_eq!("ns.vector", sink_config.get_measurement().unwrap());
+    }
+
+    #[test]
     fn test_encode_event_apply_rules() {
         let mut event = Event::from("hello");
         event.as_mut_log().insert("host", "aws.cloud.eur");
@@ -287,7 +309,7 @@ mod tests {
             "http://localhost:9999",
             "my-token",
             ProtocolVersion::V1,
-            "ns",
+            "vector",
             vec![],
         );
         sink.encoding.except_fields = Some(vec!["host".into()]);
@@ -296,7 +318,7 @@ mod tests {
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(string);
-        assert_eq!("ns.vector", line_protocol.0);
+        assert_eq!("vector", line_protocol.0);
         assert_eq!("metric_type=logs", line_protocol.1);
         assert_fields(line_protocol.2.to_string(), ["message=\"hello\""].to_vec());
         assert_eq!("1542182950000000011\n", line_protocol.3);
@@ -318,7 +340,7 @@ mod tests {
             "http://localhost:9999",
             "my-token",
             ProtocolVersion::V1,
-            "ns",
+            "vector",
             ["source_type", "host"].to_vec(),
         );
 
@@ -326,7 +348,7 @@ mod tests {
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(string);
-        assert_eq!("ns.vector", line_protocol.0);
+        assert_eq!("vector", line_protocol.0);
         assert_eq!(
             "host=aws.cloud.eur,metric_type=logs,source_type=file",
             line_protocol.1
@@ -362,7 +384,7 @@ mod tests {
             "http://localhost:9999",
             "my-token",
             ProtocolVersion::V2,
-            "ns",
+            "vector",
             ["source_type", "host"].to_vec(),
         );
 
@@ -370,7 +392,7 @@ mod tests {
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(string);
-        assert_eq!("ns.vector", line_protocol.0);
+        assert_eq!("vector", line_protocol.0);
         assert_eq!(
             "host=aws.cloud.eur,metric_type=logs,source_type=file",
             line_protocol.1
@@ -401,7 +423,7 @@ mod tests {
             "http://localhost:9999",
             "my-token",
             ProtocolVersion::V2,
-            "ns",
+            "vector",
             [].to_vec(),
         );
 
@@ -409,7 +431,7 @@ mod tests {
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(string);
-        assert_eq!("ns.vector", line_protocol.0);
+        assert_eq!("vector", line_protocol.0);
         assert_eq!("metric_type=logs", line_protocol.1);
         assert_fields(
             line_protocol.2.to_string(),
@@ -438,7 +460,7 @@ mod tests {
             "http://localhost:9999",
             "my-token",
             ProtocolVersion::V2,
-            "ns",
+            "vector",
             [].to_vec(),
         );
 
@@ -446,7 +468,7 @@ mod tests {
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(string);
-        assert_eq!("ns.vector", line_protocol.0);
+        assert_eq!("vector", line_protocol.0);
         assert_eq!("metric_type=logs", line_protocol.1);
         assert_fields(
             line_protocol.2,
@@ -475,7 +497,7 @@ mod tests {
             "http://localhost:9999",
             "my-token",
             ProtocolVersion::V2,
-            "ns",
+            "vector",
             ["as_a_tag", "not_exists_field", "source_type"].to_vec(),
         );
 
@@ -483,7 +505,7 @@ mod tests {
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(string);
-        assert_eq!("ns.vector", line_protocol.0);
+        assert_eq!("vector", line_protocol.0);
         assert_eq!(
             "as_a_tag=10,metric_type=logs,source_type=file",
             line_protocol.1
@@ -512,7 +534,7 @@ mod tests {
         smoke_test(
             r#"database = "my-database""#,
             StatusCode::BAD_REQUEST,
-            BatchStatus::Failed,
+            BatchStatus::Rejected,
         )
         .await;
     }
@@ -545,7 +567,7 @@ mod tests {
             token = "my-token"
         "#},
             StatusCode::BAD_REQUEST,
-            BatchStatus::Failed,
+            BatchStatus::Rejected,
         )
         .await;
     }
@@ -557,7 +579,7 @@ mod tests {
     ) -> Receiver {
         let config = format!(
             indoc! {r#"
-            namespace = "ns"
+            measurement = "vector"
             endpoint = "http://localhost:9999"
             {}
         "#},
@@ -627,9 +649,9 @@ mod tests {
     }
 
     fn assert_line_protocol(i: i64, value: Option<&str>) {
-        //ns.vector,metric_type=logs key0="value0",message="message_value" 1000000000
+        //vector,metric_type=logs key0="value0",message="message_value" 1000000000
         let line_protocol = split_line_protocol(value.unwrap());
-        assert_eq!("ns.vector", line_protocol.0);
+        assert_eq!("vector", line_protocol.0);
         assert_eq!("metric_type=logs,source_type=file", line_protocol.1);
         assert_fields(
             line_protocol.2.to_string(),
@@ -647,18 +669,18 @@ mod tests {
         uri: &str,
         token: &str,
         protocol_version: ProtocolVersion,
-        namespace: &str,
+        measurement: &str,
         tags: Vec<&str>,
     ) -> InfluxDbLogsSink {
         let uri = uri.parse::<Uri>().unwrap();
         let token = token.to_string();
-        let namespace = namespace.to_string();
+        let measurement = measurement.to_string();
         let tags: HashSet<String> = tags.into_iter().map(|tag| tag.to_string()).collect();
         InfluxDbLogsSink {
             uri,
             token,
             protocol_version,
-            namespace,
+            measurement,
             tags,
             encoding: EncodingConfigWithDefault::default().into(),
         }
@@ -686,12 +708,13 @@ mod integration_tests {
     async fn influxdb2_logs_put_data() {
         onboarding_v2().await;
 
-        let ns = format!("ns-{}", Utc::now().timestamp_nanos());
+        let measure = format!("vector-{}", Utc::now().timestamp_nanos());
 
         let cx = SinkContext::new_test();
 
         let config = InfluxDbLogsConfig {
-            namespace: ns.clone(),
+            namespace: None,
+            measurement: Some(measure.clone()),
             endpoint: "http://localhost:9999".to_string(),
             tags: Default::default(),
             influxdb1_settings: None,
@@ -727,7 +750,7 @@ mod integration_tests {
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let mut body = std::collections::HashMap::new();
-        body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"{}.vector\")", ns.clone()));
+        body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"{}\")", measure.clone()));
         body.insert("type", "flux".to_owned());
 
         let client = reqwest::Client::builder()
@@ -757,7 +780,7 @@ mod integration_tests {
                 .position(|&r| r.trim() == "_measurement")
                 .unwrap()]
             .trim(),
-            format!("{}.vector", ns.clone())
+            measure.clone()
         );
         assert_eq!(
             record2[header
@@ -765,7 +788,7 @@ mod integration_tests {
                 .position(|&r| r.trim() == "_measurement")
                 .unwrap()]
             .trim(),
-            format!("{}.vector", ns.clone())
+            measure.clone()
         );
 
         // tags

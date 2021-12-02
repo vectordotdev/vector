@@ -1,6 +1,7 @@
 use crate::config::{ComponentKey, GlobalOptions};
 use async_trait::async_trait;
 use indexmap::IndexMap;
+use std::collections::HashSet;
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum DataType {
@@ -61,6 +62,12 @@ pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone 
     }
 
     fn transform_type(&self) -> &'static str;
+
+    /// Allows to detect if a transform can be embedded in another transform.
+    /// It's used by the pipelines transform for now.
+    fn nestable(&self, _parents: &HashSet<&'static str>) -> bool {
+        true
+    }
 
     /// Allows a transform configuration to expand itself into multiple "child"
     /// transformations to replace it. This allows a transform to act as a macro
