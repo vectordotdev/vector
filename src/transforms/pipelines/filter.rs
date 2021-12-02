@@ -60,13 +60,11 @@ pub struct PipelineFilter {
 }
 
 impl DispatchFunctionTransform for PipelineFilter {
-    fn transform(&mut self, outputs: &mut IndexMap<String, Vec<Event>>, event: Event) {
-        let output = if self.condition.check(&event) {
-            outputs.get_mut("truthy")
+    fn transform(&mut self, outputs: &mut Vec<(String, Event)>, event: Event) {
+        if self.condition.check(&event) {
+            outputs.push(("truthy".to_owned(), event));
         } else {
-            outputs.get_mut("falsy")
-        };
-        let output = output.expect("invalid named output");
-        output.push(event);
+            outputs.push(("falsy".to_owned(), event));
+        }
     }
 }

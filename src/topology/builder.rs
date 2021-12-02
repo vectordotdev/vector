@@ -348,7 +348,7 @@ pub async fn build_pieces(
                 let mut output_fans = IndexMap::new();
                 let mut output_controls = IndexMap::new();
                 let output_names = named_outputs.clone();
-                for name in output_names.iter() {
+                for (name, _) in output_names.iter() {
                     let (output, control) = Fanout::new();
                     output_fans.insert(name.clone(), output);
                     output_controls.insert(name.clone(), control);
@@ -376,39 +376,25 @@ pub async fn build_pieces(
                         });
 
                         // TODO: optimize the creation of buffers
-                        let mut output_bufs = output_names
-                            .iter()
-                            .map(|name| (name.clone(), Vec::with_capacity(events.len())))
-                            .collect::<IndexMap<_, _>>();
-                        let mut bufs = output_names
-                            .iter()
-                            .map(|name| (name.clone(), Vec::with_capacity(1)))
-                            .collect::<IndexMap<_, _>>();
+                        let mut output_bufs = Vec::with_capacity(output_names.len() * events.len());
+                        let mut bufs = Vec::with_capacity(output_names.len());
 
                         for v in events {
                             t.transform(&mut bufs, v);
 
-                            for (name, buf) in output_bufs.iter_mut() {
-                                if let Some(out) = bufs.get_mut(name) {
-                                    buf.append(out);
-                                }
-                            }
+                            output_bufs.append(&mut bufs);
                         }
 
                         // TODO: account for error outputs separately?
-                        let (count, byte_size) =
-                            output_bufs.values().fold((0, 0), |(c, b), output| {
-                                (c + output.len(), b + output.size_of())
-                            });
+                        let (count, byte_size) = output_bufs
+                            .iter()
+                            .fold((0, 0), |(c, b), output| (c + 1, b + output.1.size_of()));
 
                         timer.start_wait();
 
-                        for (name, output_buf) in output_bufs {
+                        for (name, event) in output_bufs {
                             if let Some(output) = output_fans.get_mut(&name) {
-                                for event in output_buf {
-                                    output.feed(event).await.expect("unit error");
-                                }
-                                output.flush().await.expect("unit error");
+                                output.feed(event).await.expect("unit error");
                             }
                         }
 

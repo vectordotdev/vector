@@ -44,12 +44,11 @@ impl TransformConfig for EventRouterConfig {
 pub struct EventRouter;
 
 impl DispatchFunctionTransform for EventRouter {
-    fn transform(&mut self, outputs: &mut IndexMap<String, Vec<Event>>, event: Event) {
-        let output = match event {
-            Event::Log(_) => outputs.get_mut("logs"),
-            Event::Metric(_) => outputs.get_mut("metrics"),
+    fn transform(&mut self, output: &mut Vec<(String, Event)>, event: Event) {
+        let name = match event {
+            Event::Log(_) => "logs".to_owned(),
+            Event::Metric(_) => "metrics".to_owned(),
         };
-        let output = output.expect("named output not available");
-        output.push(event);
+        output.push((name, event));
     }
 }
