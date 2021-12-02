@@ -208,7 +208,7 @@ impl ComponentsQuery {
 
     /// Gets a configured component by component_key
     async fn component_by_component_key(&self, component_id: String) -> Option<Component> {
-        let key = ComponentKey::global(&component_id);
+        let key = ComponentKey::from(component_id);
         component_by_component_key(&key)
     }
 }

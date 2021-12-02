@@ -42,8 +42,6 @@ fetch_index_past_warmup = csv['fetch_index'] > args.warmup_seconds
 csv = csv[fetch_index_past_warmup]
 csv['value'] = csv['value'].div(args.vector_cpus)
 
-adjust_per_cpu = lambda b: b/args.vector_cpus
-
 # Use Tukey's method to detect values that sit 1.5 times outside the IQR.
 def total_outliers(df):
     q1 = df['value'].quantile(0.25)
@@ -69,11 +67,6 @@ for exp in csv.experiment.unique():
 
     baseline_outliers = total_outliers(baseline)
     comparison_outliers = total_outliers(comparison)
-    trim = 0.0
-    if baseline_outliers + comparison_outliers > 0:
-        # When we have outliers we perform Yuen's test instead, dropping 10% of
-        # the data to remove the more extreme results.
-        trim = 0.1
 
     # The t-test here is calculating whether the expected mean of our two
     # distributions is equal, or, put another way, whether the samples we have
@@ -85,7 +78,13 @@ for exp in csv.experiment.unique():
     # samples actually have the same mean -- are from the same distribution --
     # and so there's some statistically interesting difference between the two
     # samples. For our purposes here that implies that performance has changed.
-    res = scipy.stats.ttest_ind(baseline['value'], comparison['value'], equal_var=False, trim=trim)
+    res = scipy.stats.ttest_ind_from_stats(baseline_mean,
+                                           baseline_stdev,
+                                           len(baseline),
+                                           comparison_mean,
+                                           comparison_stdev,
+                                           len(comparison),
+                                           equal_var=False)
     ttest_results.append({'experiment': exp,
                           'Δ mean': diff.mean(),
                           'Δ mean %': percent_change,
@@ -122,7 +121,7 @@ changes = changes.drop(labels=['t-statistic', 'p-value', 'baseline mean',
                                'comparison outlier percentage',
                                'comparison stdev'], axis=1)
 changes = changes[changes['Δ mean %'].abs() > args.mean_drift_percentage].sort_values('Δ mean', ascending=False)
-changes['Δ mean'] = changes['Δ mean'].apply(adjust_per_cpu).apply(human_bytes)
+changes['Δ mean'] = changes['Δ mean'].apply(human_bytes)
 if len(changes) > 0:
     print("")
     print("This table lists those experiments that have experienced a", end=' ')
@@ -140,11 +139,11 @@ print("<details>")
 print("<summary>Fine details of change detection per experiment.</summary>")
 print("")
 ttest_results = ttest_results.sort_values('Δ mean', ascending=False)
-ttest_results['Δ mean'] = ttest_results['Δ mean'].apply(adjust_per_cpu).apply(human_bytes)
-ttest_results['baseline mean'] = ttest_results['baseline mean'].apply(adjust_per_cpu).apply(human_bytes)
-ttest_results['baseline stdev'] = ttest_results['baseline stdev'].apply(adjust_per_cpu).apply(human_bytes)
-ttest_results['comparison mean'] = ttest_results['comparison mean'].apply(adjust_per_cpu).apply(human_bytes)
-ttest_results['comparison stdev'] = ttest_results['comparison stdev'].apply(adjust_per_cpu).apply(human_bytes)
+ttest_results['Δ mean'] = ttest_results['Δ mean'].apply(human_bytes)
+ttest_results['baseline mean'] = ttest_results['baseline mean'].apply(human_bytes)
+ttest_results['baseline stdev'] = ttest_results['baseline stdev'].apply(human_bytes)
+ttest_results['comparison mean'] = ttest_results['comparison mean'].apply(human_bytes)
+ttest_results['comparison stdev'] = ttest_results['comparison stdev'].apply(human_bytes)
 print(ttest_results.to_markdown(index=False, tablefmt='github'))
 print("</details>")
 
@@ -155,14 +154,14 @@ describe = csv.groupby(['experiment', 'variant'])['value'].describe(percentiles=
 describe = describe.rename(columns={'50%': 'average', '95%': 'p95', '90%': 'p90', '99%': 'p99'})
 describe = describe.sort_values('mean', ascending=False)
 describe['skewness'] = csv.groupby(['experiment', 'variant'])['value'].skew()
-describe['mean'] = describe['mean'].apply(adjust_per_cpu).apply(human_bytes)
-describe['std'] = describe['std'].apply(adjust_per_cpu).apply(human_bytes)
-describe['min'] = describe['min'].apply(adjust_per_cpu).apply(human_bytes)
-describe['average'] = describe['average'].apply(adjust_per_cpu).apply(human_bytes)
-describe['p90'] = describe['p90'].apply(adjust_per_cpu).apply(human_bytes)
-describe['p95'] = describe['p95'].apply(adjust_per_cpu).apply(human_bytes)
-describe['p99'] = describe['p99'].apply(adjust_per_cpu).apply(human_bytes)
-describe['max'] = describe['max'].apply(adjust_per_cpu).apply(human_bytes)
+describe['mean'] = describe['mean'].apply(human_bytes)
+describe['std'] = describe['std'].apply(human_bytes)
+describe['min'] = describe['min'].apply(human_bytes)
+describe['average'] = describe['average'].apply(human_bytes)
+describe['p90'] = describe['p90'].apply(human_bytes)
+describe['p95'] = describe['p95'].apply(human_bytes)
+describe['p99'] = describe['p99'].apply(human_bytes)
+describe['max'] = describe['max'].apply(human_bytes)
 print(describe.to_markdown(index=True,
                            tablefmt='github',
                            headers=['(experiment, variant)', 'total samples',
