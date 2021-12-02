@@ -14,8 +14,8 @@ pub fn interpolate(input: &str, vars: &HashMap<String, String>) -> (String, Vec<
     let re = Regex::new(
         r"(?x)
         \$\$|
-        \$([[:word:]-.]+)|
-        \$\{([[:word:]-.]+)(?::-([^}]+)?)?\}",
+        \$([[:word:].]+)|
+        \$\{([[:word:].]+)(?::-([^}]+)?)?\}",
     )
     .unwrap();
     let interpolated = re
