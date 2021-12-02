@@ -516,7 +516,6 @@ urls: {
 	vector_generate_arguments_issue:                          "\(vector_repo)/issues/1966"
 	vector_guides:                                            "/guides/"
 	vector_glibc_benchmarks:                                  "\(vector_repo)/issues/2313"
-	vector_graphql_playground:                                "https://playground.vector.dev:8686/playground"
 	vector_highlights:                                        "/highlights/"
 	vector_host_metrics_source:                               "/docs/reference/configuration/sources/host_metrics"
 	vector_http_auth_token:                                   "/docs/reference/configuration/sinks/http/#token"
