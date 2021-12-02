@@ -49,7 +49,7 @@ where
         let index = self.index.as_ref();
         let indexed_fields = self.indexed_fields.as_slice();
         let host = self.host.as_ref();
-        let timestamp_nanos_key = self.timestamp_nanos_key.as_ref();
+        let timestamp_nanos_key = self.timestamp_nanos_key.as_deref();
 
         let builder_limit = NonZeroUsize::new(64);
         let sink = input
@@ -127,7 +127,7 @@ pub fn process_log(
     index: Option<&Template>,
     host_key: &str,
     indexed_fields: &[String],
-    timestamp_nanos_key: Option<&String>,
+    timestamp_nanos_key: Option<&str>,
 ) -> Option<HecProcessedEvent> {
     let sourcetype =
         sourcetype.and_then(|sourcetype| render_template_string(sourcetype, &log, "sourcetype"));

@@ -66,7 +66,7 @@ fn get_processed_event() -> HecProcessedEvent {
         index.as_ref(),
         "host_key",
         indexed_fields.as_slice(),
-        timestamp_nanos_key.as_ref(),
+        timestamp_nanos_key.as_deref(),
     )
     .unwrap()
 }
