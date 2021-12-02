@@ -188,13 +188,13 @@ impl<'a> Filter<'a, Value> for Query {
         }
     }
 
-    fn equals(&'a self, field: Field, to_match: String) -> Box<dyn Matcher<Value>> {
+    fn equals(&'a self, field: Field, to_match: &str) -> Box<dyn Matcher<Value>> {
         let buf = self.buf(&field);
 
         match field {
             // Default fields are compared by word boundary.
             Field::Default(_) => {
-                let re = word_regex(&to_match);
+                let re = word_regex(to_match);
 
                 resolve_value(
                     buf,
@@ -205,15 +205,19 @@ impl<'a> Filter<'a, Value> for Query {
                 )
             }
             // A literal "tags" field should match by key.
-            Field::Reserved(f) if f == "tags" => resolve_value(
-                buf,
-                Run::boxed(move |value| match value {
-                    Value::Array(v) => {
-                        v.contains(&Value::Bytes(Bytes::copy_from_slice(to_match.as_bytes())))
-                    }
-                    _ => false,
-                }),
-            ),
+            Field::Reserved(f) if f == "tags" => {
+                let to_match = to_match.to_owned();
+
+                resolve_value(
+                    buf,
+                    Run::boxed(move |value| match value {
+                        Value::Array(v) => {
+                            v.contains(&Value::Bytes(Bytes::copy_from_slice(to_match.as_bytes())))
+                        }
+                        _ => false,
+                    }),
+                )
+            }
             // Individual tags are compared by element key:value.
             Field::Tag(tag) => {
                 let value_bytes = Value::Bytes(format!("{}:{}", tag, to_match).into());
@@ -227,14 +231,18 @@ impl<'a> Filter<'a, Value> for Query {
                 )
             }
             // Everything else is matched by string equality.
-            _ => resolve_value(
-                buf,
-                Run::boxed(move |value| string_value(value) == to_match),
-            ),
+            _ => {
+                let to_match = to_match.to_owned();
+
+                resolve_value(
+                    buf,
+                    Run::boxed(move |value| string_value(value) == to_match),
+                )
+            }
         }
     }
 
-    fn prefix(&'a self, field: Field, prefix: String) -> Box<dyn Matcher<Value>> {
+    fn prefix(&'a self, field: Field, prefix: &str) -> Box<dyn Matcher<Value>> {
         let buf = self.buf(&field);
 
         match field {
@@ -262,19 +270,23 @@ impl<'a> Filter<'a, Value> for Query {
                 )
             }
             // All other field types are compared by complete value.
-            _ => resolve_value(
-                buf,
-                Run::boxed(move |value| string_value(value).starts_with(&prefix)),
-            ),
+            _ => {
+                let prefix = prefix.to_owned();
+
+                resolve_value(
+                    buf,
+                    Run::boxed(move |value| string_value(value).starts_with(&prefix)),
+                )
+            }
         }
     }
 
-    fn wildcard(&'a self, field: Field, wildcard: String) -> Box<dyn Matcher<Value>> {
+    fn wildcard(&'a self, field: Field, wildcard: &str) -> Box<dyn Matcher<Value>> {
         let buf = self.buf(&field);
 
         match field {
             Field::Default(_) => {
-                let re = word_regex(&wildcard);
+                let re = word_regex(wildcard);
 
                 resolve_value(
                     buf,
@@ -413,103 +425,6 @@ fn resolve_value(buf: LookupBuf, match_fn: Box<dyn Matcher<Value>>) -> Box<dyn M
     Run::boxed(func)
 }
 
-// fn build_matcher(node: &QueryNode) -> Box<dyn Matcher> {
-//     match node {
-//         QueryNode::MatchNoDocs => Box::new(false),
-//         QueryNode::MatchAllDocs => Box::new(true),
-//         QueryNode::AttributeExists { attr } => {
-//             let queries = attr_to_lookup_fields(attr)
-//                 .into_iter()
-//                 .map(|(field, buf)| resolve_value(buf, build_exists(field)))
-//                 .collect::<Vec<_>>();
-//
-//             any(queries)
-//         }
-//         QueryNode::AttributeMissing { attr } => {
-//             let queries = attr_to_lookup_fields(attr)
-//                 .into_iter()
-//                 .map(|(field, buf)| build_not(resolve_value(buf, build_exists(field))))
-//                 .collect::<Vec<_>>();
-//
-//             all(queries)
-//         }
-//         QueryNode::AttributeTerm { attr, value }
-//         | QueryNode::QuotedAttribute {
-//             attr,
-//             phrase: value,
-//         } => {
-//             let queries = attr_to_lookup_fields(attr)
-//                 .into_iter()
-//                 .map(|(field, buf)| resolve_value(buf, build_equals(field, value.clone())))
-//                 .collect::<Vec<_>>();
-//
-//             any(queries)
-//         }
-//         QueryNode::AttributeComparison {
-//             attr,
-//             comparator,
-//             value,
-//         } => {
-//             let queries = attr_to_lookup_fields(attr)
-//                 .into_iter()
-//                 .map(|(field, buf)| resolve_value(buf, compare(field, *comparator, value.clone())))
-//                 .collect::<Vec<_>>();
-//
-//             any(queries)
-//         }
-//         QueryNode::AttributePrefix { attr, prefix } => {
-//             let queries = attr_to_lookup_fields(attr)
-//                 .into_iter()
-//                 .map(|(field, buf)| resolve_value(buf, wildcard_with_prefix(field, prefix.clone())))
-//                 .collect::<Vec<_>>();
-//
-//             any(queries)
-//         }
-//         QueryNode::AttributeWildcard { attr, wildcard } => {
-//             let queries = attr_to_lookup_fields(attr)
-//                 .into_iter()
-//                 .map(|(field, buf)| resolve_value(buf, build_wildcard(field, wildcard)))
-//                 .collect::<Vec<_>>();
-//
-//             any(queries)
-//         }
-//         QueryNode::AttributeRange {
-//             attr,
-//             lower,
-//             lower_inclusive,
-//             upper,
-//             upper_inclusive,
-//         } => {
-//             let queries = attr_to_lookup_fields(attr)
-//                 .into_iter()
-//                 .map(|(field, buf)| {
-//                     resolve_value(
-//                         buf,
-//                         range(
-//                             field,
-//                             lower.clone(),
-//                             *lower_inclusive,
-//                             upper.clone(),
-//                             *upper_inclusive,
-//                         ),
-//                     )
-//                 })
-//                 .collect::<Vec<_>>();
-//
-//             any(queries)
-//         }
-//         QueryNode::NegatedNode { node } => build_not(build_matcher(node)),
-//         QueryNode::Boolean { oper, nodes } => {
-//             let funcs = nodes.iter().map(build_matcher).collect::<Vec<_>>();
-//
-//             match oper {
-//                 BooleanType::And => all(funcs),
-//                 BooleanType::Or => any(funcs),
-//             }
-//         }
-//     }
-// }
-//
 /// Returns compiled word boundary regex. Cached to avoid recompilation in hot paths.
 fn word_regex(to_match: &str) -> Regex {
     Regex::new(&format!(

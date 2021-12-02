@@ -11,13 +11,13 @@ pub trait Filter<'a, V: std::fmt::Debug + Send + Sync + Clone + 'static>: DynClo
     fn exists(&'a self, field: Field) -> Box<dyn Matcher<V>>;
 
     /// Determine whether a field value equals `to_match`.
-    fn equals(&'a self, field: Field, to_match: String) -> Box<dyn Matcher<V>>;
+    fn equals(&'a self, field: Field, to_match: &str) -> Box<dyn Matcher<V>>;
 
     /// Determine whether a value starts with a prefix.
-    fn prefix(&'a self, field: Field, prefix: String) -> Box<dyn Matcher<V>>;
+    fn prefix(&'a self, field: Field, prefix: &str) -> Box<dyn Matcher<V>>;
 
     /// Determine whether a value matches a wilcard.
-    fn wildcard(&'a self, field: Field, wildcard: String) -> Box<dyn Matcher<V>>;
+    fn wildcard(&'a self, field: Field, wildcard: &str) -> Box<dyn Matcher<V>>;
 
     /// Compare a field value against `comparison_value`, using one of the `comparator` operators.
     fn compare(
@@ -149,7 +149,7 @@ where
             let matchers = f
                 .build_fields(attr)
                 .into_iter()
-                .map(|field| f.equals(field, value.clone()))
+                .map(|field| f.equals(field, value))
                 .collect::<Vec<_>>();
 
             any(matchers)
@@ -158,7 +158,7 @@ where
             let matchers = f
                 .build_fields(attr)
                 .into_iter()
-                .map(|field| f.prefix(field, prefix.clone()))
+                .map(|field| f.prefix(field, prefix))
                 .collect::<Vec<_>>();
 
             any(matchers)
@@ -167,7 +167,7 @@ where
             let matchers = f
                 .build_fields(attr)
                 .into_iter()
-                .map(|field| f.wildcard(field, wildcard.clone()))
+                .map(|field| f.wildcard(field, wildcard))
                 .collect::<Vec<_>>();
 
             any(matchers)
