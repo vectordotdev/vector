@@ -852,12 +852,14 @@ mod integration_tests {
     use crate::config::{SourceConfig, SourceContext};
     use crate::docker::Container;
     use crate::sources::fluent::FluentConfig;
-    use crate::test_util::{collect_ready, next_addr_for_ip, trace_init, wait_for_tcp};
+    use crate::test_util::{
+        collect_ready, next_addr, next_addr_for_ip, random_string, trace_init, wait_for_tcp,
+    };
     use crate::Pipeline;
-    use futures::channel::mpsc;
+    use futures::Stream;
     use std::{fs::File, io::Write, net::SocketAddr, time::Duration};
     use tokio::time::sleep;
-    use vector_core::event::Event;
+    use vector_core::event::{Event, EventStatus};
 
     const FLUENT_BIT_IMAGE: &str = "fluent/fluent-bit";
     const FLUENT_BIT_TAG: &str = "1.7";
@@ -873,9 +875,19 @@ mod integration_tests {
 
     #[tokio::test]
     async fn fluentbit() {
+        test_fluentbit(EventStatus::Delivered).await;
+    }
+
+    #[tokio::test]
+    async fn fluentbit_rejection() {
+        test_fluentbit(EventStatus::Rejected).await;
+    }
+
+    async fn test_fluentbit(status: EventStatus) {
         trace_init();
 
-        let (out, address) = source().await;
+        let test_address = next_addr();
+        let (out, source_address) = source(status).await;
 
         let dir = make_file(
             "fluent-bit.conf",
@@ -887,109 +899,131 @@ mod integration_tests {
     Daemon     off
 
 [INPUT]
-    Name       dummy
+    Name       http
+    Host       {listen_host}
+    Port       {listen_port}
 
 [OUTPUT]
     Name          forward
     Match         *
     Host          host.docker.internal
-    Port          {}
+    Port          {send_port}
+    Require_ack_response true
 "#,
-                address.port()
+                listen_host = test_address.ip(),
+                listen_port = test_address.port(),
+                send_port = source_address.port(),
             ),
         );
+
+        let msg = random_string(64);
+        let body = serde_json::json!({ "message": msg });
 
         let events = Container::new(FLUENT_BIT_IMAGE, FLUENT_BIT_TAG)
             .bind(dir.path().display(), "/fluent-bit/etc")
             .run(async move {
+                wait_for_tcp(test_address).await;
+                reqwest::Client::new()
+                    .post(&format!("http://{}/", test_address))
+                    .header("content-type", "application/json")
+                    .body(body.to_string())
+                    .send()
+                    .await
+                    .unwrap();
+                sleep(Duration::from_secs(2)).await;
+                let result = collect_ready(out).await;
+                result
+            })
+            .await;
+
+        assert_eq!(events.len(), 1);
+        let log = events[0].as_log();
+        assert_eq!(log["tag"], "http.0".into());
+        assert_eq!(log["message"], msg.into());
+        assert!(log.get("timestamp").is_some());
+        assert!(log.get("host").is_some());
+    }
+
+    #[tokio::test]
+    async fn fluentd() {
+        test_fluentd(EventStatus::Delivered, "").await;
+    }
+
+    #[tokio::test]
+    async fn fluentd_gzip() {
+        test_fluentd(EventStatus::Delivered, "compress gzip").await;
+    }
+
+    #[tokio::test]
+    async fn fluentd_rejection() {
+        test_fluentd(EventStatus::Rejected, "").await;
+    }
+
+    async fn test_fluentd(status: EventStatus, options: &str) {
+        trace_init();
+
+        let test_address = next_addr();
+        let (out, source_address) = source(status).await;
+
+        let config = format!(
+            r#"
+<source>
+  @type http
+  bind {http_host}
+  port {http_port}
+</source>
+
+<match *>
+  @type forward
+  <server>
+    name  local
+    host  host.docker.internal
+    port  {port}
+  </server>
+  <buffer>
+    flush_mode immediate
+  </buffer>
+  require_ack_response true
+  ack_response_timeout 1
+  {options}
+</match>
+"#,
+            http_host = test_address.ip(),
+            http_port = test_address.port(),
+            port = source_address.port(),
+            options = options
+        );
+
+        let dir = make_file("fluent.conf", &config);
+
+        let msg = random_string(64);
+        let body = serde_json::json!({ "message": msg });
+
+        let events = Container::new(FLUENTD_IMAGE, FLUENTD_TAG)
+            .bind(dir.path().display(), "/fluentd/etc")
+            .run(async move {
+                wait_for_tcp(test_address).await;
+                reqwest::Client::new()
+                    .post(&format!("http://{}/", test_address))
+                    .header("content-type", "application/json")
+                    .body(body.to_string())
+                    .send()
+                    .await
+                    .unwrap();
                 sleep(Duration::from_secs(2)).await;
                 collect_ready(out).await
             })
             .await;
 
-        assert!(!events.is_empty());
-        assert_eq!(events[0].as_log()["tag"], "dummy.0".into());
-        assert_eq!(events[0].as_log()["message"], "dummy".into());
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].as_log()["tag"], "".into());
+        assert_eq!(events[0].as_log()["message"], msg.into());
         assert!(events[0].as_log().get("timestamp").is_some());
         assert!(events[0].as_log().get("host").is_some());
     }
 
-    #[tokio::test]
-    async fn fluentd() {
-        let config = r#"
-<source>
-  @type dummy
-  dummy {"message": "dummy"}
-  tag dummy
-</source>
-
-<match *>
-  @type forward
-  <server>
-    name  local
-    host  host.docker.internal
-    port  PORT
-  </server>
-  <buffer>
-    flush_mode immediate
-  </buffer>
-</match>
-"#;
-        test_fluentd(config).await;
-    }
-
-    #[tokio::test]
-    async fn fluentd_gzip() {
-        let config = r#"
-<source>
-  @type dummy
-  dummy {"message": "dummy"}
-  tag dummy
-</source>
-
-<match *>
-  @type forward
-  <server>
-    name  local
-    host  host.docker.internal
-    port  PORT
-  </server>
-  <buffer>
-    flush_mode immediate
-  </buffer>
-  compress gzip
-</match>
-"#;
-        test_fluentd(config).await;
-    }
-
-    async fn test_fluentd(config: &str) {
-        trace_init();
-
-        let (out, address) = source().await;
-
-        let dir = make_file(
-            "fluent.conf",
-            &config.replace("PORT", &address.port().to_string()),
-        );
-
-        let events = Container::new(FLUENTD_IMAGE, FLUENTD_TAG)
-            .bind(dir.path().display(), "/fluentd/etc")
-            .run(async move {
-                sleep(Duration::from_secs(5)).await;
-                collect_ready(out).await
-            })
-            .await;
-
-        assert!(!events.is_empty());
-        assert_eq!(events[0].as_log()["tag"], "dummy".into());
-        assert_eq!(events[0].as_log()["message"], "dummy".into());
-        assert!(events[0].as_log().get("timestamp").is_some());
-        assert!(events[0].as_log().get("host").is_some());
-    }
-
-    async fn source() -> (mpsc::Receiver<Event>, SocketAddr) {
-        let (sender, recv) = Pipeline::new_test();
+    async fn source(status: EventStatus) -> (impl Stream<Item = Event>, SocketAddr) {
+        let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
         tokio::spawn(async move {
             FluentConfig {
