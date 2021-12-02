@@ -83,13 +83,14 @@ pub fn parse_grok_rules(
 }
 
 /// The result of parsing grok rules - pure grok definitions, which can be feed directly to the grok,
-/// and rule filters to post-process extracted fields
+/// and grok fields, that will be extracted, with their filters
 #[derive(Debug, Clone)]
 struct ParsedGrokRule {
     pub definition: String,
     pub fields: HashMap<String, GrokField>,
 }
 
+/// A grok field, that should be extracted, with its lookup path and post-processing filters to apply.
 #[derive(Debug, Clone)]
 pub struct GrokField {
     pub lookup: LookupBuf,
@@ -295,7 +296,7 @@ fn index_repeated_fields(grok_patterns: Vec<GrokPattern>) -> Vec<GrokPattern> {
 /// # Arguments
 ///
 /// - `pattern` - a parsed grok pattern
-/// - `filters` - post-processing filters that need to be applied after grok parsing
+/// - `fields` - grok fields with their filters
 /// - `aliases` - all aliases and their definitions
 /// - `parsed_aliases` - aliases that have already been parsed
 /// - `inflight_parsed_aliases` - names of the aliases that are being currently parsed(aliases can refer to other aliases) to catch circular dependencies
@@ -381,7 +382,7 @@ impl Destination {
 
 /// Process a match function from a given pattern:
 /// - returns a grok expression(a grok pattern or a regular expression) corresponding to a given match function
-/// - some match functions(e.g. number) implicitly introduce a filter to be applied to an extracted value - stores it to `filters`.
+/// - some match functions(e.g. number) implicitly introduce a filter to be applied to an extracted value - stores it to `fields`.
 fn resolves_match_function(
     fields: &mut HashMap<String, GrokField>,
     pattern: &ast::GrokPattern,
