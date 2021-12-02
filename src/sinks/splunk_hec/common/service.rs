@@ -13,27 +13,24 @@ use http::Request;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::Arc,
     task::{Context, Poll},
 };
 use tokio::sync::{
     mpsc::{self},
-    oneshot,
+    oneshot, OwnedSemaphorePermit, Semaphore,
 };
+use tokio_util::sync::PollSemaphore;
 use tower::{Service, ServiceExt};
 use uuid::Uuid;
 use vector_core::event::EventStatus;
 
-#[derive(Clone)]
 pub struct HecService {
     pub batch_service:
         HttpBatchService<BoxFuture<'static, Result<Request<Vec<u8>>, crate::Error>>, HecRequest>,
     ack_finalizer_tx: Option<mpsc::Sender<(u64, oneshot::Sender<EventStatus>)>>,
-    max_pending_acks: u64,
-    max_pending_acks_reached: Arc<AtomicBool>,
+    ack_slots: PollSemaphore,
+    current_ack_slot: Option<OwnedSemaphorePermit>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -73,11 +70,23 @@ impl HecService {
                 });
             future
         });
+        let ack_slots = PollSemaphore::new(Arc::new(Semaphore::new(max_pending_acks as usize)));
         Self {
             batch_service,
             ack_finalizer_tx: tx,
-            max_pending_acks,
-            max_pending_acks_reached: Arc::new(AtomicBool::new(false)),
+            ack_slots,
+            current_ack_slot: None,
+        }
+    }
+}
+
+impl Clone for HecService {
+    fn clone(&self) -> Self {
+        Self {
+            batch_service: self.batch_service.clone(),
+            ack_finalizer_tx: self.ack_finalizer_tx.clone(),
+            ack_slots: self.ack_slots.clone(),
+            current_ack_slot: None,
         }
     }
 }
@@ -87,19 +96,33 @@ impl Service<HecRequest> for HecService {
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self, _cx: &mut Context) -> std::task::Poll<Result<(), Self::Error>> {
-        if self.max_pending_acks_reached.load(Ordering::Relaxed) {
-            Poll::Pending
-        } else {
+    fn poll_ready(&mut self, cx: &mut Context) -> std::task::Poll<Result<(), Self::Error>> {
+        // Ready if indexer acknowledgements is disabled or there is room for
+        // additional pending acks. Otherwise, wait until there is room.
+        if self.ack_finalizer_tx.is_none() {
             Poll::Ready(Ok(()))
+        } else {
+            match self.ack_slots.poll_acquire(cx) {
+                Poll::Ready(Some(permit)) => {
+                    if self.current_ack_slot.replace(permit).is_some() {
+                        Poll::Ready(Err("poll_ready called after a successful call".into()))
+                    } else {
+                        Poll::Ready(Ok(()))
+                    }
+                }
+                Poll::Ready(None) => Poll::Ready(Err(
+                    "Indexer acknowledgements semaphore unexpectedly closed".into(),
+                )),
+                Poll::Pending => Poll::Pending,
+            }
         }
     }
 
     fn call(&mut self, req: HecRequest) -> Self::Future {
         let mut http_service = self.batch_service.clone();
         let ack_finalizer_tx = self.ack_finalizer_tx.clone();
-        let max_pending_acks = self.max_pending_acks;
-        let max_pending_acks_reached = Arc::clone(&self.max_pending_acks_reached);
+        let ack_slot = self.current_ack_slot.take();
+
         Box::pin(async move {
             http_service.ready().await?;
             let events_count = req.events_count;
@@ -107,20 +130,14 @@ impl Service<HecRequest> for HecService {
             let response = http_service.call(req).await?;
             let event_status = if response.status().is_success() {
                 if let Some(ack_finalizer_tx) = ack_finalizer_tx {
+                    let _ack_slot = ack_slot.expect("poll_ready not called before invoking call");
                     let body = serde_json::from_slice::<HecAckResponseBody>(response.body());
                     match body {
                         Ok(body) => {
                             if let Some(ack_id) = body.ack_id {
                                 let (tx, rx) = oneshot::channel();
                                 match ack_finalizer_tx.send((ack_id, tx)).await {
-                                    Ok(_) => {
-                                        max_pending_acks_reached.store(
-                                            (ack_finalizer_tx.capacity() as u64)
-                                                == max_pending_acks,
-                                            Ordering::Relaxed,
-                                        );
-                                        rx.await.unwrap_or(EventStatus::Rejected)
-                                    }
+                                    Ok(_) => rx.await.unwrap_or(EventStatus::Rejected),
                                     // If we cannot send ack ids to the ack client, fall back to default behavior
                                     Err(_) => {
                                         emit!(&SplunkIndexerAcknowledgementUnavailableError);
@@ -128,7 +145,7 @@ impl Service<HecRequest> for HecService {
                                     }
                                 }
                             } else {
-                                // Default behavior if indexer acknowledgements is disabled
+                                // Default behavior if indexer acknowledgements is disabled on the Splunk server
                                 EventStatus::Delivered
                             }
                         }
@@ -139,6 +156,7 @@ impl Service<HecRequest> for HecService {
                         }
                     }
                 } else {
+                    // Default behavior if indexer acknowledgements is disabled by configuration
                     EventStatus::Delivered
                 }
             } else if response.status().is_server_error() {
@@ -199,13 +217,14 @@ impl HttpRequestBuilder {
 
 #[cfg(test)]
 mod tests {
-    use futures_util::{stream::FuturesUnordered, StreamExt};
+    use futures_util::{future::poll_fn, poll, stream::FuturesUnordered, StreamExt};
     use std::{
         collections::HashMap,
-        num::NonZeroU8,
+        num::{NonZeroU64, NonZeroU8},
         sync::atomic::{AtomicU64, Ordering},
+        task::Poll,
     };
-    use tower::Service;
+    use tower::{Service, ServiceExt};
     use vector_core::{
         config::proxy::ProxyConfig,
         event::{EventFinalizers, EventStatus},
@@ -289,19 +308,31 @@ mod tests {
         mock_server
     }
 
+    fn ack_response_always_succeed(req: &Request) -> ResponseTemplate {
+        let req = serde_json::from_slice::<HecAckStatusRequest>(req.body.as_slice()).unwrap();
+        ResponseTemplate::new(200).set_body_json(HecAckStatusResponse {
+            acks: req
+                .acks
+                .into_iter()
+                .map(|ack_id| (ack_id, true))
+                .collect::<HashMap<_, _>>(),
+        })
+    }
+
+    fn ack_response_always_fail(req: &Request) -> ResponseTemplate {
+        let req = serde_json::from_slice::<HecAckStatusRequest>(req.body.as_slice()).unwrap();
+        ResponseTemplate::new(200).set_body_json(HecAckStatusResponse {
+            acks: req
+                .acks
+                .into_iter()
+                .map(|ack_id| (ack_id, false))
+                .collect::<HashMap<_, _>>(),
+        })
+    }
+
     #[tokio::test]
     async fn acknowledgements_enabled_on_server() {
-        let ack_response = |req: &Request| {
-            let req = serde_json::from_slice::<HecAckStatusRequest>(req.body.as_slice()).unwrap();
-            ResponseTemplate::new(200).set_body_json(HecAckStatusResponse {
-                acks: req
-                    .acks
-                    .into_iter()
-                    .map(|ack_id| (ack_id, true))
-                    .collect::<HashMap<_, _>>(),
-            })
-        };
-        let mock_server = get_hec_mock_server(true, ack_response).await;
+        let mock_server = get_hec_mock_server(true, ack_response_always_succeed).await;
 
         let acknowledgements_config = HecClientAcknowledgementsConfig {
             query_interval: NonZeroU8::new(1).unwrap(),
@@ -309,9 +340,10 @@ mod tests {
         };
         let mut service = get_hec_service(mock_server.uri(), acknowledgements_config);
 
-        let mut responses = (0..10)
-            .map(|_| service.call(get_hec_request()))
-            .collect::<FuturesUnordered<_>>();
+        let mut responses = FuturesUnordered::new();
+        responses.push(service.ready().await.unwrap().call(get_hec_request()));
+        responses.push(service.ready().await.unwrap().call(get_hec_request()));
+        responses.push(service.ready().await.unwrap().call(get_hec_request()));
         while let Some(response) = responses.next().await {
             assert_eq!(EventStatus::Delivered, response.unwrap().event_status)
         }
@@ -329,23 +361,13 @@ mod tests {
         let mut service = get_hec_service(mock_server.uri(), acknowledgements_config);
 
         let request = get_hec_request();
-        let response = service.call(request).await.unwrap();
+        let response = service.ready().await.unwrap().call(request).await.unwrap();
         assert_eq!(EventStatus::Delivered, response.event_status)
     }
 
     #[tokio::test]
     async fn acknowledgements_enabled_on_server_retry_limit_exceeded() {
-        let ack_response = |req: &Request| {
-            let req = serde_json::from_slice::<HecAckStatusRequest>(req.body.as_slice()).unwrap();
-            ResponseTemplate::new(200).set_body_json(HecAckStatusResponse {
-                acks: req
-                    .acks
-                    .into_iter()
-                    .map(|ack_id| (ack_id, false))
-                    .collect::<HashMap<_, _>>(),
-            })
-        };
-        let mock_server = get_hec_mock_server(true, ack_response).await;
+        let mock_server = get_hec_mock_server(true, ack_response_always_fail).await;
 
         let acknowledgements_config = HecClientAcknowledgementsConfig {
             query_interval: NonZeroU8::new(1).unwrap(),
@@ -355,7 +377,7 @@ mod tests {
         let mut service = get_hec_service(mock_server.uri(), acknowledgements_config);
 
         let request = get_hec_request();
-        let response = service.call(request).await.unwrap();
+        let response = service.ready().await.unwrap().call(request).await.unwrap();
         assert_eq!(EventStatus::Rejected, response.event_status)
     }
 
@@ -375,7 +397,7 @@ mod tests {
         let mut service = get_hec_service(mock_server.uri(), acknowledgements_config);
 
         let request = get_hec_request();
-        let response = service.call(request).await.unwrap();
+        let response = service.ready().await.unwrap().call(request).await.unwrap();
         assert_eq!(EventStatus::Delivered, response.event_status)
     }
 
@@ -392,23 +414,13 @@ mod tests {
         let mut service = get_hec_service(mock_server.uri(), acknowledgements_config);
 
         let request = get_hec_request();
-        let response = service.call(request).await.unwrap();
+        let response = service.ready().await.unwrap().call(request).await.unwrap();
         assert_eq!(EventStatus::Errored, response.event_status)
     }
 
     #[tokio::test]
     async fn acknowledgements_server_changed_event_response_format() {
-        let ack_response = |req: &Request| {
-            let req = serde_json::from_slice::<HecAckStatusRequest>(req.body.as_slice()).unwrap();
-            ResponseTemplate::new(200).set_body_json(HecAckStatusResponse {
-                acks: req
-                    .acks
-                    .into_iter()
-                    .map(|ack_id| (ack_id, true))
-                    .collect::<HashMap<_, _>>(),
-            })
-        };
-        let mock_server = get_hec_mock_server(true, ack_response).await;
+        let mock_server = get_hec_mock_server(true, ack_response_always_succeed).await;
         // Override the usual event endpoint
         Mock::given(method("POST"))
             .and(path("/services/collector/event"))
@@ -431,7 +443,55 @@ mod tests {
         let mut service = get_hec_service(mock_server.uri(), acknowledgements_config);
 
         let request = get_hec_request();
-        let response = service.call(request).await.unwrap();
+        let response = service.ready().await.unwrap().call(request).await.unwrap();
         assert_eq!(EventStatus::Delivered, response.event_status)
+    }
+
+    #[tokio::test]
+    async fn service_poll_ready_multiple_times() {
+        let mock_server = get_hec_mock_server(true, ack_response_always_fail).await;
+        let mut service = get_hec_service(mock_server.uri(), Default::default());
+
+        assert!(service.ready().await.is_ok());
+        assert!(service.ready().await.is_err());
+    }
+
+    #[tokio::test]
+    #[should_panic]
+    async fn service_call_without_poll_ready() {
+        let mock_server = get_hec_mock_server(true, ack_response_always_fail).await;
+        let mut service = get_hec_service(mock_server.uri(), Default::default());
+
+        let _ = service.call(get_hec_request()).await;
+    }
+
+    #[tokio::test]
+    async fn acknowledgements_max_pending_acks_reached() {
+        let mock_server = get_hec_mock_server(true, ack_response_always_fail).await;
+
+        let acknowledgements_config = HecClientAcknowledgementsConfig {
+            query_interval: NonZeroU8::new(1).unwrap(),
+            retry_limit: NonZeroU8::new(5).unwrap(),
+            // Allow a single pending ack
+            max_pending_acks: NonZeroU64::new(1).unwrap(),
+            ..Default::default()
+        };
+        let mut service = get_hec_service(mock_server.uri(), acknowledgements_config);
+
+        // Grab the one available ack slot
+        let pending_call = service.ready().await.unwrap().call(get_hec_request());
+        // The service should return pending for additional requests
+        assert!(matches!(
+            poll!(poll_fn(|cx| service.poll_ready(cx))),
+            Poll::Pending
+        ));
+        // Complete the call to free up the slot
+        let response = pending_call.await.unwrap();
+        assert_eq!(EventStatus::Rejected, response.event_status);
+        // The service should now be ready for additional requests
+        assert!(matches!(
+            poll!(poll_fn(|cx| service.poll_ready(cx))),
+            Poll::Ready(Ok(_))
+        ));
     }
 }

@@ -58,7 +58,6 @@ pub enum HecAckApiError {
 struct HecAckClient {
     acks: HashMap<u64, (u8, Sender<EventStatus>)>,
     retry_limit: u8,
-    max_pending_acks: u64,
     client: HttpClient,
     http_request_builder: Arc<HttpRequestBuilder>,
 }
@@ -66,22 +65,15 @@ struct HecAckClient {
 impl HecAckClient {
     fn new(
         retry_limit: u8,
-        max_pending_acks: u64,
         client: HttpClient,
         http_request_builder: Arc<HttpRequestBuilder>,
     ) -> Self {
         Self {
             acks: HashMap::new(),
             retry_limit,
-            max_pending_acks,
             client,
             http_request_builder,
         }
-    }
-
-    /// Whether the ack client is able to accept additional ack ids
-    fn ready(&self) -> bool {
-        (self.acks.len() as u64) < self.max_pending_acks
     }
 
     /// Adds an ack id to be queried
@@ -232,7 +224,6 @@ pub async fn run_acknowledgements(
     ));
     let mut ack_client = HecAckClient::new(
         indexer_acknowledgements.retry_limit.get(),
-        indexer_acknowledgements.max_pending_acks.get(),
         client,
         http_request_builder,
     );
@@ -242,7 +233,7 @@ pub async fn run_acknowledgements(
             _ = interval.tick() => {
                 ack_client.run().await;
             },
-            ack_info = receiver.recv(), if ack_client.ready() => {
+            ack_info = receiver.recv() => {
                 match ack_info {
                     Some((ack_id, tx)) => {
                         ack_client.add(ack_id, tx);
@@ -279,12 +270,7 @@ mod tests {
         let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
         let http_request_builder =
             HttpRequestBuilder::new(String::from(""), String::from(""), Compression::default());
-        HecAckClient::new(
-            retry_limit,
-            1_000_000u64,
-            client,
-            Arc::new(http_request_builder),
-        )
+        HecAckClient::new(retry_limit, client, Arc::new(http_request_builder))
     }
 
     fn populate_ack_client(
