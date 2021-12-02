@@ -137,6 +137,15 @@ impl Controller {
             });
         });
 
+        // Add alias `events_processed_total` for `events_out_total`.
+        for i in 0..metrics.len() {
+            let metric = &metrics[i];
+            if metric.name() == "events_out_total" {
+                let alias = metric.clone().with_name("processed_events_total");
+                metrics.push(alias);
+            }
+        }
+
         let handle = Handle::Counter(Arc::new(Counter::with_count(metrics.len() as u64 + 1)));
         metrics.push(Metric::from_metric_kv(&CARDINALITY_KEY, &handle));
 

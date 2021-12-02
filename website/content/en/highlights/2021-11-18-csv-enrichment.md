@@ -24,7 +24,7 @@ are now available:
 
 - [`get_enrichment_table_record`][get_enrichment_table_record] works by looking
   up a single row CSV file
-- [`find_enrichment_table_records`][get_enrichment_table_records] can return
+- [`find_enrichment_table_records`][find_enrichment_table_records] can return
   multiple rows in an array format for more complex use cases
 
 For example, when collecting events from IoT devices, you may want to keep your
