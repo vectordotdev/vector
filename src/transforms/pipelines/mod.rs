@@ -61,7 +61,7 @@ mod router;
 
 use crate::conditions::AnyCondition;
 use crate::config::{
-    DataType, ExpandType, GenerateConfig, TransformConfig, TransformContext, TransformDescription,
+    DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription,
 };
 use crate::transforms::{noop::Noop, Transform};
 use indexmap::IndexMap;
@@ -113,10 +113,10 @@ impl PipelineConfig {
 
         let mut previous: Vec<String> = inputs.into();
 
-        if let Some(filter) = self.filter {
+        if let Some(ref filter) = self.filter {
             let filter_key = component_key.join("filter");
             map.insert(
-                filter_key,
+                filter_key.clone(),
                 (
                     previous.clone(),
                     Box::new(filter::PipelineFilterConfig::new(filter.clone())),
@@ -125,7 +125,7 @@ impl PipelineConfig {
             previous = vec![filter_key.join("truthy").id().to_owned()];
         }
 
-        for (index, transform) in self.transforms.iter().enumerate() {
+        for (index, transform) in self.transforms.iter_mut().enumerate() {
             let transform_key = component_key.join(index);
             if let Some(expanded) = transform.expand(&transform_key, &previous)? {
                 previous = vec![transform_key.id().to_owned()];
@@ -189,7 +189,7 @@ impl EventTypeConfig {
 
         let mut previous: Vec<String> = inputs.into();
         for name in self.names() {
-            if let Some(pipeline) = self.pipelines.get(&name) {
+            if let Some(pipeline) = self.pipelines.get_mut(&name) {
                 let pipeline_key = component_key.join(name);
                 if let Some(expanded) = pipeline.expand(&pipeline_key, &previous)? {
                     map.extend(expanded);

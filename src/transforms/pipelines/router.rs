@@ -1,9 +1,7 @@
-use crate::config::{DataType, ExpandType, TransformConfig, TransformContext};
+use crate::config::{DataType, TransformConfig, TransformContext};
 use crate::event::Event;
-use crate::transforms::{DispatchFunctionTransform, FunctionTransform, Transform};
-use indexmap::IndexMap;
+use crate::transforms::{DispatchFunctionTransform, Transform};
 use serde::{Deserialize, Serialize};
-use vector_core::config::ComponentKey;
 
 /// This transform handles a path for a type of event.
 /// It expands into a EventFilter that will filter the events depending on their type

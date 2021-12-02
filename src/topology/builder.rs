@@ -338,7 +338,7 @@ pub async fn build_pieces(
                 // of relying on the one fallible function pattern we currently have
                 assert_eq!(1, named_outputs.len());
                 outputs.insert(
-                    OutputId::from((key, named_outputs.remove(0))),
+                    OutputId::from((key, named_outputs.remove(0).0)),
                     errors_control,
                 );
 

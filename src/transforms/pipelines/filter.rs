@@ -1,9 +1,7 @@
-use crate::conditions::{not::NotConfig, AnyCondition, Condition};
-use crate::config::{DataType, ExpandType, TransformConfig, TransformContext};
+use crate::conditions::{AnyCondition, Condition};
+use crate::config::{DataType, TransformConfig, TransformContext};
 use crate::event::Event;
-use crate::transforms::filter::FilterConfig;
 use crate::transforms::{DispatchFunctionTransform, Transform};
-use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
 /// This transform is made to do the following trick

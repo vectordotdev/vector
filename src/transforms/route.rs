@@ -1,9 +1,6 @@
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{
-        DataType, ExpandType, GenerateConfig, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::RouteEventDiscarded,
     transforms::{noop::Noop, FunctionTransform, Transform},

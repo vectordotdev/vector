@@ -10,7 +10,7 @@ pub enum Node {
     Transform {
         in_ty: DataType,
         out_ty: DataType,
-        named_outputs: Vec<String>,
+        named_outputs: Vec<(String, DataType)>,
     },
     Sink {
         ty: DataType,
@@ -235,7 +235,7 @@ impl Graph {
                         named_outputs
                             .clone()
                             .into_iter()
-                            .map(|n| OutputId::from((key, n))),
+                            .map(|n| OutputId::from((key, n.0))),
                     );
                     outputs
                 }

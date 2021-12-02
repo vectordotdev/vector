@@ -3,9 +3,7 @@ use crate::{
     event::Metric,
     shutdown::ShutdownSignal,
     sinks::{self, util::UriSerde},
-    sources,
-    transforms::noop::Noop,
-    Pipeline,
+    sources, Pipeline,
 };
 use async_trait::async_trait;
 use component::ComponentDescription;
@@ -462,18 +460,17 @@ impl TransformOuter<String> {
 
         if let Some(expanded) = expansion {
             let mut children = Vec::new();
-            let mut previous = self.inputs.clone();
 
             for (name, (inputs, content)) in expanded {
                 let child = TransformOuter {
                     inputs,
                     inner: content,
                 };
-                // child.expand(name.clone(), &ptypes, transforms, expansions)?;
+                transforms.insert(key.clone(), child);
                 children.push(name.clone());
             }
 
-            expansions.insert(key.clone(), children);
+            expansions.insert(key, children);
         } else {
             transforms.insert(key, self);
         }

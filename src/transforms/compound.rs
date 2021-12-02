@@ -1,8 +1,5 @@
 use crate::{
-    config::{
-        DataType, ExpandType, GenerateConfig, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     transforms::{noop::Noop, Transform},
 };
 use indexmap::IndexMap;
@@ -50,13 +47,13 @@ impl TransformConfig for CompoundConfig {
         let mut previous: Vec<String> = inputs.into();
 
         for (i, step) in self.steps.iter().enumerate() {
-            let step_key = if let Some(id) = step.id {
+            let step_key = if let Some(ref id) = step.id {
                 component_key.join(id)
             } else {
                 component_key.join(i)
             };
             if map
-                .insert(step_key, (previous, step.transform.to_owned()))
+                .insert(step_key.clone(), (previous, step.transform.to_owned()))
                 .is_some()
             {
                 return Err("conflicting id found while expanding transform".into());
