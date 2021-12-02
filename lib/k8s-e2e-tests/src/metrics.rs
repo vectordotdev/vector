@@ -29,7 +29,7 @@ pub fn extract_processed_events_sum(metrics: &str) -> Result<u64, Box<dyn std::e
         .filter_map(|captures| {
             let metric_name = &captures["name"];
             let value = &captures["value"];
-            if !metric_name.contains("events_sent_total") {
+            if !metric_name.contains("component_sent_events_total") {
                 return None;
             }
             Some(value.to_owned())
