@@ -30,14 +30,28 @@ This is just the beginning. In the near future, the API will enable you to both
 observe _and_ control Vector remotely, programmatically, and on demand. Stay
 tuned!
 
-## Take it for a spin in our live playground
+## Take it for a spin in the Vector playground
 
-Try our new [**GraphQL public playground
-today**](https://playground.vector.dev:8686/playground), which enables you to
-execute queries against a live Vector instance that we host and manage:
+Start up Vector locally with the following config:
 
-![Vector GraphQL API Public
-Playground](/img/blog/vector-api-public-playground.png)
+```toml
+[api]
+enabled = true
+
+[sources.demo]
+type = "demo_logs"
+format = "json"
+interval = 1.0
+
+[sinks.console]
+type = "console"
+inputs = ["demo"]
+encoding.codec = "text"
+```
+
+You can then access
+[http://localhost:8686/playground](http://localhost:8686/playground) to get
+a live GraphQL playground to experiment with.
 
 Here are a few queries you can try:
 
