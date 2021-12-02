@@ -1,6 +1,6 @@
 use crate::config::{DataType, ExpandType, TransformConfig, TransformContext};
 use crate::event::Event;
-use crate::transforms::{FunctionTransform, Transform};
+use crate::transforms::{DispatchFunctionTransform, FunctionTransform, Transform};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
@@ -129,5 +129,19 @@ impl FunctionTransform for EventFilterConfig {
         if self.inner.validate(&event) {
             output.push(event);
         }
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct EventRouter;
+
+impl DispatchFunctionTransform for EventRouter {
+    fn transform(&mut self, outputs: &mut IndexMap<String, Vec<Event>>, event: Event) {
+        let output = match event {
+            Event::Log(_) => outputs.get_mut("logs"),
+            Event::Metric(_) => outputs.get_mut("metrics"),
+        };
+        let output = output.expect("named output not available");
+        output.push(event);
     }
 }
