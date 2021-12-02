@@ -1,4 +1,4 @@
-async fn healthcheck(
+pub async fn healthcheck(
     config: CloudwatchLogsSinkConfig,
     client: CloudWatchLogsClient,
 ) -> crate::Result<()> {
