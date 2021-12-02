@@ -139,6 +139,10 @@ fn walk(
     // Use `remove` to take ownership.
     if let Some((key, mut target)) = transforms.remove_entry(node) {
         match target.transform {
+            Transform::DispatchFunction(_) => {
+                // unit tests don't currently support multiple outputs, so just throw these away
+                unimplemented!()
+            }
             Transform::Function(ref mut t) => {
                 for input in inputs.clone() {
                     t.transform(&mut results, input)

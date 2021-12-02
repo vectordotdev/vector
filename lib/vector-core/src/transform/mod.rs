@@ -4,6 +4,7 @@ use std::pin::Pin;
 #[cfg(any(feature = "lua"))]
 pub mod runtime_transform;
 pub use config::{DataType, ExpandType, TransformConfig, TransformContext};
+pub use indexmap::IndexMap;
 
 mod config;
 
@@ -12,6 +13,7 @@ mod config;
 /// While function transforms can be run out of order, or concurrently, task
 /// transforms act as a coordination or barrier point.
 pub enum Transform {
+    DispatchFunction(Box<dyn DispatchFunctionTransform>),
     Function(Box<dyn FunctionTransform>),
     FallibleFunction(Box<dyn FallibleFunctionTransform>),
     Task(Box<dyn TaskTransform>),
@@ -93,6 +95,41 @@ impl Transform {
         }
     }
 
+    /// Create a new dispatch function transform.
+    ///
+    /// There are similar to `FunctionTransform`, but with multiple outputs.
+    pub fn dispatch_function(v: impl DispatchFunctionTransform + 'static) -> Self {
+        Transform::DispatchFunction(Box::new(v))
+    }
+
+    /// Mutably borrow the inner transform as a dispatch function transform.
+    ///
+    /// # Panics
+    ///
+    /// If the transform is not a [`DispatchFunctionTransform`] this will panic.
+    pub fn as_dispatch_function(&mut self) -> &mut Box<dyn DispatchFunctionTransform> {
+        match self {
+            Transform::DispatchFunction(t) => t,
+            _ => panic!(
+                "Called `Transform::as_dispatch_function` on something that was not a dispatch function variant."
+            ),
+        }
+    }
+
+    /// Transmute the inner transform into a dispatch function transform.
+    ///
+    /// # Panics
+    ///
+    /// If the transform is not a [`DispatchFunctionTransform`] this will panic.
+    pub fn into_dispatch_function(self) -> Box<dyn DispatchFunctionTransform> {
+        match self {
+            Transform::DispatchFunction(t) => t,
+            _ => panic!(
+                "Called `Transform::into_dispatch_function` on something that was not a dispatch function variant."
+            ),
+        }
+    }
+
     /// Create a new task transform.
     ///
     /// These tasks are coordinated, and map a stream of some `U` to some other
@@ -153,6 +190,14 @@ pub trait FallibleFunctionTransform: Send + dyn_clone::DynClone + Sync {
 }
 
 dyn_clone::clone_trait_object!(FallibleFunctionTransform);
+
+/// Similar to `FunctionTransform`, but with a map of outputs to handle routing events without
+/// having to clone them.
+pub trait DispatchFunctionTransform: Send + dyn_clone::DynClone + Sync {
+    fn transform(&mut self, output: &mut IndexMap<String, Vec<Event>>, event: Event);
+}
+
+dyn_clone::clone_trait_object!(DispatchFunctionTransform);
 
 // For testing, it's convenient to ignore the error output and continue to use helpers like
 // `transform_one`.

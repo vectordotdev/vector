@@ -14,6 +14,7 @@ use crate::{
     Pipeline,
 };
 use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use std::pin::Pin;
 use std::{
@@ -340,6 +341,88 @@ pub async fn build_pieces(
                     OutputId::from((key, named_outputs.remove(0))),
                     errors_control,
                 );
+
+                Task::new(key.clone(), typetag, transform)
+            }
+            Transform::DispatchFunction(mut t) => {
+                let mut output_fans = IndexMap::new();
+                let mut output_controls = IndexMap::new();
+                let output_names = named_outputs.clone();
+                for name in output_names.iter() {
+                    let (output, control) = Fanout::new();
+                    output_fans.insert(name.clone(), output);
+                    output_controls.insert(name.clone(), control);
+                }
+
+                let mut input_rx = input_rx
+                    .filter(move |event| ready(filter_event_type(event, input_type)))
+                    .ready_chunks(128); // 128 is an arbitrary, smallish constant
+
+                let mut timer = crate::utilization::Timer::new();
+                let mut last_report = Instant::now();
+
+                let transform = async move {
+                    timer.start_wait();
+                    while let Some(events) = input_rx.next().await {
+                        let stopped = timer.stop_wait();
+                        if stopped.duration_since(last_report).as_secs() >= 5 {
+                            timer.report();
+                            last_report = stopped;
+                        }
+
+                        emit!(&EventsReceived {
+                            count: events.len(),
+                            byte_size: events.size_of(),
+                        });
+
+                        // TODO: optimize the creation of buffers
+                        let mut output_bufs = output_names
+                            .iter()
+                            .map(|name| (name.clone(), Vec::with_capacity(events.len())))
+                            .collect::<IndexMap<_, _>>();
+                        let mut bufs = output_names
+                            .iter()
+                            .map(|name| (name.clone(), Vec::with_capacity(1)))
+                            .collect::<IndexMap<_, _>>();
+
+                        for v in events {
+                            t.transform(&mut bufs, v);
+
+                            for (name, buf) in output_bufs.iter_mut() {
+                                if let Some(out) = bufs.get_mut(name) {
+                                    buf.append(out);
+                                }
+                            }
+                        }
+
+                        // TODO: account for error outputs separately?
+                        let (count, byte_size) =
+                            output_bufs.values().fold((0, 0), |(c, b), output| {
+                                (c + output.len(), b + output.size_of())
+                            });
+
+                        timer.start_wait();
+
+                        for (name, output_buf) in output_bufs {
+                            if let Some(output) = output_fans.get_mut(&name) {
+                                for event in output_buf {
+                                    output.feed(event).await.expect("unit error");
+                                }
+                                output.flush().await.expect("unit error");
+                            }
+                        }
+
+                        emit!(&EventsSent { count, byte_size });
+                    }
+
+                    debug!("Finished.");
+                    Ok(TaskOutput::Transform)
+                }
+                .boxed();
+
+                output_controls.into_iter().for_each(|(name, control)| {
+                    outputs.insert(OutputId::from(key.join(name)), control);
+                });
 
                 Task::new(key.clone(), typetag, transform)
             }
