@@ -56,7 +56,6 @@
 /// Each pipeline will then be expanded into a list of its transforms and at the end of each
 /// expansion, a `Noop` transform will be added to use the `pipeline` name as an alias
 /// (`my_pipelines.logs.transforms.foo`).
-mod expander;
 mod filter;
 mod router;
 
@@ -64,10 +63,11 @@ use crate::conditions::AnyCondition;
 use crate::config::{
     DataType, ExpandType, GenerateConfig, TransformConfig, TransformContext, TransformDescription,
 };
-use crate::transforms::Transform;
+use crate::transforms::{noop::Noop, Transform};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use vector_core::config::ComponentKey;
 
 inventory::submit! {
     TransformDescription::new::<PipelinesConfig>("pipelines")
@@ -102,23 +102,46 @@ impl Clone for PipelineConfig {
 }
 
 impl PipelineConfig {
-    /// Expands a single pipeline into a series of its transforms.
-    fn serial(&self) -> Box<dyn TransformConfig> {
-        let transforms: IndexMap<String, Box<dyn TransformConfig>> = self
-            .transforms
-            .iter()
-            .enumerate()
-            .map(|(index, config)| (index.to_string(), config.clone()))
-            .collect();
-        let transforms = Box::new(expander::ExpanderConfig::serial(transforms));
-        if let Some(ref filter) = self.filter {
-            Box::new(filter::PipelineFilterConfig::new(
-                filter.clone(),
-                transforms,
-            ))
-        } else {
-            transforms
+    fn expand(
+        &mut self,
+        component_key: &ComponentKey,
+        inputs: &[String],
+    ) -> crate::Result<Option<IndexMap<ComponentKey, (Vec<String>, Box<dyn TransformConfig>)>>>
+    {
+        let mut map: IndexMap<ComponentKey, (Vec<String>, Box<dyn TransformConfig>)> =
+            IndexMap::new();
+
+        let mut previous: Vec<String> = inputs.into();
+
+        if let Some(filter) = self.filter {
+            let filter_key = component_key.join("filter");
+            map.insert(
+                filter_key,
+                (
+                    previous.clone(),
+                    Box::new(filter::PipelineFilterConfig::new(filter.clone())),
+                ),
+            );
+            previous = vec![filter_key.join("truthy").id().to_owned()];
         }
+
+        for (index, transform) in self.transforms.iter().enumerate() {
+            let transform_key = component_key.join(index);
+            if let Some(expanded) = transform.expand(&transform_key, &previous)? {
+                previous = vec![transform_key.id().to_owned()];
+                map.extend(expanded);
+            } else {
+                map.insert(transform_key, (previous.clone(), transform.clone()));
+            }
+        }
+
+        if self.filter.is_some() {
+            previous.push(component_key.join("filter").join("falsy").id().to_owned());
+        } else {
+            map.insert(component_key.clone(), (previous, Box::new(Noop)));
+        }
+
+        Ok(Some(map))
     }
 }
 
@@ -143,10 +166,6 @@ impl EventTypeConfig {
 }
 
 impl EventTypeConfig {
-    fn is_empty(&self) -> bool {
-        self.pipelines.is_empty()
-    }
-
     fn names(&self) -> Vec<String> {
         if let Some(ref names) = self.order {
             // This assumes all the pipelines are present in the `order` field.
@@ -159,20 +178,29 @@ impl EventTypeConfig {
         }
     }
 
-    /// Expands a group of pipelines into a series of pipelines.
-    /// They will then be expanded into a series of transforms.
-    fn serial(&self) -> Box<dyn TransformConfig> {
-        let pipelines: IndexMap<String, Box<dyn TransformConfig>> = self
-            .names()
-            .into_iter()
-            .filter_map(|name| {
-                self.pipelines
-                    .get(&name)
-                    .map(|config| (name, config.serial()))
-            })
-            .collect();
+    fn expand(
+        &mut self,
+        component_key: &ComponentKey,
+        inputs: &[String],
+    ) -> crate::Result<Option<IndexMap<ComponentKey, (Vec<String>, Box<dyn TransformConfig>)>>>
+    {
+        let mut map: IndexMap<ComponentKey, (Vec<String>, Box<dyn TransformConfig>)> =
+            IndexMap::new();
 
-        Box::new(expander::ExpanderConfig::serial(pipelines))
+        let mut previous: Vec<String> = inputs.into();
+        for name in self.names() {
+            if let Some(pipeline) = self.pipelines.get(&name) {
+                let pipeline_key = component_key.join(name);
+                if let Some(expanded) = pipeline.expand(&pipeline_key, &previous)? {
+                    map.extend(expanded);
+                    previous = vec![pipeline_key.id().to_owned()];
+                }
+            }
+        }
+
+        map.insert(component_key.clone(), (previous, Box::new(Noop)));
+
+        Ok(Some(map))
     }
 }
 
@@ -196,30 +224,6 @@ impl PipelinesConfig {
     }
 }
 
-impl PipelinesConfig {
-    /// Transforms the actual transform in 2 parallel transforms.
-    /// They are wrapped into an EventRouterConfig transform in order to filter logs and metrics.
-    fn parallel(&self) -> IndexMap<String, Box<dyn TransformConfig>> {
-        let mut map: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
-
-        if !self.logs.is_empty() {
-            map.insert(
-                "logs".to_string(),
-                Box::new(router::EventRouterConfig::log(self.logs.serial())),
-            );
-        }
-
-        if !self.metrics.is_empty() {
-            map.insert(
-                "metrics".to_string(),
-                Box::new(router::EventRouterConfig::metric(self.metrics.serial())),
-            );
-        }
-
-        map
-    }
-}
-
 #[async_trait::async_trait]
 #[typetag::serde(name = "pipelines")]
 impl TransformConfig for PipelinesConfig {
@@ -227,14 +231,49 @@ impl TransformConfig for PipelinesConfig {
         Err("this transform must be expanded".into())
     }
 
+    /// Expands the pipelines in multiple components
+    ///
+    /// `id.router`: dispatch function to dispatch logs and events depending on type
+    /// `id.router.logs`: output of the dispatch function for logs
+    /// `id.router.metrics`: output of the dispatch function fo metrics
+    /// `id.logs`: id of the unexpanded transform for logs
+    /// `id.metrics`: id of the unexpanded transform for metrics
+    /// `id`: noop transform to join metrics and logs stream
     fn expand(
         &mut self,
-    ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
-        Ok(Some((
-            self.parallel(),
-            // need to aggregate to be able to use the transform name as an input.
-            ExpandType::Parallel { aggregates: true },
-        )))
+        component_key: &ComponentKey,
+        inputs: &[String],
+    ) -> crate::Result<Option<IndexMap<ComponentKey, (Vec<String>, Box<dyn TransformConfig>)>>>
+    {
+        let mut map: IndexMap<ComponentKey, (Vec<String>, Box<dyn TransformConfig>)> =
+            IndexMap::new();
+        let router_key = component_key.join("router");
+        map.insert(
+            router_key.clone(),
+            (
+                inputs.into(),
+                Box::new(router::EventRouterConfig::default()),
+            ),
+        );
+        let mut outputs = Vec::with_capacity(2);
+
+        let logs_inputs = vec![router_key.join("logs").id().to_owned()];
+        let logs_key = component_key.join("logs");
+        if let Some(expanded) = self.logs.expand(&logs_key, &logs_inputs)? {
+            map.extend(expanded);
+            outputs.push(logs_key.id().to_owned());
+        }
+
+        let metrics_inputs = vec![router_key.join("metrics").id().to_owned()];
+        let metrics_key = component_key.join("metrics");
+        if let Some(expanded) = self.metrics.expand(&metrics_key, &metrics_inputs)? {
+            map.extend(expanded);
+            outputs.push(metrics_key.id().to_owned());
+        }
+
+        map.insert(component_key.clone(), (outputs, Box::new(Noop)));
+
+        Ok(Some(map))
     }
 
     fn input_type(&self) -> DataType {

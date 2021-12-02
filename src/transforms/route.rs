@@ -6,10 +6,11 @@ use crate::{
     },
     event::Event,
     internal_events::RouteEventDiscarded,
-    transforms::{FunctionTransform, Transform},
+    transforms::{noop::Noop, FunctionTransform, Transform},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use vector_core::config::ComponentKey;
 
 //------------------------------------------------------------------------------
 
@@ -100,20 +101,32 @@ impl TransformConfig for RouteConfig {
 
     fn expand(
         &mut self,
-    ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
-        let mut map: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
+        component_key: &ComponentKey,
+        inputs: &[String],
+    ) -> crate::Result<Option<IndexMap<ComponentKey, (Vec<String>, Box<dyn TransformConfig>)>>>
+    {
+        let mut map: IndexMap<ComponentKey, (Vec<String>, Box<dyn TransformConfig>)> =
+            IndexMap::new();
+        let mut outputs = Vec::new();
 
         while let Some((k, v)) = self.route.pop() {
+            let inner_key = component_key.join(k);
+            outputs.push(inner_key.id().to_owned());
             if map
-                .insert(k.clone(), Box::new(LaneConfig { condition: v }))
+                .insert(
+                    inner_key,
+                    (inputs.into(), Box::new(LaneConfig { condition: v })),
+                )
                 .is_some()
             {
                 return Err("duplicate route id".into());
             }
         }
 
+        map.insert(component_key.clone(), (outputs, Box::new(Noop)));
+
         if !map.is_empty() {
-            Ok(Some((map, ExpandType::Parallel { aggregates: false })))
+            Ok(Some(map))
         } else {
             Err("must specify at least one lane".into())
         }
@@ -145,8 +158,11 @@ impl TransformConfig for RouteCompatConfig {
 
     fn expand(
         &mut self,
-    ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
-        self.0.expand()
+        component_key: &ComponentKey,
+        inputs: &[String],
+    ) -> crate::Result<Option<IndexMap<ComponentKey, (Vec<String>, Box<dyn TransformConfig>)>>>
+    {
+        self.0.expand(component_key, inputs)
     }
 
     fn input_type(&self) -> DataType {

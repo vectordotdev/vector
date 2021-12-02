@@ -3,10 +3,11 @@ use crate::{
         DataType, ExpandType, GenerateConfig, TransformConfig, TransformContext,
         TransformDescription,
     },
-    transforms::Transform,
+    transforms::{noop::Noop, Transform},
 };
 use indexmap::IndexMap;
 use serde::{self, Deserialize, Serialize};
+use vector_core::config::ComponentKey;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct CompoundConfig {
@@ -40,22 +41,33 @@ impl TransformConfig for CompoundConfig {
 
     fn expand(
         &mut self,
-    ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
-        let mut map: IndexMap<String, Box<dyn TransformConfig>> = IndexMap::new();
+        component_key: &ComponentKey,
+        inputs: &[String],
+    ) -> crate::Result<Option<IndexMap<ComponentKey, (Vec<String>, Box<dyn TransformConfig>)>>>
+    {
+        let mut map: IndexMap<ComponentKey, (Vec<String>, Box<dyn TransformConfig>)> =
+            IndexMap::new();
+        let mut previous: Vec<String> = inputs.into();
+
         for (i, step) in self.steps.iter().enumerate() {
+            let step_key = if let Some(id) = step.id {
+                component_key.join(id)
+            } else {
+                component_key.join(i)
+            };
             if map
-                .insert(
-                    step.id.as_ref().cloned().unwrap_or_else(|| i.to_string()),
-                    step.transform.to_owned(),
-                )
+                .insert(step_key, (previous, step.transform.to_owned()))
                 .is_some()
             {
                 return Err("conflicting id found while expanding transform".into());
             }
+            previous = vec![step_key.id().to_owned()];
         }
 
+        map.insert(component_key.clone(), (previous, Box::new(Noop)));
+
         if !map.is_empty() {
-            Ok(Some((map, ExpandType::Serial { alias: false })))
+            Ok(Some(map))
         } else {
             Err("must specify at least one transform".into())
         }
@@ -87,6 +99,8 @@ mod test {
     fn can_serialize_nested_transforms() {
         // We need to serialize the config to check if a config has
         // changed when reloading.
+        let root = ComponentKey::from("root");
+        let inputs = vec!["bar".to_owned()];
         let config = toml::from_str::<CompoundConfig>(
             r#"
             [[steps]]
@@ -100,7 +114,7 @@ mod test {
         "#,
         )
         .unwrap()
-        .expand()
+        .expand(&root, &inputs)
         .unwrap()
         .unwrap();
 

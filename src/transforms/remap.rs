@@ -50,9 +50,9 @@ impl TransformConfig for RemapConfig {
         })
     }
 
-    fn named_outputs(&self) -> Vec<String> {
+    fn named_outputs(&self) -> Vec<(String, DataType)> {
         if self.reroute_dropped {
-            vec![String::from("dropped")]
+            vec![(String::from("dropped"), DataType::Any)]
         } else {
             vec![]
         }
