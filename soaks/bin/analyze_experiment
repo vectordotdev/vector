@@ -67,11 +67,6 @@ for exp in csv.experiment.unique():
 
     baseline_outliers = total_outliers(baseline)
     comparison_outliers = total_outliers(comparison)
-    trim = 0.0
-    if baseline_outliers + comparison_outliers > 0:
-        # When we have outliers we perform Yuen's test instead, dropping 10% of
-        # the data to remove the more extreme results.
-        trim = 0.1
 
     # The t-test here is calculating whether the expected mean of our two
     # distributions is equal, or, put another way, whether the samples we have
@@ -83,7 +78,13 @@ for exp in csv.experiment.unique():
     # samples actually have the same mean -- are from the same distribution --
     # and so there's some statistically interesting difference between the two
     # samples. For our purposes here that implies that performance has changed.
-    res = scipy.stats.ttest_ind(baseline['value'], comparison['value'], equal_var=False, trim=trim)
+    res = scipy.stats.ttest_ind_from_stats(baseline_mean,
+                                           baseline_stdev,
+                                           len(baseline),
+                                           comparison_mean,
+                                           comparison_stdev,
+                                           len(comparison),
+                                           equal_var=False)
     ttest_results.append({'experiment': exp,
                           'Δ mean': diff.mean(),
                           'Δ mean %': percent_change,
