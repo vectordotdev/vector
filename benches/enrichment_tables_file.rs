@@ -39,7 +39,6 @@ fn benchmark_enrichment_tables_file(c: &mut Criterion) {
 
         let mut file = File::new(
             Default::default(),
-            Default::default(),
             SystemTime::now(),
             data,
             // Headers.

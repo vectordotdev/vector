@@ -280,9 +280,7 @@ impl QueryVisitor {
                         _ => unreachable!(),
                     }
                 }
-                Rule::query => {
-                    return Self::visit_query(item, field.as_deref().unwrap_or(default_field))
-                }
+                Rule::query => return Self::visit_query(item, field.unwrap_or(default_field)),
                 // We've covered all the cases, so this should never happen
                 _ => unreachable!(),
             }

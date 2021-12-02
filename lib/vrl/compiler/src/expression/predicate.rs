@@ -20,7 +20,6 @@ impl Predicate {
             return Err(Error {
                 variant: ErrorVariant::NonBoolean(type_def.kind()),
                 span,
-                labels: vec![],
             });
         }
 
@@ -108,7 +107,6 @@ pub struct Error {
     pub(crate) variant: ErrorVariant,
 
     span: Span,
-    labels: Vec<Label>,
 }
 
 #[derive(thiserror::Error, Debug)]

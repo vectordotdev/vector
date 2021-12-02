@@ -351,6 +351,7 @@ mod integration_tests {
     }
 
     #[derive(Clone, Deserialize)]
+    #[allow(dead_code)] // deserialize all fields
     struct HumioLog {
         #[serde(rename = "#repo")]
         humio_repo: String,
