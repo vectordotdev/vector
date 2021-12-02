@@ -1,9 +1,7 @@
 use vrl::prelude::*;
 
 use datadog_filter::{build_filter, Fielder, Filter, Matcher, Run};
-use datadog_search_syntax::{
-    normalize_fields, parse, BooleanType, Comparison, ComparisonValue, Field, QueryNode,
-};
+use datadog_search_syntax::{normalize_fields, parse, Comparison, ComparisonValue, Field};
 
 use lookup_lib::{parser::parse_lookup, LookupBuf};
 use regex::Regex;
@@ -237,11 +235,72 @@ impl<'a> Filter<'a, Value> for Query {
     }
 
     fn prefix(&'a self, field: Field, prefix: String) -> Box<dyn Matcher<Value>> {
-        todo!()
+        let buf = self.buf(&field);
+
+        match field {
+            // Default fields are matched by word boundary.
+            Field::Default(_) => {
+                let re = word_regex(&format!("{}*", prefix));
+
+                resolve_value(
+                    buf,
+                    Run::boxed(move |value| re.is_match(&string_value(value))),
+                )
+            }
+            // Tags are recursed until a match is found.
+            Field::Tag(tag) => {
+                let starts_with = format!("{}:{}", tag, prefix);
+
+                resolve_value(
+                    buf,
+                    Run::boxed(move |value| match value {
+                        Value::Array(v) => {
+                            v.iter().any(|v| string_value(v).starts_with(&starts_with))
+                        }
+                        _ => false,
+                    }),
+                )
+            }
+            // All other field types are compared by complete value.
+            _ => resolve_value(
+                buf,
+                Run::boxed(move |value| string_value(value).starts_with(&prefix)),
+            ),
+        }
     }
 
     fn wildcard(&'a self, field: Field, wildcard: String) -> Box<dyn Matcher<Value>> {
-        todo!()
+        let buf = self.buf(&field);
+
+        match field {
+            Field::Default(_) => {
+                let re = word_regex(&wildcard);
+
+                resolve_value(
+                    buf,
+                    Run::boxed(move |value| re.is_match(&string_value(value))),
+                )
+            }
+            Field::Tag(tag) => {
+                let re = wildcard_regex(&format!("{}:{}", tag, wildcard));
+
+                resolve_value(
+                    buf,
+                    Run::boxed(move |value| match value {
+                        Value::Array(v) => v.iter().any(|v| re.is_match(&string_value(v))),
+                        _ => false,
+                    }),
+                )
+            }
+            _ => {
+                let re = wildcard_regex(&wildcard);
+
+                resolve_value(
+                    buf,
+                    Run::boxed(move |value| re.is_match(&string_value(value))),
+                )
+            }
+        }
     }
 
     fn compare(
@@ -353,52 +412,6 @@ fn resolve_value(buf: LookupBuf, match_fn: Box<dyn Matcher<Value>>) -> Box<dyn M
 
     Run::boxed(func)
 }
-
-/// Returns a boxed `Matcher`
-// fn wildcard_with_prefix(field: Field, prefix: String) -> Box<dyn Matcher> {
-//     match field {
-//         // Default fields are matched by word boundary.
-//         Field::Default(_) => {
-//             let re = word_regex(&format!("{}*", prefix));
-//
-//             Run::boxed(move |value| re.is_match(&string_value(value)))
-//         }
-//         // Tags are recursed until a match is found.
-//         Field::Tag(tag) => {
-//             let starts_with = format!("{}:{}", tag, prefix);
-//
-//             Run::boxed(move |value| match value {
-//                 Value::Array(v) => v.iter().any(|v| string_value(v).starts_with(&starts_with)),
-//                 _ => false,
-//             })
-//         }
-//         // All other field types are compared by complete value.
-//         _ => Run::boxed(move |value| string_value(value).starts_with(&prefix)),
-//     }
-// }
-
-// fn build_wildcard(field: Field, wildcard: &str) -> Box<dyn Matcher> {
-//     match field {
-//         Field::Default(_) => {
-//             let re = word_regex(wildcard);
-//
-//             Run::boxed(move |value| re.is_match(&string_value(value)))
-//         }
-//         Field::Tag(tag) => {
-//             let re = wildcard_regex(&format!("{}:{}", tag, wildcard));
-//
-//             Run::boxed(move |value| match value {
-//                 Value::Array(v) => v.iter().any(|v| re.is_match(&string_value(v))),
-//                 _ => false,
-//             })
-//         }
-//         _ => {
-//             let re = wildcard_regex(wildcard);
-//
-//             Run::boxed(move |value| re.is_match(&string_value(value)))
-//         }
-//     }
-// }
 
 // fn build_matcher(node: &QueryNode) -> Box<dyn Matcher> {
 //     match node {
