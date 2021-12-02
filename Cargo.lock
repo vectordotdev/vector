@@ -8291,7 +8291,6 @@ dependencies = [
  "hex",
  "hostname",
  "indexmap",
- "itertools",
  "lazy_static",
  "lookup",
  "md-5",

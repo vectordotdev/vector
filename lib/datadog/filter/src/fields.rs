@@ -6,7 +6,8 @@ use datadog_search_syntax::Field;
 pub trait Fielder {
     type IntoIter: IntoIterator<Item = Field>;
 
-    /// Builds fields, and returns an iterator. Takes a mutable ref to self to enable caching
-    /// scenarios where further lookups or other expensive operations can be performed at boot-time.
-    fn build_fields(&mut self, attr: impl AsRef<str>) -> Self::IntoIter;
+    /// Builds fields, and returns an iterator. Takes a immutable ref to self to allow for
+    /// recursion when building filters. A type that implements `Fielder` + `Filter` and needs
+    /// to update an internal cache when building fields should use interior mutability.
+    fn build_fields(&self, attr: impl AsRef<str>) -> Self::IntoIter;
 }

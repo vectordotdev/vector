@@ -4,11 +4,11 @@ use datadog_filter::{build_filter, Fielder, Filter, Matcher, Run};
 use datadog_search_syntax::{
     normalize_fields, parse, BooleanType, Comparison, ComparisonValue, Field, QueryNode,
 };
-use itertools::Itertools;
 
 use lookup_lib::{parser::parse_lookup, LookupBuf};
 use regex::Regex;
-use std::borrow::Cow;
+use std::cell::RefCell;
+use std::{borrow::Cow, collections::HashMap};
 
 #[derive(Clone, Copy, Debug)]
 pub struct MatchDatadogQuery;
@@ -114,92 +114,134 @@ fn type_def() -> TypeDef {
 
 #[derive(Clone)]
 struct Query {
-    lookup_bufs: Vec<LookupBuf>,
+    lookup_bufs: RefCell<HashMap<Field, LookupBuf>>,
 }
 
 impl Query {
     fn new() -> Self {
         Self {
-            lookup_bufs: vec![],
+            lookup_bufs: RefCell::new(HashMap::new()),
         }
+    }
+
+    fn buf(&self, field: &Field) -> LookupBuf {
+        self.lookup_bufs
+            .borrow()
+            .get(field)
+            .expect("should have lookup buf")
+            .clone()
     }
 }
 
 impl Fielder for Query {
     type IntoIter = Vec<Field>;
 
-    fn build_fields(&mut self, attr: impl AsRef<str>) -> Self::IntoIter {
-        let mut fields = vec![];
-
+    /// Build fields by translating a Datadog Search Syntax attribute to a `Field` and a
+    /// corresponding `LookupBuf`. This will be the starting point for looking up a VRL `Value`
+    /// received by a filter closure.
+    fn build_fields(&self, attr: impl AsRef<str>) -> Self::IntoIter {
         for (field, buf) in normalize_fields(attr)
             .into_iter()
             .filter_map(|field| lookup_field(&field).map(move |buf| (field, buf)))
         {
-            fields.push(field);
-            self.lookup_bufs.push(buf);
+            self.lookup_bufs.borrow_mut().insert(field, buf);
         }
 
-        fields
+        self.lookup_bufs
+            .borrow()
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>()
     }
 }
 
 impl<'a> Filter<'a, Value> for Query {
     fn exists(&'a self, field: Field) -> Box<dyn Matcher<Value>> {
+        let buf = self.buf(&field);
+
         match field {
             // Tags need to check the element value.
             Field::Tag(tag) => {
                 let starts_with = format!("{}:", tag);
 
-                Run::boxed(move |obj| match obj {
-                    Value::Array(v) => v.iter().any(|v| {
-                        let str_value = string_value(v);
+                resolve_value(
+                    buf,
+                    Run::boxed(move |obj| match obj {
+                        Value::Array(v) => v.iter().any(|v| {
+                            let str_value = string_value(v);
 
-                        // The tag matches using either 'key' or 'key:value' syntax.
-                        str_value == tag || str_value.starts_with(&starts_with)
+                            // The tag matches using either 'key' or 'key:value' syntax.
+                            str_value == tag || str_value.starts_with(&starts_with)
+                        }),
+                        _ => false,
                     }),
-                    _ => false,
-                })
+                )
             }
             // Literal field 'tags' needs to be compared by key.
-            Field::Reserved(f) if f == "tags" => Run::boxed(|value| match value {
-                Value::Array(v) => v.iter().any(|v| v == value),
-                _ => false,
-            }),
+            Field::Reserved(f) if f == "tags" => resolve_value(
+                buf,
+                Run::boxed(|value| match value {
+                    Value::Array(v) => v.iter().any(|v| v == value),
+                    _ => false,
+                }),
+            ),
             // Other field types have already resolved at this point, so just return true.
             _ => Box::new(true),
         }
     }
 
     fn equals(&'a self, field: Field, to_match: String) -> Box<dyn Matcher<Value>> {
+        let buf = self.buf(&field);
+
         match field {
             // Default fields are compared by word boundary.
             Field::Default(_) => {
                 let re = word_regex(&to_match);
 
-                Run::boxed(move |value| match value {
-                    Value::Bytes(val) => re.is_match(&String::from_utf8_lossy(val)),
-                    _ => false,
-                })
+                resolve_value(
+                    buf,
+                    Run::boxed(move |value| match value {
+                        Value::Bytes(val) => re.is_match(&String::from_utf8_lossy(val)),
+                        _ => false,
+                    }),
+                )
             }
             // A literal "tags" field should match by key.
-            Field::Reserved(f) if f == "tags" => Run::boxed(move |value| match value {
-                Value::Array(v) => {
-                    v.contains(&Value::Bytes(Bytes::copy_from_slice(to_match.as_bytes())))
-                }
-                _ => false,
-            }),
+            Field::Reserved(f) if f == "tags" => resolve_value(
+                buf,
+                Run::boxed(move |value| match value {
+                    Value::Array(v) => {
+                        v.contains(&Value::Bytes(Bytes::copy_from_slice(to_match.as_bytes())))
+                    }
+                    _ => false,
+                }),
+            ),
             // Individual tags are compared by element key:value.
             Field::Tag(tag) => {
                 let value_bytes = Value::Bytes(format!("{}:{}", tag, to_match).into());
 
-                Run::boxed(move |value| match value {
-                    Value::Array(v) => v.contains(&value_bytes),
-                    _ => false,
-                })
+                resolve_value(
+                    buf,
+                    Run::boxed(move |value| match value {
+                        Value::Array(v) => v.contains(&value_bytes),
+                        _ => false,
+                    }),
+                )
             }
             // Everything else is matched by string equality.
-            _ => Run::boxed(move |value| string_value(value) == to_match),
+            _ => resolve_value(
+                buf,
+                Run::boxed(move |value| string_value(value) == to_match),
+            ),
         }
+    }
+
+    fn prefix(&'a self, field: Field, prefix: String) -> Box<dyn Matcher<Value>> {
+        todo!()
+    }
+
+    fn wildcard(&'a self, field: Field, wildcard: String) -> Box<dyn Matcher<Value>> {
+        todo!()
     }
 
     fn compare(
@@ -208,99 +250,109 @@ impl<'a> Filter<'a, Value> for Query {
         comparator: Comparison,
         comparison_value: ComparisonValue,
     ) -> Box<dyn Matcher<Value>> {
+        let buf = self.buf(&field);
         let rhs = Cow::from(comparison_value.to_string());
 
         match field {
             // Facets are compared numerically if the value is numeric, or as strings otherwise.
             Field::Facet(_) => {
-                Run::boxed(move |value| match (value, &comparison_value) {
-                    // Integers.
-                    (Value::Integer(lhs), ComparisonValue::Integer(rhs)) => match comparator {
-                        Comparison::Lt => *lhs < *rhs,
-                        Comparison::Lte => *lhs <= *rhs,
-                        Comparison::Gt => *lhs > *rhs,
-                        Comparison::Gte => *lhs >= *rhs,
-                    },
-                    // Floats.
-                    (Value::Float(lhs), ComparisonValue::Float(rhs)) => {
-                        let lhs = lhs.into_inner();
-                        match comparator {
-                            Comparison::Lt => lhs < *rhs,
-                            Comparison::Lte => lhs <= *rhs,
-                            Comparison::Gt => lhs > *rhs,
-                            Comparison::Gte => lhs >= *rhs,
+                resolve_value(
+                    buf,
+                    Run::boxed(move |value| match (value, &comparison_value) {
+                        // Integers.
+                        (Value::Integer(lhs), ComparisonValue::Integer(rhs)) => match comparator {
+                            Comparison::Lt => *lhs < *rhs,
+                            Comparison::Lte => *lhs <= *rhs,
+                            Comparison::Gt => *lhs > *rhs,
+                            Comparison::Gte => *lhs >= *rhs,
+                        },
+                        // Floats.
+                        (Value::Float(lhs), ComparisonValue::Float(rhs)) => {
+                            let lhs = lhs.into_inner();
+                            match comparator {
+                                Comparison::Lt => lhs < *rhs,
+                                Comparison::Lte => lhs <= *rhs,
+                                Comparison::Gt => lhs > *rhs,
+                                Comparison::Gte => lhs >= *rhs,
+                            }
                         }
-                    }
-                    // Where the rhs is a string ref, the lhs is coerced into a string.
-                    (_, ComparisonValue::String(rhs)) => {
-                        let lhs = string_value(value);
-                        let rhs = Cow::from(rhs);
+                        // Where the rhs is a string ref, the lhs is coerced into a string.
+                        (_, ComparisonValue::String(rhs)) => {
+                            let lhs = string_value(value);
+                            let rhs = Cow::from(rhs);
 
-                        match comparator {
-                            Comparison::Lt => lhs < rhs,
-                            Comparison::Lte => lhs <= rhs,
-                            Comparison::Gt => lhs > rhs,
-                            Comparison::Gte => lhs >= rhs,
+                            match comparator {
+                                Comparison::Lt => lhs < rhs,
+                                Comparison::Lte => lhs <= rhs,
+                                Comparison::Gt => lhs > rhs,
+                                Comparison::Gte => lhs >= rhs,
+                            }
                         }
-                    }
-                    // Otherwise, compare directly as strings.
-                    _ => {
-                        let lhs = string_value(value);
+                        // Otherwise, compare directly as strings.
+                        _ => {
+                            let lhs = string_value(value);
 
-                        match comparator {
-                            Comparison::Lt => lhs < rhs,
-                            Comparison::Lte => lhs <= rhs,
-                            Comparison::Gt => lhs > rhs,
-                            Comparison::Gte => lhs >= rhs,
+                            match comparator {
+                                Comparison::Lt => lhs < rhs,
+                                Comparison::Lte => lhs <= rhs,
+                                Comparison::Gt => lhs > rhs,
+                                Comparison::Gte => lhs >= rhs,
+                            }
                         }
-                    }
-                })
+                    }),
+                )
             }
             // Tag values need extracting by "key:value" to be compared.
-            Field::Tag(_) => Run::boxed(move |value| match value {
-                Value::Array(v) => v.iter().any(|v| match string_value(v).split_once(":") {
-                    Some((_, lhs)) => {
-                        let lhs = Cow::from(lhs);
+            Field::Tag(_) => resolve_value(
+                buf,
+                Run::boxed(move |value| match value {
+                    Value::Array(v) => v.iter().any(|v| match string_value(v).split_once(":") {
+                        Some((_, lhs)) => {
+                            let lhs = Cow::from(lhs);
 
-                        match comparator {
-                            Comparison::Lt => lhs < rhs,
-                            Comparison::Lte => lhs <= rhs,
-                            Comparison::Gt => lhs > rhs,
-                            Comparison::Gte => lhs >= rhs,
+                            match comparator {
+                                Comparison::Lt => lhs < rhs,
+                                Comparison::Lte => lhs <= rhs,
+                                Comparison::Gt => lhs > rhs,
+                                Comparison::Gte => lhs >= rhs,
+                            }
                         }
-                    }
+                        _ => false,
+                    }),
                     _ => false,
                 }),
-                _ => false,
-            }),
+            ),
             // All other tag types are compared by string.
-            _ => Run::boxed(move |value| {
-                let lhs = string_value(value);
+            _ => resolve_value(
+                buf,
+                Run::boxed(move |value| {
+                    let lhs = string_value(value);
 
-                match comparator {
-                    Comparison::Lt => lhs < rhs,
-                    Comparison::Lte => lhs <= rhs,
-                    Comparison::Gt => lhs > rhs,
-                    Comparison::Gte => lhs >= rhs,
-                }
-            }),
+                    match comparator {
+                        Comparison::Lt => lhs < rhs,
+                        Comparison::Lte => lhs <= rhs,
+                        Comparison::Gt => lhs > rhs,
+                        Comparison::Gte => lhs >= rhs,
+                    }
+                }),
+            ),
         }
     }
 }
 
-// fn resolve_value(buf: LookupBuf, match_fn: Box<dyn Matcher>) -> Box<dyn Matcher> {
-//     let func = move |obj: &Value| {
-//         // Get the value by path, or return early with `false` if it doesn't exist.
-//         let value = match obj.get_by_path(&buf) {
-//             Some(v) => v,
-//             _ => return false,
-//         };
-//
-//         match_fn.run(value)
-//     };
-//
-//     Run::boxed(func)
-// }
+fn resolve_value(buf: LookupBuf, match_fn: Box<dyn Matcher<Value>>) -> Box<dyn Matcher<Value>> {
+    let func = move |obj: &Value| {
+        // Get the value by path, or return early with `false` if it doesn't exist.
+        let value = match obj.get_by_path(&buf) {
+            Some(v) => v,
+            _ => return false,
+        };
+
+        match_fn.run(value)
+    };
+
+    Run::boxed(func)
+}
 
 /// Returns a boxed `Matcher`
 // fn wildcard_with_prefix(field: Field, prefix: String) -> Box<dyn Matcher> {
