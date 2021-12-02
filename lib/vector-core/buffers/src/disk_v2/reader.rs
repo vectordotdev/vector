@@ -2,6 +2,7 @@ use std::{
     cmp, fmt,
     io::{self, ErrorKind},
     marker::PhantomData,
+    path::PathBuf,
     sync::Arc,
 };
 
@@ -21,7 +22,14 @@ use super::{
     record::{try_as_record_archive, Record, RecordStatus},
 };
 
-pub struct ReadToken(usize, u64);
+#[derive(Debug)]
+struct DeletionMarker {
+    highest_record_id: u64,
+    data_file_path: PathBuf,
+    bytes_read: u64,
+}
+
+pub(super) struct ReadToken(usize, u64);
 
 impl ReadToken {
     pub fn record_size(&self) -> usize {
@@ -98,14 +106,14 @@ where
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     async fn read_length_delimiter(&mut self) -> Result<Option<usize>, ReaderError<T>> {
         loop {
-            if self.reader.buffer().len() >= 4 {
-                let length_buf = &self.reader.buffer()[..4];
+            if self.reader.buffer().len() >= 8 {
+                let length_buf = &self.reader.buffer()[..8];
                 let length = length_buf
                     .try_into()
-                    .expect("the slice is the length of a u32");
-                self.reader.consume(4);
+                    .expect("the slice is the length of a u64");
+                self.reader.consume(8);
 
-                return Ok(Some(u32::from_be_bytes(length) as usize));
+                return Ok(Some(u64::from_be_bytes(length) as usize));
             }
 
             let buf = self.reader.fill_buf().await.context(Io)?;
@@ -116,11 +124,20 @@ where
     }
 
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
-    async fn try_next_record(&mut self) -> Result<Option<ReadToken>, ReaderError<T>> {
+    pub(super) async fn try_next_record(&mut self) -> Result<Option<ReadToken>, ReaderError<T>> {
         let record_len = match self.read_length_delimiter().await? {
             Some(len) => len,
-            None => return Ok(None),
+            None => {
+                trace!("read_length_delimiter returned None");
+                return Ok(None);
+            }
         };
+
+        if record_len == 0 {
+            return Err(ReaderError::FailedToDeserialize {
+                reason: "record length was zero".to_string(),
+            });
+        }
 
         // Read in all of the bytes we need first.
         self.aligned_buf.clear();
@@ -136,8 +153,6 @@ where
         // Now see if we can deserialize our archived record from this.
         let buf = self.aligned_buf.as_slice();
         match try_as_record_archive(buf, &self.checksummer) {
-            // TODO: do something in the error / corrupted cases; emit an error, increment an error
-            // counter, yadda yadda. something.
             RecordStatus::FailedDeserialization(de) => Err(ReaderError::FailedToDeserialize {
                 reason: de.into_inner(),
             }),
@@ -146,12 +161,13 @@ where
             }
             RecordStatus::Valid(id) => {
                 self.current_record_id = id;
-                Ok(Some(ReadToken(4 + buf.len(), id)))
+                // TODO: Another spot where our hardcoding of the length delimiter size in bytes is fragile.
+                Ok(Some(ReadToken(8 + buf.len(), id)))
             }
         }
     }
 
-    fn read_record(&mut self, token: ReadToken) -> Result<T, ReaderError<T>> {
+    pub(super) fn read_record(&mut self, token: ReadToken) -> Result<T, ReaderError<T>> {
         if token.1 != self.current_record_id {
             panic!("using expired read token");
         }
@@ -164,11 +180,6 @@ where
 
         T::decode(archived_record.payload()).context(FailedToDecode)
     }
-
-    /// Consumes this `RecordReader`, returning the underlying reader.
-    pub fn into_inner(self) -> R {
-        self.reader.into_inner()
-    }
 }
 
 #[derive(Debug)]
@@ -177,7 +188,11 @@ pub struct Reader<T> {
     reader: Option<RecordReader<File, T>>,
     bytes_read: u64,
     last_reader_record_id: u64,
+    last_acked_record_id: u64,
     ready_to_read: bool,
+    check_pending_deletions: bool,
+    pending_deletions: Vec<DeletionMarker>,
+    pending_read_sizes: Vec<u64>,
     _t: PhantomData<T>,
 }
 
@@ -191,7 +206,11 @@ where
             reader: None,
             bytes_read: 0,
             last_reader_record_id: 0,
+            last_acked_record_id: 0,
             ready_to_read: false,
+            check_pending_deletions: false,
+            pending_deletions: Vec::new(),
+            pending_read_sizes: Vec::new(),
             _t: PhantomData,
         }
     }
@@ -204,47 +223,150 @@ where
         // However, we _don't_ want to update the ledger if we're just seeking to our last known
         // read position, because that already happened for all the records we're seeking past.
         self.bytes_read += record_size;
-
-        if self.ready_to_read {
-            self.ledger.track_read(record_size);
-            self.ledger.notify_reader_waiters();
-        }
+        self.pending_read_sizes.push(record_size);
     }
 
-    /// Switches the reader over to the next data file to read.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
-    async fn roll_to_next_data_file(&mut self) -> io::Result<()> {
-        // Try and grab the file size once we're ready to roll over.  We use this to figure out if
-        // we need to subtract some more bytes from the total buffer size.  If we rolled over due to
-        // error, then we'd be keeping around bytes we'd never get to read, leaving the buffer size
-        // value invalid.  This fixes that.
+    async fn delete_completed_data_file(&mut self, marker: DeletionMarker) -> io::Result<()> {
+        // Grab the size of the data file before we delete it, which gives us a chance to fix up the
+        // total buffer size for corrupted files.
         //
-        // TODO: this doesn't address record count, though
-        if let Some(reader) = self.reader.take() {
-            let file = reader.into_inner();
-            let metadata = file.metadata().await?;
+        // Since we only decrement the buffer size after a successful read in normal cases, skipping
+        // the rest of a corrupted file could lead to the total buffer size being unsynchronized.
+        // We use the difference between the number of bytes read and the file size to figure out if
+        // we need to make a manual adjustment.
+        let data_file = File::open(&marker.data_file_path).await?;
+        let metadata = data_file.metadata().await?;
 
-            let file_size = metadata.len();
-            let size_delta = file_size - self.bytes_read;
-            if size_delta > 0 {
-                println!("fixing up size delta after rolling away from unfinished file: delta={} ({}-{})",
-                    size_delta, file_size, self.bytes_read);
-                self.ledger.state().decrement_total_buffer_size(size_delta);
-            }
+        let size_delta = metadata.len() - marker.bytes_read;
+        if size_delta > 0 {
+            trace!(
+                "fixing up buffer size after deleting partially-read data file: delta={} ({}-{})",
+                size_delta,
+                metadata.len(),
+                marker.bytes_read
+            );
+            self.ledger.state().decrement_total_buffer_size(size_delta);
         }
-        self.bytes_read = 0;
+        drop(data_file);
 
-        // Delete the current data file, and increment our reader file ID.
-        let data_file_path = self.ledger.get_current_reader_data_file_path();
-        fs::remove_file(&data_file_path).await?;
-
-        self.ledger.state().increment_reader_file_id();
+        // Delete the current data file, and increment our actual reader file ID.
+        fs::remove_file(&marker.data_file_path).await?;
+        self.ledger.increment_acked_reader_file_id();
         self.ledger.flush()?;
 
         // Notify any waiting writers that we've deleted a data file, which they may be waiting on
         // because they're looking to reuse the file ID of the file we just finished reading.
         self.ledger.notify_reader_waiters();
+
         Ok(())
+    }
+
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
+    async fn delete_completed_data_files(&mut self) -> io::Result<()> {
+        // Figure out if any of the pending deletions we have are now ready.
+        let ready_deletions = {
+            let ready_deletions_len = self
+                .pending_deletions
+                .iter()
+                .take_while(|pending| {
+                    // If we haven't wrapped around past zero, then we simply check if our new "last acked"
+                    // value is highest than the highest record ID for the deletion, otherwise we check if
+                    // the number of acknowledged records exceeds the difference between "last acked" and
+                    // "highest record ID", which handles the wrapping-to-zero case.
+                    self.last_acked_record_id >= pending.highest_record_id
+                    //|| (pending.highest_record_id - original_last_acked_record) <= ack_offset
+                })
+                .count();
+            self.pending_deletions
+                .drain(..ready_deletions_len)
+                .collect::<Vec<_>>()
+        };
+
+        // Delete each data file whose maximum record ID we've now exceeded.
+        for deletion in ready_deletions {
+            self.delete_completed_data_file(deletion).await?;
+        }
+
+        Ok(())
+    }
+
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
+    async fn adjust_acknowledgement_state(&mut self, ack_offset: u64) -> io::Result<()> {
+        trace!(
+            message = "ack state before adjusting",
+            self.last_acked_record_id
+        );
+
+        // Track our new highest acknowledged record ID, and handle any pending deletions that now qualify.
+        self.last_acked_record_id += ack_offset;
+        self.delete_completed_data_files().await
+    }
+
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
+    pub async fn handle_pending_acknowledgements(&mut self) -> io::Result<()> {
+        // In this method, we handle ensuring that whatever pending deletions that are now "ready"
+        // are handled as quickly as possible.
+        //
+        // Normally, as records are read, they'll be processed downstream, which can take a variable
+        // amount of time.  Due to this, an object is provided to callers which they use to indicate
+        // how many of the records they've read have been durably processed such that we can
+        // consider them processed from the reader perspective.  In other words, they "acknowledge"
+        // that we no longer need to care about those records.
+        //
+        // When all of the records for a given data file have been acknowledged, this means we can
+        // finally delete that data file.
+
+        // Consume however many outstanding pending acknowledgements there are and handling
+        // adjusting the ledger, as well as seeing if any pending deletions are now ready to run.
+        let pending_acks = self.ledger.consume_pending_acks();
+        if pending_acks > 0 {
+            // First, recognize all of the bytes read for the now-acknowledged records so we can
+            // adjust the total buffer size correctly.
+            let total_bytes_read = self.pending_read_sizes.drain(..pending_acks).sum();
+            self.ledger
+                .track_reads(pending_acks as u64, total_bytes_read);
+
+            // Notify any waiting writers that we've consumed a bunch of records/bytes, since they
+            // might be waiting for the total buffer size to go down below the configured limit.
+            self.ledger.notify_reader_waiters();
+
+            self.adjust_acknowledgement_state(pending_acks as u64)
+                .await?;
+        }
+
+        // Due to the structure of `next`, we handle pending acknowledgements before we generate
+        // deletion markers.  This poses a problem when `next` handles any pending acknowledgements and
+        // then also rolls to the next data file all in the same call.  Since the pending deletion
+        // isn't generated until after calling this method, we end up in a situation where
+        // `pending_acks` is zero, even though the deletion marker we just generated is ready.
+        //
+        // To handle this case, all file rolling operations set the `self.pending_acks_checked` flag
+        // to indicate that a pending deletion was recently inserted and that we should check for
+        // any pending deletions that are ready, even if we had no pending acknowledgements.
+        if self.check_pending_deletions {
+            self.check_pending_deletions = false;
+            self.delete_completed_data_files().await
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Switches the reader over to the next data file to read.
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
+    fn roll_to_next_data_file(&mut self) {
+        // Store the pending deletion marker.
+        self.pending_deletions.push(DeletionMarker {
+            highest_record_id: self.last_reader_record_id,
+            data_file_path: self.ledger.get_current_reader_data_file_path(),
+            bytes_read: self.bytes_read,
+        });
+        self.check_pending_deletions = true;
+
+        // Now reset our internal state so we can go for the next data file.
+        self.reader = None;
+        self.bytes_read = 0;
+        self.ledger.increment_unacked_reader_file_id();
     }
 
     /// Ensures this reader is ready to attempt reading the next record.
@@ -277,14 +399,14 @@ where
         }
     }
 
-    fn update_reader_last_record_id(&mut self, record_id: u64) {
+    async fn update_reader_last_record_id(&mut self, record_id: u64) -> io::Result<()> {
         let previous_id = self.last_reader_record_id;
         self.last_reader_record_id = record_id;
 
         // Don't execute the ID delta logic when we're still in setup mode, which is where we would
         // be reading record IDs below our last read record ID.
         if !self.ready_to_read {
-            return;
+            return Ok(());
         }
 
         let id_delta = record_id.wrapping_sub(previous_id);
@@ -312,9 +434,24 @@ where
                     emit(&EventsCorrupted {
                         count: corrupted_records,
                     });
+
+                    // We call this here, instead of incrementing `pending_acks` in the ledger
+                    // directly, or waiting for the next call to `next`, for two reasons:
+                    // - we can delete data files faster, potentially, by doing it right before
+                    //   `next` successfully returns a record
+                    // - since we're skipping records, there's no pending read sizes for the records
+                    //   we're skipping, so we just need to update the acknowledgement state
+                    //   directly, without going through the normal path
+                    //
+                    // We maintain ledger consistency, even without going through
+                    // `handle_pending_acknowledgements`, by updating the record count above, and
+                    // the data file deletion logic handles fixing up the buffer size.
+                    self.adjust_acknowledgement_state(corrupted_records).await?;
                 }
             }
         }
+
+        Ok(())
     }
 
     /// Seeks to the next record that the reader should read.
@@ -355,7 +492,9 @@ where
                 // If `self.last_reader_record_id` hasn't moved at all, compared to when we started
                 // (starting_last_reader_record_id), then we know that we're caught up, and we just
                 // need to set `self.last_reader_record_id` to match what the ledger has.
-                self.update_reader_last_record_id(ledger_last);
+                self.update_reader_last_record_id(ledger_last)
+                    .await
+                    .context(Io)?;
                 break;
             }
         }
@@ -369,15 +508,17 @@ where
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn next(&mut self) -> Result<Option<T>, ReaderError<T>> {
         let token = loop {
+            // Handle any pending acknowledgements first.
+            self.handle_pending_acknowledgements().await.context(Io)?;
+
             self.ensure_ready_for_read().await.context(Io)?;
 
             let reader = self
                 .reader
                 .as_mut()
-                .expect("reader should exist after ensure_ready_for_read");
+                .expect("reader should exist after `ensure_ready_for_read`");
 
-            let current_writer_file_id = self.ledger.state().get_current_writer_file_id();
-            let current_reader_file_id = self.ledger.state().get_current_reader_file_id();
+            let (reader_file_id, writer_file_id) = self.ledger.get_current_reader_writer_file_id();
 
             // Try reading a record, which if successful, gives us a token to actually read/get a
             // reference to the record.  This is a slightly-tricky song-and-dance due to rustc not
@@ -417,7 +558,7 @@ where
                     // the caller, but they might be expecting a read-after-write behavior, so we
                     // return the error to them after ensuring that we roll to the next file first.
                     if e.is_bad_read() {
-                        self.roll_to_next_data_file().await.context(Io)?;
+                        self.roll_to_next_data_file();
                     }
 
                     return Err(e);
@@ -483,34 +624,21 @@ where
                 return Ok(None);
             }
 
-            if current_writer_file_id != current_reader_file_id {
-                self.roll_to_next_data_file().await.context(Io)?;
+            if reader_file_id != writer_file_id {
+                self.roll_to_next_data_file();
             }
         };
 
         // We got a read token, so our record is present in the reader, and now we can actually read
         // it out and return a reference to it.
-        self.update_reader_last_record_id(token.record_id());
+        self.update_reader_last_record_id(token.record_id())
+            .await
+            .context(Io)?;
         self.track_read(token.record_size() as u64);
         let reader = self
             .reader
             .as_mut()
-            .expect("reader should exist after ensure_ready_for_read");
+            .expect("reader should exist after `ensure_ready_for_read`");
         reader.read_record(token).map(|record| Some(record))
-    }
-}
-
-#[cfg(test)]
-impl<T> Reader<T> {
-    pub fn get_total_records(&self) -> u64 {
-        self.ledger.state().get_total_records()
-    }
-
-    pub fn get_total_buffer_size(&self) -> u64 {
-        self.ledger.state().get_total_buffer_size()
-    }
-
-    pub fn get_current_reader_file_id(&self) -> u16 {
-        self.ledger.state().get_current_reader_file_id()
     }
 }

@@ -8,7 +8,6 @@
 //!
 //! These constraints, or more often, invariants, are the groundwork for ensuring that the design
 //! can stay simple and understandable:
-//! - buffer can grow to a maximum of ~8TB in total size
 //! - data files do not exceed 128MB
 //! - no more than 65,536 data files can exist at any given time
 //! - buffer can grow to a maximum of ~8TB in total size (65k files * 128MB)
@@ -29,7 +28,7 @@
 //!
 //! Records are packed together with a relatively simple pseudo-structure:
 //!   record:
-//!     record_len: uint32
+//!     record_len: uint64
 //!     checksum: uint32 (CRC32C of record_id + payload)
 //!     record_id: uint64
 //!     payload: uint8[]
@@ -88,19 +87,11 @@
 //! Additionally, record IDs are allocated in the same way: monotonic, sequential, and will wrap
 //! when they reach the maximum value for the data type.  For record IDs, however, this would mean
 //! reaching 2^64, which will take a really, really, really long time.
-//!
-//! # Implementation TODOs:
-//!
-//! - test what happens when reader is waiting for writer to open next data file (i'm not even sure
-//!   this is actually possible since we always ensure the writer is ready to write while
-//!   constructing the buffer, which means a file will be present, but technically our code could
-//!   handle it if the timing was right i.e. we called ensure_ready_to_read before
-//!   ensure_ready_to_write... we could probably brute force test it using Reader/Writer directly...
-//!   *shrug*)
 use std::{marker::PhantomData, sync::Arc};
 
 use snafu::{ResultExt, Snafu};
 
+mod acker;
 mod backed_archive;
 mod common;
 mod ledger;
@@ -114,6 +105,7 @@ mod tests;
 
 use crate::Bufferable;
 
+use self::acker::Acker;
 pub(crate) use self::ledger::Ledger;
 
 pub use self::{
@@ -147,9 +139,10 @@ where
     #[cfg_attr(test, instrument(level = "trace"))]
     pub(crate) async fn from_config_inner(
         config: DiskBufferConfig,
-    ) -> Result<(Writer<T>, Reader<T>, Arc<Ledger>), BufferError<T>> {
+    ) -> Result<(Writer<T>, Reader<T>, Acker, Arc<Ledger>), BufferError<T>> {
         let ledger = Ledger::load_or_create(config).await.context(LedgerError)?;
         let ledger = Arc::new(ledger);
+        let acker = Acker::from_ledger(&ledger);
 
         let mut writer = Writer::new(Arc::clone(&ledger));
         writer
@@ -163,15 +156,15 @@ where
             .await
             .context(ReaderSeekFailed)?;
 
-        Ok((writer, reader, ledger))
+        Ok((writer, reader, acker, ledger))
     }
 
     #[cfg_attr(test, instrument(level = "trace"))]
     pub async fn from_config(
         config: DiskBufferConfig,
-    ) -> Result<(Writer<T>, Reader<T>), BufferError<T>> {
-        let (writer, reader, _) = Self::from_config_inner(config).await?;
+    ) -> Result<(Writer<T>, Reader<T>, Acker), BufferError<T>> {
+        let (writer, reader, acker, _) = Self::from_config_inner(config).await?;
 
-        Ok((writer, reader))
+        Ok((writer, reader, acker))
     }
 }

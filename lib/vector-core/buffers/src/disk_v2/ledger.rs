@@ -1,7 +1,7 @@
 use std::{
     fmt, io,
     path::PathBuf,
-    sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering},
+    sync::atomic::{AtomicBool, AtomicU16, AtomicU64, AtomicUsize, Ordering},
     time::Instant,
 };
 
@@ -89,80 +89,78 @@ impl Default for LedgerState {
 }
 
 impl ArchivedLedgerState {
-    pub fn increment_records(&self, record_size: u64) {
+    pub(super) fn increment_records(&self, record_size: u64) {
         self.total_records.fetch_add(1, Ordering::AcqRel);
         self.total_buffer_size
             .fetch_add(record_size, Ordering::AcqRel);
     }
 
-    pub fn decrement_records(&self, record_size: u64) {
-        self.total_records.fetch_sub(1, Ordering::AcqRel);
+    pub(super) fn decrement_records(&self, record_len: u64, total_record_size: u64) {
+        self.total_records.fetch_sub(record_len, Ordering::AcqRel);
         self.total_buffer_size
-            .fetch_sub(record_size, Ordering::AcqRel);
-    }
-
-    pub fn get_total_buffer_size(&self) -> u64 {
-        self.total_buffer_size.load(Ordering::Acquire)
+            .fetch_sub(total_record_size, Ordering::AcqRel);
     }
 
     pub fn get_total_records(&self) -> u64 {
         self.total_records.load(Ordering::Acquire)
     }
 
-    pub fn decrement_total_buffer_size(&self, amount: u64) {
-        self.total_buffer_size.fetch_sub(amount, Ordering::AcqRel);
-    }
-
-    pub fn decrement_total_records(&self, amount: u64) {
+    pub(super) fn decrement_total_records(&self, amount: u64) {
         self.total_records.fetch_sub(amount, Ordering::AcqRel);
     }
 
-    pub fn get_next_writer_record_id(&self) -> u64 {
-        self.writer_next_record_id.load(Ordering::Acquire)
+    pub fn get_total_buffer_size(&self) -> u64 {
+        self.total_buffer_size.load(Ordering::Acquire)
     }
 
-    pub fn increment_next_writer_record_id(&self) {
-        self.writer_next_record_id.fetch_add(1, Ordering::AcqRel);
+    pub(super) fn decrement_total_buffer_size(&self, amount: u64) {
+        self.total_buffer_size.fetch_sub(amount, Ordering::AcqRel);
     }
 
-    pub fn get_last_reader_record_id(&self) -> u64 {
-        self.reader_last_record_id.load(Ordering::Acquire)
-    }
-
-    pub fn set_last_reader_record_id(&self, id: u64) {
-        self.reader_last_record_id.store(id, Ordering::Release);
-    }
-
-    /// Gets the current writer file ID.
-    pub fn get_current_writer_file_id(&self) -> u16 {
+    fn get_current_writer_file_id(&self) -> u16 {
         self.writer_current_data_file_id.load(Ordering::Acquire)
     }
 
-    /// Gets the next writer file ID.
-    pub fn get_next_writer_file_id(&self) -> u16 {
+    fn get_next_writer_file_id(&self) -> u16 {
         (self.get_current_writer_file_id() + 1) % MAX_FILE_ID
     }
 
-    /// Increments the current writer file ID.
-    pub fn increment_writer_file_id(&self) {
+    pub(super) fn increment_writer_file_id(&self) {
         self.writer_current_data_file_id
             .store(self.get_next_writer_file_id(), Ordering::Release);
     }
 
-    /// Gets the current reader file ID.
-    pub fn get_current_reader_file_id(&self) -> u16 {
+    pub(super) fn get_next_writer_record_id(&self) -> u64 {
+        self.writer_next_record_id.load(Ordering::Acquire)
+    }
+
+    pub(super) fn increment_next_writer_record_id(&self) {
+        self.writer_next_record_id.fetch_add(1, Ordering::AcqRel);
+    }
+
+    fn get_current_reader_file_id(&self) -> u16 {
         self.reader_current_data_file_id.load(Ordering::Acquire)
     }
 
-    /// Gets the next reader file ID.
-    pub fn get_next_reader_file_id(&self) -> u16 {
+    fn get_next_reader_file_id(&self) -> u16 {
         (self.get_current_reader_file_id() + 1) % MAX_FILE_ID
     }
 
-    /// Increments the current reader file ID.
-    pub fn increment_reader_file_id(&self) {
+    fn get_offset_reader_file_id(&self, offset: u16) -> u16 {
+        self.get_current_reader_file_id().wrapping_add(offset) % MAX_FILE_ID
+    }
+
+    fn increment_reader_file_id(&self) {
         self.reader_current_data_file_id
             .store(self.get_next_reader_file_id(), Ordering::Release);
+    }
+
+    pub(super) fn get_last_reader_record_id(&self) -> u64 {
+        self.reader_last_record_id.load(Ordering::Acquire)
+    }
+
+    pub(super) fn set_last_reader_record_id(&self, id: u64) {
+        self.reader_last_record_id.store(id, Ordering::Release);
     }
 
     #[cfg(test)]
@@ -211,31 +209,77 @@ pub struct Ledger {
     writer_notify: Notify,
     // Tracks when writer has fully shutdown.
     writer_done: AtomicBool,
+    // Number of pending record acknowledgements that have yeet to be consumed by the reader.
+    pending_acks: AtomicUsize,
+    // The file ID offset of the reader past the acknowledged reader file ID.
+    unacked_reader_file_id_offset: AtomicU16,
     // Last flush of all unflushed files: ledger, data file, etc.
     last_flush: AtomicCell<Instant>,
 }
 
 impl Ledger {
+    /// Gets the configuration for the buffer that this ledger represents.
     pub fn config(&self) -> &DiskBufferConfig {
         &self.config
     }
 
+    /// Gets the internal ledger state.
+    ///
+    /// This is the information persisted to disk.
     pub fn state(&self) -> &ArchivedLedgerState {
         self.state.get_archive_ref()
     }
 
+    /// Gets the current reader file ID.
+    ///
+    /// This is internally adjusted to compensate for the fact that the reader can read far past
+    /// the latest acknowledge record/data file, and so is not representative of where the reader
+    /// would start reading from if the process crashed or was abruptly stopped.
+    pub fn get_current_reader_file_id(&self) -> u16 {
+        let unacked_offset = self.unacked_reader_file_id_offset.load(Ordering::Acquire);
+        self.state().get_offset_reader_file_id(unacked_offset)
+    }
+
+    /// Gets the current writer file ID.
+    pub fn get_current_writer_file_id(&self) -> u16 {
+        self.state().get_current_writer_file_id()
+    }
+
+    /// Gets the next writer file ID.
+    ///
+    /// This is purely a future-looking operation i.e. what would the file ID be if it was
+    /// incremented from its current value.  It does not increment and return the incremented value.
+    pub fn get_next_writer_file_id(&self) -> u16 {
+        self.state().get_next_writer_file_id()
+    }
+
+    /// Gets the current reader and writer file IDs.
+    ///
+    /// Similar to [`get_current_reader_file_id`], the file ID returned for the reader compensates
+    /// for the acknowledgement state of the reader.
+    pub fn get_current_reader_writer_file_id(&self) -> (u16, u16) {
+        let reader = self.get_current_reader_file_id();
+        let writer = self.get_current_writer_file_id();
+
+        (reader, writer)
+    }
+
+    /// Gets the current reader data file path, accounting for the unacknowledged offset.
     pub fn get_current_reader_data_file_path(&self) -> PathBuf {
-        self.get_data_file_path(self.state().get_current_reader_file_id())
+        self.get_data_file_path(self.get_current_reader_file_id())
     }
 
+    /// Gets the current writer data file path.
     pub fn get_current_writer_data_file_path(&self) -> PathBuf {
-        self.get_data_file_path(self.state().get_current_writer_file_id())
+        self.get_data_file_path(self.get_current_reader_file_id())
     }
 
+    /// Gets the next writer data file path.
     pub fn get_next_writer_data_file_path(&self) -> PathBuf {
         self.get_data_file_path(self.state().get_next_writer_file_id())
     }
 
+    /// Gets the data file path for an arbitrary file ID.
     pub fn get_data_file_path(&self, file_id: u16) -> PathBuf {
         self.config
             .data_dir
@@ -267,6 +311,91 @@ impl Ledger {
         self.writer_notify.notify_one();
     }
 
+    /// Tracks the statistics of a successful write.
+    pub fn track_write(&self, record_size: u64) {
+        self.state().increment_records(record_size);
+    }
+
+    /// Tracks the statistics of multiple successful reads.
+    pub fn track_reads(&self, record_len: u64, total_record_size: u64) {
+        self.state()
+            .decrement_records(record_len, total_record_size);
+    }
+
+    /// Marks the writer as finished.
+    ///
+    /// If the writer was not yet marked done, `false` is returned.  Other, `true` is returned, and
+    /// the caller should handle any necessary logic for closing the writer.
+    pub fn mark_writer_done(&self) -> bool {
+        self.writer_done
+            .compare_exchange_weak(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
+    }
+
+    /// Returns `true` if the writer was marked as done.
+    pub fn is_writer_done(&self) -> bool {
+        self.writer_done.load(Ordering::Acquire)
+    }
+
+    /// Increments the pending acknowledgement counter by the given amount.
+    pub fn increment_pending_acks(&self, amount: usize) {
+        self.pending_acks.fetch_add(amount, Ordering::AcqRel);
+    }
+
+    /// Consumes the full amount of pending acknowledgements, and resets the counter to zero.
+    pub fn consume_pending_acks(&self) -> usize {
+        self.pending_acks.swap(0, Ordering::AcqRel)
+    }
+
+    /// Increments the unacknowledged reader file ID.
+    ///
+    /// As further described in `increment_acked_reader_file_id`, the underlying value here allows
+    /// the reader to read ahead of a data file, even if it hasn't been durably processed yet.
+    pub fn increment_unacked_reader_file_id(&self) {
+        self.unacked_reader_file_id_offset
+            .fetch_add(1, Ordering::AcqRel);
+    }
+
+    /// Increments the acknowledged reader file ID.
+    ///
+    /// As records may be read and stored for a small period of time (batching in a sink, etc), we
+    /// cannot truly say that we have durably processed a record until the caller acknowledges the
+    /// record.  However, if we always waited for an acknowledgement, then each read could be forced
+    /// to wait for multiple seconds.  Such a design would clearly be unusable.
+    ///
+    /// Instead, we allow the reader to move ahead of the latest acknowledged record by tracking
+    /// their current file ID and acknowledged file ID separately.  Once all records in a file have
+    /// been acknowledged, the data file can be deleted and the reader file ID can be durably
+    /// stored in the ledger.
+    ///
+    /// Callers use `increment_unacked_reader_file_id` to move to the next data file without
+    /// tracking that the previous data file has been durably processed and can be deleted, and
+    /// `increment_acked_reader_file_id` is the reciprocal function which tracks the highest data
+    /// file that _has_ been durably processed.
+    ///
+    /// Since the unacked file ID is simply a relative offset to the acked file ID, we decrement it
+    /// here to keep the "current" file ID stable.
+    pub fn increment_acked_reader_file_id(&self) {
+        self.state().increment_reader_file_id();
+
+        // We ignore the return value because when the value is already zero, we don't want to do an
+        // update, so we return `None`, which causes `fetch_update` to return `Err`.  It's not
+        // really an error, we just wanted to avoid the extra atomic compare/exchange.
+        //
+        // Basically, this call is actually infallible for our purposes.
+        let _ = self.unacked_reader_file_id_offset.fetch_update(
+            Ordering::Release,
+            Ordering::Relaxed,
+            |n| {
+                if n == 0 {
+                    None
+                } else {
+                    Some(n - 1)
+                }
+            },
+        );
+    }
+
     /// Determines whether or not all files should be flushed/fsync'd to disk.
     ///
     /// In the case of concurrent callers when the flush deadline has been exceeded, only one caller
@@ -287,25 +416,10 @@ impl Ledger {
         false
     }
 
-    pub fn track_write(&self, record_size: u64) {
-        self.state().increment_records(record_size);
-    }
-
-    pub fn track_read(&self, record_size: u64) {
-        self.state().decrement_records(record_size);
-    }
-
-    pub fn mark_writer_done(&self) -> bool {
-        self.writer_done
-            .compare_exchange_weak(false, true, Ordering::SeqCst, Ordering::SeqCst)
-            .is_ok()
-    }
-
-    pub fn is_writer_done(&self) -> bool {
-        self.writer_done.load(Ordering::Acquire)
-    }
-
-    pub fn flush(&self) -> io::Result<()> {
+    /// Flushes the memory-mapped file backing the ledger to disk.
+    ///
+    /// This operation is synchronous.
+    pub(super) fn flush(&self) -> io::Result<()> {
         self.state.get_backing_ref().flush()
     }
 
@@ -377,6 +491,8 @@ impl Ledger {
             reader_notify: Notify::new(),
             writer_notify: Notify::new(),
             writer_done: AtomicBool::new(false),
+            pending_acks: AtomicUsize::new(0),
+            unacked_reader_file_id_offset: AtomicU16::new(0),
             last_flush: AtomicCell::new(Instant::now()),
         })
     }
@@ -390,6 +506,11 @@ impl fmt::Debug for Ledger {
             .field("state", &self.state.get_archive_ref())
             .field("reader_notify", &self.reader_notify)
             .field("writer_notify", &self.writer_notify)
+            .field("pending_acks", &self.pending_acks.load(Ordering::Acquire))
+            .field(
+                "unacked_reader_file_id_offset",
+                &self.unacked_reader_file_id_offset.load(Ordering::Acquire),
+            )
             .field("writer_done", &self.writer_done.load(Ordering::Acquire))
             .field("last_flush", &self.last_flush)
             .finish()

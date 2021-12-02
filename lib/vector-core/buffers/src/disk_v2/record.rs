@@ -45,7 +45,7 @@ pub struct Record<'a> {
     /// The checksum of the record.
     ///
     /// The checksum is CRC32C(big_endian_bytes(id) + payload).
-    checksum: u32,
+    pub(super) checksum: u32,
     /// The record ID.
     ///
     /// This is monotonic across records.
@@ -56,6 +56,10 @@ pub struct Record<'a> {
     #[with(CopyOptimize, RefAsBox)]
     payload: &'a [u8],
 }
+
+/*#[rustc_layout(debug)]
+#[repr(transparent)]
+struct DebugArchivedRecord<'a>(ArchivedRecord<'a>);*/
 
 // Manual implementation of CheckBytes required as the derived version currently causes an internal
 // compiler error.
@@ -142,6 +146,7 @@ fn generate_checksum(checksummer: &Hasher, id: u64, payload: &[u8]) -> u32 {
 /// or not the checksum in the record matched the recalculated checksum.  Otherwise, the
 /// deserialization error encounted will be provided, which describes the error in a more verbose,
 /// debugging-oriented fashion.
+#[cfg_attr(test, instrument(skip_all, level = "trace"))]
 pub fn try_as_record_archive(buf: &[u8], checksummer: &Hasher) -> RecordStatus {
     match try_as_archive::<Record<'_>>(buf) {
         Ok(archive) => archive.verify_checksum(checksummer),

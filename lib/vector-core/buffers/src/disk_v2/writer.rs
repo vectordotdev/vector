@@ -32,7 +32,7 @@ use crate::{
     Bufferable,
 };
 
-use super::{backed_archive::BackedArchive, common::DiskBufferConfig};
+use super::{common::DiskBufferConfig, record::try_as_record_archive};
 
 #[derive(Debug, Snafu)]
 pub enum WriterError<R>
@@ -168,16 +168,19 @@ where
         }?;
         assert_eq!(self.ser_buf.len(), archive_len as usize);
 
-        let wire_archive_len: u32 = archive_len
+        let wire_archive_len: u64 = archive_len
             .try_into()
-            .expect("archive len should always fit into a u32");
+            .expect("archive len should always fit into a u64");
         self.writer
             .write_all(&wire_archive_len.to_be_bytes()[..])
             .await
             .context(Io)?;
         self.writer.write_all(&self.ser_buf).await.context(Io)?;
 
-        Ok(4 + archive_len)
+        // TODO: This is likely to never change, but ugh, this is fragile and I wish we had a
+        // better/super low overhead way to capture "the bytes we wrote" rather than piecing
+        // together what we _believe_ we should have written.
+        Ok(8 + archive_len)
     }
 
     /// Flushes the writer.
@@ -241,6 +244,7 @@ where
         self.data_file_size < self.config.max_data_file_size
     }
 
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     fn reset(&mut self) {
         self.writer = None;
         self.data_file_size = 0;
@@ -263,7 +267,7 @@ where
         let data_file_handle = self
             .writer
             .as_ref()
-            .expect("writer should exist after ensure_ready_for_write")
+            .expect("writer should exist after `ensure_ready_for_write`")
             .get_ref()
             .try_clone()
             .await
@@ -273,62 +277,53 @@ where
 
         let data_file_mmap = unsafe { Mmap::map(&data_file_handle).context(Io)? };
 
-        // We have bytes, so we should have an archived record.  Mind you, this could be a partial
-        // write if there was an error so we still need to use `BackedArchive` which will check for
-        // us and ensure we don't try to erroneously map partial bytes to `archivedRecord`.
-        match BackedArchive::<_, Record<'_>>::from_backing(data_file_mmap) {
-            // We got a record (which may or may not be corrupted, still gotta check!) so keep going.
-            Ok(archive) => {
-                let record = archive.get_archive_ref();
-                match record.verify_checksum(&Hasher::new()) {
-                    RecordStatus::Valid(id) => {
-                        // Since we have a valid record, checksum and all, see if the writer record ID
-                        // in the ledger lines up with the record ID we have here.
-                        let ledger_next_writer_record_id =
-                            self.ledger.state().get_next_writer_record_id();
-                        let last_written_record_id = id;
+        // We have bytes, so we should have an archived record... hopefully!  Go through the motions
+        // of verifying it.  If we hit any invalid states, then we should bump to the next data file
+        // since the reader will have to stop once it hits the first error in a given file.
+        let should_skip_to_next_file = match try_as_record_archive(
+            data_file_mmap.as_ref(),
+            &Hasher::new(),
+        ) {
+            RecordStatus::Valid(id) => {
+                // Since we have a valid record, checksum and all, see if the writer record ID
+                // in the ledger lines up with the record ID we have here.
+                let ledger_next = self.ledger.state().get_next_writer_record_id();
+                let last_id = id;
 
-                        // TODO: do we actually want this? the existence of a difference greater
-                        // than one implies there were records written that we tracked via the
-                        // ledger, but that never made it to disk.  if we fix up the ledger "next
-                        // writer record ID" file, we just hide that there was a problem, because
-                        // otherwise the reader would eventually hit this and then the record ID gap
-                        // logic would kick in to emit an event to show that we skipped/dropped a
-                        // bunch of events..
-                        //
-                        // the best we could reasonably do here, I think, is to skip to the next
-                        // data file to limit how many records we lose when we know the data file is
-                        // in a bad state, even if it doesn't account for corrupted records in the
-                        // middle of the file vs the last one.  we'd have to do that in the
-                        // non-success arms of this match, though.
-                        if ledger_next_writer_record_id - 1 != last_written_record_id {
-                            println!("writer record ID mismatch: next ID (ledger) = {}, last ID (written) = {}",
-                                ledger_next_writer_record_id, last_written_record_id);
-                            println!("these values should always be one apart from each other");
-                        }
-                        Ok(())
-                    }
-                    RecordStatus::Corrupted { .. } => {
-                        println!("got invalid checksum from record at end of current writer data file, boo!");
-                        Ok(())
-                    }
-                    // `ArchivedRecord::verify_checksum` doesn't actually return the failed
-                    // deserialization variant of `RecordStatus`, so we might want to switch to
-                    // using `try_as_record_archive` here instead of using `BackedArchive`.
-                    _ => unreachable!(),
+                if ledger_next - 1 == last_id {
+                    false
+                } else {
+                    trace!("writer record ID mismatch detected: next ID (ledger) = {}, last ID (written) = {}",
+                        ledger_next, last_id);
+                    true
                 }
             }
-            // Oh no, an error! There's nothing for us to do, really, since tghe reader has the
+            RecordStatus::Corrupted { .. } => {
+                trace!("invalid checksum from record at end of current writer data file");
+                true
+            }
+            // Oh no, an error! There's nothing for us to do, really, since the reader has the
             // logic for skipping records and deleting files when corruption is detected, so just
             // let that happened, but spit out the error here for posterity.
-            Err(e) => {
-                println!(
+            RecordStatus::FailedDeserialization(de) => {
+                let reason = de.into_inner();
+                trace!(
                     "got error deserializing last record in the current writer data file: {}",
-                    e.into_inner()
+                    reason
                 );
-                Ok(())
+                true
             }
+        };
+
+        // Reset our data file and increment the writer file ID so that the next call to
+        // `ensure_ready_to_write` opens the next file.  As with other corrupted data file
+        // conditions, we still depend on the reader to detect the corruption and delete the file.
+        if should_skip_to_next_file {
+            self.reset();
+            self.ledger.state().increment_writer_file_id();
         }
+
+        Ok(())
     }
 
     /// Ensures this writer is ready to attempt writer the next record.
@@ -469,7 +464,7 @@ where
         let n = self
             .writer
             .as_mut()
-            .expect("writer should exist after ensure_ready_for_write")
+            .expect("writer should exist after `ensure_ready_for_write`")
             .write_record(id, record)
             .await?;
 
@@ -524,6 +519,7 @@ where
 }
 
 impl<T> Writer<T> {
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub fn close(&mut self) {
         if self.ledger.mark_writer_done() {
             self.ledger.notify_writer_waiters();
@@ -534,20 +530,5 @@ impl<T> Writer<T> {
 impl<T> Drop for Writer<T> {
     fn drop(&mut self) {
         self.close()
-    }
-}
-
-#[cfg(test)]
-impl<T> Writer<T> {
-    pub fn get_total_records(&self) -> u64 {
-        self.ledger.state().get_total_records()
-    }
-
-    pub fn get_total_buffer_size(&self) -> u64 {
-        self.ledger.state().get_total_buffer_size()
-    }
-
-    pub fn get_current_writer_file_id(&self) -> u16 {
-        self.ledger.state().get_current_writer_file_id()
     }
 }

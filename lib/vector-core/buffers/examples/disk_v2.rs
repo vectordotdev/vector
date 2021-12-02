@@ -77,7 +77,7 @@ fn main() {
         let start = Instant::now();
         let config = DiskBufferConfig::from_path("/tmp/vector/disk-v2-testing")
             .build();
-        let (mut writer, mut reader) = Buffer::from_config(config)
+        let (mut writer, mut reader, acker) = Buffer::from_config(config)
             .await
             .expect("failed to open buffer");
 
@@ -123,25 +123,16 @@ fn main() {
         let _ = tokio::spawn(async move {
             let mut rx_histo = Histogram::<u64>::new(3).expect("should not fail");
 
-            let mut last_id = None;
             for _ in 0..reader_count {
                 let rx_start = Instant::now();
 
-                let record = reader.next().await.expect("read should not fail").expect("record should not be none");
+                let _record = reader.next().await.expect("read should not fail").expect("record should not be none");
 
                 let elapsed = rx_start.elapsed().as_nanos() as u64;
                 rx_histo.record(elapsed).expect("should not fail");
 
-                if last_id.is_none() {
-                    println!("started reading at record ID {}", record.id());
-                }
-                last_id = Some(record.id());
-
                 reader_position.fetch_add(1, Ordering::Relaxed);
-            }
-
-            if let Some(id) = last_id {
-                println!("finished reading at record ID {}", id);
+                acker.acknowledge_records(1);
             }
 
             let _ = reader_tx.send((reader, rx_histo));

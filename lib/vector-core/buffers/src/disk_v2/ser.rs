@@ -90,9 +90,6 @@ where
     T: Archive,
     T::Archived: for<'b> CheckBytes<DefaultValidator<'b>>,
 {
-    assert!(!buf.is_empty());
-    check_archived_root::<T>(buf).map_err(|e| {
-        println!("check error: {:?}", e);
-        e.into()
-    })
+    debug_assert!(!buf.is_empty());
+    check_archived_root::<T>(buf).map_err(|e| e.into())
 }
