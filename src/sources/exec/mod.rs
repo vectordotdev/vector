@@ -1,12 +1,15 @@
 use crate::{
     async_read::VecAsyncReadExt,
-    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
+    codecs::{
+        self,
+        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+    },
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{ExecCommandExecuted, ExecEventsReceived, ExecFailed, ExecTimeout},
     serde::{default_decoding, default_framing_stream_based},
     shutdown::ShutdownSignal,
-    sources::util::TcpError,
+    sources::util::StreamDecodingError,
     Pipeline,
 };
 use bytes::Bytes;
@@ -42,7 +45,7 @@ pub struct ExecConfig {
     #[serde(default = "default_framing_stream_based")]
     framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
-    decoding: Box<dyn ParserConfig>,
+    decoding: Box<dyn DeserializerConfig>,
 }
 
 // TODO: Would be nice to combine the scheduled and streaming config with the mode enum once

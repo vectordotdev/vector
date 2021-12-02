@@ -20,7 +20,6 @@ use vector_core::{
 };
 
 use super::request_builder::HecMetricsRequestBuilder;
-use vector_core::stream::ByteSizeOfItemSize;
 
 pub struct HecMetricsSink<S> {
     pub context: SinkContext,
@@ -62,7 +61,7 @@ where
                     default_namespace,
                 ))
             })
-            .batched(self.batch_settings, ByteSizeOfItemSize)
+            .batched(self.batch_settings.into_byte_size_config())
             .request_builder(builder_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {

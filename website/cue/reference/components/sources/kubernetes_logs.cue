@@ -229,6 +229,17 @@ components: sources: kubernetes_logs: {
 				examples: ["my_custom_label!=my_value", "my_custom_label!=my_value,my_other_custom_label=my_value"]
 			}
 		}
+		max_read_bytes: {
+			category:    "Reading"
+			common:      false
+			description: "An approximate limit on the amount of data read from a single pod log file at a given time."
+			required:    false
+			type: uint: {
+				default: 2048
+				examples: [2048]
+				unit: "bytes"
+			}
+		}
 		max_line_bytes: {
 			common:      false
 			description: "The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files."

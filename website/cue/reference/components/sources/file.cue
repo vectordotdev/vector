@@ -184,7 +184,7 @@ components: sources: file: {
 			description: "An approximate limit on the amount of data read from a single file at a given time."
 			required:    false
 			type: uint: {
-				default: null
+				default: 2048
 				examples: [2048]
 				unit: "bytes"
 			}

@@ -34,6 +34,7 @@ type = "internal_logs"
 [sinks.console]
 type = "console"
 inputs = ["vector_logs"]
+encoding.codec = "text"
 ```
 
 ### Using Vector logs

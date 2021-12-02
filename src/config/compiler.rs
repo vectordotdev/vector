@@ -1,5 +1,6 @@
 use super::{builder::ConfigBuilder, graph::Graph, validation, ComponentKey, Config, OutputId};
 use indexmap::{IndexMap, IndexSet};
+use std::collections::HashSet;
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
@@ -116,9 +117,15 @@ pub(super) fn expand_macros(
     let mut expanded_transforms = IndexMap::new();
     let mut expansions = IndexMap::new();
     let mut errors = Vec::new();
+    let parent_types = HashSet::new();
 
     while let Some((key, transform)) = config.transforms.pop() {
-        if let Err(error) = transform.expand(key, &mut expanded_transforms, &mut expansions) {
+        if let Err(error) = transform.expand(
+            key,
+            &parent_types,
+            &mut expanded_transforms,
+            &mut expansions,
+        ) {
             errors.push(error);
         }
     }

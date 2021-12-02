@@ -1,7 +1,7 @@
 #[cfg(feature = "codecs")]
 use crate::codecs::{
-    BytesDecoderConfig, BytesParserConfig, FramingConfig, NewlineDelimitedDecoderConfig,
-    ParserConfig,
+    decoding::{DeserializerConfig, FramingConfig},
+    BytesDecoderConfig, BytesDeserializerConfig, NewlineDelimitedDecoderConfig,
 };
 use indexmap::map::IndexMap;
 use serde::{de, Deserialize, Serialize};
@@ -35,8 +35,8 @@ pub fn default_framing_stream_based() -> Box<dyn FramingConfig> {
 }
 
 #[cfg(feature = "codecs")]
-pub fn default_decoding() -> Box<dyn ParserConfig> {
-    Box::new(BytesParserConfig::new())
+pub fn default_decoding() -> Box<dyn DeserializerConfig> {
+    Box::new(BytesDeserializerConfig::new())
 }
 
 pub fn to_string(value: impl serde::Serialize) -> String {

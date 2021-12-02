@@ -228,7 +228,7 @@ fn get_event_status(response: &Response<Bytes>) -> EventStatus {
         let body = String::from_utf8_lossy(response.body());
         if body.contains("\"errors\":true") {
             error!(message = "Response contained errors.", ?response);
-            EventStatus::Failed
+            EventStatus::Rejected
         } else {
             trace!(message = "Response successful.", ?response);
             EventStatus::Delivered
@@ -238,6 +238,6 @@ fn get_event_status(response: &Response<Bytes>) -> EventStatus {
         EventStatus::Errored
     } else {
         error!(message = "Response failed.", ?response);
-        EventStatus::Failed
+        EventStatus::Rejected
     }
 }

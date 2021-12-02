@@ -15,5 +15,5 @@ variable "tcp-gen-yaml" {
 
 variable "lading_image" {
   description = "The lading image to run"
-  type = string
+  type        = string
 }

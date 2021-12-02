@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use futures::future;
 use futures::StreamExt;
 use tower::util::BoxService;
-use vector_core::stream::{BatcherSettings, ByteSizeOfItemSize};
+use vector_core::stream::BatcherSettings;
 use vector_core::ByteSizeOf;
 
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -62,7 +62,7 @@ impl ElasticSearchSink {
             })
             .filter_map(|x| async move { x })
             .filter_map(move |log| future::ready(process_log(log, &mode, &id_key_field)))
-            .batched(self.batch_settings, ByteSizeOfItemSize)
+            .batched(self.batch_settings.into_byte_size_config())
             .request_builder(request_builder_concurrency_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
