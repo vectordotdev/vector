@@ -1942,6 +1942,7 @@ dependencies = [
  "lalrpop-util",
  "lazy_static",
  "lookup",
+ "nom 7.1.0",
  "onig",
  "ordered-float",
  "peeking_take_while",

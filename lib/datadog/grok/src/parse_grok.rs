@@ -514,4 +514,48 @@ mod tests {
             r#"invalid arguments for the function 'date'"#
         );
     }
+
+    #[test]
+    fn supports_array_filter() {
+        test_grok_pattern(vec![(
+            "%{data:field:array}",
+            "[1,2]",
+            Ok(Value::Array(vec!["1".into(), "2".into()])),
+        )]);
+        // test_grok_pattern(vec![(
+        //     "%{data:field:array(\"\\\\t\")}", //TODO fix this test
+        //     "[1\t2]",
+        //     Ok(Value::Array(vec!["1".into(), "2".into()])),
+        // )]);
+        test_grok_pattern(vec![(
+            "%{data:field:array(integer)}",
+            "[1,2]",
+            Ok(Value::Array(vec![1.into(), 2.into()])),
+        )]);
+        test_grok_pattern(vec![(
+            r#"%{data:field:array(";", integer)}"#,
+            "[1;2]",
+            Ok(Value::Array(vec![1.into(), 2.into()])),
+        )]);
+        test_grok_pattern(vec![(
+            r#"%{data:field:array("{}",";", integer)}"#,
+            "{1;2}",
+            Ok(Value::Array(vec![1.into(), 2.into()])),
+        )]);
+        test_grok_pattern(vec![(
+            "%{data:field:array(number)}",
+            "[1,2]",
+            Ok(Value::Array(vec![1.0.into(), 2.0.into()])),
+        )]);
+        test_grok_pattern(vec![(
+            "%{data:field:array(integer)}",
+            "[1,2]",
+            Ok(Value::Array(vec![1.into(), 2.into()])),
+        )]);
+        // test_grok_pattern(vec![(
+        //     "%{data:field:array(scale(10))}",
+        //     "[1,2.1]",
+        //     Ok(Value::Array(vec![10.0.into(), 21.0.into()])),
+        // )]);
+    }
 }
