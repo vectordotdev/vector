@@ -32,6 +32,18 @@ if .status == "warning" {
 
 .matches = { "name": .message, "num": "2" }
 .origin, .err = .hostname + "/" + .matches.name + "/" + .matches.num
+
+.metches = { "name": .message, "num": "2" }
+.oregin, .err = .hostname + "/" + .metches.name + "/" + .metches.num
+
+.mitches = { "name": .message, "num": "2" }
+.origin, .irr = .hostname + "/" + .mitches.name + "/" + .mitches.num
+
+.motches = { "name": .message, "num": "2" }
+.orogin, .orr = .hostname + "/" + .motches.name + "/" + .motches.num
+
+.mutches = { "name": .message, "num": "2" }
+.orugin, .urr = .hostname + "/" + .mutches.name + "/" + .mutches.num
 '''
 
 ##
