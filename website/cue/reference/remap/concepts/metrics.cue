@@ -4,8 +4,8 @@ remap: concepts: metrics: {
 		VRL enables you to transform [log events](\(urls.vector_log)) with very few restrictions but is much more
 		restrictive when it comes to [metrics](\(urls.vector_metric)). These changes to metric events _are_ allowed:
 
-		* You can add tags to the event via the `tags` field, which must be an
-		  [object](\(urls.vrl_expressions)/#object). Here's an example:
+		* You can add tags to the event via the `tags` field, whose value must be a
+		  [VRL object](\(urls.vrl_expressions)/#object) in which all keys and values are strings. Here's an example:
 
 		  ```coffee
 		  .tags = {
