@@ -1,6 +1,12 @@
-use crate::event::Event;
+use crate::{
+    event::Event,
+    fanout::{self, Fanout},
+    ByteSizeOf,
+};
+use futures::SinkExt;
 use futures::Stream;
-use std::pin::Pin;
+use std::{collections::HashMap, pin::Pin};
+
 #[cfg(any(feature = "lua"))]
 pub mod runtime_transform;
 pub use config::{DataType, ExpandType, TransformConfig, TransformContext};
@@ -181,4 +187,131 @@ pub trait TaskTransform: Send {
     ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
     where
         Self: 'static;
+}
+
+/// This currently a topology-focused trait that unifies function and fallible function transforms.
+/// Eventually it (or something very similar) should be able to replace both entirely. That will
+/// likely involve it not being batch-focused anymore, and since we'll then be able to have
+/// a single implementation of these loops that apply across all sync transforms.
+pub trait SyncTransform: Send + Sync {
+    fn run(&mut self, events: Vec<Event>, outputs: &mut TransformOutputs);
+}
+
+impl SyncTransform for Box<dyn FallibleFunctionTransform> {
+    fn run(&mut self, events: Vec<Event>, outputs: &mut TransformOutputs) {
+        let mut buf = Vec::with_capacity(1);
+        let mut err_buf = Vec::with_capacity(1);
+
+        for v in events {
+            self.transform(&mut buf, &mut err_buf, v);
+            outputs.append(&mut buf);
+            // TODO: this is a regession in the number of places that we hardcode this name, but it
+            // is temporary because we're quite close to being able to remove the overly-specific
+            // `FallibleFunctionTransform` trait entirely.
+            outputs.append_named("dropped", &mut err_buf);
+        }
+    }
+}
+
+impl SyncTransform for Box<dyn FunctionTransform> {
+    fn run(&mut self, events: Vec<Event>, outputs: &mut TransformOutputs) {
+        let mut buf = Vec::with_capacity(4); // also an arbitrary,
+                                             // smallish constant
+        for v in events {
+            self.transform(&mut buf, v);
+            outputs.append(&mut buf);
+        }
+    }
+}
+
+/// This struct manages collecting and forwarding the various outputs of transforms. It's designed
+/// to unify the interface for transforms that may or may not have more than one possible output
+/// path. It's currently batch-focused for use in topology-level tasks, but can easily be extended
+/// to be used directly by transforms via a new, simpler trait interface.
+pub struct TransformOutputs {
+    primary_buffer: Vec<Event>,
+    named_buffers: HashMap<String, Vec<Event>>,
+    primary_output: Fanout,
+    named_outputs: HashMap<String, Fanout>,
+}
+
+impl TransformOutputs {
+    pub fn new_with_capacity(
+        named_outputs_in: Vec<String>,
+        capacity: usize,
+    ) -> (Self, HashMap<Option<String>, fanout::ControlChannel>) {
+        let mut named_buffers = HashMap::new();
+        let mut named_outputs = HashMap::new();
+        let mut controls = HashMap::new();
+
+        for name in named_outputs_in {
+            let (fanout, control) = Fanout::new();
+            named_outputs.insert(name.clone(), fanout);
+            controls.insert(Some(name.clone()), control);
+            named_buffers.insert(name.clone(), Vec::new());
+        }
+
+        let (primary_output, control) = Fanout::new();
+        let me = Self {
+            primary_buffer: Vec::with_capacity(capacity),
+            named_buffers,
+            primary_output,
+            named_outputs,
+        };
+        controls.insert(None, control);
+
+        (me, controls)
+    }
+
+    pub fn append(&mut self, slice: &mut Vec<Event>) {
+        self.primary_buffer.append(slice);
+    }
+
+    pub fn append_named(&mut self, name: &str, slice: &mut Vec<Event>) {
+        self.named_buffers
+            .get_mut(name)
+            .expect("unknown output")
+            .append(slice);
+    }
+
+    pub fn len(&self) -> usize {
+        self.primary_buffer.len()
+            + self
+                .named_buffers
+                .iter()
+                .map(|(_, buf)| buf.len())
+                .sum::<usize>()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub async fn flush(&mut self) {
+        flush_inner(&mut self.primary_buffer, &mut self.primary_output).await;
+        for (key, buf) in &mut self.named_buffers {
+            flush_inner(
+                buf,
+                self.named_outputs.get_mut(key).expect("unknown output"),
+            )
+            .await;
+        }
+    }
+}
+
+async fn flush_inner(buf: &mut Vec<Event>, output: &mut Fanout) {
+    for event in buf.drain(..) {
+        output.feed(event).await.expect("unit error");
+    }
+}
+
+impl ByteSizeOf for TransformOutputs {
+    fn allocated_bytes(&self) -> usize {
+        self.primary_buffer.size_of()
+            + self
+                .named_buffers
+                .iter()
+                .map(|(_, buf)| buf.size_of())
+                .sum::<usize>()
+    }
 }

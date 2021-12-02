@@ -48,6 +48,10 @@ impl Fanout {
         (fanout, control_tx)
     }
 
+    /// Add a new sink as an output.
+    ///
+    /// # Panics
+    /// Function will panic if a sink with the same ID is already present.
     pub fn add(&mut self, id: ComponentKey, sink: RouterSink) {
         assert!(
             !self.sinks.iter().any(|(n, _)| n == &id),
@@ -72,8 +76,8 @@ impl Fanout {
         }
     }
 
-    fn replace(&mut self, id: ComponentKey, sink: Option<RouterSink>) {
-        if let Some((_, existing)) = self.sinks.iter_mut().find(|(n, _)| n == &id) {
+    fn replace(&mut self, id: &ComponentKey, sink: Option<RouterSink>) {
+        if let Some((_, existing)) = self.sinks.iter_mut().find(|(n, _)| n == id) {
             *existing = sink.map(Into::into);
         } else {
             panic!("Tried to replace a sink that's not already present");
@@ -85,7 +89,7 @@ impl Fanout {
             match message {
                 ControlMessage::Add(id, sink) => self.add(id, sink),
                 ControlMessage::Remove(id) => self.remove(&id),
-                ControlMessage::Replace(id, sink) => self.replace(id, sink),
+                ControlMessage::Replace(id, sink) => self.replace(&id, sink),
             }
         }
     }

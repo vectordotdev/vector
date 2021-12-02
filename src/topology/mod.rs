@@ -7,7 +7,7 @@
 //! each type of component.
 
 pub mod builder;
-pub mod fanout;
+pub use vector_core::fanout;
 mod running;
 mod task;
 
