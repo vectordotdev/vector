@@ -1,5 +1,5 @@
 remap: concepts: metrics: {
-	title: "Transforming metrics"
+	title:       "Transforming metrics"
 	description: """
 		VRL enables you to transform [log events](\(urls.vector_log)) with very few restrictions but is much more
 		restrictive when it comes to [metrics](\(urls.vector_metric)). These changes to metric events _are_ allowed:
