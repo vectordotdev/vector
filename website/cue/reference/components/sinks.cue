@@ -447,7 +447,7 @@ components: sinks: [Name=string]: {
 			if features.send.tls.enabled {
 				tls: configuration._tls_connect & {_args: {
 					can_enable:             features.send.tls.can_enable
-					can_verify_certificate: features.send.tls.can_enable
+					can_verify_certificate: features.send.tls.can_verify_certificate
 					can_verify_hostname:    features.send.tls.can_verify_hostname
 					enabled_default:        features.send.tls.enabled_default
 				}}
