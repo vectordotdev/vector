@@ -34,6 +34,7 @@ pub enum DeserializeError {
     /// The backing store that was given is returned, along with an error string that briefly
     /// describes the error in a more verbose fashion, suitable for debugging.
     InvalidStructure(String),
+
     /// Some of the data in the backing store cannot represent a particular field in the archive type.
     ///
     /// This would typically occur if the data read for a particular field could not specifically

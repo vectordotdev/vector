@@ -106,7 +106,7 @@ mod tests;
 use crate::Bufferable;
 
 use self::acker::Acker;
-pub(crate) use self::ledger::Ledger;
+use self::ledger::Ledger;
 
 pub use self::{
     common::{DiskBufferConfig, DiskBufferConfigBuilder},
@@ -115,19 +115,26 @@ pub use self::{
     writer::{Writer, WriterError},
 };
 
+/// Error that occurred when creating/loading a disk buffer.
 #[derive(Debug, Snafu)]
 pub enum BufferError<T>
 where
     T: Bufferable,
 {
+    /// Failed to create/load the ledger.
     #[snafu(display("failed to load/create ledger: {}", source))]
     LedgerError { source: LedgerLoadCreateError },
+
+    /// Failed to initialize/catch the reader up to where it left off.
     #[snafu(display("failed to seek to position where reader left off: {}", source))]
     ReaderSeekFailed { source: ReaderError<T> },
+
+    /// Failed to initialize/catch the writer up to where it left off.
     #[snafu(display("failed to seek to position where writer left off: {}", source))]
     WriterSeekFailed { source: WriterError<T> },
 }
 
+/// Helper type for creating a disk buffer.
 pub struct Buffer<T> {
     _t: PhantomData<T>,
 }
@@ -159,6 +166,17 @@ where
         Ok((writer, reader, acker, ledger))
     }
 
+    /// Creates a new disk buffer from the given [`DiskBufferConfig`].
+    ///
+    /// If successful, a [`Writer`] and [`Reader`] value, representing the write/read sides of the
+    /// buffer, respectively, will be returned.  Additionally, an [`Acker`] will be returned, which
+    /// must be used to indicate when records read from the [`Reader`] can be considered durably
+    /// processed and able to be deleted from the buffer.
+    ///
+    /// # Errors
+    ///
+    /// If an error occurred during the creation or loading of the disk buffer, an error variant
+    /// will be returned describing the error.
     #[cfg_attr(test, instrument(level = "trace"))]
     pub async fn from_config(
         config: DiskBufferConfig,

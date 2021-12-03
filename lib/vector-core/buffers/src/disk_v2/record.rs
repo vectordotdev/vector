@@ -22,9 +22,11 @@ pub enum RecordStatus {
     FailedDeserialization(DeserializeError),
 }
 
-/// Record header.
+/// Record container.
 ///
-/// Stores the relevant metadata for a single record.
+/// [`Record`] encapsulates the encoded form of a record written into the buffer.  It is a simple wrapper that
+/// carries only the necessary metadata: the record checksum, and a record ID used internally for
+/// properly tracking the state of the reader and writer.
 ///
 /// # Warning
 ///
@@ -46,20 +48,18 @@ pub struct Record<'a> {
     ///
     /// The checksum is CRC32C(big_endian_bytes(id) + payload).
     pub(super) checksum: u32,
+
     /// The record ID.
     ///
     /// This is monotonic across records.
     id: u64,
-    // The record length.
-    //
-    // This is the number of bytes that follow the header.
+
+    /// The record payload.
+    ///
+    /// This is the encoded form of the actual record itself.
     #[with(CopyOptimize, RefAsBox)]
     payload: &'a [u8],
 }
-
-/*#[rustc_layout(debug)]
-#[repr(transparent)]
-struct DebugArchivedRecord<'a>(ArchivedRecord<'a>);*/
 
 // Manual implementation of CheckBytes required as the derived version currently causes an internal
 // compiler error.
@@ -98,7 +98,7 @@ where
 }
 
 impl<'a> Record<'a> {
-    /// Creates a `Record<'a>` from the ID and payload, and calculates the checksum.
+    /// Creates a [`Record`] from the ID and payload, and calculates the checksum.
     pub fn with_checksum(id: u64, payload: &'a [u8], checksummer: &Hasher) -> Self {
         let checksum = generate_checksum(checksummer, id, payload);
         Self {
@@ -138,9 +138,10 @@ fn generate_checksum(checksummer: &Hasher, id: u64, payload: &[u8]) -> u32 {
     checksummer.finalize()
 }
 
-/// Checks whether the given buffer contains a valid `Record<'a>` archive.
+/// Checks whether the given buffer contains a valid [`Record`] archive.
 ///
-/// The record archive is assumed to exist starting at index 0 of the buffer.
+/// The record archive is assumed to have been serialized as the very last item in `buf`, and
+/// it is also assumed that the provided `buf` has an alignment of 8 bytes.
 ///
 /// If a record archive was able to be read from the buffer, then the status will indicate whether
 /// or not the checksum in the record matched the recalculated checksum.  Otherwise, the

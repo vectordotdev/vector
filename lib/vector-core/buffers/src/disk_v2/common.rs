@@ -9,11 +9,15 @@ pub const DEFAULT_MAX_DATA_FILE_SIZE: u64 = 128 * 1024 * 1024;
 // There's no particular reason that _has_ to be 8MB, it's just a simple default we've chosen here.
 pub const DEFAULT_MAX_RECORD_SIZE: usize = 8 * 1024 * 1024;
 
+// We specifically limit ourselves to 0-31 for file IDs in test, because it lets us more quickly
+// create/consume the file IDs so we can test edge cases like file ID rollover and "writer is
+// waiting to open file that reader is still on".
 #[cfg(not(test))]
 pub const MAX_FILE_ID: u16 = u16::MAX;
 #[cfg(test)]
 pub const MAX_FILE_ID: u16 = 32;
 
+/// Buffer configuration.
 #[derive(Clone, Debug)]
 pub struct DiskBufferConfig {
     /// Directory where this buffer will write its files.
@@ -69,6 +73,7 @@ impl DiskBufferConfig {
     }
 }
 
+/// Builder for [`DiskBufferConfig`].
 pub struct DiskBufferConfigBuilder {
     data_dir: PathBuf,
     max_buffer_size: Option<u64>,

@@ -34,25 +34,54 @@ use crate::{
 
 use super::{common::DiskBufferConfig, record::try_as_record_archive};
 
+/// Error that occurred during calls to [`Writer`].
 #[derive(Debug, Snafu)]
 pub enum WriterError<R>
 where
     R: Bufferable,
     <R as EncodeBytes<R>>::Error: 'static,
 {
+    /// A general I/O error occurred.
+    ///
+    /// Different methods will capture specific I/O errors depending on the situation, as some
+    /// errors may be expected and considered normal by design.  For all I/O errors that are
+    /// considered atypical, they will be returned as this variant.
     #[snafu(display("write I/O error: {}", source))]
     Io { source: io::Error },
+
+    /// The record attempting to be written was too large.
+    ///
+    /// In practice, most encoders will throw their own error if they cannot write all of the
+    /// necessary bytes during encoding, and so this error will typically only be emitted when the
+    /// encoder throws no error during the encoding step itself, but manages to fill up the encoding
+    /// buffer to the limit.
     #[snafu(display("record too large: limit is {}", limit))]
     RecordTooLarge { limit: usize },
+
+    /// The encoder encountered an issue during encoding.
+    ///
+    /// For common encoders, failure to write all of the bytes of the input will be the most common
+    /// error, and in fact, some some encoders, it's the only possible error that can occur.
     #[snafu(display("failed to encode record: {:?}", source))]
     FailedToEncode {
         source: <R as EncodeBytes<R>>::Error,
     },
+
+    /// The writer failed to serialize the record.
+    ///
+    /// As records are encoded and then wrapped in a container which carries metadata about the size
+    /// of the encoded record, and so on, there is a chance that we could fail to serialize that
+    /// container during the write step.
+    ///
+    /// In practice, this should generally only occur if the system is unable to allocate enough
+    /// memory during the serialization step aka the system itself is literally out of memory to
+    /// give to processes.  Rare, indeed.
     #[snafu(display("failed to serialize encoded record to buffer: {}", reason))]
     FailedToSerialize { reason: String },
 }
 
-pub struct RecordWriter<W, T> {
+/// Buffered writer that handles encoding, checksumming, and serialization of records.
+pub(super) struct RecordWriter<W, T> {
     writer: BufWriter<W>,
     encode_buf: Vec<u8>,
     ser_buf: AlignedVec,
@@ -67,9 +96,9 @@ where
     W: AsyncWrite + Unpin,
     T: Bufferable,
 {
-    /// Creates a new `RecordWriter` around the provided writer.
+    /// Creates a new [`RecordWriter`] around the provided writer.
     ///
-    /// Internally, the writer is wrapped in a `BufWriter<W>`, so callers should not pass in an
+    /// Internally, the writer is wrapped in a [`BufWriter`], so callers should not pass in an
     /// already buffered writer.
     pub fn new(writer: W, record_max_size: usize) -> Self {
         Self {
@@ -96,9 +125,8 @@ where
     ///
     /// # Errors
     ///
-    /// If there is an I/O error while writing the record, an error variant will be returned
-    /// describing the error.  Additionally, if there is an error while serializing the record, an
-    /// error variant will be returned describing the serialization error.
+    /// Errors can occur during the encoding, serialization, or I/O stage.  If an error occurs
+    /// during any of these stages, an appropriate error variant will be returned describing the error.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn write_record(&mut self, id: u64, record: T) -> Result<usize, WriterError<T>> {
         self.encode_buf.clear();
@@ -212,6 +240,7 @@ impl<T> RecordWriter<File, T> {
     }
 }
 
+/// Writes records to the buffer.
 pub struct Writer<T> {
     ledger: Arc<Ledger>,
     config: DiskBufferConfig,
@@ -224,6 +253,7 @@ impl<T> Writer<T>
 where
     T: Bufferable,
 {
+    /// Creates a new [`Writer`] attached to the given [`Ledger`].
     pub(crate) fn new(ledger: Arc<Ledger>) -> Self {
         let config = ledger.config().clone();
         Writer {
@@ -251,8 +281,17 @@ where
     }
 
     /// Validates that the last write in the current writer data file matches the ledger.
+    ///
+    /// # Errors
+    ///
+    /// If the current data file is not an empty, and there is an error reading it to perform
+    /// validation, an error variant will be returned that describes the error.
+    ///
+    /// Practically speaking, however, this method will only return I/O-related errors as all
+    /// logical errors, such as the record being invalid, are captured in order to logically adjust
+    /// the writer/ledger state to start a new file, etc.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
-    pub async fn validate_last_write(&mut self) -> Result<(), WriterError<T>> {
+    pub(super) async fn validate_last_write(&mut self) -> Result<(), WriterError<T>> {
         self.ensure_ready_for_write().await.context(Io)?;
 
         // If our current file is empty, there's no sense doing this check.
@@ -328,7 +367,7 @@ where
 
     /// Ensures this writer is ready to attempt writer the next record.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
-    pub async fn ensure_ready_for_write(&mut self) -> io::Result<()> {
+    async fn ensure_ready_for_write(&mut self) -> io::Result<()> {
         // Check the overall size of the buffer and figure out if we can write.
         loop {
             // If we haven't yet exceeded the maximum buffer size, then we can proceed.  Otherwise,
@@ -455,6 +494,14 @@ where
     }
 
     /// Writes a record.
+    ///
+    /// If the record was written successfully, the number of bytes written to the data file will be
+    /// returned.
+    ///
+    /// # Errors
+    ///
+    /// If an error occurred while writing the record, an error variant will be returned describing
+    /// the error.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn write_record(&mut self, record: T) -> Result<usize, WriterError<T>> {
         self.ensure_ready_for_write().await.context(Io)?;
@@ -478,7 +525,7 @@ where
     }
 
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
-    pub async fn flush_inner(&mut self, force_full_flush: bool) -> io::Result<()> {
+    async fn flush_inner(&mut self, force_full_flush: bool) -> io::Result<()> {
         // We always flush the `BufWriter` when this is called, but we don't always flush to disk or
         // flush the ledger.  This is enough for readers on Linux since the file ends up in the page
         // cache, as we don't do any O_DIRECT fanciness, and the new contents can be immediately
@@ -508,6 +555,11 @@ where
     /// This does not ensure that the data is fully synchronized (i.e. `fsync`) to disk, however it
     /// may sometimes perform a full synchronization if the time since the last full synchronization
     /// occurred has exceeded a configured limit.
+    ///
+    /// # Errors
+    ///
+    /// If there is an error while flushing either the current data file or the ledger, an error
+    /// variant will be returned describing the error.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn flush(&mut self) -> io::Result<()> {
         self.flush_inner(false).await
@@ -519,6 +571,15 @@ where
 }
 
 impl<T> Writer<T> {
+    /// Closes this [`Writer`], marking it as done.
+    ///
+    /// Closing the writer signals to the reader that that no more records will be written until the
+    /// buffer is reopened.  Writers and readers effectively share a "session", so until the writer
+    /// and reader both close, the buffer cannot be reopened by another Vector instance.
+    ///
+    /// In turn, the reader is able to know that when the writer is marked as done, and it cannot
+    /// read any more data, that nothing else is actually coming, and it can terminate by beginning
+    /// to return `None`.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub fn close(&mut self) {
         if self.ledger.mark_writer_done() {
@@ -529,6 +590,6 @@ impl<T> Writer<T> {
 
 impl<T> Drop for Writer<T> {
     fn drop(&mut self) {
-        self.close()
+        self.close();
     }
 }

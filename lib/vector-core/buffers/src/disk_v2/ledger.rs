@@ -20,16 +20,47 @@ use super::{
     ser::SerializeError,
 };
 
+/// Error that occurred during calls to [`Ledger`].
 #[derive(Debug, Snafu)]
 pub enum LedgerLoadCreateError {
+    /// A general I/O error occurred.
+    ///
+    /// Generally, I/O errors should only occur when flushing the ledger state and the underlying
+    /// ledger file has been corrupted or altered in some way outside of this process.  As the
+    /// ledger is fixed in size, and does not grow during the life of the process, common errors
+    /// such as running out of disk space will not typically be relevant (or possible) here.
     #[snafu(display("ledger I/O error: {}", source))]
     Io { source: io::Error },
+
+    /// The ledger is already opened by another Vector process.
+    ///
+    /// Advisory locking is used to prevent other Vector processes from concurrently opening the
+    /// same buffer, but bear in mind that this does not prevent other processes or users from
+    /// modifying the ledger file in a way that could cause undefined behavior during buffer operation.
     #[snafu(display(
         "failed to lock buffer.lock; is another Vector process running and using this buffer?"
     ))]
     LedgerLockAlreadyHeld,
+
+    /// The ledger state was unable to be deserialized.
+    ///
+    /// This should only occur if the ledger file was modified or truncated out of the Vector
+    /// process.  In rare situations, if the ledger state type (`LedgerState`, here in ledger.rs)
+    /// was modified, then the layout may now be out-of-line with the structure as it exists on disk.
+    ///
+    /// We have many strongly-worded warnings to not do this unless a developer absolutely knows
+    /// what they're doing, but it is still technically a possibility. :)
     #[snafu(display("failed to deserialize ledger from buffer: {}", reason))]
     FailedToDeserialize { reason: String },
+
+    /// The ledger state was unable to be serialized.
+    ///
+    /// This only occurs when initially creating a new buffer where the ledger state has not yet
+    /// been written to disk.  During normal operation, the ledger is memory-mapped directly and so
+    /// serialization does not occur.
+    ///
+    /// This error is likely only to occur if the process is unable to allocate memory for the
+    /// buffers required for the serialization step.
     #[snafu(display("failed to serialize ledger to buffer: {}", reason))]
     FailedToSerialize { reason: String },
 }
@@ -77,7 +108,7 @@ impl Default for LedgerState {
         Self {
             total_records: AtomicU64::new(0),
             total_buffer_size: AtomicU64::new(0),
-            // First record written is always 1, so that our defualt of 0 for
+            // First record written is always 1, so that our default of 0 for
             // `reader_last_record_id` ensures we start up in a state of "alright, waiting to read
             // record #1 next".
             writer_next_record_id: AtomicU64::new(1),
@@ -101,6 +132,7 @@ impl ArchivedLedgerState {
             .fetch_sub(total_record_size, Ordering::AcqRel);
     }
 
+    /// Gets the total number of records in the buffer.
     pub fn get_total_records(&self) -> u64 {
         self.total_records.load(Ordering::Acquire)
     }
@@ -109,6 +141,13 @@ impl ArchivedLedgerState {
         self.total_records.fetch_sub(amount, Ordering::AcqRel);
     }
 
+    /// Gets the total number of bytes for all records in the buffer.
+    ///
+    /// This number will often disagree with the size of files on disk, as data files are deleted
+    /// only after being read entirely, and are simply appended to when they are not yet full.  This
+    /// leads to behavior where writes and reads will change this value only by the size of the
+    /// records being written and read, while data files on disk will grow incrementally, and be
+    /// deleted in full.
     pub fn get_total_buffer_size(&self) -> u64 {
         self.total_buffer_size.load(Ordering::Acquire)
     }
@@ -196,6 +235,7 @@ impl ArchivedLedgerState {
     }
 }
 
+/// Tracks the internal state of the buffer.
 pub struct Ledger {
     // Buffer configuration.
     config: DiskBufferConfig,
@@ -248,7 +288,7 @@ impl Ledger {
     /// Gets the next writer file ID.
     ///
     /// This is purely a future-looking operation i.e. what would the file ID be if it was
-    /// incremented from its current value.  It does not increment and return the incremented value.
+    /// incremented from its current value.  It does not alter the current writer file ID.
     pub fn get_next_writer_file_id(&self) -> u16 {
         self.state().get_next_writer_file_id()
     }
@@ -286,14 +326,18 @@ impl Ledger {
             .join(format!("buffer-data-{}.dat", file_id))
     }
 
-    /// Waits for a signal from the reader that an entire data file has been read and subsequently deleted.
+    /// Waits for a signal from the reader that progress has been made.
+    ///
+    /// This will only occur when a record is read, which may allow enough space (below the maximum
+    /// configured buffer size) for a write to occur, or similarly, when a data file is deleted.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn wait_for_reader(&self) {
         self.reader_notify.notified().await;
     }
 
-    /// Waits for a signal from the writer that data has been written to a data file, or that a new
-    /// data file has been created.
+    /// Waits for a signal from the writer that progress has been made.
+    ///
+    /// This will occur when a record is written, or when a new data file is created.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn wait_for_writer(&self) {
         self.writer_notify.notified().await;
@@ -324,8 +368,8 @@ impl Ledger {
 
     /// Marks the writer as finished.
     ///
-    /// If the writer was not yet marked done, `false` is returned.  Other, `true` is returned, and
-    /// the caller should handle any necessary logic for closing the writer.
+    /// If the writer was not yet marked done, `false` is returned.  Otherwise, `true` is returned,
+    /// and the caller should handle any necessary logic for closing the writer.
     pub fn mark_writer_done(&self) -> bool {
         self.writer_done
             .compare_exchange_weak(false, true, Ordering::SeqCst, Ordering::SeqCst)
@@ -368,9 +412,9 @@ impl Ledger {
     /// been acknowledged, the data file can be deleted and the reader file ID can be durably
     /// stored in the ledger.
     ///
-    /// Callers use `increment_unacked_reader_file_id` to move to the next data file without
+    /// Callers use [`increment_unacked_reader_file_id`] to move to the next data file without
     /// tracking that the previous data file has been durably processed and can be deleted, and
-    /// `increment_acked_reader_file_id` is the reciprocal function which tracks the highest data
+    /// [`increment_acked_reader_file_id`] is the reciprocal function which tracks the highest data
     /// file that _has_ been durably processed.
     ///
     /// Since the unacked file ID is simply a relative offset to the acked file ID, we decrement it
@@ -403,14 +447,13 @@ impl Ledger {
     /// receives `true` is responsible for flushing the necessary files.
     pub fn should_flush(&self) -> bool {
         let last_flush = self.last_flush.load();
-        if last_flush.elapsed() > self.config.flush_interval {
-            if self
+        if last_flush.elapsed() > self.config.flush_interval
+            && self
                 .last_flush
                 .compare_exchange(last_flush, Instant::now())
                 .is_ok()
-            {
-                return true;
-            }
+        {
+            return true;
         }
 
         false
@@ -419,12 +462,29 @@ impl Ledger {
     /// Flushes the memory-mapped file backing the ledger to disk.
     ///
     /// This operation is synchronous.
+    ///
+    /// # Errors
+    ///
+    /// If there is an error while flushing the ledger to disk, an error variant will be returned
+    /// describing the error.
     pub(super) fn flush(&self) -> io::Result<()> {
         self.state.get_backing_ref().flush()
     }
 
+    /// Loads or creates a ledger for the given [`DiskBufferConfig`].
+    ///
+    /// If the ledger file does not yet exist, a default ledger state will be created and persisted
+    /// to disk.  Otherwise, the ledger file on disk will be loaded and verified.
+    ///
+    /// # Errors
+    ///
+    /// If there is an error during either serialization of the new, default ledger state, or
+    /// deserializing existing data in the ledger file, or generally during the underlying I/O
+    /// operations, an error variant will be returned describing the error.
     #[cfg_attr(test, instrument(level = "trace"))]
-    pub async fn load_or_create(config: DiskBufferConfig) -> Result<Ledger, LedgerLoadCreateError> {
+    pub(super) async fn load_or_create(
+        config: DiskBufferConfig,
+    ) -> Result<Ledger, LedgerLoadCreateError> {
         // Acquire an exclusive lock on our lock file, which prevents another Vector process from
         // loading this buffer and clashing with us.  Specifically, though: this does _not_ prevent
         // another process from messing with our ledger files, or any of the data files, etc.

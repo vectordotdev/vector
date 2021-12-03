@@ -41,21 +41,48 @@ impl ReadToken {
     }
 }
 
+/// Error that occurred during calls to [`Reader`].
 #[derive(Debug, Snafu)]
 pub enum ReaderError<T>
 where
     T: Bufferable,
 {
+    /// A general I/O error occurred.
+    ///
+    /// Different methods will capture specific I/O errors depending on the situation, as some
+    /// errors may be expected and considered normal by design.  For all I/O errors that are
+    /// considered atypical, they will be returned as this variant.
     #[snafu(display("read I/O error: {}", source))]
     Io { source: io::Error },
+
+    /// The reader failed to deserialize the record.
+    ///
+    /// In most cases, this indicates that the data file being read was corrupted or truncated in
+    /// some fashion.  Callers of [`Reader::next`] will not actually receive this error, as it is
+    /// handled internally by moving to the next data file, as corruption may have affected other
+    /// records in a way that is not easily detectable and could lead to records which
+    /// deserialize/decode but contain invalid data.
     #[snafu(display("failed to deserialize encoded record from buffer: {}", reason))]
     FailedToDeserialize { reason: String },
+
+    /// The record's checksum did not match.
+    ///
+    /// In most cases, this indicates that the data file being read was corrupted or truncated in
+    /// some fashion.  Callers of [`Reader::next`] will not actually receive this error, as it is
+    /// handled internally by moving to the next data file, as corruption may have affected other
+    /// records in a way that is not easily detectable and could lead to records which
+    /// deserialize/decode but contain invalid data.
     #[snafu(display(
         "calculated checksum did not match the actual checksum: ({} vs {})",
         calculated,
         actual
     ))]
     InvalidChecksum { calculated: u32, actual: u32 },
+
+    /// The decoder encountered an issue during decoding.
+    ///
+    /// At this stage, the record can be assumed to have been written correctly, and read correctly
+    /// from disk, as the checksum was also validated.
     #[snafu(display("failed to decoded record: {:?}", source))]
     FailedToDecode {
         source: <T as DecodeBytes<T>>::Error,
@@ -66,11 +93,7 @@ impl<T> ReaderError<T>
 where
     T: Bufferable,
 {
-    /// Gets whether or not this error represents a "bad" read.
-    ///
-    /// A bad read would be consider a read that involved no I/O error, but was not valid i.e.
-    /// checksums didn't match, or deserialization failed.
-    pub fn is_bad_read(&self) -> bool {
+    fn is_bad_read(&self) -> bool {
         match self {
             ReaderError::InvalidChecksum { .. } => true,
             ReaderError::FailedToDeserialize { .. } => true,
@@ -79,8 +102,9 @@ where
     }
 }
 
+/// Buffered reader that handles deserialization, checksumming, and decoding of records.
 #[derive(Debug)]
-pub struct RecordReader<R, T> {
+pub(super) struct RecordReader<R, T> {
     reader: BufReader<R>,
     aligned_buf: AlignedVec,
     checksummer: Hasher,
@@ -93,6 +117,10 @@ where
     R: AsyncRead + Unpin + fmt::Debug,
     T: Bufferable,
 {
+    /// Creates a new [`RecordReader`] around the provided reader.
+    ///
+    /// Internally, the reader is wrapped in a [`BufReader`], so callers should not pass in an
+    /// already buffered reader.
     pub fn new(reader: R) -> Self {
         Self {
             reader: BufReader::new(reader),
@@ -123,8 +151,28 @@ where
         }
     }
 
+    /// Attempts to read a record.
+    ///
+    /// In order to facilitate driving other logic within the reader when there is no data to
+    /// currently read, this method returns early when there is no available data at all, rather
+    /// than waiting for enough data to start readiong a normal record.  In cases where there is not
+    /// enough data to begin reading a record, `None` is returned.
+    ///
+    /// If there is any available data, even if it's not _enough_ data, then this method will
+    /// continue awaiting until it can read an entire record.
+    ///
+    /// If a record is able to be read in its entirety, a token is returned to caller that can be
+    /// used with [`read_record`] in order to get an owned `T`.  This is due to a quirk with the
+    /// compiler's ability to track stacked mutable references through conditional control flows, of
+    /// which is handled by splitting the "do we have a valid record in our buffer?" logic from the
+    /// "read that record and decode it" logic.
+    ///
+    /// # Errors
+    ///
+    /// Errors can occur during the I/O or deserialization stage.  If an error occurs during any of
+    /// these stages, an appropriate error variant will be returned describing the error.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
-    pub(super) async fn try_next_record(&mut self) -> Result<Option<ReadToken>, ReaderError<T>> {
+    pub async fn try_next_record(&mut self) -> Result<Option<ReadToken>, ReaderError<T>> {
         let record_len = match self.read_length_delimiter().await? {
             Some(len) => len,
             None => {
@@ -167,7 +215,18 @@ where
         }
     }
 
-    pub(super) fn read_record(&mut self, token: ReadToken) -> Result<T, ReaderError<T>> {
+    /// Reads the record associated with the given [`ReadToken`].
+    ///
+    /// # Errors
+    ///
+    /// If an error occurs during decoding, an error variant will be returned describing the error.
+    ///
+    /// # Panics
+    ///
+    /// If a `ReadToken` is not used in a call to `read_record` before again calling
+    /// `try_next_record`, and the `ReadToken` from _that_ call is used, this method will panic due
+    /// to an out-of-order read.
+    pub fn read_record(&mut self, token: ReadToken) -> Result<T, ReaderError<T>> {
         if token.1 != self.current_record_id {
             panic!("using expired read token");
         }
@@ -182,6 +241,7 @@ where
     }
 }
 
+/// Reads records from the buffer.
 #[derive(Debug)]
 pub struct Reader<T> {
     ledger: Arc<Ledger>,
@@ -200,6 +260,7 @@ impl<T> Reader<T>
 where
     T: Bufferable,
 {
+    /// Creates a new [`Reader`] attached to the given [`Ledger`].
     pub(crate) fn new(ledger: Arc<Ledger>) -> Self {
         Reader {
             ledger,
@@ -304,7 +365,7 @@ where
     }
 
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
-    pub async fn handle_pending_acknowledgements(&mut self) -> io::Result<()> {
+    async fn handle_pending_acknowledgements(&mut self) -> io::Result<()> {
         // In this method, we handle ensuring that whatever pending deletions that are now "ready"
         // are handled as quickly as possible.
         //
@@ -399,6 +460,13 @@ where
         }
     }
 
+    /// Updates the internal read progress state, and potentially deletes completed data files.
+    ///
+    /// # Errors
+    ///
+    /// As this method may potentially drive the "delete completed data files" logic, an I/O error
+    /// could be encountered during that phase.  If an I/O error _is_ encountered, an error variant
+    /// will be returned describing the error.
     async fn update_reader_last_record_id(&mut self, record_id: u64) -> io::Result<()> {
         let previous_id = self.last_reader_record_id;
         self.last_reader_record_id = record_id;
@@ -467,8 +535,13 @@ where
     /// beginning, essentially pointed at the wrong record.  We read out records here until we
     /// reach a point where we've read up to the record right before `get_last_reader_record_id`.
     /// This ensures that a subsequent call to `next` is ready to read the correct record.
+    ///
+    /// # Errors
+    ///
+    /// If an error occurs during seeking to the next record, an error variant will be returned
+    /// describing the error.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
-    pub(crate) async fn seek_to_next_record(&mut self) -> Result<(), ReaderError<T>> {
+    pub(super) async fn seek_to_next_record(&mut self) -> Result<(), ReaderError<T>> {
         // We don't try seeking again once we're all caught up.
         if self.ready_to_read {
             return Ok(());
@@ -505,6 +578,14 @@ where
     }
 
     /// Reads a record.
+    ///
+    /// If the writer is closed and there is no more data in the buffer, `None` is returned.
+    /// Otherwise, reads the next record or waits until the next record is available.
+    ///
+    /// # Errors
+    ///
+    /// If an error occurred while reading a record, an error variant will be returned describing
+    /// the error.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn next(&mut self) -> Result<Option<T>, ReaderError<T>> {
         let token = loop {

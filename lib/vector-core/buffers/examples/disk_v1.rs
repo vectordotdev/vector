@@ -23,7 +23,7 @@ fn generate_record_cache() -> Vec<VariableMessage> {
     // 512 bytes and 8 kilobytes.  This shiuld be fairly close to normal log events.
     let mut rng = rand::thread_rng();
     let mut records = Vec::new();
-    for i in 0..200_000 {
+    for i in 1..200_000 {
         let payload_size = rng.gen_range(512..4096);
         let payload = (0..payload_size).map(|_| rng.gen()).collect();
         let message = VariableMessage::new(i, payload);
@@ -34,16 +34,30 @@ fn generate_record_cache() -> Vec<VariableMessage> {
 
 #[tokio::main]
 async fn main() {
-    // Generate our block cache, which ensures the writer spends as little time as possible actually
+    let mut args = std::env::args();
+    let writer_count = args
+        .nth(1)
+        .unwrap_or_else(|| "10000000".to_string())
+        .parse::<usize>()
+        .expect("1st arg must be number of records to write");
+    let reader_count: usize = args
+        .nth(0)
+        .unwrap_or_else(|| "10000000".to_string())
+        .parse::<usize>()
+        .expect("2nd arg must be number of records to read");
+
+    println!(
+        "[disk_v1 init] going to write {} record(s) and will read {} record(s)",
+        writer_count, reader_count
+    );
+
+    // Generate our record cache, which ensures the writer spends as little time as possible actually
     // generating the data that it writes to the buffer.
     let record_cache = generate_record_cache();
     println!(
-        "[disk_v1 init] generated record cache ({} blocks)",
+        "[disk_v1 init] generated record cache ({} records)",
         record_cache.len()
     );
-
-    // Set up our target record count, write batch size, progress counters, etc.
-    let total_records = 3_000_000;
 
     let write_position = Arc::new(AtomicUsize::new(0));
     let read_position = Arc::new(AtomicUsize::new(0));
@@ -56,8 +70,9 @@ async fn main() {
     let variant = Variant::Disk {
         id: "disk-v1".to_owned(),
         data_dir: PathBuf::from_str("/tmp/vector/disk-v1-testing").expect("path should be valid"),
-        // We don't limit disk size, because we just want to see how fast it can complete the writes/reads.
-        max_size: 5 * 1024 * 1024 * 1024,
+        // Limit disk size to 100GB which is way more than it needs even if it wrote all records to
+        // disk and never cleaned any up, but... write amplification and all.
+        max_size: 100 * 1024 * 1024 * 1024,
         when_full: WhenFull::Block,
     };
 
@@ -69,16 +84,11 @@ async fn main() {
     let _ = tokio::spawn(async move {
         let mut rx_histo = Histogram::<u64>::new(3).expect("should not fail");
 
-        let mut unacked = 0;
-        for _ in 0..total_records {
+        for _ in 0..reader_count {
             let rx_start = Instant::now();
 
             let _record = reader.next().await.expect("read should not fail");
-            unacked += 1;
-            if unacked >= 1000 {
-                acker.ack(unacked);
-                unacked = 0;
-            }
+            acker.ack(1);
 
             let elapsed = rx_start.elapsed().as_nanos() as u64;
             rx_histo.record(elapsed).expect("should not fail");
@@ -94,7 +104,7 @@ async fn main() {
         let mut tx_histo = Histogram::<u64>::new(3).expect("should not fail");
         let mut records = record_cache.iter().cycle();
 
-        for _ in 0..total_records {
+        for _ in 0..writer_count {
             let tx_start = Instant::now();
 
             let record = records.next().cloned().expect("should never be empty");
@@ -149,8 +159,8 @@ async fn main() {
     let total_time = start.elapsed();
 
     println!(
-        "[disk_v1] writer and reader done: {} total records written and read in {:?}",
-        total_records, total_time
+        "[disk_v1] writer and reader done: {} records written, {} records read, in {:?}",
+        writer_count, reader_count, total_time
     );
 
     println!("[disk_v1] writer summary:");
