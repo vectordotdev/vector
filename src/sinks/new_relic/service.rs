@@ -88,7 +88,7 @@ impl Service<NewRelicApiRequest> for NewRelicApiService {
 
     fn call(&mut self, request: NewRelicApiRequest) -> Self::Future {
 
-        info!("Sending {} events.", request.batch_size);
+        debug!("Sending {} events.", request.batch_size);
 
         let mut client = self.client.clone();
 
