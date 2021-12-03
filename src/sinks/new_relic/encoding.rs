@@ -1,6 +1,6 @@
 use crate::{
     sinks::util::encoding::{
-        Encoder, EncodingConfigFixed
+        as_tracked_write, Encoder, EncodingConfigFixed
     }
 };
 use serde::{
@@ -29,7 +29,10 @@ impl Encoder<Result<NewRelicApiModel, &'static str>> for EncodingConfigFixed<Enc
                 NewRelicApiModel::Logs(log_api_model) => to_json(&log_api_model),
             };
             if let Some(json) = json {
-                let size = writer.write(&json)?;
+                let size = as_tracked_write::<_, _, io::Error>(writer, &json, |writer, json| {
+                    writer.write_all(json)?;
+                    Ok(())
+                })?;
                 io::Result::Ok(size)
             }
             else {
