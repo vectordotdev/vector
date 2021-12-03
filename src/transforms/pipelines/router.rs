@@ -18,10 +18,10 @@ impl TransformConfig for EventRouterConfig {
         ))
     }
 
-    fn named_outputs(&self) -> Vec<(String, DataType)> {
+    fn named_outputs(&self) -> Vec<(Option<String>, DataType)> {
         vec![
-            ("logs".to_owned(), DataType::Log),
-            ("metrics".to_owned(), DataType::Metric),
+            (Some("logs".to_owned()), DataType::Log),
+            (Some("metrics".to_owned()), DataType::Metric),
         ]
     }
 
@@ -42,11 +42,11 @@ impl TransformConfig for EventRouterConfig {
 pub struct EventRouter;
 
 impl DispatchFunctionTransform for EventRouter {
-    fn transform(&mut self, output: &mut Vec<(String, Event)>, event: Event) {
+    fn transform(&mut self, output: &mut Vec<(Option<String>, Event)>, event: Event) {
         let name = match event {
             Event::Log(_) => "logs".to_owned(),
             Event::Metric(_) => "metrics".to_owned(),
         };
-        output.push((name, event));
+        output.push((Some(name), event));
     }
 }

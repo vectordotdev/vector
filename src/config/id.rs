@@ -44,6 +44,15 @@ impl From<(&ComponentKey, String)> for OutputId {
     }
 }
 
+impl From<(&ComponentKey, Option<String>)> for OutputId {
+    fn from((key, port): (&ComponentKey, Option<String>)) -> Self {
+        Self {
+            component: key.clone(),
+            port,
+        }
+    }
+}
+
 // This panicking implementation is convenient for testing, but should never be enabled for use
 // outside of tests.
 #[cfg(test)]

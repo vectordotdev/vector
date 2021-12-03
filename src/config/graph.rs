@@ -10,7 +10,7 @@ pub enum Node {
     Transform {
         in_ty: DataType,
         out_ty: DataType,
-        named_outputs: Vec<(String, DataType)>,
+        named_outputs: Vec<(Option<String>, DataType)>,
     },
     Sink {
         ty: DataType,
@@ -228,16 +228,9 @@ impl Graph {
             .iter()
             .flat_map(|(key, node)| match node {
                 Node::Sink { .. } => vec![],
-                Node::Source { .. } => vec![key.clone().into()],
+                Node::Source { .. } => vec![OutputId::from(key)],
                 Node::Transform { named_outputs, .. } => {
-                    let mut outputs = vec![key.clone().into()];
-                    outputs.extend(
-                        named_outputs
-                            .clone()
-                            .into_iter()
-                            .map(|n| OutputId::from((key, n.0))),
-                    );
-                    outputs
+                    named_outputs.iter().map(|(name, _)| OutputId::from((key, name.clone()))).collect()
                 }
             })
             .collect()
@@ -321,7 +314,7 @@ mod test {
         fn add_transform_output(&mut self, id: &str, name: &str) {
             let id = id.into();
             match self.nodes.get_mut(&id) {
-                Some(Node::Transform { named_outputs, .. }) => named_outputs.push(name.into()),
+                Some(Node::Transform { named_outputs, .. }) => named_outputs.push((Some(name.to_owned()), DataType::Any)),
                 _ => panic!("invalid transform"),
             }
         }
@@ -549,7 +542,7 @@ mod test {
             Node::Transform {
                 in_ty: DataType::Any,
                 out_ty: DataType::Any,
-                named_outputs: vec![String::from("bar")],
+                named_outputs: vec![(Some(String::from("bar")), DataType::Any)],
             },
         );
 
@@ -563,7 +556,7 @@ mod test {
             Node::Transform {
                 in_ty: DataType::Any,
                 out_ty: DataType::Any,
-                named_outputs: vec![String::from("errors")],
+                named_outputs: vec![(Some(String::from("errors")), DataType::Any)],
             },
         );
 

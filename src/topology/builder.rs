@@ -407,7 +407,7 @@ pub async fn build_pieces(
                 .boxed();
 
                 output_controls.into_iter().for_each(|(name, control)| {
-                    outputs.insert(OutputId::from(key.join(name)), control);
+                    outputs.insert(OutputId::from((key, name)), control);
                 });
 
                 Task::new(key.clone(), typetag, transform)

@@ -194,7 +194,7 @@ dyn_clone::clone_trait_object!(FallibleFunctionTransform);
 /// Similar to `FunctionTransform`, but with a map of outputs to handle routing events without
 /// having to clone them.
 pub trait DispatchFunctionTransform: Send + dyn_clone::DynClone + Sync {
-    fn transform(&mut self, output: &mut Vec<(String, Event)>, event: Event);
+    fn transform(&mut self, output: &mut Vec<(Option<String>, Event)>, event: Event);
 }
 
 dyn_clone::clone_trait_object!(DispatchFunctionTransform);

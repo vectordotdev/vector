@@ -50,12 +50,12 @@ impl TransformConfig for RemapConfig {
         })
     }
 
-    fn named_outputs(&self) -> Vec<(String, DataType)> {
+    fn named_outputs(&self) -> Vec<(Option<String>, DataType)> {
+        let mut result = vec![(None, self.output_type())];
         if self.reroute_dropped {
-            vec![(String::from("dropped"), DataType::Any)]
-        } else {
-            vec![]
+            result.push((Some("dropped".to_owned()), DataType::Any));
         }
+        result
     }
 
     fn input_type(&self) -> DataType {

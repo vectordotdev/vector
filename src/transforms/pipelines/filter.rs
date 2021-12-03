@@ -32,10 +32,10 @@ impl TransformConfig for PipelineFilterConfig {
         })))
     }
 
-    fn named_outputs(&self) -> Vec<(String, DataType)> {
+    fn named_outputs(&self) -> Vec<(Option<String>, DataType)> {
         vec![
-            ("truthy".to_owned(), DataType::Any),
-            ("falsy".to_owned(), DataType::Any),
+            (Some("truthy".to_owned()), DataType::Any),
+            (Some("falsy".to_owned()), DataType::Any),
         ]
     }
 
@@ -58,11 +58,11 @@ pub struct PipelineFilter {
 }
 
 impl DispatchFunctionTransform for PipelineFilter {
-    fn transform(&mut self, outputs: &mut Vec<(String, Event)>, event: Event) {
+    fn transform(&mut self, outputs: &mut Vec<(Option<String>, Event)>, event: Event) {
         if self.condition.check(&event) {
-            outputs.push(("truthy".to_owned(), event));
+            outputs.push((Some("truthy".to_owned()), event));
         } else {
-            outputs.push(("falsy".to_owned(), event));
+            outputs.push((Some("falsy".to_owned()), event));
         }
     }
 }

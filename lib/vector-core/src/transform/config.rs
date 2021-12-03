@@ -57,8 +57,8 @@ pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone 
 
     fn output_type(&self) -> DataType;
 
-    fn named_outputs(&self) -> Vec<(String, DataType)> {
-        Vec::new()
+    fn named_outputs(&self) -> Vec<(Option<String>, DataType)> {
+        vec![(None, self.output_type())]
     }
 
     fn transform_type(&self) -> &'static str;

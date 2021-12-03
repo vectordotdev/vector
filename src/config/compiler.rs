@@ -149,7 +149,7 @@ fn expand_globs(config: &mut ConfigBuilder) {
             t.inner.named_outputs().into_iter().map(move |(port, _)| {
                 OutputId {
                     component: key.clone(),
-                    port: Some(port),
+                    port,
                 }
                 .to_string()
             })

@@ -215,6 +215,8 @@ mod test {
     fn can_serialize_check_fields() {
         // We need to serialize the config to check if a config has
         // changed when reloading.
+        let name = ComponentKey::from("root");
+        let inputs = vec![];
         let config = toml::from_str::<RouteConfig>(
             r#"
             lanes.first.type = "check_fields"
@@ -222,7 +224,7 @@ mod test {
         "#,
         )
         .unwrap()
-        .expand()
+        .expand(&name, &inputs)
         .unwrap()
         .unwrap();
 
