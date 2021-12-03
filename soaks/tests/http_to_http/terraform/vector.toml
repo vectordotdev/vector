@@ -24,7 +24,8 @@ address = "0.0.0.0:9090"
 [sinks.http_sink]
 type = "http"
 inputs = ["http_source"]
-endpoint = "http://http-blackhole:8080"
+uri = "http://http-blackhole:8080"
+encoding = "text"
 healthcheck.enabled = false
 buffer.type = "memory"
 buffer.max_events = 50000 # buffer 50 payloads at a time
