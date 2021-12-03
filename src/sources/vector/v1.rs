@@ -4,7 +4,7 @@ use crate::{
     event::{proto, Event},
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
     sources::{
-        util::{SocketListenAddr, TcpSource},
+        util::{SocketListenAddr, TcpNullAcker, TcpSource},
         Source,
     },
     tcp::TcpKeepaliveConfig,
@@ -63,8 +63,8 @@ impl VectorConfig {
             self.shutdown_timeout_secs,
             tls,
             self.receive_buffer_bytes,
-            cx.shutdown,
-            cx.out,
+            cx,
+            false.into(),
         )
     }
 
@@ -107,12 +107,17 @@ impl TcpSource for VectorSource {
     type Error = codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
     type Decoder = codecs::Decoder;
+    type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
         codecs::Decoder::new(
             Box::new(LengthDelimitedDecoder::new()),
             Box::new(VectorDeserializer),
         )
+    }
+
+    fn build_acker(&self, _: &Self::Item) -> Self::Acker {
+        TcpNullAcker
     }
 }
 
