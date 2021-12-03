@@ -41,6 +41,7 @@ pub mod async_read;
 pub mod aws;
 #[cfg(feature = "codecs")]
 pub mod codecs;
+pub(crate) mod common;
 pub mod encoding_transcode;
 pub mod enrichment_tables;
 pub mod graph;

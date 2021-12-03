@@ -37,7 +37,7 @@ pub struct KafkaSink {
     service: KafkaService,
     topic: Template,
     key_field: Option<String>,
-    headers_field: Option<String>,
+    headers_key: Option<String>,
 }
 
 pub fn create_producer(
@@ -55,7 +55,7 @@ impl KafkaSink {
         let producer = create_producer(producer_config)?;
 
         Ok(KafkaSink {
-            headers_field: config.headers_field,
+            headers_key: config.headers_key,
             encoding: config.encoding,
             acker,
             service: KafkaService::new(producer),
@@ -69,7 +69,7 @@ impl KafkaSink {
         let service = ConcurrencyLimit::new(self.service, QUEUED_MIN_MESSAGES as usize);
         let request_builder = KafkaRequestBuilder {
             key_field: self.key_field,
-            headers_field: self.headers_field,
+            headers_key: self.headers_key,
             topic_template: self.topic,
             encoder: self.encoding,
             log_schema: log_schema(),

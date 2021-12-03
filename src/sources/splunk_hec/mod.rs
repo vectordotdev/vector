@@ -1011,6 +1011,7 @@ mod tests {
             request: TowerRequestConfig::default(),
             tls: None,
             acknowledgements: Default::default(),
+            timestamp_nanos_key: None,
         }
         .build(SinkContext::new_test())
         .await

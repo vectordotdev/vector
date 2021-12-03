@@ -44,7 +44,7 @@ mod integration_test {
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,
             librdkafka_options: HashMap::new(),
-            headers_field: None,
+            headers_key: None,
         };
 
         self::sink::healthcheck(config).await.unwrap();
@@ -99,7 +99,7 @@ mod integration_test {
             message_timeout_ms: 300000,
             batch,
             librdkafka_options,
-            headers_field: None,
+            headers_key: None,
         };
         let (acker, _ack_counter) = Acker::new_for_testing();
         config.clone().to_rdkafka(KafkaRole::Consumer)?;
@@ -241,7 +241,7 @@ mod integration_test {
             socket_timeout_ms: 60000,
             message_timeout_ms: 300000,
             librdkafka_options: HashMap::new(),
-            headers_field: Some(headers_key.clone()),
+            headers_key: Some(headers_key.clone()),
         };
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
         println!("Topic name generated in test: {:?}", topic);

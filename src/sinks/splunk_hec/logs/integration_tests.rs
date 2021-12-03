@@ -109,6 +109,7 @@ async fn config(
         request: TowerRequestConfig::default(),
         tls: None,
         acknowledgements: Default::default(),
+        timestamp_nanos_key: None,
     }
 }
 

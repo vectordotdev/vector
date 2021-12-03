@@ -250,7 +250,7 @@ async fn tap_handler(
 
                             // Attempt to connect the sink.
                             match control_tx
-                                .send(fanout::ControlMessage::Add(ComponentKey::from(&sink_id), Box::new(sink)))
+                                .send(fanout::ControlMessage::Add(ComponentKey::from(sink_id.as_str()), Box::new(sink)))
                                 .await
                             {
                                 Ok(_) => {
@@ -261,7 +261,7 @@ async fn tap_handler(
                                     // Create a sink shutdown trigger to remove the sink
                                     // when matched components change.
                                     sinks
-                                        .insert(output_id.clone(), shutdown_trigger(control_tx.clone(), ComponentKey::global(&sink_id)));
+                                        .insert(output_id.clone(), shutdown_trigger(control_tx.clone(), ComponentKey::from(sink_id.as_str())));
                                 }
                                 Err(error) => {
                                     error!(
@@ -348,7 +348,7 @@ mod tests {
     async fn sink_log_events() {
         let pattern_matched = "tes*";
         let pattern_not_matched = "xyz";
-        let id = OutputId::from(&ComponentKey::global("test"));
+        let id = OutputId::from(&ComponentKey::from("test"));
 
         let (mut fanout, control_tx) = fanout::Fanout::new();
         let mut outputs = HashMap::new();
