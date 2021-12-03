@@ -71,8 +71,7 @@ pub mod throttle;
 pub mod tokenizer;
 
 pub use vector_core::transform::{
-    FallibleFunctionTransform, FunctionTransform, SyncTransform, TaskTransform, Transform,
-    TransformOutputs,
+    FunctionTransform, SyncTransform, TaskTransform, Transform, TransformOutputs,
 };
 
 #[derive(Debug, Snafu)]

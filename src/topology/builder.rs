@@ -438,8 +438,8 @@ fn build_transform(
             &node.key,
             Vec::new(),
         ),
-        Transform::FallibleFunction(t) => build_sync_transform(
-            Box::new(t),
+        Transform::Synchronous(t) => build_sync_transform(
+            t,
             input_rx,
             node.input_type,
             node.typetag,
@@ -527,7 +527,9 @@ fn build_sync_transform(
                 byte_size: events.size_of(),
             });
 
-            t.run(events, &mut outputs);
+            for event in events {
+                t.transform(event, &mut outputs);
+            }
 
             // TODO: account for named outputs separately?
             let count = outputs.len();

@@ -19,7 +19,7 @@ mod config;
 /// transforms act as a coordination or barrier point.
 pub enum Transform {
     Function(Box<dyn FunctionTransform>),
-    FallibleFunction(Box<dyn FallibleFunctionTransform>),
+    Synchronous(Box<dyn SyncTransform>),
     Task(Box<dyn TaskTransform>),
 }
 
@@ -63,40 +63,14 @@ impl Transform {
         }
     }
 
-    /// Create a new fallible function transform.
+    /// Create a new synchronous transform.
     ///
-    /// There are similar to `FunctionTransform`, but with a second output for events that
-    /// encountered an error during processing.
-    pub fn fallible_function(v: impl FallibleFunctionTransform + 'static) -> Self {
-        Transform::FallibleFunction(Box::new(v))
-    }
-
-    /// Mutably borrow the inner transform as a fallible function transform.
-    ///
-    /// # Panics
-    ///
-    /// If the transform is not a [`FallibleFunctionTransform`] this will panic.
-    pub fn as_fallible_function(&mut self) -> &mut Box<dyn FallibleFunctionTransform> {
-        match self {
-            Transform::FallibleFunction(t) => t,
-            _ => panic!(
-                "Called `Transform::as_fallible_function` on something that was not a fallible function variant."
-            ),
-        }
-    }
-
-    /// Transmute the inner transform into a fallible function transform.
-    ///
-    /// # Panics
-    ///
-    /// If the transform is not a [`FallibleFunctionTransform`] this will panic.
-    pub fn into_fallible_function(self) -> Box<dyn FallibleFunctionTransform> {
-        match self {
-            Transform::FallibleFunction(t) => t,
-            _ => panic!(
-                "Called `Transform::into_fallible_function` on something that was not a fallible function variant."
-            ),
-        }
+    /// This is a broader trait than the simple [`FunctionTransform`] in that it allows transforms
+    /// to write to multiple outputs. Those outputs must be known in advanced and returned via
+    /// `TransformConfig::named_outputs`. Attempting to send to any named output not registered in
+    /// advance is considered a bug and will cause a panic.
+    pub fn synchronous(v: impl SyncTransform + 'static) -> Self {
+        Transform::Synchronous(Box::new(v))
     }
 
     /// Create a new task transform.
@@ -152,26 +126,6 @@ pub trait FunctionTransform: Send + dyn_clone::DynClone + Sync {
 
 dyn_clone::clone_trait_object!(FunctionTransform);
 
-/// Similar to `FunctionTransform`, but with a second output for events that encountered an error
-/// during processing.
-pub trait FallibleFunctionTransform: Send + dyn_clone::DynClone + Sync {
-    fn transform(&mut self, output: &mut Vec<Event>, errors: &mut Vec<Event>, event: Event);
-}
-
-dyn_clone::clone_trait_object!(FallibleFunctionTransform);
-
-// For testing, it's convenient to ignore the error output and continue to use helpers like
-// `transform_one`.
-impl<T> FunctionTransform for T
-where
-    T: FallibleFunctionTransform,
-{
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
-        let mut err_buf = Vec::new();
-        self.transform(output, &mut err_buf, event);
-    }
-}
-
 /// Transforms that tend to be more complicated runtime style components.
 ///
 /// These require coordination and map a stream of some `T` to some `U`.
@@ -189,38 +143,17 @@ pub trait TaskTransform: Send {
         Self: 'static;
 }
 
-/// This currently a topology-focused trait that unifies function and fallible function transforms.
-/// Eventually it (or something very similar) should be able to replace both entirely. That will
-/// likely involve it not being batch-focused anymore, and since we'll then be able to have
-/// a single implementation of these loops that apply across all sync transforms.
+/// Broader than the simple [`FunctionTransform`], this trait allows transforms to write to
+/// multiple outputs. Those outputs must be known in advanced and returned via
+/// `TransformConfig::named_outputs`. Attempting to send to any named output not registered in
+/// advance is considered a bug and will cause a panic.
 pub trait SyncTransform: Send + Sync {
-    fn run(&mut self, events: Vec<Event>, outputs: &mut TransformOutputs);
-}
-
-impl SyncTransform for Box<dyn FallibleFunctionTransform> {
-    fn run(&mut self, events: Vec<Event>, outputs: &mut TransformOutputs) {
-        let mut buf = Vec::with_capacity(1);
-        let mut err_buf = Vec::with_capacity(1);
-
-        for v in events {
-            self.transform(&mut buf, &mut err_buf, v);
-            outputs.append(&mut buf);
-            // TODO: this is a regession in the number of places that we hardcode this name, but it
-            // is temporary because we're quite close to being able to remove the overly-specific
-            // `FallibleFunctionTransform` trait entirely.
-            outputs.append_named("dropped", &mut err_buf);
-        }
-    }
+    fn transform(&mut self, event: Event, output: &mut TransformOutputs);
 }
 
 impl SyncTransform for Box<dyn FunctionTransform> {
-    fn run(&mut self, events: Vec<Event>, outputs: &mut TransformOutputs) {
-        let mut buf = Vec::with_capacity(4); // also an arbitrary,
-                                             // smallish constant
-        for v in events {
-            self.transform(&mut buf, v);
-            outputs.append(&mut buf);
-        }
+    fn transform(&mut self, event: Event, output: &mut TransformOutputs) {
+        FunctionTransform::transform(self.as_mut(), &mut output.primary_buffer, event);
     }
 }
 
@@ -263,6 +196,17 @@ impl TransformOutputs {
         (me, controls)
     }
 
+    pub fn push(&mut self, event: Event) {
+        self.primary_buffer.push(event);
+    }
+
+    pub fn push_named(&mut self, name: &str, event: Event) {
+        self.named_buffers
+            .get_mut(name)
+            .expect("unknown output")
+            .push(event);
+    }
+
     pub fn append(&mut self, slice: &mut Vec<Event>) {
         self.primary_buffer.append(slice);
     }
@@ -272,6 +216,25 @@ impl TransformOutputs {
             .get_mut(name)
             .expect("unknown output")
             .append(slice);
+    }
+
+    pub fn drain(&mut self) -> impl Iterator<Item = Event> + '_ {
+        self.primary_buffer.drain(..)
+    }
+
+    pub fn drain_named(&mut self, name: &str) -> impl Iterator<Item = Event> + '_ {
+        self.named_buffers
+            .get_mut(name)
+            .expect("unknown output")
+            .drain(..)
+    }
+
+    pub fn take_primary(&mut self) -> Vec<Event> {
+        std::mem::take(&mut self.primary_buffer)
+    }
+
+    pub fn take_all_named(&mut self) -> HashMap<String, Vec<Event>> {
+        std::mem::take(&mut self.named_buffers)
     }
 
     pub fn len(&self) -> usize {
