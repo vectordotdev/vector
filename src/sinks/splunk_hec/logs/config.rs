@@ -48,6 +48,8 @@ pub struct HecSinkLogsConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
+    // This settings is relevant only for the `humio_logs` sink and should be left to None everywhere else
+    pub timestamp_nanos_key: Option<String>,
 }
 
 impl GenerateConfig for HecSinkLogsConfig {
@@ -65,6 +67,7 @@ impl GenerateConfig for HecSinkLogsConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
+            timestamp_nanos_key: None,
         })
         .unwrap()
     }
@@ -124,6 +127,7 @@ impl HecSinkLogsConfig {
             index: self.index.clone(),
             indexed_fields: self.indexed_fields.clone(),
             host: self.host_key.clone(),
+            timestamp_nanos_key: self.timestamp_nanos_key.clone(),
         };
 
         Ok(VectorSink::Stream(Box::new(sink)))

@@ -33,10 +33,16 @@ pub struct HumioLogsConfig {
     #[serde(default)]
     pub(in crate::sinks::humio) batch: BatchConfig<SplunkHecDefaultBatchSettings>,
     pub(in crate::sinks::humio) tls: Option<TlsOptions>,
+    #[serde(default = "timestamp_nanos_key")]
+    pub(in crate::sinks::humio) timestamp_nanos_key: Option<String>,
 }
 
 inventory::submit! {
     SinkDescription::new::<HumioLogsConfig>("humio_logs")
+}
+
+pub fn timestamp_nanos_key() -> Option<String> {
+    Some("@timestamp.nanos".to_string())
 }
 
 impl GenerateConfig for HumioLogsConfig {
@@ -54,6 +60,7 @@ impl GenerateConfig for HumioLogsConfig {
             request: TowerRequestConfig::default(),
             batch: BatchConfig::default(),
             tls: None,
+            timestamp_nanos_key: None,
         })
         .unwrap()
     }
@@ -87,6 +94,7 @@ impl HumioLogsConfig {
             index: self.index.clone(),
             sourcetype: self.event_type.clone(),
             source: self.source.clone(),
+            timestamp_nanos_key: self.timestamp_nanos_key.clone(),
             encoding: self.encoding.clone().into_encoding(),
             compression: self.compression,
             batch: self.batch,
@@ -116,7 +124,7 @@ mod integration_tests {
         sinks::util::Compression,
         test_util::{components, components::HTTP_SINK_TAGS, random_string},
     };
-    use chrono::Utc;
+    use chrono::{TimeZone, Utc};
     use indoc::indoc;
     use serde_json::{json, Value as JsonValue};
     use std::{collections::HashMap, convert::TryFrom};
@@ -140,6 +148,9 @@ mod integration_tests {
         let log = event.as_mut_log();
         log.insert(log_schema().host_key(), host.clone());
 
+        let ts = Utc.timestamp_nanos(Utc::now().timestamp_millis() * 1_000_000 + 132_456);
+        log.insert(log_schema().timestamp_key(), ts);
+
         components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
 
         let entry = find_entry(repo.name.as_str(), message.as_str()).await;
@@ -161,6 +172,7 @@ mod integration_tests {
                 .unwrap_or_else(|| "no error message".to_string())
         );
         assert_eq!(Some(host), entry.host);
+        assert_eq!("132456", entry.timestamp_nanos);
     }
 
     #[tokio::test]
@@ -258,6 +270,7 @@ mod integration_tests {
             request: TowerRequestConfig::default(),
             batch,
             tls: None,
+            timestamp_nanos_key: timestamp_nanos_key(),
         }
     }
 
@@ -372,6 +385,9 @@ mod integration_tests {
 
         #[serde(rename = "@timestamp")]
         timestamp_millis: u64,
+
+        #[serde(rename = "@timestamp.nanos")]
+        timestamp_nanos: String,
 
         #[serde(rename = "@timezone")]
         timezone: String,
