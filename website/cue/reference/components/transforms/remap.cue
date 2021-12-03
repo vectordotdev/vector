@@ -157,17 +157,25 @@ components: transforms: "remap": {
 		event_data_model: {
 			title: "Event Data Model"
 			body:  """
-				You can use the `remap` transform with both log and metric events.
+				You can use the `remap` transform to handle both log and metric events.
 
 				Log events in the `remap` transform correspond directly to Vector's [log schema](\(urls.vector_log)),
-				which means that the transform has access to the whole event.
+				which means that the transform has access to the whole event and no restrictions on how the event can be
+				modified.
 
-				With metric events the remap transform has:
+				With [metric events](\(urls.vector_metric)), VRL is much more restrictive. Below is a field-by-field
+				breakdown of VRL's access to metrics:
 
-				* read-only access to the event's`.type`
-				* read/write access to `kind`, but it can only be set to one of `incremental` or `absolute` and cannot be deleted
-				* read/write access to `name`, but it cannot be deleted
-				* read/write/delete access to `namespace`, `timestamp`, and keys in `tags`
+				* Read-only access to the event's `type`.
+				* Read/write access to `kind`, but you can only set this to either `incremental` or `absolute`. The
+				  `kind` field can be neither deleted nor assigned an arbitrary value.
+				* Read/write access to `name`, although this field can't be deleted.
+				* Read/write/delete access to `namespace`, `timestamp`, and `tags`. The `tags` field must be a [VRL
+				  object](\(urls.vrl_expressions)/#object) in which all keys and values are strings.
+
+				It's important to note that if you try to perform a disallowed action, such as deleting the `type`
+				field using `del(.type)`, Vector doesn't abort the VRL program or throw an error. Instead, it ignores
+				the disallowed action.
 				"""
 		}
 		lazy_event_mutation: {
