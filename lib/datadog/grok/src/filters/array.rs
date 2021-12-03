@@ -1,3 +1,8 @@
+use crate::{
+    ast::{Function, FunctionArgument},
+    parse_grok::Error as GrokRuntimeError,
+    parse_grok_rules::Error as GrokStaticError,
+};
 use bytes::Bytes;
 use nom::{
     branch::alt,
@@ -10,7 +15,9 @@ use nom::{
     sequence::{preceded, terminated},
     IResult,
 };
+use std::convert::TryFrom;
 
+use crate::grok_filter::GrokFilter;
 use vrl_compiler::Value;
 
 pub fn parse(
@@ -78,6 +85,81 @@ fn parse_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     }
 }
 
+pub fn filter_from_function(f: &Function) -> Result<GrokFilter, GrokStaticError> {
+    let args_len = f.args.as_ref().map_or(0, |args| args.len());
+
+    let mut delimiter = None;
+    let mut value_filter = None;
+    let mut brackets = None;
+    if args_len == 1 {
+        match &f.args.as_ref().unwrap()[0] {
+            FunctionArgument::Arg(Value::Bytes(ref bytes)) => {
+                delimiter = Some(String::from_utf8_lossy(bytes).to_string());
+            }
+            FunctionArgument::Function(f) => value_filter = Some(GrokFilter::try_from(f)?),
+            _ => return Err(GrokStaticError::InvalidFunctionArguments(f.name.clone())),
+        }
+    } else if args_len == 2 {
+        match (&f.args.as_ref().unwrap()[0], &f.args.as_ref().unwrap()[1]) {
+            (
+                FunctionArgument::Arg(Value::Bytes(ref brackets_b)),
+                FunctionArgument::Arg(Value::Bytes(ref delimiter_b)),
+            ) => {
+                brackets = Some(String::from_utf8_lossy(brackets_b).to_string());
+                delimiter = Some(String::from_utf8_lossy(delimiter_b).to_string());
+            }
+            (
+                FunctionArgument::Arg(Value::Bytes(ref delimiter_b)),
+                FunctionArgument::Function(f),
+            ) => {
+                delimiter = Some(String::from_utf8_lossy(delimiter_b).to_string());
+                value_filter = Some(GrokFilter::try_from(f)?);
+            }
+            _ => return Err(GrokStaticError::InvalidFunctionArguments(f.name.clone())),
+        }
+    } else if args_len == 3 {
+        match (
+            &f.args.as_ref().unwrap()[0],
+            &f.args.as_ref().unwrap()[1],
+            &f.args.as_ref().unwrap()[2],
+        ) {
+            (
+                FunctionArgument::Arg(Value::Bytes(ref brackets_b)),
+                FunctionArgument::Arg(Value::Bytes(ref delimiter_b)),
+                FunctionArgument::Function(f),
+            ) => {
+                brackets = Some(String::from_utf8_lossy(brackets_b).to_string());
+                delimiter = Some(String::from_utf8_lossy(delimiter_b).to_string());
+                value_filter = Some(GrokFilter::try_from(f)?);
+            }
+            _ => return Err(GrokStaticError::InvalidFunctionArguments(f.name.clone())),
+        }
+    } else if args_len > 3 {
+        return Err(GrokStaticError::InvalidFunctionArguments(f.name.clone()));
+    }
+
+    let brackets = match brackets {
+        Some(b) if b.len() == 1 => {
+            let char = b.chars().next().unwrap();
+            Some((char, char))
+        }
+        Some(b) if b.len() == 2 => {
+            let mut chars = b.chars();
+            Some((chars.next().unwrap(), chars.next().unwrap()))
+        }
+        None => None,
+        _ => {
+            return Err(GrokStaticError::InvalidFunctionArguments(f.name.clone()));
+        }
+    };
+
+    Ok(GrokFilter::Array(
+        brackets,
+        delimiter,
+        Box::new(value_filter),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -101,14 +183,14 @@ mod tests {
     }
 
     #[test]
-    fn parses_with_special_character_delimiter() {
-        let result = parse("[1\t2]", None, Some("\t")).unwrap();
-        assert_eq!(result, vec!["1".into(), "2".into()]);
-    }
+    fn parses_escaped_special_characters() {
+        let result = parse(r#"[1\\t2]"#, None, Some("\t")).unwrap();
+        assert_eq!(result, vec!["1\t2".into()]);
 
-    #[test]
-    fn parses_escaped_characters() {
-        let result = parse("[1\\t2]", None, Some("\t")).unwrap();
-        assert_eq!(result, vec!["1\\t2".into()]);
+        let result = parse(r#"[1\\n2]"#, None, Some("\n")).unwrap();
+        assert_eq!(result, vec!["1\n2".into()]);
+
+        let result = parse(r#"[1\\r2]"#, None, Some("\r")).unwrap();
+        assert_eq!(result, vec!["1\r2".into()]);
     }
 }

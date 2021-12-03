@@ -6,6 +6,7 @@ use crate::{
 
 use crate::filters::array;
 use crate::matchers::date::{apply_date_filter, DateFilter};
+use crate::parse_grok::Error;
 use ordered_float::NotNan;
 use std::{convert::TryFrom, string::ToString};
 use strum_macros::Display;
@@ -70,82 +71,7 @@ impl TryFrom<&Function> for GrokFilter {
                     }
                 })
                 .ok_or_else(|| GrokStaticError::InvalidFunctionArguments(f.name.clone())),
-            "array" => {
-                let args_len = f.args.as_ref().map_or(0, |args| args.len());
-
-                let mut delimiter = None;
-                let mut value_filter = None;
-                let mut brackets = None;
-                if args_len == 1 {
-                    match &f.args.as_ref().unwrap()[0] {
-                        FunctionArgument::Arg(Value::Bytes(ref bytes)) => {
-                            delimiter = Some(String::from_utf8_lossy(bytes).to_string());
-                        }
-                        FunctionArgument::Function(f) => {
-                            value_filter = Some(GrokFilter::try_from(f)?)
-                        }
-                        _ => return Err(GrokStaticError::InvalidFunctionArguments(f.name.clone())),
-                    }
-                } else if args_len == 2 {
-                    match (&f.args.as_ref().unwrap()[0], &f.args.as_ref().unwrap()[1]) {
-                        (
-                            FunctionArgument::Arg(Value::Bytes(ref brackets_b)),
-                            FunctionArgument::Arg(Value::Bytes(ref delimiter_b)),
-                        ) => {
-                            brackets = Some(String::from_utf8_lossy(brackets_b).to_string());
-                            delimiter = Some(String::from_utf8_lossy(delimiter_b).to_string());
-                        }
-                        (
-                            FunctionArgument::Arg(Value::Bytes(ref delimiter_b)),
-                            FunctionArgument::Function(f),
-                        ) => {
-                            delimiter = Some(String::from_utf8_lossy(delimiter_b).to_string());
-                            value_filter = Some(GrokFilter::try_from(f)?);
-                        }
-                        _ => return Err(GrokStaticError::InvalidFunctionArguments(f.name.clone())),
-                    }
-                } else if args_len == 3 {
-                    match (
-                        &f.args.as_ref().unwrap()[0],
-                        &f.args.as_ref().unwrap()[1],
-                        &f.args.as_ref().unwrap()[2],
-                    ) {
-                        (
-                            FunctionArgument::Arg(Value::Bytes(ref brackets_b)),
-                            FunctionArgument::Arg(Value::Bytes(ref delimiter_b)),
-                            FunctionArgument::Function(f),
-                        ) => {
-                            brackets = Some(String::from_utf8_lossy(brackets_b).to_string());
-                            delimiter = Some(String::from_utf8_lossy(delimiter_b).to_string());
-                            value_filter = Some(GrokFilter::try_from(f)?);
-                        }
-                        _ => return Err(GrokStaticError::InvalidFunctionArguments(f.name.clone())),
-                    }
-                } else if args_len > 3 {
-                    return Err(GrokStaticError::InvalidFunctionArguments(f.name.clone()));
-                }
-
-                let brackets = match brackets {
-                    Some(b) if b.len() == 1 => {
-                        let char = b.chars().next().unwrap();
-                        Some((char, char))
-                    }
-                    Some(b) if b.len() == 2 => {
-                        let mut chars = b.chars();
-                        Some((chars.next().unwrap(), chars.next().unwrap()))
-                    }
-                    None => None,
-                    _ => {
-                        return Err(GrokStaticError::InvalidFunctionArguments(f.name.clone()));
-                    }
-                };
-
-                Ok(GrokFilter::Array(
-                    brackets,
-                    delimiter,
-                    Box::new(value_filter),
-                ))
-            }
+            "array" => array::filter_from_function(f),
             _ => Err(GrokStaticError::UnknownFilter(f.name.clone())),
         }
     }
