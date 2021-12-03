@@ -605,7 +605,7 @@ where
                     EventStatus::Errored
                 } else {
                     error!(message = "Response failed.", ?response);
-                    EventStatus::Failed
+                    EventStatus::Rejected
                 }
             }
             Err(error) => {

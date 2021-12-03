@@ -279,7 +279,7 @@ where
                                 match result {
                                     Err(error) => {
                                         error!(message = "Service call failed.", ?error, request_id);
-                                        finalizers.update_status(EventStatus::Failed);
+                                        finalizers.update_status(EventStatus::Rejected);
                                     },
                                     Ok(response) => {
                                         trace!(message = "Service call succeeded.", request_id);

@@ -84,6 +84,7 @@ async fn config(
         batch,
         request: TowerRequestConfig::default(),
         tls: None,
+        timestamp_nanos_key: None,
     }
 }
 
@@ -124,7 +125,7 @@ async fn splunk_insert_broken_token() {
         .into();
     drop(batch);
     sink.run(stream::once(ready(event))).await.unwrap();
-    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Failed));
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
 }
 
 #[tokio::test]

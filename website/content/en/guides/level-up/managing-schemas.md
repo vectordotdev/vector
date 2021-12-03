@@ -142,14 +142,12 @@ type = "json_parser"
 [transforms.not_gdpr]
 type = "filter"
 inputs = ["parse"]
-condition.type = "check_fields"
-condition."gdpr.eq" = "false"
+condition = ".gdpr == false"
 
 [transforms.gdpr_to_strip]
 type = "filter"
 inputs = ["parse"]
-condition.type = "check_fields"
-condition."gdpr.eq" = "true"
+condition = ".gdpr == true"
 
 [transforms.gdpr_stripped]
 type = "remap"
