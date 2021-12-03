@@ -10,3 +10,4 @@ targets:
       post:
         variant: "ascii"
         maximum_prebuild_cache_size_bytes: "256 Mb"
+    headers: {}
