@@ -184,13 +184,13 @@ mod tests {
 
     #[test]
     fn parses_escaped_special_characters() {
-        let result = parse(r#"[1\\t2]"#, None, Some("\t")).unwrap();
-        assert_eq!(result, vec!["1\t2".into()]);
+        let result = parse("[1\r2]", None, Some("\r")).unwrap();
+        assert_eq!(result, vec!["1".into(), "2".into()]);
 
-        let result = parse(r#"[1\\n2]"#, None, Some("\n")).unwrap();
-        assert_eq!(result, vec!["1\n2".into()]);
+        let result = parse("[1\n2]", None, Some("\n")).unwrap();
+        assert_eq!(result, vec!["1".into(), "2".into()]);
 
-        let result = parse(r#"[1\\r2]"#, None, Some("\r")).unwrap();
-        assert_eq!(result, vec!["1\r2".into()]);
+        let result = parse("[1\t2]", None, Some("\t")).unwrap();
+        assert_eq!(result, vec!["1".into(), "2".into()]);
     }
 }
