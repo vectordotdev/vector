@@ -3,7 +3,7 @@ use crate::{
     http::HttpClient,
     internal_events::{
         SplunkIndexerAcknowledgementAPIError, SplunkIndexerAcknowledgementAckAdded,
-        SplunkIndexerAcknowledgementAckRemoved,
+        SplunkIndexerAcknowledgementAcksRemoved,
     },
 };
 use hyper::Body;
@@ -140,7 +140,7 @@ impl HecAckClient {
                 debug!(message = "Finalized ack id", ?ack_id);
             }
         }
-        emit!(&SplunkIndexerAcknowledgementAckRemoved {
+        emit!(&SplunkIndexerAcknowledgementAcksRemoved {
             count: removed_count
         });
     }
@@ -174,7 +174,7 @@ impl HecAckClient {
                 removed_count += 1.0;
             }
         }
-        emit!(&SplunkIndexerAcknowledgementAckRemoved {
+        emit!(&SplunkIndexerAcknowledgementAcksRemoved {
             count: removed_count
         });
     }

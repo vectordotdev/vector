@@ -124,11 +124,11 @@ mod sink {
         }
     }
 
-    pub struct SplunkIndexerAcknowledgementAckRemoved {
+    pub struct SplunkIndexerAcknowledgementAcksRemoved {
         pub count: f64,
     }
 
-    impl InternalEvent for SplunkIndexerAcknowledgementAckRemoved {
+    impl InternalEvent for SplunkIndexerAcknowledgementAcksRemoved {
         fn emit_metrics(&self) {
             decrement_gauge!("splunk_pending_acks", self.count);
         }
