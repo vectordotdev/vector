@@ -114,7 +114,7 @@ where
         true
     }
 
-    fn new_span(&self, span: &span::Attributes<'_>, _id: &span::Id, _ctx: Context<'_, S>) {
+    fn on_new_span(&self, span: &span::Attributes<'_>, _id: &span::Id, _ctx: Context<'_, S>) {
         let mut visitor = Visitor(self.mutex.lock().unwrap());
         span.record(&mut visitor);
     }
