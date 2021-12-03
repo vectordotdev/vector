@@ -1,11 +1,12 @@
-use super::util::{SocketListenAddr, StreamDecodingError, TcpSource};
+use super::util::{SocketListenAddr, StreamDecodingError, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
-        SourceDescription,
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Resource, SourceConfig,
+        SourceContext, SourceDescription,
     },
     event::{Event, LogEvent},
     internal_events::{FluentMessageDecodeError, FluentMessageReceived},
+    serde::bool_or_struct,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
 };
@@ -20,10 +21,8 @@ use std::{
 };
 use tokio_util::codec::Decoder;
 
-use crate::sources::fluent::message::{
-    FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentTimestamp,
-};
 mod message;
+use self::message::{FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentTimestamp};
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct FluentConfig {
@@ -31,6 +30,8 @@ pub struct FluentConfig {
     tls: Option<TlsConfig>,
     keepalive: Option<TcpKeepaliveConfig>,
     receive_buffer_bytes: Option<usize>,
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -44,6 +45,7 @@ impl GenerateConfig for FluentConfig {
             keepalive: None,
             tls: None,
             receive_buffer_bytes: None,
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -62,8 +64,8 @@ impl SourceConfig for FluentConfig {
             shutdown_secs,
             tls,
             self.receive_buffer_bytes,
-            cx.shutdown,
-            cx.out,
+            cx,
+            self.acknowledgements,
         )
     }
 
@@ -87,6 +89,7 @@ impl TcpSource for FluentSource {
     type Error = DecodeError;
     type Item = FluentFrame;
     type Decoder = FluentDecoder;
+    type Acker = FluentAcker;
 
     fn decoder(&self) -> Self::Decoder {
         FluentDecoder::new()
@@ -100,6 +103,10 @@ impl TcpSource for FluentSource {
                 log.insert(log_schema().host_key(), host.clone());
             }
         }
+    }
+
+    fn build_acker(&self, frame: &Self::Item) -> Self::Acker {
+        FluentAcker::new(frame)
     }
 }
 
@@ -168,20 +175,31 @@ impl FluentDecoder {
         byte_size: usize,
     ) -> Result<(), DecodeError> {
         match message {
-            FluentMessage::Message(tag, timestamp, record)
-            | FluentMessage::MessageWithOptions(tag, timestamp, record, ..) => {
+            FluentMessage::Message(tag, timestamp, record) => {
                 self.unread_frames.push_back((
                     FluentFrame {
                         tag,
                         timestamp,
                         record,
+                        chunk: None,
                     },
                     byte_size,
                 ));
                 Ok(())
             }
-            FluentMessage::Forward(tag, entries)
-            | FluentMessage::ForwardWithOptions(tag, entries, ..) => {
+            FluentMessage::MessageWithOptions(tag, timestamp, record, options) => {
+                self.unread_frames.push_back((
+                    FluentFrame {
+                        tag,
+                        timestamp,
+                        record,
+                        chunk: options.chunk,
+                    },
+                    byte_size,
+                ));
+                Ok(())
+            }
+            FluentMessage::Forward(tag, entries) => {
                 self.unread_frames.extend(entries.into_iter().map(
                     |FluentEntry(timestamp, record)| {
                         (
@@ -189,6 +207,23 @@ impl FluentDecoder {
                                 tag: tag.clone(),
                                 timestamp,
                                 record,
+                                chunk: None,
+                            },
+                            byte_size,
+                        )
+                    },
+                ));
+                Ok(())
+            }
+            FluentMessage::ForwardWithOptions(tag, entries, options) => {
+                self.unread_frames.extend(entries.into_iter().map(
+                    |FluentEntry(timestamp, record)| {
+                        (
+                            FluentFrame {
+                                tag: tag.clone(),
+                                timestamp,
+                                record,
+                                chunk: options.chunk.clone(),
                             },
                             byte_size,
                         )
@@ -207,6 +242,7 @@ impl FluentDecoder {
                             tag: tag.clone(),
                             timestamp,
                             record,
+                            chunk: None,
                         },
                         byte_size,
                     ));
@@ -236,6 +272,7 @@ impl FluentDecoder {
                             tag: tag.clone(),
                             timestamp,
                             record,
+                            chunk: options.chunk.clone(),
                         },
                         byte_size,
                     ));
@@ -340,12 +377,34 @@ impl Decoder for FluentEntryStreamDecoder {
     }
 }
 
+struct FluentAcker {
+    chunk: Option<String>,
+}
+
+impl FluentAcker {
+    fn new(frame: &FluentFrame) -> Self {
+        Self {
+            chunk: frame.chunk.clone(),
+        }
+    }
+}
+
+impl TcpSourceAcker for FluentAcker {
+    fn build_ack(self, ack: TcpSourceAck) -> Option<Bytes> {
+        self.chunk.map(|chunk| match ack {
+            TcpSourceAck::Ack => format!(r#"{{"ack": "{}"}}"#, chunk).into(),
+            _ => "{}".into(),
+        })
+    }
+}
+
 /// Normalized fluent message.
 #[derive(Debug, PartialEq)]
 struct FluentFrame {
     tag: FluentTag,
     timestamp: FluentTimestamp,
     record: FluentRecord,
+    chunk: Option<String>,
 }
 
 impl From<FluentFrame> for Event {
@@ -366,6 +425,7 @@ impl From<FluentFrame> for LogEvent {
             tag,
             timestamp,
             record,
+            chunk: _,
         } = frame;
 
         let mut log = LogEvent::default();
@@ -380,10 +440,16 @@ impl From<FluentFrame> for LogEvent {
 
 #[cfg(test)]
 mod tests {
-    use crate::sources::fluent::{DecodeError, FluentConfig, FluentDecoder};
+    use super::{message::FluentMessageOptions, *};
+    use crate::config::{SourceConfig, SourceContext};
+    use crate::test_util::{self, next_addr, trace_init, wait_for_tcp};
+    use crate::{event::EventStatus, Pipeline};
     use bytes::BytesMut;
-    use chrono::DateTime;
+    use chrono::{DateTime, Utc};
+    use rmp_serde::Serializer;
     use shared::{assert_event_data_eq, btreemap};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::time::{error::Elapsed, timeout, Duration};
     use tokio_util::codec::Decoder;
     use vector_core::event::{LogEvent, Value};
 
@@ -683,133 +749,228 @@ mod tests {
         }
         Ok(frames)
     }
+
+    #[tokio::test]
+    async fn ack_delivered_without_chunk() {
+        let (result, output) = check_acknowledgements(EventStatus::Delivered, false).await;
+        assert!(matches!(result, Err(_))); // the `_` inside this error is `Elapsed`
+        assert!(output.is_empty());
+    }
+
+    #[tokio::test]
+    async fn ack_delivered_with_chunk() {
+        let (result, output) = check_acknowledgements(EventStatus::Delivered, true).await;
+        assert_eq!(result.unwrap().unwrap(), output.len());
+        assert!(output.starts_with(b"{\"ack\":"));
+    }
+
+    #[tokio::test]
+    async fn ack_failed_without_chunk() {
+        let (result, output) = check_acknowledgements(EventStatus::Rejected, false).await;
+        assert_eq!(result.unwrap().unwrap(), output.len());
+        assert!(output.is_empty());
+    }
+
+    #[tokio::test]
+    async fn ack_failed_with_chunk() {
+        let (result, output) = check_acknowledgements(EventStatus::Rejected, true).await;
+        assert_eq!(result.unwrap().unwrap(), output.len());
+        assert_eq!(output, &b"{}"[..]);
+    }
+
+    async fn check_acknowledgements(
+        status: EventStatus,
+        with_chunk: bool,
+    ) -> (Result<Result<usize, std::io::Error>, Elapsed>, Bytes) {
+        trace_init();
+
+        let (sender, recv) = Pipeline::new_test_finalize(status);
+        let address = next_addr();
+        let source = FluentConfig {
+            address: address.into(),
+            tls: None,
+            keepalive: None,
+            receive_buffer_bytes: None,
+            acknowledgements: true.into(),
+        }
+        .build(SourceContext::new_test(sender))
+        .await
+        .unwrap();
+        tokio::spawn(source);
+        wait_for_tcp(address).await;
+
+        let msg = uuid::Uuid::new_v4().to_string();
+        let tag = uuid::Uuid::new_v4().to_string();
+        let req = build_req(&tag, &[("field", &msg)], with_chunk);
+
+        let sender = tokio::spawn(async move {
+            let mut socket = tokio::net::TcpStream::connect(address).await.unwrap();
+            socket.write_all(&req).await.unwrap();
+
+            let mut output = BytesMut::new();
+            (
+                timeout(Duration::from_millis(250), socket.read_buf(&mut output)).await,
+                output,
+            )
+        });
+        let events = test_util::collect_n(recv, 1).await;
+        let (result, output) = sender.await.unwrap();
+
+        assert_eq!(events.len(), 1);
+        let log = events[0].as_log();
+        assert_eq!(log.get("field").unwrap(), &msg.into());
+        assert!(matches!(log.get("host").unwrap(), Value::Bytes(_)));
+        assert!(matches!(log.get("timestamp").unwrap(), Value::Timestamp(_)));
+        assert_eq!(log.get("tag").unwrap(), &tag.into());
+
+        (result, output.into())
+    }
+
+    fn build_req(tag: &str, fields: &[(&str, &str)], with_chunk: bool) -> Vec<u8> {
+        let mut record = FluentRecord::default();
+        for (tag, value) in fields {
+            record.insert((*tag).into(), rmpv::Value::String((*value).into()).into());
+        }
+        let chunk = with_chunk.then(|| base64::encode(uuid::Uuid::new_v4().as_bytes()));
+        let req = FluentMessage::MessageWithOptions(
+            tag.into(),
+            FluentTimestamp::Unix(Utc::now()),
+            record,
+            FluentMessageOptions {
+                chunk,
+                ..Default::default()
+            },
+        );
+        let mut buf = Vec::new();
+        req.serialize(&mut Serializer::new(&mut buf)).unwrap();
+        buf
+    }
 }
 
 #[cfg(all(test, feature = "fluent-integration-tests"))]
 mod integration_tests {
-    use crate::config::SourceConfig;
-    use crate::config::SourceContext;
-    use crate::docker::docker;
+    use crate::config::{SourceConfig, SourceContext};
+    use crate::docker::Container;
     use crate::sources::fluent::FluentConfig;
-    use crate::test_util::{collect_ready, next_addr_for_ip, trace_init, wait_for_tcp};
-    use crate::Pipeline;
-    use bollard::{
-        container::{Config as ContainerConfig, CreateContainerOptions},
-        image::{CreateImageOptions, ListImagesOptions},
-        models::HostConfig,
-        Docker,
+    use crate::test_util::{
+        collect_ready, next_addr, next_addr_for_ip, random_string, trace_init, wait_for_tcp,
     };
-    use futures::{channel::mpsc, StreamExt};
-    use std::{collections::HashMap, fs::File, io::Write, net::SocketAddr, time::Duration};
+    use crate::Pipeline;
+    use futures::Stream;
+    use std::{fs::File, io::Write, net::SocketAddr, time::Duration};
     use tokio::time::sleep;
-    use uuid::Uuid;
-    use vector_core::event::Event;
+    use vector_core::event::{Event, EventStatus};
+
+    const FLUENT_BIT_IMAGE: &str = "fluent/fluent-bit";
+    const FLUENT_BIT_TAG: &str = "1.7";
+    const FLUENTD_IMAGE: &str = "fluent/fluentd";
+    const FLUENTD_TAG: &str = "v1.12";
+
+    fn make_file(name: &str, content: &str) -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        let mut file = File::create(dir.path().join(name)).unwrap();
+        write!(&mut file, "{}", content).unwrap();
+        dir
+    }
 
     #[tokio::test]
     async fn fluentbit() {
+        test_fluentbit(EventStatus::Delivered).await;
+    }
+
+    #[tokio::test]
+    async fn fluentbit_rejection() {
+        test_fluentbit(EventStatus::Rejected).await;
+    }
+
+    async fn test_fluentbit(status: EventStatus) {
         trace_init();
 
-        let image = "fluent/fluent-bit";
-        let tag = "1.7";
+        let test_address = next_addr();
+        let (out, source_address) = source(status).await;
 
-        let docker = docker(None, None).unwrap();
-
-        let (out, address) = source().await;
-
-        pull_image(&docker, image, tag).await;
-
-        let dir = tempfile::tempdir().unwrap();
-        let mut file = File::create(dir.path().join("fluent-bit.conf")).unwrap();
-        write!(
-            &mut file,
-            r#"
+        let dir = make_file(
+            "fluent-bit.conf",
+            &format!(
+                r#"
 [SERVICE]
     Grace      0
     Flush      1
     Daemon     off
 
 [INPUT]
-    Name       dummy
+    Name       http
+    Host       {listen_host}
+    Port       {listen_port}
 
 [OUTPUT]
     Name          forward
     Match         *
     Host          host.docker.internal
-    Port          {}
+    Port          {send_port}
+    Require_ack_response true
 "#,
-            address.port()
-        )
-        .unwrap();
+                listen_host = test_address.ip(),
+                listen_port = test_address.port(),
+                send_port = source_address.port(),
+            ),
+        );
 
-        let options = Some(CreateContainerOptions {
-            name: format!("vector_test_fluent_{}", Uuid::new_v4()),
-        });
-        let config = ContainerConfig {
-            image: Some(format!("{}:{}", image, tag)),
-            host_config: Some(HostConfig {
-                network_mode: Some(String::from("host")),
-                extra_hosts: Some(vec![String::from("host.docker.internal:host-gateway")]),
-                binds: Some(vec![format!(
-                    "{}:{}",
-                    dir.path().display(),
-                    "/fluent-bit/etc"
-                )]),
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
+        let msg = random_string(64);
+        let body = serde_json::json!({ "message": msg });
 
-        let container = docker.create_container(options, config).await.unwrap();
+        let events = Container::new(FLUENT_BIT_IMAGE, FLUENT_BIT_TAG)
+            .bind(dir.path().display(), "/fluent-bit/etc")
+            .run(async move {
+                wait_for_tcp(test_address).await;
+                reqwest::Client::new()
+                    .post(&format!("http://{}/", test_address))
+                    .header("content-type", "application/json")
+                    .body(body.to_string())
+                    .send()
+                    .await
+                    .unwrap();
+                sleep(Duration::from_secs(2)).await;
+                let result = collect_ready(out).await;
+                result
+            })
+            .await;
 
-        docker
-            .start_container::<String>(&container.id, None)
-            .await
-            .unwrap();
-
-        sleep(Duration::from_secs(2)).await;
-
-        let events = collect_ready(out).await;
-
-        remove_container(&docker, &container.id).await;
-
-        assert!(!events.is_empty());
-        assert_eq!(events[0].as_log()["tag"], "dummy.0".into());
-        assert_eq!(events[0].as_log()["message"], "dummy".into());
-        assert!(events[0].as_log().get("timestamp").is_some());
-        assert!(events[0].as_log().get("host").is_some());
+        assert_eq!(events.len(), 1);
+        let log = events[0].as_log();
+        assert_eq!(log["tag"], "http.0".into());
+        assert_eq!(log["message"], msg.into());
+        assert!(log.get("timestamp").is_some());
+        assert!(log.get("host").is_some());
     }
 
     #[tokio::test]
     async fn fluentd() {
-        let config = r#"
-<source>
-  @type dummy
-  dummy {"message": "dummy"}
-  tag dummy
-</source>
-
-<match *>
-  @type forward
-  <server>
-    name  local
-    host  host.docker.internal
-    port  PORT
-  </server>
-  <buffer>
-    flush_mode immediate
-  </buffer>
-</match>
-"#;
-        test_fluentd(config).await;
+        test_fluentd(EventStatus::Delivered, "").await;
     }
 
     #[tokio::test]
     async fn fluentd_gzip() {
-        let config = r#"
+        test_fluentd(EventStatus::Delivered, "compress gzip").await;
+    }
+
+    #[tokio::test]
+    async fn fluentd_rejection() {
+        test_fluentd(EventStatus::Rejected, "").await;
+    }
+
+    async fn test_fluentd(status: EventStatus, options: &str) {
+        trace_init();
+
+        let test_address = next_addr();
+        let (out, source_address) = source(status).await;
+
+        let config = format!(
+            r#"
 <source>
-  @type dummy
-  dummy {"message": "dummy"}
-  tag dummy
+  @type http
+  bind {http_host}
+  port {http_port}
 </source>
 
 <match *>
@@ -817,107 +978,52 @@ mod integration_tests {
   <server>
     name  local
     host  host.docker.internal
-    port  PORT
+    port  {port}
   </server>
   <buffer>
     flush_mode immediate
   </buffer>
-  compress gzip
+  require_ack_response true
+  ack_response_timeout 1
+  {options}
 </match>
-"#;
-        test_fluentd(config).await;
-    }
+"#,
+            http_host = test_address.ip(),
+            http_port = test_address.port(),
+            port = source_address.port(),
+            options = options
+        );
 
-    async fn test_fluentd(config: &str) {
-        trace_init();
+        let dir = make_file("fluent.conf", &config);
 
-        let image = "fluent/fluentd";
-        let tag = "v1.12";
+        let msg = random_string(64);
+        let body = serde_json::json!({ "message": msg });
 
-        let docker = docker(None, None).unwrap();
+        let events = Container::new(FLUENTD_IMAGE, FLUENTD_TAG)
+            .bind(dir.path().display(), "/fluentd/etc")
+            .run(async move {
+                wait_for_tcp(test_address).await;
+                reqwest::Client::new()
+                    .post(&format!("http://{}/", test_address))
+                    .header("content-type", "application/json")
+                    .body(body.to_string())
+                    .send()
+                    .await
+                    .unwrap();
+                sleep(Duration::from_secs(2)).await;
+                collect_ready(out).await
+            })
+            .await;
 
-        let (out, address) = source().await;
-
-        pull_image(&docker, image, tag).await;
-
-        let dir = tempfile::tempdir().unwrap();
-        let mut file = File::create(dir.path().join("fluent.conf")).unwrap();
-        write!(
-            &mut file,
-            "{}",
-            config.replace("PORT", &address.port().to_string())
-        )
-        .unwrap();
-
-        let options = Some(CreateContainerOptions {
-            name: format!("vector_test_fluent_{}", Uuid::new_v4()),
-        });
-        let config = ContainerConfig {
-            image: Some(format!("{}:{}", image, tag)),
-            host_config: Some(HostConfig {
-                network_mode: Some(String::from("host")),
-                extra_hosts: Some(vec![String::from("host.docker.internal:host-gateway")]),
-                binds: Some(vec![format!("{}:{}", dir.path().display(), "/fluentd/etc")]),
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-
-        let container = docker.create_container(options, config).await.unwrap();
-
-        docker
-            .start_container::<String>(&container.id, None)
-            .await
-            .unwrap();
-
-        sleep(Duration::from_secs(5)).await;
-
-        let events = collect_ready(out).await;
-
-        remove_container(&docker, &container.id).await;
-
-        assert!(!events.is_empty());
-        assert_eq!(events[0].as_log()["tag"], "dummy".into());
-        assert_eq!(events[0].as_log()["message"], "dummy".into());
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].as_log()["tag"], "".into());
+        assert_eq!(events[0].as_log()["message"], msg.into());
         assert!(events[0].as_log().get("timestamp").is_some());
         assert!(events[0].as_log().get("host").is_some());
     }
 
-    async fn pull_image(docker: &Docker, image: &str, tag: &str) {
-        let mut filters = HashMap::new();
-        filters.insert(
-            String::from("reference"),
-            vec![format!("{}:{}", image, tag)],
-        );
-
-        let options = Some(ListImagesOptions {
-            filters,
-            ..Default::default()
-        });
-
-        let images = docker.list_images(options).await.unwrap();
-        if images.is_empty() {
-            // If not found, pull it
-            let options = Some(CreateImageOptions {
-                from_image: image,
-                tag,
-                ..Default::default()
-            });
-
-            docker
-                .create_image(options, None, None)
-                .for_each(|item| async move {
-                    let info = item.unwrap();
-                    if let Some(error) = info.error {
-                        panic!("{:?}", error);
-                    }
-                })
-                .await
-        }
-    }
-
-    async fn source() -> (mpsc::Receiver<Event>, SocketAddr) {
-        let (sender, recv) = Pipeline::new_test();
+    async fn source(status: EventStatus) -> (impl Stream<Item = Event>, SocketAddr) {
+        let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
         tokio::spawn(async move {
             FluentConfig {
@@ -925,6 +1031,7 @@ mod integration_tests {
                 tls: None,
                 keepalive: None,
                 receive_buffer_bytes: None,
+                acknowledgements: false.into(),
             }
             .build(SourceContext::new_test(sender))
             .await
@@ -934,22 +1041,5 @@ mod integration_tests {
         });
         wait_for_tcp(address).await;
         (recv, address)
-    }
-
-    async fn remove_container(docker: &Docker, id: &str) {
-        trace!("Stopping container.");
-
-        let _ = docker
-            .stop_container(id, None)
-            .await
-            .map_err(|e| error!(%e));
-
-        trace!("Removing container.");
-
-        // Don't panic, as this is unrelated to the test
-        let _ = docker
-            .remove_container(id, None)
-            .await
-            .map_err(|e| error!(%e));
     }
 }
