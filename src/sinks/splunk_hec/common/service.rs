@@ -99,10 +99,8 @@ impl Service<HecRequest> for HecService {
     fn poll_ready(&mut self, cx: &mut Context) -> std::task::Poll<Result<(), Self::Error>> {
         // Ready if indexer acknowledgements is disabled or there is room for
         // additional pending acks. Otherwise, wait until there is room.
-        if self.ack_finalizer_tx.is_none() {
+        if self.ack_finalizer_tx.is_none() || self.current_ack_slot.is_some() {
             Poll::Ready(Ok(()))
-        } else if self.current_ack_slot.take().is_some() {
-            Poll::Ready(Err("poll_ready called after a successful call".into()))
         } else {
             match ready!(self.ack_slots.poll_acquire(cx)) {
                 Some(permit) => {
@@ -329,6 +327,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn acknowledgements_disabled_in_config() {
+        let mock_server = get_hec_mock_server(true, ack_response_always_succeed).await;
+
+        let acknowledgements_config = HecClientAcknowledgementsConfig {
+            indexer_acknowledgements_enabled: false,
+            ..Default::default()
+        };
+        let mut service = get_hec_service(mock_server.uri(), acknowledgements_config);
+
+        let request = get_hec_request();
+        let response = service.ready().await.unwrap().call(request).await.unwrap();
+        assert_eq!(EventStatus::Delivered, response.event_status)
+    }
+
+    #[tokio::test]
     async fn acknowledgements_enabled_on_server() {
         let mock_server = get_hec_mock_server(true, ack_response_always_succeed).await;
 
@@ -451,7 +464,9 @@ mod tests {
         let mut service = get_hec_service(mock_server.uri(), Default::default());
 
         assert!(service.ready().await.is_ok());
-        assert!(service.ready().await.is_err());
+        // Consecutive poll_ready returns OK since an ack slot has been granted
+        // but has not been used (call has not been invoked)
+        assert!(service.ready().await.is_ok());
     }
 
     #[tokio::test]
