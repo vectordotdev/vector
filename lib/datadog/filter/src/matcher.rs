@@ -49,6 +49,7 @@ where
     V: fmt::Debug + Send + Sync + Clone,
     T: Fn(&V) -> bool + Send + Sync + Clone,
 {
+    /// Invokes the internal `func`, returning true if a value matches.
     fn run(&self, obj: &V) -> bool {
         (self.func)(obj)
     }
@@ -89,7 +90,7 @@ where
 }
 
 /// Build a filter by parsing a Datadog Search Syntax `QueryNode`, and invoking the appropriate
-/// method on a `Fielder` + `Filter` implementation to determine the matching logic. Each method
+/// method on a `Filter` + `Resolver` implementation to determine the matching logic. Each method
 /// returns a `Matcher<V>` which is intended to be invoked at runtime. `F` should implement both
 /// `Fielder` + `Filter` in order to applying any required caching which may affect the operation
 /// of a filter method. This function is intended to be used at boot-time and NOT in a hot path!

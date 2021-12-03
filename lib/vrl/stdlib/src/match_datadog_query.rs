@@ -110,6 +110,8 @@ fn type_def() -> TypeDef {
 #[derive(Default, Clone)]
 struct VrlFilter;
 
+/// Implements `Resolver`, which translates Datadog Search Syntax literal names into
+/// fields.
 impl Resolver for VrlFilter {
     type IntoIter = Vec<Field>;
 
@@ -118,6 +120,7 @@ impl Resolver for VrlFilter {
     }
 }
 
+/// Implements `Filter`, which provides methods for matching against (in this case) VRL values.
 impl<'a> Filter<'a, Value> for VrlFilter {
     fn exists(&'a self, field: Field) -> Box<dyn Matcher<Value>> {
         let buf = lookup_field(&field);
@@ -391,7 +394,7 @@ fn resolve_value(buf: LookupBuf, match_fn: Box<dyn Matcher<Value>>) -> Box<dyn M
     Run::boxed(func)
 }
 
-/// Returns compiled word boundary regex. Cached to avoid recompilation in hot paths.
+/// Returns compiled word boundary regex.
 fn word_regex(to_match: &str) -> Regex {
     Regex::new(&format!(
         r#"\b{}\b"#,
@@ -400,7 +403,7 @@ fn word_regex(to_match: &str) -> Regex {
     .expect("invalid wildcard regex")
 }
 
-/// Returns compiled wildcard regex. Cached to avoid recompilation in hot paths.
+/// Returns compiled wildcard regex.
 fn wildcard_regex(to_match: &str) -> Regex {
     Regex::new(&format!(
         "^{}$",
