@@ -79,7 +79,7 @@ pub trait Filter<'a, V: Debug + Send + Sync + Clone + 'static>: DynClone {
                 let lower_func = self.compare(field.clone(), lower_op, lower);
                 let upper_func = self.compare(field, upper_op, upper);
 
-                Run::boxed(move |value: &V| lower_func.run(value) && upper_func.run(value))
+                Run::boxed(move |value| lower_func.run(value) && upper_func.run(value))
             }
         }
     }
