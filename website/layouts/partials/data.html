@@ -135,6 +135,16 @@
               {{ end }}
             </tbody>
           </table>
+
+          {{ with $v.shorthand_explainer }}
+          <div class="py-2 px-3 border rounded border-green-500">
+            {{ partial "heading.html" (dict "text" .title "level" 3 "icon" false "toc_hide" true) }}
+
+            <div class="prose dark:prose-dark max-w-none">
+              {{ .description | markdownify }}
+            </div>
+          </div>
+          {{ end }}
         </div>
       </div>
       {{ end }}

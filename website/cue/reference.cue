@@ -410,6 +410,21 @@ _values: {
 				"""
 		}
 	}
+
+	shorthand_explainer: {
+		title:       "Shorthand for VRL"
+		description: """
+			If you opt for the [`vrl`](\(urls.vrl_reference)) syntax for this condition, you can set the condition
+			as a string via the `condition` parameter, without needing to specify both a `source` and a `type`. The
+			table below shows some examples:
+
+			Config format | Example
+			:-------------|:-------
+			[TOML](\(urls.toml)) | `condition = ".status == 200"`
+			[YAML](\(urls.yaml)) | `condition: .status == 200`
+			[JSON](\(urls.json)) | `"condition": ".status == 200"`
+			"""
+	}
 }
 
 #TypePrimitive: {
