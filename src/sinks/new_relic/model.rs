@@ -13,6 +13,7 @@ use std::{
     convert::TryFrom,
     time::SystemTime,
 };
+use super::NewRelicSinkError;
 
 #[derive(Debug)]
 pub enum NewRelicApiModel {
@@ -48,7 +49,7 @@ impl MetricsApiModel {
 }
 
 impl TryFrom<Vec<Event>> for MetricsApiModel {
-    type Error = &'static str;
+    type Error = NewRelicSinkError;
 
     fn try_from(buf_events: Vec<Event>) -> Result<Self, Self::Error> {
         let mut metric_array = vec!();
@@ -87,7 +88,7 @@ impl TryFrom<Vec<Event>> for MetricsApiModel {
             Ok(MetricsApiModel::new(metric_array))
         }
         else {
-            Err("No valid metrics to generate")
+            Err(NewRelicSinkError::new("No valid metrics to generate"))
         }
     }
 }
@@ -102,7 +103,7 @@ impl EventsApiModel {
 }
 
 impl TryFrom<Vec<Event>> for EventsApiModel {
-    type Error = &'static str;
+    type Error = NewRelicSinkError;
 
     fn try_from(buf_events: Vec<Event>) -> Result<Self, Self::Error> {
         let mut events_array = vec!();
@@ -157,7 +158,7 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
             Ok(Self::new(events_array))
         }
         else {
-            Err("No valid events to generate")
+            Err(NewRelicSinkError::new("No valid events to generate"))
         }
     }
 }
@@ -174,7 +175,7 @@ impl LogsApiModel {
 }
 
 impl TryFrom<Vec<Event>> for LogsApiModel {
-    type Error = &'static str;
+    type Error = NewRelicSinkError;
 
     fn try_from(buf_events: Vec<Event>) -> Result<Self, Self::Error> {
         let mut logs_array = vec!();
@@ -200,7 +201,7 @@ impl TryFrom<Vec<Event>> for LogsApiModel {
             Ok(Self::new(logs_array))
         }
         else {
-            Err("No valid logs to generate")
+            Err(NewRelicSinkError::new("No valid logs to generate"))
         }
     }
 }

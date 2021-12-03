@@ -64,6 +64,18 @@ impl std::error::Error for NewRelicSinkError {
     }
 }
 
+impl From<std::io::Error> for NewRelicSinkError {
+    fn from(error: std::io::Error) -> Self {
+        Self::new(&error.to_string())
+    }
+}
+
+impl From<NewRelicSinkError> for std::io::Error {
+    fn from(error: NewRelicSinkError) -> Self {
+        Self::new(std::io::ErrorKind::Other, error)
+    }
+}
+
 struct NewRelicRequestBuilder {
     encoding: EncodingConfigFixed<Encoding>,
     compression: Compression,
@@ -72,11 +84,11 @@ struct NewRelicRequestBuilder {
 
 impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
     type Metadata = (Arc<NewRelicCredentials>, usize, EventFinalizers);
-    type Events = Result<NewRelicApiModel, &'static str>;
+    type Events = Result<NewRelicApiModel, Self::Error>;
     type Encoder = EncodingConfigFixed<Encoding>;
     type Payload = Vec<u8>;
     type Request = NewRelicApiRequest;
-    type Error = std::io::Error;
+    type Error = NewRelicSinkError;
 
     fn compression(&self) -> Compression {
         self.compression
@@ -89,7 +101,7 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
     fn split_input(&self, mut input: Vec<Event>) -> (Self::Metadata, Self::Events) {
         let events_len = input.len();
         let finalizers = input.take_finalizers();
-        let api_model = || -> Result<NewRelicApiModel, &str> {
+        let api_model = || -> Result<NewRelicApiModel, Self::Error> {
             match self.credentials.api {
                 NewRelicApi::Events => {
                     Ok(
@@ -157,7 +169,7 @@ where
         let sink = input
             .batched(self.batcher_settings.into_byte_size_config())
             .request_builder(builder_limit, request_builder)
-            .filter_map(|request: Result<NewRelicApiRequest, std::io::Error>| async move {
+            .filter_map(|request: Result<NewRelicApiRequest, NewRelicSinkError>| async move {
                 match request {
                     Err(e) => {
                         error!("Failed to build New Relic request: {:?}.", e);
