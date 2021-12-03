@@ -7,6 +7,7 @@ use crate::{
     http::HttpClient,
     sinks::{
         splunk_hec::common::{
+            acknowledgements::HecClientAcknowledgementsConfig,
             build_healthcheck, create_client, host_key,
             retry::HecRetryLogic,
             service::{HecService, HttpRequestBuilder},
@@ -48,6 +49,8 @@ pub struct HecSinkLogsConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
+    #[serde(default)]
+    pub acknowledgements: HecClientAcknowledgementsConfig,
     // This settings is relevant only for the `humio_logs` sink and should be left to None everywhere else
     pub timestamp_nanos_key: Option<String>,
 }
@@ -67,6 +70,7 @@ impl GenerateConfig for HecSinkLogsConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
+            acknowledgements: Default::default(),
             timestamp_nanos_key: None,
         })
         .unwrap()
@@ -106,14 +110,15 @@ impl HecSinkLogsConfig {
         };
 
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-        let http_request_builder = HttpRequestBuilder {
-            endpoint: self.endpoint.clone(),
-            token: self.token.clone(),
-            compression: self.compression,
-        };
+        let http_request_builder =
+            HttpRequestBuilder::new(self.endpoint.clone(), self.token.clone(), self.compression);
         let service = ServiceBuilder::new()
             .settings(request_settings, HecRetryLogic)
-            .service(HecService::new(client, http_request_builder));
+            .service(HecService::new(
+                client,
+                http_request_builder,
+                self.acknowledgements.clone(),
+            ));
 
         let batch_settings = self.batch.into_batcher_settings()?;
 
