@@ -33,8 +33,6 @@ pub struct HecLogsSinkConfig {
     // Deprecated name
     #[serde(alias = "token")]
     pub default_token: String,
-    // Deprecated name
-    #[serde(alias = "host")]
     pub endpoint: String,
     #[serde(default = "host_key")]
     pub host_key: String,

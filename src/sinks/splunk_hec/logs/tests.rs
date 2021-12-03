@@ -8,7 +8,7 @@ use crate::{
     template::Template,
     test_util::next_addr,
 };
-use chrono::{Utc, TimeZone};
+use chrono::{TimeZone, Utc};
 use futures_util::{stream, StreamExt};
 use serde::Deserialize;
 use std::{collections::BTreeMap, sync::Arc};

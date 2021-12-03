@@ -337,7 +337,6 @@ impl SplunkSource {
     }
 
     fn health_service(&self) -> BoxedFilter<(Response,)> {
-        // todo: use self.authorization() here
         let valid_credentials = self.valid_credentials.clone();
         let authorize =
             warp::header::optional("Authorization").and_then(move |token: Option<String>| {

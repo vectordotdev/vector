@@ -326,8 +326,8 @@ async fn splunk_indexer_acknowledgements() {
         ..Default::default()
     };
 
-    let config = HecSinkLogsConfig {
-        token: String::from(ACK_TOKEN),
+    let config = HecLogsSinkConfig {
+        default_token: String::from(ACK_TOKEN),
         acknowledgements: acknowledgements_config,
         ..config(HecLogsEncoder::Json, vec!["asdf".to_string()]).await
     };
