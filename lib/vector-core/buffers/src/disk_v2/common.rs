@@ -144,7 +144,9 @@ impl DiskBufferConfigBuilder {
             .max_data_file_size
             .unwrap_or(DEFAULT_MAX_DATA_FILE_SIZE);
         let max_record_size = self.max_record_size.unwrap_or(DEFAULT_MAX_RECORD_SIZE);
-        let flush_interval = self.flush_interval.unwrap_or(Duration::from_millis(500));
+        let flush_interval = self
+            .flush_interval
+            .unwrap_or_else(|| Duration::from_millis(500));
 
         // The actual on-disk maximum buffer size will be the user-supplied `max_buffer_size`
         // rounded up to the next multiple of `DATA_FILE_TARGET_MAX_SIZE`.  Internally, we'll limit

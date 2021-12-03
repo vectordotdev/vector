@@ -129,7 +129,7 @@ impl DecodeBytes<SizedRecord> for SizedRecord {
         B: Buf,
     {
         let buf_len = buffer.get_u32();
-        let _ = buffer.advance(buf_len as usize);
+        buffer.advance(buf_len as usize);
         Ok(SizedRecord(buf_len))
     }
 }

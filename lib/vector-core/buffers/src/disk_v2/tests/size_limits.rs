@@ -43,7 +43,7 @@ async fn writer_error_when_record_is_over_the_limit() {
 
             // This write should fail because it exceeds the 100 byte max record size limit.
             let second_record = SizedRecord(second_write_size);
-            let _ = writer
+            let _result = writer
                 .write_record(second_record)
                 .await
                 .expect_err("write should fail");
@@ -52,7 +52,7 @@ async fn writer_error_when_record_is_over_the_limit() {
             assert_buffer_size!(ledger, 1, first_bytes_written as u64);
         }
     })
-    .await
+    .await;
 }
 
 #[tokio::test]
@@ -174,13 +174,11 @@ async fn writer_waits_when_buffer_is_full() {
 
     let parent = trace_span!("writer_waits_when_buffer_is_full");
     let _enter = parent.enter();
-    fut.in_current_span().await
+    fut.in_current_span().await;
 }
 
 #[tokio::test]
 async fn writer_rolls_data_files_when_the_limit_is_exceeded() {
-    let _ = install_tracing_helpers();
-
     with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 
@@ -251,5 +249,5 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded() {
             assert_reader_writer_file_positions!(ledger, 1, 1);
         }
     })
-    .await
+    .await;
 }

@@ -54,13 +54,11 @@ async fn last_record_is_valid_during_load_when_buffer_correctly_flushed_and_stop
     let parent =
         trace_span!("last_record_is_valid_during_load_when_buffer_correctly_flushed_and_stopped");
     let _enter = parent.enter();
-    fut.in_current_span().await
+    fut.in_current_span().await;
 }
 
 #[tokio::test]
 async fn file_id_wraps_around_when_max_file_id_hit() {
-    let _ = install_tracing_helpers();
-
     with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 
@@ -70,7 +68,7 @@ async fn file_id_wraps_around_when_max_file_id_hit() {
             // Create our buffer with an arbitrarily low max data file size, which will let us
             // quickly run through the file ID range.
             let (mut writer, mut reader, acker, ledger) =
-                create_buffer_with_max_data_file_size(data_dir, record_size as u64).await;
+                create_buffer_with_max_data_file_size(data_dir, u64::from(record_size)).await;
 
             assert_buffer_is_empty!(ledger);
             assert_reader_writer_file_positions!(ledger, 0, 0);
@@ -78,10 +76,10 @@ async fn file_id_wraps_around_when_max_file_id_hit() {
             // We execute a loop of writing and then reading back a record, and we assert each time
             // that the file IDs are where we expect them to be.  We write 3x the number of records
             // as the max possible file ID, to ensure that rollover works.
-            let file_id_upper = u32::from(MAX_FILE_ID);
+            let file_id_upper = MAX_FILE_ID;
 
             // Random addition at the end so we don't land explicitly on the u16 boundary.
-            let target_id = (file_id_upper * 3) + 15;
+            let target_id = (u32::from(file_id_upper) * 3) + 15;
 
             let mut id = 0;
             let mut reader_file_id = 0;
@@ -101,7 +99,8 @@ async fn file_id_wraps_around_when_max_file_id_hit() {
 
                 acker.acknowledge_records(1);
 
-                let expected_file_id = id % file_id_upper;
+                let expected_file_id = u16::try_from(id % u32::from(file_id_upper))
+                    .expect("should never be greater than u16");
                 let (actual_reader_file_id, actual_writer_file_id) =
                     ledger.get_current_reader_writer_file_id();
                 reader_file_id = actual_reader_file_id;
@@ -112,8 +111,8 @@ async fn file_id_wraps_around_when_max_file_id_hit() {
                 // be in lockstep, since no data files are closed/adjusted before a read/write
                 // complete, only once we attempt the next one.
                 assert_eq!(reader_file_id, writer_file_id);
-                assert_eq!(expected_file_id as u16, reader_file_id);
-                assert_eq!(expected_file_id as u16, writer_file_id);
+                assert_eq!(expected_file_id, reader_file_id);
+                assert_eq!(expected_file_id, writer_file_id);
                 assert_buffer_size!(ledger, 1, bytes_written);
 
                 id += 1;
@@ -130,7 +129,7 @@ async fn file_id_wraps_around_when_max_file_id_hit() {
             assert_reader_writer_file_positions!(ledger, reader_file_id, writer_file_id);
         }
     })
-    .await
+    .await;
 }
 
 #[tokio::test]
@@ -146,7 +145,7 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
             // Create our buffer with an arbitrarily low max data file size, which will let us
             // quickly run through the file ID range.
             let (mut writer, mut reader, acker, ledger) =
-                create_buffer_with_max_data_file_size(data_dir, record_size as u64).await;
+                create_buffer_with_max_data_file_size(data_dir, u64::from(record_size)).await;
 
             assert_buffer_is_empty!(ledger);
             assert_reader_writer_file_positions!(ledger, 0, 0);
@@ -255,7 +254,7 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
 
     let parent = trace_span!("writer_stops_when_hitting_file_that_reader_is_still_on");
     let _enter = parent.enter();
-    fut.in_current_span().await
+    fut.in_current_span().await;
 }
 
 #[tokio::test]
@@ -299,22 +298,22 @@ async fn reader_still_works_when_record_id_wraps_around() {
             // Now we do two writes: one which uses u64::MAX, and another which will get the rolled
             // over value and go back to 0.
             let first_record_size = 14;
-            let bytes_written = writer
+            let first_bytes_written = writer
                 .write_record(SizedRecord(first_record_size))
                 .await
                 .expect("write should not fail");
-            assert_enough_bytes_written!(bytes_written, SizedRecord, first_record_size);
+            assert_enough_bytes_written!(first_bytes_written, SizedRecord, first_record_size);
             assert_eq!(0, ledger.state().get_next_writer_record_id());
 
             writer.flush().await.expect("flush should not fail");
             assert_buffer_records!(ledger, 1);
 
             let second_record_size = 256;
-            let bytes_written = writer
+            let second_bytes_written = writer
                 .write_record(SizedRecord(second_record_size))
                 .await
                 .expect("write should not fail");
-            assert_enough_bytes_written!(bytes_written, SizedRecord, second_record_size);
+            assert_enough_bytes_written!(second_bytes_written, SizedRecord, second_record_size);
             assert_eq!(1, ledger.state().get_next_writer_record_id());
 
             writer.flush().await.expect("flush should not fail");
@@ -343,5 +342,5 @@ async fn reader_still_works_when_record_id_wraps_around() {
             assert_buffer_is_empty!(ledger);
         }
     })
-    .await
+    .await;
 }

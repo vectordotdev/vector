@@ -133,6 +133,7 @@ impl ArchivedLedgerState {
     }
 
     /// Gets the total number of records in the buffer.
+    #[cfg(test)]
     pub fn get_total_records(&self) -> u64 {
         self.total_records.load(Ordering::Acquire)
     }
@@ -215,7 +216,7 @@ impl ArchivedLedgerState {
         //
         // Despite it being test-only, we're really amping up the "this is only for testing!" factor
         // by making it an actual `unsafe` function, and putting "unsafe" in the name. :)
-        self.writer_next_record_id.store(id, Ordering::Release)
+        self.writer_next_record_id.store(id, Ordering::Release);
     }
 
     #[cfg(test)]
@@ -231,7 +232,7 @@ impl ArchivedLedgerState {
         //
         // Despite it being test-only, we're really amping up the "this is only for testing!" factor
         // by making it an actual `unsafe` function, and putting "unsafe" in the name. :)
-        self.reader_last_record_id.store(id, Ordering::Release)
+        self.reader_last_record_id.store(id, Ordering::Release);
     }
 }
 
@@ -289,6 +290,7 @@ impl Ledger {
     ///
     /// This is purely a future-looking operation i.e. what would the file ID be if it was
     /// incremented from its current value.  It does not alter the current writer file ID.
+    #[cfg(test)]
     pub fn get_next_writer_file_id(&self) -> u16 {
         self.state().get_next_writer_file_id()
     }
@@ -513,7 +515,7 @@ impl Ledger {
             loop {
                 match BackedArchive::from_value(&mut buf, LedgerState::default()) {
                     Ok(archive) => {
-                        let _ = ledger_handle
+                        ledger_handle
                             .write_all(archive.get_backing_ref())
                             .await
                             .context(Io)?;

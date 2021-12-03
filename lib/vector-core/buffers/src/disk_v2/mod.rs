@@ -28,10 +28,10 @@
 //!
 //! Records are packed together with a relatively simple pseudo-structure:
 //!   record:
-//!     record_len: uint64
-//!     checksum: uint32 (CRC32C of record_id + payload)
-//!     record_id: uint64
-//!     payload: uint8[]
+//!     `record_len`: uint64
+//!     `checksum`: uint32 (CRC32C of `record_id` + `payload`)
+//!     `record_id`: uint64
+//!     `payload`: uint8[]
 //!
 //! We say pseudo-structure because we serialize these records to disk using `rkyv`, a zero-copy
 //! deserialization library which focuses on the speed of reading values by writing them to storage

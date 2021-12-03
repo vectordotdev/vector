@@ -77,7 +77,7 @@ async fn reader_throws_error_when_record_length_delimiter_is_zero() {
             }
         }
     })
-    .await
+    .await;
 }
 
 #[tokio::test]
@@ -158,7 +158,7 @@ async fn reader_throws_error_when_record_has_scrambled_archive_data() {
             ));
         }
     })
-    .await
+    .await;
 }
 
 #[tokio::test]
@@ -186,12 +186,13 @@ async fn reader_throws_error_when_record_has_decoding_error() {
             ));
         }
     })
-    .await
+    .await;
 }
 
 #[tokio::test]
 async fn writer_correctly_detects_when_last_record_has_scrambled_archive_data() {
     let assertion_registry = install_tracing_helpers();
+
     let fut = with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 
@@ -270,12 +271,13 @@ async fn writer_correctly_detects_when_last_record_has_scrambled_archive_data() 
     let parent =
         trace_span!("writer_correctly_detects_when_last_record_has_scrambled_archive_data");
     let _enter = parent.enter();
-    fut.in_current_span().await
+    fut.in_current_span().await;
 }
 
 #[tokio::test]
 async fn writer_correctly_detects_when_last_record_has_invalid_checksum() {
     let assertion_registry = install_tracing_helpers();
+
     let fut = with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 
@@ -363,7 +365,7 @@ async fn writer_correctly_detects_when_last_record_has_invalid_checksum() {
 
     let parent = trace_span!("writer_correctly_detects_when_last_record_has_invalid_checksum");
     let _enter = parent.enter();
-    fut.in_current_span().await
+    fut.in_current_span().await;
 }
 
 #[tokio::test]
@@ -419,5 +421,5 @@ async fn writer_correctly_detects_when_last_record_has_gap_in_record_id() {
 
     let parent = trace_span!("writer_correctly_detects_when_last_record_has_gap_in_record_id");
     let _enter = parent.enter();
-    fut.in_current_span().await
+    fut.in_current_span().await;
 }

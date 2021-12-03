@@ -23,6 +23,7 @@ pub mod disk;
 
 pub mod disk_v2;
 
+#[cfg(feature = "helpers")]
 pub mod helpers;
 
 mod internal_events;

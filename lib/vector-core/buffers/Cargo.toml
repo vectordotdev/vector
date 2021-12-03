@@ -49,6 +49,7 @@ human_bytes = "0.3.0"
 
 [features]
 disk-buffer = ["db-key", "leveldb"]
+helpers = []
 
 [[bench]]
 name = "on_disk"
@@ -65,4 +66,8 @@ harness = false
 
 [[example]]
 name = "disk_v1"
-required-features = ["disk-buffer"]
+required-features = ["disk-buffer", "helpers"]
+
+[[example]]
+name = "disk_v2"
+required-features = ["helpers"]

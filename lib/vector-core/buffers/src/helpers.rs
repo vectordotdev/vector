@@ -53,6 +53,10 @@ impl DecodeBytes<VariableMessage> for VariableMessage {
         Self: Sized,
     {
         let id = buffer.get_u64();
+
+        // We only use `VariableMessage` in our example binaries, and we don't exceed that in
+        // practice... it's just not important to worry about/
+        #[allow(clippy::cast_possible_truncation)]
         let payload_len = buffer.get_u64() as usize;
         let payload = buffer.copy_to_bytes(payload_len).to_vec();
         Ok(VariableMessage::new(id, payload))

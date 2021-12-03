@@ -1,8 +1,7 @@
-use super::{create_default_buffer, install_tracing_helpers, with_temp_dir, SizedRecord};
+use super::{create_default_buffer, with_temp_dir, SizedRecord};
 
 #[tokio::test]
 async fn basic_read_write_loop() {
-    let _ = install_tracing_helpers();
     with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 
@@ -17,7 +16,7 @@ async fn basic_read_write_loop() {
                 .into_iter()
                 .cycle()
                 .take(2000)
-                .map(|i| SizedRecord(i))
+                .map(SizedRecord)
                 .collect::<Vec<_>>();
             let input_items = expected_items.clone();
 
@@ -55,5 +54,5 @@ async fn basic_read_write_loop() {
             assert_eq!(actual_items, expected_items);
         }
     })
-    .await
+    .await;
 }

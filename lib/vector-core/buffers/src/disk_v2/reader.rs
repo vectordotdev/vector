@@ -39,6 +39,10 @@ impl ReadToken {
     pub fn record_id(&self) -> u64 {
         self.1
     }
+
+    fn into_id(self) -> u64 {
+        self.1
+    }
 }
 
 /// Error that occurred during calls to [`Reader`].
@@ -94,11 +98,10 @@ where
     T: Bufferable,
 {
     fn is_bad_read(&self) -> bool {
-        match self {
-            ReaderError::InvalidChecksum { .. } => true,
-            ReaderError::FailedToDeserialize { .. } => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            ReaderError::InvalidChecksum { .. } | ReaderError::FailedToDeserialize { .. }
+        )
     }
 }
 
@@ -141,6 +144,12 @@ where
                     .expect("the slice is the length of a u64");
                 self.reader.consume(8);
 
+                // We don't actually allow records to be greater than 8MB, which fit will within a
+                // 32-bit value, and so there's no risk of having a u64 length delimiter exceed.
+                // This is also practically irrelevant because the lion's share of Vector usage is
+                // on 64-bit platforms, but we're stuck doing the usize/u64 conversion dance in many
+                // places.
+                #[allow(clippy::cast_possible_truncation)]
                 return Ok(Some(u64::from_be_bytes(length) as usize));
             }
 
@@ -173,12 +182,11 @@ where
     /// these stages, an appropriate error variant will be returned describing the error.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn try_next_record(&mut self) -> Result<Option<ReadToken>, ReaderError<T>> {
-        let record_len = match self.read_length_delimiter().await? {
-            Some(len) => len,
-            None => {
-                trace!("read_length_delimiter returned None");
-                return Ok(None);
-            }
+        let record_len = if let Some(len) = self.read_length_delimiter().await? {
+            len
+        } else {
+            trace!("read_length_delimiter returned None");
+            return Ok(None);
         };
 
         if record_len == 0 {
@@ -227,7 +235,8 @@ where
     /// `try_next_record`, and the `ReadToken` from _that_ call is used, this method will panic due
     /// to an out-of-order read.
     pub fn read_record(&mut self, token: ReadToken) -> Result<T, ReaderError<T>> {
-        if token.1 != self.current_record_id {
+        let record_id = token.into_id();
+        if record_id != self.current_record_id {
             panic!("using expired read token");
         }
 
@@ -720,6 +729,6 @@ where
             .reader
             .as_mut()
             .expect("reader should exist after `ensure_ready_for_read`");
-        reader.read_record(token).map(|record| Some(record))
+        reader.read_record(token).map(Some)
     }
 }
