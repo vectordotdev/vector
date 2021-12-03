@@ -8,7 +8,7 @@ use crate::{
         UriParseError,
     },
 };
-use futures_util::future::BoxFuture;
+use futures_util::{future::BoxFuture, ready};
 use http::Request;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
@@ -101,19 +101,17 @@ impl Service<HecRequest> for HecService {
         // additional pending acks. Otherwise, wait until there is room.
         if self.ack_finalizer_tx.is_none() {
             Poll::Ready(Ok(()))
+        } else if self.current_ack_slot.take().is_some() {
+            Poll::Ready(Err("poll_ready called after a successful call".into()))
         } else {
-            match self.ack_slots.poll_acquire(cx) {
-                Poll::Ready(Some(permit)) => {
-                    if self.current_ack_slot.replace(permit).is_some() {
-                        Poll::Ready(Err("poll_ready called after a successful call".into()))
-                    } else {
-                        Poll::Ready(Ok(()))
-                    }
+            match ready!(self.ack_slots.poll_acquire(cx)) {
+                Some(permit) => {
+                    self.current_ack_slot.replace(permit);
+                    Poll::Ready(Ok(()))
                 }
-                Poll::Ready(None) => Poll::Ready(Err(
+                None => Poll::Ready(Err(
                     "Indexer acknowledgements semaphore unexpectedly closed".into(),
                 )),
-                Poll::Pending => Poll::Pending,
             }
         }
     }
