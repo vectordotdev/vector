@@ -18,64 +18,6 @@ use std::convert::TryFrom;
 use crate::grok_filter::GrokFilter;
 use vrl_compiler::Value;
 
-type SResult<'a, O> = IResult<&'a str, O, (&'a str, nom::error::ErrorKind)>;
-
-pub fn parse<'a>(
-    input: &'a str,
-    brackets: Option<(char, char)>,
-    delimiter: Option<&'a str>,
-) -> Result<Vec<Value>, String> {
-    let result = parse_array(brackets, delimiter)(input)
-        .map_err(|_| format!("could not parse '{}' as array", input))
-        .and_then(|(rest, result)| {
-            rest.trim()
-                .is_empty()
-                .then(|| result)
-                .ok_or_else(|| format!("could not parse '{}' as array", input))
-        })?;
-
-    Ok(result)
-}
-
-fn parse_array<'a>(
-    brackets: Option<(char, char)>,
-    delimiter: Option<&'a str>,
-) -> impl Fn(&'a str) -> SResult<Vec<Value>> {
-    let brackets = brackets.unwrap_or(('[', ']'));
-    move |input| {
-        preceded(
-            char(brackets.0),
-            terminated(cut(parse_array_values(delimiter)), char(brackets.1)),
-        )(input)
-    }
-}
-
-fn parse_array_values<'a>(delimiter: Option<&'a str>) -> impl Fn(&'a str) -> SResult<Vec<Value>> {
-    move |input| {
-        let delimiter = delimiter.unwrap_or(",");
-        // skip the last closing character
-        separated_list0(tag(delimiter), cut(parse_value(delimiter)))(&input[..input.len() - 1]).map(
-            |(rest, values)| {
-                if rest.is_empty() {
-                    // return the closing character
-                    (&input[input.len() - 1..], values)
-                } else {
-                    (rest, values) // will fail upstream
-                }
-            },
-        )
-    }
-}
-
-fn parse_value<'a>(delimiter: &'a str) -> impl Fn(&'a str) -> SResult<Value> {
-    move |input| {
-        map(
-            alt((take_until(delimiter), take(input.len()))),
-            |value: &str| Value::Bytes(Bytes::copy_from_slice(value.as_bytes())),
-        )(input)
-    }
-}
-
 pub fn filter_from_function(f: &Function) -> Result<GrokFilter, GrokStaticError> {
     let args_len = f.args.as_ref().map_or(0, |args| args.len());
 
@@ -149,6 +91,64 @@ pub fn filter_from_function(f: &Function) -> Result<GrokFilter, GrokStaticError>
         delimiter,
         Box::new(value_filter),
     ))
+}
+
+type SResult<'a, O> = IResult<&'a str, O, (&'a str, nom::error::ErrorKind)>;
+
+pub fn parse<'a>(
+    input: &'a str,
+    brackets: Option<(char, char)>,
+    delimiter: Option<&'a str>,
+) -> Result<Vec<Value>, String> {
+    let result = parse_array(brackets, delimiter)(input)
+        .map_err(|_| format!("could not parse '{}' as array", input))
+        .and_then(|(rest, result)| {
+            rest.trim()
+                .is_empty()
+                .then(|| result)
+                .ok_or_else(|| format!("could not parse '{}' as array", input))
+        })?;
+
+    Ok(result)
+}
+
+fn parse_array<'a>(
+    brackets: Option<(char, char)>,
+    delimiter: Option<&'a str>,
+) -> impl Fn(&'a str) -> SResult<Vec<Value>> {
+    let brackets = brackets.unwrap_or(('[', ']'));
+    move |input| {
+        preceded(
+            char(brackets.0),
+            terminated(cut(parse_array_values(delimiter)), char(brackets.1)),
+        )(input)
+    }
+}
+
+fn parse_array_values<'a>(delimiter: Option<&'a str>) -> impl Fn(&'a str) -> SResult<Vec<Value>> {
+    move |input| {
+        let delimiter = delimiter.unwrap_or(",");
+        // skip the last closing character
+        separated_list0(tag(delimiter), cut(parse_value(delimiter)))(&input[..input.len() - 1]).map(
+            |(rest, values)| {
+                if rest.is_empty() {
+                    // return the closing character
+                    (&input[input.len() - 1..], values)
+                } else {
+                    (rest, values) // will fail upstream
+                }
+            },
+        )
+    }
+}
+
+fn parse_value<'a>(delimiter: &'a str) -> impl Fn(&'a str) -> SResult<Value> {
+    move |input| {
+        map(
+            alt((take_until(delimiter), take(input.len()))),
+            |value: &str| Value::Bytes(Bytes::copy_from_slice(value.as_bytes())),
+        )(input)
+    }
 }
 
 #[cfg(test)]
