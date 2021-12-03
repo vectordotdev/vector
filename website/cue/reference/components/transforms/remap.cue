@@ -166,13 +166,14 @@ components: transforms: "remap": {
 				With [metric events](\(urls.vector_metric)), VRL is much more restrictive. Below is a field-by-field
 				breakdown of VRL's access to metrics:
 
-				* Read-only access to the event's `type`.
-				* Read/write access to `kind`, but you can only set this to either `incremental` or `absolute`. The
-				  `kind` field can be neither deleted nor assigned an arbitrary value.
-				* Read/write access to `name`, although this field can't be deleted.
-				* Delete access to `timestamp`.
-				* Read/write/delete access to `namespace` and `tags`. The `tags` field must be a [VRL
-				  object](\(urls.vrl_expressions)/#object) in which all keys and values are strings.
+				Field | Access | Specific restrictions (if any)
+				:-----|:-------|:------------------------------
+				`type` | Read only |
+				`kind` | Read/write | You can set `kind` to either `incremental` or `absolute` but not to an arbitrary value.
+				`name` | Read/write |
+				`timestamp` | Delete |
+				`namespace` | Read/write/delete |
+				`tags` | Read/write/delete | The `tags` field must be a [VRL object](\(urls.vrl_expressions)/#object) in which all keys and values are strings.
 
 				It's important to note that if you try to perform a disallowed action, such as deleting the `type`
 				field using `del(.type)`, Vector doesn't abort the VRL program or throw an error. Instead, it ignores
