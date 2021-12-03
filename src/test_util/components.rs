@@ -1,3 +1,5 @@
+#![allow(clippy::print_stdout)] // tests
+#![allow(clippy::print_stderr)] // tests
 #![deny(missing_docs)]
 
 //! This is a framework for testing components for their compliance with
@@ -28,7 +30,7 @@ pub const FILE_SINK_TAGS: [&str; 2] = ["file", "protocol"];
 /// The standard set of tags for all `HttpSink`-based sinks.
 pub const HTTP_SINK_TAGS: [&str; 2] = ["endpoint", "protocol"];
 
-/// The standard set of tags for all AWS sinks
+/// The standard set of tags for all `AWS`-based sinks.
 pub const AWS_SINK_TAGS: [&str; 2] = ["protocol", "region"];
 
 /// This struct is used to describe a set of component tests.

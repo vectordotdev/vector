@@ -37,7 +37,7 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
     let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let framework = make_framework();
 
-    // Value.yaml for datadog offical chart
+    // Value.yaml for datadog official chart
     let datadog_chart_values = &format!(
         indoc! {r#"
         datadog:

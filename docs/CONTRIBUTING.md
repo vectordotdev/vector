@@ -29,13 +29,8 @@ Vector team member will find this document useful.
          1. [Test harness](#test-harness)
 1. [Next steps](#next-steps)
 1. [Legal](#legal)
-   1. [DCO](#dco)
-      1. [Trivial changes](#trivial-changes)
+   1. [CLA](#contributor-license-agreement)
    1. [Granted rights and copyright assignment](#granted-rights-and-copyright-assignment)
-   1. [FAQ](#faq)
-      1. [Why a DCO instead of a CLA?](#why-a-dco-instead-of-a-cla)
-      1. [If I’m contributing while an employee, do I still need my employer to sign something?](#if-i%E2%80%99m-contributing-while-an-employee-do-i-still-need-my-employer-to-sign-something)
-      1. [What if I forgot to sign my commits?](#what-if-i-forgot-to-sign-my-commits)
 
 <!-- /MarkdownTOC -->
 
@@ -88,25 +83,6 @@ descriptive of your changes.
 Please ensure your commits are small and focused; they should tell a story of
 your change. This helps reviewers to follow your changes, especially for more
 complex changes.
-
-#### Signing-off
-
-Your commits must include a [DCO](https://developercertificate.org/) signature.
-This is simpler than it sounds; it just means that all of your commits
-must contain:
-
-```text
-Signed-off-by: Joe Smith <joe.smith@email.com>
-```
-
-Git makes this easy by adding the `-s` or `--signoff` flags when you commit:
-
-```bash
-git commit -sm 'My commit message'
-```
-
-We also included a `make signoff` target that handles this for you if
-you forget.
 
 ### Github Pull Requests
 
@@ -222,53 +198,17 @@ documents:
 To protect all users of Vector, the following legal requirements are made.
 If you have additional questions, please [contact us](#contact).
 
-### DCO
+### Contributor License Agreement
 
-Vector requires all contributors to agree to the DCO. DCO stands for Developer
-Certificate of Origin and is maintained by the
-[Linux Foundation](https://www.linuxfoundation.org). It is an attestation
-attached to every commit made by every developer. All contributions are covered
-by, and fall under, the DCO.
+Vector requires all contributors to sign the a Contributor License Agreement
+(CLA). This gives Vector the right to use your contribution as well as ensuring
+that you own your contributions and can use them for other purposes.
 
-#### Trivial changes
-
-Trivial changes, such as spelling fixes, do not need to be signed.
+The full text of the CLA can be found at [https://cla.datadoghq.com/vectordotdev/vector](https://cla.datadoghq.com/vectordotdev/vector).
 
 ### Granted rights and copyright assignment
 
-This is covered by the DCO. Contributions are covered by the DCO and do not
-require a CLA.
-
-### FAQ
-
-#### Why a DCO instead of a CLA?
-
-It's simpler, clearer, and still protects users of Vector. We believe the DCO
-more accurately embodies the principles of open-source. More info can be found
-here:
-
-- [Gitlab's switch to DCO](https://about.gitlab.com/2017/11/01/gitlab-switches-to-dco-license/)
-- [DCO vs CLA](https://opensource.com/article/18/3/cla-vs-dco-whats-difference)
-
-#### If I’m contributing while an employee, do I still need my employer to sign something?
-
-Nope! The DCO confirms that you are entitled to submit the code, which assumes
-that you are authorized to do so. It treats you like an adult and relies on
-your accurate statement about your rights to submit a contribution.
-
-#### What if I forgot to sign my commits?
-
-No problem! We made this simple with the [`signoff` Makefile target](Makefile):
-
-```bash
-make signoff
-```
-
-If you prefer to do this manually:
-
-```bash
-git commit --amend --signoff
-```
+This is covered by the CLA.
 
 [urls.create_branch]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-and-deleting-branches-within-your-repository
 [urls.existing_issues]: https://github.com/timberio/vector/issues

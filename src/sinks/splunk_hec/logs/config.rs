@@ -10,10 +10,11 @@ use crate::{
             build_healthcheck, create_client, host_key,
             retry::HecRetryLogic,
             service::{HecService, HttpRequestBuilder},
+            SplunkHecDefaultBatchSettings,
         },
         util::{
-            encoding::EncodingConfig, BatchConfig, BatchSettings, Buffer, Compression,
-            ServiceBuilderExt, TowerRequestConfig,
+            encoding::EncodingConfig, BatchConfig, Compression, ServiceBuilderExt,
+            TowerRequestConfig,
         },
         Healthcheck,
     },
@@ -43,10 +44,12 @@ pub struct HecSinkLogsConfig {
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<SplunkHecDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
+    // This settings is relevant only for the `humio_logs` sink and should be left to None everywhere else
+    pub timestamp_nanos_key: Option<String>,
 }
 
 impl GenerateConfig for HecSinkLogsConfig {
@@ -64,6 +67,7 @@ impl GenerateConfig for HecSinkLogsConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
+            timestamp_nanos_key: None,
         })
         .unwrap()
     }
@@ -111,11 +115,7 @@ impl HecSinkLogsConfig {
             .settings(request_settings, HecRetryLogic)
             .service(HecService::new(client, http_request_builder));
 
-        let batch_settings = BatchSettings::<Buffer>::default()
-            .bytes(1_000_000)
-            .timeout(1)
-            .parse_config(self.batch)?
-            .into_batcher_settings()?;
+        let batch_settings = self.batch.into_batcher_settings()?;
 
         let sink = HecLogsSink {
             service,
@@ -127,6 +127,7 @@ impl HecSinkLogsConfig {
             index: self.index.clone(),
             indexed_fields: self.indexed_fields.clone(),
             host: self.host_key.clone(),
+            timestamp_nanos_key: self.timestamp_nanos_key.clone(),
         };
 
         Ok(VectorSink::Stream(Box::new(sink)))

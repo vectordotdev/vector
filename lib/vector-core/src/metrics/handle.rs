@@ -128,6 +128,7 @@ impl Histogram {
         for (bound, bucket) in self.buckets.iter() {
             if value <= *bound {
                 bucket.fetch_add(1, Ordering::Relaxed);
+                break;
             }
         }
 

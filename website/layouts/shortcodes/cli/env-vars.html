@@ -1,4 +1,5 @@
 {{ $envVars := dict }}
+{{ $envVars = $envVars | merge site.Data.docs.cli.env_vars }}
 {{ $envVars = $envVars | merge site.Data.docs.components.sinks.aws_cloudwatch_logs.env_vars }}
 {{ $envVars = $envVars | merge site.Data.docs.components.sources.docker_logs.env_vars }}
 {{ $envVars = $envVars | merge site.Data.docs.components.sinks.gcp_stackdriver_logs.env_vars }}

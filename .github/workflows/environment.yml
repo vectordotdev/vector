@@ -1,14 +1,10 @@
 name: Environment Suite
 
 on:
-  pull_request:
-    paths-ignore:
-      - "website/**"
+  pull_request: {}
   push:
     branches:
       - master
-    paths-ignore:
-      - "website/**"
   workflow_dispatch:
 
 env:
@@ -20,7 +16,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v2.3.5
+        uses: actions/checkout@v2.4.0
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1.2.0
       - name: Set up Docker Buildx

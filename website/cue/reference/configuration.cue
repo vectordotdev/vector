@@ -19,7 +19,105 @@ configuration: {
 			type: string: {
 				default: "/var/lib/vector/"
 				examples: ["/var/lib/vector", "/var/local/lib/vector/", "/home/user/vector/"]
-				syntax: "literal"
+			}
+		}
+
+		enrichment_tables: {
+			common:      false
+			description: """
+				Configuration options for an [enrichment table](\(urls.enrichment_tables_concept)) to be used in a
+				[`remap`](\(urls.vector_remap_transform)) transform. Currently, only [CSV](\(urls.csv)) files are
+				supported.
+
+				For the lookup in the enrichment tables to be as performant as possible, the data is indexed according
+				to the fields that are used in the search. Note that indices can only be created for fields for which an
+				exact match is used in the condition. For range searches, an index isn't used and the enrichment table
+				drops back to a sequential scan of the data. A sequential scan shouldn't impact performance
+				significantly provided that there are only a few possible rows returned by the exact matches in the
+				condition. We don't recommend using a condition that uses only date range searches.
+				"""
+			required:    false
+			type: object: options: {
+				file: {
+					required:    true
+					description: "Configuration options for the file that provides the enrichment table."
+					type: object: options: {
+						path: {
+							description: """
+								The path of the enrichment table file. Currently, only [CSV](\(urls.csv)) files are
+								supported.
+								"""
+							warnings: [
+								"In order to be used by Vector, you need to assign read access to the enrichment table file.",
+							]
+							required: true
+							type: string: {
+								examples: [
+									"/data/info.csv",
+									"./info.csv",
+								]
+							}
+						}
+
+						encoding: {
+							description: "Configuration options for the encoding of the enrichment table's file."
+							required:    true
+							type: object: options: {
+								type: {
+									description: """
+										The encoding of the file. Currently, only [CSV](\(urls.csv)) is supported.
+										"""
+									required:    false
+									common:      true
+									type: string: default: "csv"
+								}
+
+								delimiter: {
+									description: "The delimiter used to separate fields in each row of the CSV file."
+									common:      false
+									required:    false
+									type: string: {
+										default: ","
+										examples: [ ":"]
+									}
+								}
+
+								include_headers: {
+									description: """
+										Set `include_headers` to `true` if the first row of the CSV file contains the
+										headers for each column. This is the default behavior.
+
+										If you set it to `false`, there are no headers and the columns are referred to
+										by their numerical index.
+										"""
+									required: false
+									common:   false
+									type: bool: default: true
+								}
+							}
+						}
+
+						schema: {
+							description: _coercing_fields
+							required:    false
+							common:      true
+							type: object: {
+								examples: [
+									{
+										status:            "int"
+										duration:          "float"
+										success:           "bool"
+										timestamp_iso8601: "timestamp|%F"
+										timestamp_custom:  "timestamp|%a %b %e %T %Y"
+										timestamp_unix:    "timestamp|%F %T"
+									},
+								]
+
+								options: {}
+							}
+						}
+					}
+				}
 			}
 		}
 
@@ -31,7 +129,6 @@ configuration: {
 				events.
 				"""
 			required: false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -44,7 +141,6 @@ configuration: {
 						type: string: {
 							default: "message"
 							examples: ["message", "@message"]
-							syntax: "literal"
 						}
 					}
 
@@ -57,7 +153,6 @@ configuration: {
 						type: string: {
 							default: "timestamp"
 							examples: ["timestamp", "@timestamp"]
-							syntax: "literal"
 						}
 					}
 
@@ -70,7 +165,6 @@ configuration: {
 						type: string: {
 							default: "host"
 							examples: ["host", "@host"]
-							syntax: "literal"
 						}
 					}
 
@@ -84,6 +178,19 @@ configuration: {
 						type: string: {
 							default: "source_type"
 							examples: ["source_type", "@source_type"]
+						}
+					}
+
+					metadata_key: {
+						common: true
+						description: """
+							Sets the event key to use for event metadata field (e.g. error or
+							abort annotations in the `remap` transform).
+							"""
+						required: false
+						type: string: {
+							default: "metadata"
+							examples: ["@metadata", "meta"]
 							syntax: "literal"
 						}
 					}
@@ -97,7 +204,6 @@ configuration: {
 				Configures health checks for all sinks.
 				"""
 			required: false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -108,7 +214,6 @@ configuration: {
 							option overrides it.
 							"""
 						required: false
-						warnings: []
 						type: bool: {
 							default: true
 						}
@@ -121,7 +226,6 @@ configuration: {
 							`--require-healthy` command line flag.
 							"""
 						required: false
-						warnings: []
 						type: bool: {
 							default: false
 						}
@@ -138,11 +242,9 @@ configuration: {
 				[TZ database](\(urls.tz_time_zones)), or `local` to indicate system local time.
 				"""
 			required:    false
-			warnings: []
 			type: string: {
 				default: "local"
 				examples: ["local", "America/NewYork", "EST5EDT"]
-				syntax: "literal"
 			}
 		}
 
@@ -164,7 +266,6 @@ configuration: {
 					type: string: {
 						default: null
 						examples: ["http://foo.bar:3128"]
-						syntax: "literal"
 					}
 				}
 				https: {
@@ -174,7 +275,6 @@ configuration: {
 					type: string: {
 						default: null
 						examples: ["http://foo.bar:3128"]
-						syntax: "literal"
 					}
 				}
 				no_proxy: {
@@ -191,11 +291,11 @@ configuration: {
 							Splat | `*` matches all hosts
 							"""
 					required:    false
+
 					type: array: {
 						default: null
 						items: type: string: {
 							examples: ["localhost", ".foo.bar", "*"]
-							syntax: "literal"
 						}
 					}
 				}
@@ -277,7 +377,7 @@ configuration: {
 			title: "Automatic namespacing of component files"
 			body: """
 				You can split your configuration files in component-type related folders.
-				
+
 				For example, you can create the sink `foo` in the folder `/path/to/vector/config/sinks/foo.toml` and
 				configure it as follows:
 

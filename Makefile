@@ -31,8 +31,6 @@ export AUTODESPAWN ?= ${AUTOSPAWN}
 export AUTOINSTALL ?= false
 # Override to true for a bit more log output in your environment building (more coming!)
 export VERBOSE ?= false
-# Override to set a different Rust toolchain
-export RUST_TOOLCHAIN ?= $(shell cat rust-toolchain)
 # Override the container tool. Tries docker first and then tries podman.
 export CONTAINER_TOOL ?= auto
 ifeq ($(CONTAINER_TOOL),auto)
@@ -318,6 +316,18 @@ ifeq ($(AUTOSPAWN), true)
 	sleep 10 # Many services are very slow... Give them a sec...
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features aws-integration-tests --lib ::aws_
+ifeq ($(AUTODESPAWN), true)
+	@scripts/setup_integration_env.sh aws stop
+endif
+
+.PHONY: test-integration-aws-sqs
+test-integration-aws-sqs: ## Runs AWS SQS integration tests
+ifeq ($(AUTOSPAWN), true)
+	@scripts/setup_integration_env.sh aws stop
+	@scripts/setup_integration_env.sh aws start
+	sleep 10 # Many services are very slow... Give them a sec...
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features aws-sqs-integration-tests --lib ::aws_sqs
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh aws stop
 endif

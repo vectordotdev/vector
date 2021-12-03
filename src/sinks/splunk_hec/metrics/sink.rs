@@ -14,7 +14,6 @@ use futures_util::{future, stream::BoxStream, StreamExt};
 use tower::Service;
 use vector_core::{
     event::{Event, Metric, MetricValue},
-    partition::NullPartitioner,
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
     ByteSizeOf,
@@ -62,8 +61,7 @@ where
                     default_namespace,
                 ))
             })
-            .batched(NullPartitioner::new(), self.batch_settings)
-            .map(|(_, batch)| batch)
+            .batched(self.batch_settings.into_byte_size_config())
             .request_builder(builder_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {

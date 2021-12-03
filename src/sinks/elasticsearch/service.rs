@@ -1,5 +1,3 @@
-use crate::buffers::Ackable;
-
 use crate::event::{EventFinalizers, EventStatus, Finalizable};
 use crate::http::{Auth, HttpClient};
 use crate::sinks::util::http::{HttpBatchService, RequestConfig};
@@ -10,8 +8,9 @@ use hyper::service::Service;
 use hyper::{Body, Request};
 use std::task::{Context, Poll};
 use tower::ServiceExt;
+use vector_core::buffers::Ackable;
 
-use crate::rusoto::AwsCredentialsProvider;
+use crate::aws::rusoto::AwsCredentialsProvider;
 use crate::sinks::util::{Compression, ElementCount};
 use http::header::HeaderName;
 use hyper::header::HeaderValue;
@@ -214,7 +213,6 @@ impl Service<ElasticSearchRequest> for ElasticSearchService {
             let events_byte_size = req.events_byte_size;
             let http_response = http_service.call(req).await?;
             let event_status = get_event_status(&http_response);
-            println!("Event status: {:?}", event_status);
             Ok(ElasticSearchResponse {
                 event_status,
                 http_response,
@@ -230,7 +228,7 @@ fn get_event_status(response: &Response<Bytes>) -> EventStatus {
         let body = String::from_utf8_lossy(response.body());
         if body.contains("\"errors\":true") {
             error!(message = "Response contained errors.", ?response);
-            EventStatus::Failed
+            EventStatus::Rejected
         } else {
             trace!(message = "Response successful.", ?response);
             EventStatus::Delivered
@@ -240,6 +238,6 @@ fn get_event_status(response: &Response<Bytes>) -> EventStatus {
         EventStatus::Errored
     } else {
         error!(message = "Response failed.", ?response);
-        EventStatus::Failed
+        EventStatus::Rejected
     }
 }

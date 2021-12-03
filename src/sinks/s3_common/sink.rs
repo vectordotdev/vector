@@ -1,3 +1,4 @@
+use crate::sinks::util::partitioner::KeyPartitioner;
 use crate::{
     config::SinkContext,
     event::Event,
@@ -13,8 +14,6 @@ use vector_core::stream::DriverResponse;
 use vector_core::{
     buffers::Ackable, event::Finalizable, sink::StreamSink, stream::BatcherSettings,
 };
-
-use crate::sinks::s3_common::partitioner::KeyPartitioner;
 
 pub struct S3Sink<Svc, RB> {
     acker: Acker,
@@ -60,7 +59,7 @@ where
         let request_builder = self.request_builder;
 
         let sink = input
-            .batched(partitioner, settings)
+            .batched_partitioned(partitioner, settings)
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
             .request_builder(builder_limit, request_builder)
             .filter_map(|request| async move {

@@ -5,7 +5,7 @@ use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 
 /// Extract the static pod config hashsum from the mirror pod annotations.
 ///
-/// This part of Kubernetes changed a bit over time, so we're implemeting
+/// This part of Kubernetes changed a bit over time, so we're implementing
 /// support up to 1.14, which is an MSKV at this time.
 ///
 /// See: <https://github.com/kubernetes/kubernetes/blob/cea1d4e20b4a7886d8ff65f34c6d4f95efcb4742/pkg/kubelet/pod/mirror_client.go#L80-L81>

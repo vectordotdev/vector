@@ -170,7 +170,7 @@ where
             // check and increment the current count
             // if 0: this is the first message, just pass it through
             // if 1: this is the first rate limited message
-            // otherwise supress it until the rate limit expires
+            // otherwise suppress it until the rate limit expires
             match prev {
                 0 => self.inner.on_event(event, ctx),
                 1 => {

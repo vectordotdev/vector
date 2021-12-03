@@ -19,9 +19,10 @@ provider "kubernetes" {
 # Setup background monitoring details. These are needed by the soak control to
 # understand what vector et al's running behavior is.
 module "monitoring" {
-  source = "../../../common/terraform/modules/monitoring"
-  type         = var.type
-  vector_image = var.vector_image
+  source          = "../../../common/terraform/modules/monitoring"
+  experiment_name = var.experiment_name
+  variant         = var.type
+  vector_image    = var.vector_image
 }
 
 # Setup the soak pieces
@@ -38,21 +39,23 @@ module "vector" {
   source       = "../../../common/terraform/modules/vector"
   type         = var.type
   vector_image = var.vector_image
-  test_name    = "syslog_regex_logs2metric_ddmetrics"
   vector-toml  = file("${path.module}/vector.toml")
   namespace    = kubernetes_namespace.soak.metadata[0].name
+  vector_cpus  = var.vector_cpus
   depends_on   = [module.http-blackhole]
 }
 module "http-blackhole" {
   source              = "../../../common/terraform/modules/lading_http_blackhole"
   type                = var.type
-  http-blackhole-toml = file("${path.module}/http_blackhole.toml")
+  http-blackhole-yaml = file("${path.module}/../../../common/configs/http_blackhole.yaml")
   namespace           = kubernetes_namespace.soak.metadata[0].name
+  lading_image        = var.lading_image
 }
 module "tcp-gen" {
   source       = "../../../common/terraform/modules/lading_tcp_gen"
   type         = var.type
-  tcp-gen-toml = file("${path.module}/tcp_gen.toml")
+  tcp-gen-yaml = file("${path.module}/../../../common/configs/tcp_gen_syslog_source.yaml")
   namespace    = kubernetes_namespace.soak.metadata[0].name
+  lading_image = var.lading_image
   depends_on   = [module.vector]
 }

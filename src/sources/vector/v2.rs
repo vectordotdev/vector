@@ -1,8 +1,9 @@
 use crate::{
     config::SourceContext,
-    config::{DataType, GenerateConfig, Resource},
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Resource},
     internal_events::{EventsReceived, TcpBytesReceived},
     proto::vector as proto,
+    serde::bool_or_struct,
     shutdown::ShutdownSignalToken,
     sources::{util::AfterReadExt as _, Source},
     tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig},
@@ -12,7 +13,6 @@ use crate::{
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-use std::sync::Arc;
 use tokio::net::TcpStream;
 use tonic::{
     transport::{server::Connected, Certificate, Server},
@@ -45,14 +45,7 @@ impl proto::Service for Service {
             byte_size: events.size_of(),
         });
 
-        let receiver = self.acknowledgements.then(|| {
-            let (batch, receiver) = BatchNotifier::new_with_receiver();
-            for event in &mut events {
-                event.add_batch_notifier(Arc::clone(&batch));
-            }
-
-            receiver
-        });
+        let receiver = BatchNotifier::maybe_apply_to_events(self.acknowledgements, &mut events);
 
         self.pipeline
             .clone()
@@ -85,7 +78,7 @@ async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<()
 
     match status {
         BatchStatus::Errored => Err(Status::internal("Delivery error")),
-        BatchStatus::Failed => Err(Status::data_loss("Delivery failed")),
+        BatchStatus::Rejected => Err(Status::data_loss("Delivery failed")),
         BatchStatus::Delivered => Ok(()),
     }
 }
@@ -98,6 +91,8 @@ pub struct VectorConfig {
     pub shutdown_timeout_secs: u64,
     #[serde(default)]
     tls: Option<TlsConfig>,
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 const fn default_shutdown_timeout_secs() -> u64 {
@@ -110,6 +105,7 @@ impl GenerateConfig for VectorConfig {
             address: "0.0.0.0:6000".parse().unwrap(),
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             tls: None,
+            acknowledgements: AcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -119,7 +115,7 @@ impl VectorConfig {
     pub(super) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let tls_settings = MaybeTlsSettings::from_config(&self.tls, true)?;
 
-        let source = run(self.address, tls_settings, cx).map_err(|error| {
+        let source = run(self.address, tls_settings, cx, self.acknowledgements).map_err(|error| {
             error!(message = "Source future failed.", %error);
         });
 
@@ -143,12 +139,13 @@ async fn run(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
     cx: SourceContext,
+    acknowledgements: AcknowledgementsConfig,
 ) -> crate::Result<()> {
     let _span = crate::trace::current_span();
 
     let service = proto::Server::new(Service {
         pipeline: cx.out,
-        acknowledgements: cx.acknowledgements,
+        acknowledgements: acknowledgements.enabled,
     });
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
 

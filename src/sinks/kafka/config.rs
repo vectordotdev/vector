@@ -3,7 +3,7 @@ use crate::kafka::{KafkaAuthConfig, KafkaCompression};
 use crate::serde::to_string;
 use crate::sinks::kafka::sink::{healthcheck, KafkaSink};
 use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
-use crate::sinks::util::BatchConfig;
+use crate::sinks::util::{BatchConfig, NoDefaultsBatchSettings};
 use crate::sinks::{Healthcheck, VectorSink};
 use futures::FutureExt;
 use rdkafka::ClientConfig;
@@ -20,7 +20,7 @@ pub(crate) struct KafkaSinkConfig {
     pub encoding: EncodingConfig<StandardEncodings>,
     /// These batching options will **not** override librdkafka_options values.
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<NoDefaultsBatchSettings>,
     #[serde(default)]
     pub compression: KafkaCompression,
     #[serde(flatten)]
@@ -31,7 +31,8 @@ pub(crate) struct KafkaSinkConfig {
     pub message_timeout_ms: u64,
     #[serde(default)]
     pub librdkafka_options: HashMap<String, String>,
-    pub headers_field: Option<String>,
+    #[serde(alias = "headers_field")] // accidentally released as `headers_field` in 0.18
+    pub headers_key: Option<String>,
 }
 
 const fn default_socket_timeout_ms() -> u64 {
@@ -148,7 +149,7 @@ impl GenerateConfig for KafkaSinkConfig {
             socket_timeout_ms: default_socket_timeout_ms(),
             message_timeout_ms: default_message_timeout_ms(),
             librdkafka_options: Default::default(),
-            headers_field: None,
+            headers_key: None,
         })
         .unwrap()
     }

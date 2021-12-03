@@ -9,8 +9,8 @@ pub struct State(Option<String>);
 
 impl State {
     /// Create a new resource version [`State`].
-    pub const fn new() -> Self {
-        Self(None)
+    pub fn new() -> Self {
+        Self(Some("0".to_owned()))
     }
 
     /// Update the resource version from a candidate obtained earlier.

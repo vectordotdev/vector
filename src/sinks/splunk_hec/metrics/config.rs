@@ -7,12 +7,12 @@ use crate::config::{GenerateConfig, SinkConfig, SinkContext};
 use crate::http::HttpClient;
 use crate::sinks::splunk_hec::common::retry::HecRetryLogic;
 use crate::sinks::splunk_hec::common::service::{HecService, HttpRequestBuilder};
-use crate::sinks::splunk_hec::common::{build_healthcheck, create_client, host_key};
+use crate::sinks::splunk_hec::common::{
+    build_healthcheck, create_client, host_key, SplunkHecDefaultBatchSettings,
+};
 use crate::sinks::splunk_hec::metrics::request_builder::HecMetricsRequestBuilder;
 use crate::sinks::splunk_hec::metrics::sink::HecMetricsSink;
-use crate::sinks::util::{
-    BatchConfig, BatchSettings, Buffer, Compression, ServiceBuilderExt, TowerRequestConfig,
-};
+use crate::sinks::util::{BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig};
 use crate::sinks::Healthcheck;
 use crate::template::Template;
 use crate::tls::TlsOptions;
@@ -32,7 +32,7 @@ pub struct HecMetricsSinkConfig {
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<SplunkHecDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
@@ -97,11 +97,7 @@ impl HecMetricsSinkConfig {
             .settings(request_settings, HecRetryLogic)
             .service(HecService::new(client, http_request_builder));
 
-        let batch_settings = BatchSettings::<Buffer>::default()
-            .bytes(1_000_000)
-            .timeout(1)
-            .parse_config(self.batch)?
-            .into_batcher_settings()?;
+        let batch_settings = self.batch.into_batcher_settings()?;
         let sink = HecMetricsSink {
             context: cx,
             service,

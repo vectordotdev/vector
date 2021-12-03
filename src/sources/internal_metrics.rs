@@ -17,15 +17,19 @@ pub struct InternalMetricsConfig {
     scrape_interval_secs: u64,
     tags: TagsConfig,
     namespace: Option<String>,
-    config_hash: Option<String>,
+    #[serde(skip)]
+    version: Option<String>,
+    #[serde(skip)]
+    configuration_key: Option<String>,
 }
 
 impl InternalMetricsConfig {
     /// Return an internal metrics config with enterprise reporting defaults.
-    pub fn enterprise<T: Into<String>>(config_hash: T) -> Self {
+    pub fn enterprise(version: impl Into<String>, configuration_key: impl Into<String>) -> Self {
         Self {
             namespace: Some("pipelines".to_owned()),
-            config_hash: Some(config_hash.into()),
+            version: Some(version.into()),
+            configuration_key: Some(configuration_key.into()),
             ..Self::default()
         }
     }
@@ -61,7 +65,9 @@ impl SourceConfig for InternalMetricsConfig {
         }
         let interval = time::Duration::from_secs(self.scrape_interval_secs);
         let namespace = self.namespace.clone();
-        let config_hash = self.config_hash.clone();
+        let version = self.version.clone();
+        let configuration_key = self.configuration_key.clone();
+
         let host_key = self.tags.host_key.as_deref().and_then(|tag| {
             if tag.is_empty() {
                 None
@@ -76,7 +82,8 @@ impl SourceConfig for InternalMetricsConfig {
                 .and_then(|tag| if tag.is_empty() { None } else { Some("pid") });
         Ok(Box::pin(run(
             namespace,
-            config_hash,
+            version,
+            configuration_key,
             host_key,
             pid_key,
             Controller::get()?,
@@ -97,7 +104,8 @@ impl SourceConfig for InternalMetricsConfig {
 
 async fn run(
     namespace: Option<String>,
-    config_hash: Option<String>,
+    version: Option<String>,
+    configuration_key: Option<String>,
     host_key: Option<&str>,
     pid_key: Option<&str>,
     controller: &Controller,
@@ -122,9 +130,12 @@ async fn run(
                 metric = metric.with_namespace(namespace.as_ref());
             }
 
-            // If a configuration hash is provided, report it. Used in enterprise.
-            if let Some(config_hash) = &config_hash {
-                metric.insert_tag("config_hash".to_owned(), config_hash.clone());
+            // Version and configuration key are reported in enterprise.
+            if let Some(version) = &version {
+                metric.insert_tag("version".to_owned(), version.clone());
+            }
+            if let Some(configuration_key) = &configuration_key {
+                metric.insert_tag("configuration_key".to_owned(), configuration_key.clone());
             }
 
             if let Some(host_key) = host_key {
@@ -219,7 +230,7 @@ mod tests {
                 // check fails you might look there and see if we've allowed
                 // users to set their own bucket widths.
                 assert_eq!(buckets[9].count, 1);
-                assert_eq!(buckets[10].count, 2);
+                assert_eq!(buckets[10].count, 1);
                 assert_eq!(*count, 2);
                 assert_eq!(*sum, 16.1);
             }

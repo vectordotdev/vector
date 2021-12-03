@@ -35,14 +35,14 @@ impl Compression {
         Compression::Gzip(flate2::Compression::new(6))
     }
 
-    pub const fn content_encoding(&self) -> Option<&'static str> {
+    pub const fn content_encoding(self) -> Option<&'static str> {
         match self {
             Self::None => None,
             Self::Gzip(_) => Some("gzip"),
         }
     }
 
-    pub const fn extension(&self) -> &'static str {
+    pub const fn extension(self) -> &'static str {
         match self {
             Self::None => "log",
             Self::Gzip(_) => "log.gz",

@@ -1,5 +1,6 @@
 #![deny(missing_docs)]
 
+use super::Event;
 use crate::ByteSizeOf;
 use atomig::{Atom, Atomic, Ordering};
 use futures::future::FutureExt;
@@ -98,7 +99,7 @@ impl EventFinalizers {
     /// status. This *drops* the finalizer array elements so they may
     /// immediately signal the source batch.
     pub fn update_sources(&mut self) {
-        let finalizers = mem::replace(&mut self.0, vec![].into());
+        let finalizers = mem::take(&mut self.0);
         for finalizer in finalizers.iter() {
             finalizer.update_batch();
         }
@@ -220,6 +221,32 @@ impl BatchNotifier {
         (Arc::new(notifier), BatchStatusReceiver(receiver))
     }
 
+    /// Optionally call `new_with_receiver` and wrap the result in `Option`s
+    pub fn maybe_new_with_receiver(
+        enabled: bool,
+    ) -> (Option<Arc<Self>>, Option<BatchStatusReceiver>) {
+        if enabled {
+            let (batch, receiver) = Self::new_with_receiver();
+            (Some(batch), Some(receiver))
+        } else {
+            (None, None)
+        }
+    }
+
+    /// Apply a new batch notifier to a batch of events, and return the receiver.
+    pub fn maybe_apply_to_events(
+        enabled: bool,
+        events: &mut [Event],
+    ) -> Option<BatchStatusReceiver> {
+        enabled.then(|| {
+            let (batch, receiver) = Self::new_with_receiver();
+            for event in events {
+                event.add_batch_notifier(Arc::clone(&batch));
+            }
+            receiver
+        })
+    }
+
     /// Update this notifier's status from the status of a finalized event.
     #[allow(clippy::missing_panics_doc)] // Panic is unreachable
     fn update_status(&self, status: EventStatus) {
@@ -261,8 +288,8 @@ pub enum BatchStatus {
     Delivered,
     /// At least one event in the batch had a transient error in delivery.
     Errored,
-    /// At least one event in the batch had a permanent failure.
-    Failed,
+    /// At least one event in the batch had a permanent failure or rejection.
+    Rejected,
 }
 
 impl BatchStatus {
@@ -273,8 +300,8 @@ impl BatchStatus {
         match (self, status) {
             // `Dropped` and `Delivered` do not change the status.
             (_, EventStatus::Dropped) | (_, EventStatus::Delivered) => self,
-            // `Failed` overrides `Errored` and `Delivered`
-            (Self::Failed, _) | (_, EventStatus::Failed) => Self::Failed,
+            // `Rejected` overrides `Errored` and `Delivered`
+            (Self::Rejected, _) | (_, EventStatus::Rejected) => Self::Rejected,
             // `Errored` overrides `Delivered`
             (Self::Errored, _) | (_, EventStatus::Errored) => Self::Errored,
             // No change for `Delivered`
@@ -298,7 +325,7 @@ pub enum EventStatus {
     Errored,
     /// At least one copy of this event encountered a permanent failure or
     /// rejection.
-    Failed,
+    Rejected,
     /// This status has been recorded and should not be updated.
     Recorded,
 }
@@ -323,8 +350,8 @@ impl EventStatus {
                 debug_assert!(false, "Updating EventStatus to Dropped is nonsense");
                 self
             }
-            // `Failed` overrides `Errored` or `Delivered`.
-            (Self::Failed, _) | (_, Self::Failed) => Self::Failed,
+            // `Rejected` overrides `Errored` or `Delivered`.
+            (Self::Rejected, _) | (_, Self::Rejected) => Self::Rejected,
             // `Errored` overrides `Delivered`.
             (Self::Errored, _) | (_, Self::Errored) => Self::Errored,
             // No change for `Delivered`.
@@ -375,11 +402,11 @@ mod tests {
     #[test]
     fn early_update() {
         let (mut fin, mut receiver) = make_finalizer();
-        fin.update_status(EventStatus::Failed);
+        fin.update_status(EventStatus::Rejected);
         assert_eq!(receiver.try_recv(), Err(Empty));
         fin.update_sources();
         assert_eq!(fin.count_finalizers(), 0);
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Failed));
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
     }
 
     #[test]
@@ -469,59 +496,59 @@ mod tests {
 
     #[test]
     fn event_status_updates() {
-        use EventStatus::{Delivered, Dropped, Errored, Failed, Recorded};
+        use EventStatus::{Delivered, Dropped, Errored, Recorded, Rejected};
 
         assert_eq!(Dropped.update(Dropped), Dropped);
         assert_eq!(Dropped.update(Delivered), Delivered);
         assert_eq!(Dropped.update(Errored), Errored);
-        assert_eq!(Dropped.update(Failed), Failed);
+        assert_eq!(Dropped.update(Rejected), Rejected);
         assert_eq!(Dropped.update(Recorded), Recorded);
 
         //assert_eq!(Delivered.update(Dropped), Delivered);
         assert_eq!(Delivered.update(Delivered), Delivered);
         assert_eq!(Delivered.update(Errored), Errored);
-        assert_eq!(Delivered.update(Failed), Failed);
+        assert_eq!(Delivered.update(Rejected), Rejected);
         assert_eq!(Delivered.update(Recorded), Recorded);
 
         //assert_eq!(Errored.update(Dropped), Errored);
         assert_eq!(Errored.update(Delivered), Errored);
         assert_eq!(Errored.update(Errored), Errored);
-        assert_eq!(Errored.update(Failed), Failed);
+        assert_eq!(Errored.update(Rejected), Rejected);
         assert_eq!(Errored.update(Recorded), Recorded);
 
-        //assert_eq!(Failed.update(Dropped), Failed);
-        assert_eq!(Failed.update(Delivered), Failed);
-        assert_eq!(Failed.update(Errored), Failed);
-        assert_eq!(Failed.update(Failed), Failed);
-        assert_eq!(Failed.update(Recorded), Recorded);
+        //assert_eq!(Rejected.update(Dropped), Rejected);
+        assert_eq!(Rejected.update(Delivered), Rejected);
+        assert_eq!(Rejected.update(Errored), Rejected);
+        assert_eq!(Rejected.update(Rejected), Rejected);
+        assert_eq!(Rejected.update(Recorded), Recorded);
 
         //assert_eq!(Recorded.update(Dropped), Recorded);
         assert_eq!(Recorded.update(Delivered), Recorded);
         assert_eq!(Recorded.update(Errored), Recorded);
-        assert_eq!(Recorded.update(Failed), Recorded);
+        assert_eq!(Recorded.update(Rejected), Recorded);
         assert_eq!(Recorded.update(Recorded), Recorded);
     }
 
     #[test]
     fn batch_status_update() {
-        use BatchStatus::{Delivered, Errored, Failed};
+        use BatchStatus::{Delivered, Errored, Rejected};
 
         assert_eq!(Delivered.update(EventStatus::Dropped), Delivered);
         assert_eq!(Delivered.update(EventStatus::Delivered), Delivered);
         assert_eq!(Delivered.update(EventStatus::Errored), Errored);
-        assert_eq!(Delivered.update(EventStatus::Failed), Failed);
+        assert_eq!(Delivered.update(EventStatus::Rejected), Rejected);
         assert_eq!(Delivered.update(EventStatus::Recorded), Delivered);
 
         assert_eq!(Errored.update(EventStatus::Dropped), Errored);
         assert_eq!(Errored.update(EventStatus::Delivered), Errored);
         assert_eq!(Errored.update(EventStatus::Errored), Errored);
-        assert_eq!(Errored.update(EventStatus::Failed), Failed);
+        assert_eq!(Errored.update(EventStatus::Rejected), Rejected);
         assert_eq!(Errored.update(EventStatus::Recorded), Errored);
 
-        assert_eq!(Failed.update(EventStatus::Dropped), Failed);
-        assert_eq!(Failed.update(EventStatus::Delivered), Failed);
-        assert_eq!(Failed.update(EventStatus::Errored), Failed);
-        assert_eq!(Failed.update(EventStatus::Failed), Failed);
-        assert_eq!(Failed.update(EventStatus::Recorded), Failed);
+        assert_eq!(Rejected.update(EventStatus::Dropped), Rejected);
+        assert_eq!(Rejected.update(EventStatus::Delivered), Rejected);
+        assert_eq!(Rejected.update(EventStatus::Errored), Rejected);
+        assert_eq!(Rejected.update(EventStatus::Rejected), Rejected);
+        assert_eq!(Rejected.update(EventStatus::Recorded), Rejected);
     }
 }
