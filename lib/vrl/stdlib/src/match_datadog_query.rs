@@ -274,7 +274,7 @@ impl<'a> Filter<'a, Value> for VrlFilter {
                 )
             }
             _ => {
-                let re = wildcard_regex(&wildcard);
+                let re = wildcard_regex(wildcard);
 
                 resolve_value(
                     buf,
