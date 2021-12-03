@@ -258,19 +258,31 @@ fn is_digit(ch: char) -> bool {
 fn unescape_string_literal(mut s: &str) -> String {
     let mut string = String::with_capacity(s.len());
     while let Some(i) = s.bytes().position(|b| b == b'\\') {
-        let c = match s.as_bytes()[i + 1] {
-            b'\'' => '\'',
-            b'"' => '"',
-            b'\\' => '\\',
-            b'n' => '\n',
-            b'r' => '\r',
-            b't' => '\t',
-            _ => unimplemented!("invalid escape"),
-        };
-
-        string.push_str(&s[..i]);
-        string.push(c);
-        s = &s[i + 2..];
+        if s.bytes().len() > i + 2 {
+            let c = match &s[i..i + 3] {
+                r#"\\n"# => '\n',
+                r#"\\r"# => '\r',
+                r#"\\t"# => '\t',
+                _ => '\0',
+            };
+            if c != '\0' {
+                string.push_str(&s[..i]);
+                string.push(c);
+                s = &s[i + 3..];
+                continue;
+            }
+        }
+        if s.bytes().len() > i + 1 {
+            let c = match s.as_bytes()[i + 1] {
+                b'\'' => '\'',
+                b'"' => '"',
+                b'\\' => '\\',
+                _ => unimplemented!("invalid escape"),
+            };
+            string.push_str(&s[..i]);
+            string.push(c);
+            s = &s[i + 2..];
+        }
     }
 
     string.push_str(s);

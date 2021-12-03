@@ -18,6 +18,8 @@ pub fn parse(
     brackets: Option<(char, char)>,
     delimiter: Option<&str>,
 ) -> Result<Vec<Value>, String> {
+    println!("{}", input);
+    println!("{:?}", delimiter);
     let result = parse_array(brackets, delimiter)(input)
         .map_err(|err| match err {
             nom::Err::Error(err) | nom::Err::Failure(err) => {
