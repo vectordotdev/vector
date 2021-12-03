@@ -1,12 +1,11 @@
 use vrl::prelude::*;
 
-use datadog_filter::{build_filter, Fielder, Filter, Matcher, Run};
+use datadog_filter::{build_matcher, Filter, Matcher, Resolver, Run};
 use datadog_search_syntax::{normalize_fields, parse, Comparison, ComparisonValue, Field};
 
 use lookup_lib::{parser::parse_lookup, LookupBuf};
 use regex::Regex;
-use std::cell::RefCell;
-use std::{borrow::Cow, collections::HashMap};
+use std::borrow::Cow;
 
 #[derive(Clone, Copy, Debug)]
 pub struct MatchDatadogQuery;
@@ -60,14 +59,12 @@ impl Function for MatchDatadogQuery {
             Box::new(ExpressionError::from(e.to_string())) as Box<dyn DiagnosticError>
         })?;
 
-        let mut query = Query::new();
-
         // Build the matcher function that accepts a VRL event value. This will parse the `node`
         // at boot-time and return a boxed func that contains just the logic required to match a
         // VRL `Value` against the Datadog Search Syntax literal.
-        let matcher = build_filter(&node, &mut query);
+        let filter = build_matcher(&node, &VrlFilter::default());
 
-        Ok(Box::new(MatchDatadogQueryFn { value, matcher }))
+        Ok(Box::new(MatchDatadogQueryFn { value, filter }))
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -89,7 +86,7 @@ impl Function for MatchDatadogQuery {
 #[derive(Debug, Clone)]
 struct MatchDatadogQueryFn {
     value: Box<dyn Expression>,
-    matcher: Box<dyn Matcher<Value>>,
+    filter: Box<dyn Matcher<Value>>,
 }
 
 impl Expression for MatchDatadogQueryFn {
@@ -98,7 +95,7 @@ impl Expression for MatchDatadogQueryFn {
 
         // Provide the current VRL event `Value` to the matcher function to determine
         // whether the data matches the given Datadog Search syntax literal.
-        Ok(self.matcher.run(&value).into())
+        Ok(self.filter.run(&value).into())
     }
 
     fn type_def(&self, _state: &state::Compiler) -> TypeDef {
@@ -110,52 +107,20 @@ fn type_def() -> TypeDef {
     TypeDef::new().infallible().boolean()
 }
 
-#[derive(Clone)]
-struct Query {
-    lookup_bufs: RefCell<HashMap<Field, LookupBuf>>,
-}
+#[derive(Default, Clone)]
+struct VrlFilter;
 
-impl Query {
-    fn new() -> Self {
-        Self {
-            lookup_bufs: RefCell::new(HashMap::new()),
-        }
-    }
-
-    fn buf(&self, field: &Field) -> LookupBuf {
-        self.lookup_bufs
-            .borrow()
-            .get(field)
-            .expect("should have lookup buf")
-            .clone()
-    }
-}
-
-impl Fielder for Query {
+impl Resolver for VrlFilter {
     type IntoIter = Vec<Field>;
 
-    /// Build fields by translating a Datadog Search Syntax attribute to a `Field` and a
-    /// corresponding `LookupBuf`. This will be the starting point for looking up a VRL `Value`
-    /// received by a filter closure.
     fn build_fields(&self, attr: impl AsRef<str>) -> Self::IntoIter {
-        for (field, buf) in normalize_fields(attr)
-            .into_iter()
-            .filter_map(|field| lookup_field(&field).map(move |buf| (field, buf)))
-        {
-            self.lookup_bufs.borrow_mut().insert(field, buf);
-        }
-
-        self.lookup_bufs
-            .borrow()
-            .keys()
-            .cloned()
-            .collect::<Vec<_>>()
+        normalize_fields(attr).into_iter().collect::<Vec<_>>()
     }
 }
 
-impl<'a> Filter<'a, Value> for Query {
+impl<'a> Filter<'a, Value> for VrlFilter {
     fn exists(&'a self, field: Field) -> Box<dyn Matcher<Value>> {
-        let buf = self.buf(&field);
+        let buf = lookup_field(&field);
 
         match field {
             // Tags need to check the element value.
@@ -164,7 +129,7 @@ impl<'a> Filter<'a, Value> for Query {
 
                 resolve_value(
                     buf,
-                    Run::boxed(move |obj| match obj {
+                    Run::boxed(move |value| match value {
                         Value::Array(v) => v.iter().any(|v| {
                             let str_value = string_value(v);
 
@@ -183,13 +148,14 @@ impl<'a> Filter<'a, Value> for Query {
                     _ => false,
                 }),
             ),
+
             // Other field types have already resolved at this point, so just return true.
-            _ => Box::new(true),
+            _ => resolve_value(buf, Box::new(true)),
         }
     }
 
     fn equals(&'a self, field: Field, to_match: &str) -> Box<dyn Matcher<Value>> {
-        let buf = self.buf(&field);
+        let buf = lookup_field(&field);
 
         match field {
             // Default fields are compared by word boundary.
@@ -243,7 +209,7 @@ impl<'a> Filter<'a, Value> for Query {
     }
 
     fn prefix(&'a self, field: Field, prefix: &str) -> Box<dyn Matcher<Value>> {
-        let buf = self.buf(&field);
+        let buf = lookup_field(&field);
 
         match field {
             // Default fields are matched by word boundary.
@@ -282,7 +248,7 @@ impl<'a> Filter<'a, Value> for Query {
     }
 
     fn wildcard(&'a self, field: Field, wildcard: &str) -> Box<dyn Matcher<Value>> {
-        let buf = self.buf(&field);
+        let buf = lookup_field(&field);
 
         match field {
             Field::Default(_) => {
@@ -321,7 +287,7 @@ impl<'a> Filter<'a, Value> for Query {
         comparator: Comparison,
         comparison_value: ComparisonValue,
     ) -> Box<dyn Matcher<Value>> {
-        let buf = self.buf(&field);
+        let buf = lookup_field(&field);
         let rhs = Cow::from(comparison_value.to_string());
 
         match field {
@@ -445,12 +411,12 @@ fn wildcard_regex(to_match: &str) -> Regex {
 
 /// If the provided field is a `Field::Tag`, will return a "tags" lookup buf. Otherwise,
 /// parses the field and returns a lookup buf is the lookup itself is valid.
-fn lookup_field(field: &Field) -> Option<LookupBuf> {
+fn lookup_field(field: &Field) -> LookupBuf {
     match field {
-        Field::Default(p) | Field::Reserved(p) | Field::Facet(p) => {
-            Some(parse_lookup(p.as_str()).ok()?.into_buf())
-        }
-        Field::Tag(_) => Some(LookupBuf::from("tags")),
+        Field::Default(p) | Field::Reserved(p) | Field::Facet(p) => parse_lookup(p.as_str())
+            .expect("should parse lookup buf")
+            .into_buf(),
+        Field::Tag(_) => LookupBuf::from("tags"),
     }
 }
 

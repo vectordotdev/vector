@@ -1,9 +1,11 @@
+use crate::{Filter, Resolver};
+use datadog_search_syntax::{BooleanType, QueryNode};
 use dyn_clone::{clone_trait_object, DynClone};
 use std::{fmt, marker::PhantomData};
 
 /// A `Matcher` is a type that contains a "run" method which returns true/false if value `V`
 /// matches a filter.
-pub trait Matcher<V>: DynClone + std::fmt::Debug + Send + Sync {
+pub trait Matcher<V>: DynClone + fmt::Debug + Send + Sync {
     fn run(&self, value: &V) -> bool;
 }
 
@@ -21,7 +23,7 @@ impl<V> Matcher<V> for bool {
 #[derive(Clone)]
 pub struct Run<V, T>
 where
-    V: Send + std::fmt::Debug + Sync + Clone,
+    V: fmt::Debug + Send + Sync + Clone,
     T: Fn(&V) -> bool + Send + Sync + Clone,
 {
     func: T,
@@ -30,7 +32,7 @@ where
 
 impl<'a, V, T> Run<V, T>
 where
-    V: Send + std::fmt::Debug + Sync + Clone,
+    V: fmt::Debug + Send + Sync + Clone,
     T: Fn(&V) -> bool + Send + Sync + Clone,
 {
     /// Convenience for allocating a `Self`, which is generally how a `Run` is instantiated.
@@ -44,7 +46,7 @@ where
 
 impl<V, T> Matcher<V> for Run<V, T>
 where
-    V: Send + fmt::Debug + Sync + Clone,
+    V: fmt::Debug + Send + Sync + Clone,
     T: Fn(&V) -> bool + Send + Sync + Clone,
 {
     fn run(&self, obj: &V) -> bool {
@@ -54,10 +56,147 @@ where
 
 impl<'a, V, T> fmt::Debug for Run<V, T>
 where
-    V: Send + std::fmt::Debug + Sync + Clone,
+    V: fmt::Debug + Send + Sync + Clone,
     T: Fn(&V) -> bool + Send + Sync + Clone,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Datadog matcher fn")
+    }
+}
+
+/// Returns a closure that negates the value of the provided `Matcher`.
+fn not<V>(matcher: Box<dyn Matcher<V>>) -> Box<dyn Matcher<V>>
+where
+    V: fmt::Debug + Send + Sync + Clone + 'static,
+{
+    Run::boxed(move |value| !matcher.run(value))
+}
+
+/// Returns a closure that returns true if any of the vector of `Matcher<V>` return true.
+fn any<V>(matchers: Vec<Box<dyn Matcher<V>>>) -> Box<dyn Matcher<V>>
+where
+    V: fmt::Debug + Send + Sync + Clone + 'static,
+{
+    Run::boxed(move |value| matchers.iter().any(|func| func.run(value)))
+}
+
+/// Returns a closure that returns true if all of the vector of `Matcher<V>` return true.
+fn all<V>(matchers: Vec<Box<dyn Matcher<V>>>) -> Box<dyn Matcher<V>>
+where
+    V: fmt::Debug + Send + Sync + Clone + 'static,
+{
+    Run::boxed(move |value| matchers.iter().all(|func| func.run(value)))
+}
+
+/// Build a filter by parsing a Datadog Search Syntax `QueryNode`, and invoking the appropriate
+/// method on a `Fielder` + `Filter` implementation to determine the matching logic. Each method
+/// returns a `Matcher<V>` which is intended to be invoked at runtime. `F` should implement both
+/// `Fielder` + `Filter` in order to applying any required caching which may affect the operation
+/// of a filter method. This function is intended to be used at boot-time and NOT in a hot path!
+pub fn build_matcher<'a, V, F>(node: &'a QueryNode, filter: &'a F) -> Box<dyn Matcher<V>>
+where
+    V: fmt::Debug + Send + Sync + Clone + 'static,
+    F: Filter<'a, V> + Resolver,
+{
+    match node {
+        QueryNode::MatchNoDocs => Box::new(false),
+        QueryNode::MatchAllDocs => Box::new(true),
+        QueryNode::AttributeExists { attr } => {
+            let matchers = filter
+                .build_fields(attr)
+                .into_iter()
+                .map(|field| filter.exists(field))
+                .collect::<Vec<_>>();
+
+            any(matchers)
+        }
+        QueryNode::AttributeMissing { attr } => {
+            let matchers = filter
+                .build_fields(attr)
+                .into_iter()
+                .map(|field| not(filter.exists(field)))
+                .collect::<Vec<_>>();
+
+            all(matchers)
+        }
+        QueryNode::AttributeTerm { attr, value }
+        | QueryNode::QuotedAttribute {
+            attr,
+            phrase: value,
+        } => {
+            let matchers = filter
+                .build_fields(attr)
+                .into_iter()
+                .map(|field| filter.equals(field, value))
+                .collect::<Vec<_>>();
+
+            any(matchers)
+        }
+        QueryNode::AttributePrefix { attr, prefix } => {
+            let matchers = filter
+                .build_fields(attr)
+                .into_iter()
+                .map(|field| filter.prefix(field, prefix))
+                .collect::<Vec<_>>();
+
+            any(matchers)
+        }
+        QueryNode::AttributeWildcard { attr, wildcard } => {
+            let matchers = filter
+                .build_fields(attr)
+                .into_iter()
+                .map(|field| filter.wildcard(field, wildcard))
+                .collect::<Vec<_>>();
+
+            any(matchers)
+        }
+        QueryNode::AttributeComparison {
+            attr,
+            comparator,
+            value,
+        } => {
+            let matchers = filter
+                .build_fields(attr)
+                .into_iter()
+                .map(|field| filter.compare(field, *comparator, value.clone()))
+                .collect::<Vec<_>>();
+
+            any(matchers)
+        }
+        QueryNode::AttributeRange {
+            attr,
+            lower,
+            lower_inclusive,
+            upper,
+            upper_inclusive,
+        } => {
+            let matchers = filter
+                .build_fields(attr)
+                .into_iter()
+                .map(|field| {
+                    filter.range(
+                        field,
+                        lower.clone(),
+                        *lower_inclusive,
+                        upper.clone(),
+                        *upper_inclusive,
+                    )
+                })
+                .collect::<Vec<_>>();
+
+            any(matchers)
+        }
+        QueryNode::NegatedNode { node } => not(build_matcher(node, filter)),
+        QueryNode::Boolean { oper, nodes } => {
+            let funcs = nodes
+                .iter()
+                .map(|node| build_matcher(node, filter))
+                .collect::<Vec<_>>();
+
+            match oper {
+                BooleanType::And => all(funcs),
+                BooleanType::Or => any(funcs),
+            }
+        }
     }
 }

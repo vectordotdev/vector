@@ -1,7 +1,7 @@
-mod fields;
 mod filter;
 mod matcher;
+mod resolver;
 
-pub use fields::*;
 pub use filter::*;
 pub use matcher::*;
+pub use resolver::*;
