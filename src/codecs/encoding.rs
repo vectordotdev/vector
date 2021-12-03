@@ -2,7 +2,7 @@
 //! events into bytes.
 
 use crate::{
-    codecs::{BytesSerializer, NewlineDelimitedEncoder},
+    codecs::{NewlineDelimitedEncoder, TextSerializer},
     event::Event,
     internal_events::{EncoderFramingFailed, EncoderSerializeFailed},
 };
@@ -134,7 +134,7 @@ impl Default for Encoder {
     fn default() -> Self {
         Self {
             framer: Box::new(NewlineDelimitedEncoder::new()),
-            serializer: Box::new(BytesSerializer::new()),
+            serializer: Box::new(TextSerializer::new()),
         }
     }
 }

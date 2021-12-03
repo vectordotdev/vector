@@ -10,8 +10,8 @@ mod framing;
 
 pub use decoding::Decoder;
 pub use format::{
-    BytesDeserializer, BytesDeserializerConfig, BytesSerializer, BytesSerializerConfig,
-    JsonDeserializer, JsonDeserializerConfig,
+    BytesDeserializer, BytesDeserializerConfig, JsonDeserializer, JsonDeserializerConfig,
+    TextSerializer, TextSerializerConfig,
 };
 #[cfg(feature = "sources-syslog")]
 pub use format::{SyslogDeserializer, SyslogDeserializerConfig};
