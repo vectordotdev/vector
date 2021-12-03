@@ -1010,6 +1010,7 @@ mod tests {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
+            timestamp_nanos_key: None,
         }
         .build(SinkContext::new_test())
         .await

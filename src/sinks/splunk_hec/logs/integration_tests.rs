@@ -84,6 +84,7 @@ async fn config(
         batch,
         request: TowerRequestConfig::default(),
         tls: None,
+        timestamp_nanos_key: None,
     }
 }
 
