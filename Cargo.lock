@@ -8298,7 +8298,6 @@ dependencies = [
  "datadog-grok",
  "datadog-search-syntax",
  "dns-lookup",
- "dyn-clone",
  "grok",
  "hex",
  "hostname",
