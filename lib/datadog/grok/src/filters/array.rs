@@ -1,6 +1,5 @@
 use crate::{
     ast::{Function, FunctionArgument},
-    parse_grok::Error as GrokRuntimeError,
     parse_grok_rules::Error as GrokStaticError,
 };
 use bytes::Bytes;
@@ -10,7 +9,6 @@ use nom::{
     character::complete::char,
     combinator::cut,
     combinator::map,
-    error::{ContextError, ParseError},
     multi::separated_list0,
     sequence::{preceded, terminated},
     IResult,
@@ -20,33 +18,29 @@ use std::convert::TryFrom;
 use crate::grok_filter::GrokFilter;
 use vrl_compiler::Value;
 
-pub fn parse(
-    input: &str,
+type SResult<'a, O> = IResult<&'a str, O, (&'a str, nom::error::ErrorKind)>;
+
+pub fn parse<'a>(
+    input: &'a str,
     brackets: Option<(char, char)>,
-    delimiter: Option<&str>,
+    delimiter: Option<&'a str>,
 ) -> Result<Vec<Value>, String> {
     let result = parse_array(brackets, delimiter)(input)
-        .map_err(|err| match err {
-            nom::Err::Error(err) | nom::Err::Failure(err) => {
-                // Create a descriptive error message if possible.
-                nom::error::convert_error(input, err)
-            }
-            _ => err.to_string(),
-        })
+        .map_err(|_| format!("could not parse '{}' as array", input))
         .and_then(|(rest, result)| {
             rest.trim()
                 .is_empty()
                 .then(|| result)
-                .ok_or_else(|| "could not parse successfully".into())
+                .ok_or_else(|| format!("could not parse '{}' as array", input))
         })?;
 
     Ok(result)
 }
 
-fn parse_array<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
+fn parse_array<'a>(
     brackets: Option<(char, char)>,
     delimiter: Option<&'a str>,
-) -> impl Fn(&'a str) -> IResult<&'a str, Vec<Value>, E> {
+) -> impl Fn(&'a str) -> SResult<Vec<Value>> {
     let brackets = brackets.unwrap_or(('[', ']'));
     move |input| {
         preceded(
@@ -56,27 +50,24 @@ fn parse_array<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     }
 }
 
-fn parse_array_values<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
-    delimiter: Option<&'a str>,
-) -> impl Fn(&'a str) -> IResult<&'a str, Vec<Value>, E> {
+fn parse_array_values<'a>(delimiter: Option<&'a str>) -> impl Fn(&'a str) -> SResult<Vec<Value>> {
     move |input| {
         let delimiter = delimiter.unwrap_or(",");
         // skip the last closing character
-        separated_list0(tag(delimiter), cut(parse_value(delimiter)))(&input[..input.len() - 1])
-            .and_then(|(rest, values)| {
+        separated_list0(tag(delimiter), cut(parse_value(delimiter)))(&input[..input.len() - 1]).map(
+            |(rest, values)| {
                 if rest.is_empty() {
                     // return the closing character
-                    Ok((&input[input.len() - 1..], values))
+                    (&input[input.len() - 1..], values)
                 } else {
-                    Ok((rest, values)) // will fail upstream
+                    (rest, values) // will fail upstream
                 }
-            })
+            },
+        )
     }
 }
 
-fn parse_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
-    delimiter: &'a str,
-) -> impl Fn(&'a str) -> IResult<&'a str, Value, E> {
+fn parse_value<'a>(delimiter: &'a str) -> impl Fn(&'a str) -> SResult<Value> {
     move |input| {
         map(
             alt((take_until(delimiter), take(input.len()))),

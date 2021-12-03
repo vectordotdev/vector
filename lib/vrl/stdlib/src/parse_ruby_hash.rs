@@ -75,7 +75,7 @@ impl Expression for ParseRubyHashFn {
 }
 
 fn kinds() -> Kind {
-    Kind::Null | Kind::Bytes | Kind::Float | Kind::Boolean | Kind::Array | Kind::Objectparse_inner_str
+    Kind::Null | Kind::Bytes | Kind::Float | Kind::Boolean | Kind::Array | Kind::Object
 }
 
 fn type_def() -> TypeDef {
@@ -113,9 +113,9 @@ fn parse_inner_str<'a, E: ParseError<&'a str>>(
                 '\\',
                 satisfy(|c| c == '\\' || c == delimiter),
             )),
-            |inner| inner.unwrap_or(""),parse_bytes,
+            |inner| inner.unwrap_or(""),
         )(input)
-    }parse_bytes,
+    }
 }
 
 /// Parses text with a given delimiter.

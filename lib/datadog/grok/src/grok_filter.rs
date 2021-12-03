@@ -6,7 +6,6 @@ use crate::{
 
 use crate::filters::array;
 use crate::matchers::date::{apply_date_filter, DateFilter};
-use crate::parse_grok::Error;
 use ordered_float::NotNan;
 use std::{convert::TryFrom, string::ToString};
 use strum_macros::Display;
@@ -128,9 +127,7 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
                 let v = String::from_utf8_lossy(v).parse::<f64>().map_err(|_e| {
                     GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string())
                 })?;
-                Ok(Value::Float(
-                    NotNan::new(v * scale_factor).expect("NaN").into(),
-                ))
+                Ok(Value::Float(NotNan::new(v * scale_factor).expect("NaN")))
             }
             _ => Err(GrokRuntimeError::FailedToApplyFilter(
                 filter.to_string(),
@@ -178,7 +175,7 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
         GrokFilter::Date(date_filter) => apply_date_filter(value, date_filter),
         GrokFilter::Array(brackets, delimiter, value_filter) => match value {
             Value::Bytes(bytes) => array::parse(
-                String::from_utf8_lossy(&bytes).as_ref(),
+                String::from_utf8_lossy(bytes).as_ref(),
                 brackets.to_owned(),
                 delimiter.as_ref().map(|s| s.as_str()),
             )
@@ -191,7 +188,7 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
                         .iter()
                         .map(|v| apply_filter(v, value_filter))
                         .collect::<Result<Vec<Value>, _>>()
-                        .map(|v| Value::from(v));
+                        .map(Value::from);
                     return result;
                 }
                 Ok(values.into())

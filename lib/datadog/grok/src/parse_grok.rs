@@ -99,7 +99,6 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
 mod tests {
     use super::*;
     use crate::parse_grok_rules::parse_grok_rules;
-    use ordered_float::NotNan;
     use vrl_compiler::Value;
 
     #[test]
