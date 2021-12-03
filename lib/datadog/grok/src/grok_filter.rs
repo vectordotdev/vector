@@ -195,7 +195,17 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
             Value::Integer(v) => Ok(Value::Float(
                 NotNan::new((*v as f64) * scale_factor).expect("NaN"),
             )),
-            Value::Float(v) => Ok(Value::Float(*v * scale_factor)),
+            Value::Float(v) => Ok(Value::Float(
+                NotNan::new(v.into_inner() * scale_factor).expect("NaN"),
+            )),
+            Value::Bytes(v) => {
+                let v = String::from_utf8_lossy(v).parse::<f64>().map_err(|_e| {
+                    GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string())
+                })?;
+                Ok(Value::Float(
+                    NotNan::new(v * scale_factor).expect("NaN").into(),
+                ))
+            }
             _ => Err(GrokRuntimeError::FailedToApplyFilter(
                 filter.to_string(),
                 value.to_string(),
@@ -251,11 +261,12 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
             })
             .and_then(|values| {
                 if let Some(value_filter) = value_filter.as_ref() {
-                    return values
+                    let result = values
                         .iter()
                         .map(|v| apply_filter(v, value_filter))
                         .collect::<Result<Vec<Value>, _>>()
                         .map(|v| Value::from(v));
+                    return result;
                 }
                 Ok(values.into())
             }),
