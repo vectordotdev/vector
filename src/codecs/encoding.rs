@@ -90,7 +90,7 @@ pub trait FramingConfig: Debug + DynClone + Send + Sync {
 
 dyn_clone::clone_trait_object!(FramingConfig);
 
-/// Serialize a structured event into byte frames.
+/// Serialize a structured event into a byte frame.
 pub trait Serializer:
     tokio_util::codec::Encoder<Event, Error = crate::Error> + DynClone + Debug + Send + Sync
 {
@@ -141,8 +141,8 @@ impl Default for Encoder {
 
 impl Encoder {
     /// Creates a new `Encoder` with the specified `Serializer` to produce bytes
-    /// from a structured event, and the `Framer` to wrap these into byte
-    /// frames.
+    /// from a structured event, and the `Framer` to wrap these into a byte
+    /// frame.
     pub fn new(framer: BoxedFramer, serializer: BoxedSerializer) -> Self {
         Self { framer, serializer }
     }
