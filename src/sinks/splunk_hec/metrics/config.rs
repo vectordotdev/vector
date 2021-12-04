@@ -1,22 +1,26 @@
+use super::{request_builder::HecMetricsRequestBuilder, sink::HecMetricsSink};
+use crate::{
+    config::{GenerateConfig, SinkConfig, SinkContext},
+    http::HttpClient,
+    sinks::{
+        splunk_hec::common::{
+            acknowledgements::HecClientAcknowledgementsConfig,
+            build_healthcheck, create_client, host_key,
+            retry::HecRetryLogic,
+            service::{HecService, HttpRequestBuilder},
+            SplunkHecDefaultBatchSettings,
+        },
+        util::{BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig},
+        Healthcheck,
+    },
+    template::Template,
+    tls::TlsOptions,
+};
 use futures_util::FutureExt;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
-use vector_core::transform::DataType;
-
-use crate::config::{GenerateConfig, SinkConfig, SinkContext};
-use crate::http::HttpClient;
-use crate::sinks::splunk_hec::common::retry::HecRetryLogic;
-use crate::sinks::splunk_hec::common::service::{HecService, HttpRequestBuilder};
-use crate::sinks::splunk_hec::common::{
-    build_healthcheck, create_client, host_key, SplunkHecDefaultBatchSettings,
-};
-use crate::sinks::splunk_hec::metrics::request_builder::HecMetricsRequestBuilder;
-use crate::sinks::splunk_hec::metrics::sink::HecMetricsSink;
-use crate::sinks::util::{BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig};
-use crate::sinks::Healthcheck;
-use crate::template::Template;
-use crate::tls::TlsOptions;
 use vector_core::sink::VectorSink;
+use vector_core::transform::DataType;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -36,6 +40,8 @@ pub struct HecMetricsSinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
+    #[serde(default)]
+    pub acknowledgements: HecClientAcknowledgementsConfig,
 }
 
 impl GenerateConfig for HecMetricsSinkConfig {
@@ -52,6 +58,7 @@ impl GenerateConfig for HecMetricsSinkConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -88,14 +95,15 @@ impl HecMetricsSinkConfig {
         };
 
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-        let http_request_builder = HttpRequestBuilder {
-            endpoint: self.endpoint.clone(),
-            token: self.token.clone(),
-            compression: self.compression,
-        };
+        let http_request_builder =
+            HttpRequestBuilder::new(self.endpoint.clone(), self.token.clone(), self.compression);
         let service = ServiceBuilder::new()
             .settings(request_settings, HecRetryLogic)
-            .service(HecService::new(client, http_request_builder));
+            .service(HecService::new(
+                client,
+                http_request_builder,
+                self.acknowledgements.clone(),
+            ));
 
         let batch_settings = self.batch.into_batcher_settings()?;
         let sink = HecMetricsSink {

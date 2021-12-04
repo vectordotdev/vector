@@ -22,13 +22,13 @@ start_podman () {
   podman pod create --replace --name vector-test-integration-splunk -p 8088:8088 -p 8000:8000 -p 8089:8089
   wait_for_splunk
   podman run -d --pod=vector-test-integration-splunk \
-    --name splunk timberio/splunk-hec-test:minus_compose
+    --name splunk timberio/splunk-hec-test:latest
 }
 
 start_docker () {
   docker network create vector-test-integration-splunk
   docker run -d --network=vector-test-integration-splunk -p 8088:8088 -p 8000:8000 \
-   -p 8089:8089 --name splunk timberio/splunk-hec-test:minus_compose
+   -p 8089:8089 --name splunk timberio/splunk-hec-test:latest
   wait_for_splunk
   docker exec splunk /opt/splunk/bin/splunk add index testmetrics -datatype metric
 }

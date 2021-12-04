@@ -438,6 +438,7 @@ urls: {
 	splunk_hec:                                               "https://dev.splunk.com/enterprise/docs/dataapps/httpeventcollector/"
 	splunk_hec_event_endpoint:                                "https://docs.splunk.com/Documentation/Splunk/8.0.0/RESTREF/RESTinput#services.2Fcollector.2Fevent"
 	splunk_hec_indexed_fields:                                "https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/IFXandHEC"
+	splunk_hec_indexer_acknowledgements:                      "https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/AboutHECIDXAck"
 	splunk_hec_protocol:                                      "https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints"
 	splunk_hec_raw_endpoint:                                  "https://docs.splunk.com/Documentation/Splunk/8.0.0/RESTREF/RESTinput#services.2Fcollector.2Fraw"
 	splunk_hec_setup:                                         "https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector"
