@@ -61,6 +61,15 @@ where
     }
 }
 
+impl<T> ByteSizeOf for &[T]
+where
+    T: ByteSizeOf,
+{
+    fn allocated_bytes(&self) -> usize {
+        self.iter().fold(0, |acc, v| acc + v.size_of())
+    }
+}
+
 impl<T> ByteSizeOf for Option<T>
 where
     T: ByteSizeOf,

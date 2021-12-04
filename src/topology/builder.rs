@@ -10,10 +10,10 @@ use crate::{
     event::Event,
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
-    transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs},
+    transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
     Pipeline,
 };
-use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{stream::FuturesOrdered, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use std::pin::Pin;
 use std::{
@@ -203,6 +203,7 @@ pub async fn build_pieces(
             inputs: transform.inputs.clone(),
             input_type: transform.inner.input_type(),
             named_outputs: transform.inner.named_outputs(),
+            enable_concurrency: transform.inner.enable_concurrency(),
         };
 
         let transform = match transform.inner.build(&context).await {
@@ -415,6 +416,10 @@ const fn filter_event_type(event: &Event, data_type: DataType) -> bool {
 // 128 is an arbitrary, smallish constant
 const TRANSFORM_BATCH_SIZE: usize = 128;
 
+// 64 is an arbitrary, smallish constant
+// TODO: maybe something like 2x num_cpus?
+const CONCURRENCY_LIMIT: usize = 64;
+
 #[derive(Debug, Clone)]
 struct TransformNode {
     key: ComponentKey,
@@ -422,6 +427,7 @@ struct TransformNode {
     inputs: Vec<OutputId>,
     input_type: DataType,
     named_outputs: Vec<String>,
+    enable_concurrency: bool,
 }
 
 fn build_transform(
@@ -430,25 +436,176 @@ fn build_transform(
     input_rx: BufferStream<Event>,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     match transform {
-        Transform::Function(t) => build_sync_transform(
-            Box::new(t),
-            input_rx,
-            node.input_type,
-            node.typetag,
-            &node.key,
-            Vec::new(),
-        ),
-        Transform::Synchronous(t) => build_sync_transform(
-            t,
-            input_rx,
-            node.input_type,
-            node.typetag,
-            &node.key,
-            node.named_outputs,
-        ),
+        // TODO: avoid the double boxing for function transforms here
+        Transform::Function(t) => build_sync_transform(Box::new(t), node, input_rx),
+        Transform::Synchronous(t) => build_sync_transform(t, node, input_rx),
         Transform::Task(t) => {
             build_task_transform(t, input_rx, node.input_type, node.typetag, &node.key)
         }
+    }
+}
+
+fn build_sync_transform(
+    t: Box<dyn SyncTransform>,
+    node: TransformNode,
+    input_rx: BufferStream<Event>,
+) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
+    let (outputs, controls) = TransformOutputs::new(node.named_outputs);
+
+    let runner = Runner::new(outputs);
+    let transform = if node.enable_concurrency {
+        runner
+            .run_concurrently(t, input_rx, node.input_type)
+            .boxed()
+    } else {
+        runner.run_inline(t, input_rx, node.input_type).boxed()
+    };
+
+    let mut output_controls = HashMap::new();
+    for (name, control) in controls {
+        match name {
+            None => {
+                output_controls.insert(OutputId::from(&node.key), control);
+            }
+            Some(name) => {
+                output_controls.insert(OutputId::from((&node.key, name)), control);
+            }
+        }
+    }
+
+    let task = Task::new(node.key.clone(), node.typetag, transform);
+
+    (task, output_controls)
+}
+
+struct Runner {
+    outputs: TransformOutputs,
+    timer: crate::utilization::Timer,
+    last_report: Instant,
+}
+
+impl Runner {
+    fn new(outputs: TransformOutputs) -> Self {
+        Self {
+            outputs,
+            timer: crate::utilization::Timer::new(),
+            last_report: Instant::now(),
+        }
+    }
+
+    fn on_events_received(&mut self, events: &[Event]) {
+        let stopped = self.timer.stop_wait();
+        if stopped.duration_since(self.last_report).as_secs() >= 5 {
+            self.timer.report();
+            self.last_report = stopped;
+        }
+
+        emit!(&EventsReceived {
+            count: events.len(),
+            byte_size: events.size_of(),
+        });
+    }
+
+    async fn send_outputs(&mut self, outputs_buf: &mut TransformOutputsBuf) {
+        // TODO: account for named outputs separately?
+        let count = outputs_buf.len();
+        // TODO: do we only want allocated_bytes for events themselves?
+        let byte_size = outputs_buf.size_of();
+
+        self.timer.start_wait();
+        self.outputs.send(outputs_buf).await;
+
+        emit!(&EventsSent { count, byte_size });
+    }
+
+    async fn run_inline(
+        mut self,
+        mut transform: Box<dyn SyncTransform>,
+        input_rx: BufferStream<Event>,
+        input_type: DataType,
+    ) -> Result<TaskOutput, ()> {
+        let mut outputs_buf = self.outputs.new_buf_with_capacity(TRANSFORM_BATCH_SIZE);
+
+        let mut input_rx = input_rx
+            .filter(move |event| ready(filter_event_type(event, input_type)))
+            .ready_chunks(TRANSFORM_BATCH_SIZE);
+
+        self.timer.start_wait();
+        while let Some(events) = input_rx.next().await {
+            self.on_events_received(&events);
+
+            for event in events {
+                transform.transform(event, &mut outputs_buf);
+            }
+
+            self.send_outputs(&mut outputs_buf).await;
+        }
+
+        debug!("Finished.");
+        Ok(TaskOutput::Transform)
+    }
+
+    async fn run_concurrently(
+        mut self,
+        transform: Box<dyn SyncTransform>,
+        input_rx: BufferStream<Event>,
+        input_type: DataType,
+    ) -> Result<TaskOutput, ()> {
+        let mut input_rx = input_rx
+            .filter(move |event| ready(filter_event_type(event, input_type)))
+            .ready_chunks(TRANSFORM_BATCH_SIZE);
+
+        let mut in_flight = FuturesOrdered::new();
+        let mut shutting_down = false;
+
+        self.timer.start_wait();
+        loop {
+            tokio::select! {
+                biased;
+
+                result = in_flight.next(), if !in_flight.is_empty() => {
+                    match result {
+                        Some(Ok(outputs_buf)) => {
+                            let mut outputs_buf: TransformOutputsBuf = outputs_buf;
+                            self.send_outputs(&mut outputs_buf).await;
+                        }
+                        _ => unreachable!("join error or bad poll"),
+                    }
+                }
+
+                input_events = input_rx.next(), if in_flight.len() < CONCURRENCY_LIMIT && !shutting_down => {
+                    match input_events {
+                        Some(events) => {
+                            self.on_events_received(&events);
+
+                            let mut t = transform.clone();
+                            let mut outputs_buf = self.outputs.new_buf_with_capacity(events.len());
+                            let task = tokio::spawn(async move {
+                                for event in events {
+                                    t.transform(event, &mut outputs_buf);
+                                }
+
+                                outputs_buf
+                            });
+                            in_flight.push(task);
+                        }
+                        None => {
+                            shutting_down = true;
+                            continue
+                        }
+                    }
+                }
+
+                else => {
+                    if shutting_down {
+                        break
+                    }
+                }
+            }
+        }
+
+        debug!("Finished.");
+        Ok(TaskOutput::Transform)
     }
 }
 
@@ -489,75 +646,6 @@ fn build_task_transform(
 
     let mut outputs = HashMap::new();
     outputs.insert(OutputId::from(key), control);
-
-    let task = Task::new(key.clone(), typetag, transform);
-
-    (task, outputs)
-}
-
-fn build_sync_transform(
-    mut t: Box<dyn SyncTransform>,
-    input_rx: BufferStream<Event>,
-    input_type: DataType,
-    typetag: &str,
-    key: &ComponentKey,
-    named_outputs: Vec<String>,
-) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
-    let (mut outputs, controls) =
-        TransformOutputs::new_with_capacity(named_outputs, TRANSFORM_BATCH_SIZE);
-
-    let mut input_rx = input_rx
-        .filter(move |event| ready(filter_event_type(event, input_type)))
-        .ready_chunks(TRANSFORM_BATCH_SIZE);
-
-    let mut timer = crate::utilization::Timer::new();
-    let mut last_report = Instant::now();
-
-    let transform = async move {
-        timer.start_wait();
-        while let Some(events) = input_rx.next().await {
-            let stopped = timer.stop_wait();
-            if stopped.duration_since(last_report).as_secs() >= 5 {
-                timer.report();
-                last_report = stopped;
-            }
-
-            emit!(&EventsReceived {
-                count: events.len(),
-                byte_size: events.size_of(),
-            });
-
-            for event in events {
-                t.transform(event, &mut outputs);
-            }
-
-            // TODO: account for named outputs separately?
-            let count = outputs.len();
-            // TODO: do we only want allocated_bytes for events themselves?
-            let byte_size = outputs.size_of();
-
-            timer.start_wait();
-            outputs.flush().await;
-
-            emit!(&EventsSent { count, byte_size });
-        }
-
-        debug!("Finished.");
-        Ok(TaskOutput::Transform)
-    }
-    .boxed();
-
-    let mut outputs = HashMap::new();
-    for (name, control) in controls {
-        match name {
-            None => {
-                outputs.insert(OutputId::from(key), control);
-            }
-            Some(name) => {
-                outputs.insert(OutputId::from((key, name)), control);
-            }
-        }
-    }
 
     let task = Task::new(key.clone(), typetag, transform);
 

@@ -72,6 +72,7 @@ pub mod tokenizer;
 
 pub use vector_core::transform::{
     FunctionTransform, SyncTransform, TaskTransform, Transform, TransformOutputs,
+    TransformOutputsBuf,
 };
 
 #[derive(Debug, Snafu)]

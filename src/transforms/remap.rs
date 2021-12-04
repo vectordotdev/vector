@@ -4,7 +4,7 @@ use crate::{
     },
     event::{Event, VrlTarget},
     internal_events::{RemapMappingAbort, RemapMappingError},
-    transforms::{SyncTransform, Transform, TransformOutputs},
+    transforms::{SyncTransform, Transform, TransformOutputsBuf},
     Result,
 };
 
@@ -66,6 +66,10 @@ impl TransformConfig for RemapConfig {
 
     fn transform_type(&self) -> &'static str {
         "remap"
+    }
+
+    fn enable_concurrency(&self) -> bool {
+        true
     }
 }
 
@@ -171,7 +175,7 @@ impl Clone for Remap {
 }
 
 impl SyncTransform for Remap {
-    fn transform(&mut self, event: Event, output: &mut TransformOutputs) {
+    fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf) {
         // If a program can fail or abort at runtime and we know that we will still need to forward
         // the event in that case (either to the main output or `dropped`, depending on the
         // config), we need to clone the original event and keep it around, to allow us to discard
@@ -815,7 +819,7 @@ mod tests {
     }
 
     fn collect_outputs(ft: &mut dyn SyncTransform, event: Event) -> CollectedOuput {
-        let (mut outputs, _) = TransformOutputs::new_with_capacity(vec![String::from(DROPPED)], 1);
+        let mut outputs = TransformOutputsBuf::new_with_capacity(vec![String::from(DROPPED)], 1);
 
         ft.transform(event, &mut outputs);
 
@@ -836,7 +840,7 @@ mod tests {
         ft: &mut dyn SyncTransform,
         event: Event,
     ) -> std::result::Result<Event, Event> {
-        let (mut outputs, _) = TransformOutputs::new_with_capacity(vec![String::from(DROPPED)], 1);
+        let mut outputs = TransformOutputsBuf::new_with_capacity(vec![String::from(DROPPED)], 1);
 
         ft.transform(event, &mut outputs);
 

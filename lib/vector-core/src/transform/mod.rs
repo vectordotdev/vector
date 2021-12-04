@@ -147,33 +147,27 @@ pub trait TaskTransform: Send {
 /// multiple outputs. Those outputs must be known in advanced and returned via
 /// `TransformConfig::named_outputs`. Attempting to send to any named output not registered in
 /// advance is considered a bug and will cause a panic.
-pub trait SyncTransform: Send + Sync {
-    fn transform(&mut self, event: Event, output: &mut TransformOutputs);
+pub trait SyncTransform: Send + dyn_clone::DynClone + Sync {
+    fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf);
 }
 
+dyn_clone::clone_trait_object!(SyncTransform);
+
 impl SyncTransform for Box<dyn FunctionTransform> {
-    fn transform(&mut self, event: Event, output: &mut TransformOutputs) {
+    fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf) {
         FunctionTransform::transform(self.as_mut(), &mut output.primary_buffer, event);
     }
 }
 
-/// This struct manages collecting and forwarding the various outputs of transforms. It's designed
-/// to unify the interface for transforms that may or may not have more than one possible output
-/// path. It's currently batch-focused for use in topology-level tasks, but can easily be extended
-/// to be used directly by transforms via a new, simpler trait interface.
 pub struct TransformOutputs {
-    primary_buffer: Vec<Event>,
-    named_buffers: HashMap<String, Vec<Event>>,
     primary_output: Fanout,
     named_outputs: HashMap<String, Fanout>,
 }
 
 impl TransformOutputs {
-    pub fn new_with_capacity(
+    pub fn new(
         named_outputs_in: Vec<String>,
-        capacity: usize,
     ) -> (Self, HashMap<Option<String>, fanout::ControlChannel>) {
-        let mut named_buffers = HashMap::new();
         let mut named_outputs = HashMap::new();
         let mut controls = HashMap::new();
 
@@ -181,19 +175,57 @@ impl TransformOutputs {
             let (fanout, control) = Fanout::new();
             named_outputs.insert(name.clone(), fanout);
             controls.insert(Some(name.clone()), control);
-            named_buffers.insert(name.clone(), Vec::new());
         }
 
         let (primary_output, control) = Fanout::new();
         let me = Self {
-            primary_buffer: Vec::with_capacity(capacity),
-            named_buffers,
             primary_output,
             named_outputs,
         };
         controls.insert(None, control);
 
         (me, controls)
+    }
+
+    pub fn new_buf_with_capacity(&self, capacity: usize) -> TransformOutputsBuf {
+        TransformOutputsBuf::new_with_capacity(
+            self.named_outputs.keys().cloned().collect(),
+            capacity,
+        )
+    }
+
+    pub async fn send(&mut self, buf: &mut TransformOutputsBuf) {
+        send_inner(&mut buf.primary_buffer, &mut self.primary_output).await;
+        for (key, buf) in &mut buf.named_buffers {
+            send_inner(
+                buf,
+                self.named_outputs.get_mut(key).expect("unknown output"),
+            )
+            .await;
+        }
+    }
+}
+
+async fn send_inner(buf: &mut Vec<Event>, output: &mut Fanout) {
+    for event in buf.drain(..) {
+        output.feed(event).await.expect("unit error");
+    }
+}
+
+pub struct TransformOutputsBuf {
+    primary_buffer: Vec<Event>,
+    named_buffers: HashMap<String, Vec<Event>>,
+}
+
+impl TransformOutputsBuf {
+    pub fn new_with_capacity(named_outputs_in: Vec<String>, capacity: usize) -> Self {
+        Self {
+            primary_buffer: Vec::with_capacity(capacity),
+            named_buffers: named_outputs_in
+                .into_iter()
+                .map(|k| (k, Vec::new()))
+                .collect(),
+        }
     }
 
     pub fn push(&mut self, event: Event) {
@@ -249,26 +281,9 @@ impl TransformOutputs {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
-
-    pub async fn flush(&mut self) {
-        flush_inner(&mut self.primary_buffer, &mut self.primary_output).await;
-        for (key, buf) in &mut self.named_buffers {
-            flush_inner(
-                buf,
-                self.named_outputs.get_mut(key).expect("unknown output"),
-            )
-            .await;
-        }
-    }
 }
 
-async fn flush_inner(buf: &mut Vec<Event>, output: &mut Fanout) {
-    for event in buf.drain(..) {
-        output.feed(event).await.expect("unit error");
-    }
-}
-
-impl ByteSizeOf for TransformOutputs {
+impl ByteSizeOf for TransformOutputsBuf {
     fn allocated_bytes(&self) -> usize {
         self.primary_buffer.size_of()
             + self

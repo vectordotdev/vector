@@ -7,7 +7,7 @@ use crate::{
     config,
     event::{Event, Value},
     topology::builder::load_enrichment_tables,
-    transforms::{Transform, TransformOutputs},
+    transforms::{Transform, TransformOutputsBuf},
 };
 use indexmap::IndexMap;
 use std::collections::HashMap;
@@ -147,7 +147,7 @@ fn walk(
                 transforms.insert(key, target);
             }
             Transform::Synchronous(ref mut t) => {
-                let (mut outputs, _) = TransformOutputs::new_with_capacity(
+                let mut outputs = TransformOutputsBuf::new_with_capacity(
                     target.config.named_outputs(),
                     inputs.len(),
                 );
