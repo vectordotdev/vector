@@ -10,6 +10,7 @@ license = "MPL-2.0"
 vrl = { path = "../core" }
 lookup_lib = {package = "lookup", path = "../../lookup" }
 datadog-search-syntax = { path = "../../datadog/search-syntax", optional = true }
+datadog-filter = { path = "../../datadog/filter", optional = true }
 datadog-grok = { path = "../../datadog/grok", optional = true }
 
 base64 = { version = "0.13", optional = true }
@@ -41,7 +42,6 @@ uuid = { version = "0.8", features = ["v4"], optional = true }
 roxmltree = { version = "0.14.1", optional = true }
 woothee = { version = "0.13.0", optional = true }
 uaparser = { version = "0.4.0", optional = true }
-cached = { version = "0.26.2", optional = true }
 
 [dev-dependencies]
 anyhow = "1"
@@ -226,7 +226,7 @@ log = ["tracing"]
 match = ["regex"]
 match_any = ["regex"]
 match_array = ["regex"]
-match_datadog_query = ["datadog-search-syntax", "lazy_static", "regex", "cached"]
+match_datadog_query = ["datadog-search-syntax", "datadog-filter", "lazy_static", "regex"]
 md5 = ["md-5", "hex"]
 merge = []
 now = ["chrono"]
