@@ -115,7 +115,7 @@ struct VrlFilter;
 impl Resolver for VrlFilter {
     type IntoIter = Vec<Field>;
 
-    fn build_fields(&self, attr: impl AsRef<str>) -> Self::IntoIter {
+    fn build_fields(&self, attr: &str) -> Self::IntoIter {
         normalize_fields(attr).into_iter().collect::<Vec<_>>()
     }
 }

@@ -9,5 +9,5 @@ pub trait Resolver {
     /// Builds fields, and returns an iterator. Takes a immutable ref to self to allow for
     /// recursion when building filters. A type that implements `Resolver` + `Filter` and needs
     /// to update an internal cache when building fields should use interior mutability.
-    fn build_fields(&self, attr: impl AsRef<str>) -> Self::IntoIter;
+    fn build_fields(&self, attr: &str) -> Self::IntoIter;
 }
