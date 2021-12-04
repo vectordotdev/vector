@@ -1951,7 +1951,7 @@ dependencies = [
  "serde_json",
  "shared",
  "snafu",
- "strum_macros 0.22.0",
+ "strum_macros 0.23.1",
  "thiserror",
  "tracing 0.1.29",
  "vrl-compiler",
@@ -6924,13 +6924,14 @@ dependencies = [
 
 [[package]]
 name = "strum_macros"
-version = "0.22.0"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "339f799d8b549e3744c7ac7feb216383e4005d94bdb22561b3ab8f3b808ae9fb"
+checksum = "5bb0dc7ee9c15cea6199cde9a127fa16a4c5819af85395457ad72d68edc85a38"
 dependencies = [
  "heck",
  "proc-macro2 1.0.30",
  "quote 1.0.10",
+ "rustversion",
  "syn 1.0.80",
 ]
 
@@ -7372,9 +7373,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.6.8"
+version = "0.6.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08d3725d3efa29485e87311c5b699de63cde14b00ed4d256b8318aa30ca452cd"
+checksum = "9e99e1983e5d376cd8eb4b66604d2e99e79f5bd988c3055891dcd8c9e2604cc0"
 dependencies = [
  "bytes 1.1.0",
  "futures-core",
