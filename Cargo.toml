@@ -183,7 +183,7 @@ gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "2.10.4", default-features = false, optional = true, features = ["chrono"] }
+async-graphql = { version = "3.0.11", default-features = false, optional = true, features = ["chrono"] }
 async-graphql-warp = { version = "2.10.4", default-features = false, optional = true }
 itertools = { version = "0.10.1", default-features = false, optional = true }
 
@@ -284,7 +284,7 @@ syslog = { version = "5.0.0", default-features = false, optional = true }
 syslog_loose = { version = "0.16.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.4", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = { version = "0.5.8", default-features = false }
-typetag = { version = "0.1.7", default-features = false }
+typetag = { version = "0.1.8", default-features = false }
 twox-hash = { version = "1.6.1", default-features = false }
 url = { version = "2.2.2", default-features = false, features = ["serde"] }
 uuid = { version = "0.8.2", default-features = false, features = ["serde", "v4"], optional = true }

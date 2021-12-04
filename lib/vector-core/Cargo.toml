@@ -6,7 +6,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-async-graphql = { version = "2.10.4", default-features = false, optional = true }
+async-graphql = { version = "3.0.11", default-features = false, optional = true }
 async-trait = { version = "0.1", default-features = false }
 atomig = { version = "0.3.2", features = ["derive", "serde"] }
 buffers = { path = "buffers", default-features = false }
@@ -52,7 +52,7 @@ tracing = { version = "0.1.29", default-features = false }
 tracing-core = { version = "0.1.21", default-features = false }
 tracing-log = { version = "0.1.2", default-features = false }
 tracing-subscriber = { version = "0.2.25", default-features = false }
-typetag = { version = "0.1.7", default-features = false }
+typetag = { version = "0.1.8", default-features = false }
 twox-hash = { version = "1.6.1", default-features = false }
 vrl-core = { package = "vrl", path = "../vrl/core", optional = true }
 
