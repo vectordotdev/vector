@@ -3811,9 +3811,9 @@ dependencies = [
 
 [[package]]
 name = "luajit-src"
-version = "210.2.0+resty5f13855"
+version = "210.3.2+resty1085a4d"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49f85722ea9e022305a077b916c9271011a195ee8dc9b2b764fc78b0378e3b72"
+checksum = "b1e27456f513225a9edd22fc0a5f526323f6adb3099c4de87a84ceb842d93ba4"
 dependencies = [
  "cc",
 ]
@@ -4106,9 +4106,9 @@ dependencies = [
 
 [[package]]
 name = "mlua"
-version = "0.6.6"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4235d7e740d73d7429df6f176c81b248f05c39d67264d45a7d8cecb67c227f6f"
+checksum = "871831bd7c53c48b85db47a03e5974915679a91ddd5f897dece6ce030e5191d2"
 dependencies = [
  "bstr",
  "cc",
@@ -4117,6 +4117,7 @@ dependencies = [
  "num-traits",
  "once_cell",
  "pkg-config",
+ "rustc-hash",
 ]
 
 [[package]]
