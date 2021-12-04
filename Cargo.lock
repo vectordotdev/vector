@@ -897,7 +897,7 @@ dependencies = [
  "lazy_static",
  "lazycell",
  "log",
- "peeking_take_while",
+ "peeking_take_while 0.1.2",
  "proc-macro2 1.0.30",
  "quote 1.0.10",
  "regex",
@@ -1900,7 +1900,7 @@ dependencies = [
  "lookup",
  "onig",
  "ordered-float",
- "peeking_take_while",
+ "peeking_take_while 1.0.0",
  "percent-encoding",
  "regex",
  "serde",
@@ -4747,6 +4747,12 @@ name = "peeking_take_while"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19b17cddbe7ec3f8bc800887bab5e717348c95ea2ca0b1bf0837fb964dc67099"
+
+[[package]]
+name = "peeking_take_while"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e9ed2178b0575fff8e1b83b58ba6f75e727aafac2e1b6c795169ad3b17eb518"
 
 [[package]]
 name = "pem"
