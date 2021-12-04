@@ -897,7 +897,7 @@ dependencies = [
  "lazy_static",
  "lazycell",
  "log",
- "peeking_take_while",
+ "peeking_take_while 0.1.2",
  "proc-macro2 1.0.30",
  "quote 1.0.10",
  "regex",
@@ -1900,7 +1900,7 @@ dependencies = [
  "lookup",
  "onig",
  "ordered-float",
- "peeking_take_while",
+ "peeking_take_while 1.0.0",
  "percent-encoding",
  "regex",
  "serde",
@@ -3374,6 +3374,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "inventory"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1367fed6750ff2a5bcb967a631528303bb85631f167a75eb1bf7762d57eb7678"
+dependencies = [
+ "ctor",
+ "ghost",
+]
+
+[[package]]
 name = "inventory-impl"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4731,6 +4741,12 @@ name = "peeking_take_while"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19b17cddbe7ec3f8bc800887bab5e717348c95ea2ca0b1bf0837fb964dc67099"
+
+[[package]]
+name = "peeking_take_while"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e9ed2178b0575fff8e1b83b58ba6f75e727aafac2e1b6c795169ad3b17eb518"
 
 [[package]]
 name = "pem"
@@ -7725,22 +7741,22 @@ checksum = "b63708a265f51345575b27fe43f9500ad611579e764c79edbc2037b1121959ec"
 
 [[package]]
 name = "typetag"
-version = "0.1.7"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "422619e1a7299befb977a1f6d8932c499f6151dbcafae715193570860cae8f07"
+checksum = "4080564c5b2241b5bff53ab610082234e0c57b0417f4bd10596f183001505b8a"
 dependencies = [
  "erased-serde",
- "inventory",
- "lazy_static",
+ "inventory 0.2.0",
+ "once_cell",
  "serde",
  "typetag-impl",
 ]
 
 [[package]]
 name = "typetag-impl"
-version = "0.1.7"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "504f9626fe6cc1c376227864781996668e15c1ff251d222f63ef17f310bf1fec"
+checksum = "e60147782cc30833c05fba3bab1d9b5771b2685a2557672ac96fa5d154099c0e"
 dependencies = [
  "proc-macro2 1.0.30",
  "quote 1.0.10",
@@ -7979,7 +7995,7 @@ dependencies = [
  "indexmap",
  "indoc",
  "infer 0.5.0",
- "inventory",
+ "inventory 0.1.10",
  "itertools",
  "k8s-openapi",
  "lazy_static",
