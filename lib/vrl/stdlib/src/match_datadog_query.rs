@@ -121,8 +121,8 @@ impl Resolver for VrlFilter {
 }
 
 /// Implements `Filter`, which provides methods for matching against (in this case) VRL values.
-impl<'a> Filter<'a, Value> for VrlFilter {
-    fn exists(&'a self, field: Field) -> Box<dyn Matcher<Value>> {
+impl Filter<Value> for VrlFilter {
+    fn exists(&self, field: Field) -> Box<dyn Matcher<Value>> {
         let buf = lookup_field(&field);
 
         match field {
@@ -157,7 +157,7 @@ impl<'a> Filter<'a, Value> for VrlFilter {
         }
     }
 
-    fn equals(&'a self, field: Field, to_match: &str) -> Box<dyn Matcher<Value>> {
+    fn equals(&self, field: Field, to_match: &str) -> Box<dyn Matcher<Value>> {
         let buf = lookup_field(&field);
 
         match field {
@@ -211,7 +211,7 @@ impl<'a> Filter<'a, Value> for VrlFilter {
         }
     }
 
-    fn prefix(&'a self, field: Field, prefix: &str) -> Box<dyn Matcher<Value>> {
+    fn prefix(&self, field: Field, prefix: &str) -> Box<dyn Matcher<Value>> {
         let buf = lookup_field(&field);
 
         match field {
@@ -250,7 +250,7 @@ impl<'a> Filter<'a, Value> for VrlFilter {
         }
     }
 
-    fn wildcard(&'a self, field: Field, wildcard: &str) -> Box<dyn Matcher<Value>> {
+    fn wildcard(&self, field: Field, wildcard: &str) -> Box<dyn Matcher<Value>> {
         let buf = lookup_field(&field);
 
         match field {
@@ -285,7 +285,7 @@ impl<'a> Filter<'a, Value> for VrlFilter {
     }
 
     fn compare(
-        &'a self,
+        &self,
         field: Field,
         comparator: Comparison,
         comparison_value: ComparisonValue,

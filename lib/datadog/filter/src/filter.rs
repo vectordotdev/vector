@@ -7,22 +7,22 @@ use std::fmt::Debug;
 /// function. Each method returns a heap-allocated `Matcher<V>` (typically a closure) containing
 /// logic to determine whether the value matches the filter. A filter is intended to be side-effect
 /// free and idempotent, and so only receives an immutable reference to self.
-pub trait Filter<'a, V: Debug + Send + Sync + Clone + 'static>: DynClone {
+pub trait Filter<V: Debug + Send + Sync + Clone + 'static>: DynClone {
     /// Determine whether a field value exists.
-    fn exists(&'a self, field: Field) -> Box<dyn Matcher<V>>;
+    fn exists(&self, field: Field) -> Box<dyn Matcher<V>>;
 
     /// Determine whether a field value equals `to_match`.
-    fn equals(&'a self, field: Field, to_match: &str) -> Box<dyn Matcher<V>>;
+    fn equals(&self, field: Field, to_match: &str) -> Box<dyn Matcher<V>>;
 
     /// Determine whether a value starts with a prefix.
-    fn prefix(&'a self, field: Field, prefix: &str) -> Box<dyn Matcher<V>>;
+    fn prefix(&self, field: Field, prefix: &str) -> Box<dyn Matcher<V>>;
 
     /// Determine whether a value matches a wilcard.
-    fn wildcard(&'a self, field: Field, wildcard: &str) -> Box<dyn Matcher<V>>;
+    fn wildcard(&self, field: Field, wildcard: &str) -> Box<dyn Matcher<V>>;
 
     /// Compare a field value against `comparison_value`, using one of the `comparator` operators.
     fn compare(
-        &'a self,
+        &self,
         field: Field,
         comparator: Comparison,
         comparison_value: ComparisonValue,
@@ -31,7 +31,7 @@ pub trait Filter<'a, V: Debug + Send + Sync + Clone + 'static>: DynClone {
     /// Determine whether a field value falls within a range. By default, this will use
     /// `self.compare` on both the lower and upper bound.
     fn range(
-        &'a self,
+        &self,
         field: Field,
         lower: ComparisonValue,
         lower_inclusive: bool,
@@ -85,4 +85,4 @@ pub trait Filter<'a, V: Debug + Send + Sync + Clone + 'static>: DynClone {
     }
 }
 
-clone_trait_object!(<V>Filter<'_, V>);
+clone_trait_object!(<V>Filter<V>);

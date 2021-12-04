@@ -94,10 +94,10 @@ where
 /// returns a `Matcher<V>` which is intended to be invoked at runtime. `F` should implement both
 /// `Fielder` + `Filter` in order to applying any required caching which may affect the operation
 /// of a filter method. This function is intended to be used at boot-time and NOT in a hot path!
-pub fn build_matcher<'a, V, F>(node: &'a QueryNode, filter: &'a F) -> Box<dyn Matcher<V>>
+pub fn build_matcher<V, F>(node: &QueryNode, filter: &F) -> Box<dyn Matcher<V>>
 where
     V: fmt::Debug + Send + Sync + Clone + 'static,
-    F: Filter<'a, V> + Resolver,
+    F: Filter<V> + Resolver,
 {
     match node {
         QueryNode::MatchNoDocs => Box::new(false),
@@ -107,7 +107,7 @@ where
                 .build_fields(attr)
                 .into_iter()
                 .map(|field| filter.exists(field))
-                .collect::<Vec<_>>();
+                .collect();
 
             any(matchers)
         }
@@ -116,7 +116,7 @@ where
                 .build_fields(attr)
                 .into_iter()
                 .map(|field| not(filter.exists(field)))
-                .collect::<Vec<_>>();
+                .collect();
 
             all(matchers)
         }
@@ -129,7 +129,7 @@ where
                 .build_fields(attr)
                 .into_iter()
                 .map(|field| filter.equals(field, value))
-                .collect::<Vec<_>>();
+                .collect();
 
             any(matchers)
         }
@@ -138,7 +138,7 @@ where
                 .build_fields(attr)
                 .into_iter()
                 .map(|field| filter.prefix(field, prefix))
-                .collect::<Vec<_>>();
+                .collect();
 
             any(matchers)
         }
@@ -147,7 +147,7 @@ where
                 .build_fields(attr)
                 .into_iter()
                 .map(|field| filter.wildcard(field, wildcard))
-                .collect::<Vec<_>>();
+                .collect();
 
             any(matchers)
         }
@@ -160,7 +160,7 @@ where
                 .build_fields(attr)
                 .into_iter()
                 .map(|field| filter.compare(field, *comparator, value.clone()))
-                .collect::<Vec<_>>();
+                .collect();
 
             any(matchers)
         }
@@ -183,7 +183,7 @@ where
                         *upper_inclusive,
                     )
                 })
-                .collect::<Vec<_>>();
+                .collect();
 
             any(matchers)
         }
@@ -192,7 +192,7 @@ where
             let funcs = nodes
                 .iter()
                 .map(|node| build_matcher(node, filter))
-                .collect::<Vec<_>>();
+                .collect();
 
             match oper {
                 BooleanType::And => all(funcs),
