@@ -3374,6 +3374,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "inventory"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1367fed6750ff2a5bcb967a631528303bb85631f167a75eb1bf7762d57eb7678"
+dependencies = [
+ "ctor",
+ "ghost",
+]
+
+[[package]]
 name = "inventory-impl"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4084,9 +4094,9 @@ checksum = "717e29a243b81f8130e31e24e04fb151b04a44b5a7d05370935f7d937e9de06d"
 
 [[package]]
 name = "mongodb"
-version = "2.0.1"
+version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d419667771704b002e6837d52f7461f70cea853f58c077d299f132ed6f75b2ad"
+checksum = "a2ac4ac0fb3a154a59e47cf202e41060e8af93d16b84434cea0755a845da9bd1"
 dependencies = [
  "async-trait",
  "base64 0.13.0",
@@ -7725,22 +7735,22 @@ checksum = "b63708a265f51345575b27fe43f9500ad611579e764c79edbc2037b1121959ec"
 
 [[package]]
 name = "typetag"
-version = "0.1.7"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "422619e1a7299befb977a1f6d8932c499f6151dbcafae715193570860cae8f07"
+checksum = "4080564c5b2241b5bff53ab610082234e0c57b0417f4bd10596f183001505b8a"
 dependencies = [
  "erased-serde",
- "inventory",
- "lazy_static",
+ "inventory 0.2.0",
+ "once_cell",
  "serde",
  "typetag-impl",
 ]
 
 [[package]]
 name = "typetag-impl"
-version = "0.1.7"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "504f9626fe6cc1c376227864781996668e15c1ff251d222f63ef17f310bf1fec"
+checksum = "e60147782cc30833c05fba3bab1d9b5771b2685a2557672ac96fa5d154099c0e"
 dependencies = [
  "proc-macro2 1.0.30",
  "quote 1.0.10",
@@ -7979,7 +7989,7 @@ dependencies = [
  "indexmap",
  "indoc",
  "infer 0.5.0",
- "inventory",
+ "inventory 0.1.10",
  "itertools",
  "k8s-openapi",
  "lazy_static",
