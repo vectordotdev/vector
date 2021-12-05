@@ -31,7 +31,7 @@ components: transforms: throttle: {
 				The set of logical conditions to exclude events from rate limiting.
 				"""
 			required: false
-			type: condition: syntaxes: [{name: "vrl"}]
+			type: condition: {}
 		}
 		key_field: {
 			common: false

@@ -31,14 +31,7 @@ components: transforms: filter: {
 				forwarded; messages that don't pass are dropped.
 				"""
 			required: true
-			type: condition: {
-				syntaxes: [{
-					name: "vrl"
-				},
-					{
-						name: "datadog_search"
-					}]
-			}
+			type: condition: {}
 		}
 	}
 

@@ -101,7 +101,9 @@
         </div>
 
         <div class="my-4 ml-2">
-          {{ partial "heading.html" (dict "text" "Available syntaxes" "level" 3 "icon" false "toc_hide" true) }}
+          <span>
+            {{ partial "heading.html" (dict "text" "Available syntaxes" "level" 3 "icon" false "toc_hide" true) }}
+          </span>
 
           <table class="table-auto">
             <thead>
@@ -136,15 +138,15 @@
             </tbody>
           </table>
 
-          {{ with $v.shorthand_explainer }}
-          <div class="py-2 px-3 border rounded border-green-500">
-            {{ partial "heading.html" (dict "text" .title "level" 3 "icon" false "toc_hide" true) }}
+          <div class="py-3 px-5 border rounded-md border-green-500">
+            <span>
+              {{ partial "heading.html" (dict "text" $v.shorthand_explainer.title "level" 3 "icon" false "toc_hide" true) }}
+            </span>
 
             <div class="mt-2 prose dark:prose-dark max-w-none">
-              {{ .description | markdownify }}
+              {{ $v.shorthand_explainer.description | markdownify }}
             </div>
           </div>
-          {{ end }}
         </div>
       </div>
       {{ end }}
