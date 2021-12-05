@@ -105,11 +105,10 @@ impl HttpSource for DatadogLogsSource {
             return Ok(Vec::new());
         }
 
-        let api_key = filter_api_key(
-            extract_api_key(&header_map, request_path),
-            self.drop_invalid_api_key,
-            &self.valid_api_keys,
-        );
+        let api_key = extract_api_key(&header_map, request_path);
+        if self.drop_invalid_api_key && !is_valid(&api_key, &self.valid_api_keys) {
+            return Ok(Vec::new());
+        }
 
         decode_body(body, Encoding::Json).map(|mut events| {
             // Add source type & Datadog API key
@@ -117,8 +116,11 @@ impl HttpSource for DatadogLogsSource {
             for event in events.iter_mut() {
                 let log = event.as_mut_log();
                 log.try_insert(key, Bytes::from("datadog_logs"));
-                if let Some(k) = &api_key {
-                    log.insert("dd_api_key", k.clone());
+                if self.drop_invalid_api_key {
+                    if let Some(k) = &api_key {
+                        // k must be valid here
+                        log.insert("dd_api_key", k.clone());
+                    }
                 }
             }
             events
@@ -136,13 +138,11 @@ fn extract_api_key<'a>(headers: &'a HeaderMap, path: &'a str) -> Option<String> 
         .map(str::to_owned)
 }
 
-fn filter_api_key(api_key: Option<String>, drop_invalid_api_keys: bool, valid_api_keys: &Vec<String>) -> Option<String> {
-    if let Some(ref key) = api_key {
-        if drop_invalid_api_keys && !valid_api_keys.is_empty() && !valid_api_keys.contains(key) {
-            return None;
-        }
+fn is_valid(api_key: &Option<String>, valid_api_keys: &Vec<String>) -> bool {
+    if let Some(ref k) = api_key {
+        return valid_api_keys.is_empty() || valid_api_keys.contains(k);
     }
-    api_key
+    true
 }
 
 #[cfg(test)]
@@ -291,7 +291,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn invalid_api_key_in_url_to_drop() {
+    async fn drop_event_with_invalid_api_key() {
         trace_init();
         let (rx, addr) = source(true, Some(vec!["val".to_owned()])).await;
 
@@ -299,18 +299,30 @@ mod tests {
             200,
             send_with_path(
                 addr,
-                r#"[{"message":"bar", "timestamp": 456}]"#,
+                r#"[{"message":"bar", "timestamp": 12}]"#,
                 HeaderMap::new(),
                 "/v1/input/12345678abcdefgh12345678abcdefgh"
             )
                 .await
         );
 
+        assert_eq!(
+            200,
+            send_with_path(
+                addr,
+                r#"[{"message":"bar", "timestamp": 34}]"#,
+                HeaderMap::new(),
+                "/v1/input/val"
+            )
+                .await
+        );
+
         let mut events = collect_n(rx, 1).await;
         {
-            let event = events.remove(0);
-            let log = event.as_log();
-            assert!(log.get("dd_api_key").is_none());
+            let first_event = events.remove(0);
+            let first_event_log = first_event.as_log();
+            assert_eq!(first_event_log["timestamp"], 34.into());
+            assert_eq!(first_event_log["dd_api_key"], "val".into());
         }
     }
 
@@ -334,37 +346,7 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log["dd_api_key"], "12345678abcdefgh12345678abcdefgh".into());
-        }
-    }
-
-    #[tokio::test]
-    async fn valid_api_key_in_header() {
-        trace_init();
-        let (rx, addr) = source(true, Some(vec!["12345678abcdefgh12345678abcdefgh".to_owned()])).await;
-
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            "dd-api-key",
-            "12345678abcdefgh12345678abcdefgh".parse().unwrap(),
-        );
-
-        assert_eq!(
-            200,
-            send_with_path(
-                addr,
-                r#"[{"message":"baz", "timestamp": 789}]"#,
-                headers,
-                "/v1/input/"
-            )
-                .await
-        );
-
-        let mut events = collect_n(rx, 1).await;
-        {
-            let event = events.remove(0);
-            let log = event.as_log();
-            assert_eq!(log["dd_api_key"], "12345678abcdefgh12345678abcdefgh".into());
+            assert!(log.get("dd_api_key").is_none());
         }
     }
 }

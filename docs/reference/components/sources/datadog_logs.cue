@@ -63,6 +63,16 @@ components: sources: datadog_logs: {
 
 	configuration: {
 		address: sources.http.configuration.address
+		drop_invalid_api_key: {
+			description: """
+				The flag to indicate whether to drop the event with an invalid dd_api_key.
+				If the event has no dd_api_key set, then the event would never be dropped.
+				"""
+			required: true
+			type: bool: {
+				default: false
+			}
+		}
 	}
 
 	output: logs: line: {
