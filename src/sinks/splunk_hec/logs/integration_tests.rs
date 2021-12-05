@@ -2,7 +2,10 @@ use crate::{
     config::{SinkConfig, SinkContext},
     sinks::{
         splunk_hec::{
-            common::integration_test_helpers::get_token,
+            common::{
+                acknowledgements::HecClientAcknowledgementsConfig,
+                integration_test_helpers::get_token,
+            },
             logs::{config::HecSinkLogsConfig, encoder::HecLogsEncoder},
         },
         util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
@@ -13,13 +16,14 @@ use crate::{
 };
 use futures::stream;
 use serde_json::Value as JsonValue;
-use std::convert::TryFrom;
 use std::future::ready;
+use std::{convert::TryFrom, num::NonZeroU8, sync::Arc};
 use tokio::time::{sleep, Duration};
 use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
 const USERNAME: &str = "admin";
 const PASSWORD: &str = "password";
+const ACK_TOKEN: &str = "ack-token";
 
 async fn recent_entries(index: Option<&str>) -> Vec<JsonValue> {
     let client = reqwest::Client::builder()
@@ -64,6 +68,26 @@ async fn find_entry(message: &str) -> serde_json::value::Value {
     panic!("Didn't find event in Splunk");
 }
 
+async fn find_entries(messages: &[String]) -> bool {
+    let mut found_all = false;
+    for _ in 0..20 {
+        let entries = recent_entries(None).await;
+
+        found_all = messages.iter().all(|message| {
+            entries
+                .iter()
+                .any(|entry| entry["_raw"].as_str().unwrap().contains(message.as_str()))
+        });
+
+        if found_all {
+            break;
+        }
+
+        sleep(Duration::from_millis(200)).await;
+    }
+    found_all
+}
+
 async fn config(
     encoding: impl Into<EncodingConfig<HecLogsEncoder>>,
     indexed_fields: Vec<String>,
@@ -84,6 +108,8 @@ async fn config(
         batch,
         request: TowerRequestConfig::default(),
         tls: None,
+        acknowledgements: Default::default(),
+        timestamp_nanos_key: None,
     }
 }
 
@@ -193,24 +219,7 @@ async fn splunk_insert_many() {
     let (messages, events) = random_lines_with_stream(100, 10, None);
     components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
 
-    let mut found_all = false;
-    for _ in 0..20 {
-        let entries = recent_entries(None).await;
-
-        found_all = messages.iter().all(|message| {
-            entries
-                .iter()
-                .any(|entry| entry["_raw"].as_str().unwrap() == message)
-        });
-
-        if found_all {
-            break;
-        }
-
-        sleep(Duration::from_millis(100)).await;
-    }
-
-    assert!(found_all);
+    assert!(find_entries(messages.as_slice()).await);
 }
 
 #[tokio::test]
@@ -305,4 +314,48 @@ async fn splunk_configure_hostname() {
     assert_eq!("hello", asdf);
     let host = entry["host"].as_array().unwrap()[0].as_str().unwrap();
     assert_eq!("beef.example.com:1234", host);
+}
+
+#[tokio::test]
+async fn splunk_indexer_acknowledgements() {
+    let cx = SinkContext::new_test();
+
+    let acknowledgements_config = HecClientAcknowledgementsConfig {
+        query_interval: NonZeroU8::new(1).unwrap(),
+        retry_limit: NonZeroU8::new(5).unwrap(),
+        ..Default::default()
+    };
+
+    let config = HecSinkLogsConfig {
+        token: String::from(ACK_TOKEN),
+        acknowledgements: acknowledgements_config,
+        ..config(HecLogsEncoder::Json, vec!["asdf".to_string()]).await
+    };
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let (tx, mut rx) = BatchNotifier::new_with_receiver();
+    let (messages, events) = random_lines_with_stream(100, 10, Some(Arc::clone(&tx)));
+    drop(tx);
+    components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+
+    assert_eq!(rx.try_recv(), Ok(BatchStatus::Delivered));
+    assert!(find_entries(messages.as_slice()).await);
+}
+
+#[tokio::test]
+async fn splunk_indexer_acknowledgements_disabled_on_server() {
+    let cx = SinkContext::new_test();
+
+    let config = config(HecLogsEncoder::Json, vec!["asdf".to_string()]).await;
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let (tx, mut rx) = BatchNotifier::new_with_receiver();
+    let (messages, events) = random_lines_with_stream(100, 10, Some(Arc::clone(&tx)));
+    drop(tx);
+    components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+
+    // With indexer acknowledgements disabled on the server, events are still
+    // acknowledged based on 200 OK
+    assert_eq!(rx.try_recv(), Ok(BatchStatus::Delivered));
+    assert!(find_entries(messages.as_slice()).await);
 }

@@ -10,7 +10,7 @@ use crate::{
     internal_events::SyslogEventReceived,
     internal_events::SyslogUdpReadError,
     shutdown::ShutdownSignal,
-    sources::util::{SocketListenAddr, TcpSource},
+    sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
     udp, Pipeline,
@@ -115,8 +115,8 @@ impl SourceConfig for SyslogConfig {
                     shutdown_secs,
                     tls,
                     receive_buffer_bytes,
-                    cx.shutdown,
-                    cx.out,
+                    cx,
+                    false.into(),
                 )
             }
             Mode::Udp {
@@ -178,6 +178,7 @@ impl TcpSource for SyslogTcpSource {
     type Error = codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
     type Decoder = codecs::Decoder;
+    type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
         codecs::Decoder::new(
@@ -188,6 +189,10 @@ impl TcpSource for SyslogTcpSource {
 
     fn handle_events(&self, events: &mut [Event], host: Bytes, byte_size: usize) {
         handle_events(events, &self.host_key, Some(host), byte_size);
+    }
+
+    fn build_acker(&self, _: &Self::Item) -> Self::Acker {
+        TcpNullAcker
     }
 }
 

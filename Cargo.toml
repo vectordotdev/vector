@@ -91,6 +91,7 @@ members = [
   "lib/vrl/proptests",
   "lib/datadog/grok",
   "lib/datadog/search-syntax",
+  "lib/datadog/filter",
   "lib/soak"
 ]
 
@@ -166,15 +167,15 @@ serde_bytes = { version = "0.11.5", default-features = false, features = ["std"]
 serde_json = { version = "1.0.68", default-features = false, features = ["raw_value"] }
 serde_yaml = { version = "0.8.21", default-features = false }
 serde_with = { version = "1.11.0", default-features = false, features = ["macros"] }
-serde-toml-merge = { version = "0.2.0", default-features = false }
+serde-toml-merge = { version = "0.3.0", default-features = false }
 
 # Messagepack
 rmp-serde = { version = "0.15.5", default-features = false, optional = true }
 rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"], optional = true }
 
 # Prost
-prost = { version = "0.8", default-features = false, features = ["std"]  }
-prost-types = { version = "0.8", default-features = false }
+prost = { version = "0.9", default-features = false, features = ["std"]  }
+prost-types = { version = "0.9", default-features = false }
 
 # GCP
 goauth = { version = "0.10.0", default-features = false, optional = true }
@@ -250,8 +251,8 @@ lru = { version = "0.7.0", default-features = false, optional = true }
 maxminddb = { version = "0.21.0", default-features = false, optional = true }
 md-5 = { version = "0.9", optional = true }
 # make sure to update the external docs when the Lua version changes
-mlua = { version = "0.6.6", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
-mongodb = { version = "2.0.1", default-features = false, features = ["tokio-runtime"], optional = true }
+mlua = { version = "0.7.0", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mongodb = { version = "2.0.2", default-features = false, features = ["tokio-runtime"], optional = true }
 async-nats = { version = "0.10.1", default-features = false, optional = true }
 nom = { version = "7.1.0", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
@@ -283,13 +284,13 @@ syslog = { version = "5.0.0", default-features = false, optional = true }
 syslog_loose = { version = "0.16.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.4", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = { version = "0.5.8", default-features = false }
-typetag = { version = "0.1.7", default-features = false }
+typetag = { version = "0.1.8", default-features = false }
 twox-hash = { version = "1.6.1", default-features = false }
 url = { version = "2.2.2", default-features = false, features = ["serde"] }
 uuid = { version = "0.8.2", default-features = false, features = ["serde", "v4"], optional = true }
 warp = { version = "0.3.1", default-features = false, optional = true }
 zstd = { version = "0.6", default-features = false, optional = true }
-tonic = { version = "0.5", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls"] }
+tonic = { version = "0.6", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls"] }
 data-encoding = { version = "2.2", default-features = false, features = ["std"], optional = true }
 trust-dns-proto = { version = "0.20", features = ["dnssec"], optional = true }
 
@@ -305,8 +306,8 @@ atty = "0.2.14"
 nix = "0.22.2"
 
 [build-dependencies]
-prost-build = { version = "0.8", optional = true }
-tonic-build = { version = "0.5", default-features = false, features = ["transport", "prost"], optional = true }
+prost-build = { version = "0.9", optional = true }
+tonic-build = { version = "0.6", default-features = false, features = ["transport", "prost"], optional = true }
 
 [dev-dependencies]
 approx = "0.5.0"
@@ -387,7 +388,7 @@ vendor-libz = ["libz-sys/static"]
 # transforms and sinks should depend on this feature.
 kubernetes = ["k8s-openapi", "evmap"]
 
-docker = ["bollard", "dirs-next"]
+docker = ["bollard", "dirs-next", "uuid"]
 
 # API
 api = [
@@ -471,7 +472,7 @@ sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = ["codecs"]
 sources-file = ["file-source"]
-sources-fluent = ["base64", "listenfd", "tokio-util/net", "rmpv", "rmp-serde", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "serde_bytes", "codecs"]
+sources-fluent = ["base64", "listenfd", "tokio-util/net", "rmpv", "rmp-serde", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "serde_bytes", "codecs", "uuid"]
 sources-demo_logs = ["fakedata", "codecs"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "codecs"]
 sources-host_metrics = ["heim"]
@@ -673,7 +674,7 @@ sinks-pulsar = ["avro-rs", "pulsar"]
 sinks-redis = ["redis"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
 sinks-socket = ["sinks-utils-udp"]
-sinks-splunk_hec = []
+sinks-splunk_hec = ["uuid"]
 sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
 sinks-vector = ["sinks-utils-udp", "tonic", "protobuf-build"]

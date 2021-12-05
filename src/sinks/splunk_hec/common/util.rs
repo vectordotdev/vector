@@ -1,19 +1,14 @@
-use std::num::NonZeroU64;
-
 use crate::{
     http::HttpClient,
     internal_events::TemplateRenderingFailed,
-    sinks::{
-        self,
-        util::{Compression, SinkBatchSettings},
-        UriParseError,
-    },
+    sinks::{self, util::SinkBatchSettings, UriParseError},
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use snafu::{ResultExt, Snafu};
+use std::num::NonZeroU64;
 use vector_core::{config::proxy::ProxyConfig, event::EventRef};
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -63,25 +58,6 @@ pub async fn build_healthcheck(
     }
 }
 
-pub async fn build_request(
-    endpoint: &str,
-    token: &str,
-    compression: Compression,
-    events: Vec<u8>,
-) -> crate::Result<Request<Vec<u8>>> {
-    let uri = build_uri(endpoint, "/services/collector/event").context(UriParseError)?;
-
-    let mut builder = Request::post(uri)
-        .header("Content-Type", "application/json")
-        .header("Authorization", format!("Splunk {}", token));
-
-    if let Some(ce) = compression.content_encoding() {
-        builder = builder.header("Content-Encoding", ce);
-    }
-
-    builder.body(events).map_err(Into::into)
-}
-
 pub fn build_uri(host: &str, path: &str) -> Result<Uri, http::uri::InvalidUri> {
     format!("{}{}", host.trim_end_matches('/'), path).parse::<Uri>()
 }
@@ -117,7 +93,7 @@ mod tests {
     };
 
     use crate::sinks::{
-        splunk_hec::common::{build_healthcheck, build_request, create_client},
+        splunk_hec::common::{build_healthcheck, create_client, service::HttpRequestBuilder},
         util::Compression,
     };
 
@@ -204,9 +180,11 @@ mod tests {
         let token = "token";
         let compression = Compression::None;
         let events = "events".as_bytes().to_vec();
+        let http_request_builder =
+            HttpRequestBuilder::new(String::from(endpoint), String::from(token), compression);
 
-        let request = build_request(endpoint, token, compression, events.clone())
-            .await
+        let request = http_request_builder
+            .build_request(events.clone(), "/services/collector/event")
             .unwrap();
 
         assert_eq!(
@@ -235,9 +213,11 @@ mod tests {
         let token = "token";
         let compression = Compression::gzip_default();
         let events = "events".as_bytes().to_vec();
+        let http_request_builder =
+            HttpRequestBuilder::new(String::from(endpoint), String::from(token), compression);
 
-        let request = build_request(endpoint, token, compression, events.clone())
-            .await
+        let request = http_request_builder
+            .build_request(events.clone(), "/services/collector/event")
             .unwrap();
 
         assert_eq!(
@@ -269,9 +249,11 @@ mod tests {
         let token = "token";
         let compression = Compression::gzip_default();
         let events = "events".as_bytes().to_vec();
+        let http_request_builder =
+            HttpRequestBuilder::new(String::from(endpoint), String::from(token), compression);
 
-        let err = build_request(endpoint, token, compression, events.clone())
-            .await
+        let err = http_request_builder
+            .build_request(events, "/services/collector/event")
             .unwrap_err();
         assert_eq!(err.to_string(), "URI parse error: invalid format")
     }

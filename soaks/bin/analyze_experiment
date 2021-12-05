@@ -28,7 +28,7 @@ parser.add_argument('--warmup-seconds', type=int, help='the number of seconds to
 parser.add_argument('--baseline-sha', type=str, help='the sha of the baseline experiment')
 parser.add_argument('--comparison-sha', type=str, help='the sha of the comparison experiment')
 parser.add_argument('--vector-cpus', type=int, help='the total number of CPUs given to vector during the experiment')
-parser.add_argument('--p-value', type=float, default=0.05, help='the p-value for comparing with t-test results, the smaller the more certain')
+parser.add_argument('--p-value', type=float, default=0.1, help='the p-value for comparing with t-test results, the smaller the more certain')
 parser.add_argument('--mean-drift-percentage', type=float, default=8.87, help='the percentage of mean drift we allow in an experiment, expressed as a value from 0 to 100, default 9th percentile')
 args = parser.parse_args()
 
@@ -113,8 +113,13 @@ print("further 'skewness' is from 0.0 the more indication that vector lacks", en
 print("consistency in behavior, making predictions of fitness in the field challenging.")
 print("</details>")
 
+def confidence(p):
+    c = (1.0 - p) * 100
+    return "{confidence:.{digits}f}%".format(confidence=c, digits=2)
+
 p_value_violation = ttest_results['p-value'] < args.p_value
-changes = ttest_results[p_value_violation]
+changes = ttest_results[p_value_violation].copy(deep=True)
+changes['confidence'] = changes['p-value'].apply(confidence)
 changes = changes.drop(labels=['t-statistic', 'p-value', 'baseline mean',
                                'baseline stdev', 'comparison mean',
                                'baseline outlier percentage',
@@ -133,7 +138,7 @@ if len(changes) > 0:
     print(changes.to_markdown(index=False, tablefmt='github'))
 else:
     print("")
-    print("No statistically interesting changes with confidence {}%.".format((1.0 - args.p_value) * 100))
+    print("No statistically interesting changes with confidence {}.".format(confidence(args.p_value)))
 
 print("<details>")
 print("<summary>Fine details of change detection per experiment.</summary>")
