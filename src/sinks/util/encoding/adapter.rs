@@ -62,7 +62,7 @@ impl<
             + Clone,
     > EncodingConfigAdapter<LegacyEncodingConfig, Migrator>
 {
-    pub fn transformer(&'static self) -> Transformer {
+    pub fn transformer(&self) -> Transformer {
         match self {
             Self::Encoding(config) => {
                 let only_fields = config.encoding.as_ref().and_then(|encoding| {
@@ -93,7 +93,17 @@ impl<
                 }
             }
             Self::LegacyEncodingConfig(config, _) => Transformer {
-                only_fields: config.encoding.only_fields().clone(),
+                only_fields: config.encoding.only_fields().as_ref().map(|fields| {
+                    fields
+                        .into_iter()
+                        .map(|field| {
+                            field
+                                .into_iter()
+                                .map(|component| component.clone().into_static())
+                                .collect()
+                        })
+                        .collect()
+                }),
                 except_fields: config.encoding.except_fields().clone(),
                 timestamp_format: *config.encoding.timestamp_format(),
             },
