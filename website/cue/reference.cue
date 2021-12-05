@@ -384,8 +384,8 @@ _values: {
 	}
 
 	syntaxes: [#Syntax, ...#Syntax] & [
-		{
-			name: "vrl"
+			{
+			name:        "vrl"
 			description: """
 				A [Vector Remap Language](\(urls.vrl_reference)) (VRL) [Boolean
 				expression](\(urls.vrl_boolean_expression)).
@@ -393,10 +393,10 @@ _values: {
 			example:     #".status_code != 200 && !includes(["info", "debug"], .severity)"#
 		},
 		{
-			name: "datadog_search"
+			name:        "datadog_search"
 			description: "A [Datadog Search](\(urls.datadog_search_syntax)) query string."
 			example:     #"*stack"#
-		}
+		},
 	]
 
 	options: {
