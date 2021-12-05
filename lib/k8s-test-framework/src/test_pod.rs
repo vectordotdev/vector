@@ -42,8 +42,16 @@ impl up_down::CommandBuilder for CommandBuilder {
                 up_down::CommandToBuild::Down => "delete",
             })
             .arg("-f")
-            .arg(self.config.test_pod_resource_file.path())
-            .stdin(Stdio::null());
+            .arg(self.config.test_pod_resource_file.path());
+
+        if matches!(command_to_build, up_down::CommandToBuild::Down) {
+            // We don't need a graceful shutdown
+            command.arg("--force=true");
+            command.arg("--grace-period=0");
+            command.arg("--wait=false");
+        }
+
+        command.stdin(Stdio::null());
         command
     }
 }

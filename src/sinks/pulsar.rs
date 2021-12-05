@@ -1,5 +1,4 @@
 use crate::{
-    buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     internal_events::PulsarEncodeEventFailed,
@@ -17,6 +16,7 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+use vector_core::buffers::Acker;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -221,7 +221,7 @@ impl Sink<Event> for PulsarSink {
         );
 
         let message = encode_event(item, &self.encoding, &self.avro_schema).map_err(|e| {
-            emit!(PulsarEncodeEventFailed {
+            emit!(&PulsarEncodeEventFailed {
                 error: &*e.to_string()
             })
         })?;
@@ -300,7 +300,7 @@ fn encode_event(
             let resolved_value =
                 avro_rs::types::Value::resolve(value, avro_schema.as_ref().unwrap())?;
             avro_rs::to_avro_datum(
-                &avro_schema
+                avro_schema
                     .as_ref()
                     .expect("Avro encoding selected but no schema found. Please report this."),
                 resolved_value,
@@ -355,7 +355,7 @@ mod tests {
         evt.as_mut_log().insert("key", "value");
         let mut encoding = EncodingConfig::from(Encoding::Avro);
         encoding.schema = Some(raw_schema.to_string());
-        let schema = avro_rs::Schema::parse_str(&raw_schema).unwrap();
+        let schema = avro_rs::Schema::parse_str(raw_schema).unwrap();
         let result = encode_event(evt.clone(), &encoding, &Some(schema.clone())).unwrap();
 
         let value = avro_rs::to_value(evt.into_log()).unwrap();
@@ -403,7 +403,7 @@ mod integration_tests {
         trace_init();
 
         let num_events = 1_000;
-        let (_input, events) = random_lines_with_stream(100, num_events);
+        let (_input, events) = random_lines_with_stream(100, num_events, None);
 
         let topic = format!("test-{}", random_string(10));
         let cnf = PulsarSinkConfig {
@@ -423,6 +423,10 @@ mod integration_tests {
             .with_consumer_name("VectorTestConsumer")
             .with_subscription_type(SubType::Shared)
             .with_subscription("VectorTestSub")
+            .with_options(pulsar::consumer::ConsumerOptions {
+                read_compacted: Some(false),
+                ..Default::default()
+            })
             .build::<String>()
             .await
             .unwrap();

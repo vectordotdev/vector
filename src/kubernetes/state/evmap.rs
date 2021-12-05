@@ -1,6 +1,9 @@
 //! A state implementation backed by [`evmap`].
 
-use crate::kubernetes::{debounce::Debounce, hash_value::HashValue};
+use crate::kubernetes::{
+    debounce::Debounce,
+    hash_value::{HashKey, HashValue},
+};
 use async_trait::async_trait;
 use evmap::WriteHandle;
 use futures::future::BoxFuture;
@@ -16,6 +19,7 @@ where
 {
     inner: WriteHandle<String, Value<T>>,
     debounced_flush: Option<Debounce>,
+    hash_key: HashKey,
 }
 
 impl<T> Writer<T>
@@ -27,6 +31,7 @@ where
     pub fn new(
         mut inner: WriteHandle<String, Value<T>>,
         flush_debounce_timeout: Option<Duration>,
+        hash_key: HashKey,
     ) -> Self {
         // Prepare inner.
         inner.purge();
@@ -38,6 +43,7 @@ where
         Self {
             inner,
             debounced_flush,
+            hash_key,
         }
     }
 
@@ -65,21 +71,21 @@ where
     type Item = T;
 
     async fn add(&mut self, item: Self::Item) {
-        if let Some((key, value)) = kv(item) {
+        if let Some((key, value)) = kv(item, self.hash_key) {
             self.inner.insert(key, value);
             self.debounced_flush();
         }
     }
 
     async fn update(&mut self, item: Self::Item) {
-        if let Some((key, value)) = kv(item) {
+        if let Some((key, value)) = kv(item, self.hash_key) {
             self.inner.update(key, value);
             self.debounced_flush();
         }
     }
 
     async fn delete(&mut self, item: Self::Item) {
-        if let Some((key, _value)) = kv(item) {
+        if let Some((key, _value)) = kv(item, self.hash_key) {
             self.inner.empty(key);
             self.debounced_flush();
         }
@@ -119,9 +125,12 @@ where
 pub type Value<T> = Box<HashValue<T>>;
 
 /// Build a key value pair for using in [`evmap`].
-fn kv<T: Metadata<Ty = ObjectMeta>>(object: T) -> Option<(String, Value<T>)> {
+fn kv<T: Metadata<Ty = ObjectMeta>>(object: T, hash_key: HashKey) -> Option<(String, Value<T>)> {
     let value = Box::new(HashValue::new(object));
-    let key = value.uid()?.to_owned();
+    let key = match hash_key {
+        HashKey::Uid => value.uid()?.to_owned(),
+        HashKey::Name => value.name()?.to_owned(),
+    };
     Some((key, value))
 }
 
@@ -144,7 +153,7 @@ mod tests {
     #[test]
     fn test_kv() {
         let pod = make_pod("uid");
-        let (key, val) = kv(pod.clone()).unwrap();
+        let (key, val) = kv(pod.clone(), HashKey::Uid).unwrap();
         assert_eq!(key, "uid");
         assert_eq!(val, Box::new(HashValue::new(pod)));
     }
@@ -166,7 +175,7 @@ mod tests {
             },
             ..Pod::default()
         };
-        let (key, val) = kv(pod.clone()).unwrap();
+        let (key, val) = kv(pod.clone(), HashKey::Uid).unwrap();
         assert_eq!(key, "config-hashsum");
         assert_eq!(val, Box::new(HashValue::new(pod)));
     }
@@ -174,14 +183,14 @@ mod tests {
     #[tokio::test]
     async fn test_without_debounce() {
         let (state_reader, state_writer) = evmap::new();
-        let mut state_writer = Writer::new(state_writer, None);
+        let mut state_writer = Writer::new(state_writer, None, HashKey::Uid);
 
-        assert_eq!(state_reader.is_empty(), true);
+        assert!(state_reader.is_empty());
         assert!(state_writer.maintenance_request().is_none());
 
         state_writer.add(make_pod("uid0")).await;
 
-        assert_eq!(state_reader.is_empty(), false);
+        assert!(!state_reader.is_empty());
         assert!(state_writer.maintenance_request().is_none());
 
         drop(state_writer);
@@ -194,15 +203,16 @@ mod tests {
 
         let (state_reader, state_writer) = evmap::new();
         let flush_debounce_timeout = Duration::from_millis(100);
-        let mut state_writer = Writer::new(state_writer, Some(flush_debounce_timeout));
+        let mut state_writer =
+            Writer::new(state_writer, Some(flush_debounce_timeout), HashKey::Uid);
 
-        assert_eq!(state_reader.is_empty(), true);
+        assert!(state_reader.is_empty());
         assert!(state_writer.maintenance_request().is_none());
 
         state_writer.add(make_pod("uid0")).await;
         state_writer.add(make_pod("uid1")).await;
 
-        assert_eq!(state_reader.is_empty(), true);
+        assert!(state_reader.is_empty());
         assert!(state_writer.maintenance_request().is_some());
 
         let join = tokio::spawn(async move {
@@ -212,12 +222,12 @@ mod tests {
             state_writer
         });
 
-        assert_eq!(state_reader.is_empty(), true);
+        assert!(state_reader.is_empty());
 
         tokio::time::sleep(flush_debounce_timeout * 2).await;
         let mut state_writer = join.await.unwrap();
 
-        assert_eq!(state_reader.is_empty(), false);
+        assert!(!state_reader.is_empty());
         assert!(state_writer.maintenance_request().is_none());
 
         drop(state_writer);

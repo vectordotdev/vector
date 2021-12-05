@@ -2,8 +2,10 @@ use super::{
     errors::{Parse, RequestError},
     handlers,
     models::{FirehoseRequest, FirehoseResponse},
+    Compression,
 };
 use crate::{
+    codecs,
     internal_events::{AwsKinesisFirehoseRequestError, AwsKinesisFirehoseRequestReceived},
     Pipeline,
 };
@@ -17,6 +19,9 @@ use warp::{http::StatusCode, Filter};
 /// Handles routing of incoming HTTP requests from AWS Kinesis Firehose
 pub fn firehose(
     access_key: Option<String>,
+    record_compression: Compression,
+    decoder: codecs::Decoder,
+    acknowledgements: bool,
     out: Pipeline,
 ) -> impl Filter<Extract = impl warp::Reply, Error = Infallible> + Clone {
     warp::post()
@@ -37,6 +42,9 @@ pub fn firehose(
                 .untuple_one(),
         )
         .and(parse_body())
+        .and(warp::any().map(move || record_compression))
+        .and(warp::any().map(move || decoder.clone()))
+        .and(warp::any().map(move || acknowledgements))
         .and(warp::any().map(move || out.clone()))
         .and_then(handlers::firehose)
         .recover(handle_firehose_rejection)
@@ -81,7 +89,7 @@ fn emit_received() -> impl Filter<Extract = (), Error = warp::reject::Rejection>
         .and(warp::header::optional("X-Amz-Firehose-Request-Id"))
         .and(warp::header::optional("X-Amz-Firehose-Source-Arn"))
         .map(|request_id: Option<String>, source_arn: Option<String>| {
-            emit!(AwsKinesisFirehoseRequestReceived {
+            emit!(&AwsKinesisFirehoseRequestReceived {
                 request_id: request_id.as_deref(),
                 source_arn: source_arn.as_deref(),
             });
@@ -140,7 +148,7 @@ async fn handle_firehose_rejection(err: warp::Rejection) -> Result<impl warp::Re
         request_id = None;
     }
 
-    emit!(AwsKinesisFirehoseRequestError {
+    emit!(&AwsKinesisFirehoseRequestError {
         request_id,
         error: message.as_str(),
     });

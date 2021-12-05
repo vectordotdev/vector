@@ -9,25 +9,25 @@ pub enum Severity {
 }
 
 impl Severity {
-    /// Returns `true` if the severity is a [bug](Variant::Bug).
+    /// Returns `true` if the severity is a [bug](Severity::Bug).
     #[inline]
     pub fn is_bug(self) -> bool {
         matches!(self, Severity::Bug)
     }
 
-    /// Returns `true` if the severity is an [error](Variant::Error).
+    /// Returns `true` if the severity is an [error](Severity::Error).
     #[inline]
     pub fn is_error(self) -> bool {
         matches!(self, Severity::Error)
     }
 
-    /// Returns `true` if the severity is a [warning](Variant::Warning).
+    /// Returns `true` if the severity is a [warning](Severity::Warning).
     #[inline]
     pub fn is_warning(self) -> bool {
         matches!(self, Severity::Warning)
     }
 
-    /// Returns `true` if the severity is a [note](Variant::Note).
+    /// Returns `true` if the severity is a [note](Severity::Note).
     #[inline]
     pub fn is_note(self) -> bool {
         matches!(self, Severity::Note)

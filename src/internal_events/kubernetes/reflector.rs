@@ -1,5 +1,5 @@
-use super::InternalEvent;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 /// Emitted when reflector gets a desync from the watch command.
 #[derive(Debug)]
@@ -10,11 +10,11 @@ pub struct InvocationDesyncReceived<E> {
 
 impl<E: std::fmt::Debug> InternalEvent for InvocationDesyncReceived<E> {
     fn emit_logs(&self) {
-        warn!(message = "Handling desync.", error = ?self.error);
+        warn!(message = "Handling invocation desync.", reason = ?self.error);
     }
 
     fn emit_metrics(&self) {
-        counter!("k8s_reflector_desyncs_total", 1);
+        counter!("k8s_reflector_desyncs_total", 1, "type" => "invocation");
     }
 }
 
@@ -27,11 +27,11 @@ pub struct StreamDesyncReceived<E> {
 
 impl<E: std::fmt::Debug> InternalEvent for StreamDesyncReceived<E> {
     fn emit_logs(&self) {
-        warn!(message = "Handling desync.", error = ?self.error);
+        warn!(message = "Handling stream desync.", reason = ?self.error);
     }
 
     fn emit_metrics(&self) {
-        counter!("k8s_reflector_desyncs_total", 1);
+        counter!("k8s_reflector_desyncs_total", 1, "type" => "stream");
     }
 }
 
@@ -42,7 +42,7 @@ pub struct InvocationHttpErrorReceived<E> {
 
 impl<E: std::fmt::Debug> InternalEvent for InvocationHttpErrorReceived<E> {
     fn emit_logs(&self) {
-        warn!(message = "Http Error in invocation! Your k8s metadata may be stale. Continuing Loop.", error = ?self.error);
+        warn!(message = "Http Error in invocation! Your k8s metadata may be stale. Continuing Loop.", reason = ?self.error);
     }
 
     fn emit_metrics(&self) {

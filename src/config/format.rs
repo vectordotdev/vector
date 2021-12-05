@@ -9,7 +9,7 @@ use std::path::Path;
 pub type FormatHint = Option<Format>;
 
 /// The format used to represent the configuration data.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Format {
     /// TOML format is used.
     Toml,
@@ -58,7 +58,7 @@ mod tests {
     /// This test ensures the logic to guess file format from the file path
     /// works correctly.
     /// Like all other tests, it also demonstrates various cases and how our
-    /// code behaves when it enounters them.
+    /// code behaves when it encounters them.
     #[test]
     fn test_from_path() {
         let cases = vec![
@@ -118,6 +118,7 @@ mod tests {
     // Here we test that the deserializations from various formats match
     // the TOML format.
     #[cfg(all(
+        feature = "enrichment-tables-file",
         feature = "sources-socket",
         feature = "transforms-sample",
         feature = "sinks-socket"
@@ -131,6 +132,10 @@ mod tests {
         }
 
         const SAMPLE_TOML: &str = r#"
+            [enrichment_tables.csv]
+            type = "file"
+            file.path = "/tmp/file.csv"
+            file.encoding.type = "csv"
             [sources.in]
             type = "socket"
             mode = "tcp"
@@ -170,6 +175,13 @@ mod tests {
             (
                 // YAML is sensitive to leading whitespace and linebreaks.
                 concat_with_newlines!(
+                    r#"enrichment_tables:"#,
+                    r#"  csv:"#,
+                    r#"    type: "file""#,
+                    r#"    file:"#,
+                    r#"      path: "/tmp/file.csv""#,
+                    r#"      encoding:"#,
+                    r#"        type: "csv""#,
                     r#"sources:"#,
                     r#"  in:"#,
                     r#"    type: "socket""#,
@@ -194,6 +206,17 @@ mod tests {
             (
                 r#"
                 {
+                    "enrichment_tables": {
+                        "csv": {
+                            "type": "file",
+                            "file": {
+                              "path": "/tmp/file.csv",
+                              "encoding": {
+                                "type": "csv"
+                              }
+                            }
+                        }
+                    },
                     "sources": {
                         "in": {
                             "type": "socket",

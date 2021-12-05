@@ -1,8 +1,14 @@
 pub mod adaptive_concurrency;
 pub mod batch;
 pub mod buffer;
+pub mod builder;
+pub mod compressor;
 pub mod encoding;
 pub mod http;
+pub mod normalizer;
+pub mod partitioner;
+pub mod processed_event;
+pub mod request_builder;
 pub mod retries;
 pub mod service;
 pub mod sink;
@@ -16,19 +22,26 @@ pub mod udp;
 pub mod unix;
 pub mod uri;
 
-use crate::event::Event;
+use crate::event::{Event, EventFinalizers};
 use bytes::Bytes;
 use encoding::{EncodingConfig, EncodingConfiguration};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::borrow::Cow;
 
-pub use batch::{Batch, BatchConfig, BatchSettings, BatchSize, PushResult};
+pub use batch::{
+    Batch, BatchConfig, BatchSettings, BatchSize, BulkSizeBasedDefaultBatchSettings, Merged,
+    NoDefaultsBatchSettings, PushResult, RealtimeEventBasedDefaultBatchSettings,
+    RealtimeSizeBasedDefaultBatchSettings, SinkBatchSettings, Unmerged,
+};
 pub use buffer::json::{BoxedRawValue, JsonArrayBuffer};
-pub use buffer::metrics::MetricEntry;
 pub use buffer::partition::Partition;
 pub use buffer::vec::{EncodedLength, VecBuffer};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
+pub use builder::SinkBuilderExt;
+pub use compressor::Compressor;
+pub use normalizer::Normalizer;
+pub use request_builder::{IncrementalRequestBuilder, RequestBuilder};
 pub use service::{
     Concurrency, ServiceBuilderExt, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
     TowerRequestLayer, TowerRequestSettings,
@@ -42,6 +55,50 @@ enum SinkBuildError {
     MissingHost,
     #[snafu(display("Missing port in address field"))]
     MissingPort,
+}
+
+#[derive(Debug)]
+pub struct EncodedEvent<I> {
+    pub item: I,
+    pub finalizers: EventFinalizers,
+    pub byte_size: usize,
+}
+
+impl<I> EncodedEvent<I> {
+    /// Create a trivial input with no metadata. This method will be
+    /// removed when all sinks are converted.
+    pub fn new(item: I, byte_size: usize) -> Self {
+        Self {
+            item,
+            finalizers: Default::default(),
+            byte_size,
+        }
+    }
+
+    // This should be:
+    // ```impl<F, I: From<F>> From<EncodedEvent<F>> for EncodedEvent<I>```
+    // however, the compiler rejects that due to conflicting
+    // implementations of `From` due to the generic
+    // ```impl<T> From<T> for T```
+    pub fn from<F>(that: EncodedEvent<F>) -> Self
+    where
+        I: From<F>,
+    {
+        Self {
+            item: I::from(that.item),
+            finalizers: that.finalizers,
+            byte_size: that.byte_size,
+        }
+    }
+
+    /// Remap the item using an adapter
+    pub fn map<T>(self, doit: impl Fn(I) -> T) -> EncodedEvent<T> {
+        EncodedEvent {
+            item: doit(self.item),
+            finalizers: self.finalizers,
+            byte_size: self.byte_size,
+        }
+    }
 }
 
 /**
@@ -59,7 +116,7 @@ pub enum Encoding {
 * the given encoding. If there are any errors encoding the event, logs a warning
 * and returns None.
 **/
-pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Bytes> {
+pub fn encode_log(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Bytes> {
     encoding.apply_rules(&mut event);
     let log = event.into_log();
 
@@ -92,4 +149,21 @@ pub fn encode_namespace<'a>(
     namespace
         .map(|namespace| format!("{}{}{}", namespace, delimiter, name))
         .unwrap_or_else(|| name.into_owned())
+}
+
+/// Marker trait for types that can hold a batch of events
+pub trait ElementCount {
+    fn element_count(&self) -> usize;
+}
+
+impl<T> ElementCount for Vec<T> {
+    fn element_count(&self) -> usize {
+        self.len()
+    }
+}
+
+impl ElementCount for serde_json::Value {
+    fn element_count(&self) -> usize {
+        1
+    }
 }

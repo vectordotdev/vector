@@ -29,6 +29,7 @@ pub use array::Array;
 pub use assignment::Assignment;
 pub use block::Block;
 pub use container::Container;
+pub use container::Variant;
 pub use function_argument::FunctionArgument;
 pub use function_call::FunctionCall;
 pub use group::Group;
@@ -54,10 +55,23 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     /// An expression is allowed to fail, which aborts the running program.
     fn resolve(&self, ctx: &mut Context) -> Resolved;
 
+    /// Resolve an expression to a value without any context, if possible.
+    ///
+    /// This returns `Some` for static expressions, or `None` for dynamic expressions.
+    fn as_value(&self) -> Option<Value> {
+        None
+    }
+
     /// Resolve an expression to its [`TypeDef`] type definition.
     ///
     /// This method is executed at compile-time.
     fn type_def(&self, state: &crate::State) -> TypeDef;
+
+    /// Updates the state if necessary.
+    /// By default it does nothing.
+    fn update_state(&mut self, _state: &mut crate::State) -> Result<(), ExpressionError> {
+        Ok(())
+    }
 
     /// Format the expression into a consistent style.
     ///
@@ -128,6 +142,24 @@ impl Expression for Expr {
             Noop(v) => v.resolve(ctx),
             Unary(v) => v.resolve(ctx),
             Abort(v) => v.resolve(ctx),
+        }
+    }
+
+    fn as_value(&self) -> Option<Value> {
+        use Expr::*;
+
+        match self {
+            Literal(v) => Expression::as_value(v),
+            Container(v) => Expression::as_value(v),
+            IfStatement(v) => Expression::as_value(v),
+            Op(v) => Expression::as_value(v),
+            Assignment(v) => Expression::as_value(v),
+            Query(v) => Expression::as_value(v),
+            FunctionCall(v) => Expression::as_value(v),
+            Variable(v) => Expression::as_value(v),
+            Noop(v) => Expression::as_value(v),
+            Unary(v) => Expression::as_value(v),
+            Abort(v) => Expression::as_value(v),
         }
     }
 
@@ -277,9 +309,11 @@ impl DiagnosticError for Error {
 
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ExpressionError {
-    Abort,
+    Abort {
+        span: Span,
+    },
     Error {
         message: String,
         labels: Vec<Label>,
@@ -308,7 +342,7 @@ impl DiagnosticError for ExpressionError {
         use ExpressionError::*;
 
         match self {
-            Abort => "aborted".to_owned(),
+            Abort { .. } => "aborted".to_owned(),
             Error { message, .. } => message.clone(),
         }
     }
@@ -317,7 +351,9 @@ impl DiagnosticError for ExpressionError {
         use ExpressionError::*;
 
         match self {
-            Abort => vec![],
+            Abort { span } => {
+                vec![Label::primary("aborted", span)]
+            }
             Error { labels, .. } => labels.clone(),
         }
     }
@@ -326,7 +362,7 @@ impl DiagnosticError for ExpressionError {
         use ExpressionError::*;
 
         match self {
-            Abort => vec![],
+            Abort { .. } => vec![],
             Error { notes, .. } => notes.clone(),
         }
     }

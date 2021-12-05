@@ -42,7 +42,7 @@ jobs:
     timeout-minutes: 3
     if: github.ref != 'refs/heads/master'
     steps:
-      - uses: styfle/cancel-workflow-action@0.9.0
+      - uses: styfle/cancel-workflow-action@0.9.1
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
           all_but_latest: true # can cancel workflows scheduled later
@@ -54,16 +54,20 @@ jobs:
       !github.event.pull_request
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e tests enable')
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e all targets')
+    # cargo-deb requires a release build, but we don't need optimizations for tests
+    env:
+      CARGO_PROFILE_RELEASE_OPT_LEVEL: 0
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 256
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.4.0
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v2.1.7
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
@@ -89,21 +93,20 @@ jobs:
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e tests enable')
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e all targets')
     steps:
-      - uses: actions/github-script@v4.0.2
+      - uses: actions/github-script@v5
         id: set-matrix
         with:
           script: |
             // Parameters.
             const minikube_version = [
-              "v1.15.1",
+              "v1.21.0",
             ]
             const kubernetes_version = [
               { version: "v1.19.2", is_essential: true },
               { version: "v1.18.9" },
               { version: "v1.17.12" },
-              { version: "v1.16.15" }, // v1.16.13 is broken, see https://github.com/kubernetes/kubernetes/issues/93194
+              { version: "v1.16.15" },
               { version: "v1.15.12" },
-              { version: "v1.14.10" },
             ]
             const container_runtime = [
               "docker",
@@ -145,7 +148,7 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2.4.0
       - uses: actions/download-artifact@v2
         with:
           name: e2e-test-deb-package
@@ -175,6 +178,6 @@ jobs:
     - name: Discord notification
       env:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      uses: Ilshidur/action-discord@0.3.0
+      uses: Ilshidur/action-discord@0.3.2
       with:
         args: "Master k8s e2e tests failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"

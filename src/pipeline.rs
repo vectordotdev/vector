@@ -1,6 +1,12 @@
-use crate::{event::Event, internal_events::EventOut, transforms::FunctionTransform};
+use crate::transforms::FunctionTransform;
 use futures::{channel::mpsc, task::Poll, Sink};
+#[cfg(test)]
+use futures::{Stream, StreamExt};
 use std::{collections::VecDeque, fmt, pin::Pin, task::Context};
+#[cfg(test)]
+use vector_core::event::EventStatus;
+use vector_core::internal_event::EventsSent;
+use vector_core::{event::Event, ByteSizeOf};
 
 #[derive(Debug)]
 pub struct ClosedError;
@@ -30,21 +36,43 @@ impl Pipeline {
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), <Self as Sink<Event>>::Error>> {
+        // We batch the updates to EventsSent for efficiency, and do it here because
+        // it gives us a chance to allow the natural batching of `Pipeline` to kick in.
+        let mut sent_count = 0;
+        let mut sent_bytes = 0;
+
         while let Some(event) = self.enqueued.pop_front() {
             match self.inner.poll_ready(cx) {
                 Poll::Pending => {
                     self.enqueued.push_front(event);
+                    if sent_count > 0 {
+                        emit!(&EventsSent {
+                            count: sent_count,
+                            byte_size: sent_bytes,
+                        });
+                    }
                     return Poll::Pending;
                 }
                 Poll::Ready(Ok(())) => {
                     // continue to send below
                 }
-                Poll::Ready(Err(_error)) => return Poll::Ready(Err(ClosedError)),
+                Poll::Ready(Err(_error)) => {
+                    if sent_count > 0 {
+                        emit!(&EventsSent {
+                            count: sent_count,
+                            byte_size: sent_bytes,
+                        });
+                    }
+                    return Poll::Ready(Err(ClosedError));
+                }
             }
 
+            let event_bytes = event.size_of();
             match self.inner.start_send(event) {
                 Ok(()) => {
                     // we good, keep looping
+                    sent_count += 1;
+                    sent_bytes += event_bytes;
                 }
                 Err(error) if error.is_full() => {
                     // We only try to send after a successful call to poll_ready, which reserves
@@ -53,10 +81,22 @@ impl Pipeline {
                     panic!("Channel was both ready and full; this is a bug.")
                 }
                 Err(error) if error.is_disconnected() => {
+                    if sent_count > 0 {
+                        emit!(&EventsSent {
+                            count: sent_count,
+                            byte_size: sent_bytes,
+                        });
+                    }
                     return Poll::Ready(Err(ClosedError));
                 }
                 Err(_) => unreachable!(),
             }
+        }
+        if sent_count > 0 {
+            emit!(&EventsSent {
+                count: sent_count,
+                byte_size: sent_bytes,
+            });
         }
         Poll::Ready(Ok(()))
     }
@@ -74,7 +114,6 @@ impl Sink<Event> for Pipeline {
     }
 
     fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
-        emit!(EventOut { count: 1 });
         // Note how this gets **swapped** with `new_working_set` in the loop.
         // At the end of the loop, it will only contain finalized events.
         let mut working_set = vec![item];
@@ -102,6 +141,21 @@ impl Pipeline {
     #[cfg(test)]
     pub fn new_test() -> (Self, mpsc::Receiver<Event>) {
         Self::new_with_buffer(100, vec![])
+    }
+
+    #[cfg(test)]
+    pub fn new_test_finalize(status: EventStatus) -> (Self, impl Stream<Item = Event> + Unpin) {
+        let (pipe, recv) = Self::new_with_buffer(100, vec![]);
+        // In a source test pipeline, there is no sink to acknowledge
+        // events, so we have to add a map to the receiver to handle the
+        // finalization.
+        let recv = recv.map(move |mut event| {
+            let metadata = event.metadata_mut();
+            metadata.update_status(status);
+            metadata.update_sources();
+            event
+        });
+        (pipe, recv)
     }
 
     pub fn new_with_buffer(

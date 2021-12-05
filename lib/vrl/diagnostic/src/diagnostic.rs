@@ -71,32 +71,32 @@ impl Diagnostic {
     }
 
     /// Returns `true` if the diagnostic represents either an
-    /// [error](Variant::Error) or [bug](Variant::Bug).
+    /// [error](Severity::Error) or [bug](Severity::Bug).
     #[inline]
     pub fn is_problem(&self) -> bool {
         self.severity.is_error() || self.severity.is_bug()
     }
 
-    /// Returns `true` if the diagnostic represents a [bug](Variant::Bug).
+    /// Returns `true` if the diagnostic represents a [bug](Severity::Bug).
     #[inline]
     pub fn is_bug(&self) -> bool {
         self.severity.is_bug()
     }
 
-    /// Returns `true` if the diagnostic represents an [error](Variant::Error).
+    /// Returns `true` if the diagnostic represents an [error](Severity::Error).
     #[inline]
     pub fn is_error(&self) -> bool {
         self.severity.is_error()
     }
 
     /// Returns `true` if the diagnostic represents a
-    /// [warning](Variant::Warning).
+    /// [warning](Severity::Warning).
     #[inline]
     pub fn is_warning(&self) -> bool {
         self.severity.is_warning()
     }
 
-    /// Returns `true` if the diagnostic represents a [note](Variant::Note).
+    /// Returns `true` if the diagnostic represents a [note](Severity::Note).
     #[inline]
     pub fn is_note(&self) -> bool {
         self.severity.is_note()

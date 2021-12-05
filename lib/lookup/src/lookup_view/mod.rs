@@ -120,62 +120,58 @@ impl<'a> Lookup<'a> {
     pub fn into_buf(self) -> LookupBuf {
         LookupBuf::from(self)
     }
-
-    /// Return a borrow of the Segment set.
-    pub fn as_segments(&self) -> &VecDeque<Segment<'_>> {
-        &self.segments
-    }
-
-    /// Return the Segment set.
-    pub fn into_segments(self) -> VecDeque<Segment<'a>> {
-        self.segments
-    }
 }
 
-#[inherent(pub)]
+#[inherent]
 impl<'a> Look<'a> for Lookup<'a> {
     type Segment = Segment<'a>;
 
-    fn is_root(&self) -> bool {
+    pub fn is_root(&self) -> bool {
         self.segments.is_empty()
     }
 
-    fn get(&mut self, index: usize) -> Option<&Segment<'a>> {
+    pub fn get(&mut self, index: usize) -> Option<&Segment<'a>> {
         self.segments.get(index)
     }
 
-    fn push_back(&mut self, segment: impl Into<Segment<'a>>) {
+    pub fn push_back(&mut self, segment: impl Into<Segment<'a>>) {
         self.segments.push_back(segment.into())
     }
 
-    fn pop_back(&mut self) -> Option<Segment<'a>> {
+    pub fn pop_back(&mut self) -> Option<Segment<'a>> {
         self.segments.pop_back()
     }
 
-    fn push_front(&mut self, segment: impl Into<Segment<'a>>) {
+    pub fn push_front(&mut self, segment: impl Into<Segment<'a>>) {
         self.segments.push_front(segment.into())
     }
 
-    fn pop_front(&mut self) -> Option<Segment<'a>> {
+    pub fn pop_front(&mut self) -> Option<Segment<'a>> {
         self.segments.pop_front()
     }
 
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.segments.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.segments.is_empty()
+    }
+
     /// Parse the lookup from a str.
-    fn from_str(input: &'a str) -> Result<Self, LookupError> {
+    #[allow(clippy::should_implement_trait)]
+    // Cannot be defined as `FromStr` due to lifetime constraint on return type
+    pub fn from_str(input: &'a str) -> Result<Self, LookupError> {
         crate::parser::parse_lookup(input).map_err(|err| LookupError::Invalid { message: err })
     }
 
     /// Merge a lookup.
-    fn extend(&mut self, other: Self) {
+    pub fn extend(&mut self, other: Self) {
         self.segments.extend(other.segments)
     }
 
     /// Returns `true` if `needle` is a prefix of the lookup.
-    fn starts_with(&self, needle: &Lookup<'a>) -> bool {
+    pub fn starts_with(&self, needle: &Lookup<'a>) -> bool {
         needle.iter().zip(&self.segments).all(|(n, s)| n == s)
     }
 }
@@ -316,6 +312,6 @@ impl<'de> Visitor<'de> for LookupVisitor<'de> {
 
 impl<'a> AsRef<Lookup<'a>> for Lookup<'a> {
     fn as_ref(&self) -> &Lookup<'a> {
-        &self
+        self
     }
 }

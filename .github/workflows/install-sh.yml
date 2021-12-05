@@ -14,7 +14,7 @@ jobs:
   sync-install:
     runs-on: ubuntu-18.04
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.4.0
       - run: sudo apt-get install --yes python3-setuptools python3.6-dev
       - run: pip3 install awscli --upgrade --user
       - env:
@@ -42,6 +42,6 @@ jobs:
     - name: Discord notification
       env:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      uses: Ilshidur/action-discord@0.3.0
+      uses: Ilshidur/action-discord@0.3.2
       with:
         args: "Update of sh.vector.dev failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"

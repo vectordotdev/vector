@@ -6,13 +6,12 @@ use crate::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpSink},
-            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
+            BatchConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
     tls::{TlsOptions, TlsSettings},
 };
-use bytesize::ByteSize;
 use futures::{FutureExt, SinkExt};
 use http::{
     header, header::HeaderMap, header::HeaderName, header::HeaderValue, Request, StatusCode, Uri,
@@ -23,6 +22,8 @@ use openssl::{base64, hash, pkey, sign};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+
+use super::util::batch::RealtimeSizeBasedDefaultBatchSettings;
 
 fn default_host() -> String {
     "ods.opinsights.azure.com".into()
@@ -43,7 +44,7 @@ pub struct AzureMonitorLogsConfig {
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
@@ -58,9 +59,6 @@ pub enum Encoding {
 }
 
 lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        ..Default::default()
-    };
     static ref LOG_TYPE_REGEX: Regex = Regex::new(r"^\w+$").unwrap();
     static ref LOG_TYPE_HEADER: HeaderName = HeaderName::from_static("log-type");
     static ref X_MS_DATE_HEADER: HeaderName = HeaderName::from_static(X_MS_DATE);
@@ -77,7 +75,7 @@ inventory::submit! {
 impl_generate_config_from_default!(AzureMonitorLogsConfig);
 
 /// Max number of bytes in request body
-const MAX_BATCH_SIZE_MB: u64 = 30;
+const MAX_BATCH_SIZE: usize = 30 * 1024 * 1024;
 /// API endpoint for submitting logs
 const RESOURCE: &str = "/api/logs";
 /// JSON content type of logs
@@ -93,27 +91,17 @@ const API_VERSION: &str = "2016-04-01";
 #[typetag::serde(name = "azure_monitor_logs")]
 impl SinkConfig for AzureMonitorLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let batch_settings = BatchSettings::default()
-            .bytes(bytesize::kib(5000u64))
-            .timeout(1)
-            .parse_config(self.batch)?;
-
-        let batch_bytes = batch_settings.size.bytes as u64;
-
-        if batch_bytes > bytesize::mb(MAX_BATCH_SIZE_MB) {
-            return Err(format!(
-                "provided batch size is too big for Azure Monitor: {}, max is {}",
-                ByteSize::b(batch_bytes),
-                ByteSize::mb(MAX_BATCH_SIZE_MB)
-            )
-            .into());
-        }
+        let batch_settings = self
+            .batch
+            .validate()?
+            .limit_max_bytes(MAX_BATCH_SIZE)?
+            .into_batch_settings()?;
 
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(Some(tls_settings))?;
+        let client = HttpClient::new(Some(tls_settings), &cx.proxy)?;
 
         let sink = AzureMonitorLogsSink::new(self)?;
-        let request_settings = self.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
 
         let healthcheck = healthcheck(sink.clone(), client.clone()).boxed();
 
@@ -167,7 +155,7 @@ impl HttpSink for AzureMonitorLogsSink {
             chrono::Utc::now()
         };
 
-        let mut entry = serde_json::json!(log);
+        let mut entry = serde_json::json!(&log);
         let object_entry = entry.as_object_mut().unwrap();
         object_entry.insert(
             timestamp_key.to_string(),
@@ -309,7 +297,6 @@ mod tests {
     use super::*;
     use crate::event::LogEvent;
     use serde_json::value::RawValue;
-    use std::iter::FromIterator;
 
     #[test]
     fn generate_config() {
@@ -339,7 +326,10 @@ mod tests {
         .unwrap();
 
         let sink = AzureMonitorLogsSink::new(&config).unwrap();
-        let mut log = LogEvent::from_iter([("message", "hello world")].iter().copied());
+        let mut log = [("message", "hello world")]
+            .iter()
+            .copied()
+            .collect::<LogEvent>();
         let (timestamp_key, timestamp_value) = insert_timestamp_kv(&mut log);
 
         let event = Event::from(log);
@@ -366,10 +356,10 @@ mod tests {
 
         let sink = AzureMonitorLogsSink::new(&config).unwrap();
 
-        let mut log1 = LogEvent::from_iter([("message", "hello")].iter().copied());
+        let mut log1 = [("message", "hello")].iter().copied().collect::<LogEvent>();
         let (timestamp_key1, timestamp_value1) = insert_timestamp_kv(&mut log1);
 
-        let mut log2 = LogEvent::from_iter([("message", "world")].iter().copied());
+        let mut log2 = [("message", "world")].iter().copied().collect::<LogEvent>();
         let (timestamp_key2, timestamp_value2) = insert_timestamp_kv(&mut log2);
 
         let event1 = sink.encode_event(Event::from(log1)).unwrap();

@@ -12,14 +12,18 @@ env:
   VERBOSE: true
   CI: true
   DEBIAN_FRONTEND: noninteractive
+  CONTAINER_TOOL: docker
+  RUSTFLAGS: "-D warnings"
 
 jobs:
   build-x86_64-unknown-linux-musl-packages:
-    runs-on: ubuntu-20.04
+    runs-on: [self-hosted, linux, x64, general]
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.4.0
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-      - run: make ci-sweep
+      - run: bash scripts/set-build-description.sh
       - env:
           PASS_FEATURES: "default-cmake"
         run: make package-x86_64-unknown-linux-musl-all
@@ -29,11 +33,13 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz"
 
   build-x86_64-unknown-linux-gnu-packages:
-    runs-on: ubuntu-20.04
+    runs-on: [self-hosted, linux, x64, general]
     steps:
-      - uses: actions/checkout@v1
-      - run: make ci-sweep
+      - uses: actions/checkout@v2.4.0
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - run: bash scripts/set-build-description.sh
       - env:
           PASS_FEATURES: "default"
         run: make package-x86_64-unknown-linux-gnu-all
@@ -51,11 +57,13 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm"
 
   build-aarch64-unknown-linux-musl-packages:
-    runs-on: ubuntu-20.04
+    runs-on: [self-hosted, linux, x64, general]
     steps:
-      - uses: actions/checkout@v1
-      - run: make ci-sweep
+      - uses: actions/checkout@v2.4.0
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - run: bash scripts/set-build-description.sh
       - env:
           DOCKER_PRIVILEGED: "true"
           PASS_FEATURES: "default-cmake"
@@ -66,11 +74,13 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz"
 
   build-aarch64-unknown-linux-gnu-packages:
-    runs-on: ubuntu-20.04
+    runs-on: [self-hosted, linux, x64, general]
     steps:
-      - uses: actions/checkout@v1
-      - run: make ci-sweep
+      - uses: actions/checkout@v2.4.0
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - run: bash scripts/set-build-description.sh
       - env:
           DOCKER_PRIVILEGED: "true"
           PASS_FEATURES: "default"
@@ -89,11 +99,13 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm"
 
   build-armv7-unknown-linux-gnueabihf-packages:
-    runs-on: ubuntu-20.04
+    runs-on: [self-hosted, linux, x64, general]
     steps:
-      - uses: actions/checkout@v1
-      - run: make ci-sweep
+      - uses: actions/checkout@v2.4.0
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - run: bash scripts/set-build-description.sh
       - env:
           DOCKER_PRIVILEGED: "true"
         run: make package-armv7-unknown-linux-gnueabihf-all
@@ -111,11 +123,13 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm"
 
   build-armv7-unknown-linux-musleabihf-packages:
-    runs-on: ubuntu-20.04
+    runs-on: [self-hosted, linux, x64, general]
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.4.0
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-      - run: make ci-sweep
+      - run: bash scripts/set-build-description.sh
       - env:
           DOCKER_PRIVILEGED: "true"
         run: make package-armv7-unknown-linux-musleabihf
@@ -127,13 +141,19 @@ jobs:
   build-x86_64-apple-darwin-packages:
     runs-on: macos-10.15
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.4.0
       - name: "Upgrade bash"
         run: brew install bash
       - name: "Install realpath dependency"
         run: brew install coreutils
-      - name: Add version variable
+      - name: "Add Vector version"
         run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+        shell: bash
+      - name: "Set Vector build description"
+        run: ./scripts/set-build-description.sh
+        shell: bash
+      - name: "Set release flags"
+        run: ./scripts/environment/release-flags.sh
         shell: bash
       - name: "Build archive"
         env:
@@ -148,11 +168,19 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz"
 
   build-x86_64-pc-windows-msvc-packages:
-    runs-on: windows-2019
+    runs-on: [self-hosted, windows, x64, general]
+    env:
+      RUSTFLAGS: "-D warnings -Ctarget-feature=+crt-static"
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.4.0
       - name: "Add Vector version"
         run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+        shell: bash
+      - name: "Set Vector build description"
+        run: ./scripts/set-build-description.sh
+        shell: bash
+      - name: "Set release flags"
+        run: ./scripts/environment/release-flags.sh
         shell: bash
       - name: "Download Perl"
         shell: bash
@@ -182,13 +210,13 @@ jobs:
           mkdir -p /c/wix
           cd /c/wix
           curl -sSfL https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip > wix-binaries.zip
-          unzip wix-binaries.zip
+          unzip -o wix-binaries.zip
           rm wix-binaries.zip
+      - run: choco install llvm
       - name: "Build archive"
         shell: bash
         run: |
           export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
-          export RUSTFLAGS=-Ctarget-feature=+crt-static
           export FEATURES="default-msvc"
           export ARCHIVE_TYPE="zip"
           export KEEP_SYMBOLS="true"
@@ -220,8 +248,6 @@ jobs:
     container:
       image: ${{ matrix.container }}
     steps:
-      - name: checkout
-        uses: actions/checkout@v1
       - run: |
           apt-get update && \
           apt-get install -y \
@@ -230,6 +256,8 @@ jobs:
           git \
           systemd \
           make
+      - name: checkout
+        uses: actions/checkout@v2.4.0
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
@@ -237,10 +265,12 @@ jobs:
           path: target/artifacts
       - name: First install of DEB package.
         run: |
-          dpkg -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb && vector --version
+          dpkg -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb
+          ./scripts/verify-install.sh
       - name: Second install of DEB package.
         run: |
-          dpkg -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb && vector --version
+          dpkg -i target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb
+          ./scripts/verify-install.sh
 
   rpm-verify:
     needs:
@@ -252,8 +282,6 @@ jobs:
     container:
       image: ${{ matrix.container }}
     steps:
-      - name: checkout
-        uses: actions/checkout@v1
       - run: |
           yum update -y && \
           yum install -y \
@@ -263,6 +291,8 @@ jobs:
           systemd \
           tar \
           make
+      - name: checkout
+        uses: actions/checkout@v2.4.0
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
@@ -270,10 +300,12 @@ jobs:
           path: target/artifacts
       - name: First install of RPM package.
         run: |
-          rpm -i --replacepkgs target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm && vector --version
+          rpm -i --replacepkgs target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
+          ./scripts/verify-install.sh
       - name: Second install of RPM package.
         run: |
-          rpm -i --replacepkgs target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm && vector --version
+          rpm -i --replacepkgs target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
+          ./scripts/verify-install.sh
 
   osx-verify:
     runs-on: macos-10.15
@@ -281,7 +313,7 @@ jobs:
       - build-x86_64-apple-darwin-packages
     steps:
       - name: checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2.4.0
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
@@ -301,20 +333,20 @@ jobs:
       - build-armv7-unknown-linux-gnueabihf-packages
       - deb-verify
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.4.0
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - name: Login to DockerHub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v1.10.0
         with:
           username: ${{ secrets.CI_DOCKER_USERNAME }}
           password: ${{ secrets.CI_DOCKER_PASSWORD }}
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
+        uses: docker/setup-qemu-action@v1.2.0
         with:
           platforms: all
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v1.6.0
         with:
           version: latest
           install: true
@@ -362,7 +394,7 @@ jobs:
       - rpm-verify
       - osx-verify
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.4.0
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
@@ -444,7 +476,7 @@ jobs:
       - rpm-verify
       - osx-verify
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.4.0
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
@@ -506,7 +538,7 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armhf.deb
           path: target/artifacts
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: |
           export SHA1="${{ github.sha }}"
@@ -518,9 +550,9 @@ jobs:
     needs:
       - release-s3
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.4.0
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: |
           export GITHUB_TOKEN="${{ secrets.GH_PACKAGE_PUBLISHER_TOKEN }}"
@@ -535,7 +567,7 @@ jobs:
       - deb-verify
       - rpm-verify
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.4.0
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
@@ -640,22 +672,6 @@ jobs:
           republish: "true"
           file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm"
 
-  release-helm:
-    runs-on: ubuntu-18.04
-    needs:
-      # This is not strictly required, but ensures that Helm Chart doesn't
-      # appear before the image it refers to.
-      - release-docker
-    steps:
-      - uses: actions/checkout@v1
-      - name: Install Helm
-        run: scripts/environment/setup-helm.sh
-      - name: Release Helm Chart
-        env:
-          AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
-          AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
-        run: make release-helm
-
   release-failure:
     name: release-failure
     if: failure()
@@ -675,12 +691,11 @@ jobs:
       - release-s3
       - release-cloudsmith
       - release-github
-      - release-helm
     runs-on: ubuntu-20.04
     steps:
     - name: Discord notification
       env:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      uses: Ilshidur/action-discord@0.3.0
+      uses: Ilshidur/action-discord@0.3.2
       with:
         args: "Release failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"

@@ -1,14 +1,19 @@
-use super::InternalEvent;
+// ## skip check-events ##
+
+use crate::sources::aws_kinesis_firehose::Compression;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub(crate) struct AwsKinesisFirehoseEventReceived {
+pub struct AwsKinesisFirehoseEventsReceived {
+    pub count: usize,
     pub byte_size: usize,
 }
 
-impl InternalEvent for AwsKinesisFirehoseEventReceived {
+impl InternalEvent for AwsKinesisFirehoseEventsReceived {
     fn emit_metrics(&self) {
-        counter!("events_in_total", 1);
+        counter!("component_received_events_total", self.count as u64);
+        counter!("events_in_total", self.count as u64);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
@@ -51,5 +56,25 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
 
     fn emit_metrics(&self) {
         counter!("request_read_errors_total", 1);
+    }
+}
+
+#[derive(Debug)]
+pub struct AwsKinesisFirehoseAutomaticRecordDecodeError {
+    pub compression: Compression,
+    pub error: std::io::Error,
+}
+
+impl InternalEvent for AwsKinesisFirehoseAutomaticRecordDecodeError {
+    fn emit_logs(&self) {
+        warn!(
+            message = %format!("Detected record as {} but failed to decode so passing along data as-is.", self.compression),
+            error = ?self.error,
+            internal_log_rate_secs = 10
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("request_automatic_decode_errors_total", 1);
     }
 }

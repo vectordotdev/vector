@@ -46,7 +46,12 @@ impl Function for ParseAwsVpcFlowLog {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _ctx: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
         let format = arguments.optional("format");
 
@@ -263,7 +268,7 @@ mod tests {
 
         for (format, logs) in logs {
             for log in logs {
-                assert!(parse_log(&log, format).is_ok());
+                assert!(parse_log(log, format).is_ok());
             }
         }
     }

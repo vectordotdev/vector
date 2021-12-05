@@ -1,4 +1,4 @@
-use shared::{conversion::Conversion, TimeZone};
+use shared::conversion::Conversion;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -17,7 +17,12 @@ impl Function for ParseTimestamp {
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _ctx: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
         let format = arguments.required("format");
 
@@ -54,7 +59,7 @@ impl Expression for ParseTimestampFn {
             Value::Bytes(v) => {
                 let bytes = self.format.resolve(ctx)?;
                 let format = bytes.try_bytes_utf8_lossy()?;
-                Conversion::parse(format!("timestamp|{}", format), TimeZone::Local)
+                Conversion::parse(format!("timestamp|{}", format), ctx.timezone().to_owned())
                     .map_err(|e| format!("{}", e))?
                     .convert(v)
                     .map_err(|e| e.to_string().into())
@@ -80,27 +85,47 @@ mod tests {
         parse_timestamp => ParseTimestamp;
 
         parse_timestamp {
-            args: func_args![value: DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
-                             .unwrap()
-                             .with_timezone(&Utc),
-                             format:"%d/%m/%Y:%H:%M:%S %z"],
+            args: func_args![
+                value: DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
+                    .unwrap()
+                    .with_timezone(&Utc),
+                format:"%d/%m/%Y:%H:%M:%S %z"
+            ],
             want: Ok(value!(
-                    DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
-                        .unwrap()
-                        .with_timezone(&Utc)
+                DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
+                    .unwrap()
+                    .with_timezone(&Utc)
             )),
             tdef: TypeDef::new().fallible().timestamp(),
+            tz: shared::TimeZone::default(),
         }
 
         parse_text {
-            args: func_args![value: "16/10/2019:12:00:00 +0000",
-                             format: "%d/%m/%Y:%H:%M:%S %z"],
+            args: func_args![
+                value: "16/10/2019:12:00:00 +0000",
+                format: "%d/%m/%Y:%H:%M:%S %z"
+            ],
             want: Ok(value!(
-                    DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
-                        .unwrap()
-                        .with_timezone(&Utc)
+                DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
+                    .unwrap()
+                    .with_timezone(&Utc)
             )),
             tdef: TypeDef::new().fallible().timestamp(),
+            tz: shared::TimeZone::default(),
+        }
+
+        parse_text_with_tz {
+            args: func_args![
+                value: "16/10/2019:12:00:00",
+                format:"%d/%m/%Y:%H:%M:%S"
+            ],
+            want: Ok(value!(
+                DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 10:00:00 +0000")
+                    .unwrap()
+                    .with_timezone(&Utc)
+            )),
+            tdef: TypeDef::new().fallible().timestamp(),
+            tz: shared::TimeZone::Named(chrono_tz::Europe::Paris),
         }
     ];
 }

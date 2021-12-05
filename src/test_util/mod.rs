@@ -1,6 +1,5 @@
 use crate::{
     config::{Config, ConfigDiff, GenerateConfig},
-    event::Event,
     topology::{self, RunningTopology},
     trace,
 };
@@ -40,11 +39,13 @@ use tokio_stream::wrappers::TcpListenerStream;
 #[cfg(unix)]
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
+use vector_core::event::{BatchNotifier, Event, LogEvent};
 
 const WAIT_FOR_SECS: u64 = 5; // The default time to wait in `wait_for`
 const WAIT_FOR_MIN_MILLIS: u64 = 5; // The minimum time to pause before retrying
 const WAIT_FOR_MAX_MILLIS: u64 = 500; // The maximum time to pause before retrying
-
+#[cfg(test)]
+pub mod components;
 pub mod stats;
 
 #[macro_export]
@@ -89,14 +90,17 @@ pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> 
     Ok(value)
 }
 
+pub fn next_addr_for_ip(ip: IpAddr) -> SocketAddr {
+    let port = pick_unused_port(ip);
+    SocketAddr::new(ip, port)
+}
+
 pub fn next_addr() -> SocketAddr {
-    let port = pick_unused_port();
-    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port)
+    next_addr_for_ip(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)))
 }
 
 pub fn next_addr_v6() -> SocketAddr {
-    let port = pick_unused_port();
-    SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), port)
+    next_addr_for_ip(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)))
 }
 
 pub fn trace_init() {
@@ -183,32 +187,57 @@ pub fn temp_dir() -> PathBuf {
     path.join(dir_name)
 }
 
+fn map_batch_stream(
+    stream: impl Stream<Item = LogEvent>,
+    batch: Option<Arc<BatchNotifier>>,
+) -> impl Stream<Item = Event> {
+    stream.map(move |log| log.with_batch_notifier_option(&batch).into())
+}
+
 pub fn random_lines_with_stream(
     len: usize,
     count: usize,
+    batch: Option<Arc<BatchNotifier>>,
 ) -> (Vec<String>, impl Stream<Item = Event>) {
     let lines = (0..count).map(|_| random_string(len)).collect::<Vec<_>>();
-    let stream = stream::iter(lines.clone()).map(Event::from);
+    let stream = map_batch_stream(stream::iter(lines.clone()).map(LogEvent::from), batch);
     (lines, stream)
-}
-
-fn random_events_with_stream_generic<F>(
-    count: usize,
-    generator: F,
-) -> (Vec<Event>, impl Stream<Item = Event>)
-where
-    F: Fn() -> Event,
-{
-    let events = (0..count).map(|_| generator()).collect::<Vec<_>>();
-    let stream = stream::iter(events.clone());
-    (events, stream)
 }
 
 pub fn random_events_with_stream(
     len: usize,
     count: usize,
+    batch: Option<Arc<BatchNotifier>>,
 ) -> (Vec<Event>, impl Stream<Item = Event>) {
-    random_events_with_stream_generic(count, move || Event::from(random_string(len)))
+    let events = (0..count)
+        .map(|_| Event::from(random_string(len)))
+        .collect::<Vec<_>>();
+    let stream = map_batch_stream(
+        stream::iter(events.clone()).map(|event| event.into_log()),
+        batch,
+    );
+    (events, stream)
+}
+
+pub fn random_updated_events_with_stream<F>(
+    len: usize,
+    count: usize,
+    batch: Option<Arc<BatchNotifier>>,
+    update_fn: F,
+) -> (Vec<Event>, impl Stream<Item = Event>)
+where
+    F: Fn((usize, Event)) -> Event,
+{
+    let events = (0..count)
+        .map(|_| Event::from(random_string(len)))
+        .enumerate()
+        .map(update_fn)
+        .collect::<Vec<_>>();
+    let stream = map_batch_stream(
+        stream::iter(events.clone()).map(|event| event.into_log()),
+        batch,
+    );
+    (events, stream)
 }
 
 pub fn random_string(len: usize) -> String {
@@ -243,6 +272,16 @@ where
     S: Stream + Unpin,
 {
     rx.take(n).collect().await
+}
+
+pub async fn collect_n_stream<T, S: Stream<Item = T> + Unpin>(stream: &mut S, n: usize) -> Vec<T> {
+    let mut events = Vec::new();
+
+    while events.len() < n {
+        let e = stream.next().await.unwrap();
+        events.push(e);
+    }
+    events
 }
 
 pub async fn collect_ready<S>(mut rx: S) -> Vec<S::Item>
@@ -281,6 +320,7 @@ pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     output.lines().map(|s| s.to_owned()).collect()
 }
 
+#[cfg(feature = "sources-aws_s3")]
 pub fn lines_from_zst_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     trace!(message = "Reading zst file.", path = %path.as_ref().display());
     let mut file = File::open(path).unwrap();
@@ -536,4 +576,37 @@ pub async fn start_topology(
     topology::start_validated(config, diff, pieces)
         .await
         .unwrap()
+}
+
+/// Collect the first `n` events from a stream while a future is spawned
+/// in the background. This is used for tests where the collect has to
+/// happen concurrent with the sending process (ie the stream is
+/// handling finalization, which is required for the future to receive
+/// an acknowledgement).
+pub async fn spawn_collect_n<F, S>(future: F, stream: S, n: usize) -> Vec<Event>
+where
+    F: Future<Output = ()> + Send + 'static,
+    S: Stream<Item = Event> + Unpin,
+{
+    let sender = tokio::spawn(future);
+    let events = collect_n(stream, n).await;
+    sender.await.expect("Failed to send data");
+    events
+}
+
+/// Collect all the ready events from a stream after spawning a future
+/// in the background and letting it run for a given interval. This is
+/// used for tests where the collect has to happen concurrent with the
+/// sending process (ie the stream is handling finalization, which is
+/// required for the future to receive an acknowledgement).
+pub async fn spawn_collect_ready<F, S>(future: F, stream: S, sleep: u64) -> Vec<Event>
+where
+    F: Future<Output = ()> + Send + 'static,
+    S: Stream<Item = Event> + Unpin,
+{
+    let sender = tokio::spawn(future);
+    tokio::time::sleep(Duration::from_secs(sleep)).await;
+    let events = collect_ready(stream).await;
+    sender.await.expect("Failed to send data");
+    events
 }

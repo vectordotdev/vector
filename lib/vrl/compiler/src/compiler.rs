@@ -194,7 +194,7 @@ impl<'a> Compiler<'a> {
             Many(nodes) => self.compile_exprs(nodes),
         };
 
-        Predicate::new(Node::new(span, Block::new(exprs)), &self.state)
+        Predicate::new(Node::new(span, Block::new(exprs)), self.state)
     }
 
     fn compile_op(&mut self, node: Node<ast::Op>) -> Op {
@@ -207,7 +207,7 @@ impl<'a> Compiler<'a> {
         let rhs_span = rhs.span();
         let rhs = Node::new(rhs_span, self.compile_expr(*rhs));
 
-        Op::new(lhs, opcode, rhs, &self.state).unwrap_or_else(|err| {
+        Op::new(lhs, opcode, rhs, self.state).unwrap_or_else(|err| {
             self.errors.push(Box::new(err));
             Op::noop()
         })
@@ -361,7 +361,12 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_variable(&mut self, node: Node<ast::Ident>) -> Variable {
-        Variable::new(node.into_inner(), &self.state)
+        let (span, ident) = node.take();
+
+        Variable::new(span, ident.clone(), self.state).unwrap_or_else(|err| {
+            self.errors.push(Box::new(err));
+            Variable::noop(ident)
+        })
     }
 
     fn compile_unary(&mut self, node: Node<ast::Unary>) -> Unary {
@@ -379,15 +384,15 @@ impl<'a> Compiler<'a> {
 
         let node = Node::new(expr.span(), self.compile_expr(*expr));
 
-        Not::new(node, not.span(), &self.state).unwrap_or_else(|err| {
+        Not::new(node, not.span(), self.state).unwrap_or_else(|err| {
             self.errors.push(Box::new(err));
             Not::noop()
         })
     }
 
-    fn compile_abort(&mut self, _: Node<()>) -> Abort {
+    fn compile_abort(&mut self, node: Node<()>) -> Abort {
         self.abortable = true;
-        Abort
+        Abort::new(node.span())
     }
 
     fn handle_parser_error(&mut self, error: parser::Error) {

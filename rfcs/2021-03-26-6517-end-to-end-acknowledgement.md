@@ -138,7 +138,7 @@ configuration:
    index). However, the configuration may be reloaded while the event is
    buffered in such a way that the source name provided in the
    configuration may change, or a different component may be substituted
-   for the same identifier. As such, the configured component name is
+   for the same identifier. As such, the configured component id is
    not sufficient to uniquely identify the source. Further, Vector may
    be stopped while the event is buffered and then restarted with an
    identical configuration. At this point, the old source will be
@@ -167,11 +167,11 @@ Event finalization is a three step process:
 1. When a sink completes delivery of an event, the delivery status is
    recorded in the finalizer status that is shared across all clones of
    the event. This may change that status from `Dropped` (the
-   initialization state) to either `Delivered` or `Failed`, or from
-   `Delivered` to `Failed`. The `NoOp` state is never changed.
+   initialization state) to either `Delivered`, `Errored`, or `Failed`.
+   The `Recorded` state is never changed.
 2. If one of those sinks is configured to be authoritative, it will
    immediately update the status of all its source batches and update
-   the event status to `NoOp` that no extraneous updates happen.
+   the event status to `Recorded` that no extraneous updates happen.
    Otherwise, the last copy of the event does this status update when
    the shared finalizer is dropped.
 3. When the last event if a batch is finalized, the status of that batch
@@ -204,35 +204,33 @@ The structure added to the event metadata is as follows:
 ```rust
 struct EventMetadata {
     // … existing fields …
-    finalizer: Option<Arc<EventFinalizer>>,
+    finalizers: Box<[Arc<EventFinalizer>]>,
 }
 
 struct EventFinalizer {
     status: EventStatus,
-    sources: Box<[Arc<BatchNotifier>]>,
+    source: Arc<BatchNotifier>,
+    identifier: Uuid,
 }
 
 struct BatchNotifier {
     status: Mutex<BatchStatus>,
     notifier: tokio::sync::oneshot::Sender<BatchStatus>,
-    identifier: Box<str>,
-}
-
-struct EventFinalization {
-    id: EventId,
-    status: EventStatus,
+    identifier: Uuid,
 }
 
 enum BatchStatus {
     Delivered,
+    Errored,
     Failed,
 }
 
 enum EventStatus {
     Dropped, // default status
     Delivered,
+    Errored,
     Failed,
-    NoOp,
+    Recorded,
 }
 ```
 

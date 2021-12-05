@@ -1,0 +1,49 @@
+{
+  "minWordSizefor1Typo": 4,
+  "minWordSizefor2Typos": 8,
+  "hitsPerPage": 10,
+  "maxValuesPerFacet": 100,
+  "searchableAttributes": [
+    "title",
+    "content",
+    "unordered(hierarchy)",
+    "unordered(tags)"
+  ],
+  "numericAttributesToIndex": null,
+  "attributesToRetrieve": null,
+  "unretrievableAttributes": null,
+  "optionalWords": null,
+  "attributesForFaceting": null,
+  "attributesToSnippet": [
+    "title:10",
+    "content:10"
+  ],
+  "attributesToHighlight": null,
+  "paginationLimitedTo": 1000,
+  "attributeForDistinct": null,
+  "exactOnSingleWordQuery": "attribute",
+  "ranking": [
+    "typo",
+    "geo",
+    "words",
+    "filters",
+    "proximity",
+    "attribute",
+    "exact",
+    "custom"
+  ],
+  "customRanking": [
+    "desc(level)",
+    "desc(ranking)"
+  ],
+  "separatorsToIndex": "",
+  "removeWordsIfNoResults": "none",
+  "queryType": "prefixLast",
+  "highlightPreTag": "<em>",
+  "highlightPostTag": "</em>",
+  "snippetEllipsisText": "…",
+  "alternativesAsExact": [
+    "ignorePlurals",
+    "singleWordSynonym"
+  ]
+}

@@ -9,17 +9,21 @@ use crate::{
         encode_namespace,
         tcp::TcpSinkConfig,
         udp::{UdpService, UdpSinkConfig},
-        BatchConfig, BatchSettings, BatchSink, Buffer, Compression,
+        BatchConfig, BatchSink, Buffer, Compression, EncodedEvent,
     },
 };
-use futures::{future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{future, stream, FutureExt, SinkExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::Display,
     net::{IpAddr, Ipv4Addr, SocketAddr},
+    num::NonZeroU64,
     task::{Context, Poll},
 };
 use tower::{Service, ServiceBuilder};
+use vector_core::ByteSizeOf;
+
+use super::util::SinkBatchSettings;
 
 pub struct StatsdSvc {
     inner: UdpService,
@@ -44,13 +48,22 @@ pub enum Mode {
     Unix(UnixSinkConfig),
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct StatsdDefaultBatchSettings;
+
+impl SinkBatchSettings for StatsdDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(1000);
+    const MAX_BYTES: Option<usize> = Some(1300);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct StatsdUdpConfig {
     #[serde(flatten)]
     pub udp: UdpSinkConfig,
 
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<StatsdDefaultBatchSettings>,
 }
 
 inventory::submit! {
@@ -94,11 +107,7 @@ impl SinkConfig for StatsdSinkConfig {
                 // However we need to leave some space for +1 extra trailing event in the buffer.
                 // Also one might keep an eye on server side limitations, like
                 // mentioned here https://github.com/DataDog/dd-agent/issues/2638
-                let batch = BatchSettings::default()
-                    .bytes(1300)
-                    .events(1000)
-                    .timeout(1)
-                    .parse_config(config.batch)?;
+                let batch = config.batch.into_batch_settings()?;
                 let (service, healthcheck) = config.udp.build_service(cx.clone())?;
                 let service = StatsdSvc { inner: service };
                 let sink = BatchSink::new(
@@ -108,8 +117,12 @@ impl SinkConfig for StatsdSinkConfig {
                     cx.acker(),
                 )
                 .sink_map_err(|error| error!(message = "Fatal statsd sink error.", %error))
-                .with_flat_map(move |event| {
-                    stream::iter(encode_event(event, default_namespace.as_deref())).map(Ok)
+                .with_flat_map(move |event: Event| {
+                    stream::iter({
+                        let byte_size = event.size_of();
+                        encode_event(event, default_namespace.as_deref())
+                            .map(|encoded| Ok(EncodedEvent::new(encoded, byte_size)))
+                    })
                 });
 
                 Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
@@ -171,16 +184,16 @@ fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<Vec<u8>
     let mut buf = Vec::new();
 
     let metric = event.as_metric();
-    match &metric.data.value {
+    match metric.value() {
         MetricValue::Counter { value } => {
-            push_event(&mut buf, &metric, value, "c", None);
+            push_event(&mut buf, metric, value, "c", None);
         }
         MetricValue::Gauge { value } => {
-            match metric.data.kind {
+            match metric.kind() {
                 MetricKind::Incremental => {
-                    push_event(&mut buf, &metric, format!("{:+}", value), "g", None)
+                    push_event(&mut buf, metric, format!("{:+}", value), "g", None)
                 }
-                MetricKind::Absolute => push_event(&mut buf, &metric, value, "g", None),
+                MetricKind::Absolute => push_event(&mut buf, metric, value, "g", None),
             };
         }
         MetricValue::Distribution { samples, statistic } => {
@@ -191,7 +204,7 @@ fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<Vec<u8>
             for sample in samples {
                 push_event(
                     &mut buf,
-                    &metric,
+                    metric,
                     sample.value,
                     metric_type,
                     Some(sample.rate),
@@ -200,13 +213,13 @@ fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<Vec<u8>
         }
         MetricValue::Set { values } => {
             for val in values {
-                push_event(&mut buf, &metric, val, "s", None);
+                push_event(&mut buf, metric, val, "s", None);
             }
         }
         _ => {
-            emit!(StatsdInvalidMetricReceived {
-                value: &metric.data.value,
-                kind: &metric.data.kind,
+            emit!(&StatsdInvalidMetricReceived {
+                value: metric.value(),
+                kind: &metric.kind(),
             });
 
             return None;
@@ -240,7 +253,7 @@ mod test {
     use super::*;
     use crate::{event::Metric, test_util::*};
     use bytes::Bytes;
-    use futures::{channel::mpsc, TryStreamExt};
+    use futures::{channel::mpsc, StreamExt, TryStreamExt};
     use tokio::net::UdpSocket;
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
 
@@ -300,7 +313,7 @@ mod test {
         .with_tags(Some(tags()));
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
-        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
+        let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
         shared::assert_event_data_eq!(metric1, metric2);
     }
 
@@ -316,7 +329,7 @@ mod test {
         let frame = &encode_event(event, None).unwrap();
         // The statsd parser will parse the counter as Incremental,
         // so we can't compare it with the parsed value.
-        assert_eq!("counter:1.5|c\n", from_utf8(&frame).unwrap());
+        assert_eq!("counter:1.5|c\n", from_utf8(frame).unwrap());
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -330,7 +343,7 @@ mod test {
         .with_tags(Some(tags()));
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
-        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
+        let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
         shared::assert_event_data_eq!(metric1, metric2);
     }
 
@@ -345,7 +358,7 @@ mod test {
         .with_tags(Some(tags()));
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
-        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
+        let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
         shared::assert_event_data_eq!(metric1, metric2);
     }
 
@@ -356,14 +369,14 @@ mod test {
             "distribution",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: crate::samples![1.5 => 1],
+                samples: vector_core::samples![1.5 => 1],
                 statistic: StatisticKind::Histogram,
             },
         )
         .with_tags(Some(tags()));
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
-        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
+        let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
         shared::assert_event_data_eq!(metric1, metric2);
     }
 
@@ -380,7 +393,7 @@ mod test {
         .with_tags(Some(tags()));
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
-        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
+        let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
         shared::assert_event_data_eq!(metric1, metric2);
     }
 
@@ -389,15 +402,13 @@ mod test {
         trace_init();
 
         let addr = next_addr();
+        let mut batch = BatchConfig::default();
+        batch.max_bytes = Some(512);
 
         let config = StatsdSinkConfig {
             default_namespace: Some("ns".into()),
             mode: Mode::Udp(StatsdUdpConfig {
-                batch: BatchConfig {
-                    max_bytes: Some(512),
-                    timeout_secs: Some(1),
-                    ..Default::default()
-                },
+                batch,
                 udp: UdpSinkConfig::from_address(addr.to_string()),
             }),
         };
@@ -420,7 +431,7 @@ mod test {
                     "histogram",
                     MetricKind::Incremental,
                     MetricValue::Distribution {
-                        samples: crate::samples![2.0 => 100],
+                        samples: vector_core::samples![2.0 => 100],
                         statistic: StatisticKind::Histogram,
                     },
                 )

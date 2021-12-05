@@ -1,6 +1,6 @@
-use super::InternalEvent;
 use crate::event::Event;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct KubernetesLogsEventReceived<'a> {
@@ -18,9 +18,9 @@ impl InternalEvent for KubernetesLogsEventReceived<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
         match self.pod_name {
             Some(name) => {
+                counter!("component_received_events_total", 1, "pod_name" => name.to_owned());
                 counter!("events_in_total", 1, "pod_name" => name.to_owned());
                 counter!(
                     "processed_bytes_total", self.byte_size as u64,
@@ -28,6 +28,7 @@ impl InternalEvent for KubernetesLogsEventReceived<'_> {
                 );
             }
             None => {
+                counter!("component_received_events_total", 1);
                 counter!("events_in_total", 1);
                 counter!("processed_bytes_total", self.byte_size as u64);
             }
@@ -50,6 +51,24 @@ impl InternalEvent for KubernetesLogsEventAnnotationFailed<'_> {
 
     fn emit_metrics(&self) {
         counter!("k8s_event_annotation_failures_total", 1);
+    }
+}
+
+#[derive(Debug)]
+pub struct KubernetesLogsEventNamespaceAnnotationFailed<'a> {
+    pub event: &'a Event,
+}
+
+impl InternalEvent for KubernetesLogsEventNamespaceAnnotationFailed<'_> {
+    fn emit_logs(&self) {
+        warn!(
+            message = "Failed to annotate event with namespace metadata.",
+            event = ?self.event
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("k8s_event_namespace_annotation_failures_total", 1);
     }
 }
 

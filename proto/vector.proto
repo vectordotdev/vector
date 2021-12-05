@@ -1,0 +1,27 @@
+syntax = "proto3";
+package vector;
+
+import "event.proto";
+
+message PushEventsRequest {
+  repeated event.EventWrapper events = 1;
+}
+
+message PushEventsResponse {}
+
+enum ServingStatus {
+    SERVING = 0;
+    NOT_SERVING = 1;
+}
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  ServingStatus status = 1;
+}
+
+service Vector {
+  rpc PushEvents(PushEventsRequest) returns (PushEventsResponse) {}
+
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}

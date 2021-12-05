@@ -1,0 +1,69 @@
+{{/* Dropdown version selector */}}
+{{ $versions := site.Data.docs.versions }}
+{{ $latest := index $versions 0 }}
+<div x-data="{ open: false }" @click.away="open = false" class="relative inline-block text-left">
+  <div>
+    <button @click="open = !open" type="button" class="flex items-center space-x-3 justify-center w-full rounded-md border dark:text-gray-200 text:gray-700 border-gray-300 dark:border-gray-700 shadow-sm px-4 py-2.5 bg-white dark:bg-dark text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none dark:hover:border-secondary" id="menu-button" aria-expanded="true" aria-haspopup="true">
+      <span class="flex items-center space-x-3">
+        <span class="flex text-xl space-x-2.5">
+          <span>
+            Version
+          </span>
+          <strong x-text="$store.global.version"></strong>
+        </span>
+
+        {{ $show := printf `$store.global.version === '%s'` $latest }}
+        {{ partial "badge.html" (dict "word" "latest" "color" "green" "show" $show) }}
+
+        {{ $show := `$store.global.isNightly()` }}
+        {{ partial "badge.html" (dict "word" "unstable" "color" "yellow" "show" $show) }}
+      </span>
+
+      {{/* Heroicon name: solid/chevron-down  */}}
+      <svg class="text-purple-v dark:text-secondary h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+      </svg>
+    </button>
+  </div>
+
+  <div
+    x-show="open"
+    x-transition:enter="transition ease-out duration-100"
+    x-transition:enter-start="transform opacity-0 scale-95"
+    x-transition:enter-end="transform opacity-100 scale-100"
+    x-transition:leave="transition ease-in duration-75"
+    x-transition:leave-start="transform opacity-100 scale-100"
+    x-transition:leave-end="transform opacity-0 scale-95"
+    class="origin-top-right absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-dark ring-1 ring-black ring-opacity-5 focus:outline-none"
+    role="menu"
+    aria-orientation="vertical"
+    aria-labelledby="menu-button"
+    tabindex="-1">
+
+    <div class="flex flex-col py-3" role="none">
+      <div class="flex justify-between py-1.5 px-5 items-center text-xl hover:bg-gray-50 dark:hover:bg-black">
+        <button @click="$store.global.setVersion('nightly'); open = false" class="text-gray-600 dark:text-gray-200" role="menuitem" tabindex="-1" id="version-nightly">
+          <span>
+            nightly
+          </span>
+        </button>
+
+        {{ partial "badge.html" (dict "word" "unstable" "color" "yellow") }}
+      </div>
+
+      {{ range $versions }}
+      {{ $isLatest := eq . $latest }}
+      <div class="flex justify-between py-1.5 px-5 items-center text-xl hover:bg-gray-50 dark:hover:bg-black">
+        <button @click="$store.global.setVersion('{{ . }}'); open = false" class="text-gray-600 dark:text-gray-200" role="menuitem" tabindex="-1" id="version-{{ . }}">
+          <span x-show="$store.global.version === '{{ . }}'"><strong>{{ . }}</strong></span>
+          <span x-show="$store.global.version != '{{ . }}'">{{ . }}</span>
+        </button>
+
+        {{ if $isLatest }}
+        {{ partial "badge.html" (dict "word" "latest" "color" "green") }}
+        {{ end }}
+      </div>
+      {{ end }}
+    </div>
+  </div>
+</div>

@@ -1,0 +1,38 @@
+<nav class="border-t border-gray-200 dark:border-gray-700 px-4 flex items-center justify-between sm:px-0">
+  {{ with .NextInSection }}
+  {{ $title := .Params.short | default .Title }}
+  <div class="-mt-px w-0 flex-1 flex">
+    <a href="{{ .RelPermalink }}" class="dark:text-gray-300 border-t-2 border-transparent pt-4 pr-1 inline-flex items-center text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:hover:border-gray-400">
+      {{/* Heroicon: solid/arrow-narrow-left */}}
+      <svg xmlns="http://www.w3.org/2000/svg" class="text-dark dark:text-gray-200 mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16l-4-4m0 0l4-4m-4 4h18" />
+      </svg>
+
+      <span>
+        Previous:
+      </span>
+      <span class="ml-2.5 font-bold dark:hover:text-primary hover:text-secondary">
+        {{ $title }}
+      </span>
+    </a>
+  </div>
+  {{ end }}
+
+  {{ with .PrevInSection }}
+  {{ $title := .Params.short | default .Title }}
+  <div class="-mt-px w-0 flex-1 flex justify-end">
+    <a href="{{ .RelPermalink }}" class="dark:text-gray-300 border-t-2 border-transparent pt-4 pl-1 inline-flex items-center text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:hover:border-gray-400">
+      <span class="mr-2.5">
+        Next:
+      </span>
+      <span class="font-bold dark:hover:text-primary hover:text-secondary">
+        {{ $title }}
+      </span>
+      {{/* Heroicon: solid/arrow-narrow-right */}}
+      <svg xmlns="http://www.w3.org/2000/svg" class="text-dark dark:text-gray-200 ml-3 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+      </svg>
+    </a>
+  </div>
+  {{ end }}
+</nav>

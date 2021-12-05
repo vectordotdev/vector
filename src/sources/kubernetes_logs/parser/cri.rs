@@ -10,6 +10,7 @@ use shared::TimeZone;
 use snafu::{OptionExt, Snafu};
 
 pub const MULTILINE_TAG: &str = "multiline_tag";
+pub const NEW_LINE_TAG: &str = "new_line_tag";
 
 /// Parser for the CRI log format.
 ///
@@ -34,7 +35,7 @@ impl Cri {
         let regex_parser = {
             let mut rp_config = RegexParserConfig::default();
 
-            let pattern = r"^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<multiline_tag>(P|F)) (?P<message>.*)$";
+            let pattern = r"(?-u)^(?P<timestamp>.*) (?P<stream>(stdout|stderr)) (?P<multiline_tag>(P|F)) (?P<message>.*)(?P<new_line_tag>\n?)$";
             rp_config.patterns = vec![pattern.to_owned()];
 
             rp_config.types.insert(
@@ -56,9 +57,7 @@ impl FunctionTransform for Cri {
         let mut buf = Vec::with_capacity(1);
         self.regex_parser.transform(&mut buf, event);
         if let Some(mut event) = buf.into_iter().next() {
-            if normalize_event(event.as_mut_log()).ok().is_none() {
-                return;
-            } else {
+            if normalize_event(event.as_mut_log()).ok().is_some() {
                 output.push(event);
             }
         }
@@ -66,6 +65,9 @@ impl FunctionTransform for Cri {
 }
 
 fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
+    // Remove possible new_line tag
+    // for additional details, see https://github.com/timberio/vector/issues/8606
+    let _ = log.remove(NEW_LINE_TAG);
     // Detect if this is a partial event.
     let multiline_tag = log
         .remove(MULTILINE_TAG)
@@ -96,6 +98,7 @@ pub mod tests {
     use super::super::test_util;
     use super::*;
     use crate::{event::LogEvent, test_util::trace_init, transforms::Transform};
+    use bytes::Bytes;
 
     fn make_long_string(base: &str, len: usize) -> String {
         base.chars().cycle().take(len).collect()
@@ -157,9 +160,45 @@ pub mod tests {
         ]
     }
 
+    pub fn byte_cases() -> Vec<(Bytes, Vec<LogEvent>)> {
+        vec![(
+            // This is not valid UTF-8 string, ends with \n
+            // 2021-08-05T17:35:26.640507539Z stdout P Hello World Привет Ми\xd1\n
+            Bytes::from(vec![
+                50, 48, 50, 49, 45, 48, 56, 45, 48, 53, 84, 49, 55, 58, 51, 53, 58, 50, 54, 46, 54,
+                52, 48, 53, 48, 55, 53, 51, 57, 90, 32, 115, 116, 100, 111, 117, 116, 32, 80, 32,
+                72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 32, 208, 159, 209, 128, 208,
+                184, 208, 178, 208, 181, 209, 130, 32, 208, 156, 208, 184, 209, 10,
+            ]),
+            vec![test_util::make_log_event_with_byte_message(
+                Bytes::from(vec![
+                    72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 32, 208, 159, 209, 128,
+                    208, 184, 208, 178, 208, 181, 209, 130, 32, 208, 156, 208, 184, 209,
+                ]),
+                "2021-08-05T17:35:26.640507539Z",
+                "stdout",
+                true,
+            )],
+        )]
+    }
+
     #[test]
     fn test_parsing() {
         trace_init();
-        test_util::test_parser(|| Transform::function(Cri::new(TimeZone::Local)), cases());
+        test_util::test_parser(
+            || Transform::function(Cri::new(TimeZone::Local)),
+            Event::from,
+            cases(),
+        );
+    }
+
+    #[test]
+    fn test_parsing_bytes() {
+        trace_init();
+        test_util::test_parser(
+            || Transform::function(Cri::new(TimeZone::Local)),
+            Event::from,
+            byte_cases(),
+        );
     }
 }

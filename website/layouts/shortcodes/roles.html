@@ -1,0 +1,27 @@
+{{ $roles := site.Data.docs.administration.roles }}
+{{ range $k, $v := $roles }}
+{{ partial "heading.html" (dict "text" $v.title "level" 2) }}
+
+{{ with $v.sub_roles }}
+{{ range . }}
+{{ partial "heading.html" (dict "text" .title "level" 3) }}
+{{ template "role-image" .name }}
+{{ template "role-description" .description }}
+{{ end }}
+{{ else }}
+{{ template "role-image" $k }}
+{{ end }}
+{{ template "role-description" $v.description }}
+{{ end }}
+
+
+{{ define "role-image" }}
+{{ $svg := printf "img/roles/%s.svg" . }}
+{{ partial "svg.html" (dict "src" $svg) }}
+{{ end }}
+
+{{ define "role-description" }}
+<div>
+  {{ . | markdownify }}
+</div>
+{{ end }}

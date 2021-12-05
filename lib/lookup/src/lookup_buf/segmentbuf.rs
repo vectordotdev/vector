@@ -92,18 +92,6 @@ pub enum SegmentBuf {
     Coalesce(Vec<FieldBuf>),
 }
 
-impl SegmentBuf {
-    pub fn as_segment(&self) -> Segment {
-        match self {
-            SegmentBuf::Field(field) => Segment::field(field.into()),
-            SegmentBuf::Index(i) => Segment::index(*i),
-            SegmentBuf::Coalesce(v) => {
-                Segment::coalesce(v.iter().map(|field| field.into()).collect())
-            }
-        }
-    }
-}
-
 #[cfg(any(test, feature = "arbitrary"))]
 impl Arbitrary for SegmentBuf {
     fn arbitrary(g: &mut Gen) -> Self {
@@ -134,31 +122,31 @@ impl Arbitrary for SegmentBuf {
     }
 }
 
-#[inherent(pub)]
+#[inherent]
 impl<'a> LookSegment<'a> for SegmentBuf {
     type Field = FieldBuf;
 
-    fn field(field: FieldBuf) -> SegmentBuf {
+    pub fn field(field: FieldBuf) -> SegmentBuf {
         SegmentBuf::Field(field)
     }
 
-    fn is_field(&self) -> bool {
+    pub fn is_field(&self) -> bool {
         matches!(self, SegmentBuf::Field(_))
     }
 
-    fn index(v: isize) -> SegmentBuf {
+    pub fn index(v: isize) -> SegmentBuf {
         SegmentBuf::Index(v)
     }
 
-    fn is_index(&self) -> bool {
+    pub fn is_index(&self) -> bool {
         matches!(self, SegmentBuf::Index(_))
     }
 
-    fn coalesce(v: Vec<FieldBuf>) -> SegmentBuf {
+    pub fn coalesce(v: Vec<FieldBuf>) -> SegmentBuf {
         SegmentBuf::Coalesce(v)
     }
 
-    fn is_coalesce(&self) -> bool {
+    pub fn is_coalesce(&self) -> bool {
         matches!(self, SegmentBuf::Coalesce(_))
     }
 }

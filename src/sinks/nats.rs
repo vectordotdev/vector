@@ -1,7 +1,5 @@
 use crate::{
-    buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    emit,
     event::Event,
     internal_events::{NatsEventSendFail, NatsEventSendSuccess, TemplateRenderingFailed},
     sinks::util::{
@@ -15,6 +13,7 @@ use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::convert::TryFrom;
+use vector_core::buffers::Acker;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -29,8 +28,8 @@ enum BuildError {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NatsSinkConfig {
     encoding: EncodingConfig<Encoding>,
-    #[serde(default = "default_name")]
-    name: String,
+    #[serde(default = "default_name", alias = "name")]
+    connection_name: String,
     subject: String,
     url: String,
 }
@@ -55,7 +54,7 @@ impl GenerateConfig for NatsSinkConfig {
         toml::from_str(
             r#"
             encoding.codec = "json"
-            name = "vector"
+            connection_name = "vector"
             subject = "from.vector"
             url = "nats://127.0.0.1:4222""#,
         )
@@ -89,7 +88,7 @@ impl NatsSinkConfig {
         // Set reconnect_buffer_size on the nats client to 0 bytes so that the
         // client doesn't buffer internally (to avoid message loss).
         async_nats::Options::new()
-            .with_name(&self.name)
+            .with_name(&self.connection_name)
             .reconnect_buffer_size(0)
     }
 
@@ -111,7 +110,7 @@ async fn healthcheck(config: NatsSinkConfig) -> crate::Result<()> {
 
 #[derive(Clone)]
 struct NatsOptions {
-    name: String,
+    connection_name: String,
 }
 
 pub struct NatsSink {
@@ -137,7 +136,7 @@ impl NatsSink {
 impl From<NatsOptions> for async_nats::Options {
     fn from(options: NatsOptions) -> Self {
         async_nats::Options::new()
-            .with_name(&options.name)
+            .with_name(&options.connection_name)
             .reconnect_buffer_size(0)
     }
 }
@@ -145,15 +144,15 @@ impl From<NatsOptions> for async_nats::Options {
 impl From<&NatsSinkConfig> for NatsOptions {
     fn from(options: &NatsSinkConfig) -> Self {
         Self {
-            name: options.name.clone(),
+            connection_name: options.connection_name.clone(),
         }
     }
 }
 
 #[async_trait]
 impl StreamSink for NatsSink {
-    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let nats_options: async_nats::Options = self.options.clone().into();
+    async fn run(self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let nats_options: async_nats::Options = self.options.into();
 
         let nc = nats_options.connect(&self.url).await.map_err(|_| ())?;
 
@@ -161,7 +160,7 @@ impl StreamSink for NatsSink {
             let subject = match self.subject.render_string(&event) {
                 Ok(subject) => subject,
                 Err(error) => {
-                    emit!(TemplateRenderingFailed {
+                    emit!(&TemplateRenderingFailed {
                         error,
                         field: Some("subject"),
                         drop_event: true,
@@ -176,12 +175,12 @@ impl StreamSink for NatsSink {
 
             match nc.publish(&subject, log).await {
                 Ok(_) => {
-                    emit!(NatsEventSendSuccess {
+                    emit!(&NatsEventSendSuccess {
                         byte_size: message_len,
                     });
                 }
                 Err(error) => {
-                    emit!(NatsEventSendFail { error });
+                    emit!(&NatsEventSendFail { error });
                 }
             }
 
@@ -259,7 +258,7 @@ mod integration_tests {
 
         let cnf = NatsSinkConfig {
             encoding: EncodingConfig::from(Encoding::Text),
-            name: "".to_owned(),
+            connection_name: "".to_owned(),
             subject: subject.clone(),
             url: "nats://127.0.0.1:4222".to_owned(),
         };
@@ -270,9 +269,9 @@ mod integration_tests {
 
         // Publish events.
         let (acker, ack_counter) = Acker::new_for_testing();
-        let mut sink = NatsSink::new(cnf.clone(), acker).unwrap();
+        let sink = Box::new(NatsSink::new(cnf.clone(), acker).unwrap());
         let num_events = 1_000;
-        let (input, events) = random_lines_with_stream(100, num_events);
+        let (input, events) = random_lines_with_stream(100, num_events, None);
 
         let _ = sink.run(Box::pin(events)).await.unwrap();
 

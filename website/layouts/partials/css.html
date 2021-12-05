@@ -1,0 +1,34 @@
+{{ $serverMode   := site.IsServer }}
+{{ $isHome := .IsHome }}
+{{ $cssInputs := site.Params.css }}
+{{ $includePaths := slice "node_modules" }}
+{{ $devOpts      := dict "includePaths" $includePaths "enableSourceMap" true }}
+{{ $prodOpts     := dict "includePaths" $includePaths "outputStyle" "compressed" }}
+{{ $cssOpts      := cond $serverMode $devOpts $prodOpts }}
+{{ $postCssOpts  := dict "inlineImports" true }}
+{{ $ctx := . }}
+
+{{ range $cssInputs }}
+{{ $opts := merge $cssOpts (dict "targetPath" .output) }}
+
+{{ $postProcess := .post_process }}
+{{ $css := resources.Get .input | resources.ExecuteAsTemplate .input $ctx | toCSS $opts }}
+
+{{ if .postcss }}
+{{ $css = $css | postCSS $postCssOpts }}
+{{ end }}
+
+{{ if not (and (not $isHome) .home_page_only) }}
+{{ if $serverMode }}
+<link rel="stylesheet" href="{{ $css.RelPermalink }}">
+{{ else }}
+{{ $css = $css | fingerprint }}
+
+{{ if $postProcess }}
+{{ $css = $css | resources.PostProcess }}
+{{ end }}
+
+<link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}">
+{{ end }}
+{{ end }}
+{{ end }}

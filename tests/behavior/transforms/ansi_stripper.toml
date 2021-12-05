@@ -11,7 +11,7 @@
   [[tests.outputs]]
     extract_from = "ansi_stripper_simple"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '.message == "hello123"'
 
 [transforms.ansi_stripper_nested]
@@ -28,5 +28,5 @@
   [[tests.outputs]]
     extract_from = "ansi_stripper_nested"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '.a.b == "hello123"'

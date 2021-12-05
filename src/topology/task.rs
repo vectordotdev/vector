@@ -1,5 +1,5 @@
-use crate::{buffers::Acker, event::Event};
-use futures::{future::BoxFuture, FutureExt, Stream};
+use crate::config::ComponentKey;
+use futures::{future::BoxFuture, FutureExt};
 use pin_project::pin_project;
 use std::{
     fmt,
@@ -7,12 +7,15 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+use vector_core::buffers::Acker;
+
+use super::EventStream;
 
 pub enum TaskOutput {
     Source,
     Transform,
     /// Buffer of sink
-    Sink(Pin<Box<dyn Stream<Item = Event> + Send>>, Acker),
+    Sink(Pin<EventStream>, Acker),
     Healthcheck,
 }
 
@@ -21,26 +24,29 @@ pub enum TaskOutput {
 pub struct Task {
     #[pin]
     inner: BoxFuture<'static, Result<TaskOutput, ()>>,
-    name: String,
+    key: ComponentKey,
     typetag: String,
 }
 
 impl Task {
-    pub fn new<S1, S2, Fut>(name: S1, typetag: S2, inner: Fut) -> Self
+    pub fn new<S, Fut>(key: ComponentKey, typetag: S, inner: Fut) -> Self
     where
-        S1: Into<String>,
-        S2: Into<String>,
+        S: Into<String>,
         Fut: Future<Output = Result<TaskOutput, ()>> + Send + 'static,
     {
         Self {
             inner: inner.boxed(),
-            name: name.into(),
+            key,
             typetag: typetag.into(),
         }
     }
 
-    pub fn name(&self) -> &str {
-        &self.name
+    pub const fn key(&self) -> &ComponentKey {
+        &self.key
+    }
+
+    pub fn id(&self) -> &str {
+        self.key.id()
     }
 
     pub fn typetag(&self) -> &str {
@@ -60,7 +66,7 @@ impl Future for Task {
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Task")
-            .field("name", &self.name)
+            .field("id", &self.key.id().to_string())
             .field("typetag", &self.typetag)
             .finish()
     }

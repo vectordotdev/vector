@@ -1,16 +1,20 @@
+use std::num::NonZeroU64;
+
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     http::HttpClient,
     sinks::util::{
         http::{BatchedHttpSink, HttpSink},
-        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
+        BatchConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
     },
 };
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+
+use super::util::SinkBatchSettings;
 
 lazy_static::lazy_static! {
     static ref HOST: Uri = Uri::from_static("https://api.honeycomb.io/1/batch");
@@ -25,10 +29,19 @@ pub struct HoneycombConfig {
     dataset: String,
 
     #[serde(default)]
-    batch: BatchConfig,
+    batch: BatchConfig<HoneycombDefaultBatchSettings>,
 
     #[serde(default)]
     request: TowerRequestConfig,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct HoneycombDefaultBatchSettings;
+
+impl SinkBatchSettings for HoneycombDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = None;
+    const MAX_BYTES: Option<usize> = Some(100_000);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
 }
 
 inventory::submit! {
@@ -53,16 +66,15 @@ impl SinkConfig for HoneycombConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-        let batch_settings = BatchSettings::default()
-            .bytes(bytesize::kib(100u64))
-            .timeout(1)
-            .parse_config(self.batch)?;
+        let batch_settings = self.batch.into_batch_settings()?;
 
-        let client = HttpClient::new(None)?;
+        let buffer = JsonArrayBuffer::new(batch_settings.size);
+
+        let client = HttpClient::new(None, cx.proxy())?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
-            JsonArrayBuffer::new(batch_settings.size),
+            buffer,
             request_settings,
             batch_settings.timeout,
             client.clone(),
@@ -99,10 +111,12 @@ impl HttpSink for HoneycombConfig {
             chrono::Utc::now()
         };
 
-        Some(json!({
+        let data = json!({
             "timestamp": timestamp.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
             "data": log.all_fields(),
-        }))
+        });
+
+        Some(data)
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {

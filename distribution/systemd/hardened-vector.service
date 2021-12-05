@@ -1,0 +1,56 @@
+# Experimental service configuration for a hardened Vector
+#
+# This has not been widely tested on all OSes and with all Vector
+# configurations, but can be used as a basis for limiting the Vector service
+# capabilities
+
+[Unit]
+Description=Vector
+Documentation=https://vector.dev
+After=network-online.target
+Requires=network-online.target
+
+[Service]
+EnvironmentFile=-/etc/default/vector
+User=vector
+Group=vector
+ExecStartPre=/usr/bin/vector validate
+ExecStart=/usr/bin/vector
+ExecReload=/usr/bin/vector validate
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=no
+
+# capabilities
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
+# sandboxing
+ProtectHostname=yes
+ProtectClock=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectSystem=strict
+ProtectHome=yes
+StateDirectory=vector
+ProtectControlGroups=yes
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+NoNewPrivileges=yes
+RemoveIPC=yes
+RestrictNamespaces=yes
+
+# syscall filtering
+SystemCallFilter=@system-service @debug
+SystemCallArchitectures=native
+
+# process properties
+UMask=077
+
+[Install]
+WantedBy=multi-user.target

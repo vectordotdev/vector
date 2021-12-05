@@ -1,0 +1,49 @@
+[package]
+name = "buffers"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2021"
+publish = false
+
+[dependencies]
+bytes = { version = "1.1.0", default-features = false }
+db-key = { version = "0.0.5", default-features = false, optional = true }
+futures = { version = "0.3.17", default-features = false, features = ["std"] }
+core_common = { path = "../core-common", default-features = false }
+leveldb = { version = "0.8.6", default-features = false, optional = true }
+metrics = { version = "0.17.0", default-features = false, features = ["std"] }
+pin-project = { version = "1.0.8", default-features = false }
+serde = { version = "1.0.130", default-features = false, features = ["derive"] }
+snafu = { version = "0.6.10", default-features = false, features = ["std"] }
+tokio = { version = "1.13.0", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync"] }
+tokio-stream = { version = "0.1", default-features = false, features = ["sync"] }
+tokio-util = { version = "0.6", default-features = false }
+tracing = { version = "0.1.29", default-features = false }
+
+[dev-dependencies]
+criterion = { version = "0.3", features = ["html_reports"] }
+pretty_assertions = "1.0.0"
+quickcheck = "1.0"
+tempdir = "0.3"
+tokio-test = "0.4.2"
+metrics-exporter-prometheus = "0.6"
+metrics-util = { version = "0.10.1", default-features = false }
+metrics-tracing-context = { version = "0.8.1", default-features = false }
+serde_yaml = { version = "0.8", default-features = false }
+tracing-subscriber = { version = "0.2.25", default-features = false, features = ["registry"] }
+
+[features]
+disk-buffer = ["db-key", "leveldb"]
+
+[[bench]]
+name = "on_disk"
+harness = false
+required-features = ["disk-buffer"]
+
+[[bench]]
+name = "in_memory"
+harness = false
+
+[[bench]]
+name = "in_memory_v2"
+harness = false

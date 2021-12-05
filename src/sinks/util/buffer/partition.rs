@@ -1,4 +1,8 @@
-use super::super::batch::{Batch, BatchConfig, BatchError, BatchSettings, PushResult};
+use crate::sinks::util::{Merged, SinkBatchSettings};
+
+use super::super::batch::{Batch, BatchConfig, BatchError, PushResult};
+use super::super::ElementCount;
+use vector_core::ByteSizeOf;
 
 pub trait Partition<K> {
     fn partition(&self) -> K;
@@ -16,7 +20,7 @@ pub struct PartitionInnerBuffer<T, K> {
 }
 
 impl<T, K> PartitionBuffer<T, K> {
-    pub fn new(inner: T) -> Self {
+    pub const fn new(inner: T) -> Self {
         Self { inner, key: None }
     }
 }
@@ -29,11 +33,10 @@ where
     type Input = PartitionInnerBuffer<T::Input, K>;
     type Output = PartitionInnerBuffer<T::Output, K>;
 
-    fn get_settings_defaults(
-        config: BatchConfig,
-        defaults: BatchSettings<Self>,
-    ) -> Result<BatchSettings<Self>, BatchError> {
-        Ok(T::get_settings_defaults(config, defaults.into())?.into())
+    fn get_settings_defaults<D: SinkBatchSettings>(
+        config: BatchConfig<D, Merged>,
+    ) -> Result<BatchConfig<D, Merged>, BatchError> {
+        T::get_settings_defaults(config)
     }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
@@ -67,10 +70,11 @@ where
 }
 
 impl<T, K> PartitionInnerBuffer<T, K> {
-    pub fn new(inner: T, key: K) -> Self {
+    pub const fn new(inner: T, key: K) -> Self {
         Self { inner, key }
     }
 
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn into_parts(self) -> (T, K) {
         (self.inner, self.key)
     }
@@ -82,5 +86,22 @@ where
 {
     fn partition(&self) -> K {
         self.key.clone()
+    }
+}
+
+impl<T: ByteSizeOf, K> ByteSizeOf for PartitionInnerBuffer<T, K> {
+    // This ignores the size of the key, as it does not represent actual data size.
+    fn size_of(&self) -> usize {
+        self.inner.size_of()
+    }
+
+    fn allocated_bytes(&self) -> usize {
+        self.inner.allocated_bytes()
+    }
+}
+
+impl<T: ElementCount, K> ElementCount for PartitionInnerBuffer<T, K> {
+    fn element_count(&self) -> usize {
+        self.inner.element_count()
     }
 }

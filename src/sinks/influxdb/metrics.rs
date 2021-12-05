@@ -14,8 +14,9 @@ use crate::{
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             encode_namespace,
             http::{HttpBatchService, HttpRetryLogic},
+            sink,
             statistic::{validate_quantiles, DistributionStatistic},
-            BatchConfig, BatchSettings, TowerRequestConfig,
+            BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -23,20 +24,31 @@ use crate::{
 };
 use bytes::Bytes;
 use futures::{future::BoxFuture, stream, SinkExt};
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
     future::ready,
+    num::NonZeroU64,
     task::Poll,
 };
 use tower::Service;
+use vector_core::event::metric::{MetricSketch, Quantile};
+use vector_core::ByteSizeOf;
 
 #[derive(Clone)]
 struct InfluxDbSvc {
     config: InfluxDbConfig,
     protocol_version: ProtocolVersion,
     inner: HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>>,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct InfluxDbDefaultBatchSettings;
+
+impl SinkBatchSettings for InfluxDbDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(20);
+    const MAX_BYTES: Option<usize> = None;
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -50,7 +62,7 @@ pub struct InfluxDbConfig {
     #[serde(flatten)]
     pub influxdb2_settings: Option<InfluxDb2Settings>,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<InfluxDbDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tags: Option<HashMap<String, String>>,
@@ -61,13 +73,6 @@ pub struct InfluxDbConfig {
 
 pub fn default_summary_quantiles() -> Vec<f64> {
     vec![0.5, 0.75, 0.9, 0.95, 0.99]
-}
-
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        retry_attempts: Some(5),
-        ..Default::default()
-    };
 }
 
 // https://v2.docs.influxdata.com/v2.0/write-data/#influxdb-api
@@ -87,7 +92,7 @@ impl_generate_config_from_default!(InfluxDbConfig);
 impl SinkConfig for InfluxDbConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(tls_settings)?;
+        let client = HttpClient::new(tls_settings, cx.proxy())?;
         let healthcheck = healthcheck(
             self.clone().endpoint,
             self.clone().influxdb1_settings,
@@ -123,11 +128,11 @@ impl InfluxDbSvc {
         let token = settings.token();
         let protocol_version = settings.protocol_version();
 
-        let batch = BatchSettings::default()
-            .events(20)
-            .timeout(1)
-            .parse_config(config.batch)?;
-        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
+        let batch = config.batch.into_batch_settings()?;
+        let request = config.request.unwrap_with(&TowerRequestConfig {
+            retry_attempts: Some(5),
+            ..Default::default()
+        });
 
         let uri = settings.write_uri(endpoint)?;
 
@@ -147,8 +152,16 @@ impl InfluxDbSvc {
                 MetricsBuffer::new(batch.size),
                 batch.timeout,
                 cx.acker(),
+                sink::StdServiceLogic::default(),
             )
-            .with_flat_map(move |event: Event| stream::iter(normalizer.apply(event).map(Ok)))
+            .with_flat_map(move |event: Event| {
+                stream::iter({
+                    let byte_size = event.size_of();
+                    normalizer
+                        .apply(event)
+                        .map(|metric| Ok(EncodedEvent::new(metric, byte_size)))
+                })
+            })
             .sink_map_err(|error| error!(message = "Fatal influxdb sink error.", %error));
 
         Ok(VectorSink::Sink(Box::new(sink)))
@@ -199,13 +212,12 @@ fn merge_tags(
     event: &Metric,
     tags: Option<&HashMap<String, String>>,
 ) -> Option<BTreeMap<String, String>> {
-    match (&event.series.tags, tags) {
-        (Some(ref event_tags), Some(ref config_tags)) => {
-            let mut event_tags = event_tags.clone();
+    match (event.tags().cloned(), tags) {
+        (Some(mut event_tags), Some(config_tags)) => {
             event_tags.extend(config_tags.iter().map(|(k, v)| (k.clone(), v.clone())));
             Some(event_tags)
         }
-        (Some(ref event_tags), None) => Some(event_tags.clone()),
+        (Some(event_tags), None) => Some(event_tags),
         (None, Some(config_tags)) => Some(
             config_tags
                 .iter()
@@ -220,7 +232,7 @@ pub struct InfluxMetricNormalize;
 
 impl MetricNormalize for InfluxMetricNormalize {
     fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
-        match (metric.data.kind, &metric.data.value) {
+        match (metric.kind(), &metric.value()) {
             // Counters are disaggregated. We take the previous value from the state
             // and emit the difference between previous and current as a Counter
             (_, MetricValue::Counter { .. }) => state.make_incremental(metric),
@@ -242,13 +254,13 @@ fn encode_events(
     let mut output = String::new();
     for event in events.into_iter() {
         let fullname = encode_namespace(event.namespace().or(default_namespace), '.', event.name());
-        let ts = encode_timestamp(event.data.timestamp);
+        let ts = encode_timestamp(event.timestamp());
         let tags = merge_tags(&event, tags);
-        let (metric_type, fields) = get_type_and_fields(event.data.value, &quantiles);
+        let (metric_type, fields) = get_type_and_fields(event.value(), quantiles);
 
         if let Err(error) = influx_line_protocol(
             protocol_version,
-            fullname,
+            &fullname,
             metric_type,
             tags,
             fields,
@@ -265,12 +277,12 @@ fn encode_events(
 }
 
 fn get_type_and_fields(
-    value: MetricValue,
+    value: &MetricValue,
     quantiles: &[f64],
 ) -> (&'static str, Option<HashMap<String, Field>>) {
     match value {
-        MetricValue::Counter { value } => ("counter", Some(to_fields(value))),
-        MetricValue::Gauge { value } => ("gauge", Some(to_fields(value))),
+        MetricValue::Counter { value } => ("counter", Some(to_fields(*value))),
+        MetricValue::Gauge { value } => ("gauge", Some(to_fields(*value))),
         MetricValue::Set { values } => ("set", Some(to_fields(values.len() as f64))),
         MetricValue::AggregatedHistogram {
             buckets,
@@ -286,8 +298,8 @@ fn get_type_and_fields(
                     )
                 })
                 .collect();
-            fields.insert("count".to_owned(), Field::UnsignedInt(count));
-            fields.insert("sum".to_owned(), Field::Float(sum));
+            fields.insert("count".to_owned(), Field::UnsignedInt(*count));
+            fields.insert("sum".to_owned(), Field::Float(*sum));
 
             ("histogram", Some(fields))
         }
@@ -300,13 +312,13 @@ fn get_type_and_fields(
                 .iter()
                 .map(|quantile| {
                     (
-                        format!("quantile_{}", quantile.upper_limit),
+                        format!("quantile_{}", quantile.quantile),
                         Field::Float(quantile.value),
                     )
                 })
                 .collect();
-            fields.insert("count".to_owned(), Field::UnsignedInt(count));
-            fields.insert("sum".to_owned(), Field::Float(sum));
+            fields.insert("count".to_owned(), Field::UnsignedInt(*count));
+            fields.insert("sum".to_owned(), Field::Float(*sum));
 
             ("summary", Some(fields))
         }
@@ -315,9 +327,44 @@ fn get_type_and_fields(
                 StatisticKind::Histogram => &[0.95] as &[_],
                 StatisticKind::Summary => quantiles,
             };
-            let fields = encode_distribution(&samples, quantiles);
+            let fields = encode_distribution(samples, quantiles);
             ("distribution", fields)
         }
+        MetricValue::Sketch { sketch } => match sketch {
+            MetricSketch::AgentDDSketch(ddsketch) => {
+                // Hard-coded quantiles because InfluxDB can't natively do anything useful with the
+                // actual bins.
+                let mut fields = [0.5, 0.75, 0.9, 0.99]
+                    .iter()
+                    .map(|q| {
+                        let quantile = Quantile {
+                            quantile: *q,
+                            value: ddsketch.quantile(*q).unwrap_or(0.0),
+                        };
+                        (quantile.as_percentile(), Field::Float(quantile.value))
+                    })
+                    .collect::<HashMap<_, _>>();
+                fields.insert("count".to_owned(), Field::UnsignedInt(ddsketch.count()));
+                fields.insert(
+                    "min".to_owned(),
+                    Field::Float(ddsketch.min().unwrap_or(f64::MAX)),
+                );
+                fields.insert(
+                    "max".to_owned(),
+                    Field::Float(ddsketch.max().unwrap_or(f64::MIN)),
+                );
+                fields.insert(
+                    "sum".to_owned(),
+                    Field::Float(ddsketch.sum().unwrap_or(0.0)),
+                );
+                fields.insert(
+                    "avg".to_owned(),
+                    Field::Float(ddsketch.avg().unwrap_or(0.0)),
+                );
+
+                ("sketch", Some(fields))
+            }
+        },
     }
 }
 
@@ -435,7 +482,7 @@ mod tests {
             "requests",
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
-                buckets: crate::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
+                buckets: vector_core::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
                 count: 6,
                 sum: 12.5,
             },
@@ -474,7 +521,7 @@ mod tests {
             "requests",
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
-                buckets: crate::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
+                buckets: vector_core::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
                 count: 6,
                 sum: 12.5,
             },
@@ -513,7 +560,7 @@ mod tests {
             "requests_sum",
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
-                quantiles: crate::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
+                quantiles: vector_core::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
                 count: 6,
                 sum: 12.0,
             },
@@ -552,7 +599,7 @@ mod tests {
             "requests_sum",
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
-                quantiles: crate::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
+                quantiles: vector_core::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
                 count: 6,
                 sum: 12.0,
             },
@@ -592,7 +639,7 @@ mod tests {
                 "requests",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
+                    samples: vector_core::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                     statistic: StatisticKind::Histogram,
                 },
             )
@@ -717,7 +764,7 @@ mod tests {
             "requests",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: crate::samples![1.0 => 0, 2.0 => 0],
+                samples: vector_core::samples![1.0 => 0, 2.0 => 0],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -735,7 +782,7 @@ mod tests {
             "requests",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
+                samples: vector_core::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                 statistic: StatisticKind::Summary,
             },
         )
@@ -921,11 +968,11 @@ mod integration_tests {
         for event in events {
             let metric = event.into_metric();
             let name = format!("{}.{}", metric.namespace().unwrap(), metric.name());
-            let value = match metric.data.value {
-                MetricValue::Counter { value } => value,
+            let value = match metric.value() {
+                MetricValue::Counter { value } => *value,
                 _ => unreachable!(),
             };
-            let timestamp = format_timestamp(metric.data.timestamp.unwrap(), SecondsFormat::Nanos);
+            let timestamp = format_timestamp(metric.timestamp().unwrap(), SecondsFormat::Nanos);
             let res =
                 query_v1_json(url, &format!("select * from {}..\"{}\"", database, name)).await;
 
@@ -1001,7 +1048,7 @@ mod integration_tests {
             events.push(event);
         }
 
-        let client = HttpClient::new(None).unwrap();
+        let client = HttpClient::new(None, cx.proxy()).unwrap();
         let sink = InfluxDbSvc::new(config, cx, client).unwrap();
         sink.run(stream::iter(events)).await.unwrap();
 

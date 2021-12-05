@@ -1,13 +1,9 @@
-use super::batch::{
-    err_event_too_large, Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult,
-};
+use super::batch::{err_event_too_large, Batch, BatchSize, PushResult};
 use flate2::write::GzEncoder;
 use std::io::Write;
 
 pub mod compression;
 pub mod json;
-#[cfg(feature = "sinks-loki")]
-pub mod loki;
 pub mod metrics;
 pub mod partition;
 pub mod vec;
@@ -31,7 +27,7 @@ pub enum InnerBuffer {
 }
 
 impl Buffer {
-    pub fn new(settings: BatchSize<Self>, compression: Compression) -> Self {
+    pub const fn new(settings: BatchSize<Self>, compression: Compression) -> Self {
         Self {
             inner: None,
             num_items: 0,
@@ -48,13 +44,7 @@ impl Buffer {
             let buffer = Vec::with_capacity(bytes);
             match compression {
                 Compression::None => InnerBuffer::Plain(buffer),
-                Compression::Gzip(level) => {
-                    let level = level.unwrap_or(GZIP_FAST);
-                    InnerBuffer::Gzip(GzEncoder::new(
-                        buffer,
-                        flate2::Compression::new(level as u32),
-                    ))
-                }
+                Compression::Gzip(level) => InnerBuffer::Gzip(GzEncoder::new(buffer, level)),
             }
         })
     }
@@ -86,22 +76,13 @@ impl Batch for Buffer {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn get_settings_defaults(
-        config: BatchConfig,
-        defaults: BatchSettings<Self>,
-    ) -> Result<BatchSettings<Self>, BatchError> {
-        Ok(config
-            .use_size_as_bytes()?
-            .get_settings_or_default(defaults))
-    }
-
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         // The compressed encoders don't flush bytes immediately, so we
         // can't track compressed sizes. Keep a running count of the
         // number of bytes written instead.
         let new_bytes = self.num_bytes + item.len();
         if self.is_empty() && item.len() > self.settings.bytes {
-            err_event_too_large(item.len())
+            err_event_too_large(item.len(), self.settings.bytes)
         } else if self.num_items >= self.settings.events || new_bytes > self.settings.bytes {
             PushResult::Overflow(item)
         } else {
@@ -139,16 +120,14 @@ impl Batch for Buffer {
 #[cfg(test)]
 mod test {
     use super::{Buffer, Compression};
-    use crate::{
-        buffers::Acker,
-        sinks::util::{BatchSettings, BatchSink},
-    };
+    use crate::sinks::util::{BatchSettings, BatchSink, EncodedEvent};
     use futures::{future, stream, SinkExt, StreamExt};
     use std::{
         io::Read,
         sync::{Arc, Mutex},
     };
     use tokio::time::Duration;
+    use vector_core::buffers::Acker;
 
     #[tokio::test]
     async fn gzip() {
@@ -162,13 +141,16 @@ mod test {
             sent_requests.lock().unwrap().push(req);
             future::ok::<_, std::io::Error>(())
         });
-        let batch_size = BatchSettings::default().bytes(100_000).events(1_000).size;
-        let timeout = Duration::from_secs(0);
+
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.bytes = 100_000;
+        batch_settings.size.events = 1_000;
+        batch_settings.timeout = Duration::from_secs(0);
 
         let buffered = BatchSink::new(
             svc,
-            Buffer::new(batch_size, Compression::gzip_default()),
-            timeout,
+            Buffer::new(batch_settings.size, Compression::gzip_default()),
+            batch_settings.timeout,
             acker,
         );
 
@@ -179,7 +161,7 @@ mod test {
 
         let _ = buffered
             .sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(Ok))
+            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
             .await
             .unwrap();
 

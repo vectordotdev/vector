@@ -1,25 +1,47 @@
+#[cfg(feature = "codecs")]
+use crate::codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    BytesDecoderConfig, BytesDeserializerConfig, NewlineDelimitedDecoderConfig,
+};
 use indexmap::map::IndexMap;
 use serde::{de, Deserialize, Serialize};
 use std::fmt;
 use std::marker::PhantomData;
+pub use vector_core::serde::skip_serializing_if_default;
 
-pub fn default_true() -> bool {
+pub const fn default_true() -> bool {
     true
 }
 
-pub fn default_false() -> bool {
+pub const fn default_false() -> bool {
     false
+}
+
+/// The default max length of the input buffer.
+///
+/// Any input exceeding this limit will be discarded.
+pub fn default_max_length() -> usize {
+    bytesize::kib(100u64) as usize
+}
+
+#[cfg(feature = "codecs")]
+pub fn default_framing_message_based() -> Box<dyn FramingConfig> {
+    Box::new(BytesDecoderConfig::new())
+}
+
+#[cfg(feature = "codecs")]
+pub fn default_framing_stream_based() -> Box<dyn FramingConfig> {
+    Box::new(NewlineDelimitedDecoderConfig::new())
+}
+
+#[cfg(feature = "codecs")]
+pub fn default_decoding() -> Box<dyn DeserializerConfig> {
+    Box::new(BytesDeserializerConfig::new())
 }
 
 pub fn to_string(value: impl serde::Serialize) -> String {
     let value = serde_json::to_value(value).unwrap();
     value.as_str().unwrap().into()
-}
-
-/// Answers "Is it possible to skip serializing this value, because it's the
-/// default?"
-pub(crate) fn skip_serializing_if_default<E: Default + PartialEq>(e: &E) -> bool {
-    e == &E::default()
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

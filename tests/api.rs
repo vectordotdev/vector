@@ -61,7 +61,7 @@ mod tests {
         self,
         api::{self, Server},
         config::{self, Config, Format},
-        internal_events::{emit, GeneratorEventProcessed, Heartbeat},
+        internal_events::{emit, DemoLogsEventProcessed, Heartbeat},
         test_util::{next_addr, retry_until},
     };
     use vector_api_client::{
@@ -77,7 +77,7 @@ mod tests {
     // Initialize the metrics system.
     fn init_metrics() -> oneshot::Sender<()> {
         vector::trace::init(true, true, "info");
-        let _ = vector::metrics::init();
+        let _ = vector::metrics::init_test();
 
         let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
         tokio::spawn(async move {
@@ -176,12 +176,12 @@ mod tests {
     }
 
     // Emits fake generate events every 10ms until the returned shutdown falls out of scope
-    fn emit_fake_generator_events() -> oneshot::Sender<()> {
+    fn emit_fake_demo_logs_events() -> oneshot::Sender<()> {
         let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
         tokio::spawn(async move {
             IntervalStream::new(tokio::time::interval(Duration::from_millis(10)))
                 .take_until(shutdown_rx)
-                .for_each(|_| async { emit(GeneratorEventProcessed) })
+                .for_each(|_| async { emit(DemoLogsEventProcessed) })
                 .await
         });
 
@@ -251,7 +251,7 @@ mod tests {
         interval: i64,
     ) {
         // Emit events for the duration of the test
-        let _shutdown = emit_fake_generator_events();
+        let _shutdown = emit_fake_demo_logs_events();
 
         let subscription = client.processed_events_total_subscription(interval);
 
@@ -370,17 +370,17 @@ mod tests {
                 .flatten()
                 .collect::<Vec<_>>();
 
-            // should be a single source named "in1"
+            // should be a single source with id "in1"
             assert!(sources.len() == 1);
-            assert!(sources[0].node.name == "in1");
+            assert!(sources[0].node.id == "in1");
 
-            // "in1" source should link to exactly one transform named "t1"
+            // "in1" source should link to exactly one transform with id "t1"
             assert!(sources[0].node.transforms.len() == 1);
-            assert!(sources[0].node.transforms[0].name == "t1");
+            assert!(sources[0].node.transforms[0].id == "t1");
 
-            // "in1" source should link to exactly one sink named "out2"
+            // "in1" source should link to exactly one sink with id "out2"
             assert!(sources[0].node.sinks.len() == 1);
-            assert!(sources[0].node.sinks[0].name == "out1");
+            assert!(sources[0].node.sinks[0].id == "out1");
 
             // there should be 2 transforms
             assert!(transforms.len() == 2);
@@ -390,41 +390,41 @@ mod tests {
             let mut t2 = &transforms[1];
 
             // swap if needed
-            if t1.node.name == "t2" {
+            if t1.node.id == "t2" {
                 t1 = &transforms[1];
                 t2 = &transforms[0];
             }
 
-            // "t1" transform should link to exactly one source named "in1"
+            // "t1" transform should link to exactly one source with id "in1"
             assert!(t1.node.sources.len() == 1);
-            assert!(t1.node.sources[0].name == "in1");
+            assert!(t1.node.sources[0].id == "in1");
 
-            // "t1" transform should link to exactly one transform named "t2"
+            // "t1" transform should link to exactly one transform with id "t2"
             assert!(t1.node.transforms.len() == 1);
-            assert!(t1.node.transforms[0].name == "t2");
+            assert!(t1.node.transforms[0].id == "t2");
 
             // "t1" transform should NOT link to any sinks
             assert!(t1.node.sinks.is_empty());
 
-            // "t2" transform should link to exactly one sink named "out1"
+            // "t2" transform should link to exactly one sink with id "out1"
             assert!(t2.node.sinks.len() == 1);
-            assert!(t2.node.sinks[0].name == "out1");
+            assert!(t2.node.sinks[0].id == "out1");
 
             // "t2" transform should NOT link to any sources or transforms
             assert!(t2.node.sources.is_empty());
             assert!(t2.node.transforms.is_empty());
 
-            // should be a single sink named "out1"
+            // should be a single sink with id "out1"
             assert!(sinks.len() == 1);
-            assert!(sinks[0].node.name == "out1");
+            assert!(sinks[0].node.id == "out1");
 
-            // "out1" sink should link to exactly one source named "in1"
+            // "out1" sink should link to exactly one source with id "in1"
             assert!(sinks[0].node.sources.len() == 1);
-            assert!(sinks[0].node.sources[0].name == "in1");
+            assert!(sinks[0].node.sources[0].id == "in1");
 
-            // "out1" sink should link to exactly one transform named "t2"
+            // "out1" sink should link to exactly one transform with id "t2"
             assert!(sinks[0].node.transforms.len() == 1);
-            assert!(sinks[0].node.transforms[0].name == "t2");
+            assert!(sinks[0].node.transforms[0].id == "t2");
 
             assert_eq!(res.errors, None);
         })
@@ -464,7 +464,7 @@ mod tests {
     }
 
     #[test]
-    /// Tests for events processed metrics, using fake generator events
+    /// Tests for events processed metrics, using fake demo_logs events
     fn api_graphql_event_processed_total_metrics() {
         metrics_test("tests::api_graphql_event_processed_total_metrics", async {
             let server = start_server();
@@ -501,7 +501,7 @@ mod tests {
                       enabled = true
 
                     [sources.processed_events_total_batch_source]
-                      type = "generator"
+                      type = "demo_logs"
                       format = "shuffle"
                       lines = ["Random line", "And another"]
                       interval = 0.01
@@ -510,7 +510,6 @@ mod tests {
                       # General
                       type = "blackhole"
                       inputs = ["processed_events_total_batch_source"]
-                      print_amount = 100000
                 "#;
 
                 let topology = from_str_config(conf).await;
@@ -530,11 +529,11 @@ mod tests {
                     .await
                     .expect("Didn't return results");
 
-                for name in &[
+                for id in &[
                     "processed_events_total_batch_source",
                     "processed_events_total_batch_sink",
                 ] {
-                    assert!(data.iter().any(|d| d.name == *name));
+                    assert!(data.iter().any(|d| d.id == *id));
                 }
             },
         )
@@ -551,7 +550,7 @@ mod tests {
                       enabled = true
 
                     [sources.events_out_total_batch_source]
-                      type = "generator"
+                      type = "demo_logs"
                       format = "shuffle"
                       lines = ["Random line", "And another"]
                       interval = 0.01
@@ -560,7 +559,6 @@ mod tests {
                       # General
                       type = "blackhole"
                       inputs = ["events_out_total_batch_source"]
-                      print_amount = 100000
                 "#;
 
             let topology = from_str_config(conf).await;
@@ -580,11 +578,11 @@ mod tests {
                 .await
                 .expect("Didn't return results");
 
-            for name in &[
+            for id in &[
                 "events_out_total_batch_source",
                 "events_out_total_batch_sink",
             ] {
-                assert!(data.iter().any(|d| d.name == *name));
+                assert!(data.iter().any(|d| d.id == *id));
             }
         })
     }
@@ -602,7 +600,7 @@ mod tests {
                       enabled = true
 
                     [sources.processed_bytes_total_batch_source]
-                      type = "generator"
+                      type = "demo_logs"
                       format = "shuffle"
                       lines = ["Random line", "And another"]
                       interval = 0.1
@@ -611,7 +609,6 @@ mod tests {
                       # General
                       type = "blackhole"
                       inputs = ["processed_bytes_total_batch_source"]
-                      print_amount = 100000
                 "#;
 
                 let topology = from_str_config(conf).await;
@@ -630,7 +627,7 @@ mod tests {
                     .expect("Didn't return results");
 
                 // Bytes are currently only relevant on sinks
-                assert_eq!(data[0].name, "processed_bytes_total_batch_sink");
+                assert_eq!(data[0].id, "processed_bytes_total_batch_sink");
                 assert!(data[0].metric.processed_bytes_total > 0.00);
             },
         )
@@ -645,7 +642,7 @@ mod tests {
                   enabled = true
 
                 [sources.component_added_source_1]
-                  type = "generator"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["Random line", "And another"]
                   interval = 0.1
@@ -654,7 +651,6 @@ mod tests {
                   # General
                   type = "blackhole"
                   inputs = ["component_added_source_1"]
-                  print_amount = 100000
             "#;
 
             let mut topology = from_str_config(conf).await;
@@ -680,7 +676,7 @@ mod tests {
                         .data
                         .unwrap()
                         .component_added
-                        .name,
+                        .id,
                 );
             });
 
@@ -692,13 +688,13 @@ mod tests {
                   enabled = true
 
                 [sources.component_added_source_1]
-                  type = "generator"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["Random line", "And another"]
                   interval = 0.1
 
                 [sources.component_added_source_2]
-                  type = "generator"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["3rd line", "4th line"]
                   interval = 0.1
@@ -707,7 +703,6 @@ mod tests {
                   # General
                   type = "blackhole"
                   inputs = ["component_added_source_1", "component_added_source_2"]
-                  print_amount = 100000
             "#;
 
             let c = config::load_from_str(conf, Some(Format::Toml)).unwrap();
@@ -729,13 +724,13 @@ mod tests {
                   enabled = true
 
                 [sources.component_removed_source_1]
-                  type = "generator"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["Random line", "And another"]
                   interval = 0.1
 
                 [sources.component_removed_source_2]
-                  type = "generator"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["3rd line", "4th line"]
                   interval = 0.1
@@ -744,7 +739,6 @@ mod tests {
                   # General
                   type = "blackhole"
                   inputs = ["component_removed_source_1", "component_removed_source_2"]
-                  print_amount = 100000
             "#;
 
             let mut topology = from_str_config(conf).await;
@@ -770,7 +764,7 @@ mod tests {
                         .data
                         .unwrap()
                         .component_removed
-                        .name,
+                        .id,
                 );
             });
 
@@ -783,7 +777,7 @@ mod tests {
                   enabled = true
 
                 [sources.component_removed_source_1]
-                  type = "generator"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["Random line", "And another"]
                   interval = 0.1
@@ -792,7 +786,6 @@ mod tests {
                   # General
                   type = "blackhole"
                   inputs = ["component_removed_source_1"]
-                  print_amount = 100000
             "#;
 
             let c = config::load_from_str(conf, Some(Format::Toml)).unwrap();
@@ -813,7 +806,7 @@ mod tests {
                   enabled = true
 
                 [sources.error_gen]
-                  type = "generator"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["Random line", "And another"]
                   batch_interval = 0.1
@@ -822,7 +815,6 @@ mod tests {
                   # General
                   type = "blackhole"
                   inputs = ["error_gen"]
-                  print_amount = 100000
             "#;
 
             let topology = from_str_config(conf).await;
@@ -868,7 +860,7 @@ mod tests {
                   enabled = true
 
                 [sources.error_gen]
-                  type = "generator"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["Random line", "And another"]
                   batch_interval = 0.1
@@ -877,7 +869,6 @@ mod tests {
                   # General
                   type = "blackhole"
                   inputs = ["error_gen"]
-                  print_amount = 100000
             "#;
 
             let topology = from_str_config(conf).await;
@@ -946,7 +937,6 @@ mod tests {
                 [sinks.out]
                   type = "blackhole"
                   inputs = ["file"]
-                  print_amount = 100000
             "#,
                 checkpoints.path().to_str().unwrap(),
                 path
@@ -968,7 +958,7 @@ mod tests {
                     file_source_metrics_query::FileSourceMetricsQuerySourcesEdgesNodeMetricsOnFileSourceMetrics { files, .. },
                 ) => {
                     let node = &files.edges.iter().flatten().next().unwrap().as_ref().unwrap().node;
-                    assert_eq!(node.name, path);
+                    assert_eq!(node.id, path);
                     assert_eq!(node.processed_events_total.as_ref().unwrap().processed_events_total as usize, lines.len());
                     assert_eq!(node.events_in_total.as_ref().unwrap().events_in_total as usize, lines.len());
                 }
@@ -978,14 +968,14 @@ mod tests {
     }
 
     #[test]
-    fn api_graphql_component_by_name() {
-        metrics_test("tests::api_graphql_component_by_name", async {
+    fn api_graphql_component_by_component_id() {
+        metrics_test("tests::api_graphql_component_by_component_id", async {
             let conf = r#"
                 [api]
                   enabled = true
 
                 [sources.gen1]
-                  type = "generator"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["Random line", "And another"]
                   interval = 0.1
@@ -993,7 +983,6 @@ mod tests {
                 [sinks.out]
                   type = "blackhole"
                   inputs = ["gen1"]
-                  print_amount = 100000
             "#;
 
             let topology = from_str_config(&conf).await;
@@ -1002,13 +991,13 @@ mod tests {
             let client = make_client(server.addr());
 
             // Retrieving a component that doesn't exist should return None
-            let res = client.component_by_name_query("xxx").await;
-            assert!(res.unwrap().data.unwrap().component_by_name.is_none());
+            let res = client.component_by_component_id_query("xxx").await;
+            assert!(res.unwrap().data.unwrap().component_by_component_id.is_none());
 
-            // The `gen1` name should exist
-            let res = client.component_by_name_query("gen1").await;
+            // The `gen1` id should exist
+            let res = client.component_by_component_id_query("gen1").await;
             assert_eq!(
-                res.unwrap().data.unwrap().component_by_name.unwrap().name,
+                res.unwrap().data.unwrap().component_by_component_id.unwrap().id,
                 "gen1"
             );
         })
@@ -1023,25 +1012,25 @@ mod tests {
                   enabled = true
 
                 [sources.gen1]
-                  type = "generator"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["1"]
                   interval = 0.1
 
                 [sources.gen2]
-                  type = "generator"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["2"]
                   interval = 0.1
 
                 [sources.gen3]
-                  type = "generator"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["3"]
                   interval = 0.1
 
                 [sources.gen4]
-                  type = "generator"
+                  type = "demo_logs"
                   format = "shuffle"
                   lines = ["4"]
                   interval = 0.1
@@ -1049,7 +1038,6 @@ mod tests {
                 [sinks.out]
                   type = "blackhole"
                   inputs = ["gen1", "gen2", "gen3", "gen4"]
-                  print_amount = 100000
             "#;
 
             let topology = from_str_config(&conf).await;

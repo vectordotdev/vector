@@ -1,0 +1,8 @@
+subscription ComponentSentEventsTotalsSubscription($interval: Int!) {
+    componentSentEventsTotals(interval: $interval) {
+        componentId
+        metric {
+            sentEventsTotal
+        }
+    }
+}

@@ -1,3 +1,29 @@
+//! TypeDefs
+//!
+//! The type definitions for typedefs record the various possible type definitions for the state
+//! that can be passed through a VRL program.
+//!
+//! `TypeDef` contains a `KindInfo`.
+//!
+//! `KindInfo` can be:
+//! `Unknown` - We don't know what type this is.
+//! `Known` - A set of the possible known `TypeKind`s. There can be multiple possible types for a
+//! path in scenarios such as `if .thing { .x = "hello" } else { .x = 42 }`. In that example after
+//! that statement is run, `.x` could contain either an string or an integer, we won't know until
+//! runtime exactly which.
+//!
+//! `TypeKind` is a concrete type for a path, `Bytes` (string), `Integer`, `Float`, `Boolean`,
+//! `Timestamp`, `Regex`, `Null` or `Array` or `Object`.
+//!
+//! `Array` is a Map of `Index` -> `KindInfo`.
+//! `Index` can be a specific index into that array, or `Any` which represents any index found within
+//! that array.
+//!
+//! `Object` is a Map of `Field` -> `KindInfo`.
+//! `Field` can be a specifix field name of the object, or `Any` which represents any element found
+//! within that object.
+//!
+//!
 use crate::map;
 use crate::value::Kind;
 use lookup::{FieldBuf, LookupBuf, SegmentBuf};
@@ -12,15 +38,15 @@ use std::{
 pub struct TypeDef {
     /// True, if an expression can return an error.
     ///
-    /// Some expressions are infallible (e.g. the [`Literal`] expression, or any
+    /// Some expressions are infallible (e.g. the [`Literal`][crate::expression::Literal] expression, or any
     /// custom function designed to be infallible).
     pub fallible: bool,
 
-    /// The [`value::Kind`]s this definition represents.
+    /// The [`value::Kind`][crate::value::Kind]s this definition represents.
     ///
     /// This is wrapped in a [`TypeKind`] enum, such that we encode details
     /// about potential inner kinds for collections (arrays or objects).
-    kind: KindInfo,
+    pub kind: KindInfo,
 }
 
 impl Sub<Kind> for TypeDef {
@@ -40,7 +66,7 @@ impl Sub<Kind> for TypeDef {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
-enum KindInfo {
+pub enum KindInfo {
     Unknown,
     Known(BTreeSet<TypeKind>),
 }
@@ -403,10 +429,20 @@ impl KindInfo {
             _ => Unknown,
         }
     }
+
+    fn map<F>(&self, f: F) -> Self
+    where
+        F: Fn(&TypeKind) -> TypeKind,
+    {
+        match self {
+            Self::Unknown => Self::Unknown,
+            Self::Known(set) => Self::Known(set.iter().map(f).collect()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
-enum TypeKind {
+pub enum TypeKind {
     Bytes,
     Integer,
     Float,
@@ -926,6 +962,169 @@ impl TypeDef {
         self
     }
 
+    fn update_segment<'a, I>(
+        kind: &KindInfo,
+        mut path: std::iter::Peekable<I>,
+        newkind: &KindInfo,
+    ) -> KindInfo
+    where
+        I: std::iter::Iterator<Item = &'a SegmentBuf> + Clone,
+    {
+        let next_segment = |path: &mut std::iter::Peekable<I>, kindinfo| {
+            // Keep recursing until we reach the end of the path at which point we take the new
+            // kind.
+            if path.peek().is_some() {
+                Self::update_segment(kindinfo, path.clone(), newkind)
+            } else {
+                newkind.clone()
+            }
+        };
+
+        match kind {
+            KindInfo::Unknown => {
+                // The kind is unknown and thus there is nothing to remove.
+                kind.clone()
+            }
+            KindInfo::Known(kinds) => KindInfo::Known(
+                kinds
+                    .iter()
+                    .map(|kind| match (kind, path.next()) {
+                        (TypeKind::Object(object), Some(SegmentBuf::Field(fieldname))) => {
+                            // Is there an exact fieldname specified for the given path field?
+                            let indexed = object.iter().any(|(field, _)| {
+                                matches!(field,
+                                    Field::Field(field) if field == fieldname.as_str())
+                            });
+
+                            TypeKind::Object(
+                                object
+                                    .iter()
+                                    .flat_map(|(field, kindinfo)| match field {
+                                        Field::Field(f) if f == fieldname.as_str() => {
+                                            vec![(field.clone(), next_segment(&mut path, kindinfo))]
+                                                .into_iter()
+                                        }
+
+                                        Field::Any if !indexed => {
+                                            // If this specific field wasn't defined for the
+                                            // object, we want to retain the original Any
+                                            // definition and insert our new specific field
+                                            // definition.
+                                            vec![
+                                                (field.clone(), kindinfo.clone()),
+                                                (
+                                                    Field::Field(fieldname.as_str().to_string()),
+                                                    next_segment(&mut path, kindinfo),
+                                                ),
+                                            ]
+                                            .into_iter()
+                                        }
+
+                                        _ => vec![(field.clone(), kindinfo.clone())].into_iter(),
+                                    })
+                                    .collect(),
+                            )
+                        }
+
+                        (TypeKind::Object(object), Some(SegmentBuf::Coalesce(fieldnames))) => {
+                            TypeKind::Object(
+                                object
+                                    .iter()
+                                    .map(|(field, kindinfo)| {
+                                        let kind = next_segment(&mut path, kindinfo);
+
+                                        match field {
+                                            Field::Field(ref name)
+                                                if fieldnames.iter().any(|fieldname| {
+                                                    name == fieldname.as_str()
+                                                }) =>
+                                            {
+                                                // Coalesced fields can also be Null if the coalesced value
+                                                // goes down the other branch.
+                                                (field.clone(), kind.or_null())
+                                            }
+                                            _ => (field.clone(), kind),
+                                        }
+                                    })
+                                    .collect(),
+                            )
+                        }
+
+                        (TypeKind::Array(array), Some(SegmentBuf::Index(index))) => {
+                            // Is an exact index type definition specified for the given path
+                            // segment?
+                            let indexed = array.iter().any(|(idx, _kindinfo)| {
+                                matches!(idx,
+                                    Index::Index(idx) if *index > 0 && *idx == *index as usize)
+                            });
+
+                            TypeKind::Array(
+                                array
+                                    .iter()
+                                    .flat_map(|(idx, kindinfo)| match idx {
+                                        Index::Index(idx)
+                                            if *index >= 0 && *idx == *index as usize =>
+                                        {
+                                            vec![(
+                                                Index::Index(*idx),
+                                                next_segment(&mut path, kindinfo),
+                                            )]
+                                            .into_iter()
+                                        }
+                                        _ if *index < 0 => {
+                                            // If we have specified a negative index we need to merge this
+                                            // type since we aren't sure the precise index this is
+                                            // specifying since it's dependant on the array length
+                                            // at runtime.
+                                            vec![(
+                                                *idx,
+                                                kindinfo.clone().merge(
+                                                    next_segment(&mut path, kindinfo),
+                                                    false,
+                                                    true,
+                                                ),
+                                            )]
+                                            .into_iter()
+                                        }
+                                        Index::Any if !indexed => {
+                                            // If there is an Any type specified, and we know that
+                                            // there isn't a type specified for the index provided
+                                            // in the type, we need to add a specific typedef just
+                                            // for the index.
+                                            vec![
+                                                (
+                                                    Index::Index(*index as usize),
+                                                    next_segment(&mut path, kindinfo),
+                                                ),
+                                                (*idx, kindinfo.clone()),
+                                            ]
+                                            .into_iter()
+                                        }
+                                        _ => vec![(*idx, kindinfo.clone())].into_iter(),
+                                    })
+                                    .collect(),
+                            )
+                        }
+
+                        (kind, _) => kind.clone(),
+                    })
+                    .collect(),
+            ),
+        }
+    }
+
+    /// Updates the type definition at the given path with the provided kind.
+    pub fn update_path(&self, path: &LookupBuf, kind: &KindInfo) -> Self {
+        let segments = path.as_segments();
+        let peekable = segments.iter().peekable();
+        let kind = Self::update_segment(&self.kind, peekable, kind);
+
+        TypeDef {
+            fallible: self.fallible,
+            kind,
+        }
+    }
+
     /// Performs a bitwise-or operation, and returns the resulting type definition.
     pub fn merge(self, rhs: Self) -> Self {
         Self {
@@ -951,6 +1150,181 @@ impl TypeDef {
             kind: self.kind.merge(rhs.kind, false, true),
         }
     }
+
+    /// For any array defined by this type def, allows you to map the indexed kind
+    /// to a new kind.
+    pub fn map_array<F>(&self, f: F) -> Self
+    where
+        F: Fn(&KindInfo) -> KindInfo,
+    {
+        let newkind = self.kind.map(|k| match k {
+            TypeKind::Array(array) => TypeKind::Array(
+                array
+                    .iter()
+                    .map(|(index, kind)| (*index, f(kind)))
+                    .collect(),
+            ),
+            k => k.clone(),
+        });
+
+        Self {
+            fallible: self.fallible,
+            kind: newkind,
+        }
+    }
+
+    fn remove_segment<'a, I>(kind: &KindInfo, mut path: std::iter::Peekable<I>) -> KindInfo
+    where
+        I: std::iter::Iterator<Item = &'a SegmentBuf> + Clone,
+    {
+        match kind {
+            KindInfo::Unknown => {
+                // The kind is unknown and thus there is nothing to remove.
+                kind.clone()
+            }
+            KindInfo::Known(kinds) => KindInfo::Known(
+                kinds
+                    .iter()
+                    .map(|kind| match (kind, path.next(), path.peek()) {
+                        (TypeKind::Object(object), Some(SegmentBuf::Field(fieldname)), Some(_)) => {
+                            TypeKind::Object(
+                                object
+                                    .iter()
+                                    .map(|(field, kindinfo)| match field {
+                                        Field::Field(name) if name == fieldname.as_str() => (
+                                            field.clone(),
+                                            Self::remove_segment(kindinfo, path.clone()),
+                                        ),
+                                        _ => (field.clone(), kindinfo.clone()),
+                                    })
+                                    .collect(),
+                            )
+                        }
+
+                        (TypeKind::Object(object), Some(SegmentBuf::Field(fieldname)), None) => {
+                            TypeKind::Object(
+                                object
+                                    .iter()
+                                    .filter_map(|(field, kindinfo)| match field {
+                                        Field::Field(name) if name == fieldname.as_str() => None,
+                                        _ => Some((field.clone(), kindinfo.clone())),
+                                    })
+                                    .collect(),
+                            )
+                        }
+
+                        (
+                            TypeKind::Object(object),
+                            Some(SegmentBuf::Coalesce(fieldnames)),
+                            Some(_),
+                        ) => TypeKind::Object(
+                            object
+                                .iter()
+                                .map(|(field, kindinfo)| match field {
+                                    Field::Field(name)
+                                        if fieldnames
+                                            .iter()
+                                            .any(|fieldname| fieldname.as_str() == name) =>
+                                    {
+                                        (
+                                            field.clone(),
+                                            Self::remove_segment(kindinfo, path.clone()),
+                                        )
+                                    }
+                                    _ => (field.clone(), kindinfo.clone()),
+                                })
+                                .collect(),
+                        ),
+
+                        (
+                            TypeKind::Object(object),
+                            Some(SegmentBuf::Coalesce(fieldnames)),
+                            None,
+                        ) => TypeKind::Object(
+                            object
+                                .iter()
+                                .filter_map(|(field, kindinfo)| match field {
+                                    Field::Field(name)
+                                        if fieldnames
+                                            .iter()
+                                            .any(|fieldname| fieldname.as_str() == name) =>
+                                    {
+                                        // With coalesced paths we need to remove all fields within
+                                        // the coalesce.
+                                        None
+                                    }
+                                    _ => Some((field.clone(), kindinfo.clone())),
+                                })
+                                .collect(),
+                        ),
+
+                        (TypeKind::Array(array), Some(SegmentBuf::Index(index)), Some(_)) => {
+                            TypeKind::Array(
+                                array
+                                    .iter()
+                                    .map(|(idx, kindinfo)| match idx {
+                                        Index::Index(idx)
+                                            if *index >= 0 && *idx == *index as usize =>
+                                        {
+                                            (
+                                                Index::Index(*idx),
+                                                Self::remove_segment(kindinfo, path.clone()),
+                                            )
+                                        }
+                                        _ => (*idx, kindinfo.clone()),
+                                    })
+                                    .collect(),
+                            )
+                        }
+
+                        (TypeKind::Array(array), Some(SegmentBuf::Index(index)), None) => {
+                            TypeKind::Array(
+                                array
+                                    .iter()
+                                    .filter_map(|(idx, kindinfo)| match idx {
+                                        Index::Index(idx)
+                                            if *index >= 0 && *idx == *index as usize =>
+                                        {
+                                            None
+                                        }
+                                        Index::Index(idx)
+                                            if *index >= 0 && *idx > *index as usize =>
+                                        {
+                                            // Elements after the removed index need the index
+                                            // shifting down one.
+                                            Some((Index::Index(idx - 1), kindinfo.clone()))
+                                        }
+                                        Index::Index(_) if *index < 0 => {
+                                            // After attempting to delete an element in an array
+                                            // with a negative index we can no longer maintain the
+                                            // type definition of any specific element in the array
+                                            // as we don't know which precise index is deleted
+                                            // until runtime.
+                                            None
+                                        }
+                                        _ => Some((*idx, kindinfo.clone())),
+                                    })
+                                    .collect(),
+                            )
+                        }
+
+                        (kind, _, _) => kind.clone(),
+                    })
+                    .collect(),
+            ),
+        }
+    }
+
+    /// Removes the given path from the typedef
+    pub fn remove_path(&self, path: &LookupBuf) -> Self {
+        let segments = path.as_segments();
+        let peekable = segments.iter().peekable();
+
+        TypeDef {
+            fallible: self.fallible,
+            kind: Self::remove_segment(&self.kind, peekable),
+        }
+    }
 }
 
 impl Default for TypeDef {
@@ -974,7 +1348,9 @@ impl From<Kind> for TypeDef {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::type_def;
     use lookup::{FieldBuf, SegmentBuf};
+    use shared::btreemap;
 
     #[test]
     fn collect_subtypes() {
@@ -1003,6 +1379,284 @@ mod tests {
         });
 
         assert_eq!(kind, expected);
+    }
+
+    #[test]
+    fn update_path() {
+        struct TestCase {
+            old: TypeDef,
+            path: &'static str,
+            new: TypeDef,
+        }
+
+        let cases = vec![
+            // Simple case
+            TestCase {
+                old: type_def! { object {
+                    "nonk" => type_def! { array [
+                        type_def! { object {
+                            "noog" => type_def! { bytes },
+                            "nork" => type_def! { bytes },
+                        } },
+                    ] },
+                } },
+                path: ".nonk",
+                new: type_def! { object {
+                    "nonk" => type_def! { bytes },
+                } },
+            },
+            // Same field in different branches
+            TestCase {
+                old: type_def! { object {
+                    "nonk" => type_def! { object {
+                        "shnoog" => type_def! { array [
+                            type_def! { object {
+                                "noog" => type_def! { bytes },
+                            } },
+                        ] },
+                    } },
+                    "nink" => type_def! { object {
+                        "shnoog" => type_def! { array [
+                            type_def! { object {
+                                "noog" => type_def! { bytes },
+                            } },
+                        ] },
+                    } },
+                } },
+                path: "nonk.shnoog",
+                new: type_def! { object {
+                    "nonk" => type_def! { object {
+                        "shnoog" => type_def! { bytes },
+                    } },
+                    "nink" => type_def! { object {
+                        "shnoog" => type_def! { array [
+                            type_def! { object {
+                                "noog" => type_def! { bytes },
+                            } },
+                        ] },
+                    } },
+                } },
+            },
+            // Indexed any should add the new type as a specific index and retain the any.
+            TestCase {
+                old: type_def! { object {
+                    "nonk" => type_def! { array [
+                        type_def! { object {
+                            "noog" => type_def! { array [
+                                type_def! { bytes },
+                            ] },
+                            "nork" => type_def! { bytes },
+                        } },
+                    ] },
+                } },
+                path: ".nonk[0].noog",
+                new: type_def! { object {
+                    "nonk" => type_def! { array {
+                        Index::Any => type_def! { object {
+                            "noog" => type_def! { array [
+                                type_def! { bytes },
+                            ] },
+                            "nork" => type_def! { bytes },
+                        } },
+                        Index::Index(0) => type_def! { object {
+                            "noog" => type_def! { bytes },
+                            "nork" => type_def! { bytes },
+                        } },
+                    } },
+                } },
+            },
+            // Indexed specific
+            TestCase {
+                old: type_def! { object {
+                    "nonk" => type_def! { array {
+                        Index::Index(0) => type_def! { object {
+                            "noog" => type_def! { array [
+                                type_def! { bytes },
+                            ] },
+                            "nork" => type_def! { bytes },
+                        } },
+                    } },
+                } },
+                path: ".nonk[0].noog",
+                new: type_def! { object {
+                    "nonk" => type_def! { array {
+                        Index::Index(0) => type_def! { object {
+                            "noog" => type_def! { bytes },
+                            "nork" => type_def! { bytes },
+                        } },
+                    } },
+                } },
+            },
+            // More nested
+            TestCase {
+                old: type_def! { object {
+                    "nonk" => type_def! { object {
+                        "shnoog" => type_def! { array [
+                            type_def! { object {
+                                "noog" => type_def! { bytes },
+                                "nork" => type_def! { bytes },
+                            } },
+                        ] },
+                    } },
+                } },
+                path: ".nonk.shnoog",
+                new: type_def! { object {
+                    "nonk" => type_def! { object {
+                        "shnoog" => type_def! { bytes },
+                    } },
+                } },
+            },
+            // Coalesce
+            TestCase {
+                old: type_def! { object {
+                    "nonk" => type_def! { object {
+                        "shnoog" => type_def! { array [
+                            type_def! { object {
+                                "noog" => type_def! { bytes },
+                                "nork" => type_def! { bytes },
+                            } },
+                        ] },
+                    } },
+                } },
+                path: ".(nonk | nork).shnoog",
+                new: type_def! { object {
+                    "nonk" => type_def! { object {
+                        "shnoog" => type_def! { bytes },
+                    } }.add_null(),
+                } },
+            },
+        ];
+
+        let newkind = KindInfo::Known(std::iter::once(TypeKind::Bytes).collect());
+        for case in cases {
+            let path = LookupBuf::from_str(case.path).unwrap();
+            let new = case.old.update_path(&path, &newkind);
+            assert_eq!(case.new, new, "{}", path);
+        }
+    }
+
+    #[test]
+    fn remove_path() {
+        struct TestCase {
+            old: TypeDef,
+            path: &'static str,
+            new: TypeDef,
+        }
+
+        let cases = vec![
+            // A field is removed.
+            TestCase {
+                old: type_def! { object {
+                    "nonk" => type_def! { array {
+                        0 => type_def! { object {
+                            "noog" => type_def! { bytes },
+                            "nork" => type_def! { bytes },
+                        } },
+                    } },
+                } },
+                path: "nonk[0].noog",
+                new: type_def! { object {
+                    "nonk" => type_def! { array {
+                        0 => type_def! { object {
+                            "nork" => type_def! { bytes },
+                        } },
+                    } },
+                } },
+            },
+            TestCase {
+                old: type_def! { object {
+                    "nonk" => type_def! { object {
+                        "nork" => type_def! { bytes },
+                        "nark" => type_def! { bytes },
+                    } },
+                    "noog" => type_def! { object {
+                        "nork" => type_def! { bytes },
+                        "nark" => type_def! { bytes },
+                    } },
+                } },
+                path: "nonk.nork",
+                new: type_def! { object {
+                    "nonk" => type_def! { object {
+                        "nark" => type_def! { bytes },
+                    } },
+                    "noog" => type_def! { object {
+                        "nork" => type_def! { bytes },
+                        "nark" => type_def! { bytes },
+                    } },
+                } },
+            },
+            // Coalesced field
+            TestCase {
+                old: type_def! { object {
+                    "nonk" => type_def! { object {
+                        "nork" => type_def! { bytes },
+                        "noog" => type_def! { bytes },
+                        "nonk" => type_def! { bytes },
+                    } },
+                } },
+                path: "nonk.(noog | nonk)",
+                new: type_def! { object {
+                    "nonk" => type_def! { object {
+                        "nork" => type_def! { bytes },
+                    } },
+                } },
+            },
+            // A single array element when the typedef is for any index.
+            TestCase {
+                old: type_def! { object {
+                    "nonk" => type_def! { array [
+                        type_def! { object {
+                            "noog" => type_def! { bytes },
+                            "nork" => type_def! { bytes },
+                        } },
+                    ] },
+                } },
+                path: "nonk[0]",
+                new: type_def! { object {
+                    "nonk" => type_def! { array [
+                        type_def! { object {
+                            "noog" => type_def! { bytes },
+                            "nork" => type_def! { bytes },
+                        } },
+                    ] },
+                } },
+            },
+            // A single array element when the typedef is for that index.
+            TestCase {
+                old: type_def! { object {
+                    "nonk" => type_def! { array {
+                        0 => type_def! { object {
+                            "noog" => type_def! { bytes },
+                            "nork" => type_def! { bytes },
+                        } },
+                    } },
+                } },
+                path: "nonk[0]",
+                new: type_def! { object {
+                    "nonk" => type_def! { array },
+                } },
+            },
+            // A single array element with a negative index has to remove all typedefs.
+            TestCase {
+                old: type_def! { object {
+                    "nonk" => type_def! { array {
+                        0 => type_def! { object {
+                            "noog" => type_def! { bytes },
+                            "nork" => type_def! { bytes },
+                        } },
+                    } },
+                } },
+                path: "nonk[-1]",
+                new: type_def! { object {
+                    "nonk" => type_def! { array },
+                } },
+            },
+        ];
+
+        for case in cases {
+            let path = LookupBuf::from_str(case.path).unwrap();
+            assert_eq!(case.new, case.old.remove_path(&path));
+        }
     }
 
     mod kind_info {

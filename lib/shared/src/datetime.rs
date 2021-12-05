@@ -1,7 +1,7 @@
 use chrono::{DateTime, Local, ParseError, TimeZone as _, Utc};
 use chrono_tz::Tz;
 use derivative::Derivative;
-use std::fmt::{self, Debug};
+use std::fmt::Debug;
 
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
@@ -11,13 +11,9 @@ pub enum TimeZone {
     Named(Tz),
 }
 
-/// This is a wrapper trait to allow `TimeZone` types to be passed genericly.
+/// This is a wrapper trait to allow `TimeZone` types to be passed generically.
 impl TimeZone {
-    pub(super) fn datetime_from_str(
-        &self,
-        s: &str,
-        format: &str,
-    ) -> Result<DateTime<Utc>, ParseError> {
+    pub fn datetime_from_str(&self, s: &str, format: &str) -> Result<DateTime<Utc>, ParseError> {
         match self {
             Self::Local => Local.datetime_from_str(s, format).map(datetime_to_utc),
             Self::Named(tz) => tz.datetime_from_str(s, format).map(datetime_to_utc),
@@ -62,7 +58,7 @@ pub mod ser_de {
     impl<'de> de::Visitor<'de> for TimeZoneVisitor {
         type Value = TimeZone;
 
-        fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             write!(f, "a time zone name")
         }
 

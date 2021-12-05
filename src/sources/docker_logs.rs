@@ -1,6 +1,7 @@
 use super::util::MultilineConfig;
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
+    docker::{docker, DockerTlsConfig},
     event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, PathComponent, PathIter, Value},
     internal_events::{
@@ -18,28 +19,22 @@ use bollard::{
     errors::Error as DockerError,
     service::{ContainerInspectResponse, SystemEventsResponse},
     system::EventsOptions,
-    Docker, API_DEFAULT_VERSION,
+    Docker,
 };
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{Stream, StreamExt};
-use http::uri::Uri;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use snafu::Snafu;
 use std::{
     future::ready,
-    path::PathBuf,
     pin::Pin,
     sync::Arc,
     time::Duration,
-    {collections::HashMap, convert::TryFrom, env},
+    {collections::HashMap, convert::TryFrom},
 };
 
 use tokio::sync::mpsc;
-
-// From bollard source.
-const DEFAULT_TIMEOUT: u64 = 120;
 
 const IMAGE: &str = "image";
 const CREATED_AT: &str = "container_created_at";
@@ -53,12 +48,6 @@ lazy_static! {
     static ref STDERR: Bytes = "stderr".into();
     static ref STDOUT: Bytes = "stdout".into();
     static ref CONSOLE: Bytes = "console".into();
-}
-
-#[derive(Debug, Snafu)]
-enum Error {
-    #[snafu(display("URL has no host."))]
-    NoHost,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -76,14 +65,6 @@ pub struct DockerLogsConfig {
     auto_partial_merge: bool,
     multiline: Option<MultilineConfig>,
     retry_backoff_secs: u64,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
-pub struct DockerTlsConfig {
-    ca_file: PathBuf,
-    crt_file: PathBuf,
-    key_file: PathBuf,
 }
 
 impl Default for DockerLogsConfig {
@@ -309,7 +290,7 @@ struct DockerLogsSource {
     ///  mappings of seen container_id to their data
     containers: HashMap<ContainerId, ContainerState>,
     ///receives ContainerLogInfo coming from event stream futures
-    main_recv: mpsc::UnboundedReceiver<Result<ContainerLogInfo, ContainerId>>,
+    main_recv: mpsc::UnboundedReceiver<Result<ContainerLogInfo, (ContainerId, ErrorPersistence)>>,
     /// It may contain shortened container id.
     hostname: Option<String>,
     backoff_duration: Duration,
@@ -335,7 +316,7 @@ impl DockerLogsSource {
 
         // Channel of communication between main future and event_stream futures
         let (main_send, main_recv) =
-            mpsc::unbounded_channel::<Result<ContainerLogInfo, ContainerId>>();
+            mpsc::unbounded_channel::<Result<ContainerLogInfo, (ContainerId, ErrorPersistence)>>();
 
         // Starting with logs from now.
         // TODO: Is this exception acceptable?
@@ -437,14 +418,18 @@ impl DockerLogsSource {
                                         self.esb.restart(state);
                                     }
                                 },
-                                Err(id) => {
+                                Err((id,persistence)) => {
                                     let state = self
                                         .containers
                                         .remove(&id)
                                         .expect("Every started ContainerId has it's ContainerState");
-                                    if state.is_running() {
-                                        let backoff = Some(self.backoff_duration);
-                                        self.containers.insert(id.clone(), self.esb.start(id, backoff));
+                                    match persistence{
+                                        ErrorPersistence::Transient => if state.is_running() {
+                                            let backoff= Some(self.backoff_duration);
+                                            self.containers.insert(id.clone(), self.esb.start(id, backoff));
+                                        }
+                                        // Forget the container since the error is permanent.
+                                        ErrorPersistence::Permanent => (),
                                     }
                                 }
                             }
@@ -464,7 +449,7 @@ impl DockerLogsSource {
                             let id = actor.id.unwrap();
                             let attributes = actor.attributes.unwrap();
 
-                            emit!(DockerLogsContainerEventReceived { container_id: &id, action: &action });
+                            emit!(&DockerLogsContainerEventReceived { container_id: &id, action: &action });
 
                             let id = ContainerId::new(id);
 
@@ -496,7 +481,7 @@ impl DockerLogsSource {
                                 _ => {},
                             };
                         }
-                        Some(Err(error)) => emit!(DockerLogsCommunicationError{error,container_id:None}),
+                        Some(Err(error)) => emit!(&DockerLogsCommunicationError{error,container_id:None}),
                         None => {
                             // TODO: this could be fixed, but should be tried with some timeoff and exponential backoff
                             error!(message = "Docker log event stream has ended unexpectedly.");
@@ -526,7 +511,7 @@ struct EventStreamBuilder {
     /// Event stream futures send events through this
     out: Pipeline,
     /// End through which event stream futures send ContainerLogInfo to main future
-    main_send: mpsc::UnboundedSender<Result<ContainerLogInfo, ContainerId>>,
+    main_send: mpsc::UnboundedSender<Result<ContainerLogInfo, (ContainerId, ErrorPersistence)>>,
     /// Self and event streams will end on this.
     shutdown: ShutdownSignal,
 }
@@ -551,18 +536,18 @@ impl EventStreamBuilder {
                         this.run_event_stream(info).await;
                         return;
                     }
-                    Err(error) => emit!(DockerLogsTimestampParseFailed {
+                    Err(error) => emit!(&DockerLogsTimestampParseFailed {
                         error,
                         container_id: id.as_str()
                     }),
                 },
-                Err(error) => emit!(DockerLogsContainerMetadataFetchFailed {
+                Err(error) => emit!(&DockerLogsContainerMetadataFetchFailed {
                     error,
                     container_id: id.as_str()
                 }),
             }
 
-            this.finish(Err(id));
+            this.finish(Err((id, ErrorPersistence::Transient)));
         });
 
         ContainerState::new_running()
@@ -588,7 +573,7 @@ impl EventStreamBuilder {
         });
 
         let stream = self.core.docker.logs(info.id.as_str(), options);
-        emit!(DockerLogsContainerWatch {
+        emit!(&DockerLogsContainerWatch {
             container_id: info.id.as_str()
         });
 
@@ -597,6 +582,7 @@ impl EventStreamBuilder {
 
         let core = Arc::clone(&self.core);
 
+        let mut error = None;
         let events_stream = stream
             .map(|value| {
                 match value {
@@ -612,21 +598,27 @@ impl EventStreamBuilder {
                             DockerError::DockerResponseServerError { status_code, .. }
                                 if *status_code == http::StatusCode::NOT_IMPLEMENTED =>
                             {
-                                emit!(DockerLogsLoggingDriverUnsupported {
+                                emit!(&DockerLogsLoggingDriverUnsupported {
                                     error,
                                     container_id: info.id.as_str(),
-                                })
+                                });
+                                Err(ErrorPersistence::Permanent)
                             }
-                            _ => emit!(DockerLogsCommunicationError {
-                                error,
-                                container_id: Some(info.id.as_str())
-                            }),
-                        };
-                        Err(())
+                            _ => {
+                                emit!(&DockerLogsCommunicationError {
+                                    error,
+                                    container_id: Some(info.id.as_str())
+                                });
+                                Err(ErrorPersistence::Transient)
+                            }
+                        }
                     }
                 }
             })
-            .take_while(|v| ready(v.is_ok()))
+            .take_while(|v| {
+                error = v.as_ref().err().cloned();
+                ready(v.is_ok())
+            })
             .filter_map(|v| ready(v.unwrap()))
             .take_until(self.shutdown.clone());
 
@@ -649,19 +641,20 @@ impl EventStreamBuilder {
             .await;
 
         // End of stream
-        emit!(DockerLogsContainerUnwatch {
+        emit!(&DockerLogsContainerUnwatch {
             container_id: info.id.as_str()
         });
 
-        let result = match result {
-            Ok(()) => Ok(info),
-            Err(crate::pipeline::ClosedError) => Err(info.id),
+        let result = match (result, error) {
+            (Ok(()), None) => Ok(info),
+            (Err(crate::pipeline::ClosedError), _) => Err((info.id, ErrorPersistence::Permanent)),
+            (_, Some(occurrence)) => Err((info.id, occurrence)),
         };
 
         self.finish(result);
     }
 
-    fn finish(self, result: Result<ContainerLogInfo, ContainerId>) {
+    fn finish(self, result: Result<ContainerLogInfo, (ContainerId, ErrorPersistence)>) {
         // This can legaly fail when shutting down, and any other
         // reason should have been logged in the main future.
         let _ = self.main_send.send(result);
@@ -674,6 +667,12 @@ fn add_hostname(mut event: Event, host_key: &str, hostname: &Option<String>) -> 
     }
 
     event
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum ErrorPersistence {
+    Transient,
+    Permanent,
 }
 
 /// Container ID as assigned by Docker.
@@ -703,7 +702,7 @@ struct ContainerState {
 
 impl ContainerState {
     /// It's ContainerLogInfo pair must be created exactly once.
-    fn new_running() -> Self {
+    const fn new_running() -> Self {
         ContainerState {
             info: None,
             running: true,
@@ -720,7 +719,7 @@ impl ContainerState {
         self.running = false;
     }
 
-    fn is_running(&self) -> bool {
+    const fn is_running(&self) -> bool {
         self.running
     }
 
@@ -760,7 +759,7 @@ struct ContainerLogInfo {
 impl ContainerLogInfo {
     /// Container docker ID
     /// Unix timestamp of event which created this struct
-    fn new(id: ContainerId, metadata: ContainerMetadata, created: DateTime<Utc>) -> Self {
+    const fn new(id: ContainerId, metadata: ContainerMetadata, created: DateTime<Utc>) -> Self {
         ContainerLogInfo {
             id,
             created,
@@ -779,7 +778,7 @@ impl ContainerLogInfo {
             - 1
     }
 
-    /// Expects timestamp at the beggining of message.
+    /// Expects timestamp at the beginning of message.
     /// Expects messages to be ordered by timestamps.
     fn new_event(
         &mut self,
@@ -831,7 +830,7 @@ impl ContainerLogInfo {
             }
             Err(error) => {
                 // Received bad timestamp, if any at all.
-                emit!(DockerLogsTimestampParseFailed {
+                emit!(&DockerLogsTimestampParseFailed {
                     error,
                     container_id: self.id.as_str()
                 });
@@ -889,7 +888,7 @@ impl ContainerLogInfo {
                 let prefix_path = PathIter::new("label").collect::<Vec<_>>();
                 for (key, value) in self.metadata.labels.iter() {
                     let mut path = prefix_path.clone();
-                    path.push(PathComponent::Key(key.clone()));
+                    path.push(PathComponent::Key(key.clone().into()));
                     log_event.insert_path(path, value.clone());
                 }
             }
@@ -954,7 +953,7 @@ impl ContainerLogInfo {
         // other cases were handled earlier.
         let event = Event::Log(log_event);
 
-        emit!(DockerLogsEventReceived {
+        emit!(&DockerLogsEventReceived {
             byte_size,
             container_id: self.id.as_str(),
             container_name: &self.metadata.name_str
@@ -992,89 +991,6 @@ impl ContainerMetadata {
             image: config.image.unwrap().into(),
             created_at: DateTime::parse_from_rfc3339(created.as_str())?.with_timezone(&Utc),
         })
-    }
-}
-
-// From bollard source, unfortunately they don't export this function.
-fn default_certs() -> Option<DockerTlsConfig> {
-    let from_env = env::var("DOCKER_CERT_PATH").or_else(|_| env::var("DOCKER_CONFIG"));
-    let base = match from_env {
-        Ok(path) => PathBuf::from(path),
-        Err(_) => dirs_next::home_dir()?.join(".docker"),
-    };
-    Some(DockerTlsConfig {
-        ca_file: base.join("ca.pem"),
-        key_file: base.join("key.pem"),
-        crt_file: base.join("cert.pem"),
-    })
-}
-
-fn get_authority(url: &str) -> Result<String, Error> {
-    url.parse::<Uri>()
-        .ok()
-        .and_then(|uri| uri.authority().map(<_>::to_string))
-        .ok_or(Error::NoHost)
-}
-
-fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Result<Docker> {
-    let host = host.or_else(|| env::var("DOCKER_HOST").ok());
-
-    match host {
-        None => {
-            // TODO: Use `connect_with_local_defaults` on all platforms.
-            //
-            // Using `connect_with_local_defaults` defers to `connect_with_named_pipe_defaults` on Windows. However,
-            // named pipes are currently disabled in Tokio. Tracking issue:
-            // https://github.com/fussybeaver/bollard/pull/138
-            if cfg!(windows) {
-                Docker::connect_with_http_defaults().map_err(Into::into)
-            } else {
-                Docker::connect_with_local_defaults().map_err(Into::into)
-            }
-        }
-        Some(host) => {
-            let scheme = host
-                .parse::<Uri>()
-                .ok()
-                .and_then(|uri| uri.into_parts().scheme);
-
-            match scheme.as_ref().map(|scheme| scheme.as_str()) {
-                Some("http") => {
-                    let host = get_authority(&host)?;
-                    Docker::connect_with_http(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
-                        .map_err(Into::into)
-                }
-                Some("https") => {
-                    let host = get_authority(&host)?;
-                    let tls = tls
-                        .or_else(default_certs)
-                        .ok_or(DockerError::NoCertPathError)?;
-                    Docker::connect_with_ssl(
-                        &host,
-                        &tls.key_file,
-                        &tls.crt_file,
-                        &tls.ca_file,
-                        DEFAULT_TIMEOUT,
-                        API_DEFAULT_VERSION,
-                    )
-                    .map_err(Into::into)
-                }
-                Some("unix") | Some("npipe") | None => {
-                    // TODO: Use `connect_with_local` on all platforms.
-                    //
-                    // Named pipes are currently disabled in Tokio. Tracking issue:
-                    // https://github.com/fussybeaver/bollard/pull/138
-                    if cfg!(windows) {
-                        warn!("Named pipes are currently not available on Windows, trying to connecting to Docker with default HTTP settings instead.");
-                        Docker::connect_with_http_defaults().map_err(Into::into)
-                    } else {
-                        Docker::connect_with_local(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
-                            .map_err(Into::into)
-                    }
-                }
-                Some(scheme) => Err(format!("Unknown scheme: {}", scheme).into()),
-            }
-        }
     }
 }
 

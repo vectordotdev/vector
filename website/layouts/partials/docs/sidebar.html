@@ -1,0 +1,119 @@
+{{ $sections := where site.Sections "Section" "docs" }}
+{{ $here := .RelPermalink }}
+{{ $section := .CurrentSection }}
+{{ $metaLinks := site.Menus.meta }}
+
+{{/* Iterate through all docs sections, including the root */}}
+{{ range $sections }}
+<div class="flex flex-col space-y-5 pb-10 pr-4">
+  {{ template "heading" (dict "here" $here "url" .RelPermalink "title" (.Params.short | default .Title )) }}
+
+  {{ with .Sections }}
+  {{ range . }}
+  {{ template "section" (dict "ctx" . "here" $here "section" $section) }}
+  {{ end }}
+  {{ end }}
+  {{ end }}
+
+  {{/* Extra "meta" links specified in config.toml (external links outside our doc tree) */}}
+  <div>
+    {{ template "heading" (dict "title" "Meta" "hover" false) }}
+
+    <div class="flex flex-col space-y-0.5 mt-1.5">
+      {{ template "meta-menu" $metaLinks }}
+    </div>
+  </div>
+</div>
+
+{{ define "section" }}
+{{ $here := .here }}
+{{ $section := .section }}
+<div>
+  {{ template "heading" (dict "here" $here "url" .ctx.RelPermalink "title" (.ctx.Params.short | default .ctx.Title )) }}
+
+  <div class="flex flex-col space-y-1 mt-1.5">
+    {{ range .ctx.Pages }}
+
+    {{ if .IsPage }}
+    {{ template "link" (dict "here" $here "url" .RelPermalink "title" (.Params.short | default .Title)) }}
+    {{ else if .IsSection }}
+    {{ template "subsection-group" (dict "ctx" . "here" $here "section" $section) }}
+    {{ end }}
+    {{ end }}
+  </div>
+</div>
+{{ end }}
+
+{{ define "subsection-group" }}
+{{ $here := .here }}
+{{ $section := .section }}
+{{ $open := .ctx.IsAncestor $section }}
+<div x-data="{ open: {{ $open }} }">
+  <span class="flex justify-between items-center">
+    {{ template "link" (dict "here" $here "url" .ctx.RelPermalink "title" (.ctx.Params.short | default .ctx.Title)) }}
+    {{ template "chevron-icon" }}
+  </span>
+
+  <div x-show.transition.duration.300ms="open" class="flex flex-col space-y-0.5 pl-3.5 my-0.5">
+    {{ with .ctx.Sections }}
+    {{ range . }}
+    {{ template "subsection-group" (dict "ctx" . "here" $here "section" $section) }}
+    {{ end }}
+    {{ end }}
+
+    {{ with .ctx.RegularPages }}
+    {{ range . }}
+    {{ template "link" (dict "here" $here "url" .RelPermalink "title" (.Params.short | default .Title )) }}
+    {{ end }}
+    {{ end }}
+  </div>
+</div>
+{{ end }}
+
+{{ define "heading" }}
+{{ $isActive := eq .here .url }}
+{{ if .url }}
+<a class="uppercase font-semibold text-gray-500 dark:text-gray-200 dark:hover:text-purple-v hover:text-purple-v{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}" href="{{ .url }}">
+  {{ .title }}
+</a>
+{{ else }}
+<p class="uppercase font-semibold tracking-tight text-gray-500 dark:text-gray-200">
+  {{ .title }}
+</p>
+{{ end }}
+{{ end }}
+
+{{ define "link" }}
+{{ $isActive := eq .here .url }}
+<a href="{{ .url }}" class="flex-1 text-gray-800 font-semibold tracking-tight dark:text-gray-400 dark:hover:text-purple-v hover:text-purple-v{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}">
+  {{ .title }}
+</a>
+{{ end }}
+
+{{ define "chevron-icon" }}
+<a @click="open = !open" class="cursor-pointer">
+  {{/* Heroicon: outline/chevron-right */}}
+  <svg :class="{ 'transform rotate-90 text-secondary dark:text-primary': open }" class="dark:text-gray-300 text-gray-500 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+  </svg>
+</a>
+{{ end }}
+
+{{ define "meta-menu" }}
+{{ range .  }}
+<p class="flex items-start">
+  <a class="block font-semibold dark:text-gray-400 dark:hover:text-purple-v hover:text-purple-v" href="{{ .URL }}" rel="noopener" target="_blank">
+    <span class="flex justify-between items-start">
+      <span class="pr-0.5">
+        {{ .Name }}
+      </span>
+
+      {{/* Heroicon: outline/external-link */}}
+      <svg xmlns="http://www.w3.org/2000/svg" class="dark:text-gray-400 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+      </svg>
+    </span>
+  </a>
+</p>
+{{ end }}
+{{ end }}

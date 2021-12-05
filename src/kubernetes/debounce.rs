@@ -14,7 +14,7 @@ pub struct Debounce {
 
 impl Debounce {
     /// Create a new [`Debounce`].
-    pub fn new(time: Duration) -> Self {
+    pub const fn new(time: Duration) -> Self {
         Self {
             sequence_start: None,
             time,
@@ -47,7 +47,7 @@ impl Debounce {
     /// This function exposes the state of the debounce logic.
     /// If this returns `false`, you shouldn't `poll` on [`Self::debounced`], as
     /// it's pending indefinitely.
-    pub fn is_debouncing(&self) -> bool {
+    pub const fn is_debouncing(&self) -> bool {
         self.sequence_start.is_some()
     }
 }
@@ -227,16 +227,16 @@ mod tests {
         tokio::time::pause();
 
         let mut debounce = Debounce::new(TEST_DELAY);
-        assert_eq!(debounce.is_debouncing(), false);
+        assert!(!debounce.is_debouncing());
 
         debounce.signal();
-        assert_eq!(debounce.is_debouncing(), true);
+        assert!(debounce.is_debouncing());
 
         tokio::time::advance(TEST_DELAY * 2).await;
-        assert_eq!(debounce.is_debouncing(), true);
+        assert!(debounce.is_debouncing());
 
         debounce.debounced().await;
-        assert_eq!(debounce.is_debouncing(), false);
+        assert!(!debounce.is_debouncing(),);
 
         tokio::time::resume();
     }

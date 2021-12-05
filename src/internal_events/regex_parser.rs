@@ -1,8 +1,8 @@
-use super::InternalEvent;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
-pub(crate) struct RegexParserFailedMatch<'a> {
+pub struct RegexParserFailedMatch<'a> {
     pub value: &'a [u8],
 }
 
@@ -10,7 +10,7 @@ impl InternalEvent for RegexParserFailedMatch<'_> {
     fn emit_logs(&self) {
         warn!(
             message = "Regex pattern failed to match.",
-            field = &super::truncate_string_at(&String::from_utf8_lossy(&self.value), 60)[..],
+            field = &super::truncate_string_at(&String::from_utf8_lossy(self.value), 60)[..],
             internal_log_rate_secs = 30
         );
     }
@@ -21,7 +21,7 @@ impl InternalEvent for RegexParserFailedMatch<'_> {
 }
 
 #[derive(Debug)]
-pub(crate) struct RegexParserMissingField<'a> {
+pub struct RegexParserMissingField<'a> {
     pub field: &'a str,
 }
 
@@ -36,7 +36,7 @@ impl InternalEvent for RegexParserMissingField<'_> {
 }
 
 #[derive(Debug)]
-pub(crate) struct RegexParserTargetExists<'a> {
+pub struct RegexParserTargetExists<'a> {
     pub target_field: &'a str,
 }
 
@@ -55,7 +55,7 @@ impl<'a> InternalEvent for RegexParserTargetExists<'a> {
 }
 
 #[derive(Debug)]
-pub(crate) struct RegexParserConversionFailed<'a> {
+pub struct RegexParserConversionFailed<'a> {
     pub name: &'a str,
     pub error: crate::types::Error,
 }

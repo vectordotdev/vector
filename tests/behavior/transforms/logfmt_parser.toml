@@ -15,7 +15,7 @@
   [[tests.outputs]]
     extract_from = "logfmt_parser_simple"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .code == 1234 &&
         .flag == true &&
@@ -40,7 +40,7 @@
   [[tests.outputs]]
     extract_from = "logfmt_parser_nested"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .nested.code == 1234 &&
         .nested.flag == true &&

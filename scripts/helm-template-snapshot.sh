@@ -54,6 +54,7 @@ update() {
       # shellcheck disable=SC1090
       source "$CONFIG_FILE"
       generate "$RELEASE_NAME" "$CHART" "$VALUES_FILE" >"$TARGET_FILE"
+      kubeval --strict "${TARGET_FILE}"
     )
   done
 }

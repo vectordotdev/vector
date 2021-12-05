@@ -1,0 +1,13 @@
+{{- if .Values.haproxy.enabled }}
+{{- if .Values.haproxy.config }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "haproxy.fullname" . }}
+  labels:
+  {{- include "haproxy.labels" . | nindent 4 }}
+data:
+  haproxy.cfg: |
+  {{ tpl .Values.haproxy.config . | nindent 4 }}
+{{- end }}
+{{- end }}

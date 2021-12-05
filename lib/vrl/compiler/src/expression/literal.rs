@@ -66,6 +66,10 @@ impl Expression for Literal {
         Ok(self.to_value())
     }
 
+    fn as_value(&self) -> Option<Value> {
+        Some(self.to_value())
+    }
+
     fn type_def(&self, _: &State) -> TypeDef {
         use Literal::*;
 
@@ -88,7 +92,7 @@ impl fmt::Display for Literal {
         use Literal::*;
 
         match self {
-            String(v) => write!(f, r#""{}""#, std::string::String::from_utf8_lossy(&v)),
+            String(v) => write!(f, r#""{}""#, std::string::String::from_utf8_lossy(v)),
             Integer(v) => v.fmt(f),
             Float(v) => v.fmt(f),
             Boolean(v) => v.fmt(f),

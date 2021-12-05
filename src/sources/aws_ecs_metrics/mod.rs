@@ -137,7 +137,7 @@ async fn aws_ecs_metrics(
             Ok(response) if response.status() == hyper::StatusCode::OK => {
                 match hyper::body::to_bytes(response).await {
                     Ok(body) => {
-                        emit!(AwsEcsMetricsRequestCompleted {
+                        emit!(&AwsEcsMetricsRequestCompleted {
                             start,
                             end: Instant::now()
                         });
@@ -146,7 +146,7 @@ async fn aws_ecs_metrics(
 
                         match parser::parse(body.as_ref(), namespace.clone()) {
                             Ok(metrics) => {
-                                emit!(AwsEcsMetricsReceived {
+                                emit!(&AwsEcsMetricsReceived {
                                     byte_size,
                                     count: metrics.len(),
                                 });
@@ -155,7 +155,7 @@ async fn aws_ecs_metrics(
                                 out.send_all(&mut events).await?;
                             }
                             Err(error) => {
-                                emit!(AwsEcsMetricsParseError {
+                                emit!(&AwsEcsMetricsParseError {
                                     error,
                                     url: &url,
                                     body: String::from_utf8_lossy(&body),
@@ -164,18 +164,18 @@ async fn aws_ecs_metrics(
                         }
                     }
                     Err(error) => {
-                        emit!(AwsEcsMetricsHttpError { error, url: &url });
+                        emit!(&AwsEcsMetricsHttpError { error, url: &url });
                     }
                 }
             }
             Ok(response) => {
-                emit!(AwsEcsMetricsErrorResponse {
+                emit!(&AwsEcsMetricsErrorResponse {
                     code: response.status(),
                     url: &url,
                 });
             }
             Err(error) => {
-                emit!(AwsEcsMetricsHttpError { error, url: &url });
+                emit!(&AwsEcsMetricsHttpError { error, url: &url });
             }
         }
     }
@@ -533,7 +533,7 @@ mod test {
             .find(|m| m.name() == "network_receive_bytes_total")
         {
             Some(m) => {
-                assert_eq!(m.data.value, MetricValue::Counter { value: 329932716.0 });
+                assert_eq!(m.value(), &MetricValue::Counter { value: 329932716.0 });
                 assert_eq!(m.namespace(), Some("awsecs"));
 
                 match m.tags() {

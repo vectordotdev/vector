@@ -6,6 +6,8 @@ mod append;
 mod array;
 #[cfg(feature = "assert")]
 mod assert;
+#[cfg(feature = "assert_eq")]
+mod assert_eq;
 #[cfg(feature = "boolean")]
 mod boolean;
 #[cfg(feature = "ceil")]
@@ -16,6 +18,8 @@ mod compact;
 mod contains;
 #[cfg(feature = "decode_base64")]
 mod decode_base64;
+#[cfg(feature = "decode_percent")]
+mod decode_percent;
 #[cfg(feature = "del")]
 mod del;
 #[cfg(feature = "downcase")]
@@ -24,20 +28,32 @@ mod downcase;
 mod encode_base64;
 #[cfg(feature = "encode_json")]
 mod encode_json;
+#[cfg(feature = "encode_key_value")]
+mod encode_key_value;
+#[cfg(feature = "encode_logfmt")]
+mod encode_logfmt;
+#[cfg(feature = "encode_percent")]
+mod encode_percent;
 #[cfg(feature = "ends_with")]
 mod ends_with;
 #[cfg(feature = "exists")]
 mod exists;
+#[cfg(feature = "find")]
+mod find;
 #[cfg(feature = "flatten")]
 mod flatten;
 #[cfg(feature = "float")]
 mod float;
 #[cfg(feature = "floor")]
 mod floor;
+#[cfg(feature = "format_int")]
+mod format_int;
 #[cfg(feature = "format_number")]
 mod format_number;
 #[cfg(feature = "format_timestamp")]
 mod format_timestamp;
+#[cfg(feature = "get")]
+mod get;
 #[cfg(feature = "get_env_var")]
 mod get_env_var;
 #[cfg(feature = "get_hostname")]
@@ -46,8 +62,12 @@ mod get_hostname;
 mod includes;
 #[cfg(feature = "integer")]
 mod integer;
+#[cfg(feature = "ip_aton")]
+mod ip_aton;
 #[cfg(feature = "ip_cidr_contains")]
 mod ip_cidr_contains;
+#[cfg(feature = "ip_ntoa")]
+mod ip_ntoa;
 #[cfg(feature = "ip_subnet")]
 mod ip_subnet;
 #[cfg(feature = "ip_to_ipv6")]
@@ -88,6 +108,12 @@ mod log;
 mod log_util;
 #[cfg(feature = "match")]
 mod r#match;
+#[cfg(feature = "match_any")]
+mod match_any;
+#[cfg(feature = "match_array")]
+mod match_array;
+#[cfg(feature = "match_datadog_query")]
+mod match_datadog_query;
 #[cfg(feature = "md5")]
 mod md5;
 #[cfg(feature = "merge")]
@@ -116,20 +142,30 @@ mod parse_duration;
 mod parse_glog;
 #[cfg(feature = "parse_grok")]
 mod parse_grok;
+#[cfg(feature = "parse_groks")]
+mod parse_groks;
+#[cfg(feature = "parse_int")]
+mod parse_int;
 #[cfg(feature = "parse_json")]
 mod parse_json;
 #[cfg(feature = "parse_key_value")]
 mod parse_key_value;
+#[cfg(feature = "parse_klog")]
+mod parse_klog;
 #[cfg(feature = "parse_linux_authorization")]
 mod parse_linux_authorization;
 #[cfg(feature = "parse_logfmt")]
 mod parse_logfmt;
 #[cfg(feature = "parse_nginx_log")]
 mod parse_nginx_log;
+#[cfg(feature = "parse_query_string")]
+mod parse_query_string;
 #[cfg(feature = "parse_regex")]
 mod parse_regex;
 #[cfg(feature = "parse_regex_all")]
 mod parse_regex_all;
+#[cfg(feature = "parse_ruby_hash")]
+mod parse_ruby_hash;
 #[cfg(feature = "parse_syslog")]
 mod parse_syslog;
 #[cfg(feature = "parse_timestamp")]
@@ -138,16 +174,24 @@ mod parse_timestamp;
 mod parse_tokens;
 #[cfg(feature = "parse_url")]
 mod parse_url;
+#[cfg(feature = "parse_user_agent")]
+mod parse_user_agent;
+#[cfg(feature = "parse_xml")]
+mod parse_xml;
 #[cfg(feature = "push")]
 mod push;
-//#[cfg(feature = "redact")]
-//mod redact;
-#[cfg(feature = "parse_query_string")]
-mod parse_query_string;
+#[cfg(feature = "redact")]
+mod redact;
+#[cfg(feature = "remove")]
+mod remove;
 #[cfg(feature = "replace")]
 mod replace;
+#[cfg(feature = "reverse_dns")]
+mod reverse_dns;
 #[cfg(feature = "round")]
 mod round;
+#[cfg(feature = "set")]
+mod set;
 #[cfg(feature = "sha1")]
 mod sha1;
 #[cfg(feature = "sha2")]
@@ -168,6 +212,10 @@ mod strip_ansi_escape_codes;
 mod strip_whitespace;
 #[cfg(feature = "tag_types_externally")]
 mod tag_types_externally;
+#[cfg(feature = "tally")]
+mod tally;
+#[cfg(feature = "tally_value")]
+mod tally_value;
 #[cfg(feature = "timestamp")]
 mod timestamp;
 #[cfg(feature = "to_bool")]
@@ -192,6 +240,10 @@ mod to_timestamp;
 mod to_unix_timestamp;
 #[cfg(feature = "truncate")]
 mod truncate;
+#[cfg(feature = "unique")]
+mod unique;
+#[cfg(feature = "unnest")]
+mod unnest;
 #[cfg(feature = "upcase")]
 mod upcase;
 #[cfg(feature = "uuid_v4")]
@@ -209,6 +261,8 @@ pub use crate::sha1::Sha1;
 pub use append::Append;
 #[cfg(feature = "assert")]
 pub use assert::Assert;
+#[cfg(feature = "assert_eq")]
+pub use assert_eq::AssertEq;
 #[cfg(feature = "boolean")]
 pub use boolean::Boolean;
 #[cfg(feature = "ceil")]
@@ -219,6 +273,8 @@ pub use compact::Compact;
 pub use contains::Contains;
 #[cfg(feature = "decode_base64")]
 pub use decode_base64::DecodeBase64;
+#[cfg(feature = "decode_percent")]
+pub use decode_percent::DecodePercent;
 #[cfg(feature = "del")]
 pub use del::Del;
 #[cfg(feature = "downcase")]
@@ -227,20 +283,32 @@ pub use downcase::Downcase;
 pub use encode_base64::EncodeBase64;
 #[cfg(feature = "encode_json")]
 pub use encode_json::EncodeJson;
+#[cfg(feature = "encode_key_value")]
+pub use encode_key_value::EncodeKeyValue;
+#[cfg(feature = "encode_logfmt")]
+pub use encode_logfmt::EncodeLogfmt;
+#[cfg(feature = "encode_percent")]
+pub use encode_percent::EncodePercent;
 #[cfg(feature = "ends_with")]
 pub use ends_with::EndsWith;
 #[cfg(feature = "exists")]
 pub use exists::Exists;
+#[cfg(feature = "find")]
+pub use find::Find;
 #[cfg(feature = "flatten")]
 pub use flatten::Flatten;
 #[cfg(feature = "float")]
 pub use float::Float;
 #[cfg(feature = "floor")]
 pub use floor::Floor;
+#[cfg(feature = "format_int")]
+pub use format_int::FormatInt;
 #[cfg(feature = "format_number")]
 pub use format_number::FormatNumber;
 #[cfg(feature = "format_timestamp")]
 pub use format_timestamp::FormatTimestamp;
+#[cfg(feature = "get")]
+pub use get::Get;
 #[cfg(feature = "get_env_var")]
 pub use get_env_var::GetEnvVar;
 #[cfg(feature = "get_hostname")]
@@ -249,8 +317,12 @@ pub use get_hostname::GetHostname;
 pub use includes::Includes;
 #[cfg(feature = "integer")]
 pub use integer::Integer;
+#[cfg(feature = "ip_aton")]
+pub use ip_aton::IpAton;
 #[cfg(feature = "ip_cidr_contains")]
 pub use ip_cidr_contains::IpCidrContains;
+#[cfg(feature = "ip_ntoa")]
+pub use ip_ntoa::IpNtoa;
 #[cfg(feature = "ip_subnet")]
 pub use ip_subnet::IpSubnet;
 #[cfg(feature = "ip_to_ipv6")]
@@ -283,6 +355,12 @@ pub use join::Join;
 pub use length::Length;
 #[cfg(feature = "log")]
 pub use log::Log;
+#[cfg(feature = "match_any")]
+pub use match_any::MatchAny;
+#[cfg(feature = "match_array")]
+pub use match_array::MatchArray;
+#[cfg(feature = "match_datadog_query")]
+pub use match_datadog_query::MatchDatadogQuery;
 #[cfg(feature = "merge")]
 pub use merge::Merge;
 #[cfg(feature = "now")]
@@ -309,10 +387,16 @@ pub use parse_duration::ParseDuration;
 pub use parse_glog::ParseGlog;
 #[cfg(feature = "parse_grok")]
 pub use parse_grok::ParseGrok;
+#[cfg(feature = "parse_groks")]
+pub use parse_groks::ParseGroks;
+#[cfg(feature = "parse_int")]
+pub use parse_int::ParseInt;
 #[cfg(feature = "parse_json")]
 pub use parse_json::ParseJson;
 #[cfg(feature = "parse_key_value")]
 pub use parse_key_value::ParseKeyValue;
+#[cfg(feature = "parse_klog")]
+pub use parse_klog::ParseKlog;
 #[cfg(feature = "parse_linux_authorization")]
 pub use parse_linux_authorization::ParseLinuxAuthorization;
 #[cfg(feature = "parse_logfmt")]
@@ -325,6 +409,8 @@ pub use parse_query_string::ParseQueryString;
 pub use parse_regex::ParseRegex;
 #[cfg(feature = "parse_regex_all")]
 pub use parse_regex_all::ParseRegexAll;
+#[cfg(feature = "parse_ruby_hash")]
+pub use parse_ruby_hash::ParseRubyHash;
 #[cfg(feature = "parse_syslog")]
 pub use parse_syslog::ParseSyslog;
 #[cfg(feature = "parse_timestamp")]
@@ -333,16 +419,26 @@ pub use parse_timestamp::ParseTimestamp;
 pub use parse_tokens::ParseTokens;
 #[cfg(feature = "parse_url")]
 pub use parse_url::ParseUrl;
+#[cfg(feature = "parse_user_agent")]
+pub use parse_user_agent::ParseUserAgent;
+#[cfg(feature = "parse_xml")]
+pub use parse_xml::ParseXml;
 #[cfg(feature = "push")]
 pub use push::Push;
 #[cfg(feature = "match")]
 pub use r#match::Match;
-//#[cfg(feature = "redact")]
-//pub use redact::Redact;
+#[cfg(feature = "redact")]
+pub use redact::Redact;
+#[cfg(feature = "remove")]
+pub use remove::Remove;
 #[cfg(feature = "replace")]
 pub use replace::Replace;
+#[cfg(feature = "reverse_dns")]
+pub use reverse_dns::ReverseDns;
 #[cfg(feature = "round")]
 pub use round::Round;
+#[cfg(feature = "set")]
+pub use set::Set;
 #[cfg(feature = "sha2")]
 pub use sha2::Sha2;
 #[cfg(feature = "sha3")]
@@ -361,6 +457,10 @@ pub use strip_ansi_escape_codes::StripAnsiEscapeCodes;
 pub use strip_whitespace::StripWhitespace;
 #[cfg(feature = "tag_types_externally")]
 pub use tag_types_externally::TagTypesExternally;
+#[cfg(feature = "tally")]
+pub use tally::Tally;
+#[cfg(feature = "tally_value")]
+pub use tally_value::TallyValue;
 #[cfg(feature = "timestamp")]
 pub use timestamp::Timestamp;
 #[cfg(feature = "to_bool")]
@@ -385,6 +485,10 @@ pub use to_timestamp::ToTimestamp;
 pub use to_unix_timestamp::ToUnixTimestamp;
 #[cfg(feature = "truncate")]
 pub use truncate::Truncate;
+#[cfg(feature = "unique")]
+pub use unique::Unique;
+#[cfg(feature = "unnest")]
+pub use unnest::Unnest;
 #[cfg(feature = "upcase")]
 pub use upcase::Upcase;
 #[cfg(feature = "uuid_v4")]
@@ -392,12 +496,14 @@ pub use uuid_v4::UuidV4;
 
 pub fn all() -> Vec<Box<dyn vrl::Function>> {
     vec![
-        #[cfg(feature = "array")]
-        Box::new(Array),
         #[cfg(feature = "append")]
         Box::new(Append),
+        #[cfg(feature = "array")]
+        Box::new(Array),
         #[cfg(feature = "assert")]
         Box::new(Assert),
+        #[cfg(feature = "assert_eq")]
+        Box::new(AssertEq),
         #[cfg(feature = "boolean")]
         Box::new(Boolean),
         #[cfg(feature = "ceil")]
@@ -408,6 +514,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Contains),
         #[cfg(feature = "decode_base64")]
         Box::new(DecodeBase64),
+        #[cfg(feature = "decode_percent")]
+        Box::new(DecodePercent),
         #[cfg(feature = "del")]
         Box::new(Del),
         #[cfg(feature = "downcase")]
@@ -416,20 +524,32 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(EncodeBase64),
         #[cfg(feature = "encode_json")]
         Box::new(EncodeJson),
+        #[cfg(feature = "encode_key_value")]
+        Box::new(EncodeKeyValue),
+        #[cfg(feature = "encode_logfmt")]
+        Box::new(EncodeLogfmt),
+        #[cfg(feature = "encode_percent")]
+        Box::new(EncodePercent),
         #[cfg(feature = "ends_with")]
         Box::new(EndsWith),
         #[cfg(feature = "exists")]
         Box::new(Exists),
+        #[cfg(feature = "find")]
+        Box::new(Find),
         #[cfg(feature = "flatten")]
         Box::new(Flatten),
         #[cfg(feature = "float")]
         Box::new(Float),
         #[cfg(feature = "floor")]
         Box::new(Floor),
+        #[cfg(feature = "format_int")]
+        Box::new(FormatInt),
         #[cfg(feature = "format_number")]
         Box::new(FormatNumber),
         #[cfg(feature = "format_timestamp")]
         Box::new(FormatTimestamp),
+        #[cfg(feature = "get")]
+        Box::new(Get),
         #[cfg(feature = "get_env_var")]
         Box::new(GetEnvVar),
         #[cfg(feature = "get_hostname")]
@@ -438,8 +558,12 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Includes),
         #[cfg(feature = "integer")]
         Box::new(Integer),
+        #[cfg(feature = "ip_aton")]
+        Box::new(IpAton),
         #[cfg(feature = "ip_cidr_contains")]
         Box::new(IpCidrContains),
+        #[cfg(feature = "ip_ntoa")]
+        Box::new(IpNtoa),
         #[cfg(feature = "ip_subnet")]
         Box::new(IpSubnet),
         #[cfg(feature = "ip_to_ipv6")]
@@ -474,6 +598,12 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Log),
         #[cfg(feature = "match")]
         Box::new(Match),
+        #[cfg(feature = "match_any")]
+        Box::new(MatchAny),
+        #[cfg(feature = "match_array")]
+        Box::new(MatchArray),
+        #[cfg(feature = "match_datadog_query")]
+        Box::new(MatchDatadogQuery),
         #[cfg(feature = "md5")]
         Box::new(Md5),
         #[cfg(feature = "merge")]
@@ -486,28 +616,34 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         //Box::new(OnlyFields),
         #[cfg(feature = "object")]
         Box::new(Object),
+        #[cfg(feature = "parse_apache_log")]
+        Box::new(ParseApacheLog),
         #[cfg(feature = "parse_aws_alb_log")]
         Box::new(ParseAwsAlbLog),
         #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
         Box::new(ParseAwsCloudWatchLogSubscriptionMessage),
         #[cfg(feature = "parse_aws_vpc_flow_log")]
         Box::new(ParseAwsVpcFlowLog),
+        #[cfg(feature = "parse_common_log")]
+        Box::new(ParseCommonLog),
+        #[cfg(feature = "parse_csv")]
+        Box::new(ParseCsv),
         #[cfg(feature = "parse_duration")]
         Box::new(ParseDuration),
         #[cfg(feature = "parse_glog")]
         Box::new(ParseGlog),
         #[cfg(feature = "parse_grok")]
         Box::new(ParseGrok),
+        #[cfg(feature = "parse_groks")]
+        Box::new(ParseGroks),
+        #[cfg(feature = "parse_int")]
+        Box::new(ParseInt),
         #[cfg(feature = "parse_json")]
         Box::new(ParseJson),
-        #[cfg(feature = "parse_apache_log")]
-        Box::new(ParseApacheLog),
-        #[cfg(feature = "parse_common_log")]
-        Box::new(ParseCommonLog),
-        #[cfg(feature = "parse_csv")]
-        Box::new(ParseCsv),
         #[cfg(feature = "parse_key_value")]
         Box::new(ParseKeyValue),
+        #[cfg(feature = "parse_klog")]
+        Box::new(ParseKlog),
         #[cfg(feature = "parse_linux_authorization")]
         Box::new(ParseLinuxAuthorization),
         #[cfg(feature = "parse_logfmt")]
@@ -520,6 +656,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseRegex),
         #[cfg(feature = "parse_regex_all")]
         Box::new(ParseRegexAll),
+        #[cfg(feature = "parse_ruby_hash")]
+        Box::new(ParseRubyHash),
         #[cfg(feature = "parse_syslog")]
         Box::new(ParseSyslog),
         #[cfg(feature = "parse_timestamp")]
@@ -528,16 +666,24 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseTokens),
         #[cfg(feature = "parse_url")]
         Box::new(ParseUrl),
+        #[cfg(feature = "parse_user_agent")]
+        Box::new(ParseUserAgent),
+        #[cfg(feature = "parse_xml")]
+        Box::new(ParseXml),
         #[cfg(feature = "push")]
         Box::new(Push),
-        #[cfg(feature = "match")]
-        Box::new(Match),
-        //#[cfg(feature = "redact")]
-        //Box::new(Redact),
+        #[cfg(feature = "redact")]
+        Box::new(Redact),
+        #[cfg(feature = "remove")]
+        Box::new(Remove),
         #[cfg(feature = "replace")]
         Box::new(Replace),
+        #[cfg(feature = "reverse_dns")]
+        Box::new(ReverseDns),
         #[cfg(feature = "round")]
         Box::new(Round),
+        #[cfg(feature = "set")]
+        Box::new(Set),
         #[cfg(feature = "sha1")]
         Box::new(Sha1),
         #[cfg(feature = "sha2")]
@@ -556,6 +702,10 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(StripAnsiEscapeCodes),
         #[cfg(feature = "strip_whitespace")]
         Box::new(StripWhitespace),
+        #[cfg(feature = "tally")]
+        Box::new(Tally),
+        #[cfg(feature = "tally_value")]
+        Box::new(TallyValue),
         #[cfg(feature = "tag_types_externally")]
         Box::new(TagTypesExternally),
         #[cfg(feature = "timestamp")]
@@ -582,6 +732,10 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ToUnixTimestamp),
         #[cfg(feature = "truncate")]
         Box::new(Truncate),
+        #[cfg(feature = "unique")]
+        Box::new(Unique),
+        #[cfg(feature = "unnest")]
+        Box::new(Unnest),
         #[cfg(feature = "upcase")]
         Box::new(Upcase),
         #[cfg(feature = "uuid_v4")]

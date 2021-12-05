@@ -1,18 +1,19 @@
+use crate::aws::rusoto::{self, AwsAuthentication, RegionOrEndpoint};
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
+    },
     event::Event,
     internal_events::{AwsSqsEventSent, TemplateRenderingFailed},
-    rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
-        sink::Response,
-        BatchSettings, EncodedLength, TowerRequestConfig, VecBuffer,
+        sink::{self, Response},
+        BatchConfig, EncodedEvent, EncodedLength, TowerRequestConfig, VecBuffer,
     },
     template::{Template, TemplateParseError},
 };
 use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
-use lazy_static::lazy_static;
 use rusoto_core::RusotoError;
 use rusoto_sqs::{
     GetQueueAttributesError, GetQueueAttributesRequest, SendMessageError, SendMessageRequest,
@@ -22,10 +23,14 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
     convert::{TryFrom, TryInto},
+    num::NonZeroU64,
     task::{Context, Poll},
 };
 use tower::Service;
 use tracing_futures::Instrument;
+use vector_core::ByteSizeOf;
+
+use super::util::SinkBatchSettings;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -35,6 +40,8 @@ enum BuildError {
     MessageGroupIdNotAllowed,
     #[snafu(display("invalid topic template: {}", source))]
     TopicTemplate { source: TemplateParseError },
+    #[snafu(display("invalid message_deduplication_id template: {}", source))]
+    MessageDeduplicationIdTemplate { source: TemplateParseError },
 }
 
 #[derive(Debug, Snafu)]
@@ -51,6 +58,15 @@ pub struct SqsSink {
     queue_url: String,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SqsSinkDefaultBatchSettings;
+
+impl SinkBatchSettings for SqsSinkDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(1);
+    const MAX_BYTES: Option<usize> = Some(262_144);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct SqsSinkConfig {
@@ -59,19 +75,13 @@ pub struct SqsSinkConfig {
     pub region: RegionOrEndpoint,
     pub encoding: EncodingConfig<Encoding>,
     pub message_group_id: Option<String>,
+    pub message_deduplication_id: Option<String>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
-}
-
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        timeout_secs: Some(30),
-        ..Default::default()
-    };
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -103,7 +113,7 @@ impl SinkConfig for SqsSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let client = self.create_client()?;
+        let client = self.create_client(&cx.proxy)?;
         let healthcheck = self.clone().healthcheck(client.clone());
         let sink = SqsSink::new(self.clone(), cx, client)?;
         Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck.boxed()))
@@ -131,9 +141,9 @@ impl SqsSinkConfig {
             .map_err(Into::into)
     }
 
-    pub fn create_client(&self) -> crate::Result<SqsClient> {
+    pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<SqsClient> {
         let region = (&self.region).try_into()?;
-        let client = rusoto::client()?;
+        let client = rusoto::client(proxy)?;
 
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
@@ -150,9 +160,13 @@ impl SqsSink {
         // Currently we do not use batching, so this mostly for future. Also implement `Service` is simpler than `Sink`.
         // https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-batch-api-actions.html
         // Up to 10 events, not more than 256KB as total size.
-        let batch = BatchSettings::default().events(1).bytes(262_144);
+        let batch: BatchConfig<SqsSinkDefaultBatchSettings> = BatchConfig::default();
+        let batch_settings = batch.into_batch_settings()?;
 
-        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = config.request.unwrap_with(&TowerRequestConfig {
+            timeout_secs: Some(30),
+            ..Default::default()
+        });
         let encoding = config.encoding;
         let fifo = config.queue_url.ends_with(".fifo");
         let message_group_id = match (config.message_group_id, fifo) {
@@ -161,6 +175,10 @@ impl SqsSink {
             (None, true) => return Err(Box::new(BuildError::MessageGroupIdMissing)),
             (None, false) => None,
         };
+        let message_deduplication_id = config
+            .message_deduplication_id
+            .map(Template::try_from)
+            .transpose()?;
 
         let sqs = SqsSink {
             client,
@@ -171,13 +189,20 @@ impl SqsSink {
             .batch_sink(
                 SqsRetryLogic,
                 sqs,
-                VecBuffer::new(batch.size),
-                batch.timeout,
+                VecBuffer::new(batch_settings.size),
+                batch_settings.timeout,
                 cx.acker(),
+                sink::StdServiceLogic::default(),
             )
             .sink_map_err(|error| error!(message = "Fatal sqs sink error.", %error))
             .with_flat_map(move |event| {
-                stream::iter(encode_event(event, &encoding, message_group_id.as_ref())).map(Ok)
+                stream::iter(encode_event(
+                    event,
+                    &encoding,
+                    &message_group_id,
+                    &message_deduplication_id,
+                ))
+                .map(Ok)
             });
 
         Ok(sink)
@@ -203,6 +228,7 @@ impl Service<Vec<SendMessageEntry>> for SqsSink {
         let request = SendMessageRequest {
             message_body: entry.message_body,
             message_group_id: entry.message_group_id,
+            message_deduplication_id: entry.message_deduplication_id,
             queue_url: self.queue_url.clone(),
             ..Default::default()
         };
@@ -211,7 +237,7 @@ impl Service<Vec<SendMessageEntry>> for SqsSink {
             client
                 .send_message(request)
                 .inspect_ok(|result| {
-                    emit!(AwsSqsEventSent {
+                    emit!(&AwsSqsEventSent {
                         byte_size,
                         message_id: result.message_id.as_ref()
                     })
@@ -226,6 +252,7 @@ impl Service<Vec<SendMessageEntry>> for SqsSink {
 struct SendMessageEntry {
     message_body: String,
     message_group_id: Option<String>,
+    message_deduplication_id: Option<String>,
 }
 
 impl EncodedLength for SendMessageEntry {
@@ -251,17 +278,33 @@ impl RetryLogic for SqsRetryLogic {
 fn encode_event(
     mut event: Event,
     encoding: &EncodingConfig<Encoding>,
-    message_group_id: Option<&Template>,
-) -> Option<SendMessageEntry> {
+    message_group_id: &Option<Template>,
+    message_deduplication_id: &Option<Template>,
+) -> Option<EncodedEvent<SendMessageEntry>> {
+    let byte_size = event.size_of();
     encoding.apply_rules(&mut event);
 
     let message_group_id = match message_group_id {
         Some(tpl) => match tpl.render_string(&event) {
             Ok(value) => Some(value),
             Err(error) => {
-                emit!(TemplateRenderingFailed {
+                emit!(&TemplateRenderingFailed {
                     error,
                     field: Some("message_group_id"),
+                    drop_event: true
+                });
+                return None;
+            }
+        },
+        None => None,
+    };
+    let message_deduplication_id = match message_deduplication_id {
+        Some(tpl) => match tpl.render_string(&event) {
+            Ok(value) => Some(value),
+            Err(error) => {
+                emit!(&TemplateRenderingFailed {
+                    error,
+                    field: Some("message_deduplication_id"),
                     drop_event: true
                 });
                 return None;
@@ -279,23 +322,29 @@ fn encode_event(
         Encoding::Json => serde_json::to_string(&log).expect("Error encoding event as json."),
     };
 
-    Some(SendMessageEntry {
-        message_body,
-        message_group_id,
-    })
+    Some(EncodedEvent::new(
+        SendMessageEntry {
+            message_body,
+            message_group_id,
+            message_deduplication_id,
+        },
+        byte_size,
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::LogEvent;
     use std::collections::BTreeMap;
 
     #[test]
     fn sqs_encode_event_text() {
         let message = "hello world".to_string();
-        let event = encode_event(message.clone().into(), &Encoding::Text.into(), None).unwrap();
+        let event =
+            encode_event(message.clone().into(), &Encoding::Text.into(), &None, &None).unwrap();
 
-        assert_eq!(&event.message_body, &message);
+        assert_eq!(&event.item.message_body, &message);
     }
 
     #[test]
@@ -303,18 +352,39 @@ mod tests {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("key", "value");
-        let event = encode_event(event, &Encoding::Json.into(), None).unwrap();
+        let event = encode_event(event, &Encoding::Json.into(), &None, &None).unwrap();
 
-        let map: BTreeMap<String, String> = serde_json::from_str(&event.message_body).unwrap();
+        let map: BTreeMap<String, String> = serde_json::from_str(&event.item.message_body).unwrap();
 
         assert_eq!(map[&log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
+    }
+
+    #[test]
+    fn sqs_encode_event_deduplication_id() {
+        let message_deduplication_id = Template::try_from("{{ transaction_id }}").unwrap();
+        let mut log = LogEvent::from("hello world".to_string());
+        log.insert("transaction_id", "some id");
+        let event = encode_event(
+            log.into(),
+            &Encoding::Json.into(),
+            &None,
+            &Some(message_deduplication_id),
+        )
+        .unwrap();
+
+        assert_eq!(
+            event.item.message_deduplication_id,
+            Some("some id".to_string())
+        );
     }
 }
 
 #[cfg(feature = "aws-sqs-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    #![allow(clippy::print_stdout)] //tests
+
     use super::*;
     use crate::test_util::{random_lines_with_stream, random_string};
     use rusoto_core::Region;
@@ -339,9 +409,10 @@ mod integration_tests {
 
         let config = SqsSinkConfig {
             queue_url: queue_url.clone(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
             encoding: Encoding::Text.into(),
             message_group_id: None,
+            message_deduplication_id: None,
             request: Default::default(),
             assume_role: None,
             auth: Default::default(),
@@ -351,7 +422,7 @@ mod integration_tests {
 
         let mut sink = SqsSink::new(config, cx, client.clone()).unwrap();
 
-        let (mut input_lines, events) = random_lines_with_stream(100, 10);
+        let (mut input_lines, events) = random_lines_with_stream(100, 10, None);
         sink.send_all(&mut events.map(Ok)).await.unwrap();
 
         sleep(Duration::from_secs(1)).await;

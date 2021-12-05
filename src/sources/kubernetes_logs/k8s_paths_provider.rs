@@ -6,13 +6,14 @@ use super::path_helpers::build_pod_logs_directory;
 use crate::kubernetes::{self as k8s, pod_manager_logic::extract_static_pod_config_hashsum};
 use evmap::ReadHandle;
 use file_source::paths_provider::PathsProvider;
-use k8s_openapi::api::core::v1::Pod;
+use k8s_openapi::api::core::v1::{Namespace, Pod};
 use std::path::PathBuf;
 
 /// A paths provider implementation that uses the state obtained from the
 /// the k8s API.
 pub struct K8sPathsProvider {
     pods_state_reader: ReadHandle<String, k8s::state::evmap::Value<Pod>>,
+    namespace_state_reader: ReadHandle<String, k8s::state::evmap::Value<Namespace>>,
     exclude_paths: Vec<glob::Pattern>,
 }
 
@@ -20,10 +21,12 @@ impl K8sPathsProvider {
     /// Create a new [`K8sPathsProvider`].
     pub fn new(
         pods_state_reader: ReadHandle<String, k8s::state::evmap::Value<Pod>>,
+        namespace_state_reader: ReadHandle<String, k8s::state::evmap::Value<Namespace>>,
         exclude_paths: Vec<glob::Pattern>,
     ) -> Self {
         Self {
             pods_state_reader,
+            namespace_state_reader,
             exclude_paths,
         }
     }
@@ -48,6 +51,20 @@ impl PathsProvider for K8sPathsProvider {
 
         read_ref
             .into_iter()
+            // filter out pods where we haven't fetched the namespace metadata yet
+            // they will be picked up on a later run
+            .filter(|(uid, values)| {
+                let pod: &Pod = values
+                    .get_one()
+                    .expect("we are supposed to be working with single-item values only")
+                    .as_ref();
+                trace!(message = "Verifying Namespace metadata for pod.", uid = ?uid);
+                if let Some(namespace) = pod.metadata.namespace.as_ref() {
+                    self.namespace_state_reader.get(namespace).is_some()
+                } else {
+                    false
+                }
+            })
             .flat_map(|(uid, values)| {
                 let pod = values
                     .get_one()
@@ -68,7 +85,7 @@ impl PathsProvider for K8sPathsProvider {
 /// `Static Pod`s: they keep their logs at the path that consists of config
 /// hashsum instead of the `Pod` `uid`. The reason for this is `kubelet` is
 /// locally authoritative over those `Pod`s, and the API only has
-/// `Monitor Pod`s - the "dummy" entires useful for discovery and association.
+/// `Monitor Pod`s - the "dummy" entries useful for discovery and association.
 /// Their UIDs are generated at the Kubernetes API side, and do not represent
 /// the actual config hashsum as one would expect.
 ///
@@ -92,7 +109,7 @@ fn extract_pod_logs_directory(pod: &Pod) -> Option<PathBuf> {
         metadata.uid.as_ref()?
     };
 
-    Some(build_pod_logs_directory(&namespace, &name, &uid))
+    Some(build_pod_logs_directory(namespace, name, uid))
 }
 
 const CONTAINER_EXCLUSION_ANNOTATION_KEY: &str = "vector.dev/exclude-containers";
@@ -146,10 +163,10 @@ where
                 // architecture.
                 // In some setups, there will also be paths like
                 // `<pod_logs_dir>/<hash>.log` - those we want to skip.
-                &[dir, "*/*.log"].join("/"),
+                &[dir, "*/*.log*"].join("/"),
             );
 
-            // Extract the containers to exclude, then build patters from them
+            // Extract the containers to exclude, then build patterns from them
             // and cache the results into a Vec.
             let excluded_containers = extract_excluded_containers_for_pod(pod);
             let exclusion_patterns: Vec<_> =
@@ -384,7 +401,7 @@ mod tests {
                 // Calls to the glob mock.
                 vec![(
                     // The pattern to expect at the mock.
-                    "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/*/*.log",
+                    "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/*/*.log*",
                     // The paths to return from the mock.
                     vec![
                         "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/container1/qwe.log",
@@ -415,7 +432,7 @@ mod tests {
                     ..Pod::default()
                 },
                 vec![(
-                    "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/*/*.log",
+                    "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/*/*.log*",
                     vec![],
                 )],
                 vec![],
@@ -445,9 +462,19 @@ mod tests {
         let cases = vec![
             // No exclusion pattern allows everything.
             (
-                vec!["/var/log/pods/a.log", "/var/log/pods/b.log"],
+                vec![
+                    "/var/log/pods/a.log",
+                    "/var/log/pods/b.log",
+                    "/var/log/pods/c.log.foo",
+                    "/var/log/pods/d.logbar",
+                ],
                 vec![],
-                vec!["/var/log/pods/a.log", "/var/log/pods/b.log"],
+                vec![
+                    "/var/log/pods/a.log",
+                    "/var/log/pods/b.log",
+                    "/var/log/pods/c.log.foo",
+                    "/var/log/pods/d.logbar",
+                ],
             ),
             // Test a filter that doesn't apply to anything.
             (

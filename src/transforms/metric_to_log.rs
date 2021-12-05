@@ -1,8 +1,9 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription,
+        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        TransformDescription,
     },
-    event::{self, Event, LogEvent},
+    event::{self, Event, LogEvent, Metric},
     internal_events::MetricToLogFailedSerialize,
     transforms::{FunctionTransform, Transform},
     types::Conversion,
@@ -36,10 +37,10 @@ impl GenerateConfig for MetricToLogConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "metric_to_log")]
 impl TransformConfig for MetricToLogConfig {
-    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(MetricToLog::new(
             self.host_tag.clone(),
-            self.timezone.unwrap_or(globals.timezone),
+            self.timezone.unwrap_or(context.globals.timezone),
         )))
     }
 
@@ -74,14 +75,10 @@ impl MetricToLog {
             timezone,
         }
     }
-}
 
-impl FunctionTransform for MetricToLog {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
-        let metric = event.into_metric();
-
-        let retval = serde_json::to_value(&metric)
-            .map_err(|error| emit!(MetricToLogFailedSerialize { error }))
+    pub fn transform_one(&self, metric: Metric) -> Option<LogEvent> {
+        serde_json::to_value(&metric)
+            .map_err(|error| emit!(&MetricToLogFailedSerialize { error }))
             .ok()
             .and_then(|value| match value {
                 Value::Object(object) => {
@@ -106,10 +103,18 @@ impl FunctionTransform for MetricToLog {
                         log.insert(&log_schema().host_key(), host);
                     }
 
-                    Some(log.into())
+                    Some(log)
                 }
                 _ => None,
-            });
+            })
+    }
+}
+
+impl FunctionTransform for MetricToLog {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+        let retval: Option<Event> = self
+            .transform_one(event.into_metric())
+            .map(|log| log.into());
         output.extend(retval.into_iter())
     }
 }
@@ -121,6 +126,7 @@ mod tests {
         metric::{MetricKind, MetricValue, StatisticKind},
         Metric, Value,
     };
+    use crate::transforms::test::transform_one;
     use chrono::{offset::TimeZone, DateTime, Utc};
     use pretty_assertions::assert_eq;
     use std::collections::BTreeMap;
@@ -132,11 +138,9 @@ mod tests {
 
     fn do_transform(metric: Metric) -> Option<LogEvent> {
         let event = Event::Metric(metric);
-        let mut transformer = MetricToLog::new(Some("host".into()), Default::default());
+        let mut transform = MetricToLog::new(Some("host".into()), Default::default());
 
-        transformer
-            .transform_one(event)
-            .map(|event| event.into_log())
+        transform_one(&mut transform, event).map(|event| event.into_log())
     }
 
     fn ts() -> DateTime<Utc> {
@@ -239,7 +243,7 @@ mod tests {
             "distro",
             MetricKind::Absolute,
             MetricValue::Distribution {
-                samples: crate::samples![1.0 => 10, 2.0 => 20],
+                samples: vector_core::samples![1.0 => 10, 2.0 => 20],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -286,7 +290,7 @@ mod tests {
             "histo",
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
-                buckets: crate::buckets![1.0 => 10, 2.0 => 20],
+                buckets: vector_core::buckets![1.0 => 10, 2.0 => 20],
                 count: 30,
                 sum: 50.0,
             },
@@ -332,7 +336,7 @@ mod tests {
             "summary",
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
-                quantiles: crate::quantiles![50.0 => 10.0, 90.0 => 20.0],
+                quantiles: vector_core::quantiles![50.0 => 10.0, 90.0 => 20.0],
                 count: 30,
                 sum: 50.0,
             },
@@ -348,7 +352,7 @@ mod tests {
             vec![
                 (String::from("aggregated_summary.count"), &Value::from(30)),
                 (
-                    String::from("aggregated_summary.quantiles[0].upper_limit"),
+                    String::from("aggregated_summary.quantiles[0].quantile"),
                     &Value::from(50.0)
                 ),
                 (
@@ -356,7 +360,7 @@ mod tests {
                     &Value::from(10.0)
                 ),
                 (
-                    String::from("aggregated_summary.quantiles[1].upper_limit"),
+                    String::from("aggregated_summary.quantiles[1].quantile"),
                     &Value::from(90.0)
                 ),
                 (

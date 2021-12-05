@@ -3,7 +3,7 @@ use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::util::{
-        encode_event, encoding::EncodingConfig, tcp::TcpSinkConfig, udp::UdpSinkConfig, Encoding,
+        encode_log, encoding::EncodingConfig, tcp::TcpSinkConfig, udp::UdpSinkConfig, Encoding,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -42,7 +42,7 @@ impl GenerateConfig for SocketSinkConfig {
 }
 
 impl SocketSinkConfig {
-    pub fn new(mode: Mode, encoding: EncodingConfig<Encoding>) -> Self {
+    pub const fn new(mode: Mode, encoding: EncodingConfig<Encoding>) -> Self {
         SocketSinkConfig { mode, encoding }
     }
 
@@ -62,7 +62,7 @@ impl SinkConfig for SocketSinkConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let encoding = self.encoding.clone();
-        let encode_event = move |event| encode_event(event, &encoding);
+        let encode_event = move |event| encode_log(event, &encoding);
         match &self.mode {
             Mode::Tcp(config) => config.build(cx, encode_event),
             Mode::Udp(config) => config.build(cx, encode_event),
@@ -161,7 +161,7 @@ mod test {
 
         let mut receiver = CountReceiver::receive_lines(addr);
 
-        let (lines, events) = random_lines_with_stream(10, 100);
+        let (lines, events) = random_lines_with_stream(10, 100, None);
         sink.run(events).await.unwrap();
 
         // Wait for output to connect
@@ -295,7 +295,7 @@ mod test {
                 .await;
         });
 
-        let (_, mut events) = random_lines_with_stream(10, 10);
+        let (_, mut events) = random_lines_with_stream(10, 10, None);
         while let Some(event) = events.next().await {
             let _ = sender.send(Some(event)).await.unwrap();
         }
@@ -317,7 +317,7 @@ mod test {
         assert_eq!(conn_counter.load(Ordering::SeqCst), 1);
 
         // Send another 10 events
-        let (_, mut events) = random_lines_with_stream(10, 10);
+        let (_, mut events) = random_lines_with_stream(10, 10, None);
         while let Some(event) = events.next().await {
             let _ = sender.send(Some(event)).await.unwrap();
         }
@@ -346,7 +346,7 @@ mod test {
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
-        let (_, events) = random_lines_with_stream(1000, 10000);
+        let (_, events) = random_lines_with_stream(1000, 10000, None);
         let _ = tokio::spawn(sink.run(events));
 
         // First listener

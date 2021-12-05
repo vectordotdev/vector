@@ -63,7 +63,7 @@ struct NginxMetricsConfig {
     auth: Option<Auth>,
 }
 
-pub fn default_scrape_interval_secs() -> u64 {
+pub const fn default_scrape_interval_secs() -> u64 {
     15
 }
 
@@ -82,7 +82,7 @@ impl_generate_config_from_default!(NginxMetricsConfig);
 impl SourceConfig for NginxMetricsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let tls = TlsSettings::from_options(&self.tls)?;
-        let http_client = HttpClient::new(tls)?;
+        let http_client = HttpClient::new(tls, &cx.proxy)?;
 
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
         let mut sources = Vec::with_capacity(self.endpoints.len());
@@ -106,7 +106,7 @@ impl SourceConfig for NginxMetricsConfig {
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter().map(|nginx| nginx.collect())).await;
-                emit!(NginxMetricsCollectCompleted {
+                emit!(&NginxMetricsCollectCompleted {
                     start,
                     end: Instant::now()
                 });
@@ -177,7 +177,7 @@ impl NginxMetrics {
 
         metrics.push(self.create_metric("up", gauge!(up_value)));
 
-        emit!(NginxMetricsEventsReceived {
+        emit!(&NginxMetricsEventsReceived {
             count: metrics.len(),
             uri: &self.endpoint
         });
@@ -187,7 +187,7 @@ impl NginxMetrics {
 
     async fn collect_metrics(&self) -> Result<Vec<Metric>, ()> {
         let response = self.get_nginx_response().await.map_err(|error| {
-            emit!(NginxMetricsRequestError {
+            emit!(&NginxMetricsRequestError {
                 error,
                 endpoint: &self.endpoint,
             })
@@ -195,7 +195,7 @@ impl NginxMetrics {
 
         let status = NginxStubStatus::try_from(String::from_utf8_lossy(&response).as_ref())
             .map_err(|error| {
-                emit!(NginxMetricsStubStatusParseError {
+                emit!(&NginxMetricsStubStatusParseError {
                     error,
                     endpoint: &self.endpoint,
                 })
@@ -247,12 +247,15 @@ mod tests {
 #[cfg(all(test, feature = "nginx-integration-tests"))]
 mod integration_tests {
     use super::*;
-    use crate::{test_util::trace_init, Pipeline};
+    use crate::{config::ProxyConfig, test_util::trace_init, Pipeline};
 
-    async fn test_nginx(endpoint: &'static str, auth: Option<Auth>) {
+    async fn test_nginx(endpoint: &'static str, auth: Option<Auth>, proxy: ProxyConfig) {
         trace_init();
 
         let (sender, mut recv) = Pipeline::new_test();
+
+        let mut ctx = SourceContext::new_test(sender);
+        ctx.proxy = proxy;
 
         tokio::spawn(async move {
             NginxMetricsConfig {
@@ -262,7 +265,7 @@ mod integration_tests {
                 tls: None,
                 auth,
             }
-            .build(SourceContext::new_test(sender))
+            .build(ctx)
             .await
             .unwrap()
             .await
@@ -287,7 +290,12 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_stub_status() {
-        test_nginx("http://localhost:8010/basic_status", None).await
+        test_nginx(
+            "http://localhost:8010/basic_status",
+            None,
+            ProxyConfig::default(),
+        )
+        .await
     }
 
     #[tokio::test]
@@ -298,6 +306,22 @@ mod integration_tests {
                 user: "vector".to_owned(),
                 password: "vector".to_owned(),
             }),
+            ProxyConfig::default(),
+        )
+        .await
+    }
+
+    // This integration test verifies that proxy support is wired up correctly in Vector
+    // It is the only test of its kind
+    #[tokio::test]
+    async fn test_stub_status_with_proxy() {
+        test_nginx(
+            "http://vector_nginx:8000/basic_status",
+            None,
+            ProxyConfig {
+                http: Some("http://localhost:3128".into()),
+                ..Default::default()
+            },
         )
         .await
     }

@@ -1,0 +1,90 @@
+{{ $ui := site.Data.docs.administration.ui.management }}
+{{ $latest := index site.Data.docs.versions 0 }}
+<div class="flex space-x-2">
+  {{ partial "ui/selector.html" (dict "name" "Platform" "items" $ui.family_names "var" "platform") }}
+
+  {{ range $ui.families }}
+  {{ $var := printf "%s_interface" .name }}
+  <div x-show="$store.ui.platform === '{{ .name }}'">
+    {{ partial "ui/selector.html" (dict "name" "Interface" "items" .interface_names "var" $var) }}
+  </div>
+  {{ end }}
+</div>
+
+<div class="mt-3 no-prose border rounded-md shadow dark:border-gray-700">
+  {{ range $ui.families }}
+  {{ $highlighter := .highlighter }}
+  <div x-show="$store.ui.platform === '{{ .name }}'">
+    {{ $var := printf "%s_interface" .name }}
+    {{ range .interfaces }}
+    {{ $cmds := .manage }}
+    <div x-show="$store.ui.{{ $var }} === '{{ .title }}'" class="flex flex-col">
+      <div class="pt-4 px-6">
+        <span class="text-xl">
+          Installer: <span class="font-bold">{{ .title }}</span>
+        </span>
+      </div>
+
+      <div class="py-4 px-6">
+        <span class="text-lg font-medium">
+          Variables
+        </span>
+
+        {{ with .variables.variants }}
+        <span class="mt-2 flex items-center space-x-6">
+          <span class="font-bold font-mono text-sm text-secondary dark:text-primary">
+            variant
+          </span>
+
+          <span class="flex items-center space-x-1">
+            {{ range . }}
+            {{ partial "badge.html" (dict "word" . "color" "gray") }}
+            {{ end }}
+          </span>
+        </span>
+        {{ end }}
+
+        <span class="mt-2 flex items-center space-x-6">
+          <span class="font-bold font-mono text-sm text-secondary dark:text-primary">
+            config_format
+          </span>
+          <span class="flex items-center space-x-1">
+            {{ range .variables.config_formats }}
+            {{ partial "badge.html" (dict "word" . "color" "gray") }}
+            {{ end }}
+          </span>
+        </span>
+      </div>
+
+
+      {{ with .manage }}
+      <div class="flex flex-col space-y-2 py-4 px-6">
+        {{ range slice "start" "stop" "reload" "restart" }}
+        {{ $cmd := index $cmds . }}
+
+        {{ with $cmd.info }}
+        <div class="prose dark:prose-dark">
+          {{ . | $.Page.RenderString }}
+        </div>
+        {{ end }}
+
+        {{ if $cmd.command }}
+        {{ $cmd = $cmd.command | replaceRE "{version}" $latest }}
+        <div>
+          <span class="text-lg font-medium">
+            {{ . | title }}
+          </span>
+
+          <div class="mt-2">
+            {{ highlight $cmd $highlighter "" }}
+          </div>
+        </div>
+        {{ end }}
+        {{ end }}
+      </div>
+      {{ end }}
+    </div>
+    {{ end }}
+  </div>
+  {{ end }}
+</div>

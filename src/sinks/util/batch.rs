@@ -1,82 +1,242 @@
+use super::EncodedEvent;
+use crate::{event::EventFinalizers, internal_events::LargeEventDropped};
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::marker::PhantomData;
+use std::num::{NonZeroU64, NonZeroUsize};
 use std::time::Duration;
+use vector_core::stream::BatcherSettings;
 
-#[derive(Debug, Snafu)]
+// * Provide sensible sink default 10 MB with 1s timeout. Don't allow chaining builder methods on
+//   that.
+
+#[derive(Debug, Snafu, PartialEq)]
 pub enum BatchError {
-    #[snafu(display("Cannot configure both `max_bytes` and `max_size`"))]
-    BytesAndSize,
-    #[snafu(display("Cannot configure both `max_events` and `max_size`"))]
-    EventsAndSize,
     #[snafu(display("This sink does not allow setting `max_bytes`"))]
     BytesNotAllowed,
+    #[snafu(display("`max_bytes` must be greater than zero"))]
+    InvalidMaxBytes,
+    #[snafu(display("`max_events` must be greater than zero"))]
+    InvalidMaxEvents,
+    #[snafu(display("`timeout_secs` must be greater than zero"))]
+    InvalidTimeout,
+    #[snafu(display("provided `max_bytes` exceeds the maximum limit of {}", limit))]
+    MaxBytesExceeded { limit: usize },
+    #[snafu(display("provided `max_events` exceeds the maximum limit of {}", limit))]
+    MaxEventsExceeded { limit: usize },
 }
+
+pub trait SinkBatchSettings {
+    const MAX_EVENTS: Option<usize>;
+    const MAX_BYTES: Option<usize>;
+
+    // Per Nathan, once Rust 1.57 hits, we can add a helper method, such as the following, that
+    // implementations can use to avoid the gross `unsafe` approach:
+    //
+    // const fn non_zero(val: u64) -> NonZeroU64 {
+    //     match NonZeroU64::new(val) {
+    //         Some(x) => x,
+    //         None => panic!("Value must be non-zero!")
+    //     }
+    // }
+    const TIMEOUT_SECS: NonZeroU64;
+}
+
+/// Reasonable default batch settings for sinks with timeliness concerns, limited by event count.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct RealtimeEventBasedDefaultBatchSettings;
+
+impl SinkBatchSettings for RealtimeEventBasedDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(1000);
+    const MAX_BYTES: Option<usize> = None;
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+}
+
+/// Reasonable default batch settings for sinks with timeliness concerns, limited by byte size.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct RealtimeSizeBasedDefaultBatchSettings;
+
+impl SinkBatchSettings for RealtimeSizeBasedDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = None;
+    const MAX_BYTES: Option<usize> = Some(10_000_000);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+}
+
+/// Reasonable default batch settings for sinks focused on shipping fewer-but-larger batches,
+/// limited by byte size.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct BulkSizeBasedDefaultBatchSettings;
+
+impl SinkBatchSettings for BulkSizeBasedDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = None;
+    const MAX_BYTES: Option<usize> = Some(10_000_000);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(300) };
+}
+
+/// "Default" batch settings when a sink handles batch settings entirely on its own.
+///
+/// This has very few usages, but can be notably seen in the Kafka sink, where the values are used
+/// to configure `librdkafka` itself rather than being passed as `BatchSettings`/`BatcherSettings`
+/// to components in the sink itself.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct NoDefaultsBatchSettings;
+
+impl SinkBatchSettings for NoDefaultsBatchSettings {
+    const MAX_EVENTS: Option<usize> = None;
+    const MAX_BYTES: Option<usize> = None;
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Merged;
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Unmerged;
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
-pub struct BatchConfig {
+pub struct BatchConfig<D: SinkBatchSettings, S = Unmerged> {
     pub max_bytes: Option<usize>,
     pub max_events: Option<usize>,
-    /// Deprecated. Left in for backwards compatibility, use `max_bytes`
-    /// or `max_events` instead.
-    pub max_size: Option<usize>,
     pub timeout_secs: Option<u64>,
+
+    #[serde(skip)]
+    _d: PhantomData<D>,
+    #[serde(skip)]
+    _s: PhantomData<S>,
 }
 
-impl BatchConfig {
-    // This is used internally by new_relic_logs sink, else it could be pub(super) too
-    pub fn use_size_as_bytes(&self) -> Result<Self, BatchError> {
-        let max_bytes = match (self.max_bytes, self.max_size) {
-            (Some(_), Some(_)) => return Err(BatchError::BytesAndSize),
-            (Some(bytes), None) => Some(bytes),
-            (None, Some(size)) => Some(size),
-            (None, None) => None,
+impl<D: SinkBatchSettings> BatchConfig<D, Unmerged> {
+    pub fn validate(self) -> Result<BatchConfig<D, Merged>, BatchError> {
+        let config = BatchConfig {
+            max_bytes: self.max_bytes.or(D::MAX_BYTES),
+            max_events: self.max_events.or(D::MAX_EVENTS),
+            timeout_secs: self.timeout_secs.or_else(|| Some(D::TIMEOUT_SECS.get())),
+            _d: PhantomData,
+            _s: PhantomData,
         };
-        Ok(Self {
-            max_bytes,
-            max_size: None,
-            ..*self
-        })
+
+        match (config.max_bytes, config.max_events, config.timeout_secs) {
+            // TODO: what logic do we want to check that we have the minimum number of settings?
+            // for example, we always assert that timeout_secs from D is greater than zero, but
+            // technically we could end up with max bytes or max events being none, since we just
+            // chain options... but asserting that they're set isn't really doable either, because
+            // you dont always set both of those fields, etc..
+            (Some(0), _, _) => Err(BatchError::InvalidMaxBytes),
+            (_, Some(0), _) => Err(BatchError::InvalidMaxEvents),
+            (_, _, Some(0)) => Err(BatchError::InvalidTimeout),
+
+            _ => Ok(config),
+        }
     }
 
-    pub(super) fn disallow_max_bytes(&self) -> Result<Self, BatchError> {
+    pub fn into_batch_settings<T: Batch>(self) -> Result<BatchSettings<T>, BatchError> {
+        let config = self.validate()?;
+        config.into_batch_settings()
+    }
+
+    /// Converts these settings into [`BatcherSettings`].
+    ///
+    /// `BatcherSettings` is effectively the `vector_core` spiritual successor of
+    /// [`BatchSettings<B>`].  Once all sinks are rewritten in the new stream-based style and we can
+    /// eschew customized batch buffer types, we can de-genericify `BatchSettings` and move it into
+    /// `vector_core`, and use that instead of `BatcherSettings`.
+    pub fn into_batcher_settings(self) -> Result<BatcherSettings, BatchError> {
+        let config = self.validate()?;
+        config.into_batcher_settings()
+    }
+}
+
+impl<D: SinkBatchSettings> BatchConfig<D, Merged> {
+    pub fn validate(self) -> Result<BatchConfig<D, Merged>, BatchError> {
+        Ok(self)
+    }
+
+    pub fn disallow_max_bytes(self) -> Result<Self, BatchError> {
         // Sinks that used `max_size` for an event count cannot count
         // bytes, so err if `max_bytes` is set.
         match self.max_bytes {
             Some(_) => Err(BatchError::BytesNotAllowed),
-            None => Ok(*self),
+            None => Ok(self),
         }
     }
 
-    pub(super) fn use_size_as_events(&self) -> Result<Self, BatchError> {
-        let max_events = match (self.max_events, self.max_size) {
-            (Some(_), Some(_)) => return Err(BatchError::EventsAndSize),
-            (Some(events), None) => Some(events),
-            (None, Some(size)) => Some(size),
-            (None, None) => None,
-        };
-        Ok(Self {
-            max_events,
-            max_size: None,
-            ..*self
+    pub fn limit_max_bytes(self, limit: usize) -> Result<Self, BatchError> {
+        match self.max_bytes {
+            Some(n) if n > limit => Err(BatchError::MaxBytesExceeded { limit }),
+            _ => Ok(self),
+        }
+    }
+
+    pub fn limit_max_events(self, limit: usize) -> Result<Self, BatchError> {
+        match self.max_events {
+            Some(n) if n > limit => Err(BatchError::MaxEventsExceeded { limit }),
+            _ => Ok(self),
+        }
+    }
+
+    pub fn into_batch_settings<T: Batch>(self) -> Result<BatchSettings<T>, BatchError> {
+        let adjusted = T::get_settings_defaults(self)?;
+
+        // This is unfortunate since we technically have already made sure this isn't possible in
+        // `validate`, but alas.
+        let timeout_secs = adjusted.timeout_secs.ok_or(BatchError::InvalidTimeout)?;
+
+        Ok(BatchSettings {
+            size: BatchSize {
+                bytes: adjusted.max_bytes.unwrap_or(usize::MAX),
+                events: adjusted.max_events.unwrap_or(usize::MAX),
+                _type_marker: PhantomData,
+            },
+            timeout: Duration::from_secs(timeout_secs),
         })
     }
 
-    pub(super) fn get_settings_or_default<T>(
-        &self,
-        defaults: BatchSettings<T>,
-    ) -> BatchSettings<T> {
-        BatchSettings {
-            size: BatchSize {
-                bytes: self.max_bytes.unwrap_or(defaults.size.bytes),
-                events: self.max_events.unwrap_or(defaults.size.events),
-                ..Default::default()
-            },
-            timeout: self
-                .timeout_secs
-                .map(Duration::from_secs)
-                .unwrap_or(defaults.timeout),
+    /// Converts these settings into [`BatcherSettings`].
+    ///
+    /// `BatcherSettings` is effectively the `vector_core` spiritual successor of
+    /// [`BatchSettings<B>`].  Once all sinks are rewritten in the new stream-based style and we can
+    /// eschew customized batch buffer types, we can de-genericify `BatchSettings` and move it into
+    /// `vector_core`, and use that instead of `BatcherSettings`.
+    pub fn into_batcher_settings(self) -> Result<BatcherSettings, BatchError> {
+        let max_bytes = self
+            .max_bytes
+            .and_then(NonZeroUsize::new)
+            .or_else(|| NonZeroUsize::new(usize::MAX))
+            .expect("`max_bytes` should already be validated");
+
+        let max_events = self
+            .max_events
+            .and_then(NonZeroUsize::new)
+            .or_else(|| NonZeroUsize::new(usize::MAX))
+            .expect("`max_bytes` should already be validated");
+
+        // This is unfortunate since we technically have already made sure this isn't possible in
+        // `validate`, but alas.
+        let timeout_secs = self.timeout_secs.ok_or(BatchError::InvalidTimeout)?;
+
+        Ok(BatcherSettings::new(
+            Duration::from_secs(timeout_secs),
+            max_bytes,
+            max_events,
+        ))
+    }
+}
+
+// Going from a merged to unmerged configuration is fine, because we know it already had to have
+// been validated/limited.
+impl<D1, D2> From<BatchConfig<D1, Merged>> for BatchConfig<D2, Unmerged>
+where
+    D1: SinkBatchSettings,
+    D2: SinkBatchSettings,
+{
+    fn from(config: BatchConfig<D1, Merged>) -> Self {
+        BatchConfig {
+            max_bytes: config.max_bytes,
+            max_events: config.max_events,
+            timeout_secs: config.timeout_secs,
+            _d: PhantomData,
+            _s: PhantomData,
         }
     }
 }
@@ -84,11 +244,8 @@ impl BatchConfig {
 #[derive(Debug, Derivative)]
 #[derivative(Clone(bound = ""))]
 #[derivative(Copy(bound = ""))]
-#[derivative(Default(bound = ""))]
 pub struct BatchSize<B> {
-    #[derivative(Default(value = "usize::max_value()"))]
     pub bytes: usize,
-    #[derivative(Default(value = "usize::max_value()"))]
     pub events: usize,
     // This type marker is used to drive type inference, which allows us
     // to call the right Batch::get_settings_defaults without explicitly
@@ -96,64 +253,45 @@ pub struct BatchSize<B> {
     _type_marker: PhantomData<B>,
 }
 
+impl<B> BatchSize<B> {
+    pub const fn const_default() -> Self {
+        BatchSize {
+            bytes: usize::max_value(),
+            events: usize::max_value(),
+            _type_marker: PhantomData,
+        }
+    }
+}
+
+impl<B> Default for BatchSize<B> {
+    fn default() -> Self {
+        BatchSize::const_default()
+    }
+}
+
 #[derive(Debug, Derivative)]
 #[derivative(Clone(bound = ""))]
 #[derivative(Copy(bound = ""))]
-#[derivative(Default(bound = ""))]
 pub struct BatchSettings<B> {
     pub size: BatchSize<B>,
     pub timeout: Duration,
 }
 
-impl<B: Batch> BatchSettings<B> {
-    pub fn parse_config(self, config: BatchConfig) -> Result<Self, BatchError> {
-        B::get_settings_defaults(config, self)
-    }
-}
-
-impl<B> BatchSettings<B> {
-    // Fake the builder pattern
-    pub const fn bytes(self, bytes: u64) -> Self {
-        Self {
-            size: BatchSize {
-                bytes: bytes as usize,
-                ..self.size
-            },
-            ..self
-        }
-    }
-    pub const fn events(self, events: usize) -> Self {
-        Self {
-            size: BatchSize {
-                events,
-                ..self.size
-            },
-            ..self
-        }
-    }
-    pub const fn timeout(self, secs: u64) -> Self {
-        Self {
-            timeout: Duration::from_secs(secs),
-            ..self
-        }
-    }
-
-    // Would like to use `trait From` here, but that results in
-    // "conflicting implementations of trait"
-    pub const fn into<B2>(self) -> BatchSettings<B2> {
+impl<B> Default for BatchSettings<B> {
+    fn default() -> Self {
         BatchSettings {
             size: BatchSize {
-                bytes: self.size.bytes,
-                events: self.size.events,
+                bytes: 10_000_000,
+                events: usize::MAX,
                 _type_marker: PhantomData,
             },
-            timeout: self.timeout,
+            timeout: Duration::from_secs(1),
         }
     }
 }
 
-pub(super) fn err_event_too_large<T>(length: usize) -> PushResult<T> {
-    error!(message = "Event larger than batch size, dropping.", length = %length, internal_log_rate_secs = 1);
+pub(super) fn err_event_too_large<T>(length: usize, max_length: usize) -> PushResult<T> {
+    emit!(&LargeEventDropped { length, max_length });
     PushResult::Ok(false)
 }
 
@@ -178,10 +316,11 @@ pub trait Batch: Sized {
     /// and deal with the proper behavior of `max_size` and if
     /// `max_bytes` may be set. This is in the trait to ensure all batch
     /// buffers implement it.
-    fn get_settings_defaults(
-        _config: BatchConfig,
-        _defaults: BatchSettings<Self>,
-    ) -> Result<BatchSettings<Self>, BatchError>;
+    fn get_settings_defaults<D: SinkBatchSettings>(
+        config: BatchConfig<D, Merged>,
+    ) -> Result<BatchConfig<D, Merged>, BatchError> {
+        Ok(config)
+    }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input>;
     fn is_empty(&self) -> bool;
@@ -190,13 +329,102 @@ pub trait Batch: Sized {
     fn num_items(&self) -> usize;
 }
 
+#[derive(Debug)]
+pub struct EncodedBatch<I> {
+    pub items: I,
+    pub finalizers: EventFinalizers,
+    pub count: usize,
+    pub byte_size: usize,
+}
+
+/// This is a batch construct that stores an set of event finalizers alongside the batch itself.
+#[derive(Clone, Debug)]
+pub struct FinalizersBatch<B> {
+    inner: B,
+    finalizers: EventFinalizers,
+    // The count of items inserted into this batch is distinct from the
+    // number of items recorded by the inner batch, as that inner count
+    // could be smaller due to aggregated items (ie metrics).
+    count: usize,
+    byte_size: usize,
+}
+
+impl<B: Batch> From<B> for FinalizersBatch<B> {
+    fn from(inner: B) -> Self {
+        Self {
+            inner,
+            finalizers: Default::default(),
+            count: 0,
+            byte_size: 0,
+        }
+    }
+}
+
+impl<B: Batch> Batch for FinalizersBatch<B> {
+    type Input = EncodedEvent<B::Input>;
+    type Output = EncodedBatch<B::Output>;
+
+    fn get_settings_defaults<D: SinkBatchSettings>(
+        config: BatchConfig<D, Merged>,
+    ) -> Result<BatchConfig<D, Merged>, BatchError> {
+        B::get_settings_defaults(config)
+    }
+
+    fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
+        let EncodedEvent {
+            item,
+            finalizers,
+            byte_size,
+        } = item;
+        match self.inner.push(item) {
+            PushResult::Ok(full) => {
+                self.finalizers.merge(finalizers);
+                self.count += 1;
+                self.byte_size += byte_size;
+                PushResult::Ok(full)
+            }
+            PushResult::Overflow(item) => PushResult::Overflow(EncodedEvent {
+                item,
+                finalizers,
+                byte_size,
+            }),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    fn fresh(&self) -> Self {
+        Self {
+            inner: self.inner.fresh(),
+            finalizers: Default::default(),
+            count: 0,
+            byte_size: 0,
+        }
+    }
+
+    fn finish(self) -> Self::Output {
+        EncodedBatch {
+            items: self.inner.finish(),
+            finalizers: self.finalizers,
+            count: self.count,
+            byte_size: self.byte_size,
+        }
+    }
+
+    fn num_items(&self) -> usize {
+        self.inner.num_items()
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct StatefulBatch<B> {
     inner: B,
     was_full: bool,
 }
 
-impl<B> From<B> for StatefulBatch<B> {
+impl<B: Batch> From<B> for StatefulBatch<B> {
     fn from(inner: B) -> Self {
         Self {
             inner,
@@ -206,27 +434,24 @@ impl<B> From<B> for StatefulBatch<B> {
 }
 
 impl<B> StatefulBatch<B> {
-    pub fn was_full(&self) -> bool {
+    pub const fn was_full(&self) -> bool {
         self.was_full
     }
 
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn into_inner(self) -> B {
         self.inner
     }
 }
 
-impl<B> Batch for StatefulBatch<B>
-where
-    B: Batch,
-{
+impl<B: Batch> Batch for StatefulBatch<B> {
     type Input = B::Input;
     type Output = B::Output;
 
-    fn get_settings_defaults(
-        config: BatchConfig,
-        defaults: BatchSettings<Self>,
-    ) -> Result<BatchSettings<Self>, BatchError> {
-        Ok(B::get_settings_defaults(config, defaults.into())?.into())
+    fn get_settings_defaults<D: SinkBatchSettings>(
+        config: BatchConfig<D, Merged>,
+    ) -> Result<BatchConfig<D, Merged>, BatchError> {
+        B::get_settings_defaults(config)
     }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {

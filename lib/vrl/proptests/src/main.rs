@@ -1,5 +1,7 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
+#![allow(clippy::print_stderr)] // test framework
+#![allow(clippy::print_stdout)] // test framework
 use diagnostic::Span;
 use lookup::{FieldBuf, LookupBuf, SegmentBuf};
 use ordered_float::NotNan;
@@ -62,7 +64,7 @@ prop_compose! {
     fn identifier()
         (ident in "[a-zA-Z_]+[a-zA-Z0-9_]+"
          .prop_filter("idents can't be reserved names or a single underscore",
-                      |i| RESERVED.iter().find(|r| *r == i).is_none() &&
+                      |i| !RESERVED.iter().any(|r| *r == i) &&
                           i != "_"))
     -> String {
             ident

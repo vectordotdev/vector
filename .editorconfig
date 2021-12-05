@@ -9,6 +9,9 @@ charset = utf-8
 trim_trailing_whitespace = true
 insert_final_newline = true
 
+[website/layouts/**/*.html]
+insert_final_newline = false
+
 [*.rs]
 indent_style = space
 indent_size = 4
@@ -20,3 +23,6 @@ indent_size = 4
 [*.cue]
 indent_style = tab
 indent_size = 4
+
+[*.svg]
+insert_final_newline = false

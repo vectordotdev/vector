@@ -3,7 +3,7 @@
   type = "reduce"
   group_by = [ "request_id" ]
   [transforms.reduce.ends_when]
-    type = "remap"
+    type = "vrl"
     source = "exists(.test_end_message)"
 
 [[tests]]
@@ -68,7 +68,7 @@
   [[tests.outputs]]
     extract_from = "reduce"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .message == "first message value" &&
         .host == "host1" &&
@@ -77,7 +77,7 @@
         exists(.timestamp_end)
       '''
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .message == "other reduce one" &&
         .host == "host3" &&
@@ -100,7 +100,7 @@
     "concat_array" = "concat"
 
   [transforms.reduce_strats.ends_when]
-    type = "remap"
+    type = "vrl"
     source = 'exists(.test_end_message)'
 
 [[tests]]
@@ -175,7 +175,7 @@
   [[tests.outputs]]
     extract_from = "reduce_strats"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .message == "first message value second message value third message value" &&
         .another == "foo\nbar baz\nqux\nquux" &&
@@ -185,7 +185,7 @@
         exists(.timestamp_end)
       '''
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .message == "other reduce one other reduce two other reduce three" &&
         .concat_array == ["foo", "bar", "baz"] &&
@@ -206,7 +206,7 @@
     "maxs" = "max"
 
   [transforms.reduce_numbers.ends_when]
-    type = "remap"
+    type = "vrl"
     source = "exists(.test_end_message)"
 
 [[tests]]
@@ -237,7 +237,7 @@
   [[tests.outputs]]
     extract_from = "reduce_numbers"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .mins == 5.1 &&
         .maxs == 7.2 &&
@@ -272,7 +272,7 @@
   [[tests.outputs]]
     extract_from = "reduce_numbers"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .mins == 5 &&
         .maxs == 7 &&
@@ -281,43 +281,43 @@
 
 ##------------------------------------------------------------------------------
 
-[transforms.ends_when_remap]
+[transforms.ends_when_vrl]
   inputs = []
   type = "reduce"
   group_by = ["request_id"]
 
-  [transforms.ends_when_remap.ends_when]
-    type = "remap"
+  [transforms.ends_when_vrl.ends_when]
+    type = "vrl"
     source = """
         .test_end_message == true
     """
 
 [[tests]]
-  name = "reduce_ends_when_remap"
+  name = "reduce_ends_when_vrl"
 
   [[tests.inputs]]
-    insert_at = "ends_when_remap"
+    insert_at = "ends_when_vrl"
     type = "log"
     [tests.inputs.log_fields]
       request_id = "1"
       counter = 1
 
   [[tests.inputs]]
-    insert_at = "ends_when_remap"
+    insert_at = "ends_when_vrl"
     type = "log"
     [tests.inputs.log_fields]
       request_id = "1"
       counter = 3
 
   [[tests.inputs]]
-    insert_at = "ends_when_remap"
+    insert_at = "ends_when_vrl"
     type = "log"
     [tests.inputs.log_fields]
       request_id = "2"
       counter = 5
 
   [[tests.inputs]]
-    insert_at = "ends_when_remap"
+    insert_at = "ends_when_vrl"
     type = "log"
     [tests.inputs.log_fields]
       request_id = "1"
@@ -325,14 +325,14 @@
       test_end_message = true
 
   [[tests.inputs]]
-    insert_at = "ends_when_remap"
+    insert_at = "ends_when_vrl"
     type = "log"
     [tests.inputs.log_fields]
       request_id = "1"
       counter = 7
 
   [[tests.inputs]]
-    insert_at = "ends_when_remap"
+    insert_at = "ends_when_vrl"
     type = "log"
     [tests.inputs.log_fields]
       request_id = "2"
@@ -340,7 +340,7 @@
       test_end_message = true
 
   [[tests.inputs]]
-    insert_at = "ends_when_remap"
+    insert_at = "ends_when_vrl"
     type = "log"
     [tests.inputs.log_fields]
       request_id = "3"
@@ -348,23 +348,23 @@
       test_end_message = true
 
   [[tests.outputs]]
-    extract_from = "ends_when_remap"
+    extract_from = "ends_when_vrl"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .request_id == "1" &&
         .counter == 6 &&
         exists(.timestamp_end)
       '''
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .request_id == "2" &&
         .counter == 7 &&
         exists(.test_end_message)
       '''
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .request_id == "3" &&
         .counter == 5 &&
@@ -377,7 +377,7 @@
     inputs = []
     type = "reduce"
     merge_strategies.message = "concat_newline"
-    starts_when.type = "remap"
+    starts_when.type = "vrl"
     starts_when.source = "match(string!(.message), r'^\\w.*')"
 
 [[tests]]
@@ -422,10 +422,10 @@
   [[tests.outputs]]
     extract_from = "ruby_exception"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '.message == "Started GET \"/\" for 127.0.0.1 at 2012-03-10 14:28:14 +0100"'
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .message == "foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)\n  from foobar.rb:6:in `bar'\n  from foobar.rb:2:in `foo'\n  from foobar.rb:9:in `<main>'"
       '''
@@ -436,7 +436,7 @@
     inputs = []
     type = "reduce"
     merge_strategies.message = "concat"
-    ends_when.type = "remap"
+    ends_when.type = "vrl"
     ends_when.source = """!ends_with(strip_whitespace(string!(.message)), "\\\\")"""
 
 [[tests]]
@@ -475,13 +475,13 @@
   [[tests.outputs]]
     extract_from = "line_continuation"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '.message == "First-line"'
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '.message == "Second line\\ more second line\\      end of second line"'
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '.message == "third line"'
 
 ##------------------------------------------------------------------------------
@@ -490,7 +490,7 @@
   inputs = []
   type = "reduce"
   merge_strategies.message = "concat"
-  ends_when.type = "remap"
+  ends_when.type = "vrl"
   ends_when.source = """ends_with(strip_whitespace(string!(.message)), ";")"""
 
 [[tests]]
@@ -529,13 +529,13 @@
   [[tests.outputs]]
     extract_from = "line_termination"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '.message == "first line;"'
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '.message == "second line more of the second line end of second line;         "'
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '.message == "third line;"'
 
 ##------------------------------------------------------------------------------
@@ -544,7 +544,7 @@
     inputs = []
     type = "reduce"
     merge_strategies.message = "concat"
-    starts_when.type = "remap"
+    starts_when.type = "vrl"
     starts_when.source = "match(string!(.message), r'^<\\d\\d> ')"
 
 [[tests]]
@@ -583,13 +583,13 @@
   [[tests.outputs]]
     extract_from = "log_stream"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '.message == "<12> first line   more of the first line"'
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '.message == "<22> second line"'
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '.message == "<17> third line"'
 
 ##------------------------------------------------------------------------------
@@ -598,7 +598,7 @@
     inputs = []
     type = "reduce"
     merge_strategies.message = "concat_newline"
-    starts_when.type = "remap"
+    starts_when.type = "vrl"
     starts_when.source = "match(string!(.message), r'^\\d{4}-\\d{2}-\\d{2} .+')"
 
 [[tests]]
@@ -667,7 +667,7 @@
   [[tests.outputs]]
     extract_from = "java_exception"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         message = string!(.message)
         starts_with(message, "2020-10-19 04:34:15,389") &&

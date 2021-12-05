@@ -83,14 +83,14 @@ where
             let stream = match invocation_result {
                 Ok(val) => val,
                 Err(watcher::invocation::Error::Desync { source }) => {
-                    emit!(internal_events::InvocationDesyncReceived { error: source });
+                    emit!(&internal_events::InvocationDesyncReceived { error: source });
                     // We got desynced, reset the state and retry fetching.
                     self.resource_version.reset();
                     self.state_writer.resync().await;
                     continue;
                 }
                 Err(watcher::invocation::Error::Recoverable { source }) => {
-                    emit!(internal_events::InvocationHttpErrorReceived { error: source });
+                    emit!(&internal_events::InvocationHttpErrorReceived { error: source });
                     continue;
                 }
                 Err(watcher::invocation::Error::Other { source }) => {
@@ -126,22 +126,18 @@ where
                         // We got a stream-level desync error, abort the stream
                         // and handle the desync.
                         Err(watcher::stream::Error::Desync { source }) => {
-                            emit!(internal_events::StreamDesyncReceived { error: source });
+                            emit!(&internal_events::StreamDesyncReceived { error: source });
                             // We got desynced, reset the state and retry fetching.
                             self.resource_version.reset();
                             self.state_writer.resync().await;
                             continue 'outer;
                         }
-                        // Any other streaming error means the protocol is in
-                        // an unxpected state.
-                        // This is considered a fatal error, do not attempt
-                        // to retry and just quit.
-                        // TODO: retry these errors
-                        // https://github.com/timberio/vector/issues/7149
-                        Err(watcher::stream::Error::Other { source }) => {
-                            return Err(Error::Streaming { source });
+                        // We have an error, attempt to recover from this error and continue the outer loop.
+                        Err(watcher::stream::Error::Recoverable { source }) => {
+                            emit!(&internal_events::InvocationHttpErrorReceived { error: source });
+                            continue 'outer;
                         }
-                        // A fine watch respose arrived, we just pass it down.
+                        // A fine watch response arrived, we just pass it down.
                         Ok(val) => val,
                     };
                     self.process_watch_event(response).await;
@@ -189,7 +185,7 @@ where
         // Process the event.
         self.process_event(event).await;
 
-        // Record the resourse version for this event, so when we resume
+        // Record the resources version for this event, so when we resume
         // it won't be redelivered.
         self.resource_version.update(resource_version_candidate);
     }
@@ -245,6 +241,7 @@ mod tests {
     use super::{Error, Reflector};
     use crate::{
         kubernetes::{
+            hash_value::HashKey,
             instrumenting_watcher::InstrumentingWatcher,
             mock_watcher::{self, MockWatcher},
             state,
@@ -362,7 +359,7 @@ mod tests {
         drop(reflector);
     }
 
-    // Test the properties of the normal  execution flow.
+    // Test the properties of the normal execution flow.
     #[tokio::test]
     async fn flow_test() {
         trace_init();
@@ -370,7 +367,7 @@ mod tests {
         let invocations = vec![
             (
                 vec![],
-                None,
+                Some("0".to_owned()),
                 ExpInvRes::Stream(vec![
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid0", "10"))),
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid1", "15"))),
@@ -414,7 +411,7 @@ mod tests {
         run_flow_test(invocations, expected_resulting_state).await;
     }
 
-    // Test the properies of the flow with desync during invocation.
+    // Test the properties of the flow with desync during invocation.
     #[tokio::test]
     async fn invocation_desync_test() {
         trace_init();
@@ -422,7 +419,7 @@ mod tests {
         let invocations = vec![
             (
                 vec![],
-                None,
+                Some("0".to_owned()),
                 ExpInvRes::Stream(vec![
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid0", "10"))),
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid1", "15"))),
@@ -463,7 +460,7 @@ mod tests {
         let invocations = vec![
             (
                 vec![],
-                None,
+                Some("0".to_owned()),
                 ExpInvRes::Stream(vec![
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid0", "10"))),
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid1", "15"))),
@@ -502,7 +499,7 @@ mod tests {
         let invocations = vec![
             (
                 vec![],
-                None,
+                Some("0".to_owned()),
                 ExpInvRes::Stream(vec![
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid0", "10"))),
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid1", "15"))),
@@ -538,7 +535,7 @@ mod tests {
         run_flow_test(invocations, expected_resulting_state).await;
     }
 
-    // Test the properies of the flow with desync during stream when bare desync arrives.
+    // Test the properties of the flow with desync during stream when bare desync arrives.
     #[tokio::test]
     async fn stream_desync_test_bare() {
         trace_init();
@@ -546,7 +543,7 @@ mod tests {
         let invocations = vec![
             (
                 vec![],
-                None,
+                Some("0".to_owned()),
                 ExpInvRes::Stream(vec![
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid0", "10"))),
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid1", "15"))),
@@ -579,7 +576,7 @@ mod tests {
         run_flow_test(invocations, expected_resulting_state).await;
     }
 
-    // Test the properies of the flow with desync during stream when desync arrives after an item.
+    // Test the properties of the flow with desync during stream when desync arrives after an item.
     #[tokio::test]
     async fn stream_desync_test_with_item() {
         trace_init();
@@ -587,7 +584,7 @@ mod tests {
         let invocations = vec![
             (
                 vec![],
-                None,
+                Some("0".to_owned()),
                 ExpInvRes::Stream(vec![
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid0", "10"))),
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid1", "15"))),
@@ -684,7 +681,7 @@ mod tests {
                     field_selector: Some("fields".to_owned()),
                     label_selector: Some("labels".to_owned()),
                     pretty: None,
-                    resource_version: None,
+                    resource_version: Some("0".to_owned()),
                     timeout_seconds: Some(290),
                 }
             );
@@ -923,7 +920,20 @@ mod tests {
 
             // Send an error to the stream.
             watch_stream_tx
-                .send(mock_watcher::ScenarioActionStream::ErrOther)
+                .send(mock_watcher::ScenarioActionStream::ErrRecoverable)
+                .await
+                .unwrap();
+
+            // Wait for watcher to request next item from the stream.
+            assert!(matches!(
+                watcher_events_rx.next().await.unwrap(),
+                mock_watcher::ScenarioEvent::Invocation(_)
+            ));
+
+            // We're done with the test, send the error to terminate the
+            // reflector.
+            watcher_invocations_tx
+                .send(mock_watcher::ScenarioActionInvocation::ErrOther)
                 .await
                 .unwrap();
         });
@@ -936,12 +946,7 @@ mod tests {
         logic.await.unwrap();
 
         // Assert that the reflector properly passed the error.
-        assert!(matches!(
-            result.unwrap_err(),
-            Error::Streaming {
-                source: mock_watcher::StreamError
-            }
-        ));
+        assert!(matches!(result.unwrap_err(), Error::Invocation { .. }));
 
         // Explicitly drop the reflector at the very end.
         drop(reflector);
@@ -1066,7 +1071,7 @@ mod tests {
 
         // Prepare state.
         let (state_reader, state_writer) = evmap::new();
-        let state_writer = state::evmap::Writer::new(state_writer, None); // test without debounce to avouid complexity
+        let state_writer = state::evmap::Writer::new(state_writer, None, HashKey::Uid); // test without debounce to avoid complexity
         let state_writer = state::instrumenting::Writer::new(state_writer);
         let resulting_state_reader = state_reader.clone();
 
@@ -1078,8 +1083,13 @@ mod tests {
 
         // Prepare reflector.
         let pause_between_requests = Duration::from_secs(60 * 60); // 1 hour
-        let mut reflector =
-            Reflector::new(watcher, state_writer, None, None, pause_between_requests);
+        let mut reflector = Reflector::new(
+            watcher,
+            state_writer,
+            None,
+            Some("0".to_owned()),
+            pause_between_requests,
+        );
 
         // Run test logic.
         let logic = tokio::spawn(async move {
@@ -1093,7 +1103,7 @@ mod tests {
                 // Validate that there's a delay before the invocation, and
                 // that some time has to pass before the actual invocation is
                 // issued.
-                // Wait for a quater of the expected delay, and assert that the
+                // Wait for a quarter of the expected delay, and assert that the
                 // invocation is still not yet requested.
                 tokio::time::advance(pause_between_requests / 4).await;
                 tokio::task::yield_now().await;

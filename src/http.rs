@@ -1,18 +1,18 @@
 use crate::{
+    config::ProxyConfig,
     internal_events::http_client,
     tls::{tls_connector_builder, MaybeTlsSettings, TlsError},
 };
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
-use http::header::HeaderValue;
-use http::request::Builder;
-use http::HeaderMap;
-use http::Request;
+use http::{header::HeaderValue, request::Builder, uri::InvalidUri, HeaderMap, Request};
 use hyper::{
     body::{Body, HttpBody},
+    client,
     client::{Client, HttpConnector},
 };
 use hyper_openssl::HttpsConnector;
+use hyper_proxy::ProxyConnector;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
@@ -20,24 +20,27 @@ use std::{
     task::{Context, Poll},
 };
 use tower::Service;
-use tracing::Span;
 use tracing_futures::Instrument;
 
 #[derive(Debug, Snafu)]
+#[snafu(visibility = "pub(crate)")]
 pub enum HttpError {
     #[snafu(display("Failed to build TLS connector: {}", source))]
     BuildTlsConnector { source: TlsError },
     #[snafu(display("Failed to build HTTPS connector: {}", source))]
     MakeHttpsConnector { source: openssl::error::ErrorStack },
+    #[snafu(display("Failed to build Proxy connector: {}", source))]
+    MakeProxyConnector { source: InvalidUri },
     #[snafu(display("Failed to make HTTP(S) request: {}", source))]
     CallRequest { source: hyper::Error },
+    #[snafu(display("Failed to build HTTP request: {}", source))]
+    BuildRequest { source: http::Error },
 }
 
 pub type HttpClientFuture = <HttpClient as Service<http::Request<Body>>>::Future;
 
 pub struct HttpClient<B = Body> {
-    client: Client<HttpsConnector<HttpConnector>, B>,
-    span: Span,
+    client: Client<ProxyConnector<HttpsConnector<HttpConnector>>, B>,
     user_agent: HeaderValue,
 }
 
@@ -47,7 +50,18 @@ where
     B::Data: Send,
     B::Error: Into<crate::Error>,
 {
-    pub fn new(tls_settings: impl Into<MaybeTlsSettings>) -> Result<HttpClient<B>, HttpError> {
+    pub fn new(
+        tls_settings: impl Into<MaybeTlsSettings>,
+        proxy_config: &ProxyConfig,
+    ) -> Result<HttpClient<B>, HttpError> {
+        HttpClient::new_with_custom_client(tls_settings, proxy_config, &mut Client::builder())
+    }
+
+    pub fn new_with_custom_client(
+        tls_settings: impl Into<MaybeTlsSettings>,
+        proxy_config: &ProxyConfig,
+        client_builder: &mut client::Builder,
+    ) -> Result<HttpClient<B>, HttpError> {
         let mut http = HttpConnector::new();
         http.enforce_http(false);
 
@@ -64,30 +78,29 @@ where
             Ok(())
         });
 
-        let client = Client::builder().build(https);
+        let mut proxy = ProxyConnector::new(https).unwrap();
+        proxy_config
+            .configure(&mut proxy)
+            .context(MakeProxyConnector)?;
+        let client = client_builder.build(proxy);
 
         let version = crate::get_version();
         let user_agent = HeaderValue::from_str(&format!("Vector/{}", version))
             .expect("Invalid header value for version!");
 
-        let span = tracing::info_span!("http");
-
-        Ok(HttpClient {
-            client,
-            span,
-            user_agent,
-        })
+        Ok(HttpClient { client, user_agent })
     }
 
     pub fn send(
         &self,
         mut request: Request<B>,
     ) -> BoxFuture<'static, Result<http::Response<Body>, HttpError>> {
-        let _enter = self.span.enter();
+        let span = tracing::info_span!("http");
+        let _enter = span.enter();
 
         default_request_headers(&mut request, &self.user_agent);
 
-        emit!(http_client::AboutToSendHttpRequest { request: &request });
+        emit!(&http_client::AboutToSendHttpRequest { request: &request });
 
         let response = self.client.request(request);
 
@@ -107,7 +120,7 @@ where
             let response = response_result
                 .map_err(|error| {
                     // Emit the error into the internal events system.
-                    emit!(http_client::GotHttpError {
+                    emit!(&http_client::GotHttpError {
                         error: &error,
                         roundtrip
                     });
@@ -116,13 +129,13 @@ where
                 .context(CallRequest)?;
 
             // Emit the response into the internal events system.
-            emit!(http_client::GotHttpResponse {
+            emit!(&http_client::GotHttpResponse {
                 response: &response,
                 roundtrip
             });
             Ok(response)
         }
-        .instrument(self.span.clone());
+        .instrument(span.clone());
 
         Box::pin(fut)
     }
@@ -148,7 +161,7 @@ impl<B> Service<Request<B>> for HttpClient<B>
 where
     B: fmt::Debug + HttpBody + Send + 'static,
     B::Data: Send,
-    B::Error: Into<crate::Error>,
+    B::Error: Into<crate::Error> + Send,
 {
     type Response = http::Response<Body>;
     type Error = HttpError;
@@ -167,7 +180,6 @@ impl<B> Clone for HttpClient<B> {
     fn clone(&self) -> Self {
         Self {
             client: self.client.clone(),
-            span: self.span.clone(),
             user_agent: self.user_agent.clone(),
         }
     }
@@ -218,10 +230,10 @@ impl Auth {
     pub fn apply_headers_map(&self, map: &mut HeaderMap) {
         match &self {
             Auth::Basic { user, password } => {
-                let auth = Authorization::basic(&user, &password);
+                let auth = Authorization::basic(user, password);
                 map.typed_insert(auth);
             }
-            Auth::Bearer { token } => match Authorization::bearer(&token) {
+            Auth::Bearer { token } => match Authorization::bearer(token) {
                 Ok(auth) => map.typed_insert(auth),
                 Err(error) => error!(message = "Invalid bearer token.", token = %token, %error),
             },

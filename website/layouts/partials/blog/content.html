@@ -1,0 +1,37 @@
+{{ $date := .Date | dateFormat "January 2, 2006" }}
+{{ $noindex := .Params.noindex }}
+<div{{ if not $noindex }} id="page-content"{{ end }}>
+  <div class="mb-4 md:mb-6">
+    {{ partial "breadcrumb.html" . }}
+  </div>
+
+  <h1 class="dark:text-gray-50 font-secondary font-extrabold text-4xl md:text-5xl tracking-tight sm:tracking-tighter leading-tight">
+    {{ .Title | markdownify }}
+  </h1>
+
+  {{ with .Description }}
+  <p class="dark:text-gray-200 mt-5 text-xl text-gray-500 dark:prose-dark">
+    {{ . | markdownify }}
+  </p>
+  {{ end }}
+
+  <div class="mt-3 flex items-center space-x-1 text-gray-500 dark:text-gray-300">
+    <time datetime="{{ $date }}">
+      {{ $date }}
+    </time>
+    <span aria-hidden="true">
+      &middot;
+    </span>
+    <span>
+      <strong>{{ .ReadingTime }}</strong> min read
+    </span>
+  </div>
+
+  <div class="mt-5">
+    {{ partial "blog/authors.html" . }}
+  </div>
+
+  <div class="mt-12 prose dark:prose-dark tracking-tight">
+    {{ .Content }}
+  </div>
+</div>

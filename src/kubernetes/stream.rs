@@ -27,17 +27,13 @@ where
             let buf = buf.context(Reading)?;
             let chunk = buf.chunk();
             let responses = decoder.process_next_chunk(chunk.as_ref());
-            emit!(internal_events::ChunkProcessed{ byte_size: chunk.len() });
+            emit!(&internal_events::ChunkProcessed{ byte_size: chunk.len() });
             for response in responses {
                 let response = response.context(Parsing)?;
                 yield response;
             }
         }
         decoder.finish().map_err(|data| Error::UnparsedDataUponCompletion { data })?;
-
-        // Temporary. Without it `clippy` show `needless_return` warning.
-        // https://github.com/timberio/vector/pull/4818/files/471caf28164db3599611494d68efbcb0ab090ae6#diff-38f65b460ca0ce88f0e24ff9791321090396872183b32b03c8a3435dbe4f45f3
-        ()
     }
 }
 

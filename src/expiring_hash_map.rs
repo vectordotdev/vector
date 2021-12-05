@@ -172,7 +172,7 @@ where
     ///                 println!("Expired: {}", val);
     ///                 break;
     ///             }
-    ///             Some(Err(error)) => panic!(format!("Timer error: {:?}", error)),
+    ///             Some(Err(error)) => panic!("Timer error: {:?}", error),
     ///         },
     ///         _ = tokio::time::sleep(Duration::from_millis(100)) => map.insert(
     ///             "key".to_owned(),
@@ -239,7 +239,6 @@ mod tests {
         let mut map = ExpiringHashMap::<String, String>::default();
 
         map.insert("key".to_owned(), "val".to_owned(), Duration::from_secs(1));
-        map.remove("key");
 
         let mut fut = task::spawn(map.next_expired());
         assert_pending!(fut.poll());
@@ -254,7 +253,7 @@ mod tests {
 
         let mut fut = task::spawn(map.next_expired());
         assert_eq!(unwrap_ready(fut.poll()).unwrap().unwrap().0, "val");
-        assert_eq!(fut.is_woken(), false);
+        assert!(!fut.is_woken());
     }
 
     // TODO: rewrite this test with tokio::time::clock when it's available.
@@ -275,9 +274,9 @@ mod tests {
         assert_pending!(fut.poll());
 
         // Sleep twice the ttl, to guarantee we're over the deadline.
-        assert_eq!(fut.is_woken(), false);
+        assert!(!fut.is_woken());
         tokio::time::sleep(ttl * 2).await;
-        assert_eq!(fut.is_woken(), true);
+        assert!(fut.is_woken());
 
         // Then, after deadline, has to be ready.
         assert_eq!(

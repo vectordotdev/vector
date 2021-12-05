@@ -1,6 +1,6 @@
-use crate::internal_events::InternalEvent;
 use metrics::{counter, histogram};
 use std::time::Instant;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct PostgresqlMetricsCollectCompleted {
@@ -15,7 +15,7 @@ impl InternalEvent for PostgresqlMetricsCollectCompleted {
 
     fn emit_metrics(&self) {
         counter!("collect_completed_total", 1);
-        histogram!("collect_duration_nanoseconds", self.end - self.start);
+        histogram!("collect_duration_seconds", self.end - self.start);
     }
 }
 

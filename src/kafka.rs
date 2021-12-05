@@ -1,5 +1,6 @@
+use crate::internal_events::KafkaStatisticsReceived;
 use crate::tls::TlsOptions;
-use rdkafka::ClientConfig;
+use rdkafka::{consumer::ConsumerContext, ClientConfig, ClientContext, Statistics};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::path::{Path, PathBuf};
@@ -13,7 +14,7 @@ enum KafkaError {
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum KafkaCompression {
+pub enum KafkaCompression {
     #[derivative(Default)]
     None,
     Gzip,
@@ -23,13 +24,13 @@ pub(crate) enum KafkaCompression {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub(crate) struct KafkaAuthConfig {
+pub struct KafkaAuthConfig {
     pub sasl: Option<KafkaSaslConfig>,
     pub tls: Option<KafkaTlsConfig>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub(crate) struct KafkaSaslConfig {
+pub struct KafkaSaslConfig {
     pub enabled: Option<bool>,
     pub username: Option<String>,
     pub password: Option<String>,
@@ -37,14 +38,14 @@ pub(crate) struct KafkaSaslConfig {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub(crate) struct KafkaTlsConfig {
+pub struct KafkaTlsConfig {
     pub enabled: Option<bool>,
     #[serde(flatten)]
     pub options: TlsOptions,
 }
 
 impl KafkaAuthConfig {
-    pub(crate) fn apply(&self, client: &mut ClientConfig) -> crate::Result<()> {
+    pub fn apply(&self, client: &mut ClientConfig) -> crate::Result<()> {
         let sasl_enabled = self.sasl.as_ref().and_then(|s| s.enabled).unwrap_or(false);
         let tls_enabled = self.tls.as_ref().and_then(|s| s.enabled).unwrap_or(false);
 
@@ -72,13 +73,13 @@ impl KafkaAuthConfig {
         if tls_enabled {
             let tls = self.tls.as_ref().unwrap();
             if let Some(path) = &tls.options.ca_file {
-                client.set("ssl.ca.location", pathbuf_to_string(&path)?);
+                client.set("ssl.ca.location", pathbuf_to_string(path)?);
             }
             if let Some(path) = &tls.options.crt_file {
-                client.set("ssl.certificate.location", pathbuf_to_string(&path)?);
+                client.set("ssl.certificate.location", pathbuf_to_string(path)?);
             }
             if let Some(path) = &tls.options.key_file {
-                client.set("ssl.key.location", pathbuf_to_string(&path)?);
+                client.set("ssl.key.location", pathbuf_to_string(path)?);
             }
             if let Some(pass) = &tls.options.key_pass {
                 client.set("ssl.key.password", pass);
@@ -93,3 +94,15 @@ fn pathbuf_to_string(path: &Path) -> crate::Result<&str> {
     path.to_str()
         .ok_or_else(|| KafkaError::InvalidPath { path: path.into() }.into())
 }
+
+pub struct KafkaStatisticsContext;
+
+impl ClientContext for KafkaStatisticsContext {
+    fn stats(&self, statistics: Statistics) {
+        emit!(&KafkaStatisticsReceived {
+            statistics: &statistics
+        });
+    }
+}
+
+impl ConsumerContext for KafkaStatisticsContext {}

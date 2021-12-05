@@ -1,0 +1,32 @@
+{{- if .Values.haproxy.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "haproxy.fullname" . }}
+  labels:
+    {{- include "haproxy.labels" . | nindent 4 }}
+  annotations:
+{{- range $key, $value := .Values.haproxy.service.annotations }}
+    {{ $key }}: {{ $value | quote }}
+{{- end }}
+spec:
+  type: {{ .Values.haproxy.service.type }}
+  selector:
+    {{- include "haproxy.selectorLabels" . | nindent 4 }}
+  {{- with .Values.haproxy.service.clusterIP }}
+  clusterIP: {{ . | quote}}
+  {{- end }}
+  {{- with .Values.haproxy.service.loadBalancerIP }}
+  loadBalancerIP: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.haproxy.service.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
+  ports:
+  {{- include "vector-aggregator.servicePorts" . | nindent 2 }}
+  - port: 1024
+    targetPort: 1024
+    name: metrics
+    protocol: TCP
+{{- end }}

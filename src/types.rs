@@ -1,8 +1,1 @@
-use lazy_static::lazy_static;
-use std::path::PathBuf;
-
-pub use shared::conversion::*;
-
-lazy_static! {
-    pub static ref DEFAULT_CONFIG_PATHS: Vec<PathBuf> = vec!["/etc/vector/vector.toml".into()];
-}
+pub use shared::conversion::{parse_check_conversion_map, parse_conversion_map, Conversion, Error};

@@ -5,7 +5,7 @@ use indoc::indoc;
 use std::pin::Pin;
 use transforms::lua::v2::LuaConfig;
 use vector::{
-    config::{GlobalOptions, TransformConfig},
+    config::{TransformConfig, TransformContext},
     event::Event,
     test_util::{collect_ready, runtime},
     transforms::{self, Transform},
@@ -63,6 +63,16 @@ fn bench_add_fields(c: &mut Criterion) {
                     stream::iter(buf.into_iter())
                 }))
             }
+            // ignoring multiple outputs for now
+            Transform::FallibleFunction(t) => {
+                let mut t = t.clone();
+                Box::pin(rx.flat_map(move |v| {
+                    let mut buf = Vec::with_capacity(1);
+                    let mut err_buf = Vec::with_capacity(1);
+                    t.transform(&mut buf, &mut err_buf, v);
+                    stream::iter(buf.into_iter())
+                }))
+            }
             Transform::Task(t) => t.transform(Box::pin(rx)),
         };
 
@@ -106,7 +116,7 @@ fn bench_field_filter(c: &mut Criterion) {
                     field: "the_field".to_string(),
                     value: "0".to_string(),
                 }
-                .build(&GlobalOptions::default())
+                .build(&TransformContext::default())
                 .await
                 .unwrap()
             })
@@ -145,6 +155,16 @@ fn bench_field_filter(c: &mut Criterion) {
                 Box::pin(rx.flat_map(move |v| {
                     let mut buf = Vec::with_capacity(1);
                     t.transform(&mut buf, v);
+                    stream::iter(buf.into_iter())
+                }))
+            }
+            // ignoring multiple outputs for now
+            Transform::FallibleFunction(t) => {
+                let mut t = t.clone();
+                Box::pin(rx.flat_map(move |v| {
+                    let mut buf = Vec::with_capacity(1);
+                    let mut err_buf = Vec::with_capacity(1);
+                    t.transform(&mut buf, &mut err_buf, v);
                     stream::iter(buf.into_iter())
                 }))
             }

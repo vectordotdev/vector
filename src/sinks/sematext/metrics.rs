@@ -11,24 +11,33 @@ use crate::{
     sinks::util::{
         buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
         http::{HttpBatchService, HttpRetryLogic},
-        BatchConfig, BatchSettings, TowerRequestConfig,
+        sink, BatchConfig, EncodedEvent, TowerRequestConfig,
     },
-    sinks::{Healthcheck, HealthcheckError, VectorSink},
+    sinks::{util::SinkBatchSettings, Healthcheck, HealthcheckError, VectorSink},
     vector_version, Result,
 };
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
 use http::{StatusCode, Uri};
 use hyper::{Body, Request};
 use indoc::indoc;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, future::ready, task::Poll};
+use std::{collections::HashMap, future::ready, num::NonZeroU64, task::Poll};
 use tower::Service;
+use vector_core::ByteSizeOf;
 
 #[derive(Clone)]
 struct SematextMetricsService {
     config: SematextMetricsConfig,
     inner: HttpBatchService<BoxFuture<'static, Result<Request<Vec<u8>>>>>,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SematextMetricsDefaultBatchSettings;
+
+impl SinkBatchSettings for SematextMetricsDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(20);
+    const MAX_BYTES: Option<usize> = None;
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -38,7 +47,7 @@ struct SematextMetricsConfig {
     pub endpoint: Option<String>,
     pub token: String,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<SematextMetricsDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
 }
@@ -81,7 +90,7 @@ const EU_ENDPOINT: &str = "https://spm-receiver.eu.sematext.com";
 #[typetag::serde(name = "sematext_metrics")]
 impl SinkConfig for SematextMetricsConfig {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
-        let client = HttpClient::new(None)?;
+        let client = HttpClient::new(None, cx.proxy())?;
 
         let endpoint = match (&self.endpoint, &self.region) {
             (Some(endpoint), None) => endpoint.clone(),
@@ -110,16 +119,9 @@ impl SinkConfig for SematextMetricsConfig {
     }
 }
 
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        retry_attempts: Some(5),
-        ..Default::default()
-    };
-}
-
 fn write_uri(endpoint: &str) -> Result<Uri> {
     encode_uri(
-        &endpoint,
+        endpoint,
         "write",
         &[
             ("db", Some("metrics".into())),
@@ -136,11 +138,11 @@ impl SematextMetricsService {
         cx: SinkContext,
         client: HttpClient,
     ) -> Result<VectorSink> {
-        let batch = BatchSettings::default()
-            .events(20)
-            .timeout(1)
-            .parse_config(config.batch)?;
-        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
+        let batch = config.batch.into_batch_settings()?;
+        let request = config.request.unwrap_with(&TowerRequestConfig {
+            retry_attempts: Some(5),
+            ..Default::default()
+        });
         let http_service = HttpBatchService::new(client, create_build_request(endpoint));
         let sematext_service = SematextMetricsService {
             config,
@@ -155,8 +157,16 @@ impl SematextMetricsService {
                 MetricsBuffer::new(batch.size),
                 batch.timeout,
                 cx.acker(),
+                sink::StdServiceLogic::default(),
             )
-            .with_flat_map(move |event: Event| stream::iter(normalizer.apply(event).map(Ok)))
+            .with_flat_map(move |event: Event| {
+                stream::iter({
+                    let byte_size = event.size_of();
+                    normalizer
+                        .apply(event)
+                        .map(|item| Ok(EncodedEvent::new(item, byte_size)))
+                })
+            })
             .sink_map_err(|error| error!(message = "Fatal sematext metrics sink error.", %error));
 
         Ok(VectorSink::Sink(Box::new(sink)))
@@ -177,7 +187,7 @@ impl Service<Vec<Metric>> for SematextMetricsService {
 
     fn call(&mut self, items: Vec<Metric>) -> Self::Future {
         let input = encode_events(&self.config.token, &self.config.default_namespace, items);
-        let body: Vec<u8> = input.into_bytes();
+        let body: Vec<u8> = input.item.into_bytes();
 
         self.inner.call(body)
     }
@@ -187,11 +197,11 @@ struct SematextMetricNormalize;
 
 impl MetricNormalize for SematextMetricNormalize {
     fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
-        match &metric.data.value {
+        match &metric.value() {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             MetricValue::Counter { .. } => state.make_incremental(metric),
             _ => {
-                emit!(SematextMetricsInvalidMetricReceived { metric: &metric });
+                emit!(&SematextMetricsInvalidMetricReceived { metric: &metric });
                 None
             }
         }
@@ -211,22 +221,27 @@ fn create_build_request(
     }
 }
 
-fn encode_events(token: &str, default_namespace: &str, events: Vec<Metric>) -> String {
+fn encode_events(
+    token: &str,
+    default_namespace: &str,
+    metrics: Vec<Metric>,
+) -> EncodedEvent<String> {
     let mut output = String::new();
-    for event in events.into_iter() {
-        let namespace = event
-            .series
+    let byte_size = metrics.size_of();
+    for metric in metrics.into_iter() {
+        let (series, data, _metadata) = metric.into_parts();
+        let namespace = series
             .name
             .namespace
             .unwrap_or_else(|| default_namespace.into());
-        let label = event.series.name.name;
-        let ts = encode_timestamp(event.data.timestamp);
+        let label = series.name.name;
+        let ts = encode_timestamp(data.timestamp);
 
         // Authentication in Sematext is by inserting the token as a tag.
-        let mut tags = event.series.tags.clone().unwrap_or_default();
+        let mut tags = series.tags.unwrap_or_default();
         tags.insert("token".into(), token.into());
 
-        let (metric_type, fields) = match event.data.value {
+        let (metric_type, fields) = match data.value {
             MetricValue::Counter { value } => ("counter", to_fields(label, value)),
             MetricValue::Gauge { value } => ("gauge", to_fields(label, value)),
             _ => unreachable!(), // handled by SematextMetricNormalize
@@ -234,19 +249,19 @@ fn encode_events(token: &str, default_namespace: &str, events: Vec<Metric>) -> S
 
         if let Err(error) = influx_line_protocol(
             ProtocolVersion::V1,
-            namespace,
+            &namespace,
             metric_type,
             Some(tags),
             Some(fields),
             ts,
             &mut output,
         ) {
-            emit!(SematextMetricsEncodeEventFailed { error });
+            emit!(&SematextMetricsEncodeEventFailed { error });
         };
     }
 
     output.pop();
-    output
+    EncodedEvent::new(output, byte_size)
 }
 
 fn to_fields(label: String, value: f64) -> HashMap<String, Field> {
@@ -284,7 +299,7 @@ mod tests {
 
         assert_eq!(
             "jvm,metric_type=counter,token=aaa pool.used=42 1597784400000000000",
-            encode_events("aaa", "ns", events)
+            encode_events("aaa", "ns", events).item
         );
     }
 
@@ -299,7 +314,7 @@ mod tests {
 
         assert_eq!(
             "ns,metric_type=counter,token=aaa used=42 1597784400000000000",
-            encode_events("aaa", "ns", events)
+            encode_events("aaa", "ns", events).item
         );
     }
 
@@ -325,7 +340,7 @@ mod tests {
         assert_eq!(
             "jvm,metric_type=counter,token=aaa pool.used=42 1597784400000000000\n\
              jvm,metric_type=counter,token=aaa pool.committed=18874368 1597784400000000001",
-            encode_events("aaa", "ns", events)
+            encode_events("aaa", "ns", events).item
         );
     }
 

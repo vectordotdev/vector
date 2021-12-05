@@ -1,6 +1,4 @@
-use super::{
-    err_event_too_large, Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult,
-};
+use super::{err_event_too_large, Batch, BatchSize, PushResult};
 use bytes::Bytes;
 
 pub trait EncodedLength {
@@ -15,11 +13,11 @@ pub struct VecBuffer<T> {
 }
 
 impl<T> VecBuffer<T> {
-    pub fn new(settings: BatchSize<Self>) -> Self {
+    pub const fn new(settings: BatchSize<Self>) -> Self {
         Self::new_with_settings(settings)
     }
 
-    fn new_with_settings(settings: BatchSize<Self>) -> Self {
+    const fn new_with_settings(settings: BatchSize<Self>) -> Self {
         Self {
             batch: None,
             bytes: 0,
@@ -32,19 +30,10 @@ impl<T: EncodedLength> Batch for VecBuffer<T> {
     type Input = T;
     type Output = Vec<T>;
 
-    fn get_settings_defaults(
-        config: BatchConfig,
-        defaults: BatchSettings<Self>,
-    ) -> Result<BatchSettings<Self>, BatchError> {
-        Ok(config
-            .use_size_as_events()?
-            .get_settings_or_default(defaults))
-    }
-
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         let new_bytes = self.bytes + item.encoded_length();
         if self.is_empty() && item.encoded_length() > self.settings.bytes {
-            err_event_too_large(item.encoded_length())
+            err_event_too_large(item.encoded_length(), self.settings.bytes)
         } else if self.num_items() >= self.settings.events || new_bytes > self.settings.bytes {
             PushResult::Overflow(item)
         } else {
@@ -92,23 +81,25 @@ mod tests {
 
     #[test]
     fn obeys_max_events() {
-        let settings = BatchSettings::default().events(2).size;
-        let mut buffer = VecBuffer::new(settings);
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.events = 2;
+
+        let mut buffer = VecBuffer::new(batch_settings.size);
         let data = "dummy".to_string();
 
-        assert_eq!(buffer.is_empty(), true);
+        assert!(buffer.is_empty());
         assert_eq!(buffer.num_items(), 0);
 
         assert_eq!(buffer.push(data.clone()), PushResult::Ok(false));
-        assert_eq!(buffer.is_empty(), false);
+        assert!(!buffer.is_empty());
         assert_eq!(buffer.num_items(), 1);
 
         assert_eq!(buffer.push(data.clone()), PushResult::Ok(true));
-        assert_eq!(buffer.is_empty(), false);
+        assert!(!buffer.is_empty());
         assert_eq!(buffer.num_items(), 2);
 
         assert_eq!(buffer.push(data.clone()), PushResult::Overflow(data));
-        assert_eq!(buffer.is_empty(), false);
+        assert!(!buffer.is_empty());
         assert_eq!(buffer.num_items(), 2);
 
         assert_eq!(buffer.finish().len(), 2);
@@ -116,30 +107,33 @@ mod tests {
 
     #[test]
     fn obeys_max_bytes() {
-        let settings = BatchSettings::default().events(99).bytes(22).size;
-        let mut buffer = VecBuffer::new(settings);
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.bytes = 22;
+        batch_settings.size.events = 99;
+
+        let mut buffer = VecBuffer::new(batch_settings.size);
         let data = "some bytes".to_string();
 
-        assert_eq!(buffer.is_empty(), true);
+        assert!(buffer.is_empty());
         assert_eq!(buffer.num_items(), 0);
 
         assert_eq!(
             buffer.push("this record is just too long to be inserted".into()),
             PushResult::Ok(false)
         );
-        assert_eq!(buffer.is_empty(), true);
+        assert!(buffer.is_empty());
         assert_eq!(buffer.num_items(), 0);
 
         assert_eq!(buffer.push(data.clone()), PushResult::Ok(false));
-        assert_eq!(buffer.is_empty(), false);
+        assert!(!buffer.is_empty());
         assert_eq!(buffer.num_items(), 1);
 
         assert_eq!(buffer.push(data.clone()), PushResult::Ok(true));
-        assert_eq!(buffer.is_empty(), false);
+        assert!(!buffer.is_empty());
         assert_eq!(buffer.num_items(), 2);
 
         assert_eq!(buffer.push(data.clone()), PushResult::Overflow(data));
-        assert_eq!(buffer.is_empty(), false);
+        assert!(!buffer.is_empty());
         assert_eq!(buffer.num_items(), 2);
 
         assert_eq!(buffer.finish().len(), 2);

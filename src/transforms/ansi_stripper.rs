@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{AnsiStripperFailed, AnsiStripperFieldInvalid, AnsiStripperFieldMissing},
     transforms::{FunctionTransform, Transform},
@@ -26,7 +26,7 @@ impl GenerateConfig for AnsiStripperConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "ansi_stripper")]
 impl TransformConfig for AnsiStripperConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> Result<Transform> {
         let field = self
             .field
             .clone()
@@ -58,17 +58,17 @@ impl FunctionTransform for AnsiStripper {
         let log = event.as_mut_log();
 
         match log.get_mut(&self.field) {
-            None => emit!(AnsiStripperFieldMissing { field: &self.field }),
+            None => emit!(&AnsiStripperFieldMissing { field: &self.field }),
             Some(Value::Bytes(ref mut bytes)) => {
                 match strip_ansi_escapes::strip(&bytes) {
                     Ok(b) => *bytes = b.into(),
-                    Err(error) => emit!(AnsiStripperFailed {
+                    Err(error) => emit!(&AnsiStripperFailed {
                         field: &self.field,
                         error
                     }),
                 };
             }
-            _ => emit!(AnsiStripperFieldInvalid { field: &self.field }),
+            _ => emit!(&AnsiStripperFieldInvalid { field: &self.field }),
         }
 
         output.push(event);
@@ -79,6 +79,7 @@ impl FunctionTransform for AnsiStripper {
 mod tests {
     use super::*;
     use crate::event::LogEvent;
+    use crate::transforms::test::transform_one;
 
     #[test]
     fn generate_config() {
@@ -95,8 +96,8 @@ mod tests {
                 let log = LogEvent::from($in);
                 let mut expected = log.clone();
                 expected.insert("message", "foo bar");
-                let event = transform.transform_one(log.into()).unwrap();
 
+                let event = transform_one(&mut transform, log.into()).unwrap();
                 assert_eq!(event.into_log(), expected);
             )+
         };

@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     transforms::{FunctionTransform, Transform},
 };
@@ -29,7 +29,7 @@ impl GenerateConfig for RemoveTagsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "remove_tags")]
 impl TransformConfig for RemoveTagsConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(RemoveTags::new(self.tags.clone())))
     }
 
@@ -54,16 +54,12 @@ impl RemoveTags {
 
 impl FunctionTransform for RemoveTags {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        let tags = &mut event.as_mut_metric().series.tags;
+        let metric = event.as_mut_metric();
 
-        if let Some(map) = tags {
-            for tag in &self.tags {
-                map.remove(tag);
-
-                if map.is_empty() {
-                    *tags = None;
-                    break;
-                }
+        for tag in &self.tags {
+            metric.remove_tag(tag);
+            if metric.tags().is_none() {
+                break;
             }
         }
 
@@ -75,6 +71,7 @@ impl FunctionTransform for RemoveTags {
 mod tests {
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use crate::transforms::test::transform_one;
     use shared::btreemap;
 
     #[test]
@@ -99,8 +96,7 @@ mod tests {
             .with_tags(Some(btreemap! {"env" => "production"}));
 
         let mut transform = RemoveTags::new(vec!["region".into(), "host".into()]);
-        let metric = transform
-            .transform_one(metric.into())
+        let metric = transform_one(&mut transform, metric.into())
             .unwrap()
             .into_metric();
 
@@ -118,8 +114,7 @@ mod tests {
         let expected = metric.clone().with_tags(None);
 
         let mut transform = RemoveTags::new(vec!["env".into()]);
-        let metric = transform
-            .transform_one(metric.into())
+        let metric = transform_one(&mut transform, metric.into())
             .unwrap()
             .into_metric();
 
@@ -138,8 +133,7 @@ mod tests {
         let expected = metric.clone().with_tags(None);
 
         let mut transform = RemoveTags::new(vec!["env".into()]);
-        let metric = transform
-            .transform_one(metric.into())
+        let metric = transform_one(&mut transform, metric.into())
             .unwrap()
             .into_metric();
 

@@ -1,11 +1,10 @@
 use crate::{
-    buffers::Acker,
     config::{DataType, GenerateConfig, Resource, SinkConfig, SinkContext, SinkDescription},
-    event::metric::MetricKind,
+    event::metric::{Metric, MetricData, MetricKind, MetricValue},
     event::Event,
     internal_events::PrometheusServerRequestComplete,
     sinks::{
-        util::{statistic::validate_quantiles, MetricEntry, StreamSink},
+        util::{statistic::validate_quantiles, StreamSink},
         Healthcheck, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsConfig},
@@ -23,10 +22,15 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
     convert::Infallible,
+    hash::{Hash, Hasher},
+    mem::discriminant,
     net::SocketAddr,
+    ops::{Deref, DerefMut},
     sync::{Arc, RwLock},
+    time::Instant,
 };
 use stream_cancel::{Trigger, Tripwire};
+use vector_core::buffers::Acker;
 
 use super::collector::{self, MetricCollector as _};
 
@@ -73,7 +77,7 @@ fn default_address() -> SocketAddr {
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 9598)
 }
 
-fn default_flush_period_secs() -> u64 {
+const fn default_flush_period_secs() -> u64 {
     60
 }
 
@@ -158,8 +162,13 @@ struct PrometheusExporter {
 }
 
 struct ExpiringMetrics {
-    map: IndexMap<MetricEntry, bool>,
+    map: IndexMap<MetricEntry, MetricMetadata>,
     last_flush_timestamp: i64,
+}
+
+struct MetricMetadata {
+    is_incremental_set: bool,
+    updated_at: Instant,
 }
 
 fn handle(
@@ -168,7 +177,7 @@ fn handle(
     buckets: &[f64],
     quantiles: &[f64],
     expired: bool,
-    metrics: &IndexMap<MetricEntry, bool>,
+    metrics: &IndexMap<MetricEntry, MetricMetadata>,
 ) -> Response<Body> {
     let mut response = Response::new(Body::empty());
 
@@ -177,7 +186,7 @@ fn handle(
             let mut s = collector::StringCollector::new();
 
             for (MetricEntry(metric), _) in metrics {
-                s.encode_metric(default_namespace, &buckets, quantiles, expired, metric);
+                s.encode_metric(default_namespace, buckets, quantiles, expired, metric);
             }
 
             *response.body_mut() = s.finish().into();
@@ -248,7 +257,7 @@ impl PrometheusExporter {
                         )
                     });
 
-                    emit!(PrometheusServerRequestComplete {
+                    emit!(&PrometheusServerRequestComplete {
                         status_code: response.status(),
                     });
 
@@ -263,13 +272,16 @@ impl PrometheusExporter {
         let address = self.config.address;
 
         tokio::spawn(async move {
+            #[allow(clippy::print_stderr)]
             let tls = MaybeTlsSettings::from_config(&tls, true)
                 .map_err(|error| eprintln!("Server TLS error: {}", error))?;
+            #[allow(clippy::print_stderr)]
             let listener = tls
                 .bind(&address)
                 .await
                 .map_err(|error| eprintln!("Server bind error: {}", error))?;
 
+            #[allow(clippy::print_stderr)]
             Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
                 .serve(new_service)
                 .with_graceful_shutdown(tripwire.then(crate::stream::tripwire_handler))
@@ -285,45 +297,65 @@ impl PrometheusExporter {
 
 #[async_trait]
 impl StreamSink for PrometheusExporter {
-    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.start_server_if_needed().await;
         while let Some(event) = input.next().await {
             let item = event.into_metric();
             let mut metrics = self.metrics.write().unwrap();
 
             // sets need to be expired from time to time
-            // because otherwise they could grow infinitelly
+            // because otherwise they could grow infinitely
             let now = Utc::now().timestamp();
             let interval = now - metrics.last_flush_timestamp;
             if interval > self.config.flush_period_secs as i64 {
                 metrics.last_flush_timestamp = now;
 
+                let now = Instant::now();
                 metrics.map = metrics
                     .map
                     .drain(..)
-                    .map(|(MetricEntry(mut metric), is_incremental_set)| {
-                        if is_incremental_set {
-                            metric.data.value = metric.data.value.zero();
+                    .map(|(mut entry, metadata)| {
+                        if metadata.is_incremental_set {
+                            entry.0.zero();
                         }
-                        (MetricEntry(metric), is_incremental_set)
+                        (entry, metadata)
+                    })
+                    .filter(|(_metric, metadata)| {
+                        now.duration_since(metadata.updated_at).as_secs()
+                            < self.config.flush_period_secs
                     })
                     .collect();
             }
 
-            match item.data.kind {
+            match item.kind() {
                 MetricKind::Incremental => {
                     let mut entry = MetricEntry(item.into_absolute());
-                    if let Some((MetricEntry(mut existing), _)) = metrics.map.remove_entry(&entry) {
-                        existing.data.update(&entry.data);
-                        entry = MetricEntry(existing);
+                    if let Some((MetricEntry(mut metric), _)) = metrics.map.remove_entry(&entry) {
+                        if metric.update(&entry) {
+                            entry = MetricEntry(metric);
+                        } else {
+                            warn!(message = "Metric changed type, dropping old value.", series = %entry.series());
+                        }
                     }
-                    let is_set = entry.data.value.is_set();
-                    metrics.map.insert(entry, is_set);
+                    let is_set = matches!(entry.value(), MetricValue::Set { .. });
+                    metrics.map.insert(
+                        entry,
+                        MetricMetadata {
+                            is_incremental_set: is_set,
+                            updated_at: Instant::now(),
+                        },
+                    );
                 }
                 MetricKind::Absolute => {
                     let new = MetricEntry(item);
                     metrics.map.remove(&new);
-                    metrics.map.insert(new, false);
+                    metrics.map.insert(
+                        new,
+                        MetricMetadata {
+                            is_incremental_set: false,
+                            updated_at: Instant::now(),
+                        },
+                    );
                 }
             };
 
@@ -333,10 +365,101 @@ impl StreamSink for PrometheusExporter {
     }
 }
 
+struct MetricEntry(Metric);
+
+impl Deref for MetricEntry {
+    type Target = Metric;
+    fn deref(&self) -> &Metric {
+        &self.0
+    }
+}
+
+impl DerefMut for MetricEntry {
+    fn deref_mut(&mut self) -> &mut Metric {
+        &mut self.0
+    }
+}
+
+impl AsRef<MetricData> for MetricEntry {
+    fn as_ref(&self) -> &MetricData {
+        self.0.as_ref()
+    }
+}
+
+impl Eq for MetricEntry {}
+
+impl Hash for MetricEntry {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let metric = &self.0;
+        metric.series().hash(state);
+        metric.kind().hash(state);
+        discriminant(metric.value()).hash(state);
+
+        match metric.value() {
+            MetricValue::AggregatedHistogram { buckets, .. } => {
+                for bucket in buckets {
+                    bucket.upper_limit.to_bits().hash(state);
+                }
+            }
+            MetricValue::AggregatedSummary { quantiles, .. } => {
+                for quantile in quantiles {
+                    quantile.quantile.to_bits().hash(state);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+impl PartialEq for MetricEntry {
+    fn eq(&self, other: &Self) -> bool {
+        // This differs from a straightforward implementation of `eq` by
+        // comparing only the "shape" bits (name, tags, and type) while
+        // allowing the contained values to be different.
+        self.series() == other.series()
+            && self.kind() == other.kind()
+            && discriminant(self.value()) == discriminant(other.value())
+            && match (self.value(), other.value()) {
+                (
+                    MetricValue::AggregatedHistogram {
+                        buckets: buckets1, ..
+                    },
+                    MetricValue::AggregatedHistogram {
+                        buckets: buckets2, ..
+                    },
+                ) => {
+                    buckets1.len() == buckets2.len()
+                        && buckets1
+                            .iter()
+                            .zip(buckets2.iter())
+                            .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
+                }
+                (
+                    MetricValue::AggregatedSummary {
+                        quantiles: quantiles1,
+                        ..
+                    },
+                    MetricValue::AggregatedSummary {
+                        quantiles: quantiles2,
+                        ..
+                    },
+                ) => {
+                    quantiles1.len() == quantiles2.len()
+                        && quantiles1
+                            .iter()
+                            .zip(quantiles2.iter())
+                            .all(|(q1, q2)| q1.quantile == q2.quantile)
+                }
+                _ => true,
+            }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
+        config::ProxyConfig,
         event::metric::{Metric, MetricValue},
         http::HttpClient,
         test_util::{next_addr, random_string, trace_init},
@@ -395,10 +518,7 @@ mod tests {
         trace_init();
 
         let client_settings = MaybeTlsSettings::from_config(&tls_config, false).unwrap();
-        let proto = match &tls_config {
-            Some(_) => "https",
-            None => "http",
-        };
+        let proto = client_settings.http_protocol_name();
 
         let address = next_addr();
         let config = PrometheusExporterConfig {
@@ -419,7 +539,8 @@ mod tests {
         let request = Request::get(format!("{}://{}/metrics", proto, address))
             .body(Body::empty())
             .expect("Error creating request.");
-        let result = HttpClient::new(client_settings)
+        let proxy = ProxyConfig::default();
+        let result = HttpClient::new(client_settings, &proxy)
             .unwrap()
             .send(request)
             .await
@@ -493,7 +614,7 @@ mod tests {
         };
         let cx = SinkContext::new_test();
 
-        let mut sink = PrometheusExporter::new(config, cx.acker());
+        let sink = Box::new(PrometheusExporter::new(config, cx.acker()));
 
         let m1 = Metric::new(
             "absolute",
@@ -518,28 +639,34 @@ mod tests {
             Event::Metric(m1.clone().with_value(MetricValue::Counter { value: 40. })),
         ];
 
+        let internal_metrics = Arc::clone(&sink.metrics);
+
         sink.run(Box::pin(futures::stream::iter(metrics)))
             .await
             .unwrap();
 
-        let map = &sink.metrics.read().unwrap().map;
+        let map = &internal_metrics.read().unwrap().map;
 
         assert_eq!(
-            map.get_full(&MetricEntry(m1)).unwrap().1.data.value,
-            MetricValue::Counter { value: 40. }
+            map.get_full(&MetricEntry(m1)).unwrap().1.value(),
+            &MetricValue::Counter { value: 40. }
         );
 
         assert_eq!(
-            map.get_full(&MetricEntry(m2)).unwrap().1.data.value,
-            MetricValue::Counter { value: 33. }
+            map.get_full(&MetricEntry(m2)).unwrap().1.value(),
+            &MetricValue::Counter { value: 33. }
         );
     }
 }
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
+    #![allow(clippy::print_stdout)] // tests
+    #![allow(clippy::print_stderr)] // tests
+    #![allow(clippy::dbg_macro)] // tests
+
     use super::*;
-    use crate::{http::HttpClient, test_util::trace_init};
+    use crate::{config::ProxyConfig, http::HttpClient, test_util::trace_init};
     use chrono::Utc;
     use serde_json::Value;
     use tokio::{sync::mpsc, time};
@@ -554,6 +681,7 @@ mod integration_tests {
         prometheus_scrapes_metrics().await;
         time::sleep(time::Duration::from_millis(500)).await;
         reset_on_flush_period().await;
+        expire_on_flush_period().await;
     }
 
     async fn prometheus_scrapes_metrics() {
@@ -644,12 +772,73 @@ mod integration_tests {
         );
     }
 
+    async fn expire_on_flush_period() {
+        let config = PrometheusExporterConfig {
+            address: PROMETHEUS_ADDRESS.parse().unwrap(),
+            flush_period_secs: 3,
+            ..Default::default()
+        };
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+        let (tx, rx) = mpsc::unbounded_channel();
+        tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
+
+        // metrics that will not be updated for a full flush period and therefore should expire
+        let (name1, event) = tests::create_metric_set(None, vec!["42"]);
+        tx.send(event).expect("Failed to send.");
+        let (name2, event) = tests::create_metric_gauge(None, 100.0);
+        tx.send(event).expect("Failed to send.");
+
+        // Wait a bit for the sink to process the events
+        time::sleep(time::Duration::from_secs(1)).await;
+
+        // Exporter should present both metrics at first
+        let body = fetch_exporter_body().await;
+        assert!(body.contains(&name1));
+        assert!(body.contains(&name2));
+
+        // Wait long enough to put us past flush_period_secs for the metric that wasn't updated
+        for _ in 0..7 {
+            // Update the first metric, ensuring it doesn't expire
+            let (_, event) = tests::create_metric_set(Some(name1.clone()), vec!["43"]);
+            tx.send(event).expect("Failed to send.");
+
+            // Wait a bit for time to pass
+            time::sleep(time::Duration::from_secs(1)).await;
+        }
+
+        // Exporter should present only the one that got updated
+        let body = fetch_exporter_body().await;
+        assert!(body.contains(&name1));
+        dbg!(&name1);
+        dbg!(&name2);
+        println!("{}", &body);
+        assert!(!body.contains(&name2));
+    }
+
+    async fn fetch_exporter_body() -> String {
+        let url = format!("http://{}/metrics", PROMETHEUS_ADDRESS);
+        let request = Request::get(url)
+            .body(Body::empty())
+            .expect("Error creating request.");
+        let proxy = ProxyConfig::default();
+        let result = HttpClient::new(None, &proxy)
+            .unwrap()
+            .send(request)
+            .await
+            .expect("Could not send request");
+        let result = hyper::body::to_bytes(result.into_body())
+            .await
+            .expect("Error fetching body");
+        String::from_utf8_lossy(&result).to_string()
+    }
+
     async fn prometheus_query(query: &str) -> Value {
         let url = format!("http://127.0.0.1:9090/api/v1/query?query={}", query);
         let request = Request::post(url)
             .body(Body::empty())
             .expect("Error creating request.");
-        let result = HttpClient::new(None)
+        let proxy = ProxyConfig::default();
+        let result = HttpClient::new(None, &proxy)
             .unwrap()
             .send(request)
             .await

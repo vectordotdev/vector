@@ -1,5 +1,4 @@
 use crate::{
-    buffers::Acker,
     config::SinkContext,
     event::Event,
     internal_events::{
@@ -11,7 +10,7 @@ use crate::{
         util::{
             retries::ExponentialBackoff,
             socket_bytes_sink::{BytesSink, ShutdownCheck},
-            StreamSink,
+            EncodedEvent, StreamSink,
         },
         Healthcheck, VectorSink,
     },
@@ -23,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{path::PathBuf, pin::Pin, sync::Arc, time::Duration};
 use tokio::{net::UnixStream, time::sleep};
+use vector_core::{buffers::Acker, ByteSizeOf};
 
 #[derive(Debug, Snafu)]
 pub enum UnixError {
@@ -37,7 +37,7 @@ pub struct UnixSinkConfig {
 }
 
 impl UnixSinkConfig {
-    pub fn new(path: PathBuf) -> Self {
+    pub const fn new(path: PathBuf) -> Self {
         Self { path }
     }
 
@@ -61,11 +61,11 @@ struct UnixConnector {
 }
 
 impl UnixConnector {
-    fn new(path: PathBuf) -> Self {
+    const fn new(path: PathBuf) -> Self {
         Self { path }
     }
 
-    fn fresh_backoff() -> ExponentialBackoff {
+    const fn fresh_backoff() -> ExponentialBackoff {
         // TODO: make configurable
         ExponentialBackoff::from_millis(2)
             .factor(250)
@@ -81,11 +81,11 @@ impl UnixConnector {
         loop {
             match self.connect().await {
                 Ok(stream) => {
-                    emit!(UnixSocketConnectionEstablished { path: &self.path });
+                    emit!(&UnixSocketConnectionEstablished { path: &self.path });
                     return stream;
                 }
                 Err(error) => {
-                    emit!(UnixSocketConnectionFailed {
+                    emit!(&UnixSocketConnectionFailed {
                         error,
                         path: &self.path
                     });
@@ -133,24 +133,37 @@ impl UnixSink {
 #[async_trait]
 impl StreamSink for UnixSink {
     // Same as TcpSink, more details there.
-    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let encode_event = Arc::clone(&self.encode_event);
         let mut input = input
-            .map(|event| encode_event(event).unwrap_or_else(Bytes::new))
+            .map(|mut event| {
+                let byte_size = event.size_of();
+                let finalizers = event.metadata_mut().take_finalizers();
+                encode_event(event)
+                    .map(|item| EncodedEvent {
+                        item,
+                        finalizers,
+                        byte_size,
+                    })
+                    .unwrap_or_else(|| EncodedEvent::new(Bytes::new(), 0))
+            })
             .peekable();
 
         while Pin::new(&mut input).peek().await.is_some() {
             let mut sink = self.connect().await;
-            let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
+            let _open_token = OpenGauge::new().open(|count| emit!(&ConnectionOpen { count }));
 
-            let result = match sink.send_all_peekable(&mut input).await {
+            let result = match sink
+                .send_all_peekable(&mut (&mut input).map(|item| item.item).peekable())
+                .await
+            {
                 Ok(()) => sink.close().await,
                 Err(error) => Err(error),
             };
 
             if let Err(error) = result {
-                emit!(UnixSocketError {
-                    error,
+                emit!(&UnixSocketError {
+                    error: &error,
                     path: &self.connector.path
                 });
             }
@@ -163,7 +176,7 @@ impl StreamSink for UnixSink {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sinks::util::{encode_event, Encoding};
+    use crate::sinks::util::{encode_log, Encoding};
     use crate::test_util::{random_lines_with_stream, CountReceiver};
     use tokio::net::UnixListener;
 
@@ -204,11 +217,11 @@ mod tests {
         let cx = SinkContext::new_test();
         let encoding = Encoding::Text.into();
         let (sink, _healthcheck) = config
-            .build(cx, move |event| encode_event(event, &encoding))
+            .build(cx, move |event| encode_log(event, &encoding))
             .unwrap();
 
         // Send the test data
-        let (input_lines, events) = random_lines_with_stream(100, num_lines);
+        let (input_lines, events) = random_lines_with_stream(100, num_lines, None);
         sink.run(events).await.unwrap();
 
         // Wait for output to connect

@@ -6,6 +6,9 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::num::{ParseFloatError, ParseIntError};
 
+#[cfg(test)]
+mod tests;
+
 #[derive(Debug, Snafu)]
 pub enum ConversionError {
     #[snafu(display("Unknown conversion name {:?}", name))]
@@ -29,18 +32,18 @@ pub enum Conversion {
 #[derive(Debug, Eq, PartialEq, Snafu)]
 pub enum Error {
     #[snafu(display("Invalid boolean value {:?}", s))]
-    BoolParseError { s: String },
+    BoolParse { s: String },
     #[snafu(display("Invalid integer {:?}: {}", s, source))]
-    IntParseError { s: String, source: ParseIntError },
+    IntParse { s: String, source: ParseIntError },
     #[snafu(display("Invalid floating point number {:?}: {}", s, source))]
-    FloatParseError { s: String, source: ParseFloatError },
+    FloatParse { s: String, source: ParseFloatError },
     #[snafu(
         display("Invalid timestamp {:?}: {}", s, source),
         visibility(pub(super))
     )]
-    TimestampParseError { s: String, source: ChronoParseError },
+    TimestampParse { s: String, source: ChronoParseError },
     #[snafu(display("No matching timestamp format found for {:?}", s))]
-    AutoTimestampParseError { s: String },
+    AutoTimestampParse { s: String },
 }
 
 /// Helper function to parse a conversion map and check against a list of names
@@ -86,14 +89,16 @@ impl Conversion {
     ///  * `"timestamp|FORMAT"` => Timestamp using the given format
     pub fn parse(s: impl AsRef<str>, tz: TimeZone) -> Result<Self, ConversionError> {
         let s = s.as_ref();
-        match s {
-            "asis" | "bytes" | "string" => Ok(Self::Bytes),
-            "integer" | "int" => Ok(Self::Integer),
-            "float" => Ok(Self::Float),
-            "bool" | "boolean" => Ok(Self::Boolean),
-            "timestamp" => Ok(Self::Timestamp(tz)),
-            _ if s.starts_with("timestamp|") => {
-                let fmt = &s[10..];
+        let mut split = s.splitn(2, '|').map(|segment| segment.trim());
+        match (split.next(), split.next()) {
+            (Some("asis"), None) | (Some("bytes"), None) | (Some("string"), None) => {
+                Ok(Self::Bytes)
+            }
+            (Some("integer"), None) | (Some("int"), None) => Ok(Self::Integer),
+            (Some("float"), None) => Ok(Self::Float),
+            (Some("bool"), None) | (Some("boolean"), None) => Ok(Self::Boolean),
+            (Some("timestamp"), None) => Ok(Self::Timestamp(tz)),
+            (Some("timestamp"), Some(fmt)) => {
                 // DateTime<Utc> can only convert timestamps without
                 // time zones, and DateTime<FixedOffset> can only
                 // convert with tone zones, so this has to distinguish
@@ -117,30 +122,26 @@ impl Conversion {
             Self::Bytes => bytes.into(),
             Self::Integer => {
                 let s = String::from_utf8_lossy(&bytes);
-                s.parse::<i64>()
-                    .with_context(|| IntParseError { s })?
-                    .into()
+                s.parse::<i64>().with_context(|| IntParse { s })?.into()
             }
             Self::Float => {
                 let s = String::from_utf8_lossy(&bytes);
-                s.parse::<f64>()
-                    .with_context(|| FloatParseError { s })?
-                    .into()
+                s.parse::<f64>().with_context(|| FloatParse { s })?.into()
             }
             Self::Boolean => parse_bool(&String::from_utf8_lossy(&bytes))?.into(),
             Self::Timestamp(tz) => parse_timestamp(*tz, &String::from_utf8_lossy(&bytes))?.into(),
             Self::TimestampFmt(format, tz) => {
                 let s = String::from_utf8_lossy(&bytes);
                 let dt = tz
-                    .datetime_from_str(&s, &format)
-                    .context(TimestampParseError { s })?;
+                    .datetime_from_str(&s, format)
+                    .context(TimestampParse { s })?;
 
                 datetime_to_utc(dt).into()
             }
             Self::TimestampTzFmt(format) => {
                 let s = String::from_utf8_lossy(&bytes);
-                let dt = DateTime::parse_from_str(&s, &format)
-                    .with_context(|| TimestampParseError { s })?;
+                let dt =
+                    DateTime::parse_from_str(&s, format).with_context(|| TimestampParse { s })?;
 
                 datetime_to_utc(dt).into()
             }
@@ -173,7 +174,7 @@ fn parse_bool(s: &str) -> Result<bool, Error> {
                 match s.to_lowercase().as_str() {
                     "true" | "t" | "yes" | "y" => Ok(true),
                     "false" | "f" | "no" | "n" => Ok(false),
-                    _ => Err(Error::BoolParseError { s: s.into() }),
+                    _ => Err(Error::BoolParse { s: s.into() }),
                 }
             }
         }
@@ -239,169 +240,5 @@ fn parse_timestamp(tz: TimeZone, s: &str) -> Result<DateTime<Utc>, Error> {
             return Ok(datetime_to_utc(result));
         }
     }
-    Err(Error::AutoTimestampParseError { s: s.into() })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::parse_bool;
-    #[cfg(unix)]
-    use super::parse_timestamp;
-    use super::Bytes;
-    #[cfg(unix)]
-    use super::{Conversion, Error};
-    use crate::datetime::TimeZone;
-    use chrono::{DateTime, NaiveDateTime, TimeZone as _, Utc};
-    use chrono_tz::{Australia, Tz};
-
-    #[cfg(unix)]
-    const TIMEZONE_NAME: &str = "Australia/Brisbane";
-    const TIMEZONE: Tz = Australia::Brisbane;
-
-    #[derive(PartialEq, Debug, Clone)]
-    enum StubValue {
-        Bytes(Bytes),
-        Timestamp(DateTime<Utc>),
-        Float(f64),
-        Integer(i64),
-        Boolean(bool),
-    }
-
-    impl From<Bytes> for StubValue {
-        fn from(v: Bytes) -> Self {
-            StubValue::Bytes(v)
-        }
-    }
-
-    impl From<DateTime<Utc>> for StubValue {
-        fn from(v: DateTime<Utc>) -> Self {
-            StubValue::Timestamp(v)
-        }
-    }
-
-    impl From<f64> for StubValue {
-        fn from(v: f64) -> Self {
-            StubValue::Float(v)
-        }
-    }
-
-    impl From<i64> for StubValue {
-        fn from(v: i64) -> Self {
-            StubValue::Integer(v)
-        }
-    }
-
-    impl From<bool> for StubValue {
-        fn from(v: bool) -> Self {
-            StubValue::Boolean(v)
-        }
-    }
-
-    #[cfg(unix)]
-    fn dateref() -> DateTime<Utc> {
-        Utc.from_utc_datetime(&NaiveDateTime::from_timestamp(981173106, 0))
-    }
-
-    #[cfg(unix)]
-    fn convert<T>(fmt: &str, value: &'static str) -> Result<T, Error>
-    where
-        T: From<Bytes> + From<i64> + From<f64> + From<bool> + From<DateTime<Utc>>,
-    {
-        std::env::set_var("TZ", TIMEZONE_NAME);
-        Conversion::parse(fmt, TimeZone::Local)
-            .unwrap_or_else(|_| panic!("Invalid conversion {:?}", fmt))
-            .convert(value.into())
-    }
-
-    #[cfg(unix)] // https://github.com/timberio/vector/issues/1201
-    #[test]
-    fn timestamp_conversion() {
-        assert_eq!(
-            convert::<StubValue>("timestamp", "02/03/2001:14:05:06"),
-            Ok(dateref().into())
-        );
-    }
-
-    #[cfg(unix)] // see https://github.com/timberio/vector/issues/1201
-    #[test]
-    fn timestamp_param_conversion() {
-        assert_eq!(
-            convert::<StubValue>("timestamp|%Y-%m-%d %H:%M:%S", "2001-02-03 14:05:06"),
-            Ok(dateref().into())
-        );
-    }
-
-    #[cfg(unix)] // see https://github.com/timberio/vector/issues/1201
-    #[test]
-    fn parse_timestamp_auto_tz_env() {
-        std::env::set_var("TZ", TIMEZONE_NAME);
-        let good = Ok(dateref());
-        let tz = TimeZone::Local;
-        assert_eq!(parse_timestamp(tz, "2001-02-03 14:05:06"), good);
-        assert_eq!(parse_timestamp(tz, "02/03/2001:14:05:06"), good);
-        assert_eq!(parse_timestamp(tz, "2001-02-03T14:05:06"), good);
-        assert_eq!(parse_timestamp(tz, "2001-02-03T04:05:06Z"), good);
-        assert_eq!(parse_timestamp(tz, "Sat, 3 Feb 2001 14:05:06"), good);
-        assert_eq!(parse_timestamp(tz, "Sat Feb 3 14:05:06 2001"), good);
-        assert_eq!(parse_timestamp(tz, "3-Feb-2001 14:05:06"), good);
-        assert_eq!(parse_timestamp(tz, "2001-02-02T22:05:06-06:00"), good);
-        assert_eq!(parse_timestamp(tz, "Sat, 03 Feb 2001 07:05:06 +0300"), good);
-        assert_eq!(parse_timestamp(tz, "03/Feb/2001:02:05:06 -0200"), good);
-    }
-
-    #[cfg(unix)] // see https://github.com/timberio/vector/issues/1201
-    #[test]
-    fn parse_timestamp_auto() {
-        let good = Ok(dateref());
-        let tz = TimeZone::Named(TIMEZONE);
-        assert_eq!(parse_timestamp(tz, "2001-02-03 14:05:06"), good);
-        assert_eq!(parse_timestamp(tz, "02/03/2001:14:05:06"), good);
-        assert_eq!(parse_timestamp(tz, "2001-02-03T14:05:06"), good);
-        assert_eq!(parse_timestamp(tz, "2001-02-03T04:05:06Z"), good);
-        assert_eq!(parse_timestamp(tz, "Sat, 3 Feb 2001 14:05:06"), good);
-        assert_eq!(parse_timestamp(tz, "Sat Feb 3 14:05:06 2001"), good);
-        assert_eq!(parse_timestamp(tz, "3-Feb-2001 14:05:06"), good);
-        assert_eq!(parse_timestamp(tz, "2001-02-02T22:05:06-06:00"), good);
-        assert_eq!(parse_timestamp(tz, "Sat, 03 Feb 2001 07:05:06 +0300"), good);
-    }
-
-    // These should perhaps each go into an individual test function to be
-    // able to determine what part failed, but that would end up really
-    // spamming the test logs.
-
-    #[test]
-    fn parse_bool_true() {
-        assert_eq!(parse_bool("true"), Ok(true));
-        assert_eq!(parse_bool("True"), Ok(true));
-        assert_eq!(parse_bool("t"), Ok(true));
-        assert_eq!(parse_bool("T"), Ok(true));
-        assert_eq!(parse_bool("yes"), Ok(true));
-        assert_eq!(parse_bool("YES"), Ok(true));
-        assert_eq!(parse_bool("y"), Ok(true));
-        assert_eq!(parse_bool("Y"), Ok(true));
-        assert_eq!(parse_bool("1"), Ok(true));
-        assert_eq!(parse_bool("23456"), Ok(true));
-        assert_eq!(parse_bool("-8"), Ok(true));
-    }
-
-    #[test]
-    fn parse_bool_false() {
-        assert_eq!(parse_bool("false"), Ok(false));
-        assert_eq!(parse_bool("fAlSE"), Ok(false));
-        assert_eq!(parse_bool("f"), Ok(false));
-        assert_eq!(parse_bool("F"), Ok(false));
-        assert_eq!(parse_bool("no"), Ok(false));
-        assert_eq!(parse_bool("NO"), Ok(false));
-        assert_eq!(parse_bool("n"), Ok(false));
-        assert_eq!(parse_bool("N"), Ok(false));
-        assert_eq!(parse_bool("0"), Ok(false));
-        assert_eq!(parse_bool("000"), Ok(false));
-    }
-
-    #[test]
-    fn parse_bool_errors() {
-        assert!(parse_bool("X").is_err());
-        assert!(parse_bool("yes or no").is_err());
-        assert!(parse_bool("123.4").is_err());
-    }
+    Err(Error::AutoTimestampParse { s: s.into() })
 }

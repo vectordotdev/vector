@@ -2,7 +2,7 @@
 name = "vrl-cli"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@timber.io>"]
-edition = "2018"
+edition = "2021"
 publish = false
 license = "MPL-2.0"
 
@@ -11,12 +11,13 @@ name = "vrl"
 path = "src/main.rs"
 
 [dependencies]
+shared = { path = "../../shared", default-features = false }
 vrl = { path = "../core" }
-bytes = "1.0.0"
+bytes = "1.1.0"
 exitcode = "1"
 prettytable-rs = { version = "0.8", default-features = false, optional = true }
 regex = { version = "1", default-features = false, optional = true }
-rustyline = { version = "8", default-features = false, optional = true }
+rustyline = { version = "9", default-features = false, optional = true }
 serde_json = "1"
 structopt = { version = "0.3", default-features = false }
 thiserror = "1"

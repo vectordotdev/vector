@@ -1,6 +1,6 @@
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::FilterEventDiscarded,
     transforms::{FunctionTransform, Transform},
@@ -9,8 +9,14 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
-struct FilterConfig {
+pub struct FilterConfig {
     condition: AnyCondition,
+}
+
+impl From<AnyCondition> for FilterConfig {
+    fn from(condition: AnyCondition) -> Self {
+        Self { condition }
+    }
 }
 
 inventory::submit! {
@@ -30,8 +36,10 @@ impl GenerateConfig for FilterConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "filter")]
 impl TransformConfig for FilterConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
-        Ok(Transform::function(Filter::new(self.condition.build()?)))
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
+        Ok(Transform::function(Filter::new(
+            self.condition.build(&context.enrichment_tables)?,
+        )))
     }
 
     fn input_type(&self) -> DataType {
@@ -65,7 +73,7 @@ impl FunctionTransform for Filter {
         if self.condition.check(&event) {
             output.push(event);
         } else {
-            emit!(FilterEventDiscarded);
+            emit!(&FilterEventDiscarded);
         }
     }
 }
@@ -76,6 +84,7 @@ mod test {
     use crate::{
         conditions::{is_log::IsLogConfig, ConditionConfig},
         event::Event,
+        transforms::test::transform_one,
     };
 
     #[test]
@@ -86,11 +95,11 @@ mod test {
     #[test]
     fn passes_metadata() {
         let mut filter = Filter {
-            condition: IsLogConfig {}.build().unwrap(),
+            condition: IsLogConfig {}.build(&Default::default()).unwrap(),
         };
         let event = Event::from("message");
         let metadata = event.metadata().clone();
-        let result = filter.transform_one(event).unwrap();
+        let result = transform_one(&mut filter, event).unwrap();
         assert_eq!(result.metadata(), &metadata);
     }
 }

@@ -44,11 +44,16 @@ impl Function for ToUnixTimestamp {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _ctx: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
 
         let unit = arguments
-            .optional_enum("unit", &Unit::all_value().as_slice())?
+            .optional_enum("unit", Unit::all_value().as_slice())?
             .map(|s| {
                 Unit::from_str(&s.try_bytes_utf8_lossy().expect("unit not bytes"))
                     .expect("validated enum")

@@ -4,10 +4,10 @@ use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     internal_events::{HttpEventEncoded, HttpEventMissingMessage},
     sinks::util::{
-        buffer::compression::GZIP_DEFAULT,
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink, RequestConfig},
-        BatchConfig, BatchSettings, Buffer, Compression, Concurrency, TowerRequestConfig, UriSerde,
+        BatchConfig, Buffer, Compression, RealtimeSizeBasedDefaultBatchSettings,
+        TowerRequestConfig, UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
 };
@@ -19,7 +19,6 @@ use http::{
 };
 use hyper::Body;
 use indexmap::IndexMap;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::io::Write;
@@ -50,7 +49,7 @@ pub struct HttpSinkConfig {
     pub compression: Compression,
     pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: RequestConfig,
     pub tls: Option<TlsOptions>,
@@ -69,15 +68,6 @@ fn default_config(e: Encoding) -> HttpSinkConfig {
         request: Default::default(),
         tls: Default::default(),
     }
-}
-
-lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        concurrency: Concurrency::Fixed(10),
-        timeout_secs: Some(30),
-        rate_limit_num: Some(u64::max_value()),
-        ..Default::default()
-    };
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -117,6 +107,13 @@ impl GenerateConfig for HttpSinkConfig {
     }
 }
 
+impl HttpSinkConfig {
+    fn build_http_client(&self, cx: &SinkContext) -> crate::Result<HttpClient> {
+        let tls = TlsSettings::from_options(&self.tls)?;
+        Ok(HttpClient::new(tls, cx.proxy())?)
+    }
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
@@ -124,8 +121,7 @@ impl SinkConfig for HttpSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let tls = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(tls)?;
+        let client = self.build_http_client(&cx)?;
 
         let healthcheck = match cx.healthcheck.uri.clone() {
             Some(healthcheck_uri) => {
@@ -143,12 +139,11 @@ impl SinkConfig for HttpSinkConfig {
         config.request.add_old_option(config.headers.take());
         validate_headers(&config.request.headers, &config.auth)?;
 
-        let batch = BatchSettings::default()
-            .bytes(bytesize::mib(10u64))
-            .timeout(1)
-            .parse_config(config.batch)?;
-        let request = config.request.tower.unwrap_with(&REQUEST_DEFAULTS);
-
+        let batch = config.batch.into_batch_settings()?;
+        let request = config
+            .request
+            .tower
+            .unwrap_with(&TowerRequestConfig::default());
         let sink = BatchedHttpSink::new(
             config,
             Buffer::new(batch.size, Compression::None),
@@ -189,7 +184,7 @@ impl HttpSink for HttpSinkConfig {
                     b.push(b'\n');
                     b
                 } else {
-                    emit!(HttpEventMissingMessage);
+                    emit!(&HttpEventMissingMessage);
                     return None;
                 }
             }
@@ -211,7 +206,7 @@ impl HttpSink for HttpSinkConfig {
             }
         };
 
-        emit!(HttpEventEncoded {
+        emit!(&HttpEventEncoded {
             byte_size: body.len(),
         });
 
@@ -251,8 +246,7 @@ impl HttpSink for HttpSinkConfig {
             Compression::Gzip(level) => {
                 builder = builder.header("Content-Encoding", "gzip");
 
-                let level = level.unwrap_or(GZIP_DEFAULT) as u32;
-                let mut w = GzEncoder::new(Vec::new(), flate2::Compression::new(level));
+                let mut w = GzEncoder::new(Vec::new(), level);
                 w.write_all(&body).expect("Writing to Vec can't fail");
                 body = w.finish().expect("Writing to Vec can't fail");
             }
@@ -311,18 +305,23 @@ mod tests {
         config::SinkContext,
         sinks::{
             http::HttpSinkConfig,
-            util::{http::HttpSink, test::build_test_server},
+            util::{
+                http::HttpSink,
+                test::{build_test_server, build_test_server_generic, build_test_server_status},
+            },
         },
-        test_util::{next_addr, random_lines_with_stream},
+        test_util::{components, components::HTTP_SINK_TAGS, next_addr, random_lines_with_stream},
     };
     use bytes::{Buf, Bytes};
     use flate2::read::MultiGzDecoder;
     use futures::{channel::mpsc, stream, StreamExt};
     use headers::{Authorization, HeaderMapExt};
     use http::request::Parts;
-    use hyper::Method;
+    use hyper::{Method, Response, StatusCode};
     use serde::Deserialize;
     use std::io::{BufRead, BufReader};
+    use std::sync::{atomic, Arc};
+    use vector_core::event::{BatchNotifier, BatchStatus};
 
     #[test]
     fn generate_config() {
@@ -371,7 +370,7 @@ mod tests {
         Auth = "token:thing_and-stuff"
         X-Custom-Nonsense = "_%_{}_-_&_._`_|_~_!_#_&_$_"
         "#;
-        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+        let config: HttpSinkConfig = toml::from_str(config).unwrap();
 
         assert!(super::validate_headers(&config.request.headers, &None).is_ok());
     }
@@ -384,7 +383,7 @@ mod tests {
         [request.headers]
         "\u0001" = "bad"
         "#;
-        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+        let config: HttpSinkConfig = toml::from_str(config).unwrap();
 
         assert_downcast_matches!(
             super::validate_headers(&config.request.headers, &None).unwrap_err(),
@@ -408,7 +407,7 @@ mod tests {
         user = "user"
         password = "password"
         "#;
-        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+        let config: HttpSinkConfig = toml::from_str(config).unwrap();
 
         let cx = SinkContext::new_test();
 
@@ -417,169 +416,80 @@ mod tests {
 
     #[tokio::test]
     async fn http_happy_path_post() {
-        let num_lines = 1000;
-
-        let in_addr = next_addr();
-
-        let config = r#"
-        uri = "http://$IN_ADDR/frames"
-        compression = "gzip"
-        encoding = "ndjson"
-
+        run_sink(
+            r#"
         [auth]
         strategy = "basic"
         user = "waldo"
         password = "hunter2"
-    "#
-        .replace("$IN_ADDR", &format!("{}", in_addr));
-        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
-
-        let cx = SinkContext::new_test();
-
-        let (sink, _) = config.build(cx).await.unwrap();
-        let (rx, trigger, server) = build_test_server(in_addr);
-
-        let (input_lines, events) = random_lines_with_stream(100, num_lines);
-        let pump = sink.run(events);
-
-        tokio::spawn(server);
-
-        pump.await.unwrap();
-        drop(trigger);
-
-        let output_lines = get_received(rx, |parts| {
-            assert_eq!(Method::POST, parts.method);
-            assert_eq!("/frames", parts.uri.path());
-            assert_eq!(
-                Some(Authorization::basic("waldo", "hunter2")),
-                parts.headers.typed_get()
-            );
-        })
+    "#,
+            |parts| {
+                assert_eq!(Method::POST, parts.method);
+                assert_eq!("/frames", parts.uri.path());
+                assert_eq!(
+                    Some(Authorization::basic("waldo", "hunter2")),
+                    parts.headers.typed_get()
+                );
+            },
+        )
         .await;
-
-        assert_eq!(num_lines, output_lines.len());
-        assert_eq!(input_lines, output_lines);
     }
 
     #[tokio::test]
     async fn http_happy_path_put() {
-        let num_lines = 1000;
-
-        let in_addr = next_addr();
-
-        let config = r#"
-        uri = "http://$IN_ADDR/frames"
+        run_sink(
+            r#"
         method = "put"
-        compression = "gzip"
-        encoding = "ndjson"
 
         [auth]
         strategy = "basic"
         user = "waldo"
         password = "hunter2"
-    "#
-        .replace("$IN_ADDR", &format!("{}", in_addr));
-        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
-
-        let cx = SinkContext::new_test();
-
-        let (sink, _) = config.build(cx).await.unwrap();
-        let (rx, trigger, server) = build_test_server(in_addr);
-
-        let (input_lines, events) = random_lines_with_stream(100, num_lines);
-        let pump = sink.run(events);
-
-        tokio::spawn(server);
-
-        pump.await.unwrap();
-        drop(trigger);
-
-        let output_lines = get_received(rx, |parts| {
-            assert_eq!(Method::PUT, parts.method);
-            assert_eq!("/frames", parts.uri.path());
-            assert_eq!(
-                Some(Authorization::basic("waldo", "hunter2")),
-                parts.headers.typed_get()
-            );
-        })
+    "#,
+            |parts| {
+                assert_eq!(Method::PUT, parts.method);
+                assert_eq!("/frames", parts.uri.path());
+                assert_eq!(
+                    Some(Authorization::basic("waldo", "hunter2")),
+                    parts.headers.typed_get()
+                );
+            },
+        )
         .await;
-
-        assert_eq!(num_lines, output_lines.len());
-        assert_eq!(input_lines, output_lines);
     }
 
     #[tokio::test]
     async fn http_passes_custom_headers() {
-        let num_lines = 1000;
-
-        let in_addr = next_addr();
-
-        let config = r#"
-        uri = "http://$IN_ADDR/frames"
-        encoding = "ndjson"
-        compression = "gzip"
+        run_sink(
+            r#"
         [request.headers]
         foo = "bar"
         baz = "quux"
-    "#
-        .replace("$IN_ADDR", &format!("{}", in_addr));
-        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
-
-        let cx = SinkContext::new_test();
-
-        let (sink, _) = config.build(cx).await.unwrap();
-        let (rx, trigger, server) = build_test_server(in_addr);
-
-        let (input_lines, events) = random_lines_with_stream(100, num_lines);
-        let pump = sink.run(events);
-
-        tokio::spawn(server);
-
-        pump.await.unwrap();
-        drop(trigger);
-
-        let output_lines = get_received(rx, |parts| {
-            assert_eq!(Method::POST, parts.method);
-            assert_eq!("/frames", parts.uri.path());
-            assert_eq!(
-                Some("bar"),
-                parts.headers.get("foo").map(|v| v.to_str().unwrap())
-            );
-            assert_eq!(
-                Some("quux"),
-                parts.headers.get("baz").map(|v| v.to_str().unwrap())
-            );
-        })
+    "#,
+            |parts| {
+                assert_eq!(Method::POST, parts.method);
+                assert_eq!("/frames", parts.uri.path());
+                assert_eq!(
+                    Some("bar"),
+                    parts.headers.get("foo").map(|v| v.to_str().unwrap())
+                );
+                assert_eq!(
+                    Some("quux"),
+                    parts.headers.get("baz").map(|v| v.to_str().unwrap())
+                );
+            },
+        )
         .await;
-
-        assert_eq!(num_lines, output_lines.len());
-        assert_eq!(input_lines, output_lines);
     }
 
     #[tokio::test]
     async fn retries_on_no_connection() {
         let num_lines = 10;
 
-        let in_addr = next_addr();
+        let (in_addr, sink) = build_sink("").await;
 
-        let config = r#"
-        uri = "http://$IN_ADDR/frames"
-        compression = "gzip"
-        encoding = "ndjson"
-
-        [auth]
-        strategy = "basic"
-        user = "waldo"
-        password = "hunter2"
-    "#
-        .replace("$IN_ADDR", &format!("{}", in_addr));
-        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
-
-        let cx = SinkContext::new_test();
-
-        let (sink, _) = config.build(cx).await.unwrap();
-
-        let (input_lines, events) = random_lines_with_stream(100, num_lines);
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
         let pump = tokio::spawn(sink.run(events));
 
         // This ordering starts the sender before the server has built
@@ -593,13 +503,11 @@ mod tests {
         pump.await.unwrap().unwrap();
         drop(trigger);
 
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
         let output_lines = get_received(rx, |parts| {
             assert_eq!(Method::POST, parts.method);
             assert_eq!("/frames", parts.uri.path());
-            assert_eq!(
-                Some(Authorization::basic("waldo", "hunter2")),
-                parts.headers.typed_get()
-            );
         })
         .await;
 
@@ -608,7 +516,75 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn json_compresion() {
+    async fn retries_on_temporary_error() {
+        const NUM_LINES: usize = 1000;
+        const NUM_FAILURES: usize = 2;
+
+        let (in_addr, sink) = build_sink("").await;
+
+        let counter = Arc::new(atomic::AtomicUsize::new(0));
+        let in_counter = Arc::clone(&counter);
+        let (rx, trigger, server) = build_test_server_generic(in_addr, move || {
+            let count = in_counter.fetch_add(1, atomic::Ordering::Relaxed);
+            if count < NUM_FAILURES {
+                // Send a temporary error for the first two responses
+                Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(Body::empty())
+                    .unwrap_or_else(|_| unreachable!())
+            } else {
+                Response::new(Body::empty())
+            }
+        });
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (input_lines, events) = random_lines_with_stream(100, NUM_LINES, Some(batch));
+        let pump = sink.run(events);
+
+        tokio::spawn(server);
+
+        pump.await.unwrap();
+        drop(trigger);
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+        let output_lines = get_received(rx, |parts| {
+            assert_eq!(Method::POST, parts.method);
+            assert_eq!("/frames", parts.uri.path());
+        })
+        .await;
+
+        let tries = counter.load(atomic::Ordering::Relaxed);
+        assert!(tries > NUM_FAILURES);
+        assert_eq!(NUM_LINES, output_lines.len());
+        assert_eq!(input_lines, output_lines);
+    }
+
+    #[tokio::test]
+    async fn fails_on_permanent_error() {
+        let num_lines = 1000;
+
+        let (in_addr, sink) = build_sink("").await;
+
+        let (rx, trigger, server) = build_test_server_status(in_addr, StatusCode::FORBIDDEN);
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (_input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
+        let pump = sink.run(events);
+
+        tokio::spawn(server);
+
+        pump.await.unwrap();
+        drop(trigger);
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
+
+        let output_lines = get_received(rx, |_| unreachable!("There should be no lines")).await;
+        assert!(output_lines.is_empty());
+    }
+
+    #[tokio::test]
+    async fn json_compression() {
         let num_lines = 1000;
 
         let in_addr = next_addr();
@@ -631,13 +607,16 @@ mod tests {
         let (sink, _) = config.build(cx).await.unwrap();
         let (rx, trigger, server) = build_test_server(in_addr);
 
-        let (input_lines, events) = random_lines_with_stream(100, num_lines);
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
         let pump = sink.run(events);
 
         tokio::spawn(server);
 
         pump.await.unwrap();
         drop(trigger);
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let output_lines = rx
             .flat_map(|(parts, body)| {
@@ -675,5 +654,46 @@ mod tests {
         })
         .collect::<Vec<_>>()
         .await
+    }
+
+    async fn run_sink(extra_config: &str, assert_parts: impl Fn(http::request::Parts)) {
+        let num_lines = 1000;
+
+        let (in_addr, sink) = build_sink(extra_config).await;
+
+        let (rx, trigger, server) = build_test_server(in_addr);
+        tokio::spawn(server);
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
+        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+        drop(trigger);
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+        let output_lines = get_received(rx, assert_parts).await;
+
+        assert_eq!(num_lines, output_lines.len());
+        assert_eq!(input_lines, output_lines);
+    }
+
+    async fn build_sink(extra_config: &str) -> (std::net::SocketAddr, crate::sinks::VectorSink) {
+        let in_addr = next_addr();
+        let config = format!(
+            r#"
+                uri = "http://{addr}/frames"
+                compression = "gzip"
+                encoding = "ndjson"
+                {extras}
+            "#,
+            addr = in_addr,
+            extras = extra_config
+        );
+        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+
+        let cx = SinkContext::new_test();
+
+        let (sink, _) = config.build(cx).await.unwrap();
+        (in_addr, sink)
     }
 }

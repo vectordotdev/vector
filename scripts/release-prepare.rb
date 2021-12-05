@@ -25,7 +25,7 @@ require_relative "util/version"
 #
 
 ROOT = ".."
-RELEASE_REFERENCE_DIR = File.join(ROOT, "docs", "reference", "releases")
+RELEASE_REFERENCE_DIR = File.join(ROOT, "website", "cue", "reference", "releases")
 TYPES = ["chore", "docs", "feat", "fix", "enhancement", "perf"]
 TYPES_THAT_REQUIRE_SCOPES = ["feat", "enhancement", "fix"]
 
@@ -181,12 +181,7 @@ def create_release_file!(new_version)
 end
 
 def get_commits_since(last_version)
-  Vector::Commit.fetch_since(last_version).select do |commit|
-      commit.type != "chore" &&
-        commit.type != "docs" &&
-        !commit.scopes.include?("external docs") &&
-        !commit.scopes.include?("docs")
-    end
+  Vector::Commit.fetch_since(last_version)
 end
 
 # Grabs all existing commits that are included in the `.meta/releases/*.toml`

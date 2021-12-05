@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, TransformConfig, TransformDescription},
+    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, PathComponent, PathIter, Value},
     internal_events::{GrokParserConversionFailed, GrokParserFailedMatch, GrokParserMissingField},
     transforms::{FunctionTransform, Transform},
@@ -40,7 +40,7 @@ impl_generate_config_from_default!(GrokParserConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "grok_parser")]
 impl TransformConfig for GrokParserConfig {
-    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
@@ -48,7 +48,7 @@ impl TransformConfig for GrokParserConfig {
 
         let mut grok = grok::Grok::with_patterns();
 
-        let timezone = self.timezone.unwrap_or(globals.timezone);
+        let timezone = self.timezone.unwrap_or(context.globals.timezone);
         let types = parse_conversion_map(&self.types, timezone)?;
 
         Ok(grok
@@ -87,7 +87,7 @@ pub struct GrokParser {
     field: String,
     drop_field: bool,
     types: HashMap<String, Conversion>,
-    paths: HashMap<String, Vec<PathComponent>>,
+    paths: HashMap<String, Vec<PathComponent<'static>>>,
 }
 
 impl Clone for GrokParser {
@@ -119,12 +119,14 @@ impl FunctionTransform for GrokParser {
                             if let Some(path) = self.paths.get(name) {
                                 event.insert_path(path.to_vec(), value);
                             } else {
-                                let path = PathIter::new(name).collect::<Vec<_>>();
+                                let path = PathIter::new(name)
+                                    .map(|component| component.into_static())
+                                    .collect::<Vec<_>>();
                                 self.paths.insert(name.to_string(), path.clone());
                                 event.insert_path(path, value);
                             }
                         }
-                        Err(error) => emit!(GrokParserConversionFailed { name, error }),
+                        Err(error) => emit!(&GrokParserConversionFailed { name, error }),
                     }
                 }
 
@@ -132,12 +134,12 @@ impl FunctionTransform for GrokParser {
                     event.remove(&self.field);
                 }
             } else {
-                emit!(GrokParserFailedMatch {
+                emit!(&GrokParserFailedMatch {
                     value: value.as_ref()
                 });
             }
         } else {
-            emit!(GrokParserMissingField {
+            emit!(&GrokParserMissingField {
                 field: self.field.as_ref()
             });
         }
@@ -150,7 +152,7 @@ impl FunctionTransform for GrokParser {
 mod tests {
     use super::GrokParserConfig;
     use crate::{
-        config::{log_schema, GlobalOptions, TransformConfig},
+        config::{log_schema, TransformConfig, TransformContext},
         event::{self, Event, LogEvent},
     };
     use pretty_assertions::assert_eq;
@@ -177,12 +179,14 @@ mod tests {
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
             timezone: Default::default(),
         }
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
         let parser = parser.as_function();
 
-        let result = parser.transform_one(event).unwrap().into_log();
+        let mut buf = Vec::with_capacity(1);
+        parser.transform(&mut buf, event);
+        let result = buf.pop().unwrap().into_log();
         assert_eq!(result.metadata(), &metadata);
         result
     }

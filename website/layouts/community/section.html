@@ -1,0 +1,45 @@
+{{ define "title" }}
+Community | {{ site.Title }}
+{{ end }}
+
+{{ define "main" }}
+{{ $buttons := .Params.buttons }}
+{{ $faq := .Params.faq }}
+<div class="max-w-5xl lg:max-w-7xl px-6 lg:px-8 mx-auto">
+  <div class="my-16">
+    <div class="pb-8 md:pb-10 lg:pb-12">
+      {{ partial "hero.html" . }}
+    </div>
+
+    <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4">
+      {{ range $buttons }}
+      <button class="rounded-lg border p-4 md:p-6 dark:border-gray-700 hover:border-secondary dark:hover:border-primary">
+        <a href="{{ .url }}" title="{{ .title | safeHTML }}" rel="noopener" target="_blank">
+          <div class="flex flex-col space-y-2.5 md:space-y-4 items-center justify-center">
+            <ion-icon name="{{ .ionicon }}" class="h-10 w-10 md:h-12 md:w-12 lg:h-16 lg:w-16 {{ .icon_classes }}"></ion-icon>
+
+            <span class="text-xl text-gray-800 dark:text-gray-300 font-semibold">
+              {{ .title }}
+            </span>
+
+            <div class="text-lg text-gray-600 dark:text-gray-400 tracking-tight">
+              {{ .description }}
+            </div>
+          </div>
+        </a>
+      </button>
+      {{ end }}
+    </div>
+
+    <div class="mt-12 flex flex-col space-y-6">
+      <span class="prose dark:prose-dark">
+        {{ partial "heading.html" (dict "text" "FAQ" "level" 2) }}
+      </span>
+
+      <div>
+        {{ partial "inner-content.html" . }}
+      </div>
+    </div>
+  </div>
+</div>
+{{ end }}

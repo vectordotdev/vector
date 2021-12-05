@@ -37,8 +37,16 @@ pub struct Example {
     source: String,
     #[serde(rename = "return")]
     returns: Option<Value>,
-    output: Option<Event>,
+    output: Option<ExampleOutput>,
     raises: Option<Error>,
+    skip_test: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum ExampleOutput {
+    Events(Vec<Event>),
+    Event(Event),
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -50,10 +58,12 @@ pub struct Event {
     metric: Option<Map<String, Value>>,
 }
 
-#[derive(Debug, Default, Deserialize)]
-#[serde(default)]
-pub struct Error {
-    compiletime: String,
+#[derive(Debug, Deserialize)]
+pub enum Error {
+    #[serde(rename = "compiletime")]
+    Compiletime(String),
+    #[serde(rename = "runtime")]
+    Runtime(String),
 }
 
 pub fn tests() -> Vec<Test> {
@@ -65,20 +75,24 @@ pub fn tests() -> Vec<Test> {
         .output()
         .expect("failed to execute process");
 
-    let Reference {
-        examples,
-        functions,
-        expressions,
-    } = serde_json::from_slice(&output.stdout).unwrap();
+    if output.stdout.is_empty() {
+        Vec::new()
+    } else {
+        let Reference {
+            examples,
+            functions,
+            expressions,
+        } = serde_json::from_slice(&output.stdout).unwrap();
 
-    examples_to_tests("reference", {
-        let mut map = HashMap::default();
-        map.insert("program".to_owned(), Examples { examples });
-        map
-    })
-    .chain(examples_to_tests("functions", functions))
-    .chain(examples_to_tests("expressions", expressions))
-    .collect()
+        examples_to_tests("reference", {
+            let mut map = HashMap::default();
+            map.insert("program".to_owned(), Examples { examples });
+            map
+        })
+        .chain(examples_to_tests("functions", functions))
+        .chain(examples_to_tests("expressions", expressions))
+        .collect()
+    }
 }
 
 fn examples_to_tests(
@@ -109,9 +123,10 @@ impl Test {
             returns,
             output,
             raises,
+            skip_test,
         } = example;
 
-        let mut skip = SKIP_FUNCTION_EXAMPLES.contains(&name.as_str());
+        let mut skip = skip_test.unwrap_or_else(|| SKIP_FUNCTION_EXAMPLES.contains(&name.as_str()));
 
         let object = match input {
             Some(event) => {
@@ -128,7 +143,12 @@ impl Test {
         }
 
         if let Some(output) = &output {
-            if output.metric.is_some() {
+            let contains_metric_event = match &output {
+                ExampleOutput::Events(events) => events.iter().any(|event| event.metric.is_some()),
+                ExampleOutput::Event(event) => event.metric.is_some(),
+            };
+
+            if contains_metric_event {
                 skip = true;
             }
 
@@ -138,10 +158,20 @@ impl Test {
         }
 
         let result = match raises {
-            Some(error) => error.compiletime,
+            Some(Error::Runtime(error) | Error::Compiletime(error)) => error,
             None => serde_json::to_string(
                 &returns
-                    .or_else(|| output.map(|event| serde_json::Value::Object(event.log)))
+                    .or_else(|| {
+                        output.map(|output| match output {
+                            ExampleOutput::Events(events) => serde_json::Value::Array(
+                                events
+                                    .into_iter()
+                                    .map(|event| serde_json::Value::Object(event.log))
+                                    .collect(),
+                            ),
+                            ExampleOutput::Event(event) => serde_json::Value::Object(event.log),
+                        })
+                    })
                     .unwrap_or_default(),
             )
             .unwrap(),

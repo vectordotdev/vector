@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     transforms::{FunctionTransform, Transform},
 };
@@ -29,7 +29,7 @@ impl GenerateConfig for FieldFilterConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "field_filter")]
 impl TransformConfig for FieldFilterConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         warn!(
             message =
                 r#"The "field_filter" transform is deprecated, use the "filter" transform instead"#
@@ -60,7 +60,7 @@ pub struct FieldFilter {
 }
 
 impl FieldFilter {
-    pub fn new(field_name: String, value: String) -> Self {
+    pub const fn new(field_name: String, value: String) -> Self {
         Self { field_name, value }
     }
 }
@@ -81,7 +81,7 @@ impl FunctionTransform for FieldFilter {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::event::Event;
+    use crate::{event::Event, transforms::test::transform_one};
 
     #[test]
     fn generate_config() {
@@ -95,7 +95,7 @@ mod test {
         };
         let event = Event::from(msg);
         let metadata = event.metadata().clone();
-        let result = transform.transform_one(event);
+        let result = transform_one(&mut transform, event);
         if let Some(event) = &result {
             assert_eq!(event.metadata(), &metadata);
         }

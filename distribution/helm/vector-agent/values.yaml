@@ -2,6 +2,18 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+# Additional labels to add to all resources
+# commonLabels:
+#   app.kubernetes.io/component: agent
+
+secrets:
+  generic: {}
+    # Each Key/Value will be added to a Secret resource
+    # Values should be entered base64 encoded (examples below are "REPLACE_ME" encoded)
+    # NOTE: Don't commit unencrypted secrets to git!
+    # awsAccessKeyId: "UkVQTEFDRV9NRQo="
+    # awsSecretAccessKey: "UkVQTEFDRV9NRQo="
+
 image:
   repository: timberio/vector
   pullPolicy: IfNotPresent
@@ -13,6 +25,10 @@ image:
 
 # Image pull secrets to use at the `Pod`s managed by `DaemonSet`.
 imagePullSecrets: []
+#  - myRegistryCredentialSecretName
+
+# Command to use at the pods managed by DaemonSet
+command: []
 
 # Override the chart name used in templates.
 nameOverride: ""
@@ -21,6 +37,59 @@ nameOverride: ""
 fullnameOverride: ""
 
 updateStrategy: RollingUpdate
+# Only used when updateStrategy is set to "RollingUpdate".
+maxUnavailable: 1
+
+# Use Liveness Probe (The Probe is using API endpoint which is disabled by default.
+# You have to enable the API in the Config to expose the endpoint.)
+livenessProbe: {}
+  # httpGet:
+  #   path: /health
+  #   port: api
+
+# Use Readiness Probe (The Probe is using API endpoint which is disabled by default.
+# You have to enable the API in the Config to expose the endpoint.)
+readinessProbe: {}
+  # httpGet:
+  #   path: /health
+  #   port: api
+
+# Change DNS Policy
+dnsPolicy:
+
+# Custom DNS configuration to be added to vector-agent pods
+dnsConfig: {}
+  # nameservers:
+  #   - 1.2.3.4
+  # searches:
+  #   - ns1.svc.cluster-domain.example
+  #   - my.dns.search.suffix
+  # options:
+  #   - name: ndots
+  #     value: "2"
+  #   - name: edns0
+
+# Deploy a service resource to use Topology-aware traffic routing with topology keys.
+service:
+  # Whether to create service resource or not.
+  enabled: false
+  type: ClusterIP
+  topologyKeys: {}
+  # List of valid topologyKeys values.
+  #   - "kubernetes.io/hostname"
+  #   - "topology.kubernetes.io/zone"
+  #   - "topology.kubernetes.io/region"
+  #   - "*"
+  ports:
+    - name: api
+      port: 8686
+      protocol: TCP
+      targetPort: 8686
+    # Additional ports (Vector sources, etc.)
+    # - name: another_port
+    #   port: 8081
+    #   protocol: TCP
+    #   targetPort: 8081
 
 serviceAccount:
   # Specifies whether a service account should be created.
@@ -52,6 +121,9 @@ podAnnotations: {}
 # Labels to add to the `Pod`s managed by `DaemonSet`.
 podLabels: {}
 
+# Priority class name to add to the `Pod`s managed by `DaemonSet`.
+podPriorityClassName: ""
+
 # PodSecurityContext to set at the `Pod`s managed by `DaemonSet`.
 podSecurityContext: {}
   # fsGroup: 2000
@@ -68,6 +140,16 @@ securityContext: {}
 
 # Extra env vars to pass to the `vector` container.
 env: []
+  # - name: AWS_ACCESS_KEY_ID
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: vector-agent
+  #       key: awsAccessKeyId
+
+# Extra arguments to pass to the `vector` container.
+args: []
+  # - --quiet
+  # - --verbose
 
 # Tolerations to set for the `Pod`s managed by `DaemonSet`.
 tolerations:
@@ -96,6 +178,11 @@ extraVolumes: []
 # managed by `DaemonSet`.
 extraVolumeMounts: []
 
+# Vector will store it's data here.
+dataVolume:
+  hostPath:
+    path: /var/lib/vector/
+
 rbac:
   # Whether to create rbac resources or not. Disable for non-rbac clusters.
   enabled: true
@@ -108,12 +195,57 @@ psp:
 # of using a generated one.
 existingConfigMap: ""
 
+# Specify custom contents for the Vector config
+# ref: https://vector.dev/docs/reference/configuration/
+# Note a complete and valid configuration is required. If used, the deprecated
+# configuration keys will be ignored. More information can be found at:
+# https://vector.dev/highlights/2021-07-13-helm-customconfig
+customConfig: {}
+  #  data_dir: "/vector-data-dir"
+  #  sources:
+  #    host_metrics:
+  #      type: host_metrics
+  #      filesystem:
+  #        devices:
+  #          excludes: ["binfmt_misc"]
+  #        filesystems:
+  #          excludes: ["binfmt_misc"]
+  #        mountpoints:
+  #          excludes: ["*/proc/sys/fs/binfmt_misc"]
+  #    internal_metrics:
+  #      type: internal_metrics
+  #    kubernetes_logs:
+  #      type: kubernetes_logs
+  #  sinks:
+  #    prometheus_sink:
+  #      type: prometheus_exporter
+  #      inputs: ["host_metrics", "internal_metrics"]
+  #      address: 0.0.0.0:9090
+
+# Use prometheus-operator `PodMonitor` to opt-in for Prometheus scraping.
+# To be used in clusters that rely on prometheus-operator to gather metrics.
+# You might want to set `podMonitorSelectorNilUsesHelmValues=false` if you're
+# using prometheus-operator Helm chart to allow `PodMonitor` resources
+# discovery in all namespaces.
+podMonitor:
+  # Whether to add the `PodMonitor` resource or not.
+  # `prometheus-operator` CRDs are necessary, otherwise you'll get an error.
+  enabled: false
+  # Additional labels for PodMonitor
+  additionalLabels: {}
+  # Additional relabelings to include in the `PodMonitor`.
+  extraRelabelings: []
+  # metricRelabelings to include in the `PodMonitor`.
+  metricRelabelings: []
+
 # Global parts of the generated `vector` config.
+# DEPRECATED. Use customConfig instead
 globalOptions:
   # Specifies the (in-container) data dir used by `vector`.
   dataDir: "/vector-data-dir"
 
 # Schema part of the generated `vector` config.
+# DEPRECATED. Use customConfig instead
 logSchema:
   hostKey: "host"
   messageKey: "message"
@@ -122,6 +254,7 @@ logSchema:
 
 # The Vector API.
 # Will be disabled by default.
+# DEPRECATED. Use customConfig instead
 vectorApi:
   # Turn the Vector API on or off.
   enabled: false
@@ -133,6 +266,7 @@ vectorApi:
 # The "built-in" kubernetes logs source to collect logs from the `Pod`s running
 # on the `Node`.
 # Will be added by default, unless explicitly disabled.
+# DEPRECATED. Use customConfig instead
 kubernetesLogsSource:
   # Disable to omit the kubernetes logs source from being added.
   enabled: true
@@ -147,6 +281,7 @@ kubernetesLogsSource:
 # The "built-in" vector sink, to send the logs to the vector aggregator.
 # Disabled by default when using `vector-agent` chart.
 # Enabled by default when using `vector` chart, and automatically configured.
+# DEPRECATED. Use customConfig instead
 vectorSink:
   # Disable to omit the vector sink from being added.
   enabled: false
@@ -166,6 +301,7 @@ vectorSink:
 
 # The "built-in" internal metrics source emitting Vector's internal opertaional
 # metrics.
+# DEPRECATED. Use customConfig instead
 internalMetricsSource:
   # Disable to omit the internal metrics source from being added.
   enabled: true
@@ -179,6 +315,7 @@ internalMetricsSource:
 
 # The "built-in" host metrics source emitting the metrics gathered from the node
 # that Vector is executing on.
+# DEPRECATED. Use customConfig instead
 hostMetricsSource:
   # Disable to omit the host metrics source from being added.
   enabled: true
@@ -187,8 +324,12 @@ hostMetricsSource:
   # Additional config to embed at the host metrics source.
   config:
     filesystem:
+      devices:
+        excludes: [binfmt_misc]
       filesystems:
         excludes: [binfmt_misc]
+      mountpoints:
+        excludes: ["*/proc/sys/fs/binfmt_misc"]
     # option: "value"
   # Raw TOML config to embed at the host metrics source (deprecated).
   rawConfig: null
@@ -198,6 +339,7 @@ hostMetricsSource:
 # When using this "built-in" sink, we automatically configure container ports,
 # and ensure things are ready for discovery and scraping via Prometheus'
 # `kubernetes_sd_configs` jobs.
+# DEPRECATED. Use customConfig instead
 prometheusSink:
   # Disable to omit the prometheus sink from being added.
   enabled: true
@@ -226,19 +368,24 @@ prometheusSink:
   # `prometheus.io/scrape` to discover scrape targets.
   addPodAnnotations: false
   # Use prometheus-operator `PodMonitor` to opt-in for Prometheus scraping.
-  # To be used in clusters that rely on prometheus-operator to gether metrics.
+  # To be used in clusters that rely on prometheus-operator to gather metrics.
   # You might want to set `podMonitorSelectorNilUsesHelmValues=false` if you're
   # using prometheus-operator Helm chart to allow `PodMonitor` resources
-  # dicovery in all namespaces.
+  # discovery in all namespaces.
   podMonitor:
     # Whether to add the `PodMonitor` resource or not.
     # `prometheus-operator` CRDs are necessary, otherwise you'll get an error.
     enabled: false
+    # Additional labels for PodMonitor
+    additionalLabels: {}
     # Additional relabelings to include in the `PodMonitor`.
     extraRelabelings: []
+    # metricRelabelings to include in the `PodMonitor`.
+    metricRelabelings: []
 
 # Sources to add to the generated `vector` config (besides "built-in" kubernetes
 # logs source).
+# DEPRECATED. Use customConfig instead
 sources: {}
   # source_name:
   #   type: "source_type"
@@ -247,6 +394,7 @@ sources: {}
   #     option = "value"
 
 # Transforms to add to the generated `vector` config.
+# DEPRECATED. Use customConfig instead
 transforms: {}
   # transform_name:
   #   type: "transform_type"
@@ -256,6 +404,7 @@ transforms: {}
   #     option = "value"
 
 # Sinks to add to the generated `vector` config.
+# DEPRECATED. Use customConfig instead
 sinks: {}
   # sink_name:
   #   type: "sink_type"

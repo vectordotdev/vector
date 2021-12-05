@@ -1,4 +1,8 @@
-use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
+use std::num::NonZeroU64;
+
+use super::{GcpAuthConfig, GcpCredentials, Scope};
+use crate::sinks::gcs_common::config::healthcheck_response;
+use crate::sinks::util::SinkBatchSettings;
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::Event,
@@ -7,7 +11,7 @@ use crate::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpSink},
-            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
+            BatchConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, UriParseError, VectorSink,
     },
@@ -26,6 +30,18 @@ enum HealthcheckError {
     TopicNotFound,
 }
 
+// 10MB maximum message size: https://cloud.google.com/pubsub/quotas#resource_limits
+const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct PubsubDefaultBatchSettings;
+
+impl SinkBatchSettings for PubsubDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(1000);
+    const MAX_BYTES: Option<usize> = Some(10_000_000);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct PubsubConfig {
@@ -38,7 +54,7 @@ pub struct PubsubConfig {
     pub auth: GcpAuthConfig,
 
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<PubsubDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(
@@ -50,7 +66,7 @@ pub struct PubsubConfig {
     pub tls: Option<TlsOptions>,
 }
 
-fn default_skip_authentication() -> bool {
+const fn default_skip_authentication() -> bool {
     false
 }
 
@@ -68,26 +84,19 @@ inventory::submit! {
 
 impl_generate_config_from_default!(PubsubConfig);
 
-lazy_static::lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        rate_limit_num: Some(100),
-        ..Default::default()
-    };
-}
-
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_pubsub")]
 impl SinkConfig for PubsubConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = PubsubSink::from_config(self).await?;
-        let batch_settings = BatchSettings::default()
-            .bytes(bytesize::mib(10u64))
-            .events(1000)
-            .timeout(1)
-            .parse_config(self.batch)?;
+        let batch_settings = self
+            .batch
+            .validate()?
+            .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)?
+            .into_batch_settings()?;
         let request_settings = self.request.unwrap_with(&Default::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(tls_settings)?;
+        let client = HttpClient::new(tls_settings, cx.proxy())?;
 
         let healthcheck = healthcheck(client.clone(), sink.uri("")?, sink.creds.clone()).boxed();
 
@@ -166,7 +175,8 @@ impl HttpSink for PubsubSink {
         self.encoding.apply_rules(&mut event);
         // Each event needs to be base64 encoded, and put into a JSON object
         // as the `data` item.
-        let json = serde_json::to_string(&event.into_log()).unwrap();
+        let log = event.into_log();
+        let json = serde_json::to_string(&log).unwrap();
         Some(json!({ "data": base64::encode(&json) }))
     }
 
@@ -227,9 +237,11 @@ mod tests {
 #[cfg(feature = "gcp-pubsub-integration-tests")]
 mod integration_tests {
     use super::*;
+    use crate::test_util::components::{self, HTTP_SINK_TAGS};
     use crate::test_util::{random_events_with_stream, random_string, trace_init};
     use reqwest::{Client, Method, Response};
     use serde_json::{json, Value};
+    use vector_core::event::{BatchNotifier, BatchStatus};
 
     const EMULATOR_HOST: &str = "http://localhost:8681";
     const PROJECT: &str = "testproject";
@@ -258,8 +270,10 @@ mod integration_tests {
 
         healthcheck.await.expect("Health check failed");
 
-        let (input, events) = random_events_with_stream(100, 100);
-        sink.run(events).await.expect("Sending events failed");
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (input, events) = random_events_with_stream(100, 100, Some(batch));
+        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let response = pull_messages(&subscription, 1000).await;
         let messages = response
@@ -273,6 +287,20 @@ mod integration_tests {
             let expected = serde_json::to_value(input[i].as_log().all_fields()).unwrap();
             assert_eq!(data, expected);
         }
+    }
+
+    #[tokio::test]
+    async fn publish_events_broken_topic() {
+        trace_init();
+
+        let (topic, _subscription) = create_topic_subscription().await;
+        let (sink, _healthcheck) = config_build(&format!("BREAK{}BREAK", topic)).await;
+        // Explicitly skip healthcheck
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (_input, events) = random_events_with_stream(100, 100, Some(batch));
+        sink.run(events).await.expect("Sending events failed");
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
     }
 
     #[tokio::test]

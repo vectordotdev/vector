@@ -1,8 +1,9 @@
 //! The test framework main entry point.
 
 use super::{
-    exec_tail, kubernetes_version, log_lookup, namespace, port_forward, test_pod, up_down, vector,
-    wait_for_resource, wait_for_rollout, Interface, PortForwarder, Reader, Result,
+    exec_tail, kubernetes_version, log_lookup, namespace, pod, port_forward, restart_rollout,
+    test_pod, up_down, vector, wait_for_resource, wait_for_rollout, Interface, PortForwarder,
+    Reader, Result,
 };
 
 /// Framework wraps the interface to the system with an easy-to-use rust API
@@ -18,18 +19,21 @@ impl Framework {
         Self { interface }
     }
 
-    /// Deploy `vector` into a cluster.
-    pub async fn vector(
+    /// Deploy a Helm chart into a cluster.
+    pub async fn helm_chart(
         &self,
         namespace: &str,
         helm_chart: &str,
+        helm_repo: &str,
         config: vector::Config<'_>,
     ) -> Result<up_down::Manager<vector::CommandBuilder>> {
+        let env = vec![("CHART_REPO".to_owned(), helm_repo.to_owned())];
         let mut manager = vector::manager(
-            self.interface.deploy_vector_command.as_str(),
+            self.interface.deploy_chart_command.as_str(),
             namespace,
             helm_chart,
             config,
+            Some(env),
         )?;
         manager.up().await?;
         Ok(manager)
@@ -38,9 +42,9 @@ impl Framework {
     /// Create a new namespace.
     pub async fn namespace(
         &self,
-        namespace: &str,
+        config: namespace::Config,
     ) -> Result<up_down::Manager<namespace::CommandBuilder>> {
-        let mut manager = namespace::manager(&self.interface.kubectl_command, namespace);
+        let mut manager = namespace::manager(&self.interface.kubectl_command, config);
         manager.up().await?;
         Ok(manager)
     }
@@ -139,5 +143,46 @@ impl Framework {
         extra: impl IntoIterator<Item = &'a str>,
     ) -> Result<()> {
         wait_for_rollout::run(&self.interface.kubectl_command, namespace, resource, extra).await
+    }
+
+    /// Trigger a restart for a rollout of a `resource`.
+    /// Use `extr
+    pub async fn restart_rollout<'a>(
+        &self,
+        namespace: &str,
+        resources: &str,
+        extra: impl IntoIterator<Item = &'a str>,
+    ) -> Result<()> {
+        restart_rollout::run(&self.interface.kubectl_command, namespace, resources, extra).await
+    }
+
+    /// Gets the node for a given pod.
+    async fn get_node_for_pod(&self, namespace: &str, pod: &str) -> Result<String> {
+        pod::get_node(&self.interface.kubectl_command, namespace, pod).await
+    }
+
+    /// Gets the name of the pod implementing the service on the given node.
+    async fn get_pod_on_node(&self, namespace: &str, node: &str, service: &str) -> Result<String> {
+        pod::get_pod_on_node(&self.interface.kubectl_command, namespace, node, service).await
+    }
+
+    /// Return the Vector pod that is deployed on the same node as the given pod. We want to make
+    /// sure we are scanning the Vector instance that is deployed with the test pod.
+    pub async fn get_vector_pod_with_pod(
+        &self,
+        pod_namespace: &str,
+        pod_name: &str,
+        vector_pod_namespace: &str,
+        vector_pod_name: &str,
+    ) -> Result<String> {
+        let node = self
+            .get_node_for_pod(pod_namespace, pod_name)
+            .await
+            .map_err(|_| "need the node name")?;
+
+        Ok(self
+            .get_pod_on_node(vector_pod_namespace, &node, vector_pod_name)
+            .await
+            .map_err(|_| "cant get the vector pod running on the test node")?)
     }
 }

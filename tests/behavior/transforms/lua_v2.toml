@@ -18,7 +18,7 @@
   [[tests.outputs]]
     extract_from = "lua_v2_log"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         !exists(.a) &&
         .b == "example value"
@@ -45,7 +45,7 @@
   [[tests.outputs]]
     extract_from = "lua_v2_source"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .some_field == "some value" &&
         .inserted_field == "inserted value"
@@ -128,7 +128,7 @@
   [[tests.outputs]]
     extract_from = "lua_v2_metric_to_log"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .field == "example value"
       '''

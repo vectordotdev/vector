@@ -16,7 +16,12 @@ impl Function for EncodeJson {
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _ctx: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(EncodeJsonFn { value }))
@@ -40,7 +45,7 @@ impl Expression for EncodeJsonFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
-        // With `vrl::Value` it's should not be possible to get `Err`.
+        // With `vrl::Value` it should not be possible to get `Err`.
         match serde_json::to_string(&value) {
             Ok(value) => Ok(value.into()),
             Err(error) => unreachable!("unable encode to json: {}", error),

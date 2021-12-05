@@ -1,5 +1,7 @@
-use super::InternalEvent;
+// ## skip check-events ##
+
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct RemapMappingError {
@@ -27,22 +29,6 @@ impl InternalEvent for RemapMappingError {
     fn emit_metrics(&self) {
         counter!("processing_errors_total", 1,
                  "error_type" => "failed_mapping");
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct RemapConditionExecutionError;
-
-impl InternalEvent for RemapConditionExecutionError {
-    fn emit_logs(&self) {
-        warn!(
-            message = "Remap condition execution failed.",
-            internal_log_rate_secs = 120
-        )
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1);
     }
 }
 

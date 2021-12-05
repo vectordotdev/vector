@@ -35,20 +35,16 @@ ignore = [
     # https://github.com/timberio/vector/issues/5582
     "RUSTSEC-2020-0016",
 
-    # Type confusion if __private_get_type_id__ is overriden
+    # Type confusion if __private_get_type_id__ is overridden
     # https://github.com/timberio/vector/issues/5583
-    "RUSTSEC-2019-0036",
     "RUSTSEC-2020-0036",
 
     # stdweb is unmaintained
     # https://github.com/timberio/vector/issues/5585
     "RUSTSEC-2020-0056",
 
-    # difference is unmaintained
-    # https://github.com/timberio/vector/issues/6224
-    "RUSTSEC-2020-0095",
-
-    # Soundness issues in `raw-cpuid`
-    # https://github.com/timberio/vector/issues/6223
-    "RUSTSEC-2021-0013",
+    # Potential segfault in the time crate
+    # https://github.com/vectordotdev/vector/issues/9673
+    "RUSTSEC-2020-0071",
+    "RUSTSEC-2020-0159"
 ]

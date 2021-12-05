@@ -25,7 +25,12 @@ impl Function for ParseCommonLog {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _ctx: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
         let timestamp_format = arguments.optional("timestamp_format");
 
@@ -83,6 +88,7 @@ impl Expression for ParseCommonLogFn {
             &log_util::REGEX_APACHE_COMMON_LOG,
             &captures,
             &timestamp_format,
+            ctx.timezone(),
         )
         .map_err(Into::into)
     }

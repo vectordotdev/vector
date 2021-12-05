@@ -10,7 +10,7 @@ pub struct State(Option<String>);
 impl State {
     /// Create a new resource version [`State`].
     pub fn new() -> Self {
-        Self(None)
+        Self(Some("0".to_owned()))
     }
 
     /// Update the resource version from a candidate obtained earlier.

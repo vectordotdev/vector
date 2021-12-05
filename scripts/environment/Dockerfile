@@ -4,7 +4,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PATH=/root/.cargo/bin:/root/.local/bin/:$PATH \
     LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
-    LC_ALL=en_US.UTF-8
+    LC_ALL=en_US.UTF-8 \
+    CROSS_DOCKER_IN_DOCKER=true
 
 # Container junk
 RUN echo $TZ > /etc/timezone
@@ -18,9 +19,10 @@ RUN ./git/timberio/vector/scripts/environment/bootstrap-ubuntu-20.04.sh
 WORKDIR /git/timberio/vector
 ADD scripts/environment/prepare.sh /git/timberio/vector/scripts/environment/
 ADD scripts/environment/setup-helm.sh /git/timberio/vector/scripts/environment/
+ADD scripts/environment/release-flags.sh /git/timberio/vector/scripts/environment/
 ADD scripts/Gemfile scripts/Gemfile.lock \
     /git/timberio/vector/scripts/
-ADD rust-toolchain \
+ADD rust-toolchain.toml \
     /git/timberio/vector/
 RUN ./scripts/environment/prepare.sh
 RUN ./scripts/environment/setup-helm.sh

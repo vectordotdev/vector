@@ -44,8 +44,8 @@ where
     Ok(WatchEvent<T>),
     /// Return a desync error.
     ErrDesync,
-    /// Return an "other" (i.e. non-desync) error.
-    ErrOther,
+    /// Return a recoverable error.
+    ErrRecoverable,
     /// Complete the stream (return `None`).
     Done,
 }
@@ -118,8 +118,8 @@ where
                                     Err(watcher::stream::Error::desync(StreamError))?;
                                     break;
                                 },
-                                ScenarioActionStream::ErrOther => {
-                                    Err(watcher::stream::Error::other(StreamError))?;
+                                ScenarioActionStream::ErrRecoverable => {
+                                    Err(watcher::stream::Error::recoverable(StreamError))?;
                                     break;
                                 }
                                 ScenarioActionStream::Done => break,

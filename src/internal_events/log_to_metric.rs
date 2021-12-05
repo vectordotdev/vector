@@ -1,9 +1,31 @@
-use super::InternalEvent;
+// ## skip check-events ##
+
 use crate::template::TemplateParseError;
 use metrics::counter;
 use std::num::ParseFloatError;
+use vector_core::internal_event::InternalEvent;
 
-pub(crate) struct LogToMetricFieldNotFound<'a> {
+pub struct LogToMetricFieldNull<'a> {
+    pub field: &'a str,
+}
+
+impl<'a> InternalEvent for LogToMetricFieldNull<'a> {
+    fn emit_logs(&self) {
+        warn!(
+            message = "Field is null.",
+            null_field = %self.field,
+            internal_log_rate_secs = 30
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("processing_errors_total", 1,
+                 "error_type" => "field_null",
+        );
+    }
+}
+
+pub struct LogToMetricFieldNotFound<'a> {
     pub field: &'a str,
 }
 
@@ -23,7 +45,7 @@ impl<'a> InternalEvent for LogToMetricFieldNotFound<'a> {
     }
 }
 
-pub(crate) struct LogToMetricParseFloatError<'a> {
+pub struct LogToMetricParseFloatError<'a> {
     pub field: &'a str,
     pub error: ParseFloatError,
 }
@@ -45,7 +67,7 @@ impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
     }
 }
 
-pub(crate) struct LogToMetricTemplateParseError {
+pub struct LogToMetricTemplateParseError {
     pub error: TemplateParseError,
 }
 

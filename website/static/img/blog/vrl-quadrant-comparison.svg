@@ -1,0 +1,48 @@
+<svg width="572" height="478" viewBox="0 0 572 478" xmlns="http://www.w3.org/2000/svg">
+  <g transform="translate(0 1)" fill="none" fill-rule="evenodd">
+    <g transform="translate(63)" fill="#000000" fill-rule="nonzero">
+      <rect fill-opacity=".1" width="250" height="204" rx="3"/>
+      <g transform="translate(13 60)">
+        <circle cx="18" cy="10" r="10"/>
+        <text transform="translate(0 25)" font-family="Helvetica-Bold, Helvetica" font-size="13" font-weight="bold">
+          <tspan x="0" y="13">Static</tspan>
+        </text>
+      </g>
+    </g>
+    <g transform="translate(321)" fill-rule="nonzero">
+      <rect fill-opacity=".1" fill="#000000" width="250" height="204" rx="3"/>
+      <g transform="translate(123.843 29)">
+        <circle fill="#28D9F2" cx="13.472" cy="10" r="10"/>
+        <text transform="translate(0 25)" fill="#000000" font-family="Helvetica-Bold, Helvetica" font-size="13" font-weight="bold">
+          <tspan x="0" y="13">VRL</tspan>
+        </text>
+      </g>
+    </g>
+    <rect fill-opacity=".1" fill="#000000" fill-rule="nonzero" x="63" y="216" width="250" height="204" rx="3"/>
+    <g transform="translate(321 216)" fill="#000000" fill-rule="nonzero">
+      <rect fill-opacity=".1" width="250" height="204" rx="3"/>
+      <g transform="translate(178.24 74)">
+        <text transform="translate(0 24)" font-family="Helvetica-Bold, Helvetica" font-size="13" font-weight="bold">
+          <tspan x="0" y="13">Runtimes</tspan>
+        </text>
+        <circle cx="33.148" cy="10" r="10"/>
+      </g>
+    </g>
+    <text transform="translate(269 452)" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="21">
+      <tspan x="0" y="20">Flexibility</tspan>
+    </text>
+    <g stroke-linecap="round" stroke-linejoin="round" stroke="#28D9F2">
+      <path stroke-width="4" d="M67 436h499.418"/>
+      <path stroke-width="2" fill="#28D9F2" fill-rule="nonzero" d="M562.876 430.46L571 436l-8.124 5.541z"/>
+    </g>
+    <g>
+      <text transform="rotate(-90 155.988 154.528)" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="21">
+        <tspan x="0" y="20.516">Performance &amp; Safety</tspan>
+      </text>
+      <g stroke-linecap="round" stroke-linejoin="round" stroke="#28D9F2">
+        <path stroke-width="4" d="M45 416V4"/>
+        <path stroke-width="2" fill="#28D9F2" fill-rule="nonzero" d="M39.459 7.092L45 0l5.541 7.092z"/>
+      </g>
+    </g>
+  </g>
+</svg>

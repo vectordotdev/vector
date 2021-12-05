@@ -30,7 +30,12 @@ impl Function for ParseApacheLog {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _ctx: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let variants = vec![value!("common"), value!("combined"), value!("error")];
 
         let value = arguments.required("value");
@@ -105,7 +110,8 @@ impl Expression for ParseApacheLogFn {
             .captures(&message)
             .ok_or("failed parsing common log line")?;
 
-        log_util::log_fields(&regex, &captures, &timestamp_format).map_err(Into::into)
+        log_util::log_fields(regex, &captures, &timestamp_format, ctx.timezone())
+            .map_err(Into::into)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
@@ -189,6 +195,7 @@ mod tests {
                 "size" => 2326,
             }),
             tdef: TypeDef::new().fallible().object(type_def_common()),
+            tz: shared::TimeZone::default(),
         }
 
         combined_line_valid {
@@ -210,6 +217,7 @@ mod tests {
                 "agent" => "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/1945-10-12 Firefox/37.0",
             }),
             tdef: TypeDef::new().fallible().object(type_def_combined()),
+            tz: shared::TimeZone::default(),
         }
 
         combined_line_missing_fields_valid {
@@ -229,6 +237,7 @@ mod tests {
                 "size" => 84170,
             }),
             tdef: TypeDef::new().fallible().object(type_def_combined()),
+            tz: shared::TimeZone::default(),
         }
 
         error_line_valid {
@@ -246,6 +255,45 @@ mod tests {
                 "port" => 24259
             }),
             tdef: TypeDef::new().fallible().object(type_def_error()),
+            tz: shared::TimeZone::default(),
+        }
+
+        error_line_ip_v6 {
+            args: func_args![value: r#"[01/Mar/2021:12:00:19 +0000] [ab:alert] [pid 4803:tid 3814] [client eda7:35d:3ceb:ef1e:2133:e7bf:116e:24cc:24259] I'll bypass the haptic COM bandwidth, that should matrix the CSS driver!"#,
+                             format: "error"
+                             ],
+            want: Ok(btreemap! {
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-03-01T12:00:19Z").unwrap().into()),
+                "message" => "I'll bypass the haptic COM bandwidth, that should matrix the CSS driver!",
+                "module" => "ab",
+                "severity" => "alert",
+                "pid" => 4803,
+                "thread" => "3814",
+                "client" => "eda7:35d:3ceb:ef1e:2133:e7bf:116e:24cc",
+                "port" => 24259
+            }),
+            tdef: TypeDef::new().fallible().object(type_def_error()),
+            tz: shared::TimeZone::default(),
+        }
+
+        error_line_thread_id {
+            args: func_args![
+                value: r#"[2021-06-04 15:40:27.138633] [php7:emerg] [pid 4803] [client 95.223.77.60:35106] PHP Parse error:  syntax error, unexpected \'->\' (T_OBJECT_OPERATOR) in /var/www/prod/releases/master-c7225365fd9faa26262cffeeb57b31bd7448c94a/source/index.php on line 14"#,
+                timestamp_format: "%Y-%m-%d %H:%M:%S.%f",
+                format: "error",
+            ],
+            want: Ok(btreemap! {
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-06-04T15:40:27.000138633Z").unwrap().into()),
+                "message" => "PHP Parse error:  syntax error, unexpected \\\'->\\\' (T_OBJECT_OPERATOR) in /var/www/prod/releases/master-c7225365fd9faa26262cffeeb57b31bd7448c94a/source/index.php on line 14",
+                "module" => "php7",
+                "severity" => "emerg",
+                "pid" => 4803,
+                "client" => "95.223.77.60",
+                "port" => 35106
+
+            }),
+            tdef: TypeDef::new().fallible().object(type_def_error()),
+            tz: shared::TimeZone::Named(chrono_tz::Tz::UTC),
         }
 
         log_line_valid_empty {
@@ -254,6 +302,7 @@ mod tests {
             ],
             want: Ok(btreemap! {}),
             tdef: TypeDef::new().fallible().object(type_def_common()),
+            tz: shared::TimeZone::default(),
         }
 
         log_line_valid_empty_variant {
@@ -262,6 +311,7 @@ mod tests {
             ],
             want: Ok(btreemap! {}),
             tdef: TypeDef::new().fallible().object(type_def_common()),
+            tz: shared::TimeZone::default(),
         }
 
         log_line_valid_with_local_timestamp_format {
@@ -277,6 +327,20 @@ mod tests {
                 "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2000-10-10T20:55:36Z").unwrap().into()),
             }),
             tdef: TypeDef::new().fallible().object(type_def_error()),
+            tz: shared::TimeZone::default(),
+        }
+
+        log_line_valid_with_timezone {
+            args: func_args![
+                value: "[2021/06/03 09:30:50] - - - -",
+                timestamp_format: "%Y/%m/%d %H:%M:%S",
+                format: "error",
+            ],
+            want: Ok(btreemap! {
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-06-03T07:30:50Z").unwrap().into()),
+            }),
+            tdef: TypeDef::new().fallible().object(type_def_error()),
+            tz: shared::TimeZone::Named(chrono_tz::Europe::Paris),
         }
 
         log_line_invalid {
@@ -285,6 +349,7 @@ mod tests {
             ],
             want: Err("failed parsing common log line"),
             tdef: TypeDef::new().fallible().object(type_def_common()),
+            tz: shared::TimeZone::default(),
         }
 
         log_line_invalid_timestamp {
@@ -293,6 +358,7 @@ mod tests {
             ],
             want: Err("failed parsing timestamp 1234 using format %d/%b/%Y:%T %z: input contains invalid characters"),
             tdef: TypeDef::new().fallible().object(type_def_combined()),
+            tz: shared::TimeZone::default(),
         }
     ];
 }

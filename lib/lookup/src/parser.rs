@@ -8,7 +8,7 @@ lalrpop_mod!(
 );
 
 /// Parses the string as a lookup path.
-pub(crate) fn parse_lookup(s: &str) -> Result<Lookup, String> {
+pub fn parse_lookup(s: &str) -> Result<Lookup, String> {
     path::LookupParser::new()
         .parse(s)
         .map_err(|err| format!("{}", err))

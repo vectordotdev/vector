@@ -1,0 +1,27 @@
+{{ $link := .Get 0 }}
+{{ if not $link }}
+{{ errorf "No page title specified" }}
+{{ end }}
+
+{{ $hash := .Get 1 }}
+
+{{ $page := site.GetPage $link }}
+{{ if not $page }}
+{{ errorf "Error in link shortcode at content/%s. No page found at %s." $.Page.File $link }}
+{{ end }}
+<div class="jump">
+  <a href="{{ $link }}{{ with $hash }}#{{ . }}{{ end }}">
+    <div class="border dark:border-gray-700 rounded-md px-3.5 py-2 hover:border-secondary dark:hover:border-primary">
+      <div class="flex justify-between items-center">
+        <span class="dark:text-gray-300 text-gray-700 tracking-tight text-base">
+          {{ $page.Title }}
+        </span>
+
+        {{/* Heroicon: outline/chevron-right */}}
+        <svg xmlns="http://www.w3.org/2000/svg" class="text-secondary dark:text-primary h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+      </div>
+    </div>
+  </a>
+</div>

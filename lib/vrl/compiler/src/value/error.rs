@@ -34,7 +34,7 @@ pub enum Error {
     #[error("can't subtract type {1} from {0}")]
     Sub(Kind, Kind),
 
-    #[error("can't apply an OR to these types")]
+    #[error("can't apply an OR to these types - {0}")]
     Or(#[from] ExpressionError),
 
     #[error("can't apply an AND to types {0} and {1}")]

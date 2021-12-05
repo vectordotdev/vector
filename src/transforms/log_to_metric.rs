@@ -1,12 +1,13 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription,
+        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        TransformDescription,
     },
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-    event::{Event, LogEvent, Value},
+    event::{Event, Value},
     internal_events::{
-        LogToMetricFieldNotFound, LogToMetricParseFloatError, LogToMetricTemplateParseError,
-        TemplateRenderingFailed,
+        LogToMetricFieldNotFound, LogToMetricFieldNull, LogToMetricParseFloatError,
+        LogToMetricTemplateParseError, TemplateRenderingFailed,
     },
     template::{Template, TemplateParseError, TemplateRenderingError},
     transforms::{FunctionTransform, Transform},
@@ -30,6 +31,8 @@ pub struct CounterConfig {
     namespace: Option<String>,
     #[serde(default = "default_increment_by_value")]
     increment_by_value: bool,
+    #[serde(default = "default_kind")]
+    kind: MetricKind,
     tags: Option<IndexMap<String, String>>,
 }
 
@@ -75,8 +78,24 @@ pub enum MetricConfig {
     Summary(SummaryConfig),
 }
 
-fn default_increment_by_value() -> bool {
+impl MetricConfig {
+    fn field(&self) -> &str {
+        match self {
+            MetricConfig::Counter(CounterConfig { field, .. }) => field,
+            MetricConfig::Histogram(HistogramConfig { field, .. }) => field,
+            MetricConfig::Gauge(GaugeConfig { field, .. }) => field,
+            MetricConfig::Set(SetConfig { field, .. }) => field,
+            MetricConfig::Summary(SummaryConfig { field, .. }) => field,
+        }
+    }
+}
+
+const fn default_increment_by_value() -> bool {
     false
+}
+
+const fn default_kind() -> MetricKind {
+    MetricKind::Incremental
 }
 
 #[derive(Debug, Clone)]
@@ -96,6 +115,7 @@ impl GenerateConfig for LogToMetricConfig {
                 name: None,
                 namespace: None,
                 increment_by_value: false,
+                kind: MetricKind::Incremental,
                 tags: None,
             })],
         })
@@ -106,7 +126,7 @@ impl GenerateConfig for LogToMetricConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(LogToMetric::new(self.clone())))
     }
 
@@ -124,13 +144,16 @@ impl TransformConfig for LogToMetricConfig {
 }
 
 impl LogToMetric {
-    pub fn new(config: LogToMetricConfig) -> Self {
+    pub const fn new(config: LogToMetricConfig) -> Self {
         LogToMetric { config }
     }
 }
 
 enum TransformError {
     FieldNotFound {
+        field: String,
+    },
+    FieldNull {
         field: String,
     },
     TemplateParseError(TemplateParseError),
@@ -144,7 +167,7 @@ enum TransformError {
 fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
     let template = Template::try_from(s).map_err(TransformError::TemplateParseError)?;
     template
-        .render_string(&event)
+        .render_string(event)
         .map_err(TransformError::TemplateRenderingError)
 }
 
@@ -162,7 +185,7 @@ fn render_tags(
                         map.insert(name.to_string(), tag);
                     }
                     Err(TransformError::TemplateRenderingError(error)) => {
-                        emit!(TemplateRenderingFailed {
+                        emit!(&TemplateRenderingFailed {
                             error,
                             drop_event: false,
                             field: Some(name.as_str()),
@@ -180,21 +203,6 @@ fn render_tags(
     })
 }
 
-fn parse_field(log: &LogEvent, field: &str) -> Result<f64, TransformError> {
-    let value = log
-        .get(field)
-        .ok_or_else(|| TransformError::FieldNotFound {
-            field: field.to_string(),
-        })?;
-    value
-        .to_string_lossy()
-        .parse()
-        .map_err(|error| TransformError::ParseFloatError {
-            field: field.to_string(),
-            error,
-        })
-}
-
 fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformError> {
     let log = event.as_log();
 
@@ -204,13 +212,20 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
         .cloned();
     let metadata = event.metadata().clone();
 
+    let field = config.field();
+
+    let value = match log.get(field) {
+        None => Err(TransformError::FieldNotFound {
+            field: field.to_string(),
+        }),
+        Some(Value::Null) => Err(TransformError::FieldNull {
+            field: field.to_string(),
+        }),
+        Some(value) => Ok(value),
+    }?;
+
     match config {
         MetricConfig::Counter(counter) => {
-            let value = log
-                .get(&counter.field)
-                .ok_or_else(|| TransformError::FieldNotFound {
-                    field: counter.field.clone(),
-                })?;
             let value = if counter.increment_by_value {
                 value.to_string_lossy().parse().map_err(|error| {
                     TransformError::ParseFloatError {
@@ -223,18 +238,18 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             };
 
             let name = counter.name.as_ref().unwrap_or(&counter.field);
-            let name = render_template(&name, &event)?;
+            let name = render_template(name, event)?;
 
             let namespace = counter.namespace.as_ref();
             let namespace = namespace
-                .map(|namespace| render_template(namespace, &event))
+                .map(|namespace| render_template(namespace, event))
                 .transpose()?;
 
-            let tags = render_tags(&counter.tags, &event)?;
+            let tags = render_tags(&counter.tags, event)?;
 
             Ok(Metric::new_with_metadata(
                 name,
-                MetricKind::Incremental,
+                counter.kind,
                 MetricValue::Counter { value },
                 metadata,
             )
@@ -243,23 +258,28 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             .with_timestamp(timestamp))
         }
         MetricConfig::Histogram(hist) => {
-            let value = parse_field(&log, &hist.field)?;
+            let value = value.to_string_lossy().parse().map_err(|error| {
+                TransformError::ParseFloatError {
+                    field: field.to_string(),
+                    error,
+                }
+            })?;
 
             let name = hist.name.as_ref().unwrap_or(&hist.field);
-            let name = render_template(&name, &event)?;
+            let name = render_template(name, event)?;
 
             let namespace = hist.namespace.as_ref();
             let namespace = namespace
-                .map(|namespace| render_template(namespace, &event))
+                .map(|namespace| render_template(namespace, event))
                 .transpose()?;
 
-            let tags = render_tags(&hist.tags, &event)?;
+            let tags = render_tags(&hist.tags, event)?;
 
             Ok(Metric::new_with_metadata(
                 name,
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: crate::samples![value => 1],
+                    samples: vector_core::samples![value => 1],
                     statistic: StatisticKind::Histogram,
                 },
                 metadata,
@@ -269,23 +289,28 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             .with_timestamp(timestamp))
         }
         MetricConfig::Summary(summary) => {
-            let value = parse_field(&log, &summary.field)?;
+            let value = value.to_string_lossy().parse().map_err(|error| {
+                TransformError::ParseFloatError {
+                    field: field.to_string(),
+                    error,
+                }
+            })?;
 
             let name = summary.name.as_ref().unwrap_or(&summary.field);
-            let name = render_template(&name, &event)?;
+            let name = render_template(name, event)?;
 
             let namespace = summary.namespace.as_ref();
             let namespace = namespace
-                .map(|namespace| render_template(namespace, &event))
+                .map(|namespace| render_template(namespace, event))
                 .transpose()?;
 
-            let tags = render_tags(&summary.tags, &event)?;
+            let tags = render_tags(&summary.tags, event)?;
 
             Ok(Metric::new_with_metadata(
                 name,
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: crate::samples![value => 1],
+                    samples: vector_core::samples![value => 1],
                     statistic: StatisticKind::Summary,
                 },
                 metadata,
@@ -295,17 +320,22 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             .with_timestamp(timestamp))
         }
         MetricConfig::Gauge(gauge) => {
-            let value = parse_field(&log, &gauge.field)?;
+            let value = value.to_string_lossy().parse().map_err(|error| {
+                TransformError::ParseFloatError {
+                    field: field.to_string(),
+                    error,
+                }
+            })?;
 
             let name = gauge.name.as_ref().unwrap_or(&gauge.field);
-            let name = render_template(&name, &event)?;
+            let name = render_template(name, event)?;
 
             let namespace = gauge.namespace.as_ref();
             let namespace = namespace
-                .map(|namespace| render_template(namespace, &event))
+                .map(|namespace| render_template(namespace, event))
                 .transpose()?;
 
-            let tags = render_tags(&gauge.tags, &event)?;
+            let tags = render_tags(&gauge.tags, event)?;
 
             Ok(Metric::new_with_metadata(
                 name,
@@ -318,22 +348,17 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             .with_timestamp(timestamp))
         }
         MetricConfig::Set(set) => {
-            let value = log
-                .get(&set.field)
-                .ok_or_else(|| TransformError::FieldNotFound {
-                    field: set.field.clone(),
-                })?;
             let value = value.to_string_lossy();
 
             let name = set.name.as_ref().unwrap_or(&set.field);
-            let name = render_template(&name, &event)?;
+            let name = render_template(name, event)?;
 
             let namespace = set.namespace.as_ref();
             let namespace = namespace
-                .map(|namespace| render_template(namespace, &event))
+                .map(|namespace| render_template(namespace, event))
                 .transpose()?;
 
-            let tags = render_tags(&set.tags, &event)?;
+            let tags = render_tags(&set.tags, event)?;
 
             Ok(Metric::new_with_metadata(
                 name,
@@ -353,28 +378,31 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 impl FunctionTransform for LogToMetric {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         for config in self.config.metrics.iter() {
-            match to_metric(&config, &event) {
+            match to_metric(config, &event) {
                 Ok(metric) => {
                     output.push(Event::Metric(metric));
                 }
-                Err(TransformError::FieldNotFound { field }) => emit!(LogToMetricFieldNotFound {
+                Err(TransformError::FieldNull { field }) => emit!(&LogToMetricFieldNull {
+                    field: field.as_ref()
+                }),
+                Err(TransformError::FieldNotFound { field }) => emit!(&LogToMetricFieldNotFound {
                     field: field.as_ref()
                 }),
                 Err(TransformError::ParseFloatError { field, error }) => {
-                    emit!(LogToMetricParseFloatError {
+                    emit!(&LogToMetricParseFloatError {
                         field: field.as_ref(),
                         error
                     })
                 }
                 Err(TransformError::TemplateRenderingError(error)) => {
-                    emit!(TemplateRenderingFailed {
+                    emit!(&TemplateRenderingFailed {
                         error,
                         drop_event: false,
                         field: None,
                     })
                 }
                 Err(TransformError::TemplateParseError(error)) => {
-                    emit!(LogToMetricTemplateParseError { error })
+                    emit!(&LogToMetricTemplateParseError { error })
                 }
             }
         }
@@ -384,6 +412,7 @@ impl FunctionTransform for LogToMetric {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::transforms::test::transform_one;
     use crate::{
         config::log_schema,
         event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
@@ -404,7 +433,7 @@ mod tests {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
     }
 
-    fn create_event(key: &str, value: &str) -> Event {
+    fn create_event(key: &str, value: impl Into<Value> + std::fmt::Debug) -> Event {
         let mut log = Event::from("i am a log");
         log.as_mut_log().insert(key, value);
         log.as_mut_log().insert(log_schema().timestamp_key(), ts());
@@ -424,7 +453,7 @@ mod tests {
         let event = create_event("status", "42");
         let metadata = event.metadata().clone();
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform_one(event).unwrap();
+        let metric = transform_one(&mut transform, event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
@@ -457,7 +486,7 @@ mod tests {
         let metadata = event.metadata().clone();
 
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform_one(event).unwrap();
+        let metric = transform_one(&mut transform, event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
@@ -495,7 +524,7 @@ mod tests {
         let event = create_event("backtrace", "message");
         let metadata = event.metadata().clone();
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform_one(event).unwrap();
+        let metric = transform_one(&mut transform, event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
@@ -523,7 +552,7 @@ mod tests {
         let event = create_event("success", "42");
         let mut transform = LogToMetric::new(config);
 
-        assert_eq!(transform.transform_one(event), None);
+        assert_eq!(transform_one(&mut transform, event), None);
     }
 
     #[test]
@@ -541,13 +570,43 @@ mod tests {
         let event = create_event("amount", "33.99");
         let metadata = event.metadata().clone();
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform_one(event).unwrap();
+        let metric = transform_one(&mut transform, event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
             Metric::new_with_metadata(
                 "amount_total",
                 MetricKind::Incremental,
+                MetricValue::Counter { value: 33.99 },
+                metadata,
+            )
+            .with_timestamp(Some(ts()))
+        );
+    }
+
+    #[test]
+    fn count_absolute() {
+        let config = parse_config(
+            r#"
+            [[metrics]]
+            type = "counter"
+            field = "amount"
+            name = "amount_total"
+            increment_by_value = true
+            kind = "absolute"
+            "#,
+        );
+
+        let event = create_event("amount", "33.99");
+        let metadata = event.metadata().clone();
+        let mut transform = LogToMetric::new(config);
+        let metric = transform_one(&mut transform, event).unwrap();
+
+        assert_eq!(
+            metric.into_metric(),
+            Metric::new_with_metadata(
+                "amount_total",
+                MetricKind::Absolute,
                 MetricValue::Counter { value: 33.99 },
                 metadata,
             )
@@ -569,7 +628,7 @@ mod tests {
         let event = create_event("memory_rss", "123");
         let metadata = event.metadata().clone();
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform_one(event).unwrap();
+        let metric = transform_one(&mut transform, event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
@@ -598,7 +657,7 @@ mod tests {
         let event = create_event("status", "not a number");
         let mut transform = LogToMetric::new(config);
 
-        assert_eq!(transform.transform_one(event), None);
+        assert_eq!(transform_one(&mut transform, event), None);
     }
 
     #[test]
@@ -615,7 +674,24 @@ mod tests {
         let event = create_event("not foo", "not a number");
         let mut transform = LogToMetric::new(config);
 
-        assert_eq!(transform.transform_one(event), None);
+        assert_eq!(transform_one(&mut transform, event), None);
+    }
+
+    #[test]
+    fn null_field() {
+        let config = parse_config(
+            r#"
+            [[metrics]]
+            type = "counter"
+            field = "status"
+            name = "status_total"
+            "#,
+        );
+
+        let event = create_event("status", Value::Null);
+        let mut transform = LogToMetric::new(config);
+
+        assert_eq!(transform_one(&mut transform, event), None);
     }
 
     #[test]
@@ -740,7 +816,7 @@ mod tests {
         let event = create_event("user_ip", "1.2.3.4");
         let metadata = event.metadata().clone();
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform_one(event).unwrap();
+        let metric = transform_one(&mut transform, event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
@@ -769,7 +845,7 @@ mod tests {
         let event = create_event("response_time", "2.5");
         let metadata = event.metadata().clone();
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform_one(event).unwrap();
+        let metric = transform_one(&mut transform, event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
@@ -777,7 +853,7 @@ mod tests {
                 "response_time",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: crate::samples![2.5 => 1],
+                    samples: vector_core::samples![2.5 => 1],
                     statistic: StatisticKind::Histogram
                 },
                 metadata
@@ -799,7 +875,7 @@ mod tests {
         let event = create_event("response_time", "2.5");
         let metadata = event.metadata().clone();
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform_one(event).unwrap();
+        let metric = transform_one(&mut transform, event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
@@ -807,7 +883,7 @@ mod tests {
                 "response_time",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: crate::samples![2.5 => 1],
+                    samples: vector_core::samples![2.5 => 1],
                     statistic: StatisticKind::Summary
                 },
                 metadata

@@ -203,7 +203,7 @@ mod tests {
 
     #[test]
     fn test_read_kubeconfig() {
-        let kc = kubeconfig_reader(&KUBECONFIG_JSON).unwrap();
+        let kc = kubeconfig_reader(KUBECONFIG_JSON).unwrap();
         assert_eq!(kc.base, "https://kubernetes.json.dev:4443");
         assert_eq!(kc.token, None);
         assert_eq!(
@@ -219,7 +219,7 @@ mod tests {
             "/certs/bob.key"
         );
 
-        let kc = kubeconfig_reader(&KUBECONFIG_YAML).unwrap();
+        let kc = kubeconfig_reader(KUBECONFIG_YAML).unwrap();
         assert_eq!(kc.base, "https://kubernetes.yaml.dev:4443");
         assert_eq!(kc.token, Some("abcdef654321".to_string()));
         assert_eq!(

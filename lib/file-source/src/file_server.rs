@@ -8,7 +8,6 @@ use crate::{
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::{
-    executor::block_on,
     future::{select, Either, FutureExt},
     stream, Future, Sink, SinkExt,
 };
@@ -75,10 +74,11 @@ where
         self,
         mut chans: C,
         shutdown: S,
-    ) -> Result<Shutdown, <C as Sink<Vec<(Bytes, String)>>>::Error>
+        mut checkpointer: Checkpointer,
+    ) -> Result<Shutdown, <C as Sink<Vec<Line>>>::Error>
     where
-        C: Sink<Vec<(Bytes, String)>> + Unpin,
-        <C as Sink<Vec<(Bytes, String)>>>::Error: std::error::Error,
+        C: Sink<Vec<Line>> + Unpin,
+        <C as Sink<Vec<Line>>>::Error: std::error::Error,
         S: Future + Unpin + Send + 'static,
         <S as Future>::Output: Clone + Send + Sync,
     {
@@ -89,7 +89,6 @@ where
         let mut backoff_cap: usize = 1;
         let mut lines = Vec::new();
 
-        let mut checkpointer = Checkpointer::new(&self.data_dir);
         checkpointer.read_checkpoints(self.ignore_before);
 
         let mut known_small_files = HashSet::new();
@@ -113,21 +112,15 @@ where
                 .unwrap_or_else(|_| Utc::now())
         });
 
-        checkpointer.maybe_upgrade(existing_files.iter().map(|(_, id)| id).cloned());
-
         let checkpoints = checkpointer.view();
 
-        let needs_checksum_upgrade = checkpoints.contains_bytes_checksums();
-
         for (path, file_id) in existing_files {
-            if needs_checksum_upgrade {
-                if let Ok(Some(old_checksum)) = self
-                    .fingerprinter
-                    .get_bytes_checksum(&path, &mut fingerprint_buffer)
-                {
-                    checkpoints.update_key(old_checksum, file_id)
-                }
-            }
+            checkpointer.maybe_upgrade(
+                &path,
+                file_id,
+                &self.fingerprinter,
+                &mut fingerprint_buffer,
+            );
 
             self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, true);
         }
@@ -145,12 +138,11 @@ where
         let emitter = self.emitter.clone();
         let checkpointer = Arc::new(checkpointer);
         let sleep_duration = self.glob_minimum_cooldown;
-        self.handle.spawn(async move {
-            let mut done = false;
+        let checkpoint_task_handle = self.handle.spawn(async move {
             loop {
                 let sleep = sleep(sleep_duration);
                 tokio::select! {
-                    _ = &mut shutdown2 => done = true,
+                    _ = &mut shutdown2 => return checkpointer,
                     _ = sleep => {},
                 }
 
@@ -160,15 +152,11 @@ where
                     let start = time::Instant::now();
                     match checkpointer.write_checkpoints() {
                         Ok(count) => emitter.emit_file_checkpointed(count, start.elapsed()),
-                        Err(error) => emitter.emit_file_checkpoint_write_failed(error),
+                        Err(error) => emitter.emit_file_checkpoint_write_error(error),
                     }
                 })
                 .await
                 .ok();
-
-                if done {
-                    break;
-                }
             }
         });
 
@@ -270,10 +258,6 @@ where
                 let start = time::Instant::now();
                 let mut bytes_read: usize = 0;
                 while let Ok(Some(line)) = watcher.read_line() {
-                    if line.is_empty() {
-                        break;
-                    }
-
                     let sz = line.len();
                     trace!(
                         message = "Read bytes.",
@@ -284,10 +268,12 @@ where
 
                     bytes_read += sz;
 
-                    lines.push((
-                        line,
-                        watcher.path.to_str().expect("not a valid path").to_owned(),
-                    ));
+                    lines.push(Line {
+                        text: line,
+                        filename: watcher.path.to_str().expect("not a valid path").to_owned(),
+                        file_id,
+                        offset: watcher.get_file_position(),
+                    });
 
                     if bytes_read > self.max_read_bytes {
                         maxed_out_reading_single_file = true;
@@ -298,7 +284,6 @@ where
 
                 if bytes_read > 0 {
                     global_bytes_read = global_bytes_read.saturating_add(bytes_read);
-                    checkpoints.update(file_id, watcher.get_file_position());
                 } else {
                     // Should the file be removed
                     if let Some(grace_period) = self.remove_after {
@@ -311,7 +296,7 @@ where
                                 }
                                 Err(error) => {
                                     // We will try again after some time.
-                                    self.emitter.emit_file_delete_failed(&watcher.path, error);
+                                    self.emitter.emit_file_delete_error(&watcher.path, error);
                                 }
                             }
                         }
@@ -340,7 +325,7 @@ where
             let start = time::Instant::now();
             let to_send = std::mem::take(&mut lines);
             let mut stream = stream::once(futures::future::ok(to_send));
-            let result = block_on(chans.send_all(&mut stream));
+            let result = self.handle.block_on(chans.send_all(&mut stream));
             match result {
                 Ok(()) => {}
                 Err(error) => {
@@ -355,11 +340,11 @@ where
             // limited by the hard-coded cap. Else, we set the backup_cap to its
             // minimum on the assumption that next time through there will be
             // more lines to read promptly.
-            if global_bytes_read == 0 {
-                backoff_cap = cmp::min(2_048, backoff_cap.saturating_mul(2));
+            backoff_cap = if global_bytes_read == 0 {
+                cmp::min(2_048, backoff_cap.saturating_mul(2))
             } else {
-                backoff_cap = 1;
-            }
+                1
+            };
             let backoff = backoff_cap.saturating_sub(global_bytes_read);
 
             // This works only if run inside tokio context since we are using
@@ -373,8 +358,17 @@ where
                 }
             };
             futures::pin_mut!(sleep);
-            match block_on(select(shutdown, sleep)) {
-                Either::Left((_, _)) => return Ok(Shutdown),
+            match self.handle.block_on(select(shutdown, sleep)) {
+                Either::Left((_, _)) => {
+                    let checkpointer = self
+                        .handle
+                        .block_on(checkpoint_task_handle)
+                        .expect("checkpoint task has panicked");
+                    if let Err(error) = checkpointer.write_checkpoints() {
+                        error!(?error, "Error writing checkpoints before shutdown");
+                    }
+                    return Ok(Shutdown);
+                }
                 Either::Right((_, future)) => shutdown = future,
             }
             stats.record("sleeping", start.elapsed());
@@ -431,7 +425,7 @@ where
                 watcher.set_file_findable(true);
                 fp_map.insert(file_id, watcher);
             }
-            Err(error) => self.emitter.emit_file_watch_failed(&path, error),
+            Err(error) => self.emitter.emit_file_watch_error(&path, error),
         };
     }
 }
@@ -504,4 +498,12 @@ impl Default for TimingStats {
             bytes: Default::default(),
         }
     }
+}
+
+#[derive(Debug)]
+pub struct Line {
+    pub text: Bytes,
+    pub filename: String,
+    pub file_id: FileFingerprint,
+    pub offset: u64,
 }

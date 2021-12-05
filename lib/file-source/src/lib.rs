@@ -12,8 +12,9 @@ mod internal_events;
 mod metadata_ext;
 pub mod paths_provider;
 
-pub use self::file_server::{FileServer, Shutdown as FileServerShutdown};
-pub use self::fingerprinter::{FingerprintStrategy, Fingerprinter};
+pub use self::checkpointer::{Checkpointer, CheckpointsView};
+pub use self::file_server::{FileServer, Line, Shutdown as FileServerShutdown};
+pub use self::fingerprinter::{FileFingerprint, FingerprintStrategy, Fingerprinter};
 pub use self::internal_events::FileSourceInternalEvents;
 
 pub type FilePosition = u64;

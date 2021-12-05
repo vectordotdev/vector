@@ -12,6 +12,7 @@ pub trait CommandBuilder {
     fn build(&self, command_to_build: CommandToBuild) -> Command;
 }
 
+/// Manages commands for bringing up and shutting down resources on the cluster.
 #[derive(Debug)]
 pub struct Manager<B>
 where
@@ -25,6 +26,7 @@ impl<B> Manager<B>
 where
     B: CommandBuilder,
 {
+    /// Create a new Manager.
     pub fn new(command_builder: B) -> Self {
         Self {
             command_builder,
@@ -32,21 +34,25 @@ where
         }
     }
 
+    /// Bring up the resource.
     pub async fn up(&mut self) -> Result<()> {
         self.needs_drop = true;
         self.exec(CommandToBuild::Up).await
     }
 
+    /// Shut down the resource.
     pub async fn down(&mut self) -> Result<()> {
         self.needs_drop = false;
         self.exec(CommandToBuild::Down).await
     }
 
+    /// Bring up the resource, blocking execution.
     pub fn up_blocking(&mut self) -> Result<()> {
         self.needs_drop = true;
         self.exec_blocking(CommandToBuild::Up)
     }
 
+    /// Shut down the resource, blocking execution.
     pub fn down_blocking(&mut self) -> Result<()> {
         self.needs_drop = false;
         self.exec_blocking(CommandToBuild::Down)

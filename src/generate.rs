@@ -1,6 +1,6 @@
 use crate::config::{
-    component::ExampleError, default_data_dir, GlobalOptions, SinkDescription,
-    SinkHealthcheckOptions, SourceDescription, TransformDescription,
+    component::ExampleError, SinkDescription, SinkHealthcheckOptions, SourceDescription,
+    TransformDescription,
 };
 use colored::*;
 use indexmap::IndexMap;
@@ -12,6 +12,9 @@ use std::{
 };
 use structopt::StructOpt;
 use toml::{map::Map, Value};
+use vector_core::buffers::BufferConfig;
+use vector_core::config::GlobalOptions;
+use vector_core::default_data_dir;
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -62,7 +65,7 @@ pub struct SinkOuter {
     #[serde(flatten)]
     pub inner: Value,
     pub healthcheck: SinkHealthcheckOptions,
-    pub buffer: crate::buffers::BufferConfig,
+    pub buffer: BufferConfig,
 }
 
 #[derive(Serialize)]
@@ -178,7 +181,7 @@ fn generate_example(
             } else {
                 vec![transform_names
                     .get(i - 1)
-                    .unwrap_or(&"component-name".to_owned())
+                    .unwrap_or(&"component-id".to_owned())
                     .to_owned()]
             };
 
@@ -261,8 +264,8 @@ fn generate_example(
                                 None
                             }
                         })
-                        .unwrap_or_else(|| vec!["component-name".to_owned()]),
-                    buffer: crate::buffers::BufferConfig::default(),
+                        .unwrap_or_else(|| vec!["component-id".to_owned()]),
+                    buffer: BufferConfig::default(),
                     healthcheck: SinkHealthcheckOptions::default(),
                     inner: example,
                 },
@@ -324,11 +327,14 @@ fn generate_example(
     }
 
     if file.is_some() {
+        #[allow(clippy::print_stdout)]
         match write_config(file.as_ref().unwrap(), &builder) {
-            Ok(_) => println!(
-                "Config file written to {:?}",
-                &file.as_ref().unwrap().join("\n")
-            ),
+            Ok(_) => {
+                println!(
+                    "Config file written to {:?}",
+                    &file.as_ref().unwrap().join("\n")
+                )
+            }
             Err(e) => errs.push(format!("failed to write to file: {}", e)),
         };
     };
@@ -343,11 +349,17 @@ fn generate_example(
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     match generate_example(!opts.fragment, &opts.expression, &opts.file) {
         Ok(s) => {
-            println!("{}", s);
+            #[allow(clippy::print_stdout)]
+            {
+                println!("{}", s);
+            }
             exitcode::OK
         }
         Err(errs) => {
-            errs.iter().for_each(|e| eprintln!("{}", e.red()));
+            #[allow(clippy::print_stderr)]
+            {
+                errs.iter().for_each(|e| eprintln!("{}", e.red()));
+            }
             exitcode::SOFTWARE
         }
     }
@@ -402,7 +414,10 @@ mod tests {
         }
 
         for (component, error) in &errors {
-            println!("{:?} : {}", component, error);
+            #[allow(clippy::print_stdout)]
+            {
+                println!("{:?} : {}", component, error);
+            }
         }
         assert!(errors.is_empty());
     }
@@ -439,6 +454,12 @@ mod tests {
                 max_length = 102400
                 type = "stdin"
 
+                [sources.source0.decoding]
+                codec = "bytes"
+
+                [sources.source0.framing]
+                method = "newline_delimited"
+
                 [transforms.transform0]
                 inputs = ["source0"]
                 drop_field = true
@@ -471,6 +492,12 @@ mod tests {
                 [sources.source0]
                 max_length = 102400
                 type = "stdin"
+
+                [sources.source0.decoding]
+                codec = "bytes"
+
+                [sources.source0.framing]
+                method = "newline_delimited"
 
                 [transforms.transform0]
                 inputs = ["source0"]
@@ -505,6 +532,12 @@ mod tests {
                 max_length = 102400
                 type = "stdin"
 
+                [sources.source0.decoding]
+                codec = "bytes"
+
+                [sources.source0.framing]
+                method = "newline_delimited"
+
                 [sinks.sink0]
                 inputs = ["source0"]
                 target = "stdout"
@@ -529,7 +562,7 @@ mod tests {
             Ok(indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sinks.sink0]
-                inputs = ["component-name"]
+                inputs = ["component-id"]
                 target = "stdout"
                 type = "console"
 

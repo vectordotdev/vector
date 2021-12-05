@@ -24,9 +24,11 @@ pub use std::fmt;
 
 // commonly used function types
 
-pub use compiler::function::{ArgumentList, Compiled, Example, Parameter};
+pub use compiler::function::{ArgumentList, Compiled, Example, FunctionCompileContext, Parameter};
 
 // commonly used macros
-pub use compiler::{bench_function, expr, func_args, map, test_function, test_type_def, value};
+pub use compiler::{
+    bench_function, expr, func_args, map, test_function, test_type_def, type_def, value,
+};
 pub use indoc::indoc;
 // pub use crate::{array, bench_function, func_args, lit, map, test_function, test_type_def};

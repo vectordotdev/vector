@@ -1,5 +1,5 @@
-use super::InternalEvent;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct DatadogLogEventProcessed {
@@ -9,7 +9,6 @@ pub struct DatadogLogEventProcessed {
 
 impl InternalEvent for DatadogLogEventProcessed {
     fn emit_metrics(&self) {
-        counter!("processed_events_total", self.count as u64);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }

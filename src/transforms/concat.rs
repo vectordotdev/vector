@@ -1,6 +1,6 @@
 use super::BuildError;
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{ConcatSubstringError, ConcatSubstringSourceMissing},
     transforms::{FunctionTransform, Transform},
@@ -36,7 +36,7 @@ impl GenerateConfig for ConcatConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "concat")]
 impl TransformConfig for ConcatConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         let joiner: String = match self.joiner.clone() {
             None => " ".into(),
             Some(var) => var,
@@ -161,7 +161,7 @@ impl FunctionTransform for Concat {
                     }
                 };
                 if start >= end {
-                    emit!(ConcatSubstringError {
+                    emit!(&ConcatSubstringError {
                         condition: "start >= end",
                         source: substring.source.as_ref(),
                         start,
@@ -171,7 +171,7 @@ impl FunctionTransform for Concat {
                     return;
                 }
                 if start > b.len() {
-                    emit!(ConcatSubstringError {
+                    emit!(&ConcatSubstringError {
                         condition: "start > len",
                         source: substring.source.as_ref(),
                         start,
@@ -181,7 +181,7 @@ impl FunctionTransform for Concat {
                     return;
                 }
                 if end > b.len() {
-                    emit!(ConcatSubstringError {
+                    emit!(&ConcatSubstringError {
                         condition: "end > len",
                         source: substring.source.as_ref(),
                         start,
@@ -192,7 +192,7 @@ impl FunctionTransform for Concat {
                 }
                 content_vec.push(b.slice(start..end));
             } else {
-                emit!(ConcatSubstringSourceMissing {
+                emit!(&ConcatSubstringSourceMissing {
                     source: substring.source.as_ref()
                 });
             }
@@ -211,7 +211,7 @@ impl FunctionTransform for Concat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::Event;
+    use crate::{event::Event, transforms::test::transform_one};
 
     #[test]
     fn generate_config() {
@@ -235,8 +235,8 @@ mod tests {
             ],
         );
 
-        let new_event = transform.transform_one(event).unwrap();
-        assert_eq!(new_event, expected);
+        let result = transform_one(&mut transform, event).unwrap();
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -256,9 +256,10 @@ mod tests {
             ],
         );
 
-        let new_event = transform.transform_one(event).unwrap();
-        assert_eq!(new_event, expected);
+        let result = transform_one(&mut transform, event).unwrap();
+        assert_eq!(result, expected);
     }
+
     #[test]
     fn concat_mixed() {
         let mut event = Event::from("message");
@@ -279,8 +280,8 @@ mod tests {
             ],
         );
 
-        let new_event = transform.transform_one(event).unwrap();
-        assert_eq!(new_event, expected);
+        let result = transform_one(&mut transform, event).unwrap();
+        assert_eq!(result, expected);
     }
 
     #[test]
@@ -294,7 +295,7 @@ mod tests {
             vec![Substring::new("only[3..1]".to_string()).unwrap()],
         );
 
-        assert!(transform.transform_one(event).is_none());
+        assert!(transform_one(&mut transform, event).is_none());
     }
 
     #[test]
@@ -308,7 +309,7 @@ mod tests {
             vec![Substring::new("only[10..11]".to_string()).unwrap()],
         );
 
-        assert!(transform.transform_one(event).is_none());
+        assert!(transform_one(&mut transform, event).is_none());
     }
 
     #[test]
@@ -322,6 +323,6 @@ mod tests {
             vec![Substring::new("only[..11]".to_string()).unwrap()],
         );
 
-        assert!(transform.transform_one(event).is_none());
+        assert!(transform_one(&mut transform, event).is_none());
     }
 }

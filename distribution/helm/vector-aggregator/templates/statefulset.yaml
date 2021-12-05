@@ -9,6 +9,7 @@ spec:
   selector:
     matchLabels:
       {{- include "libvector.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: aggregator
   podManagementPolicy: "{{ .Values.podManagementPolicy }}"
   replicas: {{ .Values.replicas }}
   template:
@@ -24,15 +25,16 @@ spec:
           {{- toYaml . | nindent 8 }}
         {{- end }}
         {{- include "libvector.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: aggregator
         vector.dev/exclude: "true"
     spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      {{- include "libvector.imagePullSecrets" . | indent 6 }}
       serviceAccountName: {{ include "libvector.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.podPriorityClassName }}
+      priorityClassName: {{ .Values.podPriorityClassName }}
+      {{- end }}
       containers:
         - name: vector
           securityContext:
@@ -40,8 +42,11 @@ spec:
           image: {{ include "libvector.image" . | quote }}
           imagePullPolicy: "{{ .Values.image.pullPolicy }}"
           args:
-            - --config
-            - /etc/vector/*.toml
+            - --config-dir
+            - /etc/vector/
+            {{- with .Values.args }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           env:
             {{- include "libvector.globalEnv" . | nindent 12 }}
             {{- with .Values.env }}
@@ -52,12 +57,24 @@ spec:
             {{- with .Values.extraContainersPorts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+          {{- if .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | trim | nindent 12 }}
+          {{- end }}
+          {{- if .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | trim | nindent 12 }}
+          {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
             # Vector data dir mount.
             - name: data-dir
+            {{- if .Values.globalOptions.enabled }}
               mountPath: "{{ .Values.globalOptions.dataDir }}"
+            {{- else }}
+              mountPath: "{{ .Values.customConfig.data_dir | default "/vector-data-dir" }}"
+            {{- end }}
             # Vector config dir mount.
             - name: config-dir
               mountPath: /etc/vector
@@ -66,6 +83,13 @@ spec:
             {{- with .Values.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+      {{- if .Values.dnsPolicy }}
+      dnsPolicy: {{ .Values.dnsPolicy | quote }}
+      {{- end }}
+      {{- if .Values.dnsConfig }}
+      dnsConfig:
+        {{- toYaml .Values.dnsConfig | trim | nindent 8 }}
+      {{- end }}
       terminationGracePeriodSeconds: 60
       {{- with .Values.nodeSelector }}
       nodeSelector:

@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{GeoipFieldDoesNotExist, GeoipIpAddressParseError},
     transforms::{FunctionTransform, Transform},
@@ -61,7 +61,7 @@ impl GenerateConfig for GeoipConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "geoip")]
 impl TransformConfig for GeoipConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> Result<Transform> {
         Ok(Transform::function(Geoip::new(
             self.database.clone(),
             self.source.clone(),
@@ -181,12 +181,10 @@ impl FunctionTransform for Geoip {
                     }
                 }
             } else {
-                emit!(GeoipIpAddressParseError {
-                    address: &ipaddress
-                });
+                emit!(&GeoipIpAddressParseError { address: ipaddress });
             }
         } else {
-            emit!(GeoipFieldDoesNotExist {
+            emit!(&GeoipFieldDoesNotExist {
                 field: &self.source
             });
         };
@@ -210,7 +208,10 @@ mod tests {
     use super::*;
     use crate::{
         event::Event,
-        transforms::json_parser::{JsonParser, JsonParserConfig},
+        transforms::{
+            json_parser::{JsonParser, JsonParserConfig},
+            test::transform_one,
+        },
     };
     use std::collections::HashMap;
 
@@ -355,7 +356,7 @@ mod tests {
         let mut parser = JsonParser::from(JsonParserConfig::default());
         let event = Event::from(text);
         let metadata = event.metadata().clone();
-        let event = parser.transform_one(event).unwrap();
+        let event = transform_one(&mut parser, event).unwrap();
         assert_eq!(event.metadata(), &metadata);
 
         let mut augment = Geoip::new(
@@ -364,8 +365,8 @@ mod tests {
             "geo".to_string(),
         )
         .unwrap();
-        let new_event = augment.transform_one(event).unwrap();
-        assert_eq!(new_event.metadata(), &metadata);
-        new_event
+        let result = transform_one(&mut augment, event).unwrap();
+        assert_eq!(result.metadata(), &metadata);
+        result
     }
 }

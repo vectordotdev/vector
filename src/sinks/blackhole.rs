@@ -1,20 +1,29 @@
 use crate::{
-    buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    emit,
-    event::Event,
     internal_events::BlackholeEventReceived,
     sinks::util::StreamSink,
 };
 use async_trait::async_trait;
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::time::{Duration, Instant};
-use tokio::time::sleep_until;
+use std::{
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    time::{Duration, Instant},
+};
+use tokio::{
+    select,
+    sync::watch,
+    time::{interval, sleep_until},
+};
+use vector_core::ByteSizeOf;
+use vector_core::{buffers::Acker, event::Event};
 
 pub struct BlackholeSink {
-    total_events: usize,
-    total_raw_bytes: usize,
+    total_events: Arc<AtomicUsize>,
+    total_raw_bytes: Arc<AtomicUsize>,
     config: BlackholeConfig,
     acker: Acker,
     last: Option<Instant>,
@@ -24,14 +33,14 @@ pub struct BlackholeSink {
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct BlackholeConfig {
-    #[derivative(Default(value = "1000"))]
-    #[serde(default = "default_print_amount")]
-    pub print_amount: usize,
+    #[derivative(Default(value = "1"))]
+    #[serde(default = "default_print_interval_secs")]
+    pub print_interval_secs: u64,
     pub rate: Option<usize>,
 }
 
-fn default_print_amount() -> usize {
-    1_000
+const fn default_print_interval_secs() -> u64 {
+    1
 }
 
 inventory::submit! {
@@ -70,8 +79,8 @@ impl BlackholeSink {
     pub fn new(config: BlackholeConfig, acker: Acker) -> Self {
         BlackholeSink {
             config,
-            total_events: 0,
-            total_raw_bytes: 0,
+            total_events: Arc::new(AtomicUsize::new(0)),
+            total_raw_bytes: Arc::new(AtomicUsize::new(0)),
             acker,
             last: None,
         }
@@ -80,38 +89,62 @@ impl BlackholeSink {
 
 #[async_trait]
 impl StreamSink for BlackholeSink {
-    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        while let Some(event) = input.next().await {
+    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        // Spin up a task that does the periodic reporting.  This is decoupled from the main sink so
+        // that rate limiting support can be added more simply without having to interleave it with
+        // the printing.
+        let total_events = Arc::clone(&self.total_events);
+        let total_raw_bytes = Arc::clone(&self.total_raw_bytes);
+        let interval_dur = Duration::from_secs(self.config.print_interval_secs);
+        let (shutdown, mut tripwire) = watch::channel(());
+
+        tokio::spawn(async move {
+            let mut print_interval = interval(interval_dur);
+            loop {
+                select! {
+                    _ = print_interval.tick() => {
+                        info!({
+                            events = total_events.load(Ordering::Relaxed),
+                            raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed),
+                        }, "Total events collected");
+                    },
+                    _ = tripwire.changed() => break,
+                }
+            }
+
+            info!({
+                events = total_events.load(Ordering::Relaxed),
+                raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed)
+            }, "Total events collected");
+        });
+
+        let mut chunks = input.ready_chunks(1024);
+        while let Some(events) = chunks.next().await {
             if let Some(rate) = self.config.rate {
-                let until = self.last.unwrap_or_else(Instant::now)
-                    + Duration::from_secs_f32(1.0 / rate as f32);
+                let factor: f32 = 1.0 / rate as f32;
+                let secs: f32 = factor * (events.len() as f32);
+                let until = self.last.unwrap_or_else(Instant::now) + Duration::from_secs_f32(secs);
                 sleep_until(until.into()).await;
                 self.last = Some(until);
             }
 
-            let message_len = match event {
-                Event::Log(log) => serde_json::to_string(&log),
-                Event::Metric(metric) => serde_json::to_string(&metric),
-            }
-            .map(|v| v.len())
-            .unwrap_or(0);
+            let message_len = events.size_of();
 
-            self.total_events += 1;
-            self.total_raw_bytes += message_len;
+            let _ = self.total_events.fetch_add(events.len(), Ordering::AcqRel);
+            let _ = self
+                .total_raw_bytes
+                .fetch_add(message_len, Ordering::AcqRel);
 
-            emit!(BlackholeEventReceived {
+            emit!(&BlackholeEventReceived {
                 byte_size: message_len
             });
 
-            if self.total_events % self.config.print_amount == 0 {
-                info!({
-                    events = self.total_events,
-                    raw_bytes_collected = self.total_raw_bytes
-                }, "Total events collected");
-            }
-
-            self.acker.ack(1);
+            self.acker.ack(events.len());
         }
+
+        // Notify the reporting task to shutdown.
+        let _ = shutdown.send(());
+
         Ok(())
     }
 }
@@ -129,12 +162,12 @@ mod tests {
     #[tokio::test]
     async fn blackhole() {
         let config = BlackholeConfig {
-            print_amount: 10,
+            print_interval_secs: 10,
             rate: None,
         };
-        let mut sink = BlackholeSink::new(config, Acker::Null);
+        let sink = Box::new(BlackholeSink::new(config, Acker::Null));
 
-        let (_input_lines, events) = random_events_with_stream(100, 10);
+        let (_input_lines, events) = random_events_with_stream(100, 10, None);
         let _ = sink.run(Box::pin(events)).await.unwrap();
     }
 }

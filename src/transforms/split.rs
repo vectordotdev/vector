@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{SplitConvertFailed, SplitFieldMissing},
     transforms::{FunctionTransform, Transform},
@@ -31,13 +31,13 @@ impl_generate_config_from_default!(SplitConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "split")]
 impl TransformConfig for SplitConfig {
-    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
             .unwrap_or_else(|| crate::config::log_schema().message_key().to_string());
 
-        let timezone = self.timezone.unwrap_or(globals.timezone);
+        let timezone = self.timezone.unwrap_or(context.globals.timezone);
         let types = parse_check_conversion_map(&self.types, &self.field_names, timezone)
             .map_err(|error| format!("{}", error))?;
 
@@ -114,7 +114,7 @@ impl FunctionTransform for Split {
                         event.as_mut_log().insert(name.clone(), value);
                     }
                     Err(error) => {
-                        emit!(SplitConvertFailed { field: name, error });
+                        emit!(&SplitConvertFailed { field: name, error });
                     }
                 }
             }
@@ -122,7 +122,7 @@ impl FunctionTransform for Split {
                 event.as_mut_log().remove(&self.field);
             }
         } else {
-            emit!(SplitFieldMissing { field: &self.field });
+            emit!(&SplitFieldMissing { field: &self.field });
         };
 
         output.push(event);
@@ -189,13 +189,15 @@ mod tests {
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
             timezone: Default::default(),
         }
-        .build(&GlobalOptions::default())
+        .build(&TransformContext::default())
         .await
         .unwrap();
         let parser = parser.as_function();
 
         let metadata = event.metadata().clone();
-        let result = parser.transform_one(event).unwrap().into_log();
+        let mut buf = Vec::with_capacity(1);
+        parser.transform(&mut buf, event);
+        let result = buf.pop().unwrap().into_log();
         assert_eq!(result.metadata(), &metadata);
         result
     }

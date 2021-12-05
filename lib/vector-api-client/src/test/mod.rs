@@ -38,16 +38,16 @@ pub struct ComponentErrorsTotalsSubscription;
 )]
 pub struct FileSourceMetricsQuery;
 
-/// Component by name query
+/// Component by id query
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
-    query_path = "tests/queries/component_by_name.graphql",
+    query_path = "tests/queries/component_by_component_key.graphql",
     response_derives = "Debug"
 )]
-pub struct ComponentByNameQuery;
+pub struct ComponentByComponentKeyQuery;
 
-/// Component by name query
+/// Component by id query
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
@@ -72,8 +72,10 @@ pub trait TestQueryExt {
         first: Option<i64>,
         last: Option<i64>,
     ) -> crate::QueryResult<FileSourceMetricsQuery>;
-    async fn component_by_name_query(&self, name: &str)
-        -> crate::QueryResult<ComponentByNameQuery>;
+    async fn component_by_component_key_query(
+        &self,
+        component_id: &str,
+    ) -> crate::QueryResult<ComponentByComponentKeyQuery>;
     async fn components_connection_query(
         &self,
         after: Option<String>,
@@ -118,11 +120,17 @@ impl TestQueryExt for crate::Client {
         self.query::<FileSourceMetricsQuery>(&request_body).await
     }
 
-    async fn component_by_name_query(&self, name: &str) -> QueryResult<ComponentByNameQuery> {
-        let request_body = ComponentByNameQuery::build_query(component_by_name_query::Variables {
-            name: name.to_string(),
-        });
-        self.query::<ComponentByNameQuery>(&request_body).await
+    async fn component_by_component_key_query(
+        &self,
+        component_id: &str,
+    ) -> QueryResult<ComponentByComponentKeyQuery> {
+        let request_body = ComponentByComponentKeyQuery::build_query(
+            component_by_component_key_query::Variables {
+                component_id: component_id.to_string(),
+            },
+        );
+        self.query::<ComponentByComponentKeyQuery>(&request_body)
+            .await
     }
 
     async fn components_connection_query(

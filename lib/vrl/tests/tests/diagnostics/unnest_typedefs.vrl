@@ -1,0 +1,26 @@
+# result:
+# [true, true, true, true, true, true, true, true]
+
+.noog.nork[2].ning.nonk = ["banana", "nananaman", "annanas"]
+
+.a = unnest(.noog.nork[2].ning.nonk)
+.b = unnest(.noog.nork[2].(ning | nong).nonk)
+.c = unnest(.noog.nork)
+
+zoog.zork[2].zing.zonk = ["banana", "nananaman", "annanas"]
+
+.za = unnest(zoog.zork[2].zing.zonk)
+.zb = unnest(zoog.zork[2].(zing | zong).zonk)
+.zc = unnest(zoog.zork)
+
+[
+  contains(.a[0].noog.nork[2].ning.nonk, "ana"),
+  contains(.b[0].noog.nork[2].ning.nonk || "flanana", "ana"),
+  contains(.b[0].noog.nork[2].nong.nonk || "flanana", "ana"),
+  contains(.c[2].noog.nork.ning.nonk[1], "ana"),
+
+  contains(.za[0].zork[2].zing.zonk, "ana"),
+  contains(.zb[0].zork[2].zing.zonk || "flanana", "ana"),
+  contains(.zb[0].zork[2].zong.zonk || "flanana", "ana"),
+  contains(.zc[2].zork.zing.zonk[1], "ana")
+]

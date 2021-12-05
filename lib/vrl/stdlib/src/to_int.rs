@@ -27,7 +27,7 @@ impl Function for ToInt {
             Example {
                 title: "float",
                 source: "to_int(5.6)",
-                result: Ok("6"),
+                result: Ok("5"),
             },
             Example {
                 title: "true",
@@ -85,7 +85,12 @@ impl Function for ToInt {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _ctx: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(ToIntFn { value }))
@@ -105,7 +110,7 @@ impl Expression for ToIntFn {
 
         match value {
             Integer(_) => Ok(value),
-            Float(v) => Ok(Integer(v.into_inner().round() as i64)),
+            Float(v) => Ok(Integer(v.into_inner() as i64)),
             Boolean(v) => Ok(Integer(if v { 1 } else { 0 })),
             Null => Ok(0.into()),
             Bytes(v) => Conversion::Integer
@@ -143,7 +148,7 @@ mod tests {
 
         float {
              args: func_args![value: 20.5],
-             want: Ok(21),
+             want: Ok(20),
              tdef: TypeDef::new().infallible().integer(),
         }
 

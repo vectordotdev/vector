@@ -1,5 +1,6 @@
 use std::ffi::OsString;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use structopt::StructOpt;
 
@@ -27,21 +28,34 @@ struct InstallOpts {
     display_name: Option<String>,
 
     /// Vector config files in TOML format to be used by the service.
-    #[structopt(name = "config-toml", long)]
+    #[structopt(name = "config-toml", long, use_delimiter(true))]
     config_paths_toml: Vec<PathBuf>,
 
     /// Vector config files in JSON format to be used by the service.
-    #[structopt(name = "config-json", long)]
+    #[structopt(name = "config-json", long, use_delimiter(true))]
     config_paths_json: Vec<PathBuf>,
 
     /// Vector config files in YAML format to be used by the service.
-    #[structopt(name = "config-yaml", long)]
+    #[structopt(name = "config-yaml", long, use_delimiter(true))]
     config_paths_yaml: Vec<PathBuf>,
 
     /// The configuration files that will be used by the service.
     /// If no configuration file is specified, will target default configuration file.
-    #[structopt(name = "config", short, long)]
+    #[structopt(name = "config", short, long, use_delimiter(true))]
     config_paths: Vec<PathBuf>,
+
+    /// Read configuration from files in one or more directories.
+    /// File format is detected from the file name.
+    ///
+    /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
+    #[structopt(
+        name = "config-dir",
+        short = "C",
+        long,
+        env = "VECTOR_CONFIG_DIR",
+        use_delimiter(true)
+    )]
+    pub config_dirs: Vec<PathBuf>,
 }
 
 impl InstallOpts {
@@ -63,13 +77,42 @@ impl InstallOpts {
         }
     }
 
-    fn config_paths_with_formats(&self) -> Vec<(PathBuf, config::FormatHint)> {
+    pub fn config_paths_with_formats(&self) -> Vec<config::ConfigPath> {
         config::merge_path_lists(vec![
             (&self.config_paths, None),
             (&self.config_paths_toml, Some(config::Format::Toml)),
             (&self.config_paths_json, Some(config::Format::Json)),
             (&self.config_paths_yaml, Some(config::Format::Yaml)),
         ])
+        .map(|(path, hint)| config::ConfigPath::File(path, hint))
+        .chain(
+            self.config_dirs
+                .iter()
+                .map(|dir| config::ConfigPath::Dir(dir.to_path_buf())),
+        )
+        .collect()
+    }
+}
+
+#[derive(StructOpt, Debug)]
+#[structopt(rename_all = "kebab-case")]
+struct RestartOpts {
+    /// The name of the service.
+    #[structopt(long)]
+    name: Option<String>,
+
+    /// How long to wait for the service to stop before starting it back, in seconds.
+    #[structopt(default_value = "60", long)]
+    stop_timeout: u32,
+}
+
+impl RestartOpts {
+    fn service_info(&self) -> ServiceInfo {
+        let mut default_service = ServiceInfo::default();
+        let service_name = self.name.as_deref().unwrap_or(DEFAULT_SERVICE_NAME);
+
+        default_service.name = OsString::from(service_name);
+        default_service
     }
 }
 
@@ -103,7 +146,7 @@ enum SubCommand {
     /// Stop the service.
     Stop(StandardOpts),
     /// Restart the service.
-    Restart(StandardOpts),
+    Restart(RestartOpts),
 }
 
 struct ServiceInfo {
@@ -135,7 +178,7 @@ enum ControlAction {
     Uninstall,
     Start,
     Stop,
-    Restart,
+    Restart { stop_timeout: Duration },
 }
 
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
@@ -151,7 +194,11 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
             SubCommand::Start(opts) => control_service(&opts.service_info(), ControlAction::Start),
             SubCommand::Stop(opts) => control_service(&opts.service_info(), ControlAction::Stop),
             SubCommand::Restart(opts) => {
-                control_service(&opts.service_info(), ControlAction::Restart)
+                let stop_timeout = Duration::from_secs(opts.stop_timeout as u64);
+                control_service(
+                    &opts.service_info(),
+                    ControlAction::Restart { stop_timeout },
+                )
             }
         },
         None => {
@@ -161,7 +208,6 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 }
 
-#[cfg(windows)]
 fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::ExitCode {
     use crate::vector_windows;
 
@@ -190,9 +236,9 @@ fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::Ex
             &service_definition,
             vector_windows::service_control::ControlAction::Stop,
         ),
-        ControlAction::Restart => vector_windows::service_control::control(
+        ControlAction::Restart { stop_timeout } => vector_windows::service_control::control(
             &service_definition,
-            vector_windows::service_control::ControlAction::Restart,
+            vector_windows::service_control::ControlAction::Restart { stop_timeout },
         ),
     };
 
@@ -205,28 +251,25 @@ fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::Ex
     }
 }
 
-#[cfg(unix)]
-fn control_service(_service: &ServiceInfo, _action: ControlAction) -> exitcode::ExitCode {
-    error!("Service commands are currently not supported on this platform.");
-    exitcode::UNAVAILABLE
-}
-
-fn create_service_arguments(
-    config_paths: &[(PathBuf, config::FormatHint)],
-) -> Option<Vec<OsString>> {
-    let config_paths = config::process_paths(&config_paths)?;
+fn create_service_arguments(config_paths: &[config::ConfigPath]) -> Option<Vec<OsString>> {
+    let config_paths = config::process_paths(config_paths)?;
     match config::load_from_paths(&config_paths) {
         Ok(_) => Some(
             config_paths
                 .iter()
-                .flat_map(|(path, format)| {
-                    let key = match format {
-                        None => "--config",
-                        Some(config::Format::Toml) => "--config-toml",
-                        Some(config::Format::Json) => "--config-json",
-                        Some(config::Format::Yaml) => "--config-yaml",
-                    };
-                    vec![OsString::from(key), path.as_os_str().into()]
+                .flat_map(|config_path| match config_path {
+                    config::ConfigPath::File(path, format) => {
+                        let key = match format {
+                            None => "--config",
+                            Some(config::Format::Toml) => "--config-toml",
+                            Some(config::Format::Json) => "--config-json",
+                            Some(config::Format::Yaml) => "--config-yaml",
+                        };
+                        vec![OsString::from(key), path.as_os_str().into()]
+                    }
+                    config::ConfigPath::Dir(path) => {
+                        vec![OsString::from("--config-dir"), path.as_os_str().into()]
+                    }
                 })
                 .collect::<Vec<OsString>>(),
         ),

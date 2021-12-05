@@ -2,22 +2,23 @@
 name = "tracing-limit"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@timber.io>"]
-edition = "2018"
+edition = "2021"
 publish = false
 license = "MPL-2.0"
 
 [dependencies]
 ansi_term = { version = "0.12", default-features = false }
 tracing-core = { version = "0.1", default-features = false }
-tracing-subscriber = { version = "0.2", default-features = false }
+tracing-subscriber = { version = "0.2.25", default-features = false }
 dashmap = { version = "4", default-features = false }
 
 [dev-dependencies]
 criterion = "0.3"
-tracing = "0.1.25"
+tracing = "0.1.29"
 mock_instant = { version = "0.2" }
+tracing-subscriber = { version = "0.2.25", default-features = false, features = ["env-filter"] }
 
 [[bench]]
 name = "limit"
-test = true
 harness = false
+test = true

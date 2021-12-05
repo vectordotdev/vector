@@ -28,7 +28,7 @@ fn test_buffering() {
 
     let data_dir = tempdir().unwrap();
     let data_dir = data_dir.path().to_path_buf();
-    trace!(message = "Test data dir", ?data_dir);
+    trace!(message = "Test data dir.", ?data_dir);
 
     let num_events: usize = 10;
     let line_length = 100;
@@ -61,7 +61,7 @@ fn test_buffering() {
     let (topology, input_events) = rt.block_on(async move {
         let (topology, _crash) = start_topology(config, false).await;
         let (input_events, input_events_stream) =
-            random_events_with_stream(line_length, num_events);
+            random_events_with_stream(line_length, num_events, None);
         let mut input_events_stream = input_events_stream.map(Ok);
 
         let _ = in_tx
@@ -111,7 +111,7 @@ fn test_buffering() {
         let (topology, _crash) = start_topology(config, false).await;
 
         let (input_events2, input_events_stream) =
-            random_events_with_stream(line_length, num_events);
+            random_events_with_stream(line_length, num_events, None);
         let mut input_events_stream = input_events_stream.map(Ok);
 
         let _ = in_tx

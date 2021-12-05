@@ -1,10 +1,10 @@
 use crate::expression::{levenstein, ExpressionError, FunctionArgument, Noop};
-use crate::function::{ArgumentList, Parameter};
+use crate::function::{ArgumentList, FunctionCompileContext, Parameter};
 use crate::parser::{Ident, Node};
 use crate::{value::Kind, Context, Expression, Function, Resolved, Span, State, TypeDef};
+
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 use std::fmt;
-use tracing::{span, Level};
 
 #[derive(Clone)]
 pub struct FunctionCall {
@@ -34,7 +34,7 @@ impl FunctionCall {
         abort_on_error: bool,
         arguments: Vec<Node<FunctionArgument>>,
         funcs: &[Box<dyn Function>],
-        state: &State,
+        state: &mut State,
     ) -> Result<Self, Error> {
         let (ident_span, ident) = ident.take();
 
@@ -162,8 +162,10 @@ impl FunctionCall {
                 })
             })?;
 
-        let expr = function
-            .compile(list)
+        let compile_ctx = FunctionCompileContext { span: call_span };
+
+        let mut expr = function
+            .compile(state, &compile_ctx, list)
             .map_err(|error| Error::Compilation { call_span, error })?;
 
         // Asking for an infallible function to abort on error makes no sense.
@@ -175,6 +177,12 @@ impl FunctionCall {
                 abort_span: Span::new(ident_span.end(), ident_span.end() + 1),
             });
         }
+
+        // Update the state if necessary.
+        expr.update_state(state).map_err(|err| Error::UpdateState {
+            call_span,
+            error: err.to_string(),
+        })?;
 
         Ok(Self {
             abort_on_error,
@@ -204,29 +212,29 @@ impl FunctionCall {
 
 impl Expression for FunctionCall {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        span!(Level::ERROR, "remap", vrl_position = &self.span.start()).in_scope(|| {
-            self.expr.resolve(ctx).map_err(|err| {
-                use ExpressionError::*;
+        self.expr.resolve(ctx).map_err(|err| match err {
+            ExpressionError::Abort { .. } => {
+                panic!("abort errors must only be defined by `abort` statement")
+            }
+            ExpressionError::Error {
+                message,
+                mut labels,
+                notes,
+            } => {
+                labels.push(Label::primary(message.clone(), self.span));
 
-                match err {
-                    Abort => panic!("abort errors must only be defined by `abort` statement"),
-                    Error {
-                        message,
-                        labels,
-                        notes,
-                    } => ExpressionError::Error {
-                        message: format!(
-                            r#"function call error for "{}" at ({}:{}): {}"#,
-                            self.ident,
-                            self.span.start(),
-                            self.span.end(),
-                            message
-                        ),
-                        labels,
-                        notes,
-                    },
+                ExpressionError::Error {
+                    message: format!(
+                        r#"function call error for "{}" at ({}:{}): {}"#,
+                        self.ident,
+                        self.span.start(),
+                        self.span.end(),
+                        message
+                    ),
+                    labels,
+                    notes,
                 }
-            })
+            }
         })
     }
 
@@ -374,7 +382,7 @@ pub enum Error {
         position: usize,
     },
 
-    #[error("function compilation error")]
+    #[error("function compilation error: error[E{}] {}", error.code(), error)]
     Compilation {
         call_span: Span,
         error: Box<dyn DiagnosticError>,
@@ -396,6 +404,9 @@ pub enum Error {
 
     #[error("fallible argument")]
     FallibleArgument { expr_span: Span },
+
+    #[error("error updating state {}", error)]
+    UpdateState { call_span: Span, error: String },
 }
 
 impl DiagnosticError for Error {
@@ -411,6 +422,7 @@ impl DiagnosticError for Error {
             AbortInfallible { .. } => 620,
             InvalidArgumentKind { .. } => 110,
             FallibleArgument { .. } => 630,
+            UpdateState { .. } => 640,
         }
     }
 
@@ -559,6 +571,11 @@ impl DiagnosticError for Error {
                     expr_span,
                 ),
             ],
+
+            UpdateState { call_span, error } => vec![Label::primary(
+                format!("an error occurred updating the compiler state: {}", error),
+                call_span,
+            )],
         }
     }
 
@@ -635,6 +652,9 @@ impl DiagnosticError for Error {
 
                 notes
             }
+
+            Compilation { error, .. } => error.notes(),
+
             _ => vec![],
         }
     }

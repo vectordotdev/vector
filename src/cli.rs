@@ -1,4 +1,4 @@
-use crate::{config, generate, get_version, list, unit_test, validate};
+use crate::{config, generate, get_version, graph, list, unit_test, validate};
 use std::path::PathBuf;
 use structopt::{clap::AppSettings, StructOpt};
 
@@ -31,9 +31,10 @@ impl Opts {
         Opts::from_clap(&app.get_matches())
     }
 
-    pub fn log_level(&self) -> &'static str {
+    pub const fn log_level(&self) -> &'static str {
         let (quiet_level, verbose_level) = match self.sub_command {
             Some(SubCommand::Validate(_))
+            | Some(SubCommand::Graph(_))
             | Some(SubCommand::Generate(_))
             | Some(SubCommand::List(_)) => {
                 if self.root.verbose == 0 {
@@ -64,22 +65,56 @@ pub struct RootOpts {
     /// File format is detected from the file name.
     /// If zero files are specified the default config path
     /// `/etc/vector/vector.toml` will be targeted.
-    #[structopt(name = "config", short, long, env = "VECTOR_CONFIG")]
+    #[structopt(
+        name = "config",
+        short,
+        long,
+        env = "VECTOR_CONFIG",
+        use_delimiter(true)
+    )]
     pub config_paths: Vec<PathBuf>,
+
+    /// Read configuration from files in one or more directories.
+    /// File format is detected from the file name.
+    ///
+    /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
+    #[structopt(
+        name = "config-dir",
+        short = "C",
+        long,
+        env = "VECTOR_CONFIG_DIR",
+        use_delimiter(true)
+    )]
+    pub config_dirs: Vec<PathBuf>,
 
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// TOML file format is expected.
-    #[structopt(name = "config-toml", long, env = "VECTOR_CONFIG_TOML")]
+    #[structopt(
+        name = "config-toml",
+        long,
+        env = "VECTOR_CONFIG_TOML",
+        use_delimiter(true)
+    )]
     pub config_paths_toml: Vec<PathBuf>,
 
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// JSON file format is expected.
-    #[structopt(name = "config-json", long, env = "VECTOR_CONFIG_JSON")]
+    #[structopt(
+        name = "config-json",
+        long,
+        env = "VECTOR_CONFIG_JSON",
+        use_delimiter(true)
+    )]
     pub config_paths_json: Vec<PathBuf>,
 
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// YAML file format is expected.
-    #[structopt(name = "config-yaml", long, env = "VECTOR_CONFIG_YAML")]
+    #[structopt(
+        name = "config-yaml",
+        long,
+        env = "VECTOR_CONFIG_YAML",
+        use_delimiter(true)
+    )]
     pub config_paths_yaml: Vec<PathBuf>,
 
     /// Exit on startup if any sinks fail healthchecks
@@ -119,13 +154,20 @@ pub struct RootOpts {
 
 impl RootOpts {
     /// Return a list of config paths with the associated formats.
-    pub fn config_paths_with_formats(&self) -> Vec<(PathBuf, config::FormatHint)> {
+    pub fn config_paths_with_formats(&self) -> Vec<config::ConfigPath> {
         config::merge_path_lists(vec![
             (&self.config_paths, None),
             (&self.config_paths_toml, Some(config::Format::Toml)),
             (&self.config_paths_json, Some(config::Format::Json)),
             (&self.config_paths_yaml, Some(config::Format::Yaml)),
         ])
+        .map(|(path, hint)| config::ConfigPath::File(path, hint))
+        .chain(
+            self.config_dirs
+                .iter()
+                .map(|dir| config::ConfigPath::Dir(dir.to_path_buf())),
+        )
+        .collect()
     }
 }
 
@@ -142,8 +184,11 @@ pub enum SubCommand {
     List(list::Opts),
 
     /// Run Vector config unit tests, then exit. This command is experimental and therefore subject to change.
-    /// For guidance on how to write unit tests check out: https://vector.dev/guides/level-up/unit-testing/
+    /// For guidance on how to write unit tests check out <https://vector.dev/guides/level-up/unit-testing/>.
     Test(unit_test::Opts),
+
+    /// Output the topology as visual representation using the DOT language which can be rendered by GraphViz
+    Graph(graph::Opts),
 
     /// Display topology and metrics in the console, for a local or remote Vector instance
     #[cfg(feature = "api-client")]

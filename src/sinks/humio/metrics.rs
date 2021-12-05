@@ -1,44 +1,50 @@
 use super::{host_key, logs::HumioLogsConfig, Encoding};
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, TransformConfig},
-    sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
+    config::{
+        DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, TransformConfig,
+        TransformContext,
+    },
+    sinks::{
+        splunk_hec::common::SplunkHecDefaultBatchSettings,
+        util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
+    },
     sinks::{Healthcheck, VectorSink},
     template::Template,
     tls::TlsOptions,
     transforms::metric_to_log::MetricToLogConfig,
 };
-use futures::{stream, SinkExt, StreamExt};
+use async_trait::async_trait;
+use futures::{stream, StreamExt};
+use futures_util::stream::BoxStream;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
+use vector_core::{event::Event, sink::StreamSink, transform::Transform};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct HumioMetricsConfig {
     #[serde(flatten)]
     transform: MetricToLogConfig,
-
     token: String,
     // Deprecated name
     #[serde(alias = "host")]
     pub(in crate::sinks::humio) endpoint: Option<String>,
     source: Option<Template>,
     encoding: EncodingConfig<Encoding>,
-
     event_type: Option<Template>,
-
     #[serde(default = "host_key")]
     host_key: String,
-
+    #[serde(default)]
+    indexed_fields: Vec<String>,
+    #[serde(default)]
+    index: Option<Template>,
     #[serde(default)]
     compression: Compression,
-
     #[serde(default)]
     request: TowerRequestConfig,
-
     #[serde(default)]
-    batch: BatchConfig,
-
+    batch: BatchConfig<SplunkHecDefaultBatchSettings>,
     tls: Option<TlsOptions>,
-    // The obove settings are copied from HumioLogsConfig. In theory we should do below:
+    // The above settings are copied from HumioLogsConfig. In theory we should do below:
     //
     // #[serde(flatten)]
     // sink: HumioLogsConfig,
@@ -67,7 +73,12 @@ impl GenerateConfig for HumioMetricsConfig {
 #[typetag::serde(name = "humio_metrics")]
 impl SinkConfig for HumioMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut transform = self.transform.clone().build(&cx.globals).await?;
+        let transform = self
+            .transform
+            .clone()
+            .build(&TransformContext::new_with_globals(cx.globals.clone()))
+            .await?;
+
         let sink = HumioLogsConfig {
             token: self.token.clone(),
             endpoint: self.endpoint.clone(),
@@ -75,21 +86,23 @@ impl SinkConfig for HumioMetricsConfig {
             encoding: self.encoding.clone(),
             event_type: self.event_type.clone(),
             host_key: self.host_key.clone(),
+            indexed_fields: self.indexed_fields.clone(),
+            index: self.index.clone(),
             compression: self.compression,
             request: self.request,
             batch: self.batch,
             tls: self.tls.clone(),
+            timestamp_nanos_key: None,
         };
 
         let (sink, healthcheck) = sink.clone().build(cx).await?;
 
-        let sink = Box::new(sink.into_sink().with_flat_map(move |e| {
-            let mut buf = Vec::with_capacity(1);
-            transform.as_function().transform(&mut buf, e);
-            stream::iter(buf.into_iter()).map(Ok)
-        }));
+        let sink = HumioMetricsSink {
+            inner: sink,
+            transform,
+        };
 
-        Ok((VectorSink::Sink(sink), healthcheck))
+        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -98,6 +111,25 @@ impl SinkConfig for HumioMetricsConfig {
 
     fn sink_type(&self) -> &'static str {
         "humio_metrics"
+    }
+}
+
+pub struct HumioMetricsSink {
+    inner: VectorSink,
+    transform: Transform,
+}
+
+#[async_trait]
+impl StreamSink for HumioMetricsSink {
+    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let mut transform = self.transform;
+        self.inner
+            .run(input.flat_map(move |e| {
+                let mut buf = Vec::with_capacity(1);
+                transform.as_function().transform(&mut buf, e);
+                stream::iter(buf.into_iter())
+            }))
+            .await
     }
 }
 
@@ -110,7 +142,7 @@ mod tests {
             Event, Metric,
         },
         sinks::util::test::{build_test_server, load_sink},
-        test_util,
+        test_util::{self, components, components::HTTP_SINK_TAGS},
     };
     use chrono::{offset::TimeZone, Utc};
     use indoc::indoc;
@@ -183,7 +215,7 @@ mod tests {
                     "metric2",
                     MetricKind::Absolute,
                     MetricValue::Distribution {
-                        samples: crate::samples![1.0 => 100, 2.0 => 200, 3.0 => 300],
+                        samples: vector_core::samples![1.0 => 100, 2.0 => 200, 3.0 => 300],
                         statistic: StatisticKind::Histogram,
                     },
                 )
@@ -197,7 +229,7 @@ mod tests {
         ];
 
         let len = metrics.len();
-        let _ = sink.run(stream::iter(metrics)).await.unwrap();
+        components::run_sink(sink, stream::iter(metrics), &HTTP_SINK_TAGS).await;
 
         let output = rx.take(len).collect::<Vec<_>>().await;
         assert_eq!(

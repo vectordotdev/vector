@@ -1,0 +1,14 @@
+{{ $glossary := site.Data.docs.glossary }}
+<div class="relative no-prose flex flex-col border dark:border-gray-700 rounded-md divide-y dark:divide-gray-700">
+  {{ range $glossary }}
+  <div class="py-4 px-6">
+    <span>
+      {{ partial "heading.html" (dict "text" .term) }}
+    </span>
+
+    <div class="mt-3 prose dark:prose-dark max-w-none">
+      {{ .description | markdownify }}
+    </div>
+  </div>
+  {{ end }}
+</div>

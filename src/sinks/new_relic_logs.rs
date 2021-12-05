@@ -1,10 +1,13 @@
+use std::num::NonZeroU64;
+
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::{
         http::{HttpMethod, HttpSinkConfig},
         util::{
-            encoding::EncodingConfig, http::RequestConfig, BatchConfig, Compression, Concurrency,
-            TowerRequestConfig,
+            encoding::{EncodingConfig, EncodingConfigWithDefault},
+            http::RequestConfig,
+            BatchConfig, Compression, TowerRequestConfig,
         },
     },
 };
@@ -12,6 +15,8 @@ use http::Uri;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+
+use super::util::SinkBatchSettings;
 
 // New Relic Logs API accepts payloads up to 1MB (10^6 bytes)
 const MAX_PAYLOAD_SIZE: usize = 1_000_000_usize;
@@ -22,11 +27,6 @@ enum BuildError {
         "Missing authentication key, must provide either 'license_key' or 'insert_key'"
     ))]
     MissingAuthParam,
-    #[snafu(display(
-        "Too high batch max size. The value must be {} bytes or less",
-        MAX_PAYLOAD_SIZE
-    ))]
-    BatchMaxSize,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -38,16 +38,30 @@ pub enum NewRelicLogsRegion {
     Eu,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct NewRelicLogsDefaultBatchSettings;
+
+impl SinkBatchSettings for NewRelicLogsDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = None;
+    const MAX_BYTES: Option<usize> = Some(1_000_000);
+    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+}
+
+#[derive(Deserialize, Serialize, Debug, Derivative, Clone)]
+#[derivative(Default)]
 pub struct NewRelicLogsConfig {
     pub license_key: Option<String>,
     pub insert_key: Option<String>,
     pub region: Option<NewRelicLogsRegion>,
-    pub encoding: EncodingConfig<Encoding>,
+    #[serde(
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
+    )]
+    pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<NewRelicLogsDefaultBatchSettings>,
 
     #[serde(default)]
     pub request: TowerRequestConfig,
@@ -63,9 +77,11 @@ impl GenerateConfig for NewRelicLogsConfig {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
+#[derivative(Default)]
 pub enum Encoding {
+    #[derivative(Default)]
     Json,
 }
 
@@ -112,7 +128,6 @@ impl NewRelicLogsConfig {
 
     fn create_config(&self) -> crate::Result<HttpSinkConfig> {
         let mut headers: IndexMap<String, String> = IndexMap::new();
-
         if let Some(license_key) = &self.license_key {
             headers.insert("X-License-Key".to_owned(), license_key.clone());
         } else if let Some(insert_key) = &self.insert_key {
@@ -126,24 +141,9 @@ impl NewRelicLogsConfig {
             NewRelicLogsRegion::Eu => Uri::from_static("https://log-api.eu.newrelic.com/log/v1"),
         };
 
-        let batch = self.batch.use_size_as_bytes()?;
-        let max_payload_size = batch.max_bytes.unwrap_or(MAX_PAYLOAD_SIZE);
-        if max_payload_size > MAX_PAYLOAD_SIZE {
-            return Err(Box::new(BuildError::BatchMaxSize));
-        }
-        let batch = BatchConfig {
-            max_bytes: Some(batch.max_bytes.unwrap_or(MAX_PAYLOAD_SIZE)),
-            max_events: None,
-            ..batch
-        };
+        let batch_settings = self.batch.validate()?.limit_max_bytes(MAX_PAYLOAD_SIZE)?;
 
-        let tower = TowerRequestConfig {
-            // The default throughput ceiling defaults are relatively
-            // conservative so we crank them up for New Relic.
-            concurrency: (self.request.concurrency).if_none(Concurrency::Fixed(100)),
-            rate_limit_num: Some(self.request.rate_limit_num.unwrap_or(100)),
-            ..self.request
-        };
+        let tower = TowerRequestConfig { ..self.request };
 
         let request = RequestConfig { tower, headers };
 
@@ -153,11 +153,9 @@ impl NewRelicLogsConfig {
             auth: None,
             headers: None,
             compression: self.compression,
-            encoding: self.encoding.clone().into_encoding(),
-
-            batch,
+            encoding: EncodingConfig::<Encoding>::from(self.encoding.clone()).into_encoding(),
+            batch: batch_settings.into(),
             request,
-
             tls: None,
         })
     }
@@ -169,8 +167,11 @@ mod tests {
     use crate::{
         config::SinkConfig,
         event::Event,
-        sinks::util::{encoding::EncodingConfiguration, test::build_test_server, Concurrency},
-        test_util::next_addr,
+        sinks::util::{
+            encoding::EncodingConfiguration, service::RATE_LIMIT_NUM_DEFAULT,
+            test::build_test_server, Concurrency,
+        },
+        test_util::{components, components::HTTP_SINK_TAGS, next_addr},
     };
     use bytes::Buf;
     use futures::{stream, StreamExt};
@@ -210,11 +211,11 @@ mod tests {
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
+        assert_eq!(http_config.request.tower.concurrency, Concurrency::None);
         assert_eq!(
-            http_config.request.tower.concurrency,
-            Concurrency::Fixed(100)
+            http_config.request.tower.rate_limit_num,
+            Some(RATE_LIMIT_NUM_DEFAULT)
         );
-        assert_eq!(http_config.request.tower.rate_limit_num, Some(100));
         assert_eq!(
             http_config.request.headers["X-License-Key"],
             "foo".to_owned()
@@ -228,7 +229,7 @@ mod tests {
         let mut nr_config = NewRelicLogsConfig::with_encoding(Encoding::Json);
         nr_config.insert_key = Some("foo".to_owned());
         nr_config.region = Some(NewRelicLogsRegion::Eu);
-        nr_config.batch.max_size = Some(MAX_PAYLOAD_SIZE);
+        nr_config.batch.max_bytes = Some(MAX_PAYLOAD_SIZE);
         nr_config.request.concurrency = Concurrency::Fixed(12);
         nr_config.request.rate_limit_num = Some(24);
 
@@ -262,13 +263,13 @@ mod tests {
         encoding = "json"
 
         [batch]
-        max_size = 838860
+        max_bytes = 838860
 
         [request]
         concurrency = 12
         rate_limit_num = 24
     "#;
-        let nr_config: NewRelicLogsConfig = toml::from_str(&config).unwrap();
+        let nr_config: NewRelicLogsConfig = toml::from_str(config).unwrap();
 
         let http_config = nr_config.create_config().unwrap();
 
@@ -301,13 +302,13 @@ mod tests {
         encoding = "json"
 
         [batch]
-        max_size = 8388600
+        max_bytes = 8388600
 
         [request]
         concurrency = 12
         rate_limit_num = 24
     "#;
-        let nr_config: NewRelicLogsConfig = toml::from_str(&config).unwrap();
+        let nr_config: NewRelicLogsConfig = toml::from_str(config).unwrap();
 
         nr_config.create_config().unwrap();
     }
@@ -326,14 +327,12 @@ mod tests {
 
         let (sink, _healthcheck) = http_config.build(SinkContext::new_test()).await.unwrap();
         let (rx, trigger, server) = build_test_server(in_addr);
+        tokio::spawn(server);
 
         let input_lines = (0..100).map(|i| format!("msg {}", i)).collect::<Vec<_>>();
         let events = stream::iter(input_lines.clone()).map(Event::from);
-        let pump = sink.run(events);
 
-        tokio::spawn(server);
-
-        pump.await.unwrap();
+        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
         drop(trigger);
 
         let output_lines = rx

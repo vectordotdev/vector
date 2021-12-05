@@ -1,6 +1,4 @@
-use super::super::batch::{
-    err_event_too_large, Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult,
-};
+use super::super::batch::{err_event_too_large, Batch, BatchSize, PushResult};
 use serde_json::value::{to_raw_value, RawValue, Value};
 
 pub type BoxedRawValue = Box<RawValue>;
@@ -15,7 +13,7 @@ pub struct JsonArrayBuffer {
 }
 
 impl JsonArrayBuffer {
-    pub fn new(settings: BatchSize<Self>) -> Self {
+    pub const fn new(settings: BatchSize<Self>) -> Self {
         Self {
             buffer: Vec::new(),
             total_bytes: 0,
@@ -28,20 +26,11 @@ impl Batch for JsonArrayBuffer {
     type Input = Value;
     type Output = Vec<BoxedRawValue>;
 
-    fn get_settings_defaults(
-        config: BatchConfig,
-        defaults: BatchSettings<Self>,
-    ) -> Result<BatchSettings<Self>, BatchError> {
-        Ok(config
-            .use_size_as_bytes()?
-            .get_settings_or_default(defaults))
-    }
-
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         let raw_item = to_raw_value(&item).expect("Value should be valid json");
         let new_len = self.total_bytes + raw_item.get().len() + 1;
         if self.is_empty() && new_len >= self.settings.bytes {
-            err_event_too_large(raw_item.get().len())
+            err_event_too_large(raw_item.get().len(), self.settings.bytes)
         } else if self.buffer.len() >= self.settings.events || new_len > self.settings.bytes {
             PushResult::Overflow(item)
         } else {
@@ -72,14 +61,19 @@ impl Batch for JsonArrayBuffer {
 
 #[cfg(test)]
 mod tests {
+    use crate::sinks::util::BatchSettings;
+
     use super::super::PushResult;
     use super::*;
     use serde_json::json;
 
     #[test]
     fn multi_object_array() {
-        let batch = BatchSettings::default().bytes(9999).events(2).size;
-        let mut buffer = JsonArrayBuffer::new(batch);
+        let mut batch_settings = BatchSettings::default();
+        batch_settings.size.bytes = 9999;
+        batch_settings.size.events = 2;
+
+        let mut buffer = JsonArrayBuffer::new(batch_settings.size);
 
         assert_eq!(
             buffer.push(json!({

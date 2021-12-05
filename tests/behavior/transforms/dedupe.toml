@@ -26,12 +26,12 @@
   [[tests.outputs]]
     extract_from = "dedupe_simple"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = ".a == 1 && .b == 2"
   [[tests.outputs]]
     extract_from = "dedupe_simple"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = ".a == 2 && .b == 4"
 
 [transforms.dedupe_field_order]
@@ -65,14 +65,14 @@
   [[tests.outputs]]
     extract_from = "dedupe_field_order"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .a == 1 && .b == 2 && .c == 3
       '''
   [[tests.outputs]]
     extract_from = "dedupe_field_order"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .a == 1 && .b == 3 && .c == 3
       '''
@@ -105,10 +105,10 @@
   [[tests.outputs]]
     extract_from = "dedupe_nested_fields"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '.a.b.c == "d" && .b == 2'
   [[tests.outputs]]
     extract_from = "dedupe_nested_fields"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '.a.b == "c.d" && .b == 4'

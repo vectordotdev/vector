@@ -1,8 +1,12 @@
 use super::parser;
 use crate::{
-    config::{self, GenerateConfig, SourceConfig, SourceContext, SourceDescription},
+    config::{
+        self, AcknowledgementsConfig, GenerateConfig, SourceConfig, SourceContext,
+        SourceDescription,
+    },
     event::Event,
-    internal_events::{PrometheusRemoteWriteParseError, PrometheusRemoteWriteReceived},
+    internal_events::PrometheusRemoteWriteParseError,
+    serde::bool_or_struct,
     sources::{
         self,
         util::{decode, ErrorMessage, HttpSource, HttpSourceAuthConfig},
@@ -25,6 +29,9 @@ struct PrometheusRemoteWriteConfig {
     tls: Option<TlsConfig>,
 
     auth: Option<HttpSourceAuthConfig>,
+
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -37,6 +44,7 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
             address: "127.0.0.1:9090".parse().unwrap(),
             tls: None,
             auth: None,
+            acknowledgements: AcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -53,8 +61,8 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
             true,
             &self.tls,
             &self.auth,
-            cx.out,
-            cx.shutdown,
+            cx,
+            self.acknowledgements,
         )
     }
 
@@ -73,7 +81,7 @@ struct RemoteWriteSource;
 impl RemoteWriteSource {
     fn decode_body(&self, body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
         let request = proto::WriteRequest::decode(body).map_err(|error| {
-            emit!(PrometheusRemoteWriteParseError {
+            emit!(&PrometheusRemoteWriteParseError {
                 error: error.clone()
             });
             ErrorMessage::new(
@@ -91,7 +99,7 @@ impl RemoteWriteSource {
 }
 
 impl HttpSource for RemoteWriteSource {
-    fn build_event(
+    fn build_events(
         &self,
         mut body: Bytes,
         header_map: HeaderMap,
@@ -107,10 +115,8 @@ impl HttpSource for RemoteWriteSource {
         {
             body = decode(&Some("snappy".to_string()), body)?;
         }
-        let result = self.decode_body(body)?;
-        let count = result.len();
-        emit!(PrometheusRemoteWriteReceived { count });
-        Ok(result)
+        let events = self.decode_body(body)?;
+        Ok(events)
     }
 }
 
@@ -119,15 +125,17 @@ mod test {
     use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
-        event::{Metric, MetricKind, MetricValue},
         sinks::prometheus::remote_write::RemoteWriteConfig,
-        test_util, Pipeline,
+        test_util::{self, components},
+        tls::MaybeTlsSettings,
+        Pipeline,
     };
     use chrono::{SubsecRound as _, Utc};
     use futures::stream;
+    use vector_core::event::{EventStatus, Metric, MetricKind, MetricValue};
 
     #[test]
-    fn genreate_config() {
+    fn generate_config() {
         crate::test_util::test_generate_config::<PrometheusRemoteWriteConfig>();
     }
 
@@ -142,14 +150,18 @@ mod test {
     }
 
     async fn receives_metrics(tls: Option<TlsConfig>) {
+        components::init_test();
         let address = test_util::next_addr();
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
 
-        let proto = if tls.is_none() { "http" } else { "https" };
+        let proto = MaybeTlsSettings::from_config(&tls, true)
+            .unwrap()
+            .http_protocol_name();
         let source = PrometheusRemoteWriteConfig {
             address,
             auth: None,
             tls: tls.clone(),
+            acknowledgements: AcknowledgementsConfig::default(),
         };
         let source = source.build(SourceContext::new_test(tx)).await.unwrap();
         tokio::spawn(source);
@@ -165,9 +177,17 @@ mod test {
             .expect("Error building config.");
 
         let events = make_events();
-        sink.run(stream::iter(events.clone())).await.unwrap();
+        let events_copy = events.clone();
+        let mut output = test_util::spawn_collect_ready(
+            async move {
+                sink.run(stream::iter(events_copy)).await.unwrap();
+            },
+            rx,
+            1,
+        )
+        .await;
+        components::SOURCE_TESTS.assert(&["http_path"]);
 
-        let mut output = test_util::collect_ready(rx).await;
         // The MetricBuffer used by the sink may reorder the metrics, so
         // put them back into order before comparing.
         output.sort_unstable_by_key(|event| event.as_metric().name().to_owned());
@@ -196,7 +216,7 @@ mod test {
                 "histogram_3",
                 MetricKind::Absolute,
                 MetricValue::AggregatedHistogram {
-                    buckets: crate::buckets![ 2.3 => 11, 4.2 => 85 ],
+                    buckets: vector_core::buckets![ 2.3 => 11, 4.2 => 85 ],
                     count: 96,
                     sum: 156.2,
                 },
@@ -207,7 +227,7 @@ mod test {
                 "summary_4",
                 MetricKind::Absolute,
                 MetricValue::AggregatedSummary {
-                    quantiles: crate::quantiles![ 0.1 => 1.2, 0.5 => 3.6, 0.9 => 5.2 ],
+                    quantiles: vector_core::quantiles![ 0.1 => 1.2, 0.5 => 3.6, 0.9 => 5.2 ],
                     count: 23,
                     sum: 8.6,
                 },
@@ -221,17 +241,19 @@ mod test {
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
     use super::*;
-    use crate::{test_util, Pipeline};
+    use crate::{test_util, test_util::components, Pipeline};
     use tokio::time::Duration;
 
     const PROMETHEUS_RECEIVE_ADDRESS: &str = "127.0.0.1:9093";
 
     #[tokio::test]
     async fn receive_something() {
+        components::init_test();
         let config = PrometheusRemoteWriteConfig {
             address: PROMETHEUS_RECEIVE_ADDRESS.parse().unwrap(),
             auth: None,
             tls: None,
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
         let (tx, rx) = Pipeline::new_test();
@@ -242,6 +264,7 @@ mod integration_tests {
         tokio::time::sleep(Duration::from_secs(2)).await;
 
         let events = test_util::collect_ready(rx).await;
+        components::SOURCE_TESTS.assert(&["http_path"]);
         assert!(!events.is_empty());
     }
 }

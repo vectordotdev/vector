@@ -61,10 +61,9 @@ cp -a %{_builddir}/systemd/vector.service %{buildroot}%{_unitdir}/vector.service
 cp -a %{_builddir}/systemd/vector.default %{buildroot}%{_sysconfdir}/default/vector
 
 %post
-getent group %{_username} > /dev/null || groupadd -r %{_username}
 getent passwd %{_username} > /dev/null || \
-  useradd -r -d %{_sharedstatedir}/%{_name} -g %{_username} -s /sbin/nologin \
-  -c "Vector observability data router" %{_username}
+  useradd --shell /sbin/nologin --system --home-dir %{_sharedstatedir}/%{_name} --user-group \
+    --comment "Vector observability data router" %{_username}
 chown %{_username} %{_sharedstatedir}/%{_name}
 usermod -aG systemd-journal %{_username}  || true
 

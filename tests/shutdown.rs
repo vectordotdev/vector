@@ -68,7 +68,6 @@ data_dir = "${{VECTOR_DATA_DIR}}"
 [sinks.out]
     inputs = ["in"]
     type = "blackhole"
-    print_amount = 10000
 "#,
         source
     )
@@ -212,7 +211,7 @@ fn configuration_path_recomputed() {
         dir.join("conf1.toml"),
         &source_config(
             r#"
-        type = "generator"
+        type = "demo_logs"
         format = "shuffle"
         interval = 1.0 # optional, no default
         lines = ["foo", "bar"]"#,
@@ -313,10 +312,10 @@ fn timely_shutdown_file() {
 }
 
 #[test]
-fn timely_shutdown_generator() {
+fn timely_shutdown_demo_logs() {
     test_timely_shutdown(source_vector(
         r#"
-    type = "generator"
+    type = "demo_logs"
     format = "shuffle"
     interval = 1.0 # optional, no default
     lines = ["foo", "bar"]"#,
@@ -472,10 +471,21 @@ fn timely_shutdown_syslog_unix() {
 }
 
 #[test]
-fn timely_shutdown_vector() {
+fn timely_shutdown_vector_v1() {
     test_timely_shutdown(source_vector(
         r#"
     type = "vector"
+    version = "1"
+    address = "${VECTOR_TEST_ADDRESS}""#,
+    ));
+}
+
+#[test]
+fn timely_shutdown_vector_v2() {
+    test_timely_shutdown(source_vector(
+        r#"
+    type = "vector"
+    version = "2"
     address = "${VECTOR_TEST_ADDRESS}""#,
     ));
 }

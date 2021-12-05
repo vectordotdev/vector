@@ -471,7 +471,7 @@ pub fn parse(bytes: &[u8], namespace: Option<String>) -> Result<Vec<Metric>, ser
 
         for (interface, network) in container.networks.iter() {
             metrics.extend(network_metrics(
-                &interface,
+                interface,
                 network,
                 container.ts,
                 &namespace,

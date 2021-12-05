@@ -7,7 +7,9 @@ Requires=network-online.target
 [Service]
 User=vector
 Group=vector
+ExecStartPre=/usr/bin/vector validate
 ExecStart=/usr/bin/vector
+ExecReload=/usr/bin/vector validate
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=no
 AmbientCapabilities=CAP_NET_BIND_SERVICE

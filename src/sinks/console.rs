@@ -1,5 +1,4 @@
 use crate::{
-    buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     internal_events::{ConsoleEventProcessed, ConsoleFieldNotFound},
@@ -17,6 +16,7 @@ use futures::{
 use serde::{Deserialize, Serialize};
 
 use tokio::io::{self, AsyncWriteExt};
+use vector_core::buffers::Acker;
 
 #[derive(Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
@@ -105,7 +105,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
                 match log.get(field) {
                     Some(v) => Some(v.to_string_lossy()),
                     None => {
-                        emit!(ConsoleFieldNotFound {
+                        emit!(&ConsoleFieldNotFound {
                             missing_field: field,
                         });
                         None
@@ -132,7 +132,7 @@ struct WriterSink {
 
 #[async_trait]
 impl StreamSink for WriterSink {
-    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         while let Some(event) = input.next().await {
             self.acker.ack(1);
             if let Some(mut buf) = encode_event(event, &self.encoding) {
@@ -144,7 +144,7 @@ impl StreamSink for WriterSink {
                     return Err(());
                 }
 
-                emit!(ConsoleEventProcessed {
+                emit!(&ConsoleEventProcessed {
                     byte_size: buf.len(),
                 });
             }
@@ -235,7 +235,7 @@ mod test {
             "glork",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: crate::samples![10.0 => 1],
+                samples: vector_core::samples![10.0 => 1],
                 statistic: StatisticKind::Histogram,
             },
         ));

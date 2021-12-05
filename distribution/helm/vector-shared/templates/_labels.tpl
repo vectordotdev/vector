@@ -10,6 +10,20 @@ helm.sh/chart: {{ include "libvector.chart" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
+app.kubernetes.io/part-of: {{ include "libvector.name" . }}
+
+{{- if .Values.global }}
+{{- if .Values.global.vector }}
+{{- if .Values.global.vector.commonLabels }}
+{{ toYaml .Values.global.vector.commonLabels }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{- if .Values.commonLabels }}
+{{ toYaml .Values.commonLabels }}
+{{- end }}
+
 {{- end }}
 
 {{/*

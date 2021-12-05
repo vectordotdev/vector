@@ -1,6 +1,6 @@
 use crate::{
     config::log_schema,
-    event::{Event, Metric, Value},
+    event::{EventRef, Metric, Value},
 };
 use bytes::Bytes;
 use chrono::{
@@ -17,13 +17,14 @@ use snafu::Snafu;
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::fmt;
+use std::hash::Hash;
 use std::path::PathBuf;
 
 lazy_static! {
     static ref RE: Regex = Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap();
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Eq, PartialEq, Hash, Clone)]
 pub struct Template {
     src: String,
     has_ts: bool,
@@ -86,11 +87,11 @@ impl TryFrom<Cow<'_, str>> for Template {
     }
 }
 
-fn is_error(item: &Item) -> bool {
+const fn is_error(item: &Item) -> bool {
     matches!(item, Item::Error)
 }
 
-fn is_dynamic(item: &Item) -> bool {
+const fn is_dynamic(item: &Item) -> bool {
     match item {
         Item::Fixed(_) => true,
         Item::Numeric(_, _) => true,
@@ -101,11 +102,18 @@ fn is_dynamic(item: &Item) -> bool {
 }
 
 impl Template {
-    pub fn render(&self, event: &Event) -> Result<Bytes, TemplateRenderingError> {
-        self.render_string(event).map(Into::into)
+    pub fn render<'a>(
+        &self,
+        event: impl Into<EventRef<'a>>,
+    ) -> Result<Bytes, TemplateRenderingError> {
+        self.render_string(event.into()).map(Into::into)
     }
 
-    pub fn render_string(&self, event: &Event) -> Result<String, TemplateRenderingError> {
+    pub fn render_string<'a>(
+        &self,
+        event: impl Into<EventRef<'a>>,
+    ) -> Result<String, TemplateRenderingError> {
+        let event = event.into();
         match (self.has_fields, self.has_ts) {
             (false, false) => Ok(self.src.clone()),
             (true, false) => render_fields(&self.src, event),
@@ -132,7 +140,7 @@ impl Template {
         }
     }
 
-    pub fn is_dynamic(&self) -> bool {
+    pub const fn is_dynamic(&self) -> bool {
         self.has_fields || self.has_ts
     }
 
@@ -141,7 +149,7 @@ impl Template {
     }
 }
 
-fn render_fields(src: &str, event: &Event) -> Result<String, TemplateRenderingError> {
+fn render_fields<'a>(src: &str, event: EventRef<'a>) -> Result<String, TemplateRenderingError> {
     let mut missing_keys = Vec::new();
     let out = RE
         .replace_all(src, |caps: &Captures<'_>| {
@@ -150,8 +158,8 @@ fn render_fields(src: &str, event: &Event) -> Result<String, TemplateRenderingEr
                 .map(|s| s.as_str().trim())
                 .expect("src should match regex");
             match event {
-                Event::Log(log) => log.get(&key).map(|val| val.to_string_lossy()),
-                Event::Metric(metric) => render_metric_field(key, metric),
+                EventRef::Log(log) => log.get(&key).map(|val| val.to_string_lossy()),
+                EventRef::Metric(metric) => render_metric_field(key, metric),
             }
             .unwrap_or_else(|| {
                 missing_keys.push(key.to_owned());
@@ -170,21 +178,20 @@ fn render_metric_field(key: &str, metric: &Metric) -> Option<String> {
     match key {
         "name" => Some(metric.name().into()),
         "namespace" => metric.namespace().map(Into::into),
-        _ if key.starts_with("tags.") => metric
-            .series
-            .tags
-            .as_ref()
-            .and_then(|tags| tags.get(&key[5..]).cloned()),
+        _ if key.starts_with("tags.") => {
+            metric.tags().and_then(|tags| tags.get(&key[5..]).cloned())
+        }
         _ => None,
     }
 }
 
-fn render_timestamp(src: &str, event: &Event) -> String {
+fn render_timestamp(src: &str, event: EventRef<'_>) -> String {
     let timestamp = match event {
-        Event::Log(log) => log
+        EventRef::Log(log) => log
             .get(log_schema().timestamp_key())
-            .and_then(Value::as_timestamp),
-        Event::Metric(metric) => metric.data.timestamp.as_ref(),
+            .and_then(Value::as_timestamp)
+            .copied(),
+        EventRef::Metric(metric) => metric.timestamp(),
     };
     if let Some(ts) = timestamp {
         ts.format(src).to_string()
@@ -233,7 +240,7 @@ impl Serialize for Template {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{MetricKind, MetricValue};
+    use crate::event::{Event, MetricKind, MetricValue};
     use chrono::TimeZone;
     use shared::btreemap;
 
@@ -258,26 +265,14 @@ mod tests {
 
     #[test]
     fn is_dynamic() {
-        assert_eq!(
-            true,
-            Template::try_from("/kube-demo/%F").unwrap().is_dynamic()
-        );
-        assert_eq!(
-            false,
-            Template::try_from("/kube-demo/echo").unwrap().is_dynamic()
-        );
-        assert_eq!(
-            true,
-            Template::try_from("/kube-demo/{{ foo }}")
-                .unwrap()
-                .is_dynamic()
-        );
-        assert_eq!(
-            true,
-            Template::try_from("/kube-demo/{{ foo }}/%F")
-                .unwrap()
-                .is_dynamic()
-        );
+        assert!(Template::try_from("/kube-demo/%F").unwrap().is_dynamic());
+        assert!(!Template::try_from("/kube-demo/echo").unwrap().is_dynamic());
+        assert!(Template::try_from("/kube-demo/{{ foo }}")
+            .unwrap()
+            .is_dynamic());
+        assert!(Template::try_from("/kube-demo/{{ foo }}/%F")
+            .unwrap()
+            .is_dynamic());
     }
 
     #[test]
@@ -435,7 +430,7 @@ mod tests {
 
         assert_eq!(
             Ok(Bytes::from("timestamp 2002-03-04 05:06:07")),
-            template.render(&sample_metric().into())
+            template.render(&sample_metric())
         );
     }
 
@@ -447,7 +442,7 @@ mod tests {
         ));
         assert_eq!(
             Ok(Bytes::from("name=a-counter component=template")),
-            template.render(&metric.into())
+            template.render(&metric)
         );
     }
 
@@ -458,7 +453,7 @@ mod tests {
             Err(TemplateRenderingError::MissingKeys {
                 missing_keys: vec!["tags.component".into()]
             }),
-            template.render(&sample_metric().into())
+            template.render(&sample_metric())
         );
     }
 
@@ -468,7 +463,7 @@ mod tests {
         let metric = sample_metric().with_namespace(Some("vector-test"));
         assert_eq!(
             Ok(Bytes::from("namespace=vector-test name=a-counter")),
-            template.render(&metric.into())
+            template.render(&metric)
         );
     }
 
@@ -480,7 +475,7 @@ mod tests {
             Err(TemplateRenderingError::MissingKeys {
                 missing_keys: vec!["namespace".into()]
             }),
-            template.render(&metric.into())
+            template.render(&metric)
         );
     }
 

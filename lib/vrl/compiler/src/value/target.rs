@@ -432,6 +432,8 @@ impl Value {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::print_stdout)] // tests
+
     use super::*;
     use crate::value;
 

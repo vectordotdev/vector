@@ -1,0 +1,7 @@
+zone "example.com"
+{
+    type master;
+    file "/var/lib/bind/db.example.com";
+    allow-update { any; };
+    allow-query { any; };
+};

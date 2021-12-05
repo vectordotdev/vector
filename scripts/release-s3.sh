@@ -30,15 +30,6 @@ for f in "$td_nightly"/*; do
 done
 ls "$td_nightly"
 
-td_latest="$(mktemp -d)"
-cp -av "target/artifacts/." "$td_latest"
-
-for f in "$td_latest"/*; do
-    a="$(echo "$f" | sed -r -e "s/$VERSION/latest/")"
-    mv "$f" "$a"
-done
-ls "$td_latest"
-
 #
 # A helper function for verifying a published artifact.
 #
@@ -86,6 +77,9 @@ if [[ "$CHANNEL" == "nightly" ]]; then
   verify_artifact \
     "https://packages.timber.io/vector/nightly/latest/vector-nightly-x86_64-unknown-linux-gnu.tar.gz" \
     "$td_nightly/vector-nightly-x86_64-unknown-linux-gnu.tar.gz"
+  verify_artifact \
+    "https://packages.timber.io/vector/nightly/latest/vector-nightly-x86_64-unknown-linux-gnu-debug.tar.gz" \
+    "$td_nightly/vector-nightly-x86_64-unknown-linux-gnu-debug.tar.gz"
 elif [[ "$CHANNEL" == "latest" ]]; then
   VERSION_EXACT="$VERSION"
   # shellcheck disable=SC2001
@@ -96,13 +90,9 @@ elif [[ "$CHANNEL" == "latest" ]]; then
   for i in "$VERSION_EXACT" "$VERSION_MINOR_X" "$VERSION_MAJOR_X" "latest"; do
     # Upload the specific version
     echo "Uploading artifacts to s3://packages.timber.io/vector/$i/"
-    if [[ "$i" == "latest" ]] ; then
-      aws s3 cp "$td_latest" "s3://packages.timber.io/vector/$i/" --recursive --sse --acl public-read
-    else
-      aws s3 cp "$td" "s3://packages.timber.io/vector/$i/" --recursive --sse --acl public-read
-    fi
+    aws s3 cp "$td" "s3://packages.timber.io/vector/$i/" --recursive --sse --acl public-read
 
-    if [[ "$i" == "${VERSION_MAJOR_X}" || "$i" == "${VERSION_MINOR_X}"  ]] ; then
+    if [[ "$i" == "${VERSION_MAJOR_X}" || "$i" == "${VERSION_MINOR_X}" || "$i" == "latest" ]] ; then
       # Delete anything that isn't the current version
       echo "Deleting old artifacts from s3://packages.timber.io/vector/$i/"
       aws s3 rm "s3://packages.timber.io/vector/$i/" --recursive --exclude "*$VERSION_EXACT*"
@@ -114,22 +104,31 @@ elif [[ "$CHANNEL" == "latest" ]]; then
       file=$(basename "$file")
       # vector-$version-amd64.deb -> vector-amd64.deb
       echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/$i/${file/-$VERSION_EXACT/}" --website-redirect "/vector/$i/$file" --acl public-read
-      echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/latest/${file/-$VERSION_EXACT/}" --website-redirect "/vector/latest/$file" --acl public-read
     done
     echo "Redirected old artifact names"
   done
 
+  echo "Add latest symlinks"
+  find "$td" -maxdepth 1 -type f -print0 | while read -r -d $'\0' file ; do
+    file=$(basename "$file")
+    # vector-$version-amd64.deb -> vector-latest-amd64.deb
+    echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/latest/${file/$VERSION_EXACT/latest}" --website-redirect "/vector/latest/$file" --acl public-read
+    # vector-$version-amd64.deb -> vector-amd64.deb
+    echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/latest/${file/$VERSION_EXACT-/}" --website-redirect "/vector/latest/$file" --acl public-read
+  done
+  echo "Added latest symlinks"
+
   # Verify that the files exist and can be downloaded
-  sleep "$VERIFY_TIMEOUT"
   echo "Waiting for $VERIFY_TIMEOUT seconds before running the verifications"
-  for i in "$VERSION_EXACT" "$VERSION_MINOR_X" "$VERSION_MAJOR_X"; do
+  sleep "$VERIFY_TIMEOUT"
+  for i in "$VERSION_EXACT" "$VERSION_MINOR_X" "$VERSION_MAJOR_X" "latest"; do
     verify_artifact \
       "https://packages.timber.io/vector/$i/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz" \
       "$td/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz"
   done
   verify_artifact \
     "https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-gnu.tar.gz" \
-    "$td_latest/vector-latest-x86_64-unknown-linux-gnu.tar.gz"
+    "$td/vector-$VERSION-x86_64-unknown-linux-gnu.tar.gz"
 fi
 
 #
@@ -138,4 +137,3 @@ fi
 
 rm -rf "$td"
 rm -rf "$td_nightly"
-rm -rf "$td_latest"

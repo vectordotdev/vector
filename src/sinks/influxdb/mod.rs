@@ -111,7 +111,7 @@ impl InfluxDbSettings for InfluxDb2Settings {
     }
 
     fn healthcheck_uri(&self, endpoint: String) -> crate::Result<Uri> {
-        encode_uri(&endpoint, "health", &[])
+        encode_uri(&endpoint, "ping", &[])
     }
 
     fn token(&self) -> String {
@@ -170,7 +170,7 @@ fn healthcheck(
 // https://v2.docs.influxdata.com/v2.0/reference/syntax/line-protocol/
 pub(in crate::sinks) fn influx_line_protocol(
     protocol_version: ProtocolVersion,
-    measurement: String,
+    measurement: &str,
     metric_type: &str,
     tags: Option<BTreeMap<String, String>>,
     fields: Option<HashMap<String, Field>>,
@@ -209,9 +209,9 @@ fn encode_tags(tags: BTreeMap<String, String>, output: &mut String) {
         if key.is_empty() || value.is_empty() {
             continue;
         }
-        encode_string(key.to_string(), output);
+        encode_string(&key, output);
         output.push('=');
-        encode_string(value.to_string(), output);
+        encode_string(&value, output);
         output.push(',');
     }
 
@@ -225,7 +225,7 @@ fn encode_fields(
     output: &mut String,
 ) {
     for (key, value) in fields.into_iter() {
-        encode_string(key.to_string(), output);
+        encode_string(&key, output);
         output.push('=');
         match value {
             Field::String(s) => {
@@ -262,7 +262,7 @@ fn encode_fields(
     output.pop();
 }
 
-fn encode_string(key: String, output: &mut String) {
+fn encode_string(key: &str, output: &mut String) {
     for c in key.chars() {
         if "\\, =".contains(c) {
             output.push('\\');
@@ -499,7 +499,7 @@ mod tests {
         token = "my-token"
         database = "my-database"
     "#;
-        let config: InfluxDbTestConfig = toml::from_str(&config).unwrap();
+        let config: InfluxDbTestConfig = toml::from_str(config).unwrap();
         let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
         assert_eq!(
             format!("{}", settings.expect_err("expected error")),
@@ -511,7 +511,7 @@ mod tests {
     fn test_influxdb_settings_missing() {
         let config = r#"
     "#;
-        let config: InfluxDbTestConfig = toml::from_str(&config).unwrap();
+        let config: InfluxDbTestConfig = toml::from_str(config).unwrap();
         let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
         assert_eq!(
             format!("{}", settings.expect_err("expected error")),
@@ -524,7 +524,7 @@ mod tests {
         let config = r#"
         database = "my-database"
     "#;
-        let config: InfluxDbTestConfig = toml::from_str(&config).unwrap();
+        let config: InfluxDbTestConfig = toml::from_str(config).unwrap();
         let _ = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings).unwrap();
     }
 
@@ -535,7 +535,7 @@ mod tests {
         org = "my-org"
         token = "my-token"
     "#;
-        let config: InfluxDbTestConfig = toml::from_str(&config).unwrap();
+        let config: InfluxDbTestConfig = toml::from_str(config).unwrap();
         let _ = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings).unwrap();
     }
 
@@ -599,7 +599,7 @@ mod tests {
         let uri = settings
             .healthcheck_uri("http://localhost:9999".to_owned())
             .unwrap();
-        assert_eq!("http://localhost:9999/health", uri.to_string())
+        assert_eq!("http://localhost:9999/ping", uri.to_string())
     }
 
     #[test]
@@ -726,19 +726,19 @@ mod tests {
     #[test]
     fn test_encode_string() {
         let mut value = String::new();
-        encode_string("measurement_name".to_string(), &mut value);
+        encode_string("measurement_name", &mut value);
         assert_eq!(value, "measurement_name");
 
         let mut value = String::new();
-        encode_string("measurement name".to_string(), &mut value);
+        encode_string("measurement name", &mut value);
         assert_eq!(value, "measurement\\ name");
 
         let mut value = String::new();
-        encode_string("measurement=name".to_string(), &mut value);
+        encode_string("measurement=name", &mut value);
         assert_eq!(value, "measurement\\=name");
 
         let mut value = String::new();
-        encode_string("measurement,name".to_string(), &mut value);
+        encode_string("measurement,name", &mut value);
         assert_eq!(value, "measurement\\,name");
     }
 
@@ -814,6 +814,7 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use crate::{
+        config::ProxyConfig,
         http::HttpClient,
         sinks::influxdb::{
             healthcheck,
@@ -833,7 +834,8 @@ mod integration_tests {
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string(),
         });
-        let client = HttpClient::new(None).unwrap();
+        let proxy = ProxyConfig::default();
+        let client = HttpClient::new(None, &proxy).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
@@ -852,7 +854,8 @@ mod integration_tests {
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string(),
         });
-        let client = HttpClient::new(None).unwrap();
+        let proxy = ProxyConfig::default();
+        let client = HttpClient::new(None, &proxy).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
@@ -871,7 +874,8 @@ mod integration_tests {
             password: None,
         });
         let influxdb2_settings = None;
-        let client = HttpClient::new(None).unwrap();
+        let proxy = ProxyConfig::default();
+        let client = HttpClient::new(None, &proxy).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
@@ -890,7 +894,8 @@ mod integration_tests {
             password: None,
         });
         let influxdb2_settings = None;
-        let client = HttpClient::new(None).unwrap();
+        let proxy = ProxyConfig::default();
+        let client = HttpClient::new(None, &proxy).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()

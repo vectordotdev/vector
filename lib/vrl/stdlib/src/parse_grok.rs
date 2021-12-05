@@ -85,7 +85,12 @@ impl Function for ParseGrok {
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _ctx: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
 
         let pattern = arguments
@@ -213,7 +218,7 @@ mod test {
 
         remove_empty {
             args: func_args![ value: "2020-10-02T23:22:12.223222Z",
-                              pattern: "(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:levell)",
+                              pattern: "(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:level})",
                               remove_empty: true,
             ],
             want: Ok(Value::from(

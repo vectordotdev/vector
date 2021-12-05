@@ -1,4 +1,5 @@
 use chrono::{DateTime, Datelike, Utc};
+use shared::TimeZone;
 use std::collections::BTreeMap;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use vrl::prelude::*;
@@ -40,7 +41,12 @@ impl Function for ParseSyslog {
         }]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(
+        &self,
+        _state: &state::Compiler,
+        _ctx: &FunctionCompileContext,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(ParseSyslogFn { value }))
@@ -57,7 +63,12 @@ impl Expression for ParseSyslogFn {
         let value = self.value.resolve(ctx)?;
         let message = value.try_bytes_utf8_lossy()?;
 
-        let parsed = syslog_loose::parse_message_with_year_exact(&message, resolve_year)?;
+        let timezone = match ctx.timezone() {
+            TimeZone::Local => None,
+            TimeZone::Named(tz) => Some(*tz),
+        };
+        let parsed =
+            syslog_loose::parse_message_with_year_exact_tz(&message, resolve_year, timezone)?;
 
         Ok(message_to_value(parsed))
     }
@@ -123,9 +134,9 @@ fn message_to_value(message: Message<&str>) -> Value {
     }
 
     for element in message.structured_data.into_iter() {
-        for (name, value) in element.params.into_iter() {
+        for (name, value) in element.params() {
             let key = format!("{}.{}", element.id, name);
-            result.insert(key, value.to_string().into());
+            result.insert(key, value.into());
         }
     }
 
@@ -149,7 +160,7 @@ fn type_def() -> BTreeMap<&'static str, TypeDef> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::prelude::*;
+    use chrono::TimeZone;
     use shared::btreemap;
 
     test_function![
@@ -186,7 +197,7 @@ mod tests {
                     "facility" => "local0",
                     "severity" => "notice",
                     "message" => "Proxy sticky-servers started.",
-                    "timestamp" => DateTime::<Utc>::from(chrono::Local.ymd(Utc::now().year(), 6, 13).and_hms_milli(16, 33, 35, 0)),
+                    "timestamp" => chrono::Utc.ymd(Utc::now().year(), 6, 13).and_hms_milli(16, 33, 35, 0),
                     "appname" => "haproxy",
                     "procid" => 73411,
             }),
@@ -197,7 +208,7 @@ mod tests {
             args: func_args![value: r#"Jun 13 16:33:35 haproxy[73411]: I am missing a pri."#],
             want: Ok(btreemap! {
                 "message" => "I am missing a pri.",
-                "timestamp" => DateTime::<Utc>::from(chrono::Local.ymd(Utc::now().year(), 6, 13).and_hms_milli(16, 33, 35, 0)),
+                "timestamp" => chrono::Utc.ymd(Utc::now().year(), 6, 13).and_hms_milli(16, 33, 35, 0),
                 "appname" => "haproxy",
                 "procid" => 73411,
             }),
@@ -214,7 +225,7 @@ mod tests {
                 "message" => "qwerty",
                 "procid" => 8449,
                 "severity" => "notice",
-                "timestamp" => DateTime::<Utc>::from(chrono::Local.ymd(2019, 2, 13).and_hms_milli(19, 48, 34, 0)),
+                "timestamp" => chrono::Utc.ymd(2019, 2, 13).and_hms_milli(19, 48, 34, 0),
                 "version" => 1,
             }),
             tdef: TypeDef::new().fallible().object(type_def()),
@@ -230,9 +241,70 @@ mod tests {
                 "message" => "qwerty",
                 "procid" => 8449,
                 "severity" => "notice",
-                "timestamp" => DateTime::<Utc>::from(chrono::Local.ymd(2019, 2, 13).and_hms_milli(19, 48, 34, 0)),
+                "timestamp" => chrono::Utc.ymd(2019, 2, 13).and_hms_milli(19, 48, 34, 0),
                 "version" => 1,
                 "non_empty.x" => "1",
+            }),
+            tdef: TypeDef::new().fallible().object(type_def()),
+        }
+
+        non_structured_data_in_message {
+            args: func_args![value: "<131>Jun 8 11:54:08 master apache_error [Tue Jun 08 11:54:08.929301 2021] [php7:emerg] [pid 1374899] [client 95.223.77.60:41888] rest of message"],
+            want: Ok(btreemap!{
+                "appname" => "apache_error",
+                "facility" => "local0",
+                "hostname" => "master",
+                "severity" => "err",
+                "timestamp" => chrono::Utc.ymd(2021, 6, 8).and_hms_milli(11, 54, 8, 0),
+                "message" => "[Tue Jun 08 11:54:08.929301 2021] [php7:emerg] [pid 1374899] [client 95.223.77.60:41888] rest of message",
+            }),
+            tdef: TypeDef::new().fallible().object(type_def()),
+        }
+
+        escapes_in_structured_data_quote {
+            args: func_args![value: r#"<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 key="hello \"test\""] An application event log entry..."#],
+            want: Ok(btreemap!{
+                "appname" => "evntslog",
+                "exampleSDID@32473.key" => r#"hello "test""#,
+                "facility" => "local4",
+                "hostname" => "mymachine.example.com",
+                "message" => "An application event log entry...",
+                "msgid" => "ID47",
+                "severity" => "notice",
+                "timestamp" => chrono::Utc.ymd(2003, 10, 11).and_hms_milli(22,14,15,3),
+                "version" => 1
+            }),
+            tdef: TypeDef::new().fallible().object(type_def()),
+        }
+
+        escapes_in_structured_data_slash {
+            args: func_args![value: r#"<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 key="hello a\\b"] An application event log entry..."#],
+            want: Ok(btreemap!{
+                "appname" => "evntslog",
+                "exampleSDID@32473.key" => r#"hello a\b"#,
+                "facility" => "local4",
+                "hostname" => "mymachine.example.com",
+                "message" => "An application event log entry...",
+                "msgid" => "ID47",
+                "severity" => "notice",
+                "timestamp" => chrono::Utc.ymd(2003, 10, 11).and_hms_milli(22,14,15,3),
+                "version" => 1
+            }),
+            tdef: TypeDef::new().fallible().object(type_def()),
+        }
+
+        escapes_in_structured_data_bracket {
+            args: func_args![value: r#"<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 key="hello [bye\]"] An application event log entry..."#],
+            want: Ok(btreemap!{
+                "appname" => "evntslog",
+                "exampleSDID@32473.key" => "hello [bye]",
+                "facility" => "local4",
+                "hostname" => "mymachine.example.com",
+                "message" => "An application event log entry...",
+                "msgid" => "ID47",
+                "severity" => "notice",
+                "timestamp" => chrono::Utc.ymd(2003,10,11).and_hms_milli(22,14,15,3),
+                "version" => 1
             }),
             tdef: TypeDef::new().fallible().object(type_def()),
         }

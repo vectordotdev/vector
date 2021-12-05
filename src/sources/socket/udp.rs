@@ -1,19 +1,25 @@
-use crate::udp;
 use crate::{
+    codecs::{
+        self,
+        decoding::{DeserializerConfig, FramingConfig},
+        Decoder,
+    },
+    config::log_schema,
     event::Event,
-    internal_events::{SocketEventReceived, SocketMode, SocketReceiveError},
+    internal_events::{SocketEventsReceived, SocketMode, SocketReceiveError},
+    serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    sources::Source,
-    Pipeline,
+    sources::{util::StreamDecodingError, Source},
+    udp, Pipeline,
 };
 use bytes::{Bytes, BytesMut};
-use codec::BytesDelimitedCodec;
-use futures::SinkExt;
+use chrono::Utc;
+use futures::{SinkExt, StreamExt};
 use getset::{CopyGetters, Getters};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use tokio::net::UdpSocket;
-use tokio_util::codec::Decoder;
+use tokio_util::codec::FramedRead;
 
 /// UDP processes messages per packet, where messages are separated by newline.
 #[derive(Deserialize, Serialize, Debug, Clone, Getters, CopyGetters)]
@@ -21,26 +27,30 @@ use tokio_util::codec::Decoder;
 pub struct UdpConfig {
     #[get_copy = "pub"]
     address: SocketAddr,
-    #[serde(default = "default_max_length")]
+    #[serde(default = "crate::serde::default_max_length")]
     #[get_copy = "pub"]
     max_length: usize,
     #[get = "pub"]
     host_key: Option<String>,
     #[get_copy = "pub"]
     receive_buffer_bytes: Option<usize>,
-}
-
-fn default_max_length() -> usize {
-    bytesize::kib(100u64) as usize
+    #[serde(default = "default_framing_message_based")]
+    #[get = "pub"]
+    framing: Box<dyn FramingConfig>,
+    #[serde(default = "default_decoding")]
+    #[get = "pub"]
+    decoding: Box<dyn DeserializerConfig>,
 }
 
 impl UdpConfig {
     pub fn from_address(address: SocketAddr) -> Self {
         Self {
             address,
-            max_length: default_max_length(),
+            max_length: crate::serde::default_max_length(),
             host_key: None,
             receive_buffer_bytes: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
         }
     }
 }
@@ -50,6 +60,7 @@ pub fn udp(
     max_length: usize,
     host_key: String,
     receive_buffer_bytes: Option<usize>,
+    decoder: Decoder,
     mut shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> Source {
@@ -80,35 +91,52 @@ pub fn udp(
             tokio::select! {
                 recv = socket.recv_from(&mut buf) => {
                     let (byte_size, address) = recv.map_err(|error| {
-                        emit!(SocketReceiveError {
-                            error,
-                            mode: SocketMode::Udp
-                        });
+                        let error = codecs::decoding::Error::FramingError(error.into());
+                        emit!(&SocketReceiveError {
+                            mode: SocketMode::Udp,
+                            error: &error
+                        })
                     })?;
 
-                    let mut payload = buf.split_to(byte_size);
+                    let payload = buf.split_to(byte_size);
 
-                    // UDP processes messages per payload, where messages are separated by newline
-                    // and stretch to end of payload.
-                    let mut decoder = BytesDelimitedCodec::new(b'\n');
-                    while let Ok(Some(line)) = decoder.decode_eof(&mut payload) {
-                        let mut event = Event::from(line);
+                    let mut stream = FramedRead::new(payload.as_ref(), decoder.clone());
 
-                        event
-                            .as_mut_log()
-                            .insert(crate::config::log_schema().source_type_key(), Bytes::from("socket"));
-                        event
-                            .as_mut_log()
-                            .insert(host_key.clone(), address.to_string());
+                    loop {
+                        match stream.next().await {
+                            Some(Ok((events, byte_size))) => {
+                                emit!(&SocketEventsReceived {
+                                    mode: SocketMode::Udp,
+                                    byte_size,
+                                    count: events.len()
+                                });
 
-                        emit!(SocketEventReceived { byte_size,mode:SocketMode::Udp });
+                                let now = Utc::now();
 
-                        tokio::select!{
-                            result = out.send(event) => {match result {
-                                Ok(()) => { },
-                                Err(()) => return Ok(()),
-                            }}
-                            _ = &mut shutdown => return Ok(()),
+                                for mut event in events {
+                                    if let Event::Log(ref mut log) = event {
+                                        log.try_insert(log_schema().source_type_key(), Bytes::from("socket"));
+                                        log.try_insert(log_schema().timestamp_key(), now);
+                                        log.try_insert(host_key.clone(), address.to_string());
+                                    }
+
+                                    tokio::select!{
+                                        result = out.send(event) => {match result {
+                                            Ok(()) => { },
+                                            Err(()) => return Ok(()),
+                                        }}
+                                        _ = &mut shutdown => return Ok(()),
+                                    }
+                                }
+                            }
+                            Some(Err(error)) => {
+                                // Error is logged by `crate::codecs::Decoder`, no
+                                // further handling is needed here.
+                                if !error.can_continue() {
+                                    break;
+                                }
+                            }
+                            None => break,
                         }
                     }
                 }

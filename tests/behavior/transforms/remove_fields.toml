@@ -13,7 +13,7 @@
   [[tests.outputs]]
     extract_from = "remove_fields_simple"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         !exists(.a) &&
         .b == 4
@@ -34,7 +34,7 @@
   [[tests.outputs]]
     extract_from = "remove_fields_nested"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .a.b == 3 &&
         !exists(.a.c)
@@ -58,7 +58,7 @@
   [[tests.outputs]]
     extract_from = "remove_fields_empty_objects"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         !exists(.a.b) &&
         !exists(.a.c) &&

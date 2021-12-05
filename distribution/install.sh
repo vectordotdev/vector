@@ -12,7 +12,7 @@ set -u
 
 # If PACKAGE_ROOT is unset or empty, default it.
 PACKAGE_ROOT="${PACKAGE_ROOT:-"https://packages.timber.io/vector"}"
-VECTOR_VERSION="0.13.1"
+VECTOR_VERSION="0.18.1"
 _divider="--------------------------------------------------------------------------------"
 _prompt=">>>"
 _indent="   "
@@ -78,7 +78,7 @@ main() {
     # Confirm with the user before proceeding to install Vector through a
     # package manager. Otherwise, we install from an archive.
     if [ "$prompt" = "yes" ]; then
-        echo "$_prompt We'll be installing Vector via a pre-built archive at https://packages.timber.io/vector/latest/"
+        echo "$_prompt We'll be installing Vector via a pre-built archive at https://packages.timber.io/vector/${VECTOR_VERSION}/"
         echo "$_prompt Ready to proceed? (y/n)"
         echo ""
 
@@ -148,7 +148,7 @@ install_from_archive() {
             ;;
     esac
 
-    local _url="${PACKAGE_ROOT}/latest/vector-${VECTOR_VERSION}-${_archive_arch}.tar.gz"
+    local _url="${PACKAGE_ROOT}/${VECTOR_VERSION}/vector-${VECTOR_VERSION}-${_archive_arch}.tar.gz"
 
     local _dir
     _dir="$(mktemp -d 2>/dev/null || ensure mktemp -d -t vector-install)"
@@ -177,7 +177,7 @@ install_from_archive() {
     printf "%s Install succeeded! 🚀\n" "$_prompt"
     printf "%s To start Vector:\n" "$_prompt"
     printf "\n"
-    printf "%s vector --config ~/.vector/vector.toml\n" "$_indent"
+    printf "%s vector --config ~/.vector/config/vector.toml\n" "$_indent"
     printf "\n"
     printf "%s More information at https://vector.dev/docs/\n" "$_prompt"
 

@@ -19,7 +19,7 @@
     [[tests.outputs]]
       extract_from = "key_value_parser"
       [[tests.outputs.conditions]]
-        type = "remap"
+        type = "vrl"
         source = '''
           .data.action == "Accept"
           .data.ifdir == "inbound"
@@ -39,7 +39,7 @@
     [[tests.outputs]]
       extract_from = "key_value_parser_defaults"
       [[tests.outputs.conditions]]
-        type = "remap"
+        type = "vrl"
         source = '''
           .action == "\"Accept\""
           .ifdir == "\"inbound\""

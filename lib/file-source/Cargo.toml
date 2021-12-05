@@ -2,7 +2,7 @@
 name = "file-source"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@timber.io>", "Mark Story <mark@mark-story.com>"]
-edition = "2018"
+edition = "2021"
 publish = false
 license = "MIT"
 
@@ -11,7 +11,7 @@ libc = "0.2"
 winapi = { version = "0.3", features = ["winioctl"] }
 
 [dependencies]
-crc = "1.8.1"
+crc = "2.0.0"
 glob = "0.3.0"
 scan_fmt = "0.2.6"
 
@@ -21,7 +21,7 @@ default-features = false
 features = []
 
 [dependencies.bytes]
-version = "1.0.0"
+version = "1.1.0"
 default-features = false
 features = []
 
@@ -36,7 +36,7 @@ default-features = false
 features = []
 
 [dependencies.indexmap]
-version = "1.6"
+version = "~1.7.0"
 default-features = false
 features = ["serde"]
 
@@ -66,7 +66,7 @@ default-features = false
 features = []
 
 [dependencies.tokio]
-version = "1.5.0"
+version = "1.13.0"
 default-features = false
 features = ["full"]
 
@@ -74,8 +74,9 @@ features = ["full"]
 criterion = "0.3"
 quickcheck = "1"
 tempfile = "3.1.0"
+pretty_assertions = "1.0.0"
 
 [[bench]]
 name = "buffer"
-test = true
 harness = false
+test = true

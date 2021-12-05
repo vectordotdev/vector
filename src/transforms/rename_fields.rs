@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten},
     serde::Fields,
@@ -34,7 +34,7 @@ impl GenerateConfig for RenameFieldsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "rename_fields")]
 impl TransformConfig for RenameFieldsConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         let mut fields = IndexMap::default();
         for (key, value) in self.fields.clone().all_fields() {
             fields.insert(key.to_string(), value.to_string());
@@ -60,7 +60,7 @@ impl TransformConfig for RenameFieldsConfig {
 
 impl RenameFields {
     pub fn new(fields: IndexMap<String, String>, drop_empty: bool) -> crate::Result<Self> {
-        Ok(RenameFields { fields, drop_empty })
+        Ok(Self { fields, drop_empty })
     }
 }
 
@@ -71,11 +71,11 @@ impl FunctionTransform for RenameFields {
             match log.remove_prune(&old_key, self.drop_empty) {
                 Some(v) => {
                     if event.as_mut_log().insert(&new_key, v).is_some() {
-                        emit!(RenameFieldsFieldOverwritten { field: old_key });
+                        emit!(&RenameFieldsFieldOverwritten { field: old_key });
                     }
                 }
                 None => {
-                    emit!(RenameFieldsFieldDoesNotExist { field: old_key });
+                    emit!(&RenameFieldsFieldDoesNotExist { field: old_key });
                 }
             }
         }
@@ -87,7 +87,7 @@ impl FunctionTransform for RenameFields {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::LogEvent;
+    use crate::{event::LogEvent, transforms::test::transform_one};
 
     #[test]
     fn generate_config() {
@@ -111,7 +111,7 @@ mod tests {
         );
         let mut transform = RenameFields::new(fields, false).unwrap();
 
-        let new_event = transform.transform_one(log.into()).unwrap();
+        let new_event = transform_one(&mut transform, log.into()).unwrap();
 
         assert_eq!(new_event.into_log(), expected);
     }

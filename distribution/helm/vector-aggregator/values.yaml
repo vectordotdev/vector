@@ -2,6 +2,21 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+global:
+  clusterDomain: "cluster.local"
+  kubeDNSAddress: "kube-dns.kube-system"
+# Additional labels to add to all resources
+# commonLabels:
+#   app.kubernetes.io/component: aggregator
+
+secrets:
+  generic: {}
+    # Each Key/Value will be added to a Secret resource
+    # Values should be entered base64 encoded (examples below are "REPLACE_ME" encoded)
+    # NOTE: Don't commit unencrypted secrets to git!
+    # awsAccessKeyId: "UkVQTEFDRV9NRQo="
+    # awsSecretAccessKey: "UkVQTEFDRV9NRQo="
+
 image:
   repository: timberio/vector
   pullPolicy: IfNotPresent
@@ -13,6 +28,7 @@ image:
 
 # Image pull secrets to use at the `Pod`s managed by `StatefulSet`.
 imagePullSecrets: []
+#  - myRegistryCredentialSecretName
 
 # Override the chart name used in templates.
 nameOverride: ""
@@ -54,6 +70,9 @@ podAnnotations: {}
 # Labels to add to the `Pod`s managed by `StatefulSet`.
 podLabels: {}
 
+# Priority class name to add to the `Pod`s managed by `StatefulSet`.
+podPriorityClassName: ""
+
 # PodSecurityContext to set at the `Pod`s managed by `StatefulSet`.
 podSecurityContext: {}
   # fsGroup: 2000
@@ -70,11 +89,16 @@ securityContext: {}
 
 # Extra env vars to pass to the `vector` container.
 env: []
-  # - name: VAR
-  #    valueFrom:
-  #      secretKeyRef:
-  #        name: secret
-  #        key: password
+  # - name: AWS_ACCESS_KEY_ID
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: vector-aggregator
+  #       key: awsAccessKeyId
+
+# Extra arguments to pass to the `vector` container.
+args: []
+  # - --quiet
+  # - --verbose
 
 # Tolerations to set for the `Pod`s managed by `DaemonSet`.
 tolerations:
@@ -152,6 +176,35 @@ psp:
   # Whether to create `PodSecurityPolicy` or not.
   enabled: false
 
+# Use Liveness Probe (The Probe is using API endpoint which is disabled by default.
+# You have to enable the API in the Config to expose the endpoint.)
+livenessProbe: {}
+  # httpGet:
+  #   path: /health
+  #   port: api
+
+# Use Readiness Probe (The Probe is using API endpoint which is disabled by default.
+# You have to enable the API in the Config to expose the endpoint.)
+readinessProbe: {}
+  # httpGet:
+  #   path: /health
+  #   port: api
+
+# Change DNS Policy
+dnsPolicy:
+
+# Custom DNS configuration to be added to vector-agent pods
+dnsConfig: {}
+  # nameservers:
+  #   - 1.2.3.4
+  # searches:
+  #   - ns1.svc.cluster-domain.example
+  #   - my.dns.search.suffix
+  # options:
+  #   - name: ndots
+  #     value: "2"
+  #   - name: edns0
+
 # Configuration for both regular and headless `Service`.
 service:
   # Service type - defaults to `ClusterIP` (only relevant for the regular service).
@@ -168,12 +221,51 @@ service:
 # of using a generated one.
 existingConfigMap: ""
 
+# Specify custom contents for the Vector config
+# ref: https://vector.dev/docs/reference/configuration/
+# Note a complete and valid configuration is required. If used, the deprecated
+# configuration keys will be ignored. More information can be found at:
+# https://vector.dev/highlights/2021-07-13-helm-customconfig
+customConfig: {}
+  #  data_dir: "/vector-data-dir"
+  #  sources:
+  #    host_metrics:
+  #    internal_metrics:
+  #      type: internal_metrics
+  #   vector:
+  #     type: vector
+  #     address: 0.0.0.0:9000
+  #     version: "2"
+  #  sinks:
+  #    prometheus_sink:
+  #      type: prometheus_exporter
+  #      inputs: ["internal_metrics"]
+  #      address: 0.0.0.0:9090
+
+# Use prometheus-operator `PodMonitor` to opt-in for Prometheus scraping.
+# To be used in clusters that rely on prometheus-operator to gather metrics.
+# You might want to set `podMonitorSelectorNilUsesHelmValues=false` if you're
+# using prometheus-operator Helm chart to allow `PodMonitor` resources
+# discovery in all namespaces.
+podMonitor:
+  # Whether to add the `PodMonitor` resource or not.
+  # `prometheus-operator` CRDs are necessary, otherwise you'll get an error.
+  enabled: false
+  # Additional labels for PodMonitor
+  additionalLabels: {}
+  # Additional relabelings to include in the `PodMonitor`.
+  extraRelabelings: []
+  # metricRelabelings to include in the `PodMonitor`.
+  metricRelabelings: []
+
 # Global parts of the generated `vector` config.
+# DEPRECATED. Use customConfig instead
 globalOptions:
   # Specifies the (in-container) data dir used by `vector`.
   dataDir: "/vector-data-dir"
 
 # Schema part of the generated `vector` config.
+# DEPRECATED. Use customConfig instead
 logSchema:
   hostKey: "host"
   messageKey: "message"
@@ -182,6 +274,7 @@ logSchema:
 
 # The Vector API.
 # Will be disabled by default.
+# DEPRECATED. Use customConfig instead
 vectorApi:
   # Turn the Vector API on or off.
   enabled: false
@@ -192,6 +285,7 @@ vectorApi:
 
 # The "built-in" vector source, for accepting logs from the vector agents.
 # Will be added by default, unless explicitly disabled.
+# DEPRECATED. Use customConfig instead
 vectorSource:
   # Disable to omit the vector source from being added.
   enabled: true
@@ -202,8 +296,8 @@ vectorSource:
   # The port to listen at.
   listenPort: "9000"
   # Additional config to embed at the vector source.
-  config: {}
-    # option: "value"
+  config:
+    version: "2"
   # Specific node port to bind (useful if `service.type` is set to `NodePort`).
   nodePort: null  # 9090 (must be a number)
   # Raw TOML config to embed at the vector source (deprecated).
@@ -211,6 +305,7 @@ vectorSource:
 
 # The "built-in" internal metrics source emitting Vector's internal opertaional
 # metrics.
+# DEPRECATED. Use customConfig instead
 internalMetricsSource:
   # Disable to omit the internal metrics source from being added.
   enabled: true
@@ -227,6 +322,7 @@ internalMetricsSource:
 # When using this "built-in" sink, we automatically configure container ports,
 # and ensure things are ready for discovery and scraping via Prometheus'
 # `kubernetes_sd_configs` jobs.
+# DEPRECATED. Use customConfig instead
 prometheusSink:
   # Disable to omit the prometheus sink from being added.
   enabled: true
@@ -255,18 +351,23 @@ prometheusSink:
   # `prometheus.io/scrape` to discover scrape targets.
   addPodAnnotations: false
   # Use prometheus-operator `PodMonitor` to opt-in for Prometheus scraping.
-  # To be used in clusters that rely on prometheus-operator to gether metrics.
+  # To be used in clusters that rely on prometheus-operator to gather metrics.
   # You might want to set `podMonitorSelectorNilUsesHelmValues=false` if you're
   # using prometheus-operator Helm chart to allow `PodMonitor` resources
-  # dicovery in all namespaces.
+  # discovery in all namespaces.
   podMonitor:
     # Whether to add the `PodMonitor` resource or not.
     # `prometheus-operator` CRDs are necessary, otherwise you'll get an error.
     enabled: false
+    # Additional labels for PodMonitor
+    additionalLabels: {}
     # Additional relabelings to include in the `PodMonitor`.
     extraRelabelings: []
+    # metricRelabelings to include in the `PodMonitor`.
+    metricRelabelings: []
 
 # Sources to add to the generated `vector` config
+# DEPRECATED. Use customConfig instead
 sources: {}
   # source_name:
   #   type: "source_type"
@@ -274,6 +375,7 @@ sources: {}
   #     option = "value"
 
 # Transforms to add to the generated `vector` config.
+# DEPRECATED. Use customConfig instead
 transforms: {}
   # transform_name:
   #   type: "transform_type"
@@ -282,9 +384,194 @@ transforms: {}
   #     option = "value"
 
 # Sinks to add to the generated `vector` config.
+# DEPRECATED. Use customConfig instead
 sinks: {}
   # sink_name:
   #   type: "sink_type"
   #   inputs: ["input1", "input2"]
   #   rawConfig: |
   #     option = "value"
+
+haproxy:
+  enabled: false
+  ## Default values for HAProxy
+  ## The included templates and values are heavily influenced by the haproxytech/haproxy chart
+  ## ref: https://github.com/haproxytech/helm-charts/tree/main/haproxy
+
+  ## Configure Service Account
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
+  serviceAccount:
+    create: true
+    name:
+
+  ## Default values for image
+  image:
+    repository: haproxytech/haproxy-alpine
+    tag: 2.4.0
+    pullPolicy: IfNotPresent
+
+  ## ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
+  replicaCount: 1
+
+  ## Init Containers
+  ## ref: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/
+  initContainers: []
+  # - name: sysctl
+  #   image: "busybox:musl"
+  #   command:
+  #     - /bin/sh
+  #     - -c
+  #     - sysctl -w net.core.somaxconn=65536
+  #   securityContext:
+  #     privileged: true
+
+  ## Pod termination grace period
+  ## ref: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/
+  terminationGracePeriodSeconds: 60
+
+  ## Deployment strategy definition
+  ## ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
+  strategy: {}
+  #  rollingUpdate:
+  #    maxSurge: 25%
+  #    maxUnavailable: 25%
+  #  type: RollingUpdate
+
+  ## Pod PriorityClass
+  ## ref: https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass
+  priorityClassName: ""
+
+  ## Additional volumeMounts to the controller main container
+  extraVolumeMounts: []
+  ## Example empty volume mounts when using securityContext->readOnlyRootFilesystem
+  # - name: etc-haproxy
+  #   mountPath: /etc/haproxy
+  # - name: tmp
+  #   mountPath: /tmp
+  # - name: var-state-haproxy
+  #   mountPath: /var/state/haproxy
+
+  ## Additional volumes to the controller pod
+  extraVolumes: []
+  ## Example empty volumes when using securityContext->readOnlyRootFilesystem
+  # - name: etc-haproxy
+  #   emptyDir: {}
+  # - name: tmp
+  #   emptyDir: {}
+  # - name: var-state-haproxy
+  #   emptyDir: {}
+
+  ## HAProxy daemon configuration
+  # ref: https://www.haproxy.org/download/2.2/doc/configuration.txt
+  config: |
+    global
+      log stdout local0
+      maxconn 4096
+      stats socket /tmp/haproxy
+      hard-stop-after {{ .Values.haproxy.terminationGracePeriodSeconds }}s
+
+    defaults
+      log     global
+      option  dontlognull
+      retries 3
+      option  redispatch
+      option  allbackups
+      timeout client 5s
+      timeout server 5s
+      timeout connect 5s
+
+    resolvers coredns
+      nameserver dns1 {{ .Values.global.kubeDNSAddress }}.svc.{{ .Values.global.clusterDomain }}:53
+      resolve_retries 3
+      timeout resolve 2s
+      timeout retry 1s
+      accepted_payload_size 8192
+      hold valid 10s
+      hold obsolete 15s
+
+    frontend stats
+      mode http
+      bind :::1024
+      http-request use-service prometheus-exporter if { path /metrics }
+    {{ include "haproxy.vectorConfig" . }}
+
+  ## Additional secrets to mount as volumes
+  ## This is expected to be an array of dictionaries specifying the volume name, secret name and mount path
+  mountedSecrets: []
+  #  - volumeName: ssl-certificate
+  #    secretName: star-example-com
+  #    mountPath: /usr/local/etc/ssl
+
+  ## Pod Node assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+  nodeSelector: {}
+
+  ## Node Taints and Tolerations for pod-node cheduling through attraction/repelling
+  ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  tolerations: []
+  #  - key: "key"
+  #    operator: "Equal|Exists"
+  #    value: "value"
+  #    effect: "NoSchedule|PreferNoSchedule|NoExecute(1.6 only)"
+
+  ## Node Affinity for pod-node scheduling constraints
+  ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  affinity: {}
+
+  ## Additional labels to add to the pod container metadata
+  ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+  podLabels: {}
+  #  key: value
+
+  ## Additional annotations to add to the pod container metadata
+  ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+  podAnnotations: {}
+  #  key: value
+  #
+
+  ## Disableable use of Pod Security Policy
+  ## ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/
+  podSecurityPolicy:
+    create: true
+
+  ## Pod Security Context
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+  podSecurityContext: {}
+
+  ## Container Security Context
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+  securityContext:
+    enabled: false
+    runAsUser: 1000
+    runAsGroup: 1000
+
+  ## Compute Resources
+  ## ref: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
+  resources:
+  #  limits:
+  #    cpu: 100m
+  #    memory: 64Mi
+    requests:
+      cpu: 100m
+      memory: 64Mi
+
+  ## Service configuration
+  ## ref: https://kubernetes.io/docs/concepts/services-networking/service/
+  service:
+    type: ClusterIP   # can be 'LoadBalancer'
+
+    ## Service ClusterIP
+    ## ref: https://kubernetes.io/docs/concepts/services-networking/service/
+    clusterIP: ""
+
+    ## LoadBalancer IP
+    ## ref: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer
+    loadBalancerIP: ""
+
+    ## Source IP ranges permitted to access Network Load Balancer
+    # ref: https://kubernetes.io/docs/tasks/access-application-cluster/configure-cloud-provider-firewall/
+    loadBalancerSourceRanges: []
+
+    ## Service annotations
+    ## ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+    annotations: {}

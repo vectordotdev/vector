@@ -1,7 +1,6 @@
-use super::InternalEvent;
-use crate::config;
+use crate::{built_info, config};
 use metrics::counter;
-use std::path::PathBuf;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct VectorStarted;
@@ -11,10 +10,10 @@ impl InternalEvent for VectorStarted {
         info!(
             target: "vector",
             message = "Vector has started.",
+            debug = built_info::DEBUG,
             version = built_info::PKG_VERSION,
-            git_version = built_info::GIT_VERSION.unwrap_or(""),
-            released = built_info::BUILT_TIME_UTC,
-            arch = built_info::CFG_TARGET_ARCH
+            arch = built_info::TARGET_ARCH,
+            build_id = built_info::VECTOR_BUILD_DESC.unwrap_or("none"),
         );
     }
 
@@ -25,7 +24,7 @@ impl InternalEvent for VectorStarted {
 
 #[derive(Debug)]
 pub struct VectorReloaded<'a> {
-    pub config_paths: &'a [(PathBuf, config::FormatHint)],
+    pub config_paths: &'a [config::ConfigPath],
 }
 
 impl InternalEvent for VectorReloaded<'_> {
@@ -120,9 +119,4 @@ impl InternalEvent for VectorRecoveryFailed {
     fn emit_metrics(&self) {
         counter!("recover_errors_total", 1);
     }
-}
-
-#[allow(unused)]
-mod built_info {
-    include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }

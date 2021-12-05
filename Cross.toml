@@ -1,7 +1,11 @@
 [build.env]
 passthrough = [
+    "BUILD_DIR",
+    "CARGO_PROFILE_RELEASE_OPT_LEVEL",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS",
     "RUST_BACKTRACE",
     "RUST_LOG",
+    "VECTOR_BUILD_DESC",
 ]
 
 [target.x86_64-unknown-linux-gnu]
@@ -15,3 +19,9 @@ image = "vector-cross-env:x86_64-unknown-linux-musl"
 
 [target.aarch64-unknown-linux-musl]
 image = "vector-cross-env:aarch64-unknown-linux-musl"
+
+[target.armv7-unknown-linux-gnueabihf]
+image = "vector-cross-env:armv7-unknown-linux-gnueabihf"
+
+[target.armv7-unknown-linux-musleabihf]
+image = "vector-cross-env:armv7-unknown-linux-musleabihf"

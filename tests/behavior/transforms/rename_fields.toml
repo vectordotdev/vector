@@ -21,7 +21,7 @@
   [[tests.outputs]]
     extract_from = "rename_fields_simple"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         # Plain
         !exists(.a) &&
@@ -58,7 +58,7 @@
   [[tests.outputs]]
     extract_from = "rename_fields_empty_objects"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .a.b == 1 &&
         exists(.a) &&

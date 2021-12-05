@@ -3,9 +3,10 @@ use crate::event::{
     Event,
 };
 use chrono::{DateTime, TimeZone, Utc};
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
-pub use prometheus_parser::*;
+use prometheus_parser::{proto, GroupKind, MetricGroup, ParserError};
 
 fn has_values_or_none(tags: BTreeMap<String, String>) -> Option<BTreeMap<String, String>> {
     if tags.is_empty() {
@@ -71,8 +72,9 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
             GroupKind::Histogram(metrics) => {
                 for (key, metric) in metrics {
                     let mut buckets = metric.buckets;
+                    buckets.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
                     for i in (1..buckets.len()).rev() {
-                        buckets[i].count -= buckets[i - 1].count;
+                        buckets[i].count = buckets[i].count.saturating_sub(buckets[i - 1].count);
                     }
                     let drop_last = buckets
                         .last()
@@ -114,7 +116,7 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
                                     .quantiles
                                     .into_iter()
                                     .map(|q| Quantile {
-                                        upper_limit: q.quantile,
+                                        quantile: q.quantile,
                                         value: q.value,
                                     })
                                     .collect(),
@@ -161,7 +163,7 @@ mod test {
             "##;
         let result = parse_text(exp).unwrap();
         assert_eq!(result.len(), 1);
-        assert!(result[0].data.timestamp.unwrap() >= now);
+        assert!(result[0].timestamp().unwrap() >= now);
     }
 
     #[test]
@@ -200,7 +202,7 @@ mod test {
             name{labelname="val1",basename="basevalue"} NaN
             "##;
 
-        match parse_text(exp).unwrap()[0].data.value {
+        match parse_text(exp).unwrap()[0].value() {
             MetricValue::Counter { value } => {
                 assert!(value.is_nan());
             }
@@ -693,11 +695,64 @@ mod test {
                 "http_request_duration_seconds",
                 MetricKind::Absolute,
                 MetricValue::AggregatedHistogram {
-                    buckets: crate::buckets![
+                    buckets: vector_core::buckets![
                         0.05 => 24054, 0.1 => 9390, 0.2 => 66948, 0.5 => 28997, 1.0 => 4599
                     ],
                     count: 144320,
                     sum: 53423.0,
+                },
+            )
+            .with_timestamp(Some(*TIMESTAMP))]),
+        );
+    }
+
+    #[test]
+    fn test_histogram_out_of_order() {
+        let exp = r##"
+            # HELP duration A histogram of the request duration.
+            # TYPE duration histogram
+            duration_bucket{le="+Inf"} 144320 1612411506789
+            duration_bucket{le="1"} 133988 1612411506789
+            duration_sum 53423 1612411506789
+            duration_count 144320 1612411506789
+            "##;
+
+        assert_event_data_eq!(
+            parse_text(exp),
+            Ok(vec![Metric::new(
+                "duration",
+                MetricKind::Absolute,
+                MetricValue::AggregatedHistogram {
+                    buckets: vector_core::buckets![1.0 => 133988],
+                    count: 144320,
+                    sum: 53423.0,
+                },
+            )
+            .with_timestamp(Some(*TIMESTAMP))]),
+        );
+    }
+
+    #[test]
+    fn test_histogram_backward_values() {
+        let exp = r##"
+            # HELP duration A histogram of the request duration.
+            # TYPE duration histogram
+            duration_bucket{le="1"} 2000 1612411506789
+            duration_bucket{le="10"} 1000 1612411506789
+            duration_bucket{le="+Inf"} 2000 1612411506789
+            duration_sum 2000 1612411506789
+            duration_count 2000 1612411506789
+            "##;
+
+        assert_event_data_eq!(
+            parse_text(exp),
+            Ok(vec![Metric::new(
+                "duration",
+                MetricKind::Absolute,
+                MetricValue::AggregatedHistogram {
+                    buckets: vector_core::buckets![1.0 => 2000, 10.0 => 0],
+                    count: 2000,
+                    sum: 2000.0,
                 },
             )
             .with_timestamp(Some(*TIMESTAMP))]),
@@ -755,7 +810,7 @@ mod test {
             Ok(vec![
                 Metric::new(
                     "gitlab_runner_job_duration_seconds", MetricKind::Absolute, MetricValue::AggregatedHistogram {
-                        buckets: crate::buckets![
+                        buckets: vector_core::buckets![
                             30.0 => 327,
                             60.0 => 147,
                             300.0 => 61,
@@ -775,7 +830,7 @@ mod test {
                     .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "gitlab_runner_job_duration_seconds", MetricKind::Absolute, MetricValue::AggregatedHistogram {
-                        buckets: crate::buckets![
+                        buckets: vector_core::buckets![
                             30.0 => 1,
                             60.0 => 0,
                             300.0 => 0,
@@ -795,7 +850,7 @@ mod test {
                     .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "gitlab_runner_job_duration_seconds", MetricKind::Absolute, MetricValue::AggregatedHistogram {
-                        buckets: crate::buckets![
+                        buckets: vector_core::buckets![
                             30.0 => 285, 60.0 => 880, 300.0 => 1906, 600.0 => 80, 1800.0 => 101, 3600.0 => 3,
                             7200.0 => 0, 10800.0 => 0, 18000.0 => 0, 36000.0 => 0
                         ],
@@ -839,7 +894,7 @@ mod test {
                     "rpc_duration_seconds",
                     MetricKind::Absolute,
                     MetricValue::AggregatedSummary {
-                        quantiles: crate::quantiles![
+                        quantiles: vector_core::quantiles![
                             0.01 => 3102.0,
                             0.05 => 3272.0,
                             0.5 => 4773.0,
@@ -858,7 +913,7 @@ mod test {
                     "go_gc_duration_seconds",
                     MetricKind::Absolute,
                     MetricValue::AggregatedSummary {
-                        quantiles: crate::quantiles![
+                        quantiles: vector_core::quantiles![
                             0.0 => 0.009460965,
                             0.25 => 0.009793382,
                             0.5 => 0.009870205,
@@ -897,11 +952,15 @@ mod test {
             "##;
 
         let now = Utc::now();
-        let mut result = parse_text(exp).expect("Parsing failed");
-        for metric in &mut result {
-            assert!(metric.data.timestamp.expect("Missing timestamp") >= now);
-            metric.data.timestamp = Some(*TIMESTAMP);
-        }
+        let result = parse_text(exp).expect("Parsing failed");
+        // Reset all the timestamps for comparison
+        let result: Vec<_> = result
+            .into_iter()
+            .map(|metric| {
+                assert!(metric.timestamp().expect("Missing timestamp") >= now);
+                metric.with_timestamp(Some(*TIMESTAMP))
+            })
+            .collect();
 
         assert_event_data_eq!(
             result,

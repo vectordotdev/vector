@@ -1,5 +1,8 @@
-use super::InternalEvent;
+// ## skip check-events ##
+
+use bytes::Bytes;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct StatsdEventReceived {
@@ -12,7 +15,7 @@ impl InternalEvent for StatsdEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
+        counter!("component_received_events_total", 1);
         counter!("events_in_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64,);
     }
@@ -20,18 +23,18 @@ impl InternalEvent for StatsdEventReceived {
 
 #[derive(Debug)]
 pub struct StatsdInvalidRecord<'a> {
-    pub error: crate::sources::statsd::parser::ParseError,
-    pub text: &'a str,
+    pub error: &'a crate::sources::statsd::parser::ParseError,
+    pub bytes: Bytes,
 }
 
-impl InternalEvent for StatsdInvalidRecord<'_> {
+impl<'a> InternalEvent for StatsdInvalidRecord<'a> {
     fn emit_logs(&self) {
-        error!(message = "Invalid packet from statsd, discarding.", error = ?self.error, text = %self.text);
+        error!(message = "Invalid packet from statsd, discarding.", error = ?self.error, bytes = %String::from_utf8_lossy(&self.bytes));
     }
 
     fn emit_metrics(&self) {
         counter!("invalid_record_total", 1,);
-        counter!("invalid_record_bytes_total", self.text.len() as u64,);
+        counter!("invalid_record_bytes_total", self.bytes.len() as u64);
     }
 }
 
@@ -48,14 +51,15 @@ pub struct StatsdSocketError<T> {
 }
 
 impl<T> StatsdSocketError<T> {
-    fn new(r#type: StatsdSocketErrorType, error: T) -> Self {
+    const fn new(r#type: StatsdSocketErrorType, error: T) -> Self {
         Self { r#type, error }
     }
 
-    pub fn bind(error: T) -> Self {
+    pub const fn bind(error: T) -> Self {
         Self::new(StatsdSocketErrorType::Bind, error)
     }
 
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn read(error: T) -> Self {
         Self::new(StatsdSocketErrorType::Read, error)
     }

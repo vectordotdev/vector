@@ -1,4 +1,5 @@
-use super::InternalEvent;
+// ## skip check-events ##
+
 use http::{
     header::{self, HeaderMap, HeaderValue},
     Request, Response,
@@ -6,6 +7,7 @@ use http::{
 use hyper::{body::HttpBody, Error};
 use metrics::{counter, histogram};
 use std::time::Duration;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct AboutToSendHttpRequest<'a, T> {
@@ -62,9 +64,9 @@ impl<'a, T: HttpBody> InternalEvent for GotHttpResponse<'a, T> {
     }
 
     fn emit_metrics(&self) {
-        counter!("http_client_responses_total", 1, "status" => self.response.status().to_string());
-        histogram!("http_client_rtt_nanoseconds", self.roundtrip);
-        histogram!("http_client_response_rtt_nanoseconds", self.roundtrip, "status" => self.response.status().to_string());
+        counter!("http_client_responses_total", 1, "status" => self.response.status().as_u16().to_string());
+        histogram!("http_client_rtt_seconds", self.roundtrip);
+        histogram!("http_client_response_rtt_seconds", self.roundtrip, "status" => self.response.status().as_u16().to_string());
     }
 }
 
@@ -84,8 +86,8 @@ impl<'a> InternalEvent for GotHttpError<'a> {
 
     fn emit_metrics(&self) {
         counter!("http_client_errors_total", 1, "error_kind" => self.error.to_string());
-        histogram!("http_client_rtt_ns", self.roundtrip);
-        histogram!("http_client_error_rtt_ns", self.roundtrip, "error_kind" => self.error.to_string());
+        histogram!("http_client_rtt_seconds", self.roundtrip);
+        histogram!("http_client_error_rtt_seconds", self.roundtrip, "error_kind" => self.error.to_string());
     }
 }
 

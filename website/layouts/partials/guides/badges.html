@@ -1,0 +1,27 @@
+<div class="mt-3">
+  {{ $type := cond (eq .CurrentSection.Parent.Title "Integrate") "tutorial" "guide" }}
+  {{ partial "badge.html" (dict "prefix" "type" "word" $type "color" "red" "inline" true) }}
+
+  {{ with .Params.domain }}
+  {{ partial "badge.html" (dict "prefix" "domain" "word" . "color" "green" "inline" true) }}
+  {{ end }}
+
+  {{ range .Params.transforms }}
+  {{ $href := printf "/docs/reference/configuration/transforms/%s" . | relURL }}
+  {{ partial "badge.html" (dict "prefix" "transform" "word" . "color" "blue" "inline" true "href" $href) }}
+  {{ end }}
+
+  {{ range .Params.sources }}
+  {{ $href := printf "/docs/reference/configuration/sources/%s" . | relURL }}
+  {{ partial "badge.html" (dict "prefix" "source" "word" . "color" "blue" "inline" true "href" $href) }}
+  {{ end }}
+
+  {{ range .Params.sinks }}
+  {{ $href := printf "/docs/reference/configuration/sinks/%s" . | relURL }}
+  {{ partial "badge.html" (dict "prefix" "sink" "word"  . "color" "blue" "inline" true "href" $href) }}
+  {{ end }}
+
+  {{ with .Params.platform }}
+  {{ partial "badge.html" (dict "prefix" "platform" "word" . "color" "indigo" "inline" true) }}
+  {{ end }}
+</div>

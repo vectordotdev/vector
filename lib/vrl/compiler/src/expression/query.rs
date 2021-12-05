@@ -1,4 +1,4 @@
-use crate::expression::{Container, FunctionCall, Resolved, Variable};
+use crate::expression::{assignment, Container, FunctionCall, Resolved, Variable};
 use crate::parser::ast::Ident;
 use crate::{Context, Expression, State, TypeDef, Value};
 use lookup::LookupBuf;
@@ -23,6 +23,10 @@ impl Query {
         &self.path
     }
 
+    pub fn target(&self) -> &Target {
+        &self.target
+    }
+
     pub fn is_external(&self) -> bool {
         matches!(self.target, Target::External)
     }
@@ -39,6 +43,17 @@ impl Query {
             Target::FunctionCall(expr) => Some(expr),
             Target::Container(expr) => Some(expr),
             _ => None,
+        }
+    }
+
+    pub fn delete_type_def(&self, state: &mut State) {
+        if self.is_external() {
+            if let Some(ref mut target) = state.target().as_mut() {
+                let value = target.value.clone();
+                let type_def = target.type_def.remove_path(&self.path);
+
+                state.update_target(assignment::Details { type_def, value })
+            }
         }
     }
 }
@@ -65,6 +80,16 @@ impl Expression for Query {
             .ok()
             .flatten()
             .unwrap_or(Value::Null))
+    }
+
+    fn as_value(&self) -> Option<Value> {
+        match self.target {
+            Target::Internal(ref variable) => variable
+                .value()
+                .and_then(|v| v.get_by_path(self.path()))
+                .cloned(),
+            _ => None,
+        }
     }
 
     fn type_def(&self, state: &State) -> TypeDef {

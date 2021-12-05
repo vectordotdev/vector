@@ -1,6 +1,6 @@
 use crate::expression::{Expr, Resolved};
 use crate::{Context, Expression, State, TypeDef, Value};
-use std::fmt;
+use std::{fmt, ops::Deref};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Array {
@@ -13,12 +13,28 @@ impl Array {
     }
 }
 
+impl Deref for Array {
+    type Target = Vec<Expr>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
 impl Expression for Array {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.inner
             .iter()
             .map(|expr| expr.resolve(ctx))
             .collect::<Result<Vec<_>, _>>()
+            .map(Value::Array)
+    }
+
+    fn as_value(&self) -> Option<Value> {
+        self.inner
+            .iter()
+            .map(|expr| expr.as_value())
+            .collect::<Option<Vec<_>>>()
             .map(Value::Array)
     }
 

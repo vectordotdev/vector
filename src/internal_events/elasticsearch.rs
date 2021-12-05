@@ -1,5 +1,5 @@
-use super::InternalEvent;
 use metrics::counter;
+use vector_core::internal_event::InternalEvent;
 
 #[derive(Debug)]
 pub struct ElasticSearchEventEncoded {
@@ -13,7 +13,6 @@ impl InternalEvent for ElasticSearchEventEncoded {
     }
 
     fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }

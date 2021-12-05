@@ -1,13 +1,22 @@
 pub mod prelude;
 mod runtime;
 
-pub use compiler::{function, state, value, Context, Expression, Function, Program, Target, Value};
+pub use compiler::{
+    function, state, type_def::Index, value, Context, Expression, Function, Program, Target, Value,
+};
 pub use diagnostic;
 pub use runtime::{Runtime, RuntimeResult, Terminate};
+use std::any::Any;
 
 /// Compile a given source into the final [`Program`].
-pub fn compile(source: &str, fns: &[Box<dyn Function>]) -> compiler::Result {
-    let mut state = state::Compiler::default();
+pub fn compile(
+    source: &str,
+    fns: &[Box<dyn Function>],
+    external_context: Option<Box<dyn Any>>,
+) -> compiler::Result {
+    let mut state = state::Compiler::new();
+    state.set_external_context(external_context);
+
     compile_with_state(source, fns, &mut state)
 }
 

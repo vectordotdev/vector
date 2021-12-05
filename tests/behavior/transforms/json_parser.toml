@@ -10,7 +10,7 @@
   [[tests.outputs]]
     extract_from = "json_parser_nested"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .a == 3 &&
         .b.c == 4
@@ -29,7 +29,7 @@
   [[tests.outputs]]
     extract_from = "json_parser_target_field"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .target_field.a == 3
         .target_field.b.c == 4
@@ -47,7 +47,7 @@
   [[tests.outputs]]
     extract_from = "json_parser_null_value"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '''
         .a == 3 &&
         .b == null

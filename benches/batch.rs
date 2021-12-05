@@ -3,13 +3,14 @@ use criterion::{criterion_group, Criterion, SamplingMode, Throughput};
 use futures::{future, stream, SinkExt, StreamExt};
 use std::{convert::Infallible, time::Duration};
 use vector::{
-    buffers::Acker,
     sinks::util::{
         batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
-        BatchSink, Buffer, Compression, Partition, PartitionBatchSink,
+        BatchSink, Buffer, Compression, EncodedEvent, Merged, Partition, PartitionBatchSink,
+        SinkBatchSettings,
     },
     test_util::{random_lines, runtime},
 };
+use vector_core::buffers::Acker;
 
 fn benchmark_batch(c: &mut Criterion) {
     let event_len: usize = 100;
@@ -20,10 +21,10 @@ fn benchmark_batch(c: &mut Criterion) {
     group.sampling_mode(SamplingMode::Flat);
 
     let cases = [
-        (Compression::None, bytesize::mib(2u64)),
-        (Compression::None, bytesize::kib(500u64)),
-        (Compression::gzip_default(), bytesize::mib(2u64)),
-        (Compression::gzip_default(), bytesize::kib(500u64)),
+        (Compression::None, 2_000_000),
+        (Compression::None, 500_000),
+        (Compression::gzip_default(), 2_000_000),
+        (Compression::gzip_default(), 500_000),
     ];
 
     let input: Vec<_> = random_lines(event_len)
@@ -37,13 +38,13 @@ fn benchmark_batch(c: &mut Criterion) {
                 || {
                     let rt = runtime();
                     let (acker, _) = Acker::new_for_testing();
-                    let batch = BatchSettings::default()
-                        .bytes(*batch_size as u64)
-                        .events(num_events)
-                        .size;
+                    let mut batch = BatchSettings::default();
+                    batch.size.bytes = *batch_size;
+                    batch.size.events = num_events;
+
                     let batch_sink = PartitionBatchSink::new(
                         tower::service_fn(|_| future::ok::<_, Infallible>(())),
-                        PartitionedBuffer::new(batch, *compression),
+                        PartitionedBuffer::new(batch.size, *compression),
                         Duration::from_secs(1),
                         acker,
                     )
@@ -55,7 +56,7 @@ fn benchmark_batch(c: &mut Criterion) {
                             inner: b,
                             key: Bytes::from("key"),
                         }))
-                        .map(Ok),
+                        .map(|item| Ok(EncodedEvent::new(item, 0))),
                         batch_sink,
                     )
                 },
@@ -71,19 +72,23 @@ fn benchmark_batch(c: &mut Criterion) {
                     || {
                         let rt = runtime();
                         let (acker, _) = Acker::new_for_testing();
-                        let batch = BatchSettings::default()
-                            .bytes(*batch_size as u64)
-                            .events(num_events)
-                            .size;
+                        let mut batch = BatchSettings::default();
+                        batch.size.bytes = *batch_size;
+                        batch.size.events = num_events;
+
                         let batch_sink = BatchSink::new(
                             tower::service_fn(|_| future::ok::<_, Infallible>(())),
-                            Buffer::new(batch, *compression),
+                            Buffer::new(batch.size, *compression),
                             Duration::from_secs(1),
                             acker,
                         )
                         .sink_map_err(|error| panic!("{}", error));
 
-                        (rt, stream::iter(input.clone()).map(Ok), batch_sink)
+                        (
+                            rt,
+                            stream::iter(input.clone()).map(|item| Ok(EncodedEvent::new(item, 0))),
+                            batch_sink,
+                        )
                     },
                     |(rt, input, batch_sink)| rt.block_on(input.forward(batch_sink)).unwrap(),
                     criterion::BatchSize::LargeInput,
@@ -131,11 +136,10 @@ impl Batch for PartitionedBuffer {
     type Input = InnerBuffer;
     type Output = InnerBuffer;
 
-    fn get_settings_defaults(
-        config: BatchConfig,
-        defaults: BatchSettings<Self>,
-    ) -> Result<BatchSettings<Self>, BatchError> {
-        Ok(Buffer::get_settings_defaults(config, defaults.into())?.into())
+    fn get_settings_defaults<D: SinkBatchSettings>(
+        config: BatchConfig<D, Merged>,
+    ) -> Result<BatchConfig<D, Merged>, BatchError> {
+        Buffer::get_settings_defaults(config)
     }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {

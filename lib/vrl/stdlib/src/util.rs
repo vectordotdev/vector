@@ -1,8 +1,3 @@
-#[cfg(any(feature = "parse_regex", feature = "parse_regex_all"))]
-use std::collections::BTreeMap;
-use std::str::FromStr;
-use vrl::{value::Kind, Value};
-
 /// Rounds the given number to the given precision.
 /// Takes a function parameter so the exact rounding function (ceil, floor or round)
 /// can be specified.
@@ -28,7 +23,7 @@ pub(crate) fn capture_regex_to_map(
     regex: &regex::Regex,
     capture: regex::Captures,
     numeric_groups: bool,
-) -> std::collections::BTreeMap<String, Value> {
+) -> std::collections::BTreeMap<String, vrl::Value> {
     let names = regex.capture_names().flatten().map(|name| {
         (
             name.to_owned(),
@@ -50,34 +45,39 @@ pub(crate) fn capture_regex_to_map(
 }
 
 #[cfg(any(feature = "parse_regex", feature = "parse_regex_all"))]
-pub(crate) fn regex_type_def(regex: &regex::Regex) -> BTreeMap<String, Kind> {
-    let mut inner_type = BTreeMap::new();
+pub(crate) fn regex_type_def(
+    regex: &regex::Regex,
+) -> std::collections::BTreeMap<String, vrl::value::Kind> {
+    let mut inner_type = std::collections::BTreeMap::new();
 
     // Add typedefs for each capture by numerical index.
     for num in 0..regex.captures_len() {
-        inner_type.insert(num.to_string(), Kind::Bytes | Kind::Null);
+        inner_type.insert(
+            num.to_string(),
+            vrl::value::Kind::Bytes | vrl::value::Kind::Null,
+        );
     }
 
     // Add a typedef for each capture name.
     for name in regex.capture_names().flatten() {
-        inner_type.insert(name.to_owned(), Kind::Bytes);
+        inner_type.insert(name.to_owned(), vrl::value::Kind::Bytes);
     }
 
     inner_type
 }
 
 #[cfg(any(feature = "is_nullish", feature = "compact"))]
-pub(crate) fn is_nullish(value: &Value) -> bool {
+pub(crate) fn is_nullish(value: &vrl::Value) -> bool {
     match value {
-        Value::Bytes(v) => {
-            let s = &String::from_utf8_lossy(&v)[..];
+        vrl::Value::Bytes(v) => {
+            let s = &String::from_utf8_lossy(v)[..];
 
             match s {
                 "-" => true,
                 _ => s.chars().all(char::is_whitespace),
             }
         }
-        Value::Null => true,
+        vrl::Value::Null => true,
         _ => false,
     }
 }
@@ -89,12 +89,14 @@ pub enum Base64Charset {
     UrlSafe,
 }
 
+#[cfg(any(feature = "decode_base64", feature = "encode_base64"))]
 impl Default for Base64Charset {
     fn default() -> Self {
         Self::Standard
     }
 }
 
+#[cfg(any(feature = "decode_base64", feature = "encode_base64"))]
 impl From<Base64Charset> for base64::CharacterSet {
     fn from(charset: Base64Charset) -> base64::CharacterSet {
         use Base64Charset::*;
@@ -106,7 +108,8 @@ impl From<Base64Charset> for base64::CharacterSet {
     }
 }
 
-impl FromStr for Base64Charset {
+#[cfg(any(feature = "decode_base64", feature = "encode_base64"))]
+impl std::str::FromStr for Base64Charset {
     type Err = &'static str;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {

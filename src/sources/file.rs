@@ -1,9 +1,14 @@
+use super::util::finalizer::OrderedFinalizer;
 use super::util::{EncodingConfig, MultilineConfig};
+use crate::config::AcknowledgementsConfig;
+use crate::serde::bool_or_struct;
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     encoding_transcode::{Decoder, Encoder},
-    event::Event,
-    internal_events::{FileEventReceived, FileOpen, FileSourceInternalEventsEmitter},
+    event::{BatchNotifier, Event, LogEvent},
+    internal_events::{
+        FileBytesReceived, FileEventsReceived, FileOpen, FileSourceInternalEventsEmitter,
+    },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
     trace::{current_span, Instrument},
@@ -13,12 +18,12 @@ use bytes::Bytes;
 use chrono::Utc;
 use file_source::{
     paths_provider::glob::{Glob, MatchOptions},
-    FileServer, FingerprintStrategy, Fingerprinter, ReadFrom,
+    Checkpointer, FileFingerprint, FileServer, FingerprintStrategy, Fingerprinter, Line, ReadFrom,
 };
 use futures::{
     future::TryFutureExt,
     stream::{Stream, StreamExt},
-    SinkExt,
+    FutureExt, SinkExt,
 };
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
@@ -88,6 +93,8 @@ pub struct FileConfig {
     pub remove_after_secs: Option<u64>,
     pub line_delimiter: String,
     pub encoding: Option<EncodingConfig>,
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
@@ -98,6 +105,8 @@ pub enum FingerprintConfig {
         #[serde(alias = "fingerprint_bytes")]
         bytes: Option<usize>,
         ignored_header_bytes: usize,
+        #[serde(default = "default_lines")]
+        lines: usize,
     },
     #[serde(rename = "device_and_inode")]
     DevInode,
@@ -125,6 +134,7 @@ impl From<FingerprintConfig> for FingerprintStrategy {
             FingerprintConfig::Checksum {
                 bytes,
                 ignored_header_bytes,
+                lines,
             } => {
                 let bytes = match bytes {
                     Some(bytes) => {
@@ -136,6 +146,7 @@ impl From<FingerprintConfig> for FingerprintStrategy {
                 FingerprintStrategy::Checksum {
                     bytes,
                     ignored_header_bytes,
+                    lines,
                 }
             }
             FingerprintConfig::DevInode => FingerprintStrategy::DevInode,
@@ -145,6 +156,16 @@ impl From<FingerprintConfig> for FingerprintStrategy {
 
 fn default_max_line_bytes() -> usize {
     bytesize::kib(100u64) as usize
+}
+
+const fn default_lines() -> usize {
+    1
+}
+
+#[derive(Debug)]
+pub(crate) struct FinalizerEntry {
+    pub(crate) file_id: FileFingerprint,
+    pub(crate) offset: u64,
 }
 
 impl Default for FileConfig {
@@ -161,6 +182,7 @@ impl Default for FileConfig {
             fingerprint: FingerprintConfig::Checksum {
                 bytes: None,
                 ignored_header_bytes: 0,
+                lines: 1,
             },
             ignore_not_found: false,
             host_key: None,
@@ -174,6 +196,7 @@ impl Default for FileConfig {
             remove_after_secs: None,
             line_delimiter: "\n".to_string(),
             encoding: None,
+            acknowledgements: AcknowledgementsConfig::default(),
         }
     }
 }
@@ -194,7 +217,8 @@ impl SourceConfig for FileConfig {
         // other
         let data_dir = cx
             .globals
-            .resolve_and_make_data_subdir(self.data_dir.as_ref(), &cx.name)?;
+            // source are only global, name can be used for subdir
+            .resolve_and_make_data_subdir(self.data_dir.as_ref(), cx.key.id())?;
 
         // Clippy rule, because async_trait?
         #[allow(clippy::suspicious_else_formatting)]
@@ -209,7 +233,13 @@ impl SourceConfig for FileConfig {
             }
         }
 
-        Ok(file_source(self, data_dir, cx.shutdown, cx.out))
+        Ok(file_source(
+            self,
+            data_dir,
+            cx.shutdown,
+            cx.out,
+            self.acknowledgements.enabled,
+        ))
     }
 
     fn output_type(&self) -> DataType {
@@ -226,6 +256,7 @@ pub fn file_source(
     data_dir: PathBuf,
     shutdown: ShutdownSignal,
     mut out: Pipeline,
+    acknowledgements: bool,
 ) -> super::Source {
     let ignore_before = config
         .ignore_older_secs
@@ -254,6 +285,7 @@ pub fn file_source(
         None => Bytes::from(config.line_delimiter.clone()),
     };
 
+    let checkpointer = Checkpointer::new(&data_dir);
     let file_server = FileServer {
         paths_provider,
         max_read_bytes: config.max_read_bytes,
@@ -287,6 +319,14 @@ pub fn file_source(
     let multiline_config = config.multiline.clone();
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
+    let checkpoints = checkpointer.view();
+    let shutdown = shutdown.shared();
+    let finalizer = acknowledgements.then(|| {
+        let checkpoints = checkpointer.view();
+        OrderedFinalizer::new(shutdown.clone(), move |entry: FinalizerEntry| {
+            checkpoints.update(entry.file_id, entry.offset)
+        })
+    });
 
     Box::pin(async move {
         info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
@@ -294,19 +334,24 @@ pub fn file_source(
         let mut encoding_decoder = encoding_charset.map(|e| Decoder::new(e));
 
         // sizing here is just a guess
-        let (tx, rx) = futures::channel::mpsc::channel::<Vec<(Bytes, String)>>(2);
+        let (tx, rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
         let rx = rx
             .map(futures::stream::iter)
             .flatten()
-            .map(move |(line, src)| {
+            .map(move |mut line| {
+                emit!(&FileBytesReceived {
+                    byte_size: line.text.len(),
+                    file: &line.filename,
+                });
                 // transcode each line from the file's encoding charset to utf8
-                match encoding_decoder.as_mut() {
-                    Some(d) => (d.decode_to_utf8(line), src),
-                    None => (line, src),
-                }
+                line.text = match encoding_decoder.as_mut() {
+                    Some(d) => d.decode_to_utf8(line.text),
+                    None => line.text,
+                };
+                line
             });
 
-        let messages: Box<dyn Stream<Item = (Bytes, String)> + Send + std::marker::Unpin> =
+        let messages: Box<dyn Stream<Item = Line> + Send + std::marker::Unpin> =
             if let Some(ref multiline_config) = multiline_config {
                 wrap_with_line_agg(
                     rx,
@@ -329,9 +374,22 @@ pub fn file_source(
         let span = current_span();
         let span2 = span.clone();
         let mut messages = messages
-            .map(move |(msg, file): (Bytes, String)| {
+            .map(move |line| {
                 let _enter = span2.enter();
-                create_event(msg, file, &host_key, &hostname, &file_key)
+                let mut event =
+                    create_event(line.text, line.filename, &host_key, &hostname, &file_key);
+                if let Some(finalizer) = &finalizer {
+                    let (batch, receiver) = BatchNotifier::new_with_receiver();
+                    event = event.with_batch_notifier(&batch);
+                    let entry = FinalizerEntry {
+                        file_id: line.file_id,
+                        offset: line.offset,
+                    };
+                    finalizer.add(entry, receiver);
+                } else {
+                    checkpoints.update(line.file_id, line.offset);
+                }
+                event
             })
             .map(Ok);
         tokio::spawn(async move { out.send_all(&mut messages).instrument(span).await });
@@ -339,8 +397,8 @@ pub fn file_source(
         let span = info_span!("file_server");
         spawn_blocking(move || {
             let _enter = span.enter();
-            let result = file_server.run(tx, shutdown);
-            emit!(FileOpen { count: 0 });
+            let result = file_server.run(tx, shutdown, checkpointer);
+            emit!(&FileOpen { count: 0 });
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
             // passed to the `JoinHandle` error, similar to the usual threads.
@@ -375,13 +433,21 @@ fn reconcile_position_options(
 }
 
 fn wrap_with_line_agg(
-    rx: impl Stream<Item = (Bytes, String)> + Send + std::marker::Unpin + 'static,
+    rx: impl Stream<Item = Line> + Send + std::marker::Unpin + 'static,
     config: line_agg::Config,
-) -> Box<dyn Stream<Item = (Bytes, String)> + Send + std::marker::Unpin + 'static> {
+) -> Box<dyn Stream<Item = Line> + Send + std::marker::Unpin + 'static> {
     let logic = line_agg::Logic::new(config);
     Box::new(
-        LineAgg::new(rx.map(|(line, src)| (src, line, ())), logic)
-            .map(|(src, line, _context)| (line, src)),
+        LineAgg::new(
+            rx.map(|line| (line.filename, line.text, (line.file_id, line.offset))),
+            logic,
+        )
+        .map(|(filename, text, (file_id, offset))| Line {
+            text,
+            filename,
+            file_id,
+            offset,
+        }),
     )
 }
 
@@ -392,33 +458,38 @@ fn create_event(
     hostname: &Option<String>,
     file_key: &Option<String>,
 ) -> Event {
-    emit!(FileEventReceived {
+    emit!(&FileEventsReceived {
+        count: 1,
         file: &file,
         byte_size: line.len(),
     });
 
-    let mut event = Event::from(line);
+    let mut event = LogEvent::from(line);
 
     // Add source type
-    event
-        .as_mut_log()
-        .insert(log_schema().source_type_key(), Bytes::from("file"));
+    event.insert(log_schema().source_type_key(), Bytes::from("file"));
 
     if let Some(file_key) = &file_key {
-        event.as_mut_log().insert(file_key.clone(), file);
+        event.insert(file_key.clone(), file);
     }
 
     if let Some(hostname) = &hostname {
-        event.as_mut_log().insert(host_key, hostname.clone());
+        event.insert(host_key, hostname.clone());
     }
 
-    event
+    event.into()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::Config, shutdown::ShutdownSignal, sources::file};
+    use crate::{
+        config::Config,
+        event::{EventStatus, Value},
+        shutdown::ShutdownSignal,
+        sources::file,
+        test_util::components::{self, SOURCE_TESTS},
+    };
     use encoding_rs::UTF_16LE;
     use pretty_assertions::assert_eq;
     use std::{
@@ -440,9 +511,10 @@ mod tests {
             fingerprint: FingerprintConfig::Checksum {
                 bytes: Some(8),
                 ignored_header_bytes: 0,
+                lines: 1,
             },
             data_dir: Some(dir.path().to_path_buf()),
-            glob_minimum_cooldown_ms: 0, // millis
+            glob_minimum_cooldown_ms: 100, // millis
             ..Default::default()
         }
     }
@@ -476,6 +548,7 @@ mod tests {
             FingerprintConfig::Checksum {
                 bytes: None,
                 ignored_header_bytes: 0,
+                lines: 1
             }
         );
 
@@ -502,6 +575,7 @@ mod tests {
             FingerprintConfig::Checksum {
                 bytes: Some(128),
                 ignored_header_bytes: 512,
+                lines: 1
             }
         );
 
@@ -571,8 +645,6 @@ mod tests {
     #[tokio::test]
     async fn file_happy_path() {
         let n = 5;
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -580,26 +652,23 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
-
         let path1 = dir.path().join("file1");
         let path2 = dir.path().join("file2");
-        let mut file1 = File::create(&path1).unwrap();
-        let mut file2 = File::create(&path2).unwrap();
 
-        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+        let received = run_file_source(&config, false, NoAcks, async {
+            let mut file1 = File::create(&path1).unwrap();
+            let mut file2 = File::create(&path2).unwrap();
 
-        for i in 0..n {
-            writeln!(&mut file1, "hello {}", i).unwrap();
-            writeln!(&mut file2, "goodbye {}", i).unwrap();
-        }
+            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
-        sleep_500_millis().await;
+            for i in 0..n {
+                writeln!(&mut file1, "hello {}", i).unwrap();
+                writeln!(&mut file2, "goodbye {}", i).unwrap();
+            }
 
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+            sleep_500_millis().await;
+        })
+        .await;
 
         let mut hello_i = 0;
         let mut goodbye_i = 0;
@@ -626,45 +695,69 @@ mod tests {
         assert_eq!(goodbye_i, n);
     }
 
+    // https://github.com/timberio/vector/issues/8363
     #[tokio::test]
-    async fn file_truncate() {
+    async fn file_read_empty_lines() {
         let n = 5;
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
 
         let path = dir.path().join("file");
-        let mut file = File::create(&path).unwrap();
 
-        sleep_500_millis().await; // The files must be observed at its original length before writing to it
+        let received = run_file_source(&config, false, NoAcks, async {
+            let mut file = File::create(&path).unwrap();
 
-        for i in 0..n {
-            writeln!(&mut file, "pretrunc {}", i).unwrap();
-        }
+            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
-        sleep_500_millis().await; // The writes must be observed before truncating
+            writeln!(&mut file, "line for checkpointing").unwrap();
+            for _i in 0..n {
+                writeln!(&mut file).unwrap();
+            }
 
-        file.set_len(0).unwrap();
-        file.seek(std::io::SeekFrom::Start(0)).unwrap();
+            sleep_500_millis().await;
+        })
+        .await;
 
-        sleep_500_millis().await; // The truncate must be observed before writing again
+        assert_eq!(received.len(), n + 1);
+    }
 
-        for i in 0..n {
-            writeln!(&mut file, "posttrunc {}", i).unwrap();
-        }
+    #[tokio::test]
+    async fn file_truncate() {
+        let n = 5;
 
-        sleep_500_millis().await;
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            ..test_default_file_config(&dir)
+        };
+        let path = dir.path().join("file");
+        let received = run_file_source(&config, false, NoAcks, async {
+            let mut file = File::create(&path).unwrap();
 
-        drop(trigger_shutdown);
+            sleep_500_millis().await; // The files must be observed at its original length before writing to it
 
-        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+            for i in 0..n {
+                writeln!(&mut file, "pretrunc {}", i).unwrap();
+            }
+
+            sleep_500_millis().await; // The writes must be observed before truncating
+
+            file.set_len(0).unwrap();
+            file.seek(std::io::SeekFrom::Start(0)).unwrap();
+
+            sleep_500_millis().await; // The truncate must be observed before writing again
+
+            for i in 0..n {
+                writeln!(&mut file, "posttrunc {}", i).unwrap();
+            }
+
+            sleep_500_millis().await;
+        })
+        .await;
 
         let mut i = 0;
         let mut pre_trunc = true;
@@ -694,43 +787,38 @@ mod tests {
     #[tokio::test]
     async fn file_rotate() {
         let n = 5;
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
 
         let path = dir.path().join("file");
         let archive_path = dir.path().join("file");
-        let mut file = File::create(&path).unwrap();
+        let received = run_file_source(&config, false, NoAcks, async {
+            let mut file = File::create(&path).unwrap();
 
-        sleep_500_millis().await; // The files must be observed at its original length before writing to it
+            sleep_500_millis().await; // The files must be observed at its original length before writing to it
 
-        for i in 0..n {
-            writeln!(&mut file, "prerot {}", i).unwrap();
-        }
+            for i in 0..n {
+                writeln!(&mut file, "prerot {}", i).unwrap();
+            }
 
-        sleep_500_millis().await; // The writes must be observed before rotating
+            sleep_500_millis().await; // The writes must be observed before rotating
 
-        fs::rename(&path, archive_path).expect("could not rename");
-        let mut file = File::create(&path).unwrap();
+            fs::rename(&path, archive_path).expect("could not rename");
+            let mut file = File::create(&path).unwrap();
 
-        sleep_500_millis().await; // The rotation must be observed before writing again
+            sleep_500_millis().await; // The rotation must be observed before writing again
 
-        for i in 0..n {
-            writeln!(&mut file, "postrot {}", i).unwrap();
-        }
+            for i in 0..n {
+                writeln!(&mut file, "postrot {}", i).unwrap();
+            }
 
-        sleep_500_millis().await;
-
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+            sleep_500_millis().await;
+        })
+        .await;
 
         let mut i = 0;
         let mut pre_rot = true;
@@ -760,8 +848,6 @@ mod tests {
     #[tokio::test]
     async fn file_multiple_paths() {
         let n = 5;
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -770,32 +856,28 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
-
         let path1 = dir.path().join("a.txt");
         let path2 = dir.path().join("b.txt");
         let path3 = dir.path().join("a.log");
         let path4 = dir.path().join("a.ignore.txt");
-        let mut file1 = File::create(&path1).unwrap();
-        let mut file2 = File::create(&path2).unwrap();
-        let mut file3 = File::create(&path3).unwrap();
-        let mut file4 = File::create(&path4).unwrap();
+        let received = run_file_source(&config, false, NoAcks, async {
+            let mut file1 = File::create(&path1).unwrap();
+            let mut file2 = File::create(&path2).unwrap();
+            let mut file3 = File::create(&path3).unwrap();
+            let mut file4 = File::create(&path4).unwrap();
 
-        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
-        for i in 0..n {
-            writeln!(&mut file1, "1 {}", i).unwrap();
-            writeln!(&mut file2, "2 {}", i).unwrap();
-            writeln!(&mut file3, "3 {}", i).unwrap();
-            writeln!(&mut file4, "4 {}", i).unwrap();
-        }
+            for i in 0..n {
+                writeln!(&mut file1, "1 {}", i).unwrap();
+                writeln!(&mut file2, "2 {}", i).unwrap();
+                writeln!(&mut file3, "3 {}", i).unwrap();
+                writeln!(&mut file4, "4 {}", i).unwrap();
+            }
 
-        sleep_500_millis().await;
-
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+            sleep_500_millis().await;
+        })
+        .await;
 
         let mut is = [0; 3];
 
@@ -814,45 +896,45 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn file_file_key() {
+    async fn file_file_key_acknowledged() {
+        file_file_key(Acks).await
+    }
+
+    #[tokio::test]
+    async fn file_file_key_nonacknowledged() {
+        file_file_key(NoAcks).await
+    }
+
+    async fn file_file_key(acks: AckingMode) {
         // Default
         {
-            let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
-
-            let (tx, mut rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
                 ..test_default_file_config(&dir)
             };
 
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            tokio::spawn(source);
-
             let path = dir.path().join("file");
-            let mut file = File::create(&path).unwrap();
+            let received = run_file_source(&config, true, acks, async {
+                let mut file = File::create(&path).unwrap();
 
-            sleep_500_millis().await;
+                sleep_500_millis().await;
 
-            writeln!(&mut file, "hello there").unwrap();
+                writeln!(&mut file, "hello there").unwrap();
 
-            sleep_500_millis().await;
+                sleep_500_millis().await;
+            })
+            .await;
 
-            drop(trigger_shutdown);
-            shutdown_done.await;
-
-            let received = wait_with_timeout(rx.next()).await.unwrap();
+            assert_eq!(received.len(), 1);
             assert_eq!(
-                received.as_log()["file"].to_string_lossy(),
+                received[0].as_log()["file"].to_string_lossy(),
                 path.to_str().unwrap()
             );
         }
 
         // Custom
         {
-            let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
-
-            let (tx, mut rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -860,33 +942,27 @@ mod tests {
                 ..test_default_file_config(&dir)
             };
 
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            tokio::spawn(source);
-
             let path = dir.path().join("file");
-            let mut file = File::create(&path).unwrap();
+            let received = run_file_source(&config, true, acks, async {
+                let mut file = File::create(&path).unwrap();
 
-            sleep_500_millis().await;
+                sleep_500_millis().await;
 
-            writeln!(&mut file, "hello there").unwrap();
+                writeln!(&mut file, "hello there").unwrap();
 
-            sleep_500_millis().await;
+                sleep_500_millis().await;
+            })
+            .await;
 
-            drop(trigger_shutdown);
-            shutdown_done.await;
-
-            let received = wait_with_timeout(rx.next()).await.unwrap();
+            assert_eq!(received.len(), 1);
             assert_eq!(
-                received.as_log()["source"].to_string_lossy(),
+                received[0].as_log()["source"].to_string_lossy(),
                 path.to_str().unwrap()
             );
         }
 
         // Hidden
         {
-            let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
-
-            let (tx, mut rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -894,24 +970,21 @@ mod tests {
                 ..test_default_file_config(&dir)
             };
 
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            tokio::spawn(source);
-
             let path = dir.path().join("file");
-            let mut file = File::create(&path).unwrap();
+            let received = run_file_source(&config, true, acks, async {
+                let mut file = File::create(&path).unwrap();
 
-            sleep_500_millis().await;
+                sleep_500_millis().await;
 
-            writeln!(&mut file, "hello there").unwrap();
+                writeln!(&mut file, "hello there").unwrap();
 
-            sleep_500_millis().await;
+                sleep_500_millis().await;
+            })
+            .await;
 
-            drop(trigger_shutdown);
-            shutdown_done.await;
-
-            let received = wait_with_timeout(rx.next()).await.unwrap();
+            assert_eq!(received.len(), 1);
             assert_eq!(
-                received.as_log().keys().collect::<HashSet<_>>(),
+                received[0].as_log().keys().collect::<HashSet<_>>(),
                 vec![
                     log_schema().host_key().to_string(),
                     log_schema().message_key().to_string(),
@@ -924,8 +997,20 @@ mod tests {
         }
     }
 
+    #[cfg(target_os = "linux")] // see #7988
     #[tokio::test]
-    async fn file_start_position_server_restart() {
+    async fn file_start_position_server_restart_acknowledged() {
+        file_start_position_server_restart(Acks).await
+    }
+
+    #[cfg(target_os = "linux")] // see #7988
+    #[tokio::test]
+    async fn file_start_position_server_restart_nonacknowledged() {
+        file_start_position_server_restart(NoAcks).await
+    }
+
+    #[cfg(target_os = "linux")] // see #7988
+    async fn file_start_position_server_restart(acking: AckingMode) {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -939,71 +1024,44 @@ mod tests {
 
         // First time server runs it picks up existing lines.
         {
-            let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
+            let received = run_file_source(&config, true, acking, async {
+                sleep_500_millis().await;
+                writeln!(&mut file, "first line").unwrap();
+                sleep_500_millis().await;
+            })
+            .await;
 
-            let (tx, rx) = Pipeline::new_test();
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            tokio::spawn(source);
-
-            sleep_500_millis().await;
-            writeln!(&mut file, "first line").unwrap();
-            sleep_500_millis().await;
-
-            drop(trigger_shutdown);
-
-            let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
-            let lines = received
-                .into_iter()
-                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
-                .collect::<Vec<_>>();
+            let lines = extract_messages_string(received);
             assert_eq!(lines, vec!["zeroth line", "first line"]);
         }
         // Restart server, read file from checkpoint.
         {
-            let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
+            let received = run_file_source(&config, true, acking, async {
+                sleep_500_millis().await;
+                writeln!(&mut file, "second line").unwrap();
+                sleep_500_millis().await;
+            })
+            .await;
 
-            let (tx, rx) = Pipeline::new_test();
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            tokio::spawn(source);
-
-            sleep_500_millis().await;
-            writeln!(&mut file, "second line").unwrap();
-            sleep_500_millis().await;
-
-            drop(trigger_shutdown);
-
-            let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
-            let lines = received
-                .into_iter()
-                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
-                .collect::<Vec<_>>();
+            let lines = extract_messages_string(received);
             assert_eq!(lines, vec!["second line"]);
         }
         // Restart server, read files from beginning.
         {
-            let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
                 ignore_checkpoints: Some(true),
                 read_from: Some(ReadFromConfig::Beginning),
                 ..test_default_file_config(&dir)
             };
-            let (tx, rx) = Pipeline::new_test();
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            tokio::spawn(source);
+            let received = run_file_source(&config, false, acking, async {
+                sleep_500_millis().await;
+                writeln!(&mut file, "third line").unwrap();
+                sleep_500_millis().await;
+            })
+            .await;
 
-            sleep_500_millis().await;
-            writeln!(&mut file, "third line").unwrap();
-            sleep_500_millis().await;
-
-            drop(trigger_shutdown);
-
-            let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
-            let lines = received
-                .into_iter()
-                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
-                .collect::<Vec<_>>();
+            let lines = extract_messages_string(received);
             assert_eq!(
                 lines,
                 vec!["zeroth line", "first line", "second line", "third line"]
@@ -1012,7 +1070,40 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn file_start_position_server_restart_with_file_rotation() {
+    async fn file_start_position_server_restart_unfinalized() {
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+        writeln!(&mut file, "the line").unwrap();
+        sleep_500_millis().await;
+
+        // First time server runs it picks up existing lines.
+        let received = run_file_source(&config, false, Unfinalized, sleep_500_millis()).await;
+        let lines = extract_messages_string(received);
+        assert_eq!(lines, vec!["the line"]);
+
+        // Restart server, it re-reads file since the events were not acknowledged before shutdown
+        let received = run_file_source(&config, false, Unfinalized, sleep_500_millis()).await;
+        let lines = extract_messages_string(received);
+        assert_eq!(lines, vec!["the line"]);
+    }
+
+    #[tokio::test]
+    async fn file_start_position_server_restart_with_file_rotation_acknowledged() {
+        file_start_position_server_restart_with_file_rotation(Acks).await
+    }
+
+    #[tokio::test]
+    async fn file_start_position_server_restart_with_file_rotation_nonacknowledged() {
+        file_start_position_server_restart_with_file_rotation(NoAcks).await
+    }
+
+    async fn file_start_position_server_restart_with_file_rotation(acking: AckingMode) {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1023,24 +1114,15 @@ mod tests {
         let path_for_old_file = dir.path().join("file.old");
         // Run server first time, collect some lines.
         {
-            let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
+            let received = run_file_source(&config, true, acking, async {
+                let mut file = File::create(&path).unwrap();
+                sleep_500_millis().await;
+                writeln!(&mut file, "first line").unwrap();
+                sleep_500_millis().await;
+            })
+            .await;
 
-            let (tx, rx) = Pipeline::new_test();
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            tokio::spawn(source);
-
-            let mut file = File::create(&path).unwrap();
-            sleep_500_millis().await;
-            writeln!(&mut file, "first line").unwrap();
-            sleep_500_millis().await;
-
-            drop(trigger_shutdown);
-
-            let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
-            let lines = received
-                .into_iter()
-                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
-                .collect::<Vec<_>>();
+            let lines = extract_messages_string(received);
             assert_eq!(lines, vec!["first line"]);
         }
         // Perform 'file rotation' to archive old lines.
@@ -1048,24 +1130,15 @@ mod tests {
         // Restart the server and make sure it does not re-read the old file
         // even though it has a new name.
         {
-            let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
+            let received = run_file_source(&config, false, acking, async {
+                let mut file = File::create(&path).unwrap();
+                sleep_500_millis().await;
+                writeln!(&mut file, "second line").unwrap();
+                sleep_500_millis().await;
+            })
+            .await;
 
-            let (tx, rx) = Pipeline::new_test();
-            let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            tokio::spawn(source);
-
-            let mut file = File::create(&path).unwrap();
-            sleep_500_millis().await;
-            writeln!(&mut file, "second line").unwrap();
-            sleep_500_millis().await;
-
-            drop(trigger_shutdown);
-
-            let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
-            let lines = received
-                .into_iter()
-                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
-                .collect::<Vec<_>>();
+            let lines = extract_messages_string(received);
             assert_eq!(lines, vec!["second line"]);
         }
     }
@@ -1076,8 +1149,6 @@ mod tests {
         use std::os::unix::io::AsRawFd;
         use std::time::{Duration, SystemTime};
 
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1085,55 +1156,52 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
+        let received = run_file_source(&config, false, NoAcks, async {
+            let before_path = dir.path().join("before");
+            let mut before_file = File::create(&before_path).unwrap();
+            let after_path = dir.path().join("after");
+            let mut after_file = File::create(&after_path).unwrap();
 
-        let before_path = dir.path().join("before");
-        let mut before_file = File::create(&before_path).unwrap();
-        let after_path = dir.path().join("after");
-        let mut after_file = File::create(&after_path).unwrap();
+            writeln!(&mut before_file, "first line").unwrap(); // first few bytes make up unique file fingerprint
+            writeln!(&mut after_file, "_first line").unwrap(); //   and therefore need to be non-identical
 
-        writeln!(&mut before_file, "first line").unwrap(); // first few bytes make up unique file fingerprint
-        writeln!(&mut after_file, "_first line").unwrap(); //   and therefore need to be non-identical
+            {
+                // Set the modified times
+                let before = SystemTime::now() - Duration::from_secs(8);
+                let after = SystemTime::now() - Duration::from_secs(2);
 
-        {
-            // Set the modified times
-            let before = SystemTime::now() - Duration::from_secs(8);
-            let after = SystemTime::now() - Duration::from_secs(2);
+                let before_time = libc::timeval {
+                    tv_sec: before
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs() as _,
+                    tv_usec: 0,
+                };
+                let before_times = [before_time, before_time];
 
-            let before_time = libc::timeval {
-                tv_sec: before
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs() as _,
-                tv_usec: 0,
-            };
-            let before_times = [before_time, before_time];
+                let after_time = libc::timeval {
+                    tv_sec: after
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs() as _,
+                    tv_usec: 0,
+                };
+                let after_times = [after_time, after_time];
 
-            let after_time = libc::timeval {
-                tv_sec: after
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs() as _,
-                tv_usec: 0,
-            };
-            let after_times = [after_time, after_time];
-
-            unsafe {
-                libc::futimes(before_file.as_raw_fd(), before_times.as_ptr());
-                libc::futimes(after_file.as_raw_fd(), after_times.as_ptr());
+                unsafe {
+                    libc::futimes(before_file.as_raw_fd(), before_times.as_ptr());
+                    libc::futimes(after_file.as_raw_fd(), after_times.as_ptr());
+                }
             }
-        }
 
-        sleep_500_millis().await;
-        writeln!(&mut before_file, "second line").unwrap();
-        writeln!(&mut after_file, "_second line").unwrap();
+            sleep_500_millis().await;
+            writeln!(&mut before_file, "second line").unwrap();
+            writeln!(&mut after_file, "_second line").unwrap();
 
-        sleep_500_millis().await;
+            sleep_500_millis().await;
+        })
+        .await;
 
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
         let before_lines = received
             .iter()
             .filter(|event| event.as_log()["file"].to_string_lossy().ends_with("before"))
@@ -1150,9 +1218,6 @@ mod tests {
 
     #[tokio::test]
     async fn file_max_line_bytes() {
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1160,44 +1225,31 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
-
         let path = dir.path().join("file");
-        let mut file = File::create(&path).unwrap();
+        let received = run_file_source(&config, false, NoAcks, async {
+            let mut file = File::create(&path).unwrap();
 
-        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
-        writeln!(&mut file, "short").unwrap();
-        writeln!(&mut file, "this is too long").unwrap();
-        writeln!(&mut file, "11 eleven11").unwrap();
-        let super_long = std::iter::repeat("This line is super long and will take up more space than BufReader's internal buffer, just to make sure that everything works properly when multiple read calls are involved").take(10000).collect::<String>();
-        writeln!(&mut file, "{}", super_long).unwrap();
-        writeln!(&mut file, "exactly 10").unwrap();
-        writeln!(&mut file, "it can end on a line that's too long").unwrap();
+            writeln!(&mut file, "short").unwrap();
+            writeln!(&mut file, "this is too long").unwrap();
+            writeln!(&mut file, "11 eleven11").unwrap();
+            let super_long = "This line is super long and will take up more space than BufReader's internal buffer, just to make sure that everything works properly when multiple read calls are involved".repeat(10000);
+            writeln!(&mut file, "{}", super_long).unwrap();
+            writeln!(&mut file, "exactly 10").unwrap();
+            writeln!(&mut file, "it can end on a line that's too long").unwrap();
 
-        sleep_500_millis().await;
-        sleep_500_millis().await;
+            sleep_500_millis().await;
+            sleep_500_millis().await;
 
-        writeln!(&mut file, "and then continue").unwrap();
-        writeln!(&mut file, "last short").unwrap();
+            writeln!(&mut file, "and then continue").unwrap();
+            writeln!(&mut file, "last short").unwrap();
 
-        sleep_500_millis().await;
-        sleep_500_millis().await;
+            sleep_500_millis().await;
+            sleep_500_millis().await;
+        }).await;
 
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
-        )
-        .await;
+        let received = extract_messages_value(received);
 
         assert_eq!(
             received,
@@ -1207,9 +1259,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_multi_line_aggregation_legacy() {
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1218,47 +1267,35 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
-
         let path = dir.path().join("file");
-        let mut file = File::create(&path).unwrap();
+        let received = run_file_source(&config, false, NoAcks, async {
+            let mut file = File::create(&path).unwrap();
 
-        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
-        writeln!(&mut file, "leftover foo").unwrap();
-        writeln!(&mut file, "INFO hello").unwrap();
-        writeln!(&mut file, "INFO goodbye").unwrap();
-        writeln!(&mut file, "part of goodbye").unwrap();
+            writeln!(&mut file, "leftover foo").unwrap();
+            writeln!(&mut file, "INFO hello").unwrap();
+            writeln!(&mut file, "INFO goodbye").unwrap();
+            writeln!(&mut file, "part of goodbye").unwrap();
 
-        sleep_500_millis().await;
+            sleep_500_millis().await;
 
-        writeln!(&mut file, "INFO hi again").unwrap();
-        writeln!(&mut file, "and some more").unwrap();
-        writeln!(&mut file, "INFO hello").unwrap();
+            writeln!(&mut file, "INFO hi again").unwrap();
+            writeln!(&mut file, "and some more").unwrap();
+            writeln!(&mut file, "INFO hello").unwrap();
 
-        sleep_500_millis().await;
+            sleep_500_millis().await;
 
-        writeln!(&mut file, "too slow").unwrap();
-        writeln!(&mut file, "INFO doesn't have").unwrap();
-        writeln!(&mut file, "to be INFO in").unwrap();
-        writeln!(&mut file, "the middle").unwrap();
+            writeln!(&mut file, "too slow").unwrap();
+            writeln!(&mut file, "INFO doesn't have").unwrap();
+            writeln!(&mut file, "to be INFO in").unwrap();
+            writeln!(&mut file, "the middle").unwrap();
 
-        sleep_500_millis().await;
-
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
-        )
+            sleep_500_millis().await;
+        })
         .await;
+
+        let received = extract_messages_value(received);
 
         assert_eq!(
             received,
@@ -1277,9 +1314,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_multi_line_aggregation() {
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1292,47 +1326,35 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
-
         let path = dir.path().join("file");
-        let mut file = File::create(&path).unwrap();
+        let received = run_file_source(&config, false, NoAcks, async {
+            let mut file = File::create(&path).unwrap();
 
-        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
-        writeln!(&mut file, "leftover foo").unwrap();
-        writeln!(&mut file, "INFO hello").unwrap();
-        writeln!(&mut file, "INFO goodbye").unwrap();
-        writeln!(&mut file, "part of goodbye").unwrap();
+            writeln!(&mut file, "leftover foo").unwrap();
+            writeln!(&mut file, "INFO hello").unwrap();
+            writeln!(&mut file, "INFO goodbye").unwrap();
+            writeln!(&mut file, "part of goodbye").unwrap();
 
-        sleep_500_millis().await;
+            sleep_500_millis().await;
 
-        writeln!(&mut file, "INFO hi again").unwrap();
-        writeln!(&mut file, "and some more").unwrap();
-        writeln!(&mut file, "INFO hello").unwrap();
+            writeln!(&mut file, "INFO hi again").unwrap();
+            writeln!(&mut file, "and some more").unwrap();
+            writeln!(&mut file, "INFO hello").unwrap();
 
-        sleep_500_millis().await;
+            sleep_500_millis().await;
 
-        writeln!(&mut file, "too slow").unwrap();
-        writeln!(&mut file, "INFO doesn't have").unwrap();
-        writeln!(&mut file, "to be INFO in").unwrap();
-        writeln!(&mut file, "the middle").unwrap();
+            writeln!(&mut file, "too slow").unwrap();
+            writeln!(&mut file, "INFO doesn't have").unwrap();
+            writeln!(&mut file, "to be INFO in").unwrap();
+            writeln!(&mut file, "the middle").unwrap();
 
-        sleep_500_millis().await;
-
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
-        )
+            sleep_500_millis().await;
+        })
         .await;
+
+        let received = extract_messages_value(received);
 
         assert_eq!(
             received,
@@ -1351,9 +1373,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_fair_reads() {
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1380,24 +1399,9 @@ mod tests {
 
         sleep_500_millis().await;
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
+        let received = run_file_source(&config, false, NoAcks, sleep_500_millis()).await;
 
-        sleep_500_millis().await;
-
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
-        )
-        .await;
+        let received = extract_messages_value(received);
 
         assert_eq!(
             received,
@@ -1414,9 +1418,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_oldest_first() {
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1443,24 +1444,9 @@ mod tests {
 
         sleep_500_millis().await;
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
+        let received = run_file_source(&config, false, NoAcks, sleep_500_millis()).await;
 
-        sleep_500_millis().await;
-
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
-        )
-        .await;
+        let received = extract_messages_value(received);
 
         assert_eq!(
             received,
@@ -1475,11 +1461,10 @@ mod tests {
         );
     }
 
+    // Ignoring on mac: https://github.com/timberio/vector/issues/8373
+    #[cfg(not(target_os = "macos"))]
     #[tokio::test]
     async fn test_split_reads() {
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1494,33 +1479,21 @@ mod tests {
 
         sleep_500_millis().await;
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
+        let received = run_file_source(&config, false, NoAcks, async {
+            sleep_500_millis().await;
 
-        sleep_500_millis().await;
+            write!(&mut file, "i am not a full line").unwrap();
 
-        write!(&mut file, "i am not a full line").unwrap();
+            // Longer than the EOF timeout
+            sleep_500_millis().await;
 
-        // Longer than the EOF timeout
-        sleep_500_millis().await;
+            writeln!(&mut file, " until now").unwrap();
 
-        writeln!(&mut file, " until now").unwrap();
-
-        sleep_500_millis().await;
-
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
-        )
+            sleep_500_millis().await;
+        })
         .await;
+
+        let received = extract_messages_value(received);
 
         assert_eq!(
             received,
@@ -1533,9 +1506,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_gzipped_file() {
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![PathBuf::from("tests/data/gzipped.log")],
@@ -1549,24 +1519,9 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
+        let received = run_file_source(&config, false, NoAcks, sleep_500_millis()).await;
 
-        sleep_500_millis().await;
-
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
-        )
-        .await;
+        let received = extract_messages_value(received);
 
         assert_eq!(
             received,
@@ -1582,9 +1537,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_non_utf8_encoded_file() {
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![PathBuf::from("tests/data/utf-16le.log")],
@@ -1592,24 +1544,9 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
+        let received = run_file_source(&config, false, NoAcks, sleep_500_millis()).await;
 
-        sleep_500_millis().await;
-
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
-        )
-        .await;
+        let received = extract_messages_value(received);
 
         assert_eq!(
             received,
@@ -1625,9 +1562,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_non_default_line_delimiter() {
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1635,34 +1569,22 @@ mod tests {
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
-
         let path = dir.path().join("file");
-        let mut file = File::create(&path).unwrap();
+        let received = run_file_source(&config, false, NoAcks, async {
+            let mut file = File::create(&path).unwrap();
 
-        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
-        write!(&mut file, "hello i am a line\r\n").unwrap();
-        write!(&mut file, "and i am too\r\n").unwrap();
-        write!(&mut file, "CRLF is how we end\r\n").unwrap();
-        write!(&mut file, "please treat us well\r\n").unwrap();
+            write!(&mut file, "hello i am a line\r\n").unwrap();
+            write!(&mut file, "and i am too\r\n").unwrap();
+            write!(&mut file, "CRLF is how we end\r\n").unwrap();
+            write!(&mut file, "please treat us well\r\n").unwrap();
 
-        sleep_500_millis().await;
-
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
-        )
+            sleep_500_millis().await;
+        })
         .await;
+
+        let received = extract_messages_value(received);
 
         assert_eq!(
             received,
@@ -1680,47 +1602,98 @@ mod tests {
         let n = 5;
         let remove_after_secs = 1;
 
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
             remove_after_secs: Some(remove_after_secs),
-            glob_minimum_cooldown_ms: 100,
             ..test_default_file_config(&dir)
         };
 
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source);
-
         let path = dir.path().join("file");
-        let mut file = File::create(&path).unwrap();
+        let received = run_file_source(&config, false, Acks, async {
+            let mut file = File::create(&path).unwrap();
 
-        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
-        for i in 0..n {
-            writeln!(&mut file, "{}", i).unwrap();
-        }
-        std::mem::drop(file);
-
-        for _ in 0..10 {
-            // Wait for remove grace period to end.
-            sleep(Duration::from_secs(remove_after_secs + 1)).await;
-
-            if File::open(&path).is_err() {
-                break;
+            for i in 0..n {
+                writeln!(&mut file, "{}", i).unwrap();
             }
-        }
+            std::mem::drop(file);
 
-        drop(trigger_shutdown);
+            for _ in 0..10 {
+                // Wait for remove grace period to end.
+                sleep(Duration::from_secs(remove_after_secs + 1)).await;
 
-        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+                if File::open(&path).is_err() {
+                    break;
+                }
+            }
+        })
+        .await;
+
         assert_eq!(received.len(), n);
 
         match File::open(&path) {
             Ok(_) => panic!("File wasn't removed"),
             Err(error) => assert_eq!(error.kind(), std::io::ErrorKind::NotFound),
         }
+    }
+
+    #[derive(Clone, Copy, Eq, PartialEq)]
+    enum AckingMode {
+        NoAcks,      // No acknowledgement handling and no finalization
+        Unfinalized, // Acknowledgement handling but no finalization
+        Acks,        // Full acknowledgements and proper finalization
+    }
+    use AckingMode::*;
+
+    async fn run_file_source(
+        config: &FileConfig,
+        wait_shutdown: bool,
+        acking_mode: AckingMode,
+        inner: impl Future<Output = ()>,
+    ) -> Vec<Event> {
+        components::init_test();
+
+        let (tx, rx) = if acking_mode == Acks {
+            let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
+            (tx, rx.boxed())
+        } else {
+            let (tx, rx) = Pipeline::new_test();
+            (tx, rx.boxed())
+        };
+
+        let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
+        let data_dir = config.data_dir.clone().unwrap();
+        let acks = !matches!(acking_mode, NoAcks);
+
+        tokio::spawn(file::file_source(config, data_dir, shutdown, tx, acks));
+
+        inner.await;
+
+        drop(trigger_shutdown);
+
+        let result = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+        if wait_shutdown {
+            shutdown_done.await;
+        }
+        SOURCE_TESTS.assert(&["file"]);
+        result
+    }
+
+    fn extract_messages_string(received: Vec<Event>) -> Vec<String> {
+        received
+            .into_iter()
+            .map(Event::into_log)
+            .map(|log| log[log_schema().message_key()].to_string_lossy())
+            .collect()
+    }
+
+    fn extract_messages_value(received: Vec<Event>) -> Vec<Value> {
+        received
+            .into_iter()
+            .map(Event::into_log)
+            .map(|log| log[log_schema().message_key()].clone())
+            .collect()
     }
 }

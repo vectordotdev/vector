@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, TransformConfig, TransformDescription},
+    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{JsonParserFailedParse, JsonParserTargetExists},
     transforms::{FunctionTransform, Transform},
@@ -28,7 +28,7 @@ impl_generate_config_from_default!(JsonParserConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "json_parser")]
 impl TransformConfig for JsonParserConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(JsonParser::from(self.clone())))
     }
 
@@ -80,7 +80,7 @@ impl FunctionTransform for JsonParser {
                 let to_parse = value.as_bytes();
                 serde_json::from_slice::<Value>(to_parse.as_ref())
                     .map_err(|error| {
-                        emit!(JsonParserFailedParse {
+                        emit!(&JsonParserFailedParse {
                             field: &self.field,
                             value: value.to_string_lossy().as_str(),
                             error,
@@ -103,7 +103,7 @@ impl FunctionTransform for JsonParser {
                     let contains_target = log.contains(&target_field);
 
                     if contains_target && !self.overwrite_target {
-                        emit!(JsonParserTargetExists { target_field })
+                        emit!(&JsonParserTargetExists { target_field })
                     } else {
                         if self.drop_field {
                             log.remove(&self.field);
@@ -133,7 +133,7 @@ impl FunctionTransform for JsonParser {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{config::log_schema, event::Event};
+    use crate::{config::log_schema, event::Event, transforms::test::transform_one};
     use serde_json::json;
 
     #[test]
@@ -148,8 +148,7 @@ mod test {
         let event = Event::from(r#"{"greeting": "hello", "name": "bob"}"#);
         let metadata = event.metadata().clone();
 
-        let event = parser.transform_one(event).unwrap();
-
+        let event = transform_one(&mut parser, event).unwrap();
         assert!(event.as_log().get(log_schema().message_key()).is_none());
         assert_eq!(event.metadata(), &metadata);
     }
@@ -164,8 +163,7 @@ mod test {
         let event = Event::from(r#"{"greeting": "hello", "name": "bob"}"#);
         let metadata = event.metadata().clone();
 
-        let event = parser.transform_one(event).unwrap();
-
+        let event = transform_one(&mut parser, event).unwrap();
         assert!(event.as_log().get(log_schema().message_key()).is_some());
         assert_eq!(event.metadata(), &metadata);
     }
@@ -180,7 +178,7 @@ mod test {
         let event = Event::from(r#"{"greeting": "hello", "name": "bob"}"#);
         let metadata = event.metadata().clone();
 
-        let event = parser.transform_one(event).unwrap();
+        let event = transform_one(&mut parser, event).unwrap();
 
         assert_eq!(event.as_log()["greeting"], "hello".into());
         assert_eq!(event.as_log()["name"], "bob".into());
@@ -208,7 +206,7 @@ mod test {
         let event = Event::from(test_json.to_string());
         let metadata = event.metadata().clone();
 
-        let event = parser.transform_one(event).unwrap();
+        let event = transform_one(&mut parser, event).unwrap();
 
         assert_eq!(
             event.as_log().get_flat("field.with.dots"),
@@ -231,7 +229,7 @@ mod test {
         let event = Event::from(r#" {"greeting": "hello", "name": "bob"}    "#);
         let metadata = event.metadata().clone();
 
-        let event = parser.transform_one(event).unwrap();
+        let event = transform_one(&mut parser, event).unwrap();
 
         assert_eq!(event.as_log()["greeting"], "hello".into());
         assert_eq!(event.as_log()["name"], "bob".into());
@@ -258,7 +256,7 @@ mod test {
             .insert("data", r#"{"greeting": "hello", "name": "bob"}"#);
         let metadata = event.metadata().clone();
 
-        let event = parser.transform_one(event).unwrap();
+        let event = transform_one(&mut parser, event).unwrap();
 
         assert_eq!(event.as_log()["greeting"], "hello".into(),);
         assert_eq!(event.as_log()["name"], "bob".into());
@@ -272,7 +270,7 @@ mod test {
         let event = Event::from("message");
         let metadata = event.metadata().clone();
 
-        let parsed = parser.transform_one(event.clone()).unwrap();
+        let parsed = transform_one(&mut parser, event.clone()).unwrap();
 
         assert_eq!(event, parsed);
         assert_eq!(event.metadata(), &metadata);
@@ -294,12 +292,12 @@ mod test {
         );
         let metadata = event.metadata().clone();
 
-        let parsed_event = parser_outer.transform_one(event).unwrap();
+        let parsed_event = transform_one(&mut parser_outer, event).unwrap();
 
         assert_eq!(parsed_event.as_log()["stream"], "stdout".into());
         assert_eq!(parsed_event.metadata(), &metadata);
 
-        let parsed_inner_event = parser_inner.transform_one(parsed_event).unwrap();
+        let parsed_inner_event = transform_one(&mut parser_inner, parsed_event).unwrap();
         let log = parsed_inner_event.into_log();
 
         assert_eq!(log["type"], "response".into());
@@ -320,7 +318,7 @@ mod test {
         let event = Event::from(invalid);
         let metadata = event.metadata().clone();
 
-        let parsed = parser.transform_one(event.clone()).unwrap();
+        let parsed = transform_one(&mut parser, event.clone()).unwrap();
 
         assert_eq!(event, parsed);
         assert_eq!(event.as_log()[log_schema().message_key()], invalid.into());
@@ -336,7 +334,7 @@ mod test {
         let mut event = Event::from("message");
         event.as_mut_log().insert("data", invalid);
 
-        let event = parser.transform_one(event).unwrap();
+        let event = transform_one(&mut parser, event).unwrap();
 
         assert_eq!(event.as_log()["data"], invalid.into());
         assert!(event.as_log().get("greeting").is_none());
@@ -355,13 +353,13 @@ mod test {
         });
 
         let event = Event::from(valid);
-        assert!(parser.transform_one(event).is_some());
+        assert!(transform_one(&mut parser, event).is_some());
 
         let event = Event::from(invalid);
-        assert!(parser.transform_one(event).is_none());
+        assert!(transform_one(&mut parser, event).is_none());
 
         let event = Event::from(not_object);
-        assert!(parser.transform_one(event).is_none());
+        assert!(transform_one(&mut parser, event).is_none());
 
         // Field
         let mut parser = JsonParser::from(JsonParserConfig {
@@ -372,19 +370,19 @@ mod test {
 
         let mut event = Event::from("message");
         event.as_mut_log().insert("data", valid);
-        assert!(parser.transform_one(event).is_some());
+        assert!(transform_one(&mut parser, event).is_some());
 
         let mut event = Event::from("message");
         event.as_mut_log().insert("data", invalid);
-        assert!(parser.transform_one(event).is_none());
+        assert!(transform_one(&mut parser, event).is_none());
 
         let mut event = Event::from("message");
         event.as_mut_log().insert("data", not_object);
-        assert!(parser.transform_one(event).is_none());
+        assert!(transform_one(&mut parser, event).is_none());
 
         // Missing field
         let event = Event::from("message");
-        assert!(parser.transform_one(event).is_none());
+        assert!(transform_one(&mut parser, event).is_none());
     }
 
     #[test]
@@ -401,8 +399,8 @@ mod test {
             r#"{"greeting": "hello", "name": "bob", "nested": "{\"message\": \"help i'm trapped under many layers of json\"}"}"#,
         );
         let metadata = event.metadata().clone();
-        let event = parser1.transform_one(event).unwrap();
-        let event = parser2.transform_one(event).unwrap();
+        let event = transform_one(&mut parser1, event).unwrap();
+        let event = transform_one(&mut parser2, event).unwrap();
 
         assert_eq!(event.as_log()["greeting"], "hello".into());
         assert_eq!(event.as_log()["name"], "bob".into());
@@ -433,7 +431,7 @@ mod test {
             }"#,
         );
         let metadata = event.metadata().clone();
-        let event = parser.transform_one(event).unwrap();
+        let event = transform_one(&mut parser, event).unwrap();
 
         assert_eq!(event.as_log()["string"], "this is text".into());
         assert_eq!(event.as_log()["null"], crate::event::Value::Null);
@@ -464,7 +462,7 @@ mod test {
         );
         let metadata = event.metadata().clone();
 
-        let event = parser.transform_one(event).unwrap();
+        let event = transform_one(&mut parser, event).unwrap();
 
         assert_eq!(event.as_log()["key"], "data".into());
         assert_eq!(event.as_log()["message"], "inner".into());
@@ -481,7 +479,7 @@ mod test {
         let event = Event::from(r#"invalid json"#);
         let metadata = event.metadata().clone();
 
-        let event = parser.transform_one(event).unwrap();
+        let event = transform_one(&mut parser, event).unwrap();
 
         assert_eq!(event.as_log()["message"], "invalid json".into());
         assert_eq!(event.metadata(), &metadata);
@@ -497,7 +495,7 @@ mod test {
 
         let event = Event::from(r#"{"greeting": "hello", "name": "bob"}"#);
         let metadata = event.metadata().clone();
-        let event = parser.transform_one(event).unwrap();
+        let event = transform_one(&mut parser, event).unwrap();
         let event = event.as_log();
 
         assert_eq!(event["that.greeting"], "hello".into());
@@ -516,7 +514,7 @@ mod test {
         let message = r#"{"greeting": "hello", "name": "bob"}"#;
         let event = Event::from(message);
         let metadata = event.metadata().clone();
-        let event = parser.transform_one(event).unwrap();
+        let event = transform_one(&mut parser, event).unwrap();
         let event = event.as_log();
 
         assert_eq!(event["message"], message.into());
@@ -537,7 +535,7 @@ mod test {
         let message = r#"{"greeting": "hello", "name": "bob"}"#;
         let event = Event::from(message);
         let metadata = event.metadata().clone();
-        let event = parser.transform_one(event).unwrap();
+        let event = transform_one(&mut parser, event).unwrap();
         let event = event.as_log();
 
         match event.get("message") {

@@ -2,7 +2,7 @@
   inputs = ["ignored"]
   type = "filter"
   [transforms.filter_a.condition]
-    type = "remap"
+    type = "vrl"
     source = '''
       message = if exists(.tags) { .tags.message } else { .message }
       message == "test filter 1"
@@ -11,7 +11,7 @@
   inputs = ["ignored"]
   type = "filter"
   [transforms.filter_b.condition]
-    type = "remap"
+    type = "vrl"
     source = '''
       message = if exists(.tags) { string!(.tags.message) } else { string!(.message) }
       contains(message, "test filter") &&
@@ -32,7 +32,7 @@
   [[tests.outputs]]
     extract_from = "filter_a"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '.message == "test filter 1"'
 
 [[tests]]
@@ -65,7 +65,7 @@
   [[tests.outputs]]
     extract_from = "filter_b"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '.message == "test filter 2"'
 
 [[tests]]
@@ -87,5 +87,5 @@
   [[tests.outputs]]
     extract_from = "filter_a"
     [[tests.outputs.conditions]]
-      type = "remap"
+      type = "vrl"
       source = '.tags.message == "test filter 1"'

@@ -1,0 +1,19 @@
+<div class="max-w-5xl">
+  <div class="mb-4 md:mb-6">
+    {{ partial "breadcrumb.html" . }}
+  </div>
+
+  <h2 class="dark:text-gray-50 font-secondary font-extrabold text-4xl lg:text-5xl leading-tight tracking-tight">
+    Send {{ .Params.data }}{{ with .Params.from }} from {{ .name }}{{ end }}{{ with .Params.to }} to {{ .name }}{{ end }}
+  </h2>
+
+  {{ with .Description }}
+  <p class="dark:text-gray-200 mt-5 text-lg md:text-xl text-gray-500 prose dark:prose-dark">
+    {{ . | markdownify }}
+  </p>
+  {{ end }}
+
+  <div class="mt-8">
+    {{ partial "guides/badges.html" . }}
+  </div>
+</div>

@@ -1,12 +1,12 @@
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{AddTagsTagNotOverwritten, AddTagsTagOverwritten},
     transforms::{FunctionTransform, Transform},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::{btree_map::Entry, BTreeMap};
+use std::collections::btree_map::Entry;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -39,7 +39,7 @@ impl GenerateConfig for AddTagsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "add_tags")]
 impl TransformConfig for AddTagsConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(AddTags::new(
             self.tags.clone(),
             self.overwrite,
@@ -60,7 +60,7 @@ impl TransformConfig for AddTagsConfig {
 }
 
 impl AddTags {
-    pub fn new(tags: IndexMap<String, String>, overwrite: bool) -> Self {
+    pub const fn new(tags: IndexMap<String, String>, overwrite: bool) -> Self {
         AddTags { tags, overwrite }
     }
 }
@@ -68,26 +68,20 @@ impl AddTags {
 impl FunctionTransform for AddTags {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         if !self.tags.is_empty() {
-            let tags = &mut event.as_mut_metric().series.tags;
-
-            if tags.is_none() {
-                *tags = Some(BTreeMap::new());
-            }
+            let metric = event.as_mut_metric();
 
             for (name, value) in &self.tags {
-                let map = tags.as_mut().unwrap(); // initialized earlier
-
-                let entry = map.entry(name.to_string());
+                let entry = metric.tag_entry(name.to_string());
                 match (entry, self.overwrite) {
                     (Entry::Vacant(entry), _) => {
                         entry.insert(value.clone());
                     }
                     (Entry::Occupied(mut entry), true) => {
-                        emit!(AddTagsTagOverwritten { tag: name.as_ref() });
+                        emit!(&AddTagsTagOverwritten { tag: name.as_ref() });
                         entry.insert(value.clone());
                     }
                     (Entry::Occupied(_entry), false) => {
-                        emit!(AddTagsTagNotOverwritten { tag: name.as_ref() })
+                        emit!(&AddTagsTagNotOverwritten { tag: name.as_ref() })
                     }
                 }
             }
@@ -100,7 +94,10 @@ impl FunctionTransform for AddTags {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use crate::{
+        event::metric::{Metric, MetricKind, MetricValue},
+        transforms::test::transform_one,
+    };
     use shared::btreemap;
 
     #[test]
@@ -128,8 +125,7 @@ mod tests {
         .collect();
 
         let mut transform = AddTags::new(map, true);
-        let event = transform.transform_one(metric.into()).unwrap();
-
+        let event = transform_one(&mut transform, metric.into()).unwrap();
         assert_eq!(event, expected.into());
     }
 
@@ -148,9 +144,7 @@ mod tests {
             .collect();
 
         let mut transform = AddTags::new(map, false);
-
-        let event = transform.transform_one(metric.into()).unwrap();
-
+        let event = transform_one(&mut transform, metric.into()).unwrap();
         assert_eq!(event, expected.into());
     }
 }
