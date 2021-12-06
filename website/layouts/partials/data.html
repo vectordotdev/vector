@@ -84,71 +84,7 @@
 
       {{ range $k, $v := $v.type }}
       {{ if eq $k "condition" }}
-      <div class="mt-4">
-        <div class="border rounded dark:border-gray-700 divide-y dark:divide-gray-700">
-          {{ range $k, $v := $v.options }}
-          {{ $id := printf "%s.%s" $name $k }}
-          <div class="py-3 px-5">
-            <div>
-              {{ partial "heading.html" (dict "text" $id "level" 4 "mono" true) }}
-            </div>
-
-            <div class="mt-2 prose dark:prose-dark max-w-none">
-              {{ $v.description | markdownify }}
-            </div>
-          </div>
-          {{ end }}
-        </div>
-
-        <div class="my-4 ml-2">
-          <span>
-            {{ partial "heading.html" (dict "text" "Available syntaxes" "level" 3 "icon" false "toc_hide" true) }}
-          </span>
-
-          <table class="table-auto">
-            <thead>
-              <tr>
-                <th>
-                  Syntax
-                </th>
-                <th>
-                  Description
-                </th>
-                <th>
-                  Example
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {{ range $v.syntaxes }}
-              <tr>
-                <td>
-                  <code>
-                    {{ .name }}
-                  </code>
-                </td>
-                <td>
-                  {{ .description | markdownify }}
-                </td>
-                <td>
-                  <code>{{ .example }}</code>
-                </td>
-              </tr>
-              {{ end }}
-            </tbody>
-          </table>
-
-          <div class="py-3 px-5 border rounded-md border-green-500">
-            <span>
-              {{ partial "heading.html" (dict "text" $v.shorthand_explainer.title "level" 3 "icon" false "toc_hide" true) }}
-            </span>
-
-            <div class="mt-2 prose dark:prose-dark max-w-none">
-              {{ $v.shorthand_explainer.description | markdownify }}
-            </div>
-          </div>
-        </div>
-      </div>
+      {{ template "config-condition" (dict "name" $k "condition" $v) }}
       {{ end }}
 
       {{ if eq $k "object" }} {{/* Object (with sub-configs) */}}
@@ -2003,6 +1939,10 @@
     </div>
     {{ end }}
 
+    {{ if eq $k "condition" }}
+    {{ template "config-condition" (dict "name" "*" "condition" $v) }}
+    {{ end }}
+
     {{ with $v.enum }}
     <div class="mt-4">
       <span class="font-semibold">
@@ -2042,4 +1982,73 @@
 {{ else }} {{/* If just a plain old string, use Ruby syntax highlighting as a best guess */}}
 {{ highlight . "ruby" "" }}
 {{ end }}
+{{ end }}
+
+{{ define "config-condition" }}
+{{ $name := .name }}
+<div class="mt-4">
+  <div class="border rounded dark:border-gray-700 divide-y dark:divide-gray-700">
+    {{ range $k, $v := .condition.options }}
+    {{ $id := printf "%s.%s" $name $k }}
+    <div class="py-3 px-5">
+      <div>
+        {{ partial "heading.html" (dict "text" $id "level" 4 "mono" true) }}
+      </div>
+
+      <div class="mt-2 prose dark:prose-dark max-w-none">
+        {{ $v.description | markdownify }}
+      </div>
+    </div>
+    {{ end }}
+  </div>
+
+  <div class="my-4 ml-2">
+    <span>
+      {{ partial "heading.html" (dict "text" "Available syntaxes" "level" 3 "icon" false "toc_hide" true) }}
+    </span>
+
+    <table class="table-auto">
+      <thead>
+        <tr>
+          <th>
+            Syntax
+          </th>
+          <th>
+            Description
+          </th>
+          <th>
+            Example
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {{ range .condition.syntaxes }}
+        <tr>
+          <td>
+            <code>
+              {{ .name }}
+            </code>
+          </td>
+          <td>
+            {{ .description | markdownify }}
+          </td>
+          <td>
+            <code>{{ .example }}</code>
+          </td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+
+    <div class="py-3 px-5 border rounded-md border-green-500">
+      <span>
+        {{ partial "heading.html" (dict "text" .condition.shorthand_explainer.title "level" 3 "icon" false "toc_hide" true) }}
+      </span>
+
+      <div class="mt-2 prose dark:prose-dark max-w-none">
+        {{ .condition.shorthand_explainer.description | markdownify }}
+      </div>
+    </div>
+  </div>
+</div>
 {{ end }}
