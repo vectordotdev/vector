@@ -218,10 +218,10 @@ mod tests {
 
         let recs = make_events(2);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
-        let _ = send.await.unwrap();
+        send.await.unwrap();
 
-        assert_eq!(collect_ready(rx_a).await, recs);
-        assert_eq!(collect_ready(rx_b).await, recs);
+        assert_eq!(collect_ready(rx_a), recs);
+        assert_eq!(collect_ready(rx_b), recs);
     }
 
     #[tokio::test]
@@ -278,9 +278,9 @@ mod tests {
 
         fanout.send(recs[2].clone()).await.unwrap();
 
-        assert_eq!(collect_ready(rx_a).await, recs);
-        assert_eq!(collect_ready(rx_b).await, recs);
-        assert_eq!(collect_ready(rx_c).await, &recs[2..]);
+        assert_eq!(collect_ready(rx_a), recs);
+        assert_eq!(collect_ready(rx_b), recs);
+        assert_eq!(collect_ready(rx_c), &recs[2..]);
     }
 
     #[tokio::test]
@@ -307,8 +307,8 @@ mod tests {
 
         fanout.send(recs[2].clone()).await.unwrap();
 
-        assert_eq!(collect_ready(rx_a).await, recs);
-        assert_eq!(collect_ready(rx_b).await, &recs[..2]);
+        assert_eq!(collect_ready(rx_a), recs);
+        assert_eq!(collect_ready(rx_b), &recs[..2]);
     }
 
     #[tokio::test]
@@ -446,13 +446,13 @@ mod tests {
 
         let (tx_a2, rx_a2) = mpsc::unbounded();
         let tx_a2 = Box::new(tx_a2.sink_map_err(|_| unreachable!()));
-        fanout.replace(ComponentKey::from("a"), Some(tx_a2));
+        fanout.replace(&ComponentKey::from("a"), Some(tx_a2));
 
         fanout.send(recs[2].clone()).await.unwrap();
 
-        assert_eq!(collect_ready(rx_a1).await, &recs[..2]);
-        assert_eq!(collect_ready(rx_b).await, recs);
-        assert_eq!(collect_ready(rx_a2).await, &recs[2..]);
+        assert_eq!(collect_ready(rx_a1), &recs[..2]);
+        assert_eq!(collect_ready(rx_b), recs);
+        assert_eq!(collect_ready(rx_a2), &recs[2..]);
     }
 
     #[tokio::test]
@@ -474,7 +474,7 @@ mod tests {
 
         let (tx_a2, rx_a2) = mpsc::unbounded();
         let tx_a2 = Box::new(tx_a2.sink_map_err(|_| unreachable!()));
-        fanout.replace(ComponentKey::from("a"), None);
+        fanout.replace(&ComponentKey::from("a"), None);
 
         futures::join!(
             async {
@@ -490,49 +490,49 @@ mod tests {
             fanout.send(recs[2].clone()).map(|_| ())
         );
 
-        assert_eq!(collect_ready(rx_a1).await, &recs[..2]);
-        assert_eq!(collect_ready(rx_b).await, recs);
-        assert_eq!(collect_ready(rx_a2).await, &recs[2..]);
+        assert_eq!(collect_ready(rx_a1), &recs[..2]);
+        assert_eq!(collect_ready(rx_b), recs);
+        assert_eq!(collect_ready(rx_a2), &recs[2..]);
     }
 
     #[tokio::test]
     async fn fanout_error_poll_first() {
-        fanout_error(&[Some(ErrorWhen::Poll), None, None]).await
+        fanout_error(&[Some(ErrorWhen::Poll), None, None]).await;
     }
 
     #[tokio::test]
     async fn fanout_error_poll_middle() {
-        fanout_error(&[None, Some(ErrorWhen::Poll), None]).await
+        fanout_error(&[None, Some(ErrorWhen::Poll), None]).await;
     }
 
     #[tokio::test]
     async fn fanout_error_poll_last() {
-        fanout_error(&[None, None, Some(ErrorWhen::Poll)]).await
+        fanout_error(&[None, None, Some(ErrorWhen::Poll)]).await;
     }
 
     #[tokio::test]
     async fn fanout_error_poll_not_middle() {
-        fanout_error(&[Some(ErrorWhen::Poll), None, Some(ErrorWhen::Poll)]).await
+        fanout_error(&[Some(ErrorWhen::Poll), None, Some(ErrorWhen::Poll)]).await;
     }
 
     #[tokio::test]
     async fn fanout_error_send_first() {
-        fanout_error(&[Some(ErrorWhen::Send), None, None]).await
+        fanout_error(&[Some(ErrorWhen::Send), None, None]).await;
     }
 
     #[tokio::test]
     async fn fanout_error_send_middle() {
-        fanout_error(&[None, Some(ErrorWhen::Send), None]).await
+        fanout_error(&[None, Some(ErrorWhen::Send), None]).await;
     }
 
     #[tokio::test]
     async fn fanout_error_send_last() {
-        fanout_error(&[None, None, Some(ErrorWhen::Send)]).await
+        fanout_error(&[None, None, Some(ErrorWhen::Send)]).await;
     }
 
     #[tokio::test]
     async fn fanout_error_send_not_middle() {
-        fanout_error(&[Some(ErrorWhen::Send), None, Some(ErrorWhen::Send)]).await
+        fanout_error(&[Some(ErrorWhen::Send), None, Some(ErrorWhen::Send)]).await;
     }
 
     async fn fanout_error(modes: &[Option<ErrorWhen>]) {
@@ -541,18 +541,15 @@ mod tests {
 
         for (i, mode) in modes.iter().enumerate() {
             let id = ComponentKey::from(format!("{}", i));
-            match *mode {
-                Some(when) => {
-                    let tx = AlwaysErrors { when };
-                    let tx = Box::new(tx.sink_map_err(|_| ()));
-                    fanout.add(id, tx);
-                }
-                None => {
-                    let (tx, rx) = mpsc::channel(0);
-                    let tx = Box::new(tx.sink_map_err(|_| unreachable!()));
-                    fanout.add(id, tx);
-                    rx_channels.push(rx);
-                }
+            if let Some(when) = *mode {
+                let tx = AlwaysErrors { when };
+                let tx = Box::new(tx.sink_map_err(|_| ()));
+                fanout.add(id, tx);
+            } else {
+                let (tx, rx) = mpsc::channel(0);
+                let tx = Box::new(tx.sink_map_err(|_| unreachable!()));
+                fanout.add(id, tx);
+                rx_channels.push(rx);
             }
         }
 
