@@ -378,13 +378,9 @@ impl Source {
                 max_line_length: max_line_bytes,
                 ignore_not_found: true,
             },
-            // We expect the files distribution to not be a concern because of
-            // the way we pick files for gathering: for each container, only the
-            // last log file is currently picked. Thus there's no need for
-            // ordering, as each logical log stream is guaranteed to start with
-            // just one file, makis it impossible to interleave with other
-            // relevant log lines in the absence of such relevant log lines.
-            oldest_first: false,
+            // We'd like to consume rotated pod log files first to release our file handle and let
+            // the space be reclaimed
+            oldest_first: true,
             // We do not remove the log files, `kubelet` is responsible for it.
             remove_after: None,
             // The standard emitter.

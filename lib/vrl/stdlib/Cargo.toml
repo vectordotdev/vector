@@ -10,6 +10,7 @@ license = "MPL-2.0"
 vrl = { path = "../core" }
 lookup_lib = {package = "lookup", path = "../../lookup" }
 datadog-search-syntax = { path = "../../datadog/search-syntax", optional = true }
+datadog-filter = { path = "../../datadog/filter", optional = true }
 datadog-grok = { path = "../../datadog/grok", optional = true }
 
 base64 = { version = "0.13", optional = true }
@@ -228,7 +229,7 @@ log = ["tracing"]
 match = ["regex"]
 match_any = ["regex"]
 match_array = ["regex"]
-match_datadog_query = ["datadog-search-syntax", "lazy_static", "regex", "cached"]
+match_datadog_query = ["datadog-search-syntax", "datadog-filter", "lazy_static", "regex"]
 md5 = ["md-5", "hex"]
 merge = []
 now = ["chrono"]

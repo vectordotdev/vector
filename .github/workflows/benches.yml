@@ -57,7 +57,7 @@ jobs:
         target: [bench, bench-remap-functions, bench-remap, bench-languages, bench-metrics, bench-dnstap, bench-transform]
     steps:
       - uses: actions/checkout@v2.4.0
-      - uses: actions/cache@v2.1.6
+      - uses: actions/cache@v2.1.7
         with:
           path: |
             ~/.cargo/registry

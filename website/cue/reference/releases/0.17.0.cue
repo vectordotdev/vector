@@ -19,6 +19,13 @@ releases: "0.17.0": {
 
 	It also contains a number of additional enhancements and bug fixes. Check out the
 	[highlights](/releases/0.17.0#highlights) and [changelog](/releases/0.17.0#changelog) for more details.
+
+	## Known issues
+
+	- `events_out_total` and `processed_events_total` ceased being published by
+	  sources and transforms. This will be fixed in a subsequent release, but
+	  these metrics have also been replaced by `component_sent_events_total`
+	  which is being implemented for all components.
 	"""
 
 	whats_next: [

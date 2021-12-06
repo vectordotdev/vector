@@ -1,5 +1,4 @@
 use futures::task::AtomicWaker;
-use metrics::counter;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -36,16 +35,6 @@ impl Acker {
                     notifier.wake();
                 }
             }
-
-            // WARN this string "events_out_total" is a duplicate of the metric
-            // name in `ROOT/src/internal_events/topology.rs`. `Acker` had a
-            // dependency relationship with vector's root `internal_events`
-            // prior to being migrated into core. Ideally we would not duplicate
-            // information like this inside the project but I could think of no
-            // other way to break the dependency in the context of PR #7400. It
-            // is possible to thread this needle but the changes are more
-            // substantial than one movement PR could bear.
-            counter!("events_out_total", num as u64);
         }
     }
 

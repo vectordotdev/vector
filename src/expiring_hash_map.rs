@@ -239,7 +239,6 @@ mod tests {
         let mut map = ExpiringHashMap::<String, String>::default();
 
         map.insert("key".to_owned(), "val".to_owned(), Duration::from_secs(1));
-        map.remove("key");
 
         let mut fut = task::spawn(map.next_expired());
         assert_pending!(fut.poll());

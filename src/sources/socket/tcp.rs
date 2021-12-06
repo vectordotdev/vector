@@ -7,7 +7,7 @@ use crate::{
     event::Event,
     internal_events::{SocketEventsReceived, SocketMode},
     serde::default_decoding,
-    sources::util::{SocketListenAddr, TcpSource},
+    sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
 };
@@ -101,6 +101,7 @@ impl TcpSource for RawTcpSource {
     type Error = codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
     type Decoder = codecs::Decoder;
+    type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
         self.decoder.clone()
@@ -126,5 +127,9 @@ impl TcpSource for RawTcpSource {
                 log.try_insert(host_key, host.clone());
             }
         }
+    }
+
+    fn build_acker(&self, _: &Self::Item) -> Self::Acker {
+        TcpNullAcker
     }
 }
