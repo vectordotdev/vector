@@ -39,9 +39,7 @@
           {{ end }}
 
           {{ with $v.syntax }}
-          {{ if eq . "remap_boolean_expression" }}
-          {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#boolean-expressions") }}
-          {{ else if eq . "remap_program" }}
+          {{ if eq . "remap_program" }}
           {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#program") }}
           {{ else }}
           {{ partial "badge.html" (dict "word" . "color" "gray") }}
@@ -85,6 +83,74 @@
       {{ end }}
 
       {{ range $k, $v := $v.type }}
+      {{ if eq $k "condition" }}
+      <div class="mt-4">
+        <div class="border rounded dark:border-gray-700 divide-y dark:divide-gray-700">
+          {{ range $k, $v := $v.options }}
+          {{ $id := printf "%s.%s" $name $k }}
+          <div class="py-3 px-5">
+            <div>
+              {{ partial "heading.html" (dict "text" $id "level" 4 "mono" true) }}
+            </div>
+
+            <div class="mt-2 prose dark:prose-dark max-w-none">
+              {{ $v.description | markdownify }}
+            </div>
+          </div>
+          {{ end }}
+        </div>
+
+        <div class="my-4 ml-2">
+          <span>
+            {{ partial "heading.html" (dict "text" "Available syntaxes" "level" 3 "icon" false "toc_hide" true) }}
+          </span>
+
+          <table class="table-auto">
+            <thead>
+              <tr>
+                <th>
+                  Syntax
+                </th>
+                <th>
+                  Description
+                </th>
+                <th>
+                  Example
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {{ range $v.syntaxes }}
+              <tr>
+                <td>
+                  <code>
+                    {{ .name }}
+                  </code>
+                </td>
+                <td>
+                  {{ .description | markdownify }}
+                </td>
+                <td>
+                  <code>{{ .example }}</code>
+                </td>
+              </tr>
+              {{ end }}
+            </tbody>
+          </table>
+
+          <div class="py-3 px-5 border rounded-md border-green-500">
+            <span>
+              {{ partial "heading.html" (dict "text" $v.shorthand_explainer.title "level" 3 "icon" false "toc_hide" true) }}
+            </span>
+
+            <div class="mt-2 prose dark:prose-dark max-w-none">
+              {{ $v.shorthand_explainer.description | markdownify }}
+            </div>
+          </div>
+        </div>
+      </div>
+      {{ end }}
+
       {{ if eq $k "object" }} {{/* Object (with sub-configs) */}}
       <div class="mt-4">
         {{ template "config-object" (dict "name" $name "config" $v "level" 4) }}
@@ -1904,9 +1970,7 @@
         {{ end }}
 
         {{ with $v.syntax }}
-        {{ if eq . "remap_boolean_expression" }}
-        {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#boolean-expressions") }}
-        {{ else if eq . "remap_program" }}
+        {{ if eq . "remap_program" }}
         {{ partial "badge.html" (dict "word" . "color" "gray" "href" "/docs/reference/vrl#program") }}
         {{ else }}
         {{ partial "badge.html" (dict "word" . "color" "gray") }}

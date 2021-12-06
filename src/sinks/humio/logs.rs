@@ -3,7 +3,12 @@ use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::splunk_hec::logs::config::HecSinkLogsConfig,
     sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
-    sinks::{splunk_hec::common::SplunkHecDefaultBatchSettings, Healthcheck, VectorSink},
+    sinks::{
+        splunk_hec::common::{
+            acknowledgements::HecClientAcknowledgementsConfig, SplunkHecDefaultBatchSettings,
+        },
+        Healthcheck, VectorSink,
+    },
     template::Template,
     tls::TlsOptions,
 };
@@ -100,6 +105,10 @@ impl HumioLogsConfig {
             batch: self.batch,
             request: self.request,
             tls: self.tls.clone(),
+            acknowledgements: HecClientAcknowledgementsConfig {
+                indexer_acknowledgements_enabled: false,
+                ..Default::default()
+            },
         }
     }
 }
