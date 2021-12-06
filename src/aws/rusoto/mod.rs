@@ -4,7 +4,8 @@ pub mod region;
 //TODO: replace with direct import
 pub use super::auth::AwsAuthentication;
 use crate::config::ProxyConfig;
-use crate::{http::HttpError, tls::MaybeTlsSettings};
+use crate::{http::HttpError,
+            tls::{MaybeTlsSettings}};
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;
@@ -42,8 +43,8 @@ use tower::{Service, ServiceExt};
 
 pub type Client = HttpClient<crate::http::HttpClient<RusotoBody>>;
 
-pub fn client(proxy: &ProxyConfig) -> crate::Result<Client> {
-    let settings = MaybeTlsSettings::enable_client()?;
+pub fn client(tls_setting: Option<MaybeTlsSettings>, proxy: &ProxyConfig) -> crate::Result<Client> {
+    let settings = tls_setting.unwrap_or(MaybeTlsSettings::enable_client()?);
     let client = crate::http::HttpClient::new(settings, proxy)?;
     Ok(HttpClient { client })
 }

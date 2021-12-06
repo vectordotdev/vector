@@ -6,6 +6,7 @@ use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkConte
 use crate::sinks::aws_kinesis_streams::service::KinesisService;
 use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
 use crate::sinks::util::{BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig};
+use crate::tls::{TlsSettings, TlsOptions, MaybeTlsSettings};
 use futures::FutureExt;
 use rusoto_core::RusotoError;
 use rusoto_kinesis::{DescribeStreamInput, Kinesis, KinesisClient, PutRecordsError};
@@ -59,6 +60,7 @@ pub struct KinesisSinkConfig {
     pub batch: BatchConfig<KinesisDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub tls: Option<TlsOptions>,
     // Deprecated name. Moved to auth.
     pub assume_role: Option<String>,
     #[serde(default)]
@@ -91,7 +93,8 @@ impl KinesisSinkConfig {
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisClient> {
         let region = (&self.region).try_into()?;
 
-        let client = rusoto::client(proxy)?;
+        let tls_settings = MaybeTlsSettings::from(TlsSettings::from_options(&self.tls)?);
+        let client = rusoto::client(Some(tls_settings), proxy)?;
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());

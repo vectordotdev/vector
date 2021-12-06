@@ -29,6 +29,7 @@ async fn check_batch_size() {
         compression: Compression::None,
         batch,
         request: Default::default(),
+        tls: None,
         assume_role: None,
         auth: Default::default(),
     };
@@ -56,6 +57,7 @@ async fn check_batch_events() {
         compression: Compression::None,
         batch,
         request: Default::default(),
+        tls: None,
         assume_role: None,
         auth: Default::default(),
     };

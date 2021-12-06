@@ -12,6 +12,7 @@ use crate::{
         BatchConfig, EncodedEvent, EncodedLength, TowerRequestConfig, VecBuffer,
     },
     template::{Template, TemplateParseError},
+    tls::{MaybeTlsSettings, TlsOptions, TlsSettings},
 };
 use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
 use rusoto_core::RusotoError;
@@ -78,6 +79,7 @@ pub struct SqsSinkConfig {
     pub message_deduplication_id: Option<String>,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub tls: Option<TlsOptions>,
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
     #[serde(default)]
@@ -143,7 +145,9 @@ impl SqsSinkConfig {
 
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<SqsClient> {
         let region = (&self.region).try_into()?;
-        let client = rusoto::client(proxy)?;
+        let tls_settings = MaybeTlsSettings::from(TlsSettings::from_options(&self.tls)?);
+
+        let client = rusoto::client(Some(tls_settings), proxy)?;
 
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 

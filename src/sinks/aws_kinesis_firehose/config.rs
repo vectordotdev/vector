@@ -8,6 +8,7 @@ use crate::sinks::util::retries::RetryLogic;
 use crate::sinks::util::{
     BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
 };
+use crate::tls::{MaybeTlsSettings, TlsOptions, TlsSettings};
 use futures::FutureExt;
 use rusoto_core::RusotoError;
 use rusoto_firehose::{
@@ -49,6 +50,7 @@ pub struct KinesisFirehoseSinkConfig {
     pub batch: BatchConfig<KinesisFirehoseDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub tls: Option<TlsOptions>,
     // Deprecated name. Moved to auth.
     pub assume_role: Option<String>,
     #[serde(default)]
@@ -163,8 +165,9 @@ impl KinesisFirehoseSinkConfig {
 
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<KinesisFirehoseClient> {
         let region = (&self.region).try_into()?;
+        let tls_settings = MaybeTlsSettings::from(TlsSettings::from_options(&self.tls)?);
 
-        let client = rusoto::client(proxy)?;
+        let client = rusoto::client(Some(tls_settings), proxy)?;
         let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());

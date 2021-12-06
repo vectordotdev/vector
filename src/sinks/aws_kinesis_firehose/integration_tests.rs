@@ -49,6 +49,7 @@ async fn firehose_put_records() {
             retry_attempts: Some(0),
             ..Default::default()
         },
+        tls: None,
         assume_role: None,
         auth: Default::default(),
     };
