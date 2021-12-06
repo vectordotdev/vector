@@ -230,7 +230,7 @@ mod test {
 
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
-            r#"[{"first":{"type":"lane","condition":{"type":"check_fields","message.eq":"foo"}}},{"Parallel":{"aggregates":false}}]"#
+            r#"{"root.first":[[],{"type":"lane","condition":{"type":"check_fields","message.eq":"foo"}}],"root":[["root.first"],{"type":"noop"}]}"#
         );
     }
 }

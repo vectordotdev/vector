@@ -70,6 +70,15 @@ impl TransformConfig for CompoundConfig {
         }
     }
 
+    fn named_outputs(&self) -> Vec<(Option<String>, DataType)> {
+        let mut result = vec![(None, self.output_type())];
+        for (index, step) in self.steps.iter().enumerate() {
+            let id = step.id.clone().unwrap_or_else(|| index.to_string());
+            result.push((Some(id), step.transform.output_type()));
+        }
+        result
+    }
+
     fn input_type(&self) -> DataType {
         DataType::Any
     }
@@ -96,9 +105,7 @@ mod test {
     fn can_serialize_nested_transforms() {
         // We need to serialize the config to check if a config has
         // changed when reloading.
-        let root = ComponentKey::from("root");
-        let inputs = vec!["bar".to_owned()];
-        let config = toml::from_str::<CompoundConfig>(
+        let mut config = toml::from_str::<CompoundConfig>(
             r#"
             [[steps]]
             type = "mock"
@@ -110,14 +117,16 @@ mod test {
             suffix = "step1"
         "#,
         )
-        .unwrap()
-        .expand(&root, &inputs)
-        .unwrap()
         .unwrap();
+        assert_eq!(config.named_outputs().len(), 3);
+
+        let root = ComponentKey::from("root");
+        let inputs = vec!["bar".to_owned()];
+        let config = config.expand(&root, &inputs).unwrap().unwrap();
 
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
-            r#"[{"0":{"type":"mock"},"foo":{"type":"mock"}},{"Serial":{"alias":false}}]"#
+            r#"{"root.0":[["bar"],{"type":"mock"}],"root.foo":[["root.0"],{"type":"mock"}],"root":[["root.foo"],{"type":"noop"}]}"#
         );
     }
 }

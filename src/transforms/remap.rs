@@ -791,7 +791,7 @@ mod tests {
             ..Default::default()
         };
 
-        assert!(conf.named_outputs().is_empty());
+        assert_eq!(conf.named_outputs().len(), 1);
 
         let context = TransformContext {
             key: Some(ComponentKey::from("remapper")),

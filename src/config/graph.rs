@@ -9,8 +9,7 @@ pub enum Node {
     },
     Transform {
         in_ty: DataType,
-        out_ty: DataType,
-        named_outputs: Vec<(Option<String>, DataType)>,
+        outs: HashMap<Option<String>, DataType>,
     },
     Sink {
         ty: DataType,
@@ -70,8 +69,7 @@ impl Graph {
                 id.clone(),
                 Node::Transform {
                     in_ty: config.inner.input_type(),
-                    out_ty: config.inner.output_type(),
-                    named_outputs: config.inner.named_outputs(),
+                    outs: config.inner.named_outputs().into_iter().collect(),
                 },
             );
         }
@@ -142,20 +140,32 @@ impl Graph {
 
         // check that all edges connect components with compatible data types
         for edge in &self.edges {
-            let (in_key, out_key) = (&edge.from.component, &edge.to);
-            if self.nodes.get(in_key).is_none() || self.nodes.get(out_key).is_none() {
+            let (in_item, out_key) = (&edge.from, &edge.to);
+            if self.nodes.get(&in_item.component).is_none() || self.nodes.get(out_key).is_none() {
                 continue;
             }
-            match (self.nodes[in_key].clone(), self.nodes[out_key].clone()) {
+            match (
+                self.nodes[&in_item.component].clone(),
+                self.nodes[out_key].clone(),
+            ) {
                 (Node::Source { ty: ty1 }, Node::Sink { ty: ty2, .. })
-                | (Node::Source { ty: ty1 }, Node::Transform { in_ty: ty2, .. })
-                | (Node::Transform { out_ty: ty1, .. }, Node::Transform { in_ty: ty2, .. })
-                | (Node::Transform { out_ty: ty1, .. }, Node::Sink { ty: ty2, .. }) => {
+                | (Node::Source { ty: ty1 }, Node::Transform { in_ty: ty2, .. }) => {
                     if ty1 != ty2 && ty1 != DataType::Any && ty2 != DataType::Any {
                         errors.push(format!(
                             "Data type mismatch between {} ({:?}) and {} ({:?})",
-                            in_key, ty1, out_key, ty2
+                            in_item.component, ty1, out_key, ty2
                         ));
+                    }
+                }
+                (Node::Transform { outs, .. }, Node::Transform { in_ty: ty2, .. })
+                | (Node::Transform { outs, .. }, Node::Sink { ty: ty2, .. }) => {
+                    if let Some(ty1) = outs.get(&in_item.port) {
+                        if ty1 != &ty2 && ty1 != &DataType::Any && ty2 != DataType::Any {
+                            errors.push(format!(
+                                "Data type mismatch between {} ({:?}) and {} ({:?})",
+                                in_item.component, ty1, out_key, ty2
+                            ));
+                        }
                     }
                 }
                 (Node::Sink { .. }, _) | (_, Node::Source { .. }) => unreachable!(),
@@ -229,9 +239,10 @@ impl Graph {
             .flat_map(|(key, node)| match node {
                 Node::Sink { .. } => vec![],
                 Node::Source { .. } => vec![OutputId::from(key)],
-                Node::Transform { named_outputs, .. } => {
-                    named_outputs.iter().map(|(name, _)| OutputId::from((key, name.clone()))).collect()
-                }
+                Node::Transform { outs, .. } => outs
+                    .iter()
+                    .map(|(name, _)| OutputId::from((key, name.clone())))
+                    .collect(),
             })
             .collect()
     }
@@ -299,8 +310,11 @@ mod test {
                 id.clone(),
                 Node::Transform {
                     in_ty,
-                    out_ty,
-                    named_outputs: Default::default(),
+                    outs: {
+                        let mut res = HashMap::new();
+                        res.insert(None, out_ty);
+                        res
+                    },
                 },
             );
             for from in inputs {
@@ -314,7 +328,9 @@ mod test {
         fn add_transform_output(&mut self, id: &str, name: &str) {
             let id = id.into();
             match self.nodes.get_mut(&id) {
-                Some(Node::Transform { named_outputs, .. }) => named_outputs.push((Some(name.to_owned()), DataType::Any)),
+                Some(Node::Transform { outs, .. }) => {
+                    outs.insert(Some(name.to_owned()), DataType::Any);
+                }
                 _ => panic!("invalid transform"),
             }
         }
@@ -541,8 +557,11 @@ mod test {
             ComponentKey::from("foo"),
             Node::Transform {
                 in_ty: DataType::Any,
-                out_ty: DataType::Any,
-                named_outputs: vec![(Some(String::from("bar")), DataType::Any)],
+                outs: {
+                    let mut res = HashMap::new();
+                    res.insert(Some(String::from("bar")), DataType::Any);
+                    res
+                },
             },
         );
 
@@ -555,8 +574,11 @@ mod test {
             ComponentKey::from("baz"),
             Node::Transform {
                 in_ty: DataType::Any,
-                out_ty: DataType::Any,
-                named_outputs: vec![(Some(String::from("errors")), DataType::Any)],
+                outs: {
+                    let mut res = HashMap::new();
+                    res.insert(Some(String::from("errors")), DataType::Any);
+                    res
+                },
             },
         );
 

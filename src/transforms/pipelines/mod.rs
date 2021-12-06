@@ -337,9 +337,8 @@ impl PipelinesConfig {
 #[cfg(test)]
 mod tests {
     use super::{GenerateConfig, PipelinesConfig};
-    use crate::config::{ComponentKey, TransformOuter};
-    use indexmap::IndexMap;
-    use std::collections::HashSet;
+    use crate::config::ComponentKey;
+    use vector_core::transform::TransformConfig;
 
     #[test]
     fn generate_config() {
@@ -360,36 +359,24 @@ mod tests {
     #[test]
     fn expanding() {
         let config = PipelinesConfig::generate_config();
-        let config: PipelinesConfig = config.try_into().unwrap();
-        let outer = TransformOuter {
-            inputs: Vec::<String>::new(),
-            inner: Box::new(config),
-        };
+        let mut config: PipelinesConfig = config.try_into().unwrap();
+        let inputs = vec!["syslog".to_owned()];
         let name = ComponentKey::from("foo");
-        let mut transforms = IndexMap::new();
-        let mut expansions = IndexMap::new();
-        let parents = HashSet::new();
-        outer
-            .expand(name, &parents, &mut transforms, &mut expansions)
-            .unwrap();
+        let expanded = config.expand(&name, &inputs).unwrap().unwrap();
         assert_eq!(
-            transforms
+            expanded
                 .keys()
                 .map(|key| key.to_string())
                 .collect::<Vec<String>>(),
             vec![
-                "foo.logs.filter",
-                "foo.logs.pipelines.foo.truthy.filter",
-                "foo.logs.pipelines.foo.truthy.transforms.0",
-                "foo.logs.pipelines.foo.truthy.transforms.1",
-                "foo.logs.pipelines.foo.truthy.transforms",
-                "foo.logs.pipelines.foo.truthy",
-                "foo.logs.pipelines.foo.falsy",
-                "foo.logs.pipelines.foo",
-                "foo.logs.pipelines.bar.0",
-                "foo.logs.pipelines.bar",
-                "foo.logs.pipelines",
+                "foo.router",
+                "foo.logs.foo.filter",
+                "foo.logs.foo.0",
+                "foo.logs.foo.1",
+                "foo.logs.bar.0",
+                "foo.logs.bar",
                 "foo.logs",
+                "foo.metrics",
                 "foo"
             ],
         );
