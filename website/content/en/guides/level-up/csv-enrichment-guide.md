@@ -3,9 +3,9 @@ title: Enrich your observability data
 short: Enrichment
 description: Learn how to use CSV enrichment to provide more context to your data
 author_github: https://github.com/barieom
-domain: enrichment
+domain: enriching
 weight: 5
-tags: ["enriching", "logs", "level up", "guides", "guide"]
+tags: ["enrichment", "logs", "level up", "guides", "guide"]
 ---
 
 {{< requirement >}}
