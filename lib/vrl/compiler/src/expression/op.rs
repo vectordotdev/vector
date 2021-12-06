@@ -1,6 +1,6 @@
 use crate::expression::{self, Expr, Noop, Resolved};
 use crate::parser::{ast, Node};
-use crate::{value, Context, Expression, State, TypeDef, Value};
+use crate::{Context, Expression, State, TypeDef, Value};
 use diagnostic::{DiagnosticError, Label, Note, Span, Urls};
 use std::fmt;
 
@@ -113,8 +113,8 @@ impl Expression for Op {
     }
 
     fn type_def(&self, state: &State) -> TypeDef {
+        use crate::value::Kind as K;
         use ast::Opcode::*;
-        use value::Kind as K;
 
         let lhs_def = self.lhs.type_def(state);
         let rhs_def = self.rhs.type_def(state);

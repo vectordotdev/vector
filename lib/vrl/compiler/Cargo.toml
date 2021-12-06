@@ -10,6 +10,7 @@ diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
 shared = { path = "../../shared", default-features = false, features = ["conversion"] }
 lookup = { path = "../../lookup" }
+value = { path = "../../value" }
 
 bitflags = "1"
 bytes = "1.1.0"

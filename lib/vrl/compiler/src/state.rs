@@ -46,6 +46,11 @@ impl Compiler {
         }
     }
 
+    /// Get the type definition of the program target (e.g. the type accessed through `.`).
+    pub fn target_type_def(&self) -> Option<&TypeDef> {
+        self.target().as_ref().map(|t| &t.type_def)
+    }
+
     pub(crate) fn variable_idents(&self) -> impl Iterator<Item = &Ident> + '_ {
         self.variables.keys()
     }
@@ -90,11 +95,6 @@ impl Compiler {
             *self = *snapshot;
             self.external_context = context;
         }
-    }
-
-    /// Returns the root typedef for the paths (not the variables) of the object.
-    pub fn target_type_def(&self) -> Option<&TypeDef> {
-        self.target.as_ref().map(|assignment| &assignment.type_def)
     }
 
     /// Sets the external context data for VRL functions to use.

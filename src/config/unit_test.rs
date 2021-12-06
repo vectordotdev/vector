@@ -6,6 +6,7 @@ use crate::{
     conditions::Condition,
     config,
     event::{Event, Value},
+    schema,
     topology::builder::load_enrichment_tables,
     transforms::Transform,
 };
@@ -501,6 +502,7 @@ async fn build_unit_test(
                 key: Some(id.clone()),
                 globals: config.global.clone(),
                 enrichment_tables: enrichment_tables.clone(),
+                pipeline_schema: schema::Output::empty(),
             };
 
             match transform_config.inner.build(&context).await {

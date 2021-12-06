@@ -5,7 +5,7 @@ use lookup::LookupBuf;
 use value::{kind, Kind};
 
 /// The schema representation of the "output" produced by a component.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Output {
     kind: value::Kind,
     purpose: HashMap<field::Purpose, LookupBuf>,
@@ -22,6 +22,11 @@ impl Output {
         }
     }
 
+    /// Given kinds and purposes, create a new output schema.
+    pub fn from_parts(kind: value::Kind, purpose: HashMap<field::Purpose, LookupBuf>) -> Self {
+        Self { kind, purpose }
+    }
+
     /// Add type information for an event field.
     pub fn define_field(
         &mut self,
@@ -36,5 +41,15 @@ impl Output {
         if let Some(purpose) = purpose {
             self.purpose.insert(purpose, path);
         }
+    }
+
+    pub fn kind(&self) -> &value::Kind {
+        &self.kind
+    }
+}
+
+impl Default for Output {
+    fn default() -> Self {
+        Self::empty()
     }
 }

@@ -9,6 +9,7 @@ use crate::{
     },
     event::Event,
     internal_events::EventsReceived,
+    schema,
     shutdown::SourceShutdownCoordinator,
     transforms::Transform,
     Pipeline,
@@ -195,6 +196,9 @@ pub async fn build_pieces(
             key: Some(key.clone()),
             globals: config.global.clone(),
             enrichment_tables: enrichment_tables.clone(),
+
+            // XXX: to be implemented
+            pipeline_schema: schema::Output::empty(),
         };
 
         let trans_inputs = &transform.inputs;

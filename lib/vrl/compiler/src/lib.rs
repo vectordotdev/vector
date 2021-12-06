@@ -13,13 +13,13 @@ pub mod value;
 pub(crate) use diagnostic::Span;
 pub(crate) use state::Compiler as State;
 
+pub use self::value::Value;
 pub use context::Context;
 pub use expression::{Expression, ExpressionError, Resolved};
 pub use function::{Function, Parameter};
 pub use program::Program;
 pub use target::Target;
 pub use type_def::TypeDef;
-pub use value::Value;
 
 pub use paste::paste;
 

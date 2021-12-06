@@ -8455,6 +8455,7 @@ dependencies = [
  "typetag",
  "url",
  "uuid",
+ "value",
  "vector-api-client",
  "vector-vrl-functions",
  "vector_core",
@@ -8634,6 +8635,7 @@ dependencies = [
  "shared",
  "thiserror",
  "tracing 0.1.29",
+ "value",
  "vrl-diagnostic",
  "vrl-parser",
 ]

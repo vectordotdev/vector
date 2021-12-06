@@ -46,7 +46,30 @@ pub struct TypeDef {
     ///
     /// This is wrapped in a [`TypeKind`] enum, such that we encode details
     /// about potential inner kinds for collections (arrays or objects).
+    //
+    // TODO(Jean): migrate to new `value` crate's `Kind` type.
     pub kind: KindInfo,
+}
+
+impl From<value::Kind> for TypeDef {
+    fn from(kind: value::Kind) -> Self {
+        Self {
+            fallible: false,
+            kind: kind.into(),
+        }
+    }
+}
+
+impl From<value::Kind> for KindInfo {
+    fn from(_kind: value::Kind) -> Self {
+        todo!()
+    }
+}
+
+impl From<TypeDef> for value::Kind {
+    fn from(_type_def: TypeDef) -> Self {
+        todo!()
+    }
 }
 
 impl Sub<Kind> for TypeDef {

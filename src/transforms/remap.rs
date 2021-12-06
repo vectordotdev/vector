@@ -4,6 +4,7 @@ use crate::{
     },
     event::{Event, VrlTarget},
     internal_events::{RemapMappingAbort, RemapMappingError},
+    schema,
     transforms::{FallibleFunctionTransform, Transform},
     Result,
 };
@@ -11,9 +12,9 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
-use std::fs::File;
 use std::io::{self, Read};
 use std::path::PathBuf;
+use std::{collections::HashMap, fs::File};
 use vrl::diagnostic::Formatter;
 use vrl::prelude::ExpressionError;
 use vrl::{Program, Runtime, Terminate};
@@ -69,6 +70,14 @@ impl TransformConfig for RemapConfig {
     fn transform_type(&self) -> &'static str {
         "remap"
     }
+
+    /// Calculate the output schema of the remap transform, based on the input, and the type
+    /// definition of the compiled program.
+    fn output_schema(&self, context: &TransformContext) -> Option<schema::Output> {
+        Remap::new(self.clone(), &context)
+            .ok()
+            .map(|remap| remap.output_schema)
+    }
 }
 
 #[derive(Debug)]
@@ -80,10 +89,11 @@ pub struct Remap {
     drop_on_error: bool,
     drop_on_abort: bool,
     reroute_dropped: bool,
+    output_schema: schema::Output,
 }
 
 impl Remap {
-    pub fn new(config: RemapConfig, context: &TransformContext) -> crate::Result<Self> {
+    pub fn new(config: RemapConfig, ctx: &TransformContext) -> crate::Result<Self> {
         let source = match (&config.source, &config.file) {
             (Some(source), None) => source.to_owned(),
             (None, Some(path)) => {
@@ -103,21 +113,31 @@ impl Remap {
         functions.append(&mut enrichment::vrl_functions());
         functions.append(&mut vector_vrl_functions::vrl_functions());
 
-        let program = vrl::compile(
-            &source,
-            &functions,
-            Some(Box::new(context.enrichment_tables.clone())),
-        )
-        .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
+        let type_def = ctx.pipeline_schema.kind().clone().into();
+
+        let mut state = vrl::state::Compiler::new_with_type_def(type_def);
+
+        state.set_external_context(Some(Box::new(ctx.enrichment_tables.clone())));
+
+        let program = vrl::compile_with_state(&source, &functions, &mut state)
+            .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
+
+        let kind: value::Kind = state.target_type_def().cloned().unwrap_or_default().into();
+
+        // TODO(Jean): Get field purposes set by VRL functions.
+        let purposes = HashMap::default();
+
+        let output_schema = schema::Output::from_parts(kind, purposes);
 
         Ok(Remap {
-            component_key: context.key.clone(),
+            component_key: ctx.key.clone(),
             program,
             runtime: Runtime::default(),
             timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
             reroute_dropped: config.reroute_dropped,
+            output_schema,
         })
     }
 
@@ -169,6 +189,7 @@ impl Clone for Remap {
             drop_on_error: self.drop_on_error,
             drop_on_abort: self.drop_on_abort,
             reroute_dropped: self.reroute_dropped,
+            output_schema: self.output_schema.clone(),
         }
     }
 }
