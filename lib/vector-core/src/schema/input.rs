@@ -23,7 +23,7 @@ impl Input {
     }
 
     /// Add a restriction to the schema.
-    pub fn require_field_purpose(&mut self, purpose: field::Purpose, kind: Kind) {
-        self.fields.insert(purpose, kind);
+    pub fn require_field_purpose(&mut self, purpose: impl Into<field::Purpose>, kind: Kind) {
+        self.fields.insert(purpose.into(), kind);
     }
 }

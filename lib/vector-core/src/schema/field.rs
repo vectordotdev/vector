@@ -10,3 +10,16 @@ pub enum Purpose {
     Severity,
     Custom(&'static str),
 }
+
+impl From<&'static str> for Purpose {
+    fn from(s: &'static str) -> Self {
+        match s {
+            "timestamp" => Self::Timestamp,
+            "host" => Self::Host,
+            "message" => Self::Message,
+            "source" => Self::Source,
+            "Severity" => Self::Severity,
+            _ => Self::Custom(s),
+        }
+    }
+}
