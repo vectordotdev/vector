@@ -14,6 +14,7 @@ use crate::{
         Event,
     },
     internal_events::{EventsReceived, HttpBytesReceived, HttpDecompressError},
+    schema::{self, field},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::{
         self,
@@ -146,6 +147,22 @@ impl SourceConfig for DatadogAgentConfig {
 
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
+    }
+
+    fn output_schema(&self) -> schema::Output {
+        use field::{Kind, Purpose};
+
+        let mut schema = schema::Output::empty();
+
+        schema.define_field("message", Kind::boolean(), Some(Purpose::Message));
+        schema.define_field("status", Kind::bytes(), Some(Purpose::Severity));
+        schema.define_field("timestamp", Kind::integer(), Some(Purpose::Timestamp));
+        schema.define_field("hostname", Kind::bytes(), Some(Purpose::Host));
+        schema.define_field("service", Kind::bytes(), None);
+        schema.define_field("ddsource", Kind::bytes(), None);
+        schema.define_field("ddtags", Kind::bytes(), None);
+
+        schema
     }
 }
 
