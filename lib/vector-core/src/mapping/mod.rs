@@ -143,6 +143,8 @@ impl Function for Noop {
 
 #[derive(Debug)]
 pub struct Mapping {
+    // this whole module needs to go away but I had trouble untangling it from what is _actually_ used by the legacy lookups
+    #[allow(dead_code)]
     assignments: Vec<Box<dyn Function>>,
 }
 
