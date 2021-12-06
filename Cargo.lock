@@ -8217,6 +8217,7 @@ dependencies = [
  "url",
  "uuid",
  "vector-api-client",
+ "vector-vrl-functions",
  "vector_core",
  "vrl",
  "vrl-cli",
@@ -8250,6 +8251,13 @@ dependencies = [
  "url",
  "uuid",
  "weak-table",
+]
+
+[[package]]
+name = "vector-vrl-functions"
+version = "0.1.0"
+dependencies = [
+ "vrl",
 ]
 
 [[package]]
