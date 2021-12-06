@@ -7,7 +7,7 @@ targets:
       dd-api-key: "DEADBEEF"
     target_uri: "http://vector:8282/v1/input"
     bytes_per_second: "500 Mb"
-    parallel_connections: 10
+    parallel_connections: 100
     method:
       post:
         variant: "datadog_log"

@@ -7,7 +7,7 @@ targets:
       dd-api-key: "DEADBEEF"
     target_uri: "http://vector:8282/services/collector/event/1.0"
     bytes_per_second: "120 Mb"
-    parallel_connections: 50
+    parallel_connections: 100
     method:
       post:
         variant: "splunk_hec"
