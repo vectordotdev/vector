@@ -225,6 +225,50 @@ Regarding sketches, thos from APM stats are not exactly the same as the internal
 converting them to the internal representation will required some plumbing this could be avoided by not decoding those
 sketches as all and keeping those as opaque data/raw bytes slices inside Vector.
 
+About the source(s) reorganisation an alternative to avoid the work to implement the `<source_id>.<suffix>` an
+alternative would be to handle different Datadog Agent in a dedicated source:
+
+* Either the `datadog-agent` source is adjusted to be configurable with an `type` settings (that could be set to `logs`,
+  `metrics` or `traces`
+* Or source types are mapped to Datadog types: `datadog-logs`, `datadog-metrics` & `datadog-trace` (`datadog-agent`
+  would probably became an alias for `datadog-logs` or `datadog-metrics` before being deprecated),
+
+This would lead to the following config, functionnally identical to the [snippet above](#user-experience), a bit longer
+but still very straighforward and easily readable (note that having multiple binding addresses may translate to more
+parameter in later work around helm charts):
+
+```
+[sources.dd_in_logs]
+  type = "datadog_logs"
+  address = "[::]:8081"
+
+[sources.dd_in_metrics]
+  type = "datadog_metrics"
+  address = "[::]:8082"
+
+[sources.dd_in_traces]
+  type = "datadog_traces"
+  address = "[::]:8083"
+
+[sinks.dd_traces]
+  type = "datadog_traces"
+  inputs = ["dd_in_traces" ]
+
+[sinks.dd_out_logs]
+  type = "datadog_logs"
+  inputs = ["dd_in_logs"]
+
+[sinks.dd_out_metrics]
+  type = "datadog_metrics"
+  inputs = ["dd_in_metrics"]
+
+[sinks.debug]
+  type = "console"
+  inputs = ["dd_in_*"]
+  encoding.codec = "json"
+```
+
+
 ## Outstanding Questions
 
 * Confirms `datadog-agent` source re-arragement and introducting multiple outputs (named like: `<source_id>.<suffix>`)
