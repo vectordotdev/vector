@@ -7947,7 +7947,7 @@ dependencies = [
  "csv",
  "dashmap",
  "data-encoding",
- "datadog-search-syntax",
+ "datadog-filter",
  "derivative",
  "dirs-next",
  "dnsmsg-parser",
@@ -8091,8 +8091,6 @@ dependencies = [
  "vector_core",
  "vrl",
  "vrl-cli",
- "vrl-compiler",
- "vrl-parser",
  "vrl-stdlib",
  "walkdir",
  "warp",
@@ -8122,6 +8120,10 @@ dependencies = [
  "uuid",
  "weak-table",
 ]
+
+[[package]]
+name = "vector-datadog-filter"
+version = "0.1.0"
 
 [[package]]
 name = "vector_core"

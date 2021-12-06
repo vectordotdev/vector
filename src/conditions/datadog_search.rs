@@ -1,7 +1,5 @@
 use super::vrl::VrlConfig;
 use crate::conditions::{Condition, ConditionConfig, ConditionDescription};
-
-#[cfg(feature = "transforms-filter")]
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
