@@ -5,7 +5,7 @@ description: Learn how to use CSV enrichment to provide more context to your dat
 author_github: https://github.com/barieom
 domain: enrichment
 weight: 5
-tags: ["enrichment", "logs", "level up", "guides", "guide"]
+tags: ["enriching", "logs", "level up", "guides", "guide"]
 ---
 
 {{< requirement >}}
