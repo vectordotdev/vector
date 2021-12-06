@@ -22,7 +22,11 @@ impl Assignment {
         let (span, variant) = node.take();
 
         let variant = match variant {
-            Variant::Single { target, expr } => {
+            Variant::Single {
+                target,
+                expr,
+                omit_return_value,
+            } => {
                 let target_span = target.span();
                 let expr_span = expr.span();
                 let assignment_span = Span::new(target_span.start(), expr_span.start() - 1);
@@ -63,6 +67,7 @@ impl Assignment {
                 Variant::Single {
                     target,
                     expr: Box::new(expr),
+                    omit_return_value,
                 }
             }
 
@@ -135,10 +140,18 @@ impl Assignment {
         Ok(Self { variant })
     }
 
+    pub(crate) fn omit_return_value(&mut self, omit: bool) {
+        self.variant.omit_return_value(omit);
+    }
+
     pub(crate) fn noop() -> Self {
         let target = Target::Noop;
         let expr = Box::new(Expr::Literal(Literal::Null));
-        let variant = Variant::Single { target, expr };
+        let variant = Variant::Single {
+            target,
+            expr,
+            omit_return_value: false,
+        };
 
         Self { variant }
     }
@@ -159,7 +172,7 @@ impl fmt::Display for Assignment {
         use Variant::*;
 
         match &self.variant {
-            Single { target, expr } => write!(f, "{} = {}", target, expr),
+            Single { target, expr, .. } => write!(f, "{} = {}", target, expr),
             Infallible { ok, err, expr, .. } => write!(f, "{}, {} = {}", ok, err, expr),
         }
     }
@@ -170,7 +183,7 @@ impl fmt::Debug for Assignment {
         use Variant::*;
 
         match &self.variant {
-            Single { target, expr } => write!(f, "{:?} = {:?}", target, expr),
+            Single { target, expr, .. } => write!(f, "{:?} = {:?}", target, expr),
             Infallible { ok, err, expr, .. } => {
                 write!(f, "Ok({:?}), Err({:?}) = {:?}", ok, err, expr)
             }
@@ -345,6 +358,7 @@ pub enum Variant<T, U> {
     Single {
         target: T,
         expr: Box<U>,
+        omit_return_value: bool,
     },
     Infallible {
         ok: T,
@@ -356,6 +370,19 @@ pub enum Variant<T, U> {
     },
 }
 
+impl<T, U> Variant<T, U> {
+    pub fn omit_return_value(&mut self, omit: bool) {
+        if let Variant::Single {
+            target: _,
+            expr: _,
+            omit_return_value,
+        } = self
+        {
+            *omit_return_value = omit
+        }
+    }
+}
+
 impl<U> Expression for Variant<Target, U>
 where
     U: Expression + Clone,
@@ -364,10 +391,23 @@ where
         use Variant::*;
 
         let value = match self {
-            Single { target, expr } => {
+            Single {
+                target,
+                expr,
+                omit_return_value,
+            } => {
                 let value = expr.resolve(ctx)?;
-                target.insert(value.clone(), ctx);
-                value
+
+                // It is deemed safe to omit the return value,
+                // we can avoid cloning `value` and return `null`
+                // as the expression value.
+                if *omit_return_value {
+                    target.insert(value, ctx);
+                    Value::Null
+                } else {
+                    target.insert(value.clone(), ctx);
+                    value
+                }
             }
             Infallible {
                 ok,
@@ -411,7 +451,7 @@ where
         use Variant::*;
 
         match self {
-            Single { target, expr } => write!(f, "{} = {}", target, expr),
+            Single { target, expr, .. } => write!(f, "{} = {}", target, expr),
             Infallible { ok, err, expr, .. } => write!(f, "{}, {} = {}", ok, err, expr),
         }
     }

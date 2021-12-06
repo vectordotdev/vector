@@ -1,4 +1,5 @@
 use crate::expression::*;
+use crate::optimizer;
 use crate::{Function, Program, State, Value};
 use chrono::{TimeZone, Utc};
 use diagnostic::DiagnosticError;
@@ -28,15 +29,16 @@ impl<'a> Compiler<'a> {
     }
 
     pub(super) fn compile(mut self, ast: parser::Program) -> Result<Program, Errors> {
-        let expressions = self
-            .compile_root_exprs(ast)
-            .into_iter()
-            .map(|expr| Box::new(expr) as _)
-            .collect();
+        let expressions = self.compile_root_exprs(ast);
 
         if !self.errors.is_empty() {
             return Err(self.errors);
         }
+
+        let expressions = optimizer::optimize(expressions)
+            .into_iter()
+            .map(|expr| Box::new(expr) as _)
+            .collect();
 
         Ok(Program {
             expressions,
@@ -249,11 +251,25 @@ impl<'a> Compiler<'a> {
                         let expr =
                             Box::new(expr.map(|node| self.compile_expr(Node::new(span, node))));
 
-                        Node::new(span, Variant::Single { target, expr })
+                        Node::new(
+                            span,
+                            Variant::Single {
+                                target,
+                                expr,
+                                omit_return_value: false,
+                            },
+                        )
                     }
                     AssignmentOp::Merge => {
                         let expr = self.rewrite_to_merge(span, &target, expr);
-                        Node::new(span, Variant::Single { target, expr })
+                        Node::new(
+                            span,
+                            Variant::Single {
+                                target,
+                                expr,
+                                omit_return_value: false,
+                            },
+                        )
                     }
                 }
             }

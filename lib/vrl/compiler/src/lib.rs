@@ -1,5 +1,6 @@
 mod compiler;
 mod context;
+mod optimizer;
 mod program;
 mod target;
 mod test_util;
