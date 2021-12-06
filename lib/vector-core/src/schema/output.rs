@@ -46,6 +46,10 @@ impl Output {
     pub fn kind(&self) -> &value::Kind {
         &self.kind
     }
+
+    pub fn purpose(&self) -> &HashMap<field::Purpose, LookupBuf> {
+        &self.purpose
+    }
 }
 
 impl Default for Output {
