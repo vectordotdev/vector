@@ -1,4 +1,5 @@
 use crate::config::{ComponentKey, GlobalOptions};
+use crate::schema;
 use async_trait::async_trait;
 use indexmap::IndexMap;
 use std::collections::HashSet;
@@ -76,6 +77,17 @@ pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone 
         &mut self,
     ) -> crate::Result<Option<(IndexMap<String, Box<dyn TransformConfig>>, ExpandType)>> {
         Ok(None)
+    }
+
+    /// The event schema this transform produces.
+    ///
+    /// If set to `None`, the transform does not alter the incoming schema, meaning it passes along
+    /// whatever schema it gets from its input(s).
+    ///
+    /// If the transform ingests from multiple inputs and no custom schema output is defined, the
+    /// resulting output is determined by a merge strategy.
+    fn output_schema(&self, _ctx: &TransformContext) -> Option<schema::Output> {
+        None
     }
 }
 

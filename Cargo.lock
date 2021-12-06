@@ -8455,7 +8455,6 @@ dependencies = [
  "typetag",
  "url",
  "uuid",
- "value",
  "vector-api-client",
  "vector-vrl-functions",
  "vector_core",
@@ -8564,6 +8563,7 @@ dependencies = [
  "tracing-subscriber",
  "twox-hash",
  "typetag",
+ "value",
  "vrl",
 ]
 

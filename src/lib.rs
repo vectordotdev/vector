@@ -31,7 +31,6 @@ pub mod dns;
 pub mod docker;
 pub mod expiring_hash_map;
 pub mod generate;
-pub(crate) mod schema;
 #[macro_use]
 pub mod internal_events;
 #[cfg(feature = "api")]
@@ -88,7 +87,7 @@ pub mod vector_windows;
 
 pub use pipeline::Pipeline;
 
-pub use vector_core::{event, mapping, metrics, Error, Result};
+pub use vector_core::{event, mapping, metrics, schema, Error, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]

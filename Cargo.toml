@@ -214,9 +214,6 @@ vrl-compiler = { path = "lib/vrl/compiler", optional = true }
 # Lookup
 lookup = { path = "lib/lookup" }
 
-# Schema
-value = { path = "lib/value" }
-
 # External libs
 async-compression = { version = "0.3.7", default-features = false, features = ["tokio", "gzip", "zstd"] }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }

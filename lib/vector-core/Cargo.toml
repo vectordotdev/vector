@@ -52,8 +52,9 @@ tracing = { version = "0.1.29", default-features = false }
 tracing-core = { version = "0.1.21", default-features = false }
 tracing-log = { version = "0.1.2", default-features = false }
 tracing-subscriber = { version = "0.2.25", default-features = false }
-typetag = { version = "0.1.8", default-features = false }
 twox-hash = { version = "1.6.1", default-features = false }
+typetag = { version = "0.1.8", default-features = false }
+value = { path = "../value", default-features = false }
 vrl-core = { package = "vrl", path = "../vrl/core", optional = true }
 
 [build-dependencies]

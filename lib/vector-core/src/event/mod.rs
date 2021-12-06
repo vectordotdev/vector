@@ -1,3 +1,4 @@
+pub use self::value::Value;
 use crate::ByteSizeOf;
 use buffers::bytes::{DecodeBytes, EncodeBytes};
 use bytes::{Buf, BufMut, Bytes};
@@ -18,7 +19,6 @@ use std::fmt::Debug;
 use std::sync::Arc;
 pub use util::log::PathComponent;
 pub use util::log::PathIter;
-pub use value::Value;
 #[cfg(feature = "vrl")]
 pub use vrl_target::VrlTarget;
 
