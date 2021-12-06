@@ -8253,6 +8253,11 @@ dependencies = [
 [[package]]
 name = "vector-datadog-filter"
 version = "0.1.0"
+dependencies = [
+ "datadog-filter",
+ "datadog-search-syntax",
+ "vector_core",
+]
 
 [[package]]
 name = "vector_core"

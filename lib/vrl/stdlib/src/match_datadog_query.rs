@@ -1,7 +1,7 @@
 use vrl::prelude::*;
 
 use datadog_filter::{build_matcher, Filter, Matcher, Resolver, Run};
-use datadog_search_syntax::{normalize_fields, parse, Comparison, ComparisonValue, Field};
+use datadog_search_syntax::{parse, Comparison, ComparisonValue, Field};
 
 use lookup_lib::{parser::parse_lookup, LookupBuf};
 use regex::Regex;
@@ -112,13 +112,7 @@ struct VrlFilter;
 
 /// Implements `Resolver`, which translates Datadog Search Syntax literal names into
 /// fields.
-impl Resolver for VrlFilter {
-    type IntoIter = Vec<Field>;
-
-    fn build_fields(&self, attr: &str) -> Self::IntoIter {
-        normalize_fields(attr).into_iter().collect::<Vec<_>>()
-    }
-}
+impl Resolver for VrlFilter {}
 
 /// Implements `Filter`, which provides methods for matching against (in this case) VRL values.
 impl Filter<Value> for VrlFilter {
