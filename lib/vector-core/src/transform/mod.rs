@@ -153,6 +153,16 @@ pub trait SyncTransform: Send + dyn_clone::DynClone + Sync {
 
 dyn_clone::clone_trait_object!(SyncTransform);
 
+impl<T> SyncTransform for T
+where
+    T: FunctionTransform,
+{
+    fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf) {
+        FunctionTransform::transform(self, &mut output.primary_buffer, event);
+    }
+}
+
+// TODO: this is a bit ugly when we already have the above impl
 impl SyncTransform for Box<dyn FunctionTransform> {
     fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf) {
         FunctionTransform::transform(self.as_mut(), &mut output.primary_buffer, event);
