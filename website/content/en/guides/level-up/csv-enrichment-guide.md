@@ -57,6 +57,8 @@ status_code,status_message
 ```
 
 To enrich your observability data, you can use ['get_enrichment_table_record'][get_enrichment_table_record].
+This function searches your enrichment table for a row that matches the 
+original field value, replacing that with a new value in that row. 
 Assuming that your `csv` file is called `iot_status.csv`, the following
 illustrates the required Vector configuration:
 
@@ -75,7 +77,7 @@ status_message = "string"
 
 After this configuration, we can now translate the output from IoT devices to
 human-readable messages that provide further context in our `iot_status.csv`.
-To do so, we can make use of the [`get_enrichment_table_record`][get_enrichment_table_record] function:
+To do so, we can make use of the [`get_enrichment_table_record`][get_enrichment_table_record] function.
 
 ``` toml
 [transforms.enrich_iot_status]
@@ -86,7 +88,9 @@ source = '''
 
 status_code = del(.status_code)
 
-row = get_enrichment_table_record!("iot_status", {"status_code" : status_code})
+# In the case that no row with a matching value is found, the original value of
+# the status code is assigned.
+row, status_code = get_enrichment_table_record("iot_status", {"status_code" : status_code})
 
 .status = row.status_message
 '''
@@ -130,15 +134,16 @@ log management solution your team may be using, such as
 log.
 
 The key benefit to using `enrichment tables` in this case is that you can
-enrich your observability data to trigger an alert on your on-premise network
-from a data source that is also securely on your on-premise server; in other words,
-you don't need to worry about uploading the data source containing potentially
-sensitive or proprietary information to a 3rd party log management solution.
+enrich your observability data to trigger an alert from a data source. In cases 
+where you want to avoid exposing this data source due to its sensitivity, 
+you can do this entirely on your on-premise infrastructure, rather than uploading
+the dataset to a 3rd-party log management solution.
 
 Let's assume that you have a `csv` file containing a list of sensitive IP
-addresses that's deemed suspicious for your company for one reason or another.
-Any IP address that's on the list that attempts to access specific URL
-on your service must trigger an alert to your team for further investigation. In
+addresses that's deemed suspicious for your company for one reason or another whether
+it be from your own proprietary list or a 3rd-party source, such as [Emerging Threats][Emerging Threats]
+or [FBI InfraGard][FBI InfraGard]. Any IP address that's on the list that attempts to access specific 
+URL on your service must trigger an alert to your team for further investigation. In
 that case, you can set your `csv` file, let's call it  similarly to below:
 
 ``` csv
@@ -162,7 +167,7 @@ source = '''
 
 ip = del(.ip)
 
-row = get_enrichment_table_record!("ip_info", { "ip" : ip })
+row, ip = get_enrichment_table_record("ip_info", { "ip" : ip })
 
 .alert.type = row.alert_type
 .alert.severity = row.severity
@@ -206,5 +211,7 @@ any feedback or request for additional support you have for the Vector team!
 [Datadog's Log Management]: https://docs.datadoghq.com/logs/
 [find_enrichment_table_records]: /docs/reference/vrl/functions/#find_enrichment_table_records
 [example IP source]: https://datatracker.ietf.org/doc/html/rfc5737
+[Emerging Threats]: https://rules.emergingthreats.net/
+[FBI InfraGard]: https://www.infragard.org/Application/Account/Login
 [Discord chat]: https://discord.com/invite/dX3bdkF
 [Twitter]: https://twitter.com/vectordotdev
