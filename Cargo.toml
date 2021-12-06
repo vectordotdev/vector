@@ -151,7 +151,7 @@ rusoto_sts = { version = "0.47.0", optional = true }
 # AWS - Official SDK
 aws-config = {version = "0.0.22-alpha", optional = true}
 aws-types = {version = "0.0.22-alpha", optional = true}
-aws-sdk-sqs = {version = "0.0.22-alpha", optional = true}
+aws-sdk-sqs = {version = "0.2.0", optional = true}
 
 
 # Azure
