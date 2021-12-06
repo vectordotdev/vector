@@ -137,10 +137,10 @@ impl Controller {
             });
         });
 
-        // Add alias `events_processed_total` for `events_out_total`.
+        // Add alias `processed_events_total` for `component_sent_events_total`.
         for i in 0..metrics.len() {
             let metric = &metrics[i];
-            if metric.name() == "events_out_total" {
+            if metric.name() == "component_sent_events_total" {
                 let alias = metric.clone().with_name("processed_events_total");
                 metrics.push(alias);
             }

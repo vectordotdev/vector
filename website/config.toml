@@ -34,8 +34,8 @@ subtagline = "Vector is deployed over 1,000,000 times per month by Fortune 500 c
 alpine_js_version = "2.8.2"
 ionicons_version = "5.4.0"
 site_logo = "img/vector-open-graph.png"
-favicon = "favicon.ico"
 display_banner = false # Whether to display the top banner in layouts/partials/banner.html
+favicon = "favicon.ico"
 
 # Update this every time there's a new "generation" of the site. Incrementing this forces the browser to refresh any
 # state persisted in localStorage. You should do that whenever there's some change in the front-end logic that requires
