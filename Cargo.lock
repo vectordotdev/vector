@@ -1097,6 +1097,7 @@ dependencies = [
 name = "buffers"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "bytes 1.1.0",
  "core_common",
  "criterion",

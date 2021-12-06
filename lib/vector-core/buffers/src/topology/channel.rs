@@ -375,7 +375,7 @@ mod tests {
     #[tokio::test]
     async fn test_sender_block() {
         // Get a non-overflow buffer in blocking mode with a capacity of 3.
-        let (mut tx, rx) = build_buffer(3, WhenFull::Block, None);
+        let (mut tx, rx) = build_buffer(3, WhenFull::Block, None).await;
 
         // We should be able to send three messages through unimpeded.
         assert_current_send_capacity(&mut tx, 3, None);
@@ -398,7 +398,7 @@ mod tests {
     #[tokio::test]
     async fn test_sender_drop_newest() {
         // Get a non-overflow buffer in "drop newest" mode with a capacity of 3.
-        let (mut tx, rx) = build_buffer(3, WhenFull::DropNewest, None);
+        let (mut tx, rx) = build_buffer(3, WhenFull::DropNewest, None).await;
 
         // We should be able to send three messages through unimpeded.
         assert_current_send_capacity(&mut tx, 3, None);
@@ -423,7 +423,7 @@ mod tests {
     async fn test_sender_overflow_block() {
         // Get an overflow buffer, where the overflow buffer is in blocking mode, and both the base
         // and overflow buffers have a capacity of 2.
-        let (mut tx, rx) = build_buffer(2, WhenFull::Overflow, Some(WhenFull::Block));
+        let (mut tx, rx) = build_buffer(2, WhenFull::Overflow, Some(WhenFull::Block)).await;
 
         // We should be able to send four message through unimpeded -- two for the base sender, and
         // two for the overflow sender.
@@ -449,7 +449,7 @@ mod tests {
     async fn test_sender_overflow_drop_newest() {
         // Get an overflow buffer, where the overflow buffer is in "drop newest" mode, and both the
         // base and overflow buffers have a capacity of 2.
-        let (mut tx, rx) = build_buffer(2, WhenFull::Overflow, Some(WhenFull::DropNewest));
+        let (mut tx, rx) = build_buffer(2, WhenFull::Overflow, Some(WhenFull::DropNewest)).await;
 
         // We should be able to send four message through unimpeded -- two for the base sender, and
         // two for the overflow sender.

@@ -7,7 +7,7 @@ use crate::{
         builder::IntoBuffer,
         channel::{BufferReceiver, BufferSender},
     },
-    Bufferable,
+    Bufferable, buffer_usage_data::BufferUsageHandle,
 };
 use crate::{MemoryBuffer, WhenFull};
 
@@ -45,29 +45,37 @@ impl DecodeBytes<u64> for u64 {
 /// If `mode` is set to `WhenFull::Overflow`, then the buffer will be set to overflow mode, with
 /// another in-memory channel buffer being used as the overflow buffer.  The overflow buffer will
 /// also use the same capacity as the outer buffer.
-pub fn build_buffer(
+pub async fn build_buffer(
     capacity: usize,
     mode: WhenFull,
     overflow_mode: Option<WhenFull>,
 ) -> (BufferSender<u64>, BufferReceiver<u64>) {
     match mode {
         WhenFull::Block | WhenFull::DropNewest => {
-            let channel = MemoryBuffer::new(capacity);
-            let (sender, receiver) = channel.into_buffer_parts();
+            let usage_handle = BufferUsageHandle::testing();
+            let channel = Box::new(MemoryBuffer::new(capacity));
+            let (sender, receiver, _) = channel.into_buffer_parts(&usage_handle)
+                .await
+                .expect("should not fail to create memory buffer");
             let sender = BufferSender::new(sender, mode);
             let receiver = BufferReceiver::new(receiver);
             (sender, receiver)
         }
         WhenFull::Overflow => {
+            let usage_handle = BufferUsageHandle::testing();
             let overflow_mode = overflow_mode
                 .expect("overflow_mode must be specified when base is in overflow mode");
-            let overflow_channel = MemoryBuffer::new(capacity);
-            let (overflow_sender, overflow_receiver) = overflow_channel.into_buffer_parts();
+            let overflow_channel = Box::new(MemoryBuffer::new(capacity));
+            let (overflow_sender, overflow_receiver, _) = overflow_channel.into_buffer_parts(&usage_handle)
+                .await
+                .expect("should not fail to create memory buffer");
             let overflow_sender = BufferSender::new(overflow_sender, overflow_mode);
             let overflow_receiver = BufferReceiver::new(overflow_receiver);
 
-            let base_channel = MemoryBuffer::new(capacity);
-            let (base_sender, base_receiver) = base_channel.into_buffer_parts();
+            let base_channel = Box::new(MemoryBuffer::new(capacity));
+            let (base_sender, base_receiver, _) = base_channel.into_buffer_parts(&usage_handle)
+                .await
+                .expect("should not fail to create memory buffer");
             let base_sender = BufferSender::with_overflow(base_sender, overflow_sender);
             let base_receiver = BufferReceiver::with_overflow(base_receiver, overflow_receiver);
 

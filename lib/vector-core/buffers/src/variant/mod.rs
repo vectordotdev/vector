@@ -13,3 +13,11 @@ pub use disk_and_memory::*;
 
 mod in_memory_v2;
 pub use in_memory_v2::*;
+
+#[cfg(feature = "disk-buffer")]
+mod disk_v1;
+#[cfg(feature = "disk-buffer")]
+pub use disk_v1::*;
+
+mod disk_v2;
+pub use disk_v2::*;

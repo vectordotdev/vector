@@ -1,4 +1,4 @@
-use crate::{build, Acker, BufferInputCloner, BufferStream, Bufferable, Variant, WhenFull};
+use crate::{Acker, Bufferable, WhenFull, topology::{channel::{BufferSender, BufferReceiver}, builder::TopologyBuilder}, MemoryBuffer, DiskV1Buffer};
 use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, path::PathBuf};
 use tracing::Span;
@@ -8,7 +8,10 @@ use tracing::Span;
 enum BufferTypeKind {
     Memory,
     #[cfg(feature = "disk-buffer")]
-    Disk,
+    #[serde(rename = "disk")]
+    DiskV1,
+    #[serde(rename = "disk_v2")]
+    DiskV2,
 }
 
 #[cfg(feature = "disk-buffer")]
@@ -77,14 +80,26 @@ impl BufferTypeVisitor {
                 })
             }
             #[cfg(feature = "disk-buffer")]
-            BufferTypeKind::Disk => {
+            BufferTypeKind::DiskV1 => {
                 if max_events.is_some() {
                     return Err(de::Error::unknown_field(
                         "max_events",
                         &["type", "max_size", "when_full"],
                     ));
                 }
-                Ok(BufferType::Disk {
+                Ok(BufferType::DiskV1 {
+                    max_size: max_size.ok_or_else(|| de::Error::missing_field("max_size"))?,
+                    when_full,
+                })
+            },
+            BufferTypeKind::DiskV2 => {
+                if max_events.is_some() {
+                    return Err(de::Error::unknown_field(
+                        "max_events",
+                        &["type", "max_size", "when_full"],
+                    ));
+                }
+                Ok(BufferType::DiskV2 {
                     max_size: max_size.ok_or_else(|| de::Error::missing_field("max_size"))?,
                     when_full,
                 })
@@ -190,7 +205,13 @@ pub enum BufferType {
     },
     /// A buffer stage backed by an on-disk database, powered by LevelDB.
     #[cfg(feature = "disk-buffer")]
-    Disk {
+    DiskV1 {
+        max_size: usize,
+        #[serde(default)]
+        when_full: WhenFull,
+    },
+    /// A buffer stage backed by disk.
+    DiskV2 {
         max_size: usize,
         #[serde(default)]
         when_full: WhenFull,
@@ -198,12 +219,22 @@ pub enum BufferType {
 }
 
 impl BufferType {
-    fn when_full(&self) -> WhenFull {
+    #[cfg_attr(not(feature = "disk-buffer"), allow(unused))]
+    fn add_to_builder<T>(&self, builder: &mut TopologyBuilder<T>, data_dir: PathBuf, id: String)
+    where
+        T: Bufferable + Clone,
+    {
         match *self {
-            #[cfg(not(feature = "disk-buffer"))]
-            BufferType::Memory { when_full, .. } => when_full,
+            BufferType::Memory { when_full, max_events } => {
+                builder.stage(MemoryBuffer::new(max_events), when_full);
+            },
             #[cfg(feature = "disk-buffer")]
-            BufferType::Memory { when_full, .. } | BufferType::Disk { when_full, .. } => when_full,
+            BufferType::DiskV1 { when_full, max_size } => {
+                builder.stage(DiskV1Buffer::new(id, data_dir, max_size), when_full);
+            },
+            BufferType::DiskV2 { when_full, max_size } => {
+                builder.stage(DiskV2Buffer::new(id, data_dir, max_size), when_full);
+            },
         }
     }
 }
@@ -221,10 +252,6 @@ impl BufferType {
 /// component, where you could only choose which buffer type to use.  As we expand buffer
 /// functionality to allow chaining buffers together, you'll see "buffer topology" used in internal
 /// documentation to correctly reflect the internal structure.
-///
-/// * - buffers are currently only single stage as we work on improvements to the buffers system;
-///     this will eventually be changed to allow chained buffer topologies to be constructed by
-///     users depending on their buffer config for sinks
 #[derive(Clone, Debug, PartialEq)]
 pub struct BufferConfig {
     stages: Vec<BufferType>,
@@ -261,57 +288,24 @@ impl BufferConfig {
     ///
     /// If a disk buffer stage is configured and the data directory provided is `None`, an error
     /// variant will be thrown.
-    #[cfg_attr(not(feature = "disk-buffer"), allow(unused))]
     #[allow(clippy::needless_pass_by_value)]
-    pub fn build<T>(
+    pub async fn build<T>(
         &self,
-        data_dir: &Option<PathBuf>,
+        data_dir: PathBuf,
         buffer_id: String,
         span: Span,
-    ) -> Result<(BufferInputCloner<T>, BufferStream<T>, Acker), String>
+    ) -> Result<(BufferSender<T>, BufferReceiver<T>, Acker), String>
     where
         T: Bufferable + Clone,
     {
-        // For now, we only support a single buffer stage, so make sure we only have one.
-        let stage = match self.stages.len() {
-            0 => Err("buffer must be configured".to_string()),
-            1 => self
-                .stages
-                .first()
-                .copied()
-                .ok_or_else(|| "stage cannot possibly be empty".to_string()),
-            _ => Err("chained buffers are not yet supported".to_string()),
-        }?;
+        let mut builder = TopologyBuilder::new();
 
-        // Overflow mode is also not supported yet.
-        if let WhenFull::Overflow = stage.when_full() {
-            return Err("overflow mode is not yet supported".to_string());
+        for stage in self.stages.iter().cloned() {
+            stage.add_to_builder(&mut builder, data_dir.clone(), buffer_id.clone());
         }
 
-        let variant = match stage {
-            BufferType::Memory {
-                max_events,
-                when_full,
-            } => Variant::Memory {
-                max_events,
-                when_full,
-                instrument: true,
-            },
-            #[cfg(feature = "disk-buffer")]
-            BufferType::Disk {
-                max_size,
-                when_full,
-            } => Variant::Disk {
-                max_size,
-                when_full,
-                data_dir: data_dir
-                    .as_ref()
-                    .ok_or_else(|| "Must set data_dir to use on-disk buffering.".to_string())?
-                    .clone(),
-                id: buffer_id,
-            },
-        };
-        build(variant, span)
+        builder.build(span).await
+            .map_err(|e| format!("error while building buffer topology: {}", e))
     }
 }
 
