@@ -35,6 +35,7 @@ async fn config() -> HecMetricsSinkConfig {
         batch,
         request: TowerRequestConfig::default(),
         tls: None,
+        acknowledgements: Default::default(),
     }
 }
 

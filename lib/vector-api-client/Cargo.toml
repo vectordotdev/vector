@@ -33,5 +33,5 @@ tokio-tungstenite = { version = "0.13.0", features = ["tls"] }
 chrono = { version = "0.4.6", features = ["serde"] }
 url = "2.2.2"
 uuid = { version = "0.8", features = ["serde", "v4"] }
-weak-table = "0.3.0"
+weak-table = "0.3.2"
 indoc = "1.0.3"

@@ -3,9 +3,9 @@ use itertools::{
     Itertools,
 };
 
-use lookup::LookupBuf;
 use shared::btreemap;
 
+use crate::parse_grok_rules::GrokField;
 use crate::{grok_filter::apply_filter, parse_grok_rules::GrokRule};
 use vrl_compiler::{Target, Value};
 
@@ -46,46 +46,50 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
 
     if let Some(ref matches) = grok_rule.pattern.match_against(source) {
         for (name, value) in matches.iter() {
-            let path: LookupBuf = if name == "." {
-                LookupBuf::root()
-            } else {
-                name.parse().expect("path should always be valid")
-            };
-
             let mut value = Some(Value::from(value));
 
-            // apply filters
-            if let Some(filters) = grok_rule.filters.get(&path) {
+            if let Some(GrokField {
+                lookup: field,
+                filters,
+            }) = grok_rule.fields.get(name)
+            {
                 filters.iter().for_each(|filter| {
                     if let Some(ref v) = value {
                         match apply_filter(v, filter) {
                             Ok(v) => value = Some(v),
                             Err(error) => {
-                                warn!(message = "Error applying filter", path = %path, filter = %filter, %error);
+                                warn!(message = "Error applying filter", field = %field, filter = %filter, %error);
                                 value = None;
                             }
                         }
                     }
                 });
-            };
 
-            if let Some(value) = value {
-                match value {
-                    // root-level maps must be merged
-                    Value::Object(map) if path.is_root() || path.segments[0].is_index() => {
-                        parsed.as_object_mut().expect("root is object").extend(map);
-                    }
-                    // anything else at the root leve must be ignored
-                    _ if path.is_root() || path.segments[0].is_index() => {}
-                    // ignore empty strings if necessary
-                    Value::Bytes(b) if remove_empty && b.is_empty() => {}
-                    // otherwise just apply VRL lookup insert logic
-                    _ => {
-                        parsed.insert(&path, value).unwrap_or_else(
-                                |error| warn!(message = "Error updating field value", path = %path, %error)
+                if let Some(value) = value {
+                    match value {
+                        // root-level maps must be merged
+                        Value::Object(map) if field.is_root() || field.segments[0].is_index() => {
+                            parsed.as_object_mut().expect("root is object").extend(map);
+                        }
+                        // anything else at the root leve must be ignored
+                        _ if field.is_root() || field.segments[0].is_index() => {}
+                        // ignore empty strings if necessary
+                        Value::Bytes(b) if remove_empty && b.is_empty() => {}
+                        // otherwise just apply VRL lookup insert logic
+                        _ => {
+                            parsed.insert(field, value).unwrap_or_else(
+                                |error| warn!(message = "Error updating field value", field = %field, %error)
                             );
-                    }
-                };
+                        }
+                    };
+                }
+            } else {
+                // this must be a regex named capturing group (?<name>group),
+                // where name can only be alphanumeric - thus we do not need to parse field names(no nested fields)
+                parsed
+                    .as_object_mut()
+                    .expect("parsed value is not an object")
+                    .insert(name.to_string(), value.into());
             }
         }
 
@@ -218,7 +222,7 @@ mod tests {
         ]);
     }
 
-    fn test_grok_pattern_without_field(tests: Vec<(&str, &str, Result<Value, Error>)>) {
+    fn test_full_grok(tests: Vec<(&str, &str, Result<Value, Error>)>) {
         for (filter, k, v) in tests {
             let rules =
                 parse_grok_rules(&[filter.to_string()], btreemap! {}).expect("should parse rules");
@@ -303,7 +307,7 @@ mod tests {
     #[test]
     fn does_not_merge_field_maps() {
         // only root-level maps are merged
-        test_grok_pattern_without_field(vec![(
+        test_full_grok(vec![(
             "'%{data:nested.json:json}' '%{data:nested.json:json}'",
             r#"'{ "json_field1": "value2" }' '{ "json_field2": "value3" }'"#,
             Ok(Value::from(btreemap! {
@@ -321,14 +325,14 @@ mod tests {
     fn supports_filters_without_fields() {
         // if the root-level value, after filters applied, is a map then merge it at the root level,
         // otherwise ignore it
-        test_grok_pattern_without_field(vec![(
+        test_full_grok(vec![(
             "%{data::json}",
             r#"{ "json_field1": "value2" }"#,
             Ok(Value::from(btreemap! {
                 "json_field1" => Value::Bytes("value2".into()),
             })),
         )]);
-        test_grok_pattern_without_field(vec![(
+        test_full_grok(vec![(
             "%{notSpace:standalone_field} '%{data::json}' '%{data::json}' %{number::number}",
             r#"value1 '{ "json_field1": "value2" }' '{ "json_field2": "value3" }' 3"#,
             Ok(Value::from(btreemap! {
@@ -338,7 +342,7 @@ mod tests {
             })),
         )]);
         // ignore non-map root-level fields
-        test_grok_pattern_without_field(vec![(
+        test_full_grok(vec![(
             "%{notSpace:standalone_field} %{data::integer}",
             r#"value1 1"#,
             Ok(Value::from(btreemap! {
@@ -346,7 +350,7 @@ mod tests {
             })),
         )]);
         // empty map if fails
-        test_grok_pattern_without_field(vec![(
+        test_full_grok(vec![(
             "%{data::json}",
             r#"not a json"#,
             Ok(Value::from(btreemap! {})),
@@ -356,7 +360,7 @@ mod tests {
     #[test]
     fn ignores_field_if_filter_fails() {
         // empty map for filters like json
-        test_grok_pattern_without_field(vec![(
+        test_full_grok(vec![(
             "%{notSpace:field1:integer} %{data:field2:json}",
             r#"not_a_number not a json"#,
             Ok(Value::from(btreemap! {})),
@@ -415,6 +419,26 @@ mod tests {
             format!("{}", err),
             "Circular dependency found in the alias 'pattern1'"
         );
+    }
+
+    #[test]
+    fn extracts_field_with_regex_capture() {
+        test_grok_pattern(vec![(
+            r#"(?<field>\w+)"#,
+            "abc",
+            Ok(Value::Bytes("abc".into())),
+        )]);
+
+        // the group name can only be alphanumeric,
+        // though we don't validate group names(it would be unnecessary overhead at boot-time),
+        // field names are treated as literals, not as lookup paths
+        test_full_grok(vec![(
+            r#"(?<nested.field.name>\w+)"#,
+            "abc",
+            Ok(Value::from(btreemap! {
+                "nested.field.name" => Value::Bytes("abc".into()),
+            })),
+        )]);
     }
 
     #[test]
