@@ -57,8 +57,8 @@ status_code,status_message
 ```
 
 To enrich your observability data, you can use ['get_enrichment_table_record'][get_enrichment_table_record].
-This function searches your enrichment table for a row that matches the 
-original field value, replacing that with a new value in that row. 
+This function searches your enrichment table for a row that matches the
+original field value, replacing that with a new value in that row.
 Assuming that your `csv` file is called `iot_status.csv`, the following
 illustrates the required Vector configuration:
 
@@ -134,15 +134,15 @@ log management solution your team may be using, such as
 log.
 
 The key benefit to using `enrichment tables` in this case is that you can
-enrich your observability data to trigger an alert from a data source. In cases 
-where you want to avoid exposing this data source due to its sensitivity, 
+enrich your observability data to trigger an alert from a data source. In cases
+where you want to avoid exposing this data source due to its sensitivity,
 you can do this entirely on your on-premise infrastructure, rather than uploading
 the dataset to a 3rd-party log management solution.
 
 Let's assume that you have a `csv` file containing a list of sensitive IP
 addresses that's deemed suspicious for your company for one reason or another whether
 it be from your own proprietary list or a 3rd-party source, such as [Emerging Threats][Emerging Threats]
-or [FBI InfraGard][FBI InfraGard]. Any IP address that's on the list that attempts to access specific 
+or [FBI InfraGard][FBI InfraGard]. Any IP address that's on the list that attempts to access specific
 URL on your service must trigger an alert to your team for further investigation. In
 that case, you can set your `csv` file, let's call it  similarly to below:
 
