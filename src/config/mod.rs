@@ -466,8 +466,8 @@ impl TransformOuter<String> {
                     inputs,
                     inner: content,
                 };
-                transforms.insert(key.clone(), child);
-                children.push(name.clone());
+                transforms.insert(name.clone(), child);
+                children.push(name);
             }
 
             expansions.insert(key, children);
