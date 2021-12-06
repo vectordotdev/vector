@@ -90,7 +90,7 @@ status_code = del(.status_code)
 
 # In the case that no row with a matching value is found, the original value of
 # the status code is assigned.
-row, status_code = get_enrichment_table_record("iot_status", {"status_code" : status_code})
+row = get_enrichment_table_record("iot_status", {"status_code" : status_code}) ?? status_code
 
 .status = row.status_message
 '''
@@ -167,7 +167,7 @@ source = '''
 
 ip = del(.ip)
 
-row, ip = get_enrichment_table_record("ip_info", { "ip" : ip })
+row = get_enrichment_table_record("ip_info", { "ip" : ip }) ?? ip
 
 .alert.type = row.alert_type
 .alert.severity = row.severity
