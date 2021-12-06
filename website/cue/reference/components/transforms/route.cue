@@ -42,12 +42,7 @@ components: transforms: route: {
 							condition will be included in this route.
 							"""
 						required: true
-						type: string: {
-							examples: [
-								#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
-							]
-							syntax: "remap_boolean_expression"
-						}
+						type: condition: {}
 					}
 				}
 			}
