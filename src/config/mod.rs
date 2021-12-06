@@ -438,25 +438,21 @@ impl TransformOuter<String> {
     pub(crate) fn expand(
         mut self,
         key: ComponentKey,
-        parent_types: &HashSet<&'static str>,
         transforms: &mut IndexMap<ComponentKey, TransformOuter<String>>,
         expansions: &mut IndexMap<ComponentKey, Vec<ComponentKey>>,
     ) -> Result<(), String> {
-        if !self.inner.nestable(parent_types) {
-            return Err(format!(
-                "the component {} cannot be nested in {:?}",
-                self.inner.transform_type(),
-                parent_types
-            ));
-        }
+        let parent_types = {
+            let mut set = HashSet::new();
+            set.insert(self.inner.transform_type());
+            set
+        };
+
+        self.inner.nestable(&parent_types)?;
 
         let expansion = self
             .inner
             .expand(&key, &self.inputs)
             .map_err(|err| format!("failed to expand transform '{}': {}", key, err))?;
-
-        let mut ptypes = parent_types.clone();
-        ptypes.insert(self.inner.transform_type());
 
         if let Some(expanded) = expansion {
             let mut children = Vec::new();

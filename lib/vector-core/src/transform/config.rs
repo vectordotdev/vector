@@ -63,10 +63,9 @@ pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone 
 
     fn transform_type(&self) -> &'static str;
 
-    /// Allows to detect if a transform can be embedded in another transform.
-    /// It's used by the pipelines transform for now.
-    fn nestable(&self, _parents: &HashSet<&'static str>) -> bool {
-        true
+    /// Check if current transform and potential inner children can be nested in `parents`
+    fn nestable(&self, _parents: &HashSet<&'static str>) -> Result<(), String> {
+        Ok(())
     }
 
     /// Allows a transform configuration to expand itself into multiple "child"

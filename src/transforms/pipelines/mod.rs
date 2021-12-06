@@ -289,8 +289,19 @@ impl TransformConfig for PipelinesConfig {
     }
 
     /// The pipelines transform shouldn't be embedded in another pipelines transform.
-    fn nestable(&self, parents: &HashSet<&'static str>) -> bool {
-        !parents.contains(&self.transform_type())
+    fn nestable(&self, parents: &HashSet<&'static str>) -> Result<(), String> {
+        if parents.contains(&self.transform_type()) {
+            Err("Pipelines transform shouldn't be nested in a pipelines transform.".to_owned())
+        } else {
+            let mut nodes = parents.clone();
+            nodes.insert(self.transform_type());
+            for pipeline in self.logs.pipelines.values() {
+                for transform in pipeline.transforms.iter() {
+                    transform.nestable(&nodes)?;
+                }
+            }
+            Ok(())
+        }
     }
 }
 
