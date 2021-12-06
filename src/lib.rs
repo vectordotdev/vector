@@ -31,6 +31,7 @@ pub mod dns;
 pub mod docker;
 pub mod expiring_hash_map;
 pub mod generate;
+pub(crate) mod schema;
 #[macro_use]
 pub mod internal_events;
 #[cfg(feature = "api")]

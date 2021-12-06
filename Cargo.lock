@@ -8266,6 +8266,9 @@ dependencies = [
 [[package]]
 name = "value"
 version = "0.1.0"
+dependencies = [
+ "lookup",
+]
 
 [[package]]
 name = "vcpkg"
@@ -8452,6 +8455,7 @@ dependencies = [
  "typetag",
  "url",
  "uuid",
+ "value",
  "vector-api-client",
  "vector-vrl-functions",
  "vector_core",

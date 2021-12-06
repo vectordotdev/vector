@@ -1,6 +1,7 @@
 use crate::{
     conditions,
     event::Metric,
+    schema,
     shutdown::ShutdownSignal,
     sinks::{self, util::UriSerde},
     sources,
@@ -194,6 +195,14 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
     fn resources(&self) -> Vec<Resource> {
         Vec::new()
     }
+
+    /// The schema produced by the source.
+    ///
+    /// Defaults to an empty schema, meaning there is no known details about the shape of the
+    /// events.
+    fn output_schema(&self) -> schema::Output {
+        schema::Output::empty()
+    }
 }
 
 pub struct SourceContext {
@@ -375,6 +384,13 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
     /// Resources that the sink is using.
     fn resources(&self) -> Vec<Resource> {
         Vec::new()
+    }
+
+    /// The schema events are required to match for this sink.
+    ///
+    /// Defaults to an empty schema, meaning there are no limitations on the shape of an event.
+    fn input_schema(&self) -> schema::Input {
+        schema::Input::empty()
     }
 }
 
