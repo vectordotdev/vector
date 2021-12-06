@@ -18,7 +18,7 @@ pub struct PipelineFilterConfig {
 }
 
 impl PipelineFilterConfig {
-    pub fn new(condition: AnyCondition) -> Self {
+    pub const fn new(condition: AnyCondition) -> Self {
         Self { condition }
     }
 }
