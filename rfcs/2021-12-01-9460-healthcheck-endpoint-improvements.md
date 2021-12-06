@@ -60,9 +60,9 @@ to avoid unwanted complexity.
 ## Prior Art
 
 - [Beats](https://www.elastic.co/guide/en/beats/filebeat/7.15/http-endpoint.html)
-  - [Liveness and Readiness Probes](https://github.com/elastic/helm-charts/blob/main/filebeat/values.yaml#L174-L198)
+  - [Liveness and Readiness Probes](https://github.com/elastic/helm-charts/blob/715eeda8a45b8c3d8542921f5485aa502c238d93/filebeat/values.yaml#L174-L198)
 - [FluentBit](https://docs.fluentbit.io/manual/administration/monitoring#rest-api-interface)
-  - [Liveness and Readiness Probes](https://github.com/fluent/helm-charts/blob/main/charts/fluent-bit/values.yaml#L131-L139)
+  - [Liveness and Readiness Probes](https://github.com/fluent/helm-charts/blob/355575c5b2a5bd858bcadeaa9d8d5d7f15a7816d/charts/fluent-bit/values.yaml#L132-L140)
 
 ## Alternatives
 
