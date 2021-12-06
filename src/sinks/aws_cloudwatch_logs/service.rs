@@ -1,3 +1,30 @@
+use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsSinkConfig;
+use crate::sinks::aws_cloudwatch_logs::retry::CloudwatchRetryLogic;
+use crate::sinks::aws_cloudwatch_logs::{request, CloudwatchKey};
+use crate::sinks::util::retries::FixedRetryPolicy;
+use crate::sinks::util::{
+    EncodedLength, PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings,
+};
+use chrono::Duration;
+use chrono::Utc;
+use futures::future::BoxFuture;
+use futures::{ready, FutureExt};
+use futures_util::TryFutureExt;
+use rusoto_core::RusotoError;
+use rusoto_logs::{
+    CloudWatchLogsClient, CreateLogGroupError, CreateLogStreamError, DescribeLogStreamsError,
+    InputLogEvent, PutLogEventsError,
+};
+use std::collections::HashMap;
+use std::fmt;
+use std::task::{Context, Poll};
+use tokio::sync::oneshot;
+use tower::buffer::Buffer;
+use tower::limit::{ConcurrencyLimit, RateLimit};
+use tower::retry::Retry;
+use tower::timeout::Timeout;
+use tower::{Service, ServiceBuilder, ServiceExt};
+
 type Svc = Buffer<
     ConcurrencyLimit<
         RateLimit<
@@ -9,6 +36,55 @@ type Svc = Buffer<
     >,
     Vec<InputLogEvent>,
 >;
+
+#[derive(Debug)]
+pub enum CloudwatchError {
+    Put(RusotoError<PutLogEventsError>),
+    Describe(RusotoError<DescribeLogStreamsError>),
+    CreateStream(RusotoError<CreateLogStreamError>),
+    CreateGroup(RusotoError<CreateLogGroupError>),
+    NoStreamsFound,
+    ServiceDropped,
+    MakeService,
+}
+
+impl fmt::Display for CloudwatchError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CloudwatchError::Put(error) => write!(f, "CloudwatchError::Put: {}", error),
+            CloudwatchError::Describe(error) => write!(f, "CloudwatchError::Describe: {}", error),
+            CloudwatchError::CreateStream(error) => {
+                write!(f, "CloudwatchError::CreateStream: {}", error)
+            }
+            CloudwatchError::CreateGroup(error) => {
+                write!(f, "CloudwatchError::CreateGroup: {}", error)
+            }
+            CloudwatchError::NoStreamsFound => write!(f, "CloudwatchError: No Streams Found"),
+            CloudwatchError::ServiceDropped => write!(
+                f,
+                "CloudwatchError: The service was dropped while there was a request in flight."
+            ),
+            CloudwatchError::MakeService => write!(
+                f,
+                "CloudwatchError: The inner service was unable to be created."
+            ),
+        }
+    }
+}
+
+impl std::error::Error for CloudwatchError {}
+
+impl From<RusotoError<PutLogEventsError>> for CloudwatchError {
+    fn from(error: RusotoError<PutLogEventsError>) -> Self {
+        CloudwatchError::Put(error)
+    }
+}
+
+impl From<RusotoError<DescribeLogStreamsError>> for CloudwatchError {
+    fn from(error: RusotoError<DescribeLogStreamsError>) -> Self {
+        CloudwatchError::Describe(error)
+    }
+}
 
 impl CloudwatchLogsPartitionSvc {
     pub fn new(config: CloudwatchLogsSinkConfig, client: CloudWatchLogsClient) -> Self {

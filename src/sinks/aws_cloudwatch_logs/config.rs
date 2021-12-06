@@ -1,13 +1,17 @@
+use crate::aws::rusoto;
 use crate::aws::{AwsAuthentication, RegionOrEndpoint};
-use crate::config::{ProxyConfig, SinkConfig, SinkContext};
+use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext};
 use crate::sinks::aws_cloudwatch_logs::healthcheck::healthcheck;
+use crate::sinks::aws_cloudwatch_logs::retry::CloudwatchRetryLogic;
 use crate::sinks::aws_cloudwatch_logs::service::CloudwatchLogsPartitionSvc;
 use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
-use crate::sinks::util::{BatchConfig, Compression, TowerRequestConfig};
-use crate::sinks::VectorSink;
+use crate::sinks::util::{BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig};
+use crate::sinks::{Healthcheck, VectorSink};
 use crate::template::Template;
 use futures::FutureExt;
 use rusoto_logs::CloudWatchLogsClient;
+use serde::{Deserialize, Serialize};
+use std::num::NonZeroU64;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -46,10 +50,7 @@ impl CloudwatchLogsSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let batch_settings = self.batch.into_batch_settings()?;
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
 
@@ -87,12 +88,12 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 
 impl GenerateConfig for CloudwatchLogsSinkConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(default_config(Encoding::Json)).unwrap()
+        toml::Value::try_from(default_config(StandardEncodings::Json)).unwrap()
     }
 }
 
 //TODO: use `Default` instead
-fn default_config(e: Encoding) -> CloudwatchLogsSinkConfig {
+fn default_config(e: StandardEncodings) -> CloudwatchLogsSinkConfig {
     CloudwatchLogsSinkConfig {
         group_name: Default::default(),
         stream_name: Default::default(),

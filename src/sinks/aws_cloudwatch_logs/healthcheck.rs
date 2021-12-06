@@ -1,3 +1,22 @@
+use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsSinkConfig;
+use rusoto_core::RusotoError;
+use rusoto_logs::{CloudWatchLogs, CloudWatchLogsClient, DescribeLogGroupsRequest};
+use snafu::Snafu;
+
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("DescribeLogGroups failed: {}", source))]
+    DescribeLogGroupsFailed {
+        source: RusotoError<rusoto_logs::DescribeLogGroupsError>,
+    },
+    #[snafu(display("No log group found"))]
+    NoLogGroup,
+    #[snafu(display("Unable to extract group name"))]
+    GroupNameError,
+    #[snafu(display("Group name mismatch: expected {}, found {}", expected, name))]
+    GroupNameMismatch { expected: String, name: String },
+}
+
 pub async fn healthcheck(
     config: CloudwatchLogsSinkConfig,
     client: CloudWatchLogsClient,

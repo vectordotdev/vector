@@ -1,5 +1,11 @@
+use crate::sinks::aws_cloudwatch_logs::service::CloudwatchError;
+use crate::sinks::util::retries::RetryLogic;
+use rusoto_core::request::BufferedHttpResponse;
+use rusoto_core::RusotoError;
+use rusoto_logs::{CreateLogStreamError, DescribeLogStreamsError, PutLogEventsError};
+
 #[derive(Debug, Clone)]
-struct CloudwatchRetryLogic;
+pub struct CloudwatchRetryLogic;
 
 impl RetryLogic for CloudwatchRetryLogic {
     type Error = CloudwatchError;
