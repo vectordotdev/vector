@@ -1,12 +1,12 @@
 use crate::expression::assignment;
 use crate::{parser::ast::Ident, TypeDef, Value};
-use std::{any::Any, collections::HashMap};
+use anymap::AnyMap;
+use std::collections::HashMap;
 
 /// The state held by the compiler.
 ///
 /// This state allows the compiler to track certain invariants during
 /// compilation, which in turn drives our progressive type checking system.
-#[derive(Default)]
 pub struct Compiler {
     /// stored external target type definition
     target: Option<assignment::Details>,
@@ -15,7 +15,7 @@ pub struct Compiler {
     variables: HashMap<Ident, assignment::Details>,
 
     /// context passed between the client program and a VRL function.
-    external_context: Option<Box<dyn Any>>,
+    external_context: AnyMap,
 
     /// On request, the compiler can store its state in this field, which can
     /// later be used to revert the compiler state to the previously stored
@@ -28,6 +28,15 @@ pub struct Compiler {
     /// forget any state it started tracking while parsing the old, defunct
     /// expression.
     snapshot: Option<Box<Self>>,
+}
+
+impl Default for Compiler {
+    fn default() -> Self {
+        Self {
+            external_context: AnyMap::new(),
+            ..Default::default()
+        }
+    }
 }
 
 impl Compiler {
@@ -81,7 +90,9 @@ impl Compiler {
         let snapshot = Self {
             target,
             variables,
-            external_context: None,
+            // FIXME(Jean): this can lead to unexpected results, but we can probably drop the
+            // "snapshot" feature all-together.
+            external_context: AnyMap::new(),
             snapshot: None,
         };
 
@@ -90,31 +101,25 @@ impl Compiler {
 
     /// Roll back the compiler state to a previously stored snapshot.
     pub(crate) fn rollback(&mut self) {
-        if let Some(mut snapshot) = self.snapshot.take() {
-            let context = snapshot.external_context.take();
+        if let Some(snapshot) = self.snapshot.take() {
             *self = *snapshot;
-            self.external_context = context;
         }
     }
 
     /// Sets the external context data for VRL functions to use.
-    pub fn set_external_context(&mut self, data: Option<Box<dyn Any>>) {
-        self.external_context = data;
+    pub fn set_external_context<T: 'static>(&mut self, data: T) {
+        self.external_context.insert::<T>(data);
     }
 
     /// Retrieves the first data of the required type from the external context.
     pub fn get_external_context<T: 'static>(&self) -> Option<&T> {
-        self.external_context
-            .as_ref()
-            .and_then(|data| data.downcast_ref::<T>())
+        self.external_context.get::<T>()
     }
 
     /// Retrieves a mutable reference to the first data of the required type from
     /// the external context.
     pub fn get_external_context_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        self.external_context
-            .as_mut()
-            .and_then(|data| data.downcast_mut::<T>())
+        self.external_context.get_mut::<T>()
     }
 }
 

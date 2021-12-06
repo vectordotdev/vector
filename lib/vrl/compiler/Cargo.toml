@@ -12,6 +12,7 @@ shared = { path = "../../shared", default-features = false, features = ["convers
 lookup = { path = "../../lookup" }
 value = { path = "../../value" }
 
+anymap = { version = "0.12", default-features = false }
 bitflags = "1"
 bytes = "1.1.0"
 chrono = "0.4"
@@ -21,9 +22,9 @@ ordered-float = "2"
 paste = "1"
 regex = "1"
 serde = "1"
+serde_json = { version = "1", default-features = false, features = ["std"] }
 thiserror = "1"
 tracing = "0.1"
-serde_json = { version = "1", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 criterion = "0.3"

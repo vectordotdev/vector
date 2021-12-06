@@ -117,7 +117,7 @@ impl Remap {
 
         let mut state = vrl::state::Compiler::new_with_type_def(type_def);
 
-        state.set_external_context(Some(Box::new(ctx.enrichment_tables.clone())));
+        state.set_external_context(ctx.enrichment_tables.clone());
 
         let program = vrl::compile_with_state(&source, &functions, &mut state)
             .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;

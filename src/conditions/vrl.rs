@@ -48,16 +48,16 @@ impl ConditionConfig for VrlConfig {
             .chain(vector_vrl_functions::vrl_functions())
             .collect::<Vec<_>>();
 
-        let program = vrl::compile(
-            &self.source,
-            &functions,
-            Some(Box::new(enrichment_tables.clone())),
-        )
-        .map_err(|diagnostics| {
-            Formatter::new(&self.source, diagnostics)
-                .colored()
-                .to_string()
-        })?;
+        let mut state = vrl::state::Compiler::default();
+        state.set_external_context(enrichment_tables.clone());
+
+        let program = vrl::compile_with_state(&self.source, &functions, &mut state).map_err(
+            |diagnostics| {
+                Formatter::new(&self.source, diagnostics)
+                    .colored()
+                    .to_string()
+            },
+        )?;
 
         Ok(Box::new(Vrl {
             program,
