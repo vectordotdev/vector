@@ -13,3 +13,6 @@ vector_core = { path = "../vector-core" }
 # Datadog
 datadog-search-syntax = { path = "../datadog/search-syntax" }
 datadog-filter = { path = "../datadog/filter" }
+
+# Test util (still public)
+serde_json = { version = "1.0.68", default-features = false  }
