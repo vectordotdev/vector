@@ -47,7 +47,51 @@ impl Filter<LogEvent> for EventFilter {
     }
 
     fn equals(&self, field: Field, to_match: &str) -> Box<dyn Matcher<LogEvent>> {
-        todo!()
+        match field {
+            // Default fields are compared by word boundary.
+            Field::Default(f) => {
+                let re = word_regex(to_match);
+
+                Run::boxed(move |log: &LogEvent| match log.get(&f) {
+                    Some(Value::Bytes(val)) => re.is_match(&String::from_utf8_lossy(val)),
+                    _ => false,
+                })
+            }
+            // A literal "tags" field should match by key.
+            Field::Reserved(f) if f == "tags" => {
+                let to_match = to_match.to_owned();
+
+                Run::boxed(move |log| match log.get(&f) {
+                    Some(Value::Array(v)) => {
+                        v.contains(&Value::Bytes(Bytes::copy_from_slice(to_match.as_bytes())))
+                    }
+                    _ => false,
+                })
+            }
+            // Individual tags are compared by element key:value.
+            Field::Tag(tag) => {
+                let value_bytes = Value::Bytes(format!("{}:{}", tag, to_match).into());
+
+                Run::boxed(move |log| match log.get(&tag) {
+                    Some(Value::Array(v)) => v.contains(&value_bytes),
+                    _ => false,
+                })
+            }
+            // Everything else is matched by string equality.
+            Field::Reserved(f) | Field::Facet(f) => {
+                let to_match = to_match.to_owned();
+
+                Run::boxed(move |log| match log.get(&f) {
+                    Some(Value::Bytes(v)) => {
+                        let bytes = v.as_bytes();
+                        let str_value = String::from_utf8_lossy(&bytes);
+
+                        str_value == to_match
+                    }
+                    _ => false,
+                })
+            }
+        }
     }
 
     fn prefix(&self, field: Field, prefix: &str) -> Box<dyn Matcher<LogEvent>> {

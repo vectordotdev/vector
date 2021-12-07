@@ -8493,6 +8493,7 @@ dependencies = [
  "datadog-search-syntax",
  "serde_json",
  "vector_core",
+]
 
 [[package]]
 name = "vector-vrl-functions"
