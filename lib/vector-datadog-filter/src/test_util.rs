@@ -40,24 +40,24 @@ pub fn get_checks() -> Vec<(&'static str, Event, Event)> {
             log_event!["tags" => vec!["b:foo"]],
             log_event!["tags" => vec!["a:foo"]],
         ),
-        // // Facet exists.
-        // (
-        //     "_exists_:@b",
-        //     log_event!["custom" => json!({"b": "foo"})],
-        //     log_event!["custom" => json!({"a": "foo"})],
-        // ),
-        // // Facet exists (negate).
-        // (
-        //     "NOT _exists_:@b",
-        //     log_event!["custom" => json!({"a": "foo"})],
-        //     log_event!["custom" => json!({"b": "foo"})],
-        // ),
-        // // Facet exists (negate w/-).
-        // (
-        //     "-_exists_:@b",
-        //     log_event!["custom" => json!({"a": "foo"})],
-        //     log_event!["custom" => json!({"b": "foo"})],
-        // ),
+        // Facet exists.
+        (
+            "_exists_:@b",
+            log_event!["custom" => json!({"b": "foo"})],
+            log_event!["custom" => json!({"a": "foo"})],
+        ),
+        // Facet exists (negate).
+        (
+            "NOT _exists_:@b",
+            log_event!["custom" => json!({"a": "foo"})],
+            log_event!["custom" => json!({"b": "foo"})],
+        ),
+        // Facet exists (negate w/-).
+        (
+            "-_exists_:@b",
+            log_event!["custom" => json!({"a": "foo"})],
+            log_event!["custom" => json!({"b": "foo"})],
+        ),
         // Tag doesn't exist.
         (
             "_missing_:a",
@@ -76,24 +76,24 @@ pub fn get_checks() -> Vec<(&'static str, Event, Event)> {
             log_event!["tags" => vec!["a:foo"]],
             log_event![],
         ),
-        // // Facet doesn't exist.
-        // (
-        //     "_missing_:@b",
-        //     log_event!["custom" => json!({"a": "foo"})],
-        //     log_event!["custom" => json!({"b": "foo"})],
-        // ),
-        // // Facet doesn't exist (negate).
-        // (
-        //     "NOT _missing_:@b",
-        //     log_event!["custom" => json!({"b": "foo"})],
-        //     log_event!["custom" => json!({"a": "foo"})],
-        // ),
-        // // Facet doesn't exist (negate w/-).
-        // (
-        //     "-_missing_:@b",
-        //     log_event!["custom" => json!({"b": "foo"})],
-        //     log_event!["custom" => json!({"a": "foo"})],
-        // ),
+        // Facet doesn't exist.
+        (
+            "_missing_:@b",
+            log_event!["custom" => json!({"a": "foo"})],
+            log_event!["custom" => json!({"b": "foo"})],
+        ),
+        // Facet doesn't exist (negate).
+        (
+            "NOT _missing_:@b",
+            log_event!["custom" => json!({"b": "foo"})],
+            log_event!["custom" => json!({"a": "foo"})],
+        ),
+        // Facet doesn't exist (negate w/-).
+        (
+            "-_missing_:@b",
+            log_event!["custom" => json!({"b": "foo"})],
+            log_event!["custom" => json!({"a": "foo"})],
+        ),
         // // Keyword.
         // ("bla", log_event!["message" => "bla"], log_event![]),
         // (

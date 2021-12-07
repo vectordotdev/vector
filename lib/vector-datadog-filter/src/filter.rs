@@ -28,7 +28,25 @@ impl Filter<Event> for EventFilter {
                     _ => false,
                 })
             }
-            _ => todo!(),
+            // Literal field 'tags' needs to be compared by key.
+            Field::Reserved(f) if f == "tags" => Run::boxed(move |ev| match ev {
+                Event::Log(log) => match log.get(&f) {
+                    Some(Value::Array(v)) => v.iter().any(|v| {
+                        let bytes = v.as_bytes();
+                        let str_value = String::from_utf8_lossy(&bytes);
+
+                        str_value == f
+                    }),
+                    _ => false,
+                },
+                _ => false,
+            }),
+            Field::Default(f) | Field::Facet(f) | Field::Reserved(f) => {
+                Run::boxed(move |ev| match ev {
+                    Event::Log(log) => log.get(&f).is_some(),
+                    _ => false,
+                })
+            }
         }
     }
 
