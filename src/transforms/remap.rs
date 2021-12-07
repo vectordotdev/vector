@@ -73,8 +73,8 @@ impl TransformConfig for RemapConfig {
 
     /// Calculate the output schema of the remap transform, based on the input, and the type
     /// definition of the compiled program.
-    fn output_schema(&self, context: &TransformContext) -> Option<schema::Output> {
-        Remap::new(self.clone(), &context)
+    fn output_schema(&self, ctx: &TransformContext) -> Option<schema::Output> {
+        Remap::new(self.clone(), &ctx)
             .ok()
             .map(|remap| remap.output_schema)
     }
@@ -118,7 +118,7 @@ impl Remap {
         let mut state = vrl::state::Compiler::new_with_type_def(type_def);
 
         state.set_external_context(ctx.enrichment_tables.clone());
-        state.set_external_context(ctx.pipeline_schema.purpose().clone());
+        state.set_external_context(ctx.schema_registry.clone());
 
         let program = vrl::compile_with_state(&source, &functions, &mut state)
             .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;

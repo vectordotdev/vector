@@ -503,6 +503,7 @@ async fn build_unit_test(
                 globals: config.global.clone(),
                 enrichment_tables: enrichment_tables.clone(),
                 pipeline_schema: schema::Output::empty(),
+                schema_registry: schema::Registry::default(),
             };
 
             match transform_config.inner.build(&context).await {

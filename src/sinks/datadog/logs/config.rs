@@ -2,7 +2,7 @@ use super::service::LogApiRetry;
 use super::sink::{DatadogLogsJsonEncoding, LogSinkBuilder};
 use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
 use crate::http::HttpClient;
-use crate::schema::{self, field};
+use crate::schema::{self, field::Kind};
 use crate::sinks::datadog::logs::service::LogApiService;
 use crate::sinks::datadog::{get_api_validate_endpoint, healthcheck, Region};
 use crate::sinks::util::encoding::EncodingConfigFixed;
@@ -167,8 +167,6 @@ impl SinkConfig for DatadogLogsConfig {
     }
 
     fn input_schema(&self) -> schema::Input {
-        use field::{Kind, Purpose};
-
         let mut schema = schema::Input::empty();
         schema.require_field_purpose("message", Kind::bytes());
         schema.require_field_purpose("timestamp", Kind::integer());

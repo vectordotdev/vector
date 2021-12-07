@@ -43,12 +43,23 @@ impl Output {
         }
     }
 
+    /// Get the type definition of the schema.
     pub fn kind(&self) -> &value::Kind {
         &self.kind
     }
 
+    /// Get a list of field purposes and their path.
     pub fn purpose(&self) -> &HashMap<field::Purpose, LookupBuf> {
         &self.purpose
+    }
+
+    /// Merge `other` schema into `self`.
+    ///
+    /// If both schemas contain the same purpose key, then `other` key is used. In the future, we
+    /// might update this to return an error, and prevent Vector from booting.
+    pub fn merge(&mut self, other: Self) {
+        self.kind.merge(other.kind);
+        self.purpose.extend(other.purpose);
     }
 }
 

@@ -37,6 +37,7 @@ pub struct TransformContext {
 
     /// The merged "output" schema produced by the inputs of this transform.
     pub pipeline_schema: schema::Output,
+    pub schema_registry: schema::Registry,
 }
 
 impl TransformContext {

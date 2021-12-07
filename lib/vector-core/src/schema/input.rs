@@ -7,7 +7,7 @@ use value::Kind;
 ///
 /// This schema defines the (semantic) fields a component expects to receive from its input
 /// components.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Input {
     fields: HashMap<field::Purpose, Kind>,
 }
@@ -20,6 +20,10 @@ impl Input {
         Self {
             fields: HashMap::default(),
         }
+    }
+
+    pub fn purposes(&self) -> Vec<&field::Purpose> {
+        self.fields.keys().collect()
     }
 
     /// Add a restriction to the schema.

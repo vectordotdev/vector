@@ -124,6 +124,10 @@ pub async fn build_pieces(
     let (enrichment_tables, enrichment_errors) = load_enrichment_tables(config, diff).await;
     errors.extend(enrichment_errors);
 
+    let schema_registry = load_schema_registry(config, enrichment_tables.clone())
+        .map_err(|err| vec![err])
+        .await?;
+
     // Build sources
     for (key, source) in config
         .sources
@@ -192,16 +196,22 @@ pub async fn build_pieces(
         .iter()
         .filter(|(key, _)| diff.transforms.contains_new(key))
     {
+        let trans_inputs = &transform.inputs;
+
+        let pipeline_schema = pipeline_schema_from_inputs(
+            config,
+            schema_registry.clone(),
+            trans_inputs,
+            enrichment_tables.clone(),
+        );
+
         let context = TransformContext {
             key: Some(key.clone()),
             globals: config.global.clone(),
             enrichment_tables: enrichment_tables.clone(),
-
-            // XXX: to be implemented
-            pipeline_schema: schema::Output::empty(),
+            pipeline_schema,
+            schema_registry: schema_registry.clone(),
         };
-
-        let trans_inputs = &transform.inputs;
 
         let typetag = transform.inner.transform_type();
 
@@ -564,4 +574,129 @@ const fn filter_event_type(event: &Event, data_type: DataType) -> bool {
         DataType::Log => matches!(event, Event::Log(_)),
         DataType::Metric => matches!(event, Event::Metric(_)),
     }
+}
+
+async fn load_schema_registry(
+    config: &super::Config,
+    enrichment_tables: enrichment::TableRegistry,
+) -> Result<schema::Registry, String> {
+    let mut registry = schema::Registry::default();
+
+    for (key, sink) in &config.sinks {
+        let input_schema = sink.inner.input_schema();
+
+        registry
+            .register_sink(key.clone(), input_schema.clone())
+            .map_err(|err| err.to_string())?;
+
+        // We need to walk backwards through the pipeline connected to this sink, to build the
+        // individual sources and transforms.
+        //
+        // This is needed, so that we can inform these components of the required expectations laid
+        // out by the sink schema.
+        for input in &sink.inputs {
+            let key = input.component.clone();
+            register_registry_component(
+                key,
+                &mut registry,
+                config,
+                enrichment_tables.clone(),
+                input_schema.clone(),
+            )?;
+        }
+    }
+
+    Ok(registry.finalize())
+}
+
+/// Recursively store components into the registry.
+///
+/// For transforms, we also track the input schema of the sink to which this transform feeds its
+/// data.
+fn register_registry_component(
+    key: ComponentKey,
+    registry: &mut schema::Registry,
+    config: &super::Config,
+    enrichment_tables: enrichment::TableRegistry,
+    input_schema: schema::Input,
+) -> Result<(), String> {
+    if let Some(source) = config.sources.get(&key) {
+        let schema = source.inner.output_schema();
+        registry
+            .register_source(key, schema)
+            .map_err(|err| err.to_string())?;
+    } else if let Some(transform) = config.transforms.get(&key) {
+        let pipeline_schema = pipeline_schema_from_inputs(
+            config,
+            registry.clone(),
+            &transform.inputs,
+            enrichment_tables.clone(),
+        );
+
+        let ctx = TransformContext {
+            key: Some(key.clone()),
+            globals: config.global.clone(),
+            enrichment_tables: enrichment_tables.clone(),
+            pipeline_schema,
+            schema_registry: registry.clone(),
+        };
+
+        let output_schema = transform.inner.output_schema(&ctx);
+
+        registry
+            .register_transform(key.clone(), output_schema, input_schema.clone())
+            .map_err(|err| err.to_string())?;
+
+        register_registry_component(key, registry, config, enrichment_tables, input_schema)?;
+    }
+
+    Ok(())
+}
+
+fn pipeline_schema_from_inputs(
+    config: &super::Config,
+    registry: schema::Registry,
+    inputs: &[OutputId],
+    enrichment_tables: enrichment::TableRegistry,
+) -> schema::Output {
+    let mut output = schema::Output::empty();
+
+    for input in inputs {
+        let key = &input.component;
+
+        // If the input is a source, it'll always have an output schema defined, even if it is an
+        // "empty" schema.
+        //
+        // We merge this schema into the top-level schema.
+        if let Some(source) = config.sources.get(key) {
+            let schema = source.inner.output_schema();
+            output.merge(schema);
+
+        // If the input is a transform, it _might_ define its own output schema, or it might not
+        // change anything in the schema from its inputs, in which case we need to recursively get
+        // the schemas of the transform inputs.
+        } else if let Some(transform) = config.transforms.get(key) {
+            let ctx = TransformContext {
+                key: Some(key.clone()),
+                globals: config.global.clone(),
+                enrichment_tables: enrichment_tables.clone(),
+                pipeline_schema: output.clone(),
+                schema_registry: registry.clone(),
+            };
+
+            let schema = match transform.inner.output_schema(&ctx) {
+                Some(schema) => schema,
+                None => pipeline_schema_from_inputs(
+                    config,
+                    registry.clone(),
+                    &transform.inputs,
+                    enrichment_tables.clone(),
+                ),
+            };
+
+            output.merge(schema);
+        }
+    }
+
+    output
 }
