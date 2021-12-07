@@ -11,11 +11,11 @@ bytes = { version = "1.1.0", default-features = false }
 bytecheck = { version = "0.6.5", default-features = false, features = ["std"] }
 crc32fast = { version = "1.2.1", default-features = false, features = ["std"] }
 crossbeam-utils = { version = "0.8.5", default-features = false }
-db-key = { version = "0.0.5", default-features = false, optional = true }
+db-key = { version = "0.0.5", default-features = false }
 fslock = { version = "0.2.0", default-features = false, features = ["std"] }
 futures = { version = "0.3.17", default-features = false, features = ["std"] }
 core_common = { path = "../core-common", default-features = false }
-leveldb = { version = "0.8.6", default-features = false, optional = true }
+leveldb = { version = "0.8.6", default-features = false  }
 metrics = { version = "0.17.0", default-features = false, features = ["std"] }
 memmap2 = { version = "0.5.0", default-features = false }
 parking_lot = { version = "0.11.2", default-features = false }
@@ -49,13 +49,11 @@ tracing-subscriber = { version = "0.2.25" }
 human_bytes = "0.3.0"
 
 [features]
-disk-buffer = ["db-key", "leveldb"]
 helpers = []
 
 [[bench]]
 name = "on_disk"
 harness = false
-required-features = ["disk-buffer"]
 
 [[bench]]
 name = "in_memory"
@@ -67,8 +65,12 @@ harness = false
 
 [[example]]
 name = "disk_v1"
-required-features = ["disk-buffer", "helpers"]
+required-features = ["helpers"]
 
 [[example]]
 name = "disk_v2"
+required-features = ["helpers"]
+
+[[example]]
+name = "in_memory_v2"
 required-features = ["helpers"]

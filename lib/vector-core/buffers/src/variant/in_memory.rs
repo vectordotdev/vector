@@ -18,6 +18,14 @@ impl MemoryBuffer {
     pub fn new(capacity: usize) -> Self {
         MemoryBuffer { capacity }
     }
+
+    pub fn testing<T>(capacity: usize) -> (PollSender<T>, ReceiverStream<T>)
+    where
+        T: Bufferable,
+    {
+        let (tx, rx) = channel(capacity);
+        (PollSender::new(tx), ReceiverStream::new(rx))
+    }
 }
 
 #[async_trait]

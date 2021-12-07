@@ -1,7 +1,6 @@
 #![allow(clippy::print_stderr)] // soak framework
 #![allow(clippy::print_stdout)] // soak framework
 use std::{
-    path::PathBuf,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -10,11 +9,11 @@ use std::{
 };
 
 use buffers::{
-    disk_v2::{Buffer, DiskBufferConfig},
     helpers::VariableMessage,
-    topology::builder::TopologyBuilder,
-    DiskV2Buffer, WhenFull,
+    topology::builder::{IntoBuffer, TopologyBuilder},
+    MemoryBuffer, WhenFull,
 };
+use core_common::byte_size_of::ByteSizeOf;
 use futures::{SinkExt, StreamExt};
 use hdrhistogram::Histogram;
 use human_bytes::human_bytes;
@@ -55,7 +54,7 @@ fn main() {
         .expect("3rd arg must be number of records to read");
 
     println!(
-        "[disk_v2 init] going to write {} record(s), in batches of {}, and will read {} record(s)",
+        "[in_memory_v2 init] going to write {} record(s), in batches of {}, and will read {} record(s)",
         writer_count, writer_batch_size, reader_count
     );
 
@@ -63,7 +62,7 @@ fn main() {
     // generating the data that it writes to the buffer.
     let record_cache = generate_record_cache();
     println!(
-        "[disk_v2 init] generated record cache ({} records)",
+        "[in_memory_v2 init] generated record cache ({} records)",
         record_cache.len()
     );
 
@@ -76,14 +75,10 @@ fn main() {
         let writer_position = Arc::clone(&write_position);
         let reader_position = Arc::clone(&read_position);
 
-        // Create a disk buffer under /tmp/vector with the given ID and a maximum size of 32GB.
+        // Now create the writer and reader and their associated tasks.
         let start = Instant::now();
-        let id = String::from("disk_v2_example");
-        let data_dir = PathBuf::from("/tmp/vector");
-        let max_size = 32 * 1024 * 1024 * 1024;
-
         let mut builder = TopologyBuilder::new();
-        builder.stage(DiskV2Buffer::new(id, data_dir, max_size), WhenFull::Block);
+        builder.stage(MemoryBuffer::new(500), WhenFull::Block);
         let (mut writer, mut reader, acker) = builder.build(Span::none())
             .await
             .expect("build should not fail");
@@ -98,12 +93,15 @@ fn main() {
             for _ in 0..iters {
                 let tx_start = Instant::now();
 
+                let mut tx_bytes_total = 0;
                 for _ in 0..writer_batch_size {
                     let record = records.next().cloned().expect("should never be empty");
+                    let record_byte_size = record.size_of();
                     writer
                         .send(record)
                         .await
                         .expect("failed to write record");
+                    tx_bytes_total += record_byte_size;
                 }
 
                 let elapsed = tx_start.elapsed().as_nanos() as u64;
@@ -112,7 +110,6 @@ fn main() {
                 writer_position.fetch_add(writer_batch_size, Ordering::Relaxed);
             }
 
-            writer.flush().await.expect("flush shouldn't fail");
             writer_tx.send(tx_histo);
         });
 
@@ -129,7 +126,6 @@ fn main() {
                 rx_histo.record(elapsed).expect("should not fail");
 
                 reader_position.fetch_add(1, Ordering::Relaxed);
-                acker.ack(1);
             }
 
             reader_tx.send(rx_histo);
@@ -150,29 +146,25 @@ fn main() {
                     Ok(result) => {
                         writer_result = Some(result);
                         writer_elapsed = Some(reader_writer_start.elapsed());
-                        println!("[disk_v2 writer] {:?}: finished", start.elapsed());
+                        println!("[in_memory_v2 writer] {:?}: finished", start.elapsed());
                     },
-                    Err(_) => panic!("[disk_v2 writer] task failed unexpectedly!"),
+                    Err(_) => panic!("[in_memory_v2 writer] task failed unexpectedly!"),
                 },
                 result = &mut reader_rx, if reader_result.is_none() => match result {
                     Ok(result) => {
                         reader_result = Some(result);
                         reader_elapsed = Some(reader_writer_start.elapsed());
-                        println!("[disk_v2 reader] {:?}: finished", start.elapsed());
+                        println!("[in_memory_v2 reader] {:?}: finished", start.elapsed());
                     },
-                    Err(_) => panic!("[disk_v2 reader] task failed unexpectedly!"),
+                    Err(_) => panic!("[in_memory_v2 reader] task failed unexpectedly!"),
                 },
                 _ = progress_interval.tick(), if writer_result.is_none() || reader_result.is_none() => {
-                    //if let Some((writer, _)) = writer_result.as_mut() {
-                    //    writer.flush().await.expect("failed to flush");
-                    //}
-
                     let elapsed = start.elapsed();
                     let write_pos = write_position.load(Ordering::Relaxed);
                     let read_pos = read_position.load(Ordering::Relaxed);
 
-                    println!("[disk_v2 writer] {:?}s: position = {:11}", elapsed.as_secs(), write_pos);
-                    println!("[disk_v2 reader] {:?}s: position = {:11}", elapsed.as_secs(), read_pos);
+                    println!("[in_memory_v2 writer] {:?}s: position = {:11}", elapsed.as_secs(), write_pos);
+                    println!("[in_memory_v2 reader] {:?}s: position = {:11}", elapsed.as_secs(), read_pos);
                 },
                 else => break,
             }
@@ -184,7 +176,7 @@ fn main() {
         let reader_elapsed = reader_elapsed.expect("must be set if reader finished");
 
         println!(
-            "[disk_v2] writer and reader done: {} records written, {} records read, in {:?}",
+            "[in_memory_v2] writer and reader done: {} records written, {} records read, in {:?}",
             writer_count,
             reader_count,
             total_time
@@ -192,7 +184,7 @@ fn main() {
 
         let writer_histo = writer_result.unwrap();
 
-        println!("[disk_v2] writer summary:");
+        println!("[in_memory_v2] writer summary:");
         let write_rps = write_position.load(Ordering::Relaxed) as f64 / writer_elapsed.as_secs_f64();
 
         println!("  -> records per second: {}", write_rps as u64);
@@ -204,7 +196,7 @@ fn main() {
         }
         println!("       q=max -> {:?}", nanos_to_dur(writer_histo.max()));
 
-        println!("[disk_v2] reader summary:");
+        println!("[in_memory_v2] reader summary:");
 
         let reader_histo = reader_result.unwrap();
         let read_rps = read_position.load(Ordering::Relaxed) as f64 / reader_elapsed.as_secs_f64();

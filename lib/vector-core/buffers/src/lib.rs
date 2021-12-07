@@ -17,7 +17,6 @@ mod buffer_usage_data;
 mod config;
 pub mod encoding;
 pub use config::{BufferConfig, BufferType};
-#[cfg(feature = "disk-buffer")]
 pub mod disk;
 
 pub mod disk_v2;

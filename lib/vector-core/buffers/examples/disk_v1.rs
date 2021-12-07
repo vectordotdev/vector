@@ -11,7 +11,9 @@ use std::{
     time::{Duration, Instant},
 };
 
-use buffers::{helpers::VariableMessage, Variant, WhenFull};
+use buffers::{
+    helpers::VariableMessage, topology::builder::TopologyBuilder, DiskV1Buffer, Variant, WhenFull,
+};
 use futures::{SinkExt, StreamExt};
 use hdrhistogram::Histogram;
 use rand::Rng;
@@ -65,23 +67,21 @@ async fn main() {
     let writer_position = Arc::clone(&write_position);
     let reader_position = Arc::clone(&read_position);
 
-    // Now create the writer and reader and their associated tasks.
+    // Create a disk buffer under /tmp/vector with the given ID and a maximum size of 32GB.
     let start = Instant::now();
-    let variant = Variant::Disk {
-        id: "disk-v1".to_owned(),
-        data_dir: PathBuf::from_str("/tmp/vector/disk-v1-testing").expect("path should be valid"),
-        // Limit disk size to 100GB which is way more than it needs even if it wrote all records to
-        // disk and never cleaned any up, but... write amplification and all.
-        max_size: 100 * 1024 * 1024 * 1024,
-        when_full: WhenFull::Block,
-    };
+    let id = String::from("disk_v1_example");
+    let data_dir = PathBuf::from("/tmp/vector");
+    let max_size = 32 * 1024 * 1024 * 1024;
 
-    let (writer, mut reader, acker) =
-        buffers::build::<VariableMessage>(variant, Span::none()).expect("failed to create buffer");
-    let mut writer = writer.get();
+    let mut builder = TopologyBuilder::new();
+    builder.stage(DiskV1Buffer::new(id, data_dir, max_size), WhenFull::Block);
+    let (mut writer, mut reader, acker) = builder
+        .build(Span::none())
+        .await
+        .expect("build should not fail");
 
     let (reader_tx, mut reader_rx) = oneshot::channel();
-    let _ = tokio::spawn(async move {
+    tokio::spawn(async move {
         let mut rx_histo = Histogram::<u64>::new(3).expect("should not fail");
 
         for _ in 0..reader_count {
@@ -96,11 +96,11 @@ async fn main() {
             reader_position.fetch_add(1, Ordering::Relaxed);
         }
 
-        let _ = reader_tx.send((reader, rx_histo));
+        reader_tx.send(rx_histo);
     });
 
     let (writer_tx, mut writer_rx) = oneshot::channel();
-    let _ = tokio::spawn(async move {
+    tokio::spawn(async move {
         let mut tx_histo = Histogram::<u64>::new(3).expect("should not fail");
         let mut records = record_cache.iter().cycle();
 
@@ -118,7 +118,7 @@ async fn main() {
             writer_position.fetch_add(1, Ordering::Relaxed);
         }
 
-        let _ = writer_tx.send((writer, tx_histo));
+        writer_tx.send(tx_histo);
     });
 
     // Now let the tasks run, occasionally emitting metrics about their progress, while waiting for
@@ -165,7 +165,7 @@ async fn main() {
 
     println!("[disk_v1] writer summary:");
 
-    let (_, writer_histo) = writer_result.unwrap();
+    let writer_histo = writer_result.unwrap();
     let rps = write_position.load(Ordering::Relaxed) as f64 / total_time.as_secs_f64();
 
     println!("  -> records per second: {}", rps as u64);
@@ -179,7 +179,7 @@ async fn main() {
 
     println!("[disk_v1] reader summary:");
 
-    let (_, reader_histo) = reader_result.unwrap();
+    let reader_histo = reader_result.unwrap();
     let rps = read_position.load(Ordering::Relaxed) as f64 / total_time.as_secs_f64();
 
     println!("  -> records per second: {}", rps as u64);

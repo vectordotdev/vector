@@ -13,17 +13,13 @@ use tracing::Span;
 #[serde(rename_all = "snake_case")]
 enum BufferTypeKind {
     Memory,
-    #[cfg(feature = "disk-buffer")]
     #[serde(rename = "disk")]
     DiskV1,
     #[serde(rename = "disk_v2")]
     DiskV2,
 }
 
-#[cfg(feature = "disk-buffer")]
 const ALL_FIELDS: [&str; 4] = ["type", "max_events", "max_size", "when_full"];
-#[cfg(not(feature = "disk-buffer"))]
-const ALL_FIELDS: [&str; 3] = ["type", "max_events", "when_full"];
 
 struct BufferTypeVisitor;
 
@@ -34,7 +30,6 @@ impl BufferTypeVisitor {
     {
         let mut kind: Option<BufferTypeKind> = None;
         let mut max_events: Option<usize> = None;
-        #[cfg(feature = "disk-buffer")]
         let mut max_size: Option<usize> = None;
         let mut when_full: Option<WhenFull> = None;
         while let Some(key) = map.next_key::<String>()? {
@@ -73,7 +68,6 @@ impl BufferTypeVisitor {
         let when_full = when_full.unwrap_or_default();
         match kind {
             BufferTypeKind::Memory => {
-                #[cfg(feature = "disk-buffer")]
                 if max_size.is_some() {
                     return Err(de::Error::unknown_field(
                         "max_size",
@@ -85,7 +79,6 @@ impl BufferTypeVisitor {
                     when_full,
                 })
             }
-            #[cfg(feature = "disk-buffer")]
             BufferTypeKind::DiskV1 => {
                 if max_events.is_some() {
                     return Err(de::Error::unknown_field(
@@ -210,7 +203,6 @@ pub enum BufferType {
         when_full: WhenFull,
     },
     /// A buffer stage backed by an on-disk database, powered by LevelDB.
-    #[cfg(feature = "disk-buffer")]
     DiskV1 {
         max_size: usize,
         #[serde(default)]
@@ -225,7 +217,6 @@ pub enum BufferType {
 }
 
 impl BufferType {
-    #[cfg_attr(not(feature = "disk-buffer"), allow(unused))]
     fn add_to_builder<T>(&self, builder: &mut TopologyBuilder<T>, data_dir: PathBuf, id: String)
     where
         T: Bufferable + Clone,
@@ -237,7 +228,6 @@ impl BufferType {
             } => {
                 builder.stage(MemoryBuffer::new(max_events), when_full);
             }
-            #[cfg(feature = "disk-buffer")]
             BufferType::DiskV1 {
                 when_full,
                 max_size,
@@ -442,7 +432,6 @@ max_events: 42
             },
         );
 
-        #[cfg(feature = "disk-buffer")]
         check_single_stage(
             r#"
           type: disk
