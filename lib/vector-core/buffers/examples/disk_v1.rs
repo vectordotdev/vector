@@ -1,6 +1,5 @@
 #![allow(clippy::print_stderr)] // soak framework
 #![allow(clippy::print_stdout)] // soak framework
-#[cfg(feature = "disk-buffer")]
 use std::path::PathBuf;
 use std::{
     str::FromStr,
@@ -12,7 +11,7 @@ use std::{
 };
 
 use buffers::{
-    helpers::VariableMessage, topology::builder::TopologyBuilder, DiskV1Buffer, Variant, WhenFull,
+    helpers::VariableMessage, topology::builder::TopologyBuilder, DiskV1Buffer, WhenFull,
 };
 use futures::{SinkExt, StreamExt};
 use hdrhistogram::Histogram;

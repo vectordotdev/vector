@@ -13,7 +13,6 @@ pub(crate) struct OnDiskV2 {
     capacity: usize,
 }
 
-#[cfg(feature = "disk-buffer")]
 impl OnDiskV2 {
     pub(crate) fn new(variant: &Variant) -> Self {
         match variant {
@@ -32,7 +31,6 @@ impl OnDiskV2 {
     }
 }
 
-#[cfg(feature = "disk-buffer")]
 impl Model for OnDiskV2 {
     fn send(&mut self, item: Message) -> Progress {
         let byte_size = EncodeBytes::encoded_size(&item).unwrap();

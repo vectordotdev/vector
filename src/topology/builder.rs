@@ -400,8 +400,7 @@ pub async fn build_pieces(
         } else {
             let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
                 BufferType::Memory { .. } => "memory",
-                #[cfg(feature = "disk-buffer")]
-                BufferType::Disk { .. } => "disk",
+                BufferType::DiskV1 { .. } | BufferType::DiskV2 => "disk",
             };
             let buffer_span = error_span!(
                 "sink",

@@ -46,7 +46,6 @@ impl BufferTypeVisitor {
                     }
                     max_events = Some(map.next_value()?);
                 }
-                #[cfg(feature = "disk-buffer")]
                 "max_size" => {
                     if max_size.is_some() {
                         return Err(de::Error::duplicate_field("max_size"));
