@@ -73,7 +73,7 @@ jobs:
     # Doesn't work yet, see https://github.com/actions/cache/issues/176
     - name: Cache deb
       id: deb-cache
-      uses: actions/cache@v2.1.6
+      uses: actions/cache@v2.1.7
       with:
         path: target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb
         key: vector-test-harness-packaged-deb-${{ steps.pr-info.outputs.head_sha }}

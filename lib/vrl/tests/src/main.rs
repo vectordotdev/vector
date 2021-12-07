@@ -120,7 +120,11 @@ fn main() {
             continue;
         }
 
-        let dots = 60 - test.name.len();
+        let dots = if test.name.len() >= 60 {
+            0
+        } else {
+            60 - test.name.len()
+        };
         print!(
             "  {}{}",
             test.name,
