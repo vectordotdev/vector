@@ -441,11 +441,7 @@ impl TransformOuter<String> {
         transforms: &mut IndexMap<ComponentKey, TransformOuter<String>>,
         expansions: &mut IndexMap<ComponentKey, Vec<ComponentKey>>,
     ) -> Result<(), String> {
-        let parent_types = {
-            let mut set = HashSet::new();
-            set.insert(self.inner.transform_type());
-            set
-        };
+        let parent_types = HashSet::new();
 
         self.inner.nestable(&parent_types)?;
 
