@@ -64,6 +64,19 @@ components: sinks: influxdb_logs: {
 				examples: ["service"]
 			}
 		}
+		tags: {
+			required:    false
+			common:      false
+			description: "The set of fields that will be attached to each LineProtocol as tags. Note: If the set of tag values has high cardinality this also increase cardinality in InfluxDB."
+			groups: ["v1", "v2"]
+			type: array: {
+				default: null
+				items: type: string: {
+					examples: ["field1", "parent.child_field"]
+					syntax: "field_path"
+				}
+			}
+		}
 	}
 
 	input: {

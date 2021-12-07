@@ -55,6 +55,15 @@ components: sinks: influxdb_metrics: {
 				examples: ["service"]
 			}
 		}
+		tags: {
+			required:    false
+			common:      false
+			description: "A map of additional key-value pairs that will be attached to each LineProtocol as tags."
+			groups: ["v1", "v2"]
+			type: object: {
+				examples: [{region: "us-west-1"}]
+			}
+		}
 	}
 
 	input: {
