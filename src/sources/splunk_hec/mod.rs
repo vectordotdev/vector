@@ -412,10 +412,16 @@ impl SplunkSource {
                     match (token, valid_credentials.is_empty()) {
                         // Remove the "Splunk " prefix if present as it is not
                         // part of the token itself
-                        (token, true) => Ok(token.map(|t| t.replacen("Splunk ", "", 1))),
-                        (Some(token), false) if valid_credentials.contains(&token) => {
-                            Ok(Some(token.replacen("Splunk ", "", 1)))
+                        (token, true) => {
+                            Ok(token
+                                .map(|t| t.strip_prefix("Splunk ").map(Into::into).unwrap_or(t)))
                         }
+                        (Some(token), false) if valid_credentials.contains(&token) => Ok(Some(
+                            token
+                                .strip_prefix("Splunk ")
+                                .map(Into::into)
+                                .unwrap_or(token),
+                        )),
                         (Some(_), false) => Err(Rejection::from(ApiError::InvalidAuthorization)),
                         (None, false) => Err(Rejection::from(ApiError::MissingAuthorization)),
                     }
