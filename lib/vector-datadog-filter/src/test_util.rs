@@ -180,100 +180,100 @@ pub fn get_checks() -> Vec<(&'static str, Event, Event)> {
             log_event!["tags" => vec!["a:bla"]],
             log_event!["tags" => vec!["b:bla"]],
         ),
-        // // Reserved tag match.
-        // (
-        //     "host:foo",
-        //     log_event!["host" => "foo"],
-        //     log_event!["tags" => vec!["host:foo"]],
-        // ),
-        // (
-        //     "host:foo",
-        //     log_event!["host" => "foo"],
-        //     log_event!["host" => "foobar"],
-        // ),
-        // (
-        //     "host:foo",
-        //     log_event!["host" => "foo"],
-        //     log_event!["host" => r#"{"value": "foo"}"#],
-        // ),
-        // // Tag match (negate).
-        // (
-        //     "NOT a:bla",
-        //     log_event!["tags" => vec!["b:bla"]],
-        //     log_event!["tags" => vec!["a:bla"]],
-        // ),
-        // // Reserved tag match (negate).
-        // (
-        //     "NOT host:foo",
-        //     log_event!["tags" => vec!["host:fo  o"]],
-        //     log_event!["host" => "foo"],
-        // ),
-        // // Tag match (negate w/-).
-        // (
-        //     "-a:bla",
-        //     log_event!["tags" => vec!["b:bla"]],
-        //     log_event!["tags" => vec!["a:bla"]],
-        // ),
-        // // Reserved tag match (negate w/-).
-        // (
-        //     "-trace_id:foo",
-        //     log_event![],
-        //     log_event!["trace_id" => "foo"],
-        // ),
-        // // Quoted tag match.
-        // (
-        //     r#"a:"bla""#,
-        //     log_event!["tags" => vec!["a:bla"]],
-        //     log_event!["custom" => json!({"a": "bla"})],
-        // ),
-        // // Quoted tag match (negate).
-        // (
-        //     r#"NOT a:"bla""#,
-        //     log_event!["custom" => json!({"a": "bla"})],
-        //     log_event!["tags" => vec!["a:bla"]],
-        // ),
-        // // Quoted tag match (negate w/-).
-        // (
-        //     r#"-a:"bla""#,
-        //     log_event!["custom" => json!({"a": "bla"})],
-        //     log_event!["tags" => vec!["a:bla"]],
-        // ),
-        // // Facet match.
-        // (
-        //     "@a:bla",
-        //     log_event!["custom" => json!({"a": "bla"})],
-        //     log_event!["tags" => vec!["a:bla"]],
-        // ),
-        // // Facet match (negate).
-        // (
-        //     "NOT @a:bla",
-        //     log_event!["tags" => vec!["a:bla"]],
-        //     log_event!["custom" => json!({"a": "bla"})],
-        // ),
-        // // Facet match (negate w/-).
-        // (
-        //     "-@a:bla",
-        //     log_event!["tags" => vec!["a:bla"]],
-        //     log_event!["custom" => json!({"a": "bla"})],
-        // ),
-        // // Quoted facet match.
-        // (
-        //     r#"@a:"bla""#,
-        //     log_event!["custom" => json!({"a": "bla"})],
-        //     log_event!["tags" => vec!["a:bla"]],
-        // ),
-        // // Quoted facet match (negate).
-        // (
-        //     r#"NOT @a:"bla""#,
-        //     log_event!["tags" => vec!["a:bla"]],
-        //     log_event!["custom" => json!({"a": "bla"})],
-        // ),
-        // // Quoted facet match (negate w/-).
-        // (
-        //     r#"-@a:"bla""#,
-        //     log_event!["tags" => vec!["a:bla"]],
-        //     log_event!["custom" => json!({"a": "bla"})],
-        // ),
+        // Reserved tag match.
+        (
+            "host:foo",
+            log_event!["host" => "foo"],
+            log_event!["tags" => vec!["host:foo"]],
+        ),
+        (
+            "host:foo",
+            log_event!["host" => "foo"],
+            log_event!["host" => "foobar"],
+        ),
+        (
+            "host:foo",
+            log_event!["host" => "foo"],
+            log_event!["host" => r#"{"value": "foo"}"#],
+        ),
+        // Tag match (negate).
+        (
+            "NOT a:bla",
+            log_event!["tags" => vec!["b:bla"]],
+            log_event!["tags" => vec!["a:bla"]],
+        ),
+        // Reserved tag match (negate).
+        (
+            "NOT host:foo",
+            log_event!["tags" => vec!["host:fo  o"]],
+            log_event!["host" => "foo"],
+        ),
+        // Tag match (negate w/-).
+        (
+            "-a:bla",
+            log_event!["tags" => vec!["b:bla"]],
+            log_event!["tags" => vec!["a:bla"]],
+        ),
+        // Reserved tag match (negate w/-).
+        (
+            "-trace_id:foo",
+            log_event![],
+            log_event!["trace_id" => "foo"],
+        ),
+        // Quoted tag match.
+        (
+            r#"a:"bla""#,
+            log_event!["tags" => vec!["a:bla"]],
+            log_event!["custom" => json!({"a": "bla"})],
+        ),
+        // Quoted tag match (negate).
+        (
+            r#"NOT a:"bla""#,
+            log_event!["custom" => json!({"a": "bla"})],
+            log_event!["tags" => vec!["a:bla"]],
+        ),
+        // Quoted tag match (negate w/-).
+        (
+            r#"-a:"bla""#,
+            log_event!["custom" => json!({"a": "bla"})],
+            log_event!["tags" => vec!["a:bla"]],
+        ),
+        // Facet match.
+        (
+            "@a:bla",
+            log_event!["custom" => json!({"a": "bla"})],
+            log_event!["tags" => vec!["a:bla"]],
+        ),
+        // Facet match (negate).
+        (
+            "NOT @a:bla",
+            log_event!["tags" => vec!["a:bla"]],
+            log_event!["custom" => json!({"a": "bla"})],
+        ),
+        // Facet match (negate w/-).
+        (
+            "-@a:bla",
+            log_event!["tags" => vec!["a:bla"]],
+            log_event!["custom" => json!({"a": "bla"})],
+        ),
+        // Quoted facet match.
+        (
+            r#"@a:"bla""#,
+            log_event!["custom" => json!({"a": "bla"})],
+            log_event!["tags" => vec!["a:bla"]],
+        ),
+        // Quoted facet match (negate).
+        (
+            r#"NOT @a:"bla""#,
+            log_event!["tags" => vec!["a:bla"]],
+            log_event!["custom" => json!({"a": "bla"})],
+        ),
+        // Quoted facet match (negate w/-).
+        (
+            r#"-@a:"bla""#,
+            log_event!["tags" => vec!["a:bla"]],
+            log_event!["custom" => json!({"a": "bla"})],
+        ),
         // // Wildcard prefix.
         // (
         //     "*bla",
