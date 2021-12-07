@@ -971,6 +971,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "block-buffer"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1d36a02058e76b040de25a4464ba1c80935655595b661505c8b39b664828b95"
+dependencies = [
+ "generic-array 0.14.4",
+]
+
+[[package]]
 name = "block-padding"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1759,6 +1768,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
+name = "crypto-common"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "567569e659735adb39ff2d4c20600f7cd78be5471f8c58ab162bce3c03fdbc5f"
+dependencies = [
+ "generic-array 0.14.4",
+]
+
+[[package]]
 name = "crypto-mac"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2046,6 +2064,17 @@ version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3dd60d1080a57a05ab032377049e0591415d2b31afd7028356dbf3cc6dcb066"
 dependencies = [
+ "generic-array 0.14.4",
+]
+
+[[package]]
+name = "digest"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8549e6bfdecd113b7e221fe60b433087f6957387a20f8118ebca9b12af19143d"
+dependencies = [
+ "block-buffer 0.10.0",
+ "crypto-common",
  "generic-array 0.14.4",
 ]
 
@@ -3949,6 +3978,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "md-5"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6a38fc55c8bbc10058782919516f88826e70320db6d206aebc49611d24216ae"
+dependencies = [
+ "digest 0.10.0",
+]
+
+[[package]]
 name = "md5"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4205,7 +4243,7 @@ dependencies = [
  "hex",
  "hmac",
  "lazy_static",
- "md-5",
+ "md-5 0.9.1",
  "os_info",
  "pbkdf2",
  "percent-encoding",
@@ -5099,7 +5137,7 @@ dependencies = [
  "bytes 1.1.0",
  "fallible-iterator",
  "hmac",
- "md-5",
+ "md-5 0.9.1",
  "memchr",
  "rand 0.8.4",
  "sha2",
@@ -6130,7 +6168,7 @@ dependencies = [
  "http",
  "hyper",
  "log",
- "md-5",
+ "md-5 0.9.1",
  "percent-encoding",
  "pin-project-lite",
  "rusoto_credential",
@@ -8355,7 +8393,7 @@ dependencies = [
  "lru",
  "matches",
  "maxminddb",
- "md-5",
+ "md-5 0.10.0",
  "metrics",
  "metrics-tracing-context",
  "metrics-util",
@@ -8677,7 +8715,7 @@ dependencies = [
  "indexmap",
  "lazy_static",
  "lookup",
- "md-5",
+ "md-5 0.10.0",
  "nom 7.1.0",
  "percent-encoding",
  "regex",
