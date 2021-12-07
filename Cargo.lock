@@ -971,6 +971,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "block-buffer"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1d36a02058e76b040de25a4464ba1c80935655595b661505c8b39b664828b95"
+dependencies = [
+ "generic-array 0.14.4",
+]
+
+[[package]]
 name = "block-padding"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1759,6 +1768,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
+name = "crypto-common"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "567569e659735adb39ff2d4c20600f7cd78be5471f8c58ab162bce3c03fdbc5f"
+dependencies = [
+ "generic-array 0.14.4",
+]
+
+[[package]]
 name = "crypto-mac"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2050,6 +2068,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "digest"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8549e6bfdecd113b7e221fe60b433087f6957387a20f8118ebca9b12af19143d"
+dependencies = [
+ "block-buffer 0.10.0",
+ "crypto-common",
+ "generic-array 0.14.4",
+]
+
+[[package]]
 name = "dirs"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2156,7 +2185,7 @@ checksum = "c762bae6dcaf24c4c84667b8579785430908723d5c889f469d76a41d59cc7a9d"
 dependencies = [
  "curve25519-dalek",
  "ed25519",
- "sha2",
+ "sha2 0.9.8",
  "zeroize",
 ]
 
@@ -4215,7 +4244,7 @@ dependencies = [
  "serde_bytes",
  "serde_with",
  "sha-1 0.9.8",
- "sha2",
+ "sha2 0.9.8",
  "socket2 0.4.2",
  "stringprep",
  "strsim 0.10.0",
@@ -4620,7 +4649,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_path_to_error",
- "sha2",
+ "sha2 0.9.8",
  "thiserror",
  "url",
 ]
@@ -5102,7 +5131,7 @@ dependencies = [
  "md-5",
  "memchr",
  "rand 0.8.4",
- "sha2",
+ "sha2 0.9.8",
  "stringprep",
 ]
 
@@ -6136,7 +6165,7 @@ dependencies = [
  "rusoto_credential",
  "rustc_version 0.4.0",
  "serde",
- "sha2",
+ "sha2 0.9.8",
  "tokio",
 ]
 
@@ -6705,6 +6734,17 @@ dependencies = [
  "cpufeatures",
  "digest 0.9.0",
  "opaque-debug 0.3.0",
+]
+
+[[package]]
+name = "sha2"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "900d964dd36bb15bcf2f2b35694c072feab74969a54f2bbeec7a2d725d2bdcb6"
+dependencies = [
+ "cfg-if 1.0.0",
+ "cpufeatures",
+ "digest 0.10.0",
 ]
 
 [[package]]
@@ -8413,7 +8453,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml",
- "sha2",
+ "sha2 0.10.0",
  "shared",
  "smallvec",
  "smpl_jwt",
@@ -8685,7 +8725,7 @@ dependencies = [
  "rust_decimal",
  "serde_json",
  "sha-1 0.9.8",
- "sha2",
+ "sha2 0.9.8",
  "sha3",
  "shared",
  "strip-ansi-escapes",
