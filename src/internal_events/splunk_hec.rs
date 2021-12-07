@@ -55,7 +55,6 @@ mod sink {
         }
 
         fn emit_metrics(&self) {
-            counter!("processing_errors_total", 1, "error_type" => "invalid_metric_kind");
             counter!("component_errors_total", 1, "stage" => "processing", "error_type" => "invalid_metric");
         }
     }
