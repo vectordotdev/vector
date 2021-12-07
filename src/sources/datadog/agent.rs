@@ -52,6 +52,8 @@ impl warp::reject::Reject for ApiError {}
 pub struct DatadogAgentConfig {
     address: SocketAddr,
     tls: Option<TlsConfig>,
+    drop_invalid_api_key: bool,
+    valid_api_keys: Option<Vec<String>>,
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
     #[serde(default = "default_framing_message_based")]
@@ -77,6 +79,8 @@ impl GenerateConfig for DatadogAgentConfig {
         toml::Value::try_from(Self {
             address: "0.0.0.0:8080".parse().unwrap(),
             tls: None,
+            drop_invalid_api_key: false,
+            valid_api_keys: None,
             store_api_key: true,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
@@ -92,7 +96,13 @@ impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
-        let source = DatadogAgentSource::new(self.store_api_key, decoder, tls.http_protocol_name());
+        let source = DatadogAgentSource::new(
+            self.store_api_key,
+            self.drop_invalid_api_key,
+            self.valid_api_keys.clone(),
+            decoder,
+            tls.http_protocol_name()
+        );
         let listener = tls.bind(&self.address).await?;
         let log_service = source
             .clone()
@@ -153,6 +163,8 @@ impl SourceConfig for DatadogAgentConfig {
 struct DatadogAgentSource {
     store_api_key: bool,
     api_key_matcher: Regex,
+    drop_invalid_api_key: bool,
+    valid_api_keys: Option<Vec<String>>,
     log_schema_timestamp_key: &'static str,
     log_schema_source_type_key: &'static str,
     decoder: codecs::Decoder,
@@ -165,11 +177,13 @@ struct DatadogSeriesRequest {
 }
 
 impl DatadogAgentSource {
-    fn new(store_api_key: bool, decoder: codecs::Decoder, protocol: &'static str) -> Self {
+    fn new(store_api_key: bool, drop_invalid_api_key: bool, valid_api_keys: Option<Vec<String>>, decoder: codecs::Decoder, protocol: &'static str) -> Self {
         Self {
             store_api_key,
             api_key_matcher: Regex::new(r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??")
                 .expect("static regex always compiles"),
+            drop_invalid_api_key,
+            valid_api_keys,
             log_schema_source_type_key: log_schema().source_type_key(),
             log_schema_timestamp_key: log_schema().timestamp_key(),
             decoder,
@@ -194,6 +208,13 @@ impl DatadogAgentSource {
             .or_else(|| query_params.map(Arc::from))
             // Try from header next
             .or_else(|| header.map(Arc::from))
+    }
+
+    fn is_valid_api_key(&self, api_key: Option<Arc<str>>) -> bool {
+        if let Some(ref k) = api_key {
+            return valid_api_keys.is_none() || valid_api_keys.contains(k.as_ref());
+        }
+        true
     }
 
     async fn handle_request(
@@ -333,6 +354,13 @@ impl DatadogAgentSource {
                         http_path: path.as_str(),
                         protocol: self.protocol,
                     });
+                    let api_key = self.extract_api_key(path.as_str(), api_token, query_params.dd_api_key);
+                    let events = match self.is_valid_api_key(api_key) {
+                        true => {
+
+                        }
+                        false => {}
+                    };
                     let events = decode(&encoding_header, body).and_then(|body| {
                         self.decode_datadog_sketches(
                             body,
@@ -672,7 +700,12 @@ mod tests {
                 Box::new(BytesDecoder::new()),
                 Box::new(BytesDeserializer::new()),
             );
-            let source = DatadogAgentSource::new(true, decoder, "http");
+            let source = DatadogAgentSource::new(
+                true,
+                false,
+                None,
+                decoder,
+                "http");
             let events = source.decode_log_body(body, api_key).unwrap();
             assert_eq!(events.len(), msgs.len());
             for (msg, event) in msgs.into_iter().zip(events.into_iter()) {
@@ -710,6 +743,8 @@ mod tests {
                 address,
                 tls: None,
                 store_api_key,
+                drop_invalid_api_key: false,
+                valid_api_keys: None,
                 framing: default_framing_message_based(),
                 decoding: default_decoding(),
                 acknowledgements: acknowledgements.into(),
