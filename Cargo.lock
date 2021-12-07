@@ -8674,7 +8674,6 @@ dependencies = [
  "datadog-grok",
  "datadog-search-syntax",
  "dns-lookup",
- "encode_unicode",
  "grok",
  "hex",
  "hostname",
