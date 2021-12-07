@@ -647,7 +647,15 @@ fn register_registry_component(
             .register_transform(key.clone(), output_schema, input_schema.clone())
             .map_err(|err| err.to_string())?;
 
-        register_registry_component(key, registry, config, enrichment_tables, input_schema)?;
+        for input in &transform.inputs {
+            register_registry_component(
+                input.component.clone(),
+                registry,
+                config,
+                enrichment_tables.clone(),
+                input_schema.clone(),
+            )?;
+        }
     }
 
     Ok(())
