@@ -2,7 +2,7 @@ use std::{fmt, num::NonZeroUsize};
 
 use crate::{
     config::SinkContext,
-    internal_events::SplunkInvalidMetricReceived,
+    internal_events::SplunkInvalidMetricReceivedError,
     sinks::{
         splunk_hec::common::{render_template_string, request::HecRequest},
         util::{encode_namespace, processed_event::ProcessedEvent, SinkBuilderExt},
@@ -123,9 +123,10 @@ impl HecMetricsProcessedEventMetadata {
             MetricValue::Counter { value } => Some(value),
             MetricValue::Gauge { value } => Some(value),
             _ => {
-                emit!(&SplunkInvalidMetricReceived {
+                emit!(&SplunkInvalidMetricReceivedError {
                     value: metric.value(),
                     kind: &metric.kind(),
+                    error: "Metric kind not supported.".into(),
                 });
                 None
             }
