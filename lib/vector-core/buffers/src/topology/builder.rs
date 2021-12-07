@@ -13,6 +13,19 @@ use crate::{Acker, WhenFull};
 /// Value that can be used as a stage in a buffer topology.
 #[async_trait]
 pub trait IntoBuffer<T> {
+    /// Gets whether or not this buffer stage provides its own instrumentation, or if it should be
+    /// instrumented from the outside.
+    ///
+    /// As some buffer stages, like the in-memory channel, never have a chance to catch the values
+    /// in the middle of the channel without introducing an unnecessary hop, [`BufferSender`] and
+    /// [`BufferReceiver`] can be configured to instrument all events flowing through directly.
+    ///
+    /// When instrumentation is provided in this way, [`ByteSizeOf`] is used to calculate the size
+    /// of the event going both into and out of the buffer.
+    fn provides_instrumentation(&self) -> bool {
+        true
+    }
+
     /// Converts this value into a sender and receiver pair suitable for use in a buffer topology.
     async fn into_buffer_parts(
         self: Box<Self>,
@@ -126,6 +139,7 @@ impl<T> TopologyBuilder<T> {
             // the handle to the `BufferSender`/`BufferReceiver` wrappers, but that's the price we
             // have to pay for letting each stage function in an opaque way when wrapped.
             let usage_handle = buffer_usage.add_stage(stage_idx, stage.when_full);
+            let provides_instrumentation = stage.untransformed.provides_instrumentation();
             let (sender, receiver, acker) = stage
                 .untransformed
                 .into_buffer_parts(&usage_handle)
@@ -154,7 +168,7 @@ impl<T> TopologyBuilder<T> {
             }
             current_acker = acker;
 
-            let next_stage = match current_stage.take() {
+            let (mut sender, mut receiver) = match current_stage.take() {
                 None => (
                     BufferSender::new(sender, stage.when_full),
                     BufferReceiver::new(receiver),
@@ -165,7 +179,12 @@ impl<T> TopologyBuilder<T> {
                 ),
             };
 
-            current_stage = Some(next_stage);
+            if !provides_instrumentation {
+                sender.with_instrumentation(usage_handle.clone());
+                receiver.with_instrumentation(usage_handle);
+            }
+
+            current_stage = Some((sender, receiver));
         }
 
         let (sender, receiver) = current_stage.ok_or(TopologyError::EmptyTopology)?;

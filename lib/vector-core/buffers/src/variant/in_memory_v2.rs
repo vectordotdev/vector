@@ -25,6 +25,10 @@ impl<T> IntoBuffer<T> for MemoryBuffer
 where
     T: Bufferable,
 {
+    fn provides_instrumentation(&self) -> bool {
+        false
+    }
+
     async fn into_buffer_parts(
         self: Box<Self>,
         usage_handle: &BufferUsageHandle,
