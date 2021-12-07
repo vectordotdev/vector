@@ -394,7 +394,7 @@ jobs:
                                          --baseline-sha ${{ needs.compute-soak-meta.outputs.baseline-sha }} \
                                          --comparison-sha ${{ needs.compute-soak-meta.outputs.comparison-sha }} \
                                          --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                         --warmup-seconds 30 \
+                                         --warmup-seconds 30 --erratic-soaks syslog_loki,http_to_http_acks \
                                          --p-value 0.1 > /tmp/${{ github.event.number}}-${{ github.run_attempt }}-analysis
 
       - name: Read analysis file
@@ -449,5 +449,5 @@ jobs:
       - name: Detect regressions
         run: |
           ./soaks/bin/detect_regressions --capture-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures/ \
-                                         --warmup-seconds 30 \
+                                         --warmup-seconds 30 --erratic-soaks syslog_loki,http_to_http_acks \
                                          --p-value 0.1
