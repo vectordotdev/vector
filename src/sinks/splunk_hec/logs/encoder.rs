@@ -3,7 +3,7 @@ use std::io;
 use vector_core::{config::log_schema, event::LogEvent};
 
 use crate::{
-    internal_events::{SplunkEventEncodeError, SplunkEventSent},
+    internal_events::SplunkEventEncodeError,
     sinks::util::encoding::{Encoder, EncodingConfiguration},
 };
 use serde::{Deserialize, Serialize};
@@ -81,12 +81,7 @@ impl HecLogsEncoder {
         hec_data.sourcetype = metadata.sourcetype;
 
         match serde_json::to_vec(&hec_data) {
-            Ok(value) => {
-                emit!(&SplunkEventSent {
-                    byte_size: value.len()
-                });
-                Some(value)
-            }
+            Ok(value) => Some(value),
             Err(error) => {
                 emit!(&SplunkEventEncodeError { error });
                 None

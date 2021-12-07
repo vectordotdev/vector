@@ -14,17 +14,6 @@ mod sink {
     use vector_core::internal_event::InternalEvent;
 
     #[derive(Debug)]
-    pub struct SplunkEventSent {
-        pub byte_size: usize,
-    }
-
-    impl InternalEvent for SplunkEventSent {
-        fn emit_metrics(&self) {
-            counter!("processed_bytes_total", self.byte_size as u64);
-        }
-    }
-
-    #[derive(Debug)]
     pub struct SplunkEventEncodeError {
         pub error: Error,
     }
