@@ -102,6 +102,7 @@ impl SinkConfig for InfluxDbLogsConfig {
         let mut tags: HashSet<String> = self.tags.clone().into_iter().collect();
         tags.insert(log_schema().host_key().to_string());
         tags.insert(log_schema().source_type_key().to_string());
+        tags.insert("metric_type".to_string());
 
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
@@ -161,9 +162,10 @@ impl HttpSink for InfluxDbLogsSink {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
-        self.encoding.apply_rules(&mut event);
+    fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let mut event = event.into_log();
+        event.insert("metric_type".to_string(), "logs".to_string());
+        self.encoding.apply_rules(&mut event);
 
         // Timestamp
         let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key()) {
@@ -186,7 +188,6 @@ impl HttpSink for InfluxDbLogsSink {
         if let Err(error) = influx_line_protocol(
             self.protocol_version,
             &self.measurement,
-            "logs",
             Some(tags),
             Some(fields),
             timestamp,
@@ -310,11 +311,11 @@ mod tests {
             "my-token",
             ProtocolVersion::V1,
             "vector",
-            vec![],
+            ["metric_type", "host"].to_vec(),
         );
         sink.encoding.except_fields = Some(vec!["host".into()]);
 
-        let bytes = sink.encode_event(event).unwrap();
+        let bytes = sink.encode_event(event.clone()).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(string);
@@ -322,6 +323,16 @@ mod tests {
         assert_eq!("metric_type=logs", line_protocol.1);
         assert_fields(line_protocol.2.to_string(), ["message=\"hello\""].to_vec());
         assert_eq!("1542182950000000011\n", line_protocol.3);
+
+        sink.encoding.except_fields = Some(vec!["metric_type".into()]);
+        let bytes = sink.encode_event(event.clone()).unwrap();
+        let string = std::str::from_utf8(&bytes).unwrap();
+        let line_protocol = split_line_protocol(string);
+        assert_eq!(
+            "host=aws.cloud.eur", line_protocol.1,
+            "metric_type tag should be excluded"
+        );
+        assert_fields(line_protocol.2, ["message=\"hello\""].to_vec());
     }
 
     #[test]
@@ -341,7 +352,7 @@ mod tests {
             "my-token",
             ProtocolVersion::V1,
             "vector",
-            ["source_type", "host"].to_vec(),
+            ["source_type", "host", "metric_type"].to_vec(),
         );
 
         let bytes = sink.encode_event(event).unwrap();
@@ -385,7 +396,7 @@ mod tests {
             "my-token",
             ProtocolVersion::V2,
             "vector",
-            ["source_type", "host"].to_vec(),
+            ["source_type", "host", "metric_type"].to_vec(),
         );
 
         let bytes = sink.encode_event(event).unwrap();
@@ -424,7 +435,7 @@ mod tests {
             "my-token",
             ProtocolVersion::V2,
             "vector",
-            [].to_vec(),
+            ["metric_type"].to_vec(),
         );
 
         let bytes = sink.encode_event(event).unwrap();
@@ -461,7 +472,7 @@ mod tests {
             "my-token",
             ProtocolVersion::V2,
             "vector",
-            [].to_vec(),
+            ["metric_type"].to_vec(),
         );
 
         let bytes = sink.encode_event(event).unwrap();
@@ -498,7 +509,7 @@ mod tests {
             "my-token",
             ProtocolVersion::V2,
             "vector",
-            ["as_a_tag", "not_exists_field", "source_type"].to_vec(),
+            ["as_a_tag", "not_exists_field", "source_type", "metric_type"].to_vec(),
         );
 
         let bytes = sink.encode_event(event).unwrap();
