@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use tempfile::{tempdir, TempDir};
+use tempfile::tempdir;
 
 #[derive(Debug)]
 pub struct TempFile {
@@ -22,7 +22,7 @@ impl TempFile {
 impl Drop for TempFile {
     fn drop(&mut self) {
         if let Some(dir) = self.path.parent() {
-            let _ = remove_dir_all(dir);
+            let _ = std::fs::remove_dir_all(dir);
         }
     }
 }
