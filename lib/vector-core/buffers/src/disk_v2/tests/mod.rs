@@ -75,22 +75,6 @@ macro_rules! assert_enough_bytes_written {
     };
 }
 
-#[macro_export]
-macro_rules! assert_pending_and_unwoken {
-    ($spawn_fut:expr) => {
-        assert!(!$spawn_fut.is_woken());
-        assert_pending!($spawn_fut.poll());
-    };
-}
-
-#[macro_export]
-macro_rules! assert_woken_but_pending {
-    ($spawn_fut:expr) => {
-        assert!($spawn_fut.is_woken());
-        assert_pending!($spawn_fut.poll());
-    };
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct SizedRecord(pub u32);
 

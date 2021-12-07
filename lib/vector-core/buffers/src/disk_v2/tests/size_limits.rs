@@ -3,7 +3,7 @@ use tracing::Instrument;
 
 use crate::{
     assert_buffer_is_empty, assert_buffer_size, assert_enough_bytes_written,
-    assert_pending_and_unwoken, assert_reader_writer_file_positions, assert_woken_but_pending,
+    assert_reader_writer_file_positions,
 };
 
 use super::{
@@ -100,7 +100,24 @@ async fn writer_waits_when_buffer_is_full() {
                     .expect("write should not fail")
             });
 
-            assert_pending_and_unwoken!(second_record_write);
+            let called_wait_for_reader = assertion_registry
+                .build()
+                .with_name("wait_for_reader")
+                .with_parent_name("writer_waits_when_buffer_is_full")
+                .was_entered()
+                .finalize();
+            let got_past_wait_for_reader = assertion_registry
+                .build()
+                .with_name("wait_for_reader")
+                .with_parent_name("writer_waits_when_buffer_is_full")
+                .was_closed()
+                .finalize();
+            assert!(!called_wait_for_reader.try_assert());
+            assert!(!got_past_wait_for_reader.try_assert());
+
+            assert_pending!(second_record_write.poll());
+            called_wait_for_reader.assert();
+            assert!(!got_past_wait_for_reader.try_assert());
 
             // Now do a read, which would theoretically make enough space available, but wait! We
             // actually have to acknowledge the read, too, to update the buffer size.  This read
@@ -109,39 +126,47 @@ async fn writer_waits_when_buffer_is_full() {
             assert_eq!(first_record_read, Some(SizedRecord(first_write_size)));
 
             // We haven't yet acknowledged the record, so nothing has changed yet:
-            assert_pending_and_unwoken!(second_record_write);
+            assert_pending!(second_record_write.poll());
+            assert!(!got_past_wait_for_reader.try_assert());
             assert_buffer_size!(ledger, 1, first_bytes_written);
 
             // Trigger our second read, which is necessary to actually run the acknowledgement logic
             // that consumes pending acks, potentially deletes data files, etc.  We trigger it
             // before so that we can also validate that when a read is blocking on more data,
             // acknowledging a record will wake it up so it can run the logic.
-            let called_handle_pending_acks = assertion_registry
+            let deleted_first_data_file = assertion_registry
                 .build()
-                .with_name("handle_pending_acknowledgements")
+                .with_name("delete_completed_data_files")
                 .with_parent_name("writer_waits_when_buffer_is_full")
-                .was_entered()
+                .was_closed()
+                .finalize();
+
+            let got_past_wait_for_waiter = assertion_registry
+                .build()
+                .with_name("wait_for_writer")
+                .with_parent_name("writer_waits_when_buffer_is_full")
+                .was_closed()
                 .finalize();
 
             let mut second_record_read =
                 spawn(async { reader.next().await.expect("read should not fail") });
 
-            assert!(!called_handle_pending_acks.try_assert());
+            assert!(!deleted_first_data_file.try_assert());
+            assert!(!got_past_wait_for_waiter.try_assert());
             assert_pending!(second_record_read.poll());
 
             // Now acknowledge the first record we read.  This will wake up our second read, so it
             // can at least handle the pending acknowledgements logic, but it won't actually be ready,
             // because the second write hasn't completed yet:
             acker.ack(1);
-            assert_woken_but_pending!(second_record_read);
+            assert_pending!(second_record_read.poll());
+            deleted_first_data_file.assert();
+            got_past_wait_for_waiter.assert();
 
-            called_handle_pending_acks.assert();
-
-            // And now the writer should be woken up since the acknowledgement was processed:
-            assert!(second_record_write.is_woken());
+            // And now the writer should be woken up since the acknowledgement was processed, and
+            // the blocked write should be able to complete:
             assert_buffer_is_empty!(ledger);
 
-            // And our blocked write should be able to complete, as a result:
             let second_bytes_written = second_record_write.await;
             assert_enough_bytes_written!(second_bytes_written, SizedRecord, second_write_size);
 
