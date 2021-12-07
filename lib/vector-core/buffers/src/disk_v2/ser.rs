@@ -92,5 +92,5 @@ where
     T::Archived: for<'b> CheckBytes<DefaultValidator<'b>>,
 {
     debug_assert!(!buf.is_empty());
-    check_archived_root::<T>(buf).map_err(|e| e.into())
+    check_archived_root::<T>(buf).map_err(Into::into)
 }
