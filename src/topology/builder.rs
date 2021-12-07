@@ -15,6 +15,7 @@ use crate::{
 };
 use futures::{stream::FuturesOrdered, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use std::pin::Pin;
 use std::{
     collections::HashMap,
@@ -36,6 +37,8 @@ use vector_core::{
 lazy_static! {
     static ref ENRICHMENT_TABLES: enrichment::TableRegistry = enrichment::TableRegistry::default();
 }
+
+static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(num_cpus::get);
 
 pub async fn load_enrichment_tables<'a>(
     config: &'a super::Config,
@@ -413,13 +416,6 @@ const fn filter_event_type(event: &Event, data_type: DataType) -> bool {
     }
 }
 
-// 128 is an arbitrary, smallish constant
-const TRANSFORM_BATCH_SIZE: usize = 128;
-
-// 64 is an arbitrary, smallish constant
-// TODO: maybe something like 2x num_cpus?
-const CONCURRENCY_LIMIT: usize = 64;
-
 #[derive(Debug, Clone)]
 struct TransformNode {
     key: ComponentKey,
@@ -524,11 +520,14 @@ impl Runner {
         input_rx: BufferStream<Event>,
         input_type: DataType,
     ) -> Result<TaskOutput, ()> {
-        let mut outputs_buf = self.outputs.new_buf_with_capacity(TRANSFORM_BATCH_SIZE);
+        // 128 is an arbitrary, smallish constant
+        const INLINE_BATCH_SIZE: usize = 128;
+
+        let mut outputs_buf = self.outputs.new_buf_with_capacity(INLINE_BATCH_SIZE);
 
         let mut input_rx = input_rx
             .filter(move |event| ready(filter_event_type(event, input_type)))
-            .ready_chunks(TRANSFORM_BATCH_SIZE);
+            .ready_chunks(INLINE_BATCH_SIZE);
 
         self.timer.start_wait();
         while let Some(events) = input_rx.next().await {
@@ -551,9 +550,13 @@ impl Runner {
         input_rx: BufferStream<Event>,
         input_type: DataType,
     ) -> Result<TaskOutput, ()> {
+        // 1024 is an arbitrary, medium-ish constant, larger than the inline runner's batch size to
+        // try to balance out the increased overhead of spawning tasks
+        const CONCURRENT_BATCH_SIZE: usize = 1024;
+
         let mut input_rx = input_rx
             .filter(move |event| ready(filter_event_type(event, input_type)))
-            .ready_chunks(TRANSFORM_BATCH_SIZE);
+            .ready_chunks(CONCURRENT_BATCH_SIZE);
 
         let mut in_flight = FuturesOrdered::new();
         let mut shutting_down = false;
@@ -573,7 +576,7 @@ impl Runner {
                     }
                 }
 
-                input_events = input_rx.next(), if in_flight.len() < CONCURRENCY_LIMIT && !shutting_down => {
+                input_events = input_rx.next(), if in_flight.len() < *TRANSFORM_CONCURRENCY_LIMIT && !shutting_down => {
                     match input_events {
                         Some(events) => {
                             self.on_events_received(&events);
