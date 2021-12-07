@@ -171,7 +171,6 @@ fn healthcheck(
 pub(in crate::sinks) fn influx_line_protocol(
     protocol_version: ProtocolVersion,
     measurement: &str,
-    metric_type: &str,
     tags: Option<BTreeMap<String, String>>,
     fields: Option<HashMap<String, Field>>,
     timestamp: i64,
@@ -188,8 +187,7 @@ pub(in crate::sinks) fn influx_line_protocol(
     line_protocol.push(',');
 
     // Tags
-    let mut unwrapped_tags = tags.unwrap_or_else(BTreeMap::new);
-    unwrapped_tags.insert("metric_type".to_owned(), metric_type.to_owned());
+    let unwrapped_tags = tags.unwrap_or_default();
     encode_tags(unwrapped_tags, line_protocol);
     line_protocol.push(' ');
 
