@@ -84,7 +84,7 @@ impl Value {
         self,
         mut rhs: impl FnMut() -> Result<Self, ExpressionError>,
     ) -> Result<Self, Error> {
-        let err = Error::Or;
+        let err = |err| Error::Or(err);
 
         match self {
             Value::Null => rhs().map_err(err),

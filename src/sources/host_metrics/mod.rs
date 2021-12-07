@@ -425,7 +425,10 @@ impl FilterList {
     #[cfg(test)]
     fn contains_test(&self, value: Option<&str>) -> bool {
         let result = self.contains_str(value);
-        assert_eq!(result, self.contains_path(value.map(std::path::Path::new)));
+        assert_eq!(
+            result,
+            self.contains_path(value.map(|value| std::path::Path::new(value)))
+        );
         result
     }
 }

@@ -417,6 +417,6 @@ impl DecodeBytes<Event> for Event {
     where
         B: Buf,
     {
-        proto::EventWrapper::decode(buffer).map(Into::into)
+        proto::EventWrapper::decode(buffer).map(|wrp| wrp.into())
     }
 }

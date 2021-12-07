@@ -380,10 +380,10 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
 
 #[derive(Debug, Clone)]
 pub struct SinkContext {
-    pub acker: Acker,
-    pub healthcheck: SinkHealthcheckOptions,
-    pub globals: GlobalOptions,
-    pub proxy: ProxyConfig,
+    pub(super) acker: Acker,
+    pub(super) healthcheck: SinkHealthcheckOptions,
+    pub(super) globals: GlobalOptions,
+    pub(super) proxy: ProxyConfig,
 }
 
 impl SinkContext {

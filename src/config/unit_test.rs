@@ -114,7 +114,7 @@ fn events_to_string(name: &str, events: &[Event]) -> String {
             name,
             events
                 .iter()
-                .map(event_to_string)
+                .map(|e| event_to_string(e))
                 .collect::<Vec<_>>()
                 .join("\n    ")
         )

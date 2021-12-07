@@ -34,7 +34,7 @@ impl<'a> Context<'a> {
 
     /// Get a mutable reference to the [`runtime state`](Runtime).
     pub fn state_mut(&mut self) -> &mut Runtime {
-        self.state
+        &mut self.state
     }
 
     /// Get a reference to the [`TimeZone`]

@@ -66,7 +66,7 @@ where
     T: ByteSizeOf,
 {
     fn allocated_bytes(&self) -> usize {
-        self.as_ref().map_or(0, ByteSizeOf::allocated_bytes)
+        self.as_ref().map_or(0, |x| x.allocated_bytes())
     }
 }
 

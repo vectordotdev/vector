@@ -114,12 +114,14 @@ struct QueryResult {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct QueryData {
+    result_type: String,
     result: Vec<QueryResult>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct QueryResponse {
+    status: Status,
     data: QueryData,
 }
 

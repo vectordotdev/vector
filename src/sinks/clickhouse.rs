@@ -659,7 +659,6 @@ timestamp_format = "unix""#,
     }
 
     #[derive(Debug, Deserialize)]
-    #[allow(dead_code)] // deserialize all fields
     struct QueryResponse {
         data: Vec<Value>,
         meta: Vec<Value>,
@@ -668,7 +667,6 @@ timestamp_format = "unix""#,
     }
 
     #[derive(Debug, Deserialize)]
-    #[allow(dead_code)] // deserialize all fields
     struct Stats {
         bytes_read: usize,
         elapsed: f64,

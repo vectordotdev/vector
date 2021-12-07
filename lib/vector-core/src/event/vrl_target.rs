@@ -211,7 +211,7 @@ impl vrl_core::Target for VrlTarget {
                     }))
                 } else {
                     log.remove(path, compact)
-                        .map(|val| val.map(Into::into))
+                        .map(|val| val.map(|val| val.into()))
                         .map_err(|err| err.to_string())
                 }
             }

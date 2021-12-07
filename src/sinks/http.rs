@@ -351,7 +351,6 @@ mod tests {
 
         #[derive(Deserialize, Debug)]
         #[serde(deny_unknown_fields)]
-        #[allow(dead_code)] // deserialize all fields
         struct ExpectedEvent {
             message: String,
             timestamp: chrono::DateTime<chrono::Utc>,
