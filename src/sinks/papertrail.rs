@@ -113,7 +113,7 @@ fn encode_event(
         facility: Facility::LOG_USER,
         hostname: host,
         process,
-        pid: pid as i32,
+        pid,
     };
 
     let mut s: Vec<u8> = Vec::new();

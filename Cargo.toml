@@ -89,6 +89,7 @@ members = [
   "lib/vrl/stdlib",
   "lib/vrl/tests",
   "lib/vrl/proptests",
+  "lib/vector-vrl-functions",
   "lib/datadog/grok",
   "lib/datadog/search-syntax",
   "lib/datadog/filter",
@@ -109,6 +110,7 @@ tracing-limit = { path = "lib/tracing-limit" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
+vector-vrl-functions = { path = "lib/vector-vrl-functions" }
 
 # Tokio / Futures
 async-stream = "0.3.2"
@@ -227,7 +229,7 @@ evmap = { version = "10.0.2", default-features = false, optional = true }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.21", default-features = false }
 futures-util = { version = "0.3.17", default-features = false }
-getset = { version = "0.1.1", default-features = false }
+getset = { version = "0.1.2", default-features = false }
 glob = { version = "0.3.0", default-features = false }
 governor = { version = "0.3.2", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
 grok = { version = "1.2.0", default-features = false, optional = true }
@@ -280,7 +282,7 @@ socket2 = { version = "0.4.2", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
 structopt = { version = "0.3.25", default-features = false }
-syslog = { version = "5.0.0", default-features = false, optional = true }
+syslog = { version = "6.0.0", default-features = false, optional = true }
 syslog_loose = { version = "0.16.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.4", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = { version = "0.5.8", default-features = false }
