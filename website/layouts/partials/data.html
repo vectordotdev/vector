@@ -1985,11 +1985,11 @@
 {{ end }}
 
 {{ define "config-condition" }}
-{{ $name := .name }}
+{{ $configName := .name }}
 <div class="mt-4">
   <div class="border rounded dark:border-gray-700 divide-y dark:divide-gray-700">
     {{ range $k, $v := .condition.options }}
-    {{ $id := printf "%s.%s" $name $k }}
+    {{ $id := printf "%s.%s" $configName $k }}
     <div class="py-3 px-5">
       <div>
         {{ partial "heading.html" (dict "text" $id "level" 4 "mono" true) }}
@@ -2052,29 +2052,50 @@
 
     <div class="mt-4">
       <span>
-        {{ partial "heading.html" (dict "text" "Full config examples" "level" 3) }}
+        {{ partial "heading.html" (dict "text" "Condition config examples" "level" 3) }}
       </span>
 
-      <p>
-        The examples below are in TOML format, but JSON and YAML are also supported.
-      </p>
-
-      <div class="flex flex-col space-y-2">
+      <div class="mt-2 flex flex-col space-y-2">
         {{ range .condition.condition_examples }}
+        {{ $name := .name }}
+        {{ $example := .example }}
+        {{ $vrlOnly := .vrl_only }}
         <div class="flex flex-col space-y-2">
           <span>
             {{ partial "heading.html" (dict "text" .title "level" 4) }}
           </span>
 
-          <div>
-            {{ $code := "" }}
-            {{ if .vrl_only }}
-            {{ $code = printf "%s = \"%s\"" $name .example }}
-            {{ else }}
-            {{ $code = printf "%s.type = \"%s\"\n%s.source = \"%s\"" $name .name $name .example }}
+          {{ $formats := slice "toml" "yaml" "json" }}
+          <div class="flex space-x-2">
+            {{ range $formats }}
+            <button @click="$store.global.setFormat('{{ . }}')"
+              :class="{ 'text-secondary dark:text-primary': $store.global.isFormat('{{ . }}') }" class="font-semibold">
+              {{ . | upper }}
+            </button>
             {{ end }}
-            {{ highlight $code "ruby" "" }}
           </div>
+
+          {{ range $formats }}
+          {{ $code := "" }}
+          {{ $shorthand := "" }}
+          {{ if eq . "toml" }}
+          {{ $code = printf "%s = { type = \"%s\", source = \"%s\" }" $configName $name $example }}
+          {{ $shorthand = printf "%s = \"%s\"" $configName $example }}
+          {{ else if eq . "yaml" }}
+          {{ $code = printf "%s:\n  type: \"%s\"\n  source: \"%s\"" $configName $name $example }}
+          {{ $shorthand = printf "%s: \"%s\"" $configName $example }}
+          {{ else if eq . "json" }}
+          {{ $code = printf "\"%s\": {\n  \"type\": \"%s\",\n  \"source\": \"%s\"\n}" $configName $name $example }}
+          {{ $shorthand = printf "\"%s\": \"%s\"" $configName $example }}
+          {{ end }}
+          <div x-show="$store.global.isFormat('{{ . }}')" class="mt-2">
+            {{ if $vrlOnly }}
+            {{ highlight $shorthand . "" }}
+            {{ else }}
+            {{ highlight $code . "" }}
+            {{ end }}
+          </div>
+          {{ end }}
         </div>
         {{ end }}
       </div>
