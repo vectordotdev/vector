@@ -1,6 +1,6 @@
 use crate::conditions::{Condition, ConditionConfig, ConditionDescription};
-use crate::event::Event;
-use datadog_filter::{build_matcher, Matcher};
+use crate::event::{Event, LogEvent};
+use datadog_filter::{build_matcher, Matcher, Run};
 use datadog_search_syntax::parse;
 use serde::{Deserialize, Serialize};
 use vector_datadog_filter::EventFilter;
@@ -36,10 +36,18 @@ impl ConditionConfig for DatadogSearchConfig {
         _enrichment_tables: &enrichment::TableRegistry,
     ) -> crate::Result<Box<dyn Condition>> {
         let node = parse(&self.source)?;
-        let matcher = build_matcher(&node, &EventFilter::default());
+        let matcher = as_log(build_matcher(&node, &EventFilter::default()));
 
         Ok(Box::new(DatadogSearchRunner { matcher }))
     }
+}
+
+/// Run the provided `Matcher` when we're dealing with `LogEvent`s. Otherwise, return false.
+fn as_log(matcher: Box<dyn Matcher<LogEvent>>) -> Box<dyn Matcher<Event>> {
+    Run::boxed(move |ev| match ev {
+        Event::Log(log) => matcher.run(log),
+        _ => false,
+    })
 }
 
 //------------------------------------------------------------------------------
@@ -72,14 +80,14 @@ mod test {
                 cond.check_with_context(&pass).is_ok(),
                 "should pass: {}\nevent: {:?}",
                 source,
-                pass
+                pass.as_log()
             );
 
             assert!(
                 cond.check_with_context(&fail).is_err(),
                 "should fail: {}\nevent: {:?}",
                 source,
-                fail
+                fail.as_log()
             );
         }
     }

@@ -1,10 +1,13 @@
 use vrl::prelude::*;
 
-use datadog_filter::{build_matcher, Filter, Matcher, Resolver, Run};
+use datadog_filter::{
+    build_matcher,
+    regex::{wildcard_regex, word_regex},
+    Filter, Matcher, Resolver, Run,
+};
 use datadog_search_syntax::{parse, Comparison, ComparisonValue, Field};
 
 use lookup_lib::{parser::parse_lookup, LookupBuf};
-use regex::Regex;
 use std::borrow::Cow;
 
 #[derive(Clone, Copy, Debug)]
@@ -386,24 +389,6 @@ fn resolve_value(buf: LookupBuf, match_fn: Box<dyn Matcher<Value>>) -> Box<dyn M
     };
 
     Run::boxed(func)
-}
-
-/// Returns compiled word boundary regex.
-fn word_regex(to_match: &str) -> Regex {
-    Regex::new(&format!(
-        r#"\b{}\b"#,
-        regex::escape(to_match).replace("\\*", ".*")
-    ))
-    .expect("invalid wildcard regex")
-}
-
-/// Returns compiled wildcard regex.
-fn wildcard_regex(to_match: &str) -> Regex {
-    Regex::new(&format!(
-        "^{}$",
-        regex::escape(to_match).replace("\\*", ".*")
-    ))
-    .expect("invalid wildcard regex")
 }
 
 /// If the provided field is a `Field::Tag`, will return a "tags" lookup buf. Otherwise,
