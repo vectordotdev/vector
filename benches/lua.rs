@@ -64,6 +64,9 @@ fn bench_add_fields(c: &mut Criterion) {
                 }))
             }
             // ignoring multiple outputs for now
+            Transform::DispatchFunction(_) => {
+                unimplemented!()
+            }
             Transform::FallibleFunction(t) => {
                 let mut t = t.clone();
                 Box::pin(rx.flat_map(move |v| {
@@ -159,6 +162,9 @@ fn bench_field_filter(c: &mut Criterion) {
                 }))
             }
             // ignoring multiple outputs for now
+            Transform::DispatchFunction(_) => {
+                unimplemented!()
+            }
             Transform::FallibleFunction(t) => {
                 let mut t = t.clone();
                 Box::pin(rx.flat_map(move |v| {

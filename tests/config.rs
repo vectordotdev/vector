@@ -841,5 +841,5 @@ async fn route() {
     .await
     .unwrap();
 
-    assert_eq!(0, warnings.len());
+    assert!(warnings.is_empty());
 }

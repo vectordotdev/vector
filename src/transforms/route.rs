@@ -3,7 +3,7 @@ use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::RouteEventDiscarded,
-    transforms::{noop::Noop, FunctionTransform, Transform},
+    transforms::{FunctionTransform, Transform},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -120,8 +120,6 @@ impl TransformConfig for RouteConfig {
             }
         }
 
-        map.insert(component_key.clone(), (outputs, Box::new(Noop)));
-
         if !map.is_empty() {
             Ok(Some(map))
         } else {
@@ -230,7 +228,7 @@ mod test {
 
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
-            r#"{"root.first":[[],{"type":"lane","condition":{"type":"check_fields","message.eq":"foo"}}],"root":[["root.first"],{"type":"noop"}]}"#
+            r#"{"root.first":[[],{"type":"lane","condition":{"type":"check_fields","message.eq":"foo"}}]}"#
         );
     }
 }
