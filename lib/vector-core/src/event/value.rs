@@ -294,11 +294,24 @@ impl TryInto<serde_json::Value> for Value {
 #[cfg(feature = "vrl")]
 impl From<vrl_core::Value> for Value {
     fn from(v: vrl_core::Value) -> Self {
-        match v {
-            vrl_core::Value::Regex(v) => {
-                Value::Bytes(bytes::Bytes::copy_from_slice(v.to_string().as_bytes()))
+        if v.contains_regex() {
+            use vrl_core::Value::{
+                Array, Boolean, Bytes, Float, Integer, Null, Object, Regex, Timestamp,
+            };
+
+            match v {
+                Bytes(v) => Value::Bytes(v),
+                Integer(v) => Value::Integer(v),
+                Float(v) => Value::Float(*v),
+                Boolean(v) => Value::Boolean(v),
+                Object(v) => Value::Map(v.into_iter().map(|(k, v)| (k, v.into())).collect()),
+                Array(v) => Value::Array(v.into_iter().map(Into::into).collect()),
+                Timestamp(v) => Value::Timestamp(v),
+                Regex(v) => Value::Bytes(bytes::Bytes::copy_from_slice(v.to_string().as_bytes())),
+                Null => Value::Null,
             }
-            v => unsafe { std::mem::transmute(v) },
+        } else {
+            unsafe { std::mem::transmute(v) }
         }
     }
 }

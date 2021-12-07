@@ -31,6 +31,17 @@ pub enum Value {
     Regex(Regex),
 }
 
+impl Value {
+    pub fn contains_regex(&self) -> bool {
+        match self {
+            Value::Regex(_) => true,
+            Value::Object(map) => map.iter().any(|(_, value)| value.contains_regex()),
+            Value::Array(arr) => arr.iter().any(|value| value.contains_regex()),
+            _ => false,
+        }
+    }
+}
+
 impl Eq for Value {}
 
 impl fmt::Display for Value {
