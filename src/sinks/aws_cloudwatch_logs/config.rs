@@ -2,8 +2,10 @@ use crate::aws::rusoto;
 use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext};
 use crate::sinks::aws_cloudwatch_logs::healthcheck::healthcheck;
+use crate::sinks::aws_cloudwatch_logs::request_builder::CloudwatchRequestBuilder;
 use crate::sinks::aws_cloudwatch_logs::retry::CloudwatchRetryLogic;
-use crate::sinks::aws_cloudwatch_logs::service::CloudwatchLogsPartitionSvc;
+use crate::sinks::aws_cloudwatch_logs::service::{CloudwatchLogsPartitionSvc, CloudwatchResponse};
+use crate::sinks::aws_cloudwatch_logs::sink::CloudwatchSink;
 use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
 use crate::sinks::util::{BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig};
 use crate::sinks::{Healthcheck, VectorSink};
@@ -12,6 +14,7 @@ use futures::FutureExt;
 use rusoto_logs::CloudWatchLogsClient;
 use serde::{Deserialize, Serialize};
 use std::num::NonZeroU64;
+use vector_core::config::log_schema;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -51,28 +54,26 @@ impl CloudwatchLogsSinkConfig {
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let batch_settings = self.batch.into_batch_settings()?;
+        let batcher_settings = self.batch.into_batcher_settings()?;
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
-
-        let log_group = self.group_name.clone();
-        let log_stream = self.stream_name.clone();
-
         let client = self.create_client(cx.proxy())?;
         let svc = request.service(
-            CloudwatchRetryLogic,
+            CloudwatchRetryLogic::new(),
             CloudwatchLogsPartitionSvc::new(self.clone(), client.clone()),
         );
-
         let encoding = self.encoding.clone();
-        // let buffer = PartitionBuffer::new(VecBuffer::new(batch_settings.size));
-        // let sink = PartitionBatchSink::new(svc, buffer, batch_settings.timeout, cx.acker())
-        //     .sink_map_err(|error| error!(message = "Fatal cloudwatchlogs sink error.", %error))
-        //     .with_flat_map(move |event| {
-        //         stream::iter(partition_encode(event, &encoding, &log_group, &log_stream)).map(Ok)
-        //     });
-
         let healthcheck = healthcheck(self.clone(), client).boxed();
-        let sink = CloudwatchLogsSink {};
+        let sink = CloudwatchSink {
+            batcher_settings,
+            request_builder: CloudwatchRequestBuilder {
+                group_template: self.group_name.clone(),
+                stream_template: self.stream_name.clone(),
+                log_schema: log_schema().clone(),
+                encoding,
+            },
+            acker: cx.acker(),
+            service: svc,
+        };
 
         Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
     }

@@ -1,15 +1,33 @@
-use crate::sinks::aws_cloudwatch_logs::service::CloudwatchError;
+use crate::sinks::aws_cloudwatch_logs::service::{CloudwatchError, CloudwatchResponse};
 use crate::sinks::util::retries::RetryLogic;
 use rusoto_core::request::BufferedHttpResponse;
 use rusoto_core::RusotoError;
 use rusoto_logs::{CreateLogStreamError, DescribeLogStreamsError, PutLogEventsError};
+use std::marker::PhantomData;
 
-#[derive(Debug, Clone)]
-pub struct CloudwatchRetryLogic;
+#[derive(Debug)]
+pub struct CloudwatchRetryLogic<T> {
+    phantom: PhantomData<T>,
+}
+impl<T> CloudwatchRetryLogic<T> {
+    pub fn new() -> CloudwatchRetryLogic<T> {
+        CloudwatchRetryLogic {
+            phantom: PhantomData,
+        }
+    }
+}
 
-impl RetryLogic for CloudwatchRetryLogic {
+impl<T> Clone for CloudwatchRetryLogic<T> {
+    fn clone(&self) -> Self {
+        CloudwatchRetryLogic {
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<T: Send + Sync + 'static> RetryLogic for CloudwatchRetryLogic<T> {
     type Error = CloudwatchError;
-    type Response = ();
+    type Response = T;
 
     #[allow(clippy::cognitive_complexity)] // long, but just a hair over our limit
     fn is_retriable_error(&self, error: &Self::Error) -> bool {

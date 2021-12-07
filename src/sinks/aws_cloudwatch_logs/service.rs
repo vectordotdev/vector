@@ -1,5 +1,8 @@
+use crate::event::EventStatus;
 use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsSinkConfig;
+use crate::sinks::aws_cloudwatch_logs::request_builder::CloudwatchRequest;
 use crate::sinks::aws_cloudwatch_logs::retry::CloudwatchRetryLogic;
+use crate::sinks::aws_cloudwatch_logs::sink::BatchCloudwatchRequest;
 use crate::sinks::aws_cloudwatch_logs::{request, CloudwatchKey};
 use crate::sinks::util::retries::FixedRetryPolicy;
 use crate::sinks::util::{
@@ -24,12 +27,15 @@ use tower::limit::{ConcurrencyLimit, RateLimit};
 use tower::retry::Retry;
 use tower::timeout::Timeout;
 use tower::{Service, ServiceBuilder, ServiceExt};
+use vector_core::internal_event::EventsSent;
+use vector_core::stream::DriverResponse;
+use vrl::prelude::fmt::{Debug, Formatter};
 
 type Svc = Buffer<
     ConcurrencyLimit<
         RateLimit<
             Retry<
-                FixedRetryPolicy<CloudwatchRetryLogic>,
+                FixedRetryPolicy<CloudwatchRetryLogic<()>>,
                 Buffer<Timeout<CloudwatchLogsSvc>, Vec<InputLogEvent>>,
             >,
         >,
@@ -86,6 +92,29 @@ impl From<RusotoError<DescribeLogStreamsError>> for CloudwatchError {
     }
 }
 
+#[derive(Debug)]
+pub struct CloudwatchResponse {}
+
+impl crate::sinks::util::sink::Response for CloudwatchResponse {
+    fn is_successful(&self) -> bool {
+        unimplemented!()
+    }
+
+    fn is_transient(&self) -> bool {
+        unimplemented!()
+    }
+}
+
+impl DriverResponse for CloudwatchResponse {
+    fn event_status(&self) -> EventStatus {
+        todo!()
+    }
+
+    fn events_sent(&self) -> EventsSent {
+        todo!()
+    }
+}
+
 impl CloudwatchLogsPartitionSvc {
     pub fn new(config: CloudwatchLogsSinkConfig, client: CloudWatchLogsClient) -> Self {
         let request_settings = config.request.unwrap_with(&TowerRequestConfig::default());
@@ -99,10 +128,8 @@ impl CloudwatchLogsPartitionSvc {
     }
 }
 
-impl Service<PartitionInnerBuffer<Vec<InputLogEvent>, CloudwatchKey>>
-    for CloudwatchLogsPartitionSvc
-{
-    type Response = ();
+impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
+    type Response = CloudwatchResponse;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -110,12 +137,16 @@ impl Service<PartitionInnerBuffer<Vec<InputLogEvent>, CloudwatchKey>>
         Poll::Ready(Ok(()))
     }
 
-    fn call(
-        &mut self,
-        req: PartitionInnerBuffer<Vec<InputLogEvent>, CloudwatchKey>,
-    ) -> Self::Future {
-        let (events, key) = req.into_parts();
-
+    fn call(&mut self, req: BatchCloudwatchRequest) -> Self::Future {
+        let key = req.key;
+        let events = req
+            .events
+            .into_iter()
+            .map(|req| InputLogEvent {
+                message: req.message,
+                timestamp: req.timestamp,
+            })
+            .collect();
         let svc = if let Some(svc) = &mut self.clients.get_mut(&key) {
             svc.clone()
         } else {
@@ -127,7 +158,10 @@ impl Service<PartitionInnerBuffer<Vec<InputLogEvent>, CloudwatchKey>>
                     self.request_settings.rate_limit_num,
                     self.request_settings.rate_limit_duration,
                 )
-                .retry(self.request_settings.retry_policy(CloudwatchRetryLogic))
+                .retry(
+                    self.request_settings
+                        .retry_policy(CloudwatchRetryLogic::new()),
+                )
                 .buffer(1)
                 .timeout(self.request_settings.timeout)
                 .service(CloudwatchLogsSvc::new(
@@ -140,7 +174,11 @@ impl Service<PartitionInnerBuffer<Vec<InputLogEvent>, CloudwatchKey>>
             svc
         };
 
-        svc.oneshot(events).map_err(Into::into).boxed()
+        //TODO: remove the Boxing?
+        svc.oneshot(events)
+            .map_ok(|x| CloudwatchResponse {})
+            .map_err(Into::into)
+            .boxed()
     }
 }
 

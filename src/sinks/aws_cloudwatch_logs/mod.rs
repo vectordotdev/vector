@@ -1,6 +1,7 @@
 mod config;
 mod healthcheck;
 mod request;
+mod request_builder;
 mod retry;
 mod service;
 mod sink;
@@ -55,7 +56,8 @@ use vector_core::ByteSizeOf;
 use super::util::SinkBatchSettings;
 
 #[derive(Debug, Snafu)]
-pub(self) enum CloudwatchLogsError {
+#[snafu(visibility(pub))]
+pub enum CloudwatchLogsError {
     #[snafu(display("{}", source))]
     HttpClientError {
         source: rusoto_core::request::TlsError,
@@ -66,6 +68,9 @@ pub(self) enum CloudwatchLogsError {
     },
     #[snafu(display("Encoded event is too long, length={}", length))]
     EventTooLong { length: usize },
+
+    #[snafu(display("{}", source))]
+    IoError { source: std::io::Error },
 }
 
 inventory::submit! {
