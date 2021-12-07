@@ -132,7 +132,7 @@ async fn writer_waits_when_buffer_is_full() {
             // Now acknowledge the first record we read.  This will wake up our second read, so it
             // can at least handle the pending acknowledgements logic, but it won't actually be ready,
             // because the second write hasn't completed yet:
-            acker.acknowledge_records(1);
+            acker.ack(1);
             assert_woken_but_pending!(second_record_read);
 
             called_handle_pending_acks.assert();
@@ -164,7 +164,7 @@ async fn writer_waits_when_buffer_is_full() {
             assert_buffer_size!(ledger, 1, second_bytes_written);
 
             // Now acknowledge the record, and do our final read:
-            acker.acknowledge_records(1);
+            acker.ack(1);
 
             let final_record_read = reader.next().await.expect("read should not fail");
             assert_eq!(final_record_read, None);
@@ -230,14 +230,14 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded() {
             // Now read both records, make sure they are what we expect, etc.
             let first_record_read = reader.next().await.expect("read should not fail");
             assert_eq!(first_record_read, Some(SizedRecord(first_write_size)));
-            acker.acknowledge_records(1);
+            acker.ack(1);
 
             assert_buffer_size!(ledger, 2, (first_bytes_written + second_bytes_written));
             assert_reader_writer_file_positions!(ledger, 0, 1);
 
             let second_record_read = reader.next().await.expect("read should not fail");
             assert_eq!(second_record_read, Some(SizedRecord(second_write_size)));
-            acker.acknowledge_records(1);
+            acker.ack(1);
 
             assert_buffer_size!(ledger, 1, second_bytes_written);
             assert_reader_writer_file_positions!(ledger, 1, 1);

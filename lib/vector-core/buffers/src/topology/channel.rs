@@ -7,7 +7,7 @@ use futures::{Sink, Stream};
 use pin_project::pin_project;
 use tokio_stream::wrappers::ReceiverStream;
 
-use crate::WhenFull;
+use crate::{buffer_usage_data::BufferUsageHandle, WhenFull};
 use crate::{
     topology::{
         poll_sender::{PollSendError, PollSender},
@@ -15,6 +15,8 @@ use crate::{
     },
     Bufferable,
 };
+
+use super::strategy::StrategyResult;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum SendState {
@@ -56,6 +58,7 @@ pub struct BufferSender<T> {
     overflow: Option<Pin<Box<BufferSender<T>>>>,
     state: SendState,
     when_full: WhenFull,
+    instrumentation: Option<BufferUsageHandle>,
 }
 
 impl<T> BufferSender<T> {
@@ -66,6 +69,7 @@ impl<T> BufferSender<T> {
             overflow: None,
             state: SendState::Idle,
             when_full,
+            instrumentation: None,
         }
     }
 
@@ -76,7 +80,13 @@ impl<T> BufferSender<T> {
             overflow: Some(Box::pin(overflow)),
             state: SendState::Idle,
             when_full: WhenFull::Overflow,
+            instrumentation: None,
         }
+    }
+
+    /// Configures this sender to instrument the items passing through it.
+    pub fn with_instrumentation(&mut self, handle: BufferUsageHandle) {
+        self.instrumentation = Some(handle);
     }
 }
 
@@ -174,18 +184,31 @@ impl<T: Bufferable> Sink<T> for BufferSender<T> {
     }
 
     fn start_send(mut self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+        let item_size = self.instrumentation.as_ref().map(|_| item.size_of());
+
         let result = match self.state {
             // Sender isn't ready at all.
             SendState::Idle => panic!(
                 "`start_send` should not be called unless `poll_ready` returned successfully"
             ),
             // We've been instructed to drop the next item.
-            SendState::DropNext => Ok(()),
+            SendState::DropNext => {
+                if let Some(instrumentation) = self.instrumentation.as_ref() {
+                    instrumentation.try_increment_dropped_event_count(1);
+                }
+                Ok(())
+            }
             // Base is ready, so send the item there.
             SendState::BaseReady => self.send_item(item),
             // Overflow is ready, so send the item there.
             SendState::OverflowReady => self.overflow.as_mut().unwrap().as_mut().start_send(item),
         };
+
+        if let Some(item_size) = item_size {
+            if let Some(handle) = self.instrumentation.as_ref() {
+                handle.increment_sent_event_count_and_byte_size(1, item_size);
+            }
+        }
 
         self.state = SendState::Idle;
         result
@@ -239,6 +262,7 @@ pub struct BufferReceiver<T> {
     base: ReceiverStream<T>,
     overflow: Option<Box<BufferReceiver<T>>>,
     strategy: PollStrategy,
+    instrumentation: Option<BufferUsageHandle>,
 }
 
 impl<T> BufferReceiver<T> {
@@ -248,6 +272,7 @@ impl<T> BufferReceiver<T> {
             base: receiver,
             overflow: None,
             strategy: PollStrategy::default(),
+            instrumentation: None,
         }
     }
 
@@ -257,7 +282,13 @@ impl<T> BufferReceiver<T> {
             base: receiver,
             overflow: Some(Box::new(overflow)),
             strategy: PollStrategy::default(),
+            instrumentation: None,
         }
+    }
+
+    /// Configures this receiver to instrument the items passing through it.
+    pub fn with_instrumentation(&mut self, handle: BufferUsageHandle) {
+        self.instrumentation = Some(handle);
     }
 }
 
@@ -278,7 +309,18 @@ impl<T: Bufferable> Stream for BufferReceiver<T> {
         let primary = this.base;
         let secondary = this.overflow.as_mut().map(Pin::new);
 
-        this.strategy.poll_streams(primary, secondary, cx)
+        this.strategy
+            .poll_streams(primary, secondary, cx)
+            .map(|result| match result {
+                StrategyResult::Primary(i) => {
+                    if let Some(handle) = this.instrumentation {
+                        handle.increment_received_event_count_and_byte_size(1, i.size_of());
+                    }
+                    Some(i)
+                }
+                StrategyResult::Secondary(i) => Some(i),
+                StrategyResult::Neither => None,
+            })
     }
 }
 

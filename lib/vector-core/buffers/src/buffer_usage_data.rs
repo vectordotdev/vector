@@ -9,55 +9,66 @@ use crate::internal_events::{
 };
 use crate::WhenFull;
 
+#[derive(Clone, Debug)]
 pub struct BufferUsageHandle {
     state: Arc<BufferUsageData>,
 }
 
 impl BufferUsageHandle {
     /// Creates a dummy [`BufferUsageHandle`] handle.
-    /// 
+    ///
     /// No usage data is written or stored.
     #[cfg(test)]
     pub(crate) fn testing() -> Self {
         BufferUsageHandle {
-            state: Arc::new(BufferUsageData::new(WhenFull::Block, 0))
-         }
+            state: Arc::new(BufferUsageData::new(WhenFull::Block, 0)),
+        }
     }
 
     /// Sets the limits for this buffer component.
-    /// 
+    ///
     /// Limits are exposed as gauges to provide stable values when superimposed on dashboards/graphs
     /// with the "actual" usage amounts.
     pub fn set_buffer_limits(&self, max_bytes: Option<usize>, max_events: Option<usize>) {
         if let Some(max_bytes) = max_bytes {
-            self.state.max_size_bytes.store(max_bytes, Ordering::Relaxed);
+            self.state
+                .max_size_bytes
+                .store(max_bytes, Ordering::Relaxed);
         }
 
         if let Some(max_events) = max_events {
-            self.state.max_size_events.store(max_events, Ordering::Relaxed);
+            self.state
+                .max_size_events
+                .store(max_events, Ordering::Relaxed);
         }
     }
 
     /// Increments the number of events (and their total size) received by this buffer component.
-    /// 
+    ///
     /// This represents the events being sent into the buffer.
     pub fn increment_received_event_count_and_byte_size(&self, count: u64, byte_size: usize) {
-        self.state.received_event_count
+        self.state
+            .received_event_count
             .fetch_add(count, Ordering::Relaxed);
-        self.state.received_byte_size
+        self.state
+            .received_byte_size
             .fetch_add(byte_size, Ordering::Relaxed);
     }
 
     /// Increments the number of events (and their total size) sent by this buffer component.
-    /// 
+    ///
     /// This represents the events being read out of the buffer.
     pub fn increment_sent_event_count_and_byte_size(&self, count: u64, byte_size: usize) {
-        self.state.sent_event_count.fetch_add(count, Ordering::Relaxed);
-        self.state.sent_byte_size.fetch_add(byte_size, Ordering::Relaxed);
+        self.state
+            .sent_event_count
+            .fetch_add(count, Ordering::Relaxed);
+        self.state
+            .sent_byte_size
+            .fetch_add(byte_size, Ordering::Relaxed);
     }
 
     /// Attempts to increment the count of dropped events for this buffer component.
-    /// 
+    ///
     /// If the component itself is not configured to drop events, this call does nothing.
     pub fn try_increment_dropped_event_count(&self, count: u64) {
         if let Some(dropped_event_count) = &self.state.dropped_event_count {
@@ -66,6 +77,7 @@ impl BufferUsageHandle {
     }
 }
 
+#[derive(Debug)]
 pub struct BufferUsageData {
     idx: usize,
     received_event_count: AtomicU64,
@@ -78,10 +90,7 @@ pub struct BufferUsageData {
 }
 
 impl BufferUsageData {
-    pub fn new(
-        mode: WhenFull,
-        idx: usize,
-    ) -> Self {
+    pub fn new(mode: WhenFull, idx: usize) -> Self {
         let dropped_event_count = match mode {
             WhenFull::Block | WhenFull::Overflow => None,
             WhenFull::DropNewest => Some(AtomicU64::new(0)),
@@ -107,7 +116,7 @@ pub struct BufferUsage {
 
 impl BufferUsage {
     /// Creates an instance of [`BufferUsage`] attached to the given span.
-    /// 
+    ///
     /// As buffers can have multiple stages, callers have the ability to register each stage via [`add_stage`]
     pub fn from_span(span: Span) -> BufferUsage {
         Self {
@@ -117,7 +126,7 @@ impl BufferUsage {
     }
 
     /// Adds a new stage to track usage for.
-    /// 
+    ///
     /// A [`BufferUsageHandle`] is returned that the caller can use to actually update the usage
     /// metrics with.  This handle will only update the usage metrics for the particular stage it
     /// was added for.

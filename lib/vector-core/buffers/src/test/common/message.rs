@@ -1,4 +1,4 @@
-use crate::bytes::{DecodeBytes, EncodeBytes};
+use crate::encoding::{DecodeBytes, EncodeBytes};
 use bytes::{Buf, BufMut};
 use core_common::byte_size_of::ByteSizeOf;
 use quickcheck::{Arbitrary, Gen};

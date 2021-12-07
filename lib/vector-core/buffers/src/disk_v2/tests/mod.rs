@@ -12,11 +12,10 @@ use tracing_fluent_assertions::{AssertionRegistry, AssertionsLayer};
 use tracing_subscriber::{filter::LevelFilter, Layer};
 use tracing_subscriber::{layer::SubscriberExt, Registry};
 
-use crate::bytes::{DecodeBytes, EncodeBytes};
 use crate::disk_v2::{Buffer, DiskBufferConfig, Reader, Writer};
-use crate::Bufferable;
+use crate::encoding::{DecodeBytes, EncodeBytes};
+use crate::{Acker, Bufferable};
 
-use super::acker::Acker;
 use super::Ledger;
 
 mod basic;

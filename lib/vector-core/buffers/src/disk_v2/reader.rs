@@ -15,7 +15,7 @@ use tokio::{
     io::{AsyncBufReadExt, AsyncRead, BufReader},
 };
 
-use crate::{bytes::DecodeBytes, internal_events::EventsCorrupted, Bufferable};
+use crate::{encoding::DecodeBytes, internal_events::EventsCorrupted, Bufferable};
 
 use super::{
     ledger::Ledger,

@@ -15,7 +15,7 @@ use bytes::{Buf, BufMut};
 /// Encode a `T` into a `bytes` buffer, possibly unsuccessfully
 pub trait EncodeBytes<T> {
     /// The type returned when `encode` fails
-    type Error: error::Error + 'static;
+    type Error: error::Error + Send + Sync + 'static;
 
     /// Attempt to encode a `T` into `B` buffer
     ///
@@ -39,7 +39,7 @@ pub trait EncodeBytes<T> {
 /// Decode a `T` from a `bytes` buffer, possibly unsuccessfully
 pub trait DecodeBytes<T> {
     /// The type returned when `decode` fails
-    type Error: error::Error + 'static;
+    type Error: error::Error + Send + Sync + 'static;
 
     /// Attempt to decode a `T` from `B` buffer
     ///

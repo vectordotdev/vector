@@ -1,20 +1,23 @@
 use std::error::Error;
 
 use async_trait::async_trait;
-use snafu::{Snafu, ResultExt};
+use snafu::{ResultExt, Snafu};
 use tokio_stream::wrappers::ReceiverStream;
 use tracing::Span;
 
 use crate::buffer_usage_data::{BufferUsage, BufferUsageHandle};
 use crate::topology::channel::{BufferReceiver, BufferSender};
 use crate::topology::poll_sender::PollSender;
-use crate::{WhenFull, Acker};
+use crate::{Acker, WhenFull};
 
 /// Value that can be used as a stage in a buffer topology.
 #[async_trait]
 pub trait IntoBuffer<T> {
     /// Converts this value into a sender and receiver pair suitable for use in a buffer topology.
-    async fn into_buffer_parts(self: Box<Self>, usage_handle: &BufferUsageHandle) -> Result<(PollSender<T>, ReceiverStream<T>, Option<Acker>), Box<dyn Error + Send + Sync>>;
+    async fn into_buffer_parts(
+        self: Box<Self>,
+        usage_handle: &BufferUsageHandle,
+    ) -> Result<(PollSender<T>, ReceiverStream<T>, Option<Acker>), Box<dyn Error + Send + Sync>>;
 }
 
 #[derive(Debug, Snafu)]
@@ -29,8 +32,13 @@ pub enum TopologyError {
     #[snafu(display("last stage in topology cannot be set to overflow mode"))]
     OverflowWhenLast,
     #[snafu(display("failed to build individual stage {}: {}", stage_idx, source))]
-    FailedToBuildStage { stage_idx: usize, source: Box<dyn Error + Send + Sync> },
-    #[snafu(display("multiple components with segmented acknowledgements cannot be used in the same buffer"))]
+    FailedToBuildStage {
+        stage_idx: usize,
+        source: Box<dyn Error + Send + Sync>,
+    },
+    #[snafu(display(
+        "multiple components with segmented acknowledgements cannot be used in the same buffer"
+    ))]
     StackedAcks,
 }
 
@@ -47,9 +55,7 @@ pub struct TopologyBuilder<T> {
 impl<T> TopologyBuilder<T> {
     /// Creates a new, empty [`TopologyBuilder`].
     pub fn new() -> Self {
-        Self {
-            stages: Vec::new(),
-        }
+        Self { stages: Vec::new() }
     }
 
     /// Adds a new stage to the buffer topology.
@@ -88,7 +94,10 @@ impl<T> TopologyBuilder<T> {
     ///
     /// If there was a configuration error with one of the stages, an error variant will be returned
     /// explaining the issue.
-    pub async fn build(self, span: Span) -> Result<(BufferSender<T>, BufferReceiver<T>, Acker), TopologyError> {
+    pub async fn build(
+        self,
+        span: Span,
+    ) -> Result<(BufferSender<T>, BufferReceiver<T>, Acker), TopologyError> {
         // We pop stages off in reverse order to build from the inside out.
         let mut buffer_usage = BufferUsage::from_span(span);
         let mut current_acker = None;
@@ -117,7 +126,10 @@ impl<T> TopologyBuilder<T> {
             // the handle to the `BufferSender`/`BufferReceiver` wrappers, but that's the price we
             // have to pay for letting each stage function in an opaque way when wrapped.
             let usage_handle = buffer_usage.add_stage(stage_idx, stage.when_full);
-            let (sender, receiver, acker) = stage.untransformed.into_buffer_parts(&usage_handle).await
+            let (sender, receiver, acker) = stage
+                .untransformed
+                .into_buffer_parts(&usage_handle)
+                .await
                 .context(FailedToBuildStage { stage_idx })?;
 
             // Multiple components with "segmented" acknowledgements cannot be supported at the
@@ -157,7 +169,7 @@ impl<T> TopologyBuilder<T> {
         }
 
         let (sender, receiver) = current_stage.ok_or(TopologyError::EmptyTopology)?;
-        let acker = current_acker.unwrap_or_else(|| Acker::Null);
+        let acker = current_acker.unwrap_or_else(|| Acker::passthrough());
 
         // Install the buffer usage handler since we successfully created the buffer topology.  This
         // spawns it in the background and periodically emits aggregated metrics about each of the
@@ -207,7 +219,7 @@ mod tests {
         builder.stage(MemoryBuffer::new(1), WhenFull::Overflow);
         let result = builder.build(Span::none()).await;
         match result {
-            Err(TopologyError::OverflowWhenLast) => {},
+            Err(TopologyError::OverflowWhenLast) => {}
             r => panic!("unexpected build result: {:?}", r),
         }
     }

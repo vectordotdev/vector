@@ -1,17 +1,13 @@
 use crate::buffer_usage_data::BufferUsageHandle;
-use crate::{BufferStream, Bufferable};
-use futures::Sink;
-use pin_project::pin_project;
+use crate::Bufferable;
 use snafu::Snafu;
 use std::fmt::Debug;
 use std::{
     io,
     path::{Path, PathBuf},
-    pin::Pin,
-    task::{Context, Poll},
 };
 
-use self::leveldb_buffer::{Writer, Reader};
+use self::leveldb_buffer::{Reader, Writer};
 
 pub mod leveldb_buffer;
 
@@ -43,7 +39,7 @@ pub fn open<T>(
     data_dir: &Path,
     name: &str,
     max_size: usize,
-    usage_handle: &BufferUsageHandle,
+    usage_handle: BufferUsageHandle,
 ) -> Result<(Writer<T>, Reader<T>, super::Acker), DataDirError>
 where
     T: Bufferable + Clone,

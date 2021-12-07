@@ -12,10 +12,10 @@
 #[macro_use]
 extern crate tracing;
 
-mod acker;
+mod acknowledgements;
 mod buffer_usage_data;
-pub mod bytes;
 mod config;
+pub mod encoding;
 pub use config::{BufferConfig, BufferType};
 #[cfg(feature = "disk-buffer")]
 pub mod disk;
@@ -31,21 +31,13 @@ mod test;
 pub mod topology;
 mod variant;
 
-use crate::buffer_usage_data::BufferUsageData;
-use crate::bytes::{DecodeBytes, EncodeBytes};
-pub use acker::{Ackable, Acker};
+use crate::encoding::{DecodeBytes, EncodeBytes};
+pub use acknowledgements::{Ackable, Acker};
 use core_common::byte_size_of::ByteSizeOf;
-use futures::{channel::mpsc, Sink, SinkExt};
-use futures::{Stream, StreamExt};
-use pin_project::pin_project;
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use std::pin::Pin;
-use std::sync::Arc;
-use std::task::{Context, Poll};
-use tracing::Span;
 pub use variant::*;
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Copy, Clone)]
@@ -86,14 +78,6 @@ pub trait Bufferable:
 
 // Blanket implementation for anything that is already bufferable.
 impl<T> Bufferable for T where
-    T: ByteSizeOf
-        + EncodeBytes<Self>
-        + DecodeBytes<Self>
-        + Debug
-        + Send
-        + Sync
-        + Unpin
-        + Sized
-        + 'static
+    T: ByteSizeOf + EncodeBytes<T> + DecodeBytes<T> + Debug + Send + Sync + Unpin + Sized + 'static
 {
 }

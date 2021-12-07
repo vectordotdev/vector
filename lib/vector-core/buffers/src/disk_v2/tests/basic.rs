@@ -37,7 +37,7 @@ async fn basic_read_write_loop() {
                 let mut items = Vec::new();
                 while let Some(record) = reader.next().await.expect("reader should not fail") {
                     items.push(record);
-                    acker.acknowledge_records(1);
+                    acker.ack(1);
                 }
                 items
             });

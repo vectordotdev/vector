@@ -1,4 +1,10 @@
-use crate::{Acker, Bufferable, WhenFull, topology::{channel::{BufferSender, BufferReceiver}, builder::TopologyBuilder}, MemoryBuffer, DiskV1Buffer};
+use crate::{
+    topology::{
+        builder::TopologyBuilder,
+        channel::{BufferReceiver, BufferSender},
+    },
+    Acker, Bufferable, DiskV1Buffer, DiskV2Buffer, MemoryBuffer, WhenFull,
+};
 use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, path::PathBuf};
 use tracing::Span;
@@ -91,7 +97,7 @@ impl BufferTypeVisitor {
                     max_size: max_size.ok_or_else(|| de::Error::missing_field("max_size"))?,
                     when_full,
                 })
-            },
+            }
             BufferTypeKind::DiskV2 => {
                 if max_events.is_some() {
                     return Err(de::Error::unknown_field(
@@ -225,16 +231,25 @@ impl BufferType {
         T: Bufferable + Clone,
     {
         match *self {
-            BufferType::Memory { when_full, max_events } => {
+            BufferType::Memory {
+                when_full,
+                max_events,
+            } => {
                 builder.stage(MemoryBuffer::new(max_events), when_full);
-            },
+            }
             #[cfg(feature = "disk-buffer")]
-            BufferType::DiskV1 { when_full, max_size } => {
+            BufferType::DiskV1 {
+                when_full,
+                max_size,
+            } => {
                 builder.stage(DiskV1Buffer::new(id, data_dir, max_size), when_full);
-            },
-            BufferType::DiskV2 { when_full, max_size } => {
+            }
+            BufferType::DiskV2 {
+                when_full,
+                max_size,
+            } => {
                 builder.stage(DiskV2Buffer::new(id, data_dir, max_size), when_full);
-            },
+            }
         }
     }
 }
@@ -304,7 +319,9 @@ impl BufferConfig {
             stage.add_to_builder(&mut builder, data_dir.clone(), buffer_id.clone());
         }
 
-        builder.build(span).await
+        builder
+            .build(span)
+            .await
             .map_err(|e| format!("error while building buffer topology: {}", e))
     }
 }
@@ -431,7 +448,7 @@ max_events: 42
           type: disk
           max_size: 1024
           "#,
-            BufferType::Disk {
+            BufferType::DiskV1 {
                 max_size: 1024,
                 when_full: WhenFull::Block,
             },

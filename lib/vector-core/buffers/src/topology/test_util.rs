@@ -4,12 +4,13 @@ use bytes::{Buf, BufMut};
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    bytes::{DecodeBytes, EncodeBytes},
+    buffer_usage_data::BufferUsageHandle,
+    encoding::{DecodeBytes, EncodeBytes},
     topology::{
         builder::IntoBuffer,
         channel::{BufferReceiver, BufferSender},
     },
-    Bufferable, buffer_usage_data::BufferUsageHandle,
+    Bufferable,
 };
 use crate::{MemoryBuffer, WhenFull};
 
@@ -67,7 +68,8 @@ pub async fn build_buffer(
         WhenFull::Block | WhenFull::DropNewest => {
             let usage_handle = BufferUsageHandle::testing();
             let channel = Box::new(MemoryBuffer::new(capacity));
-            let (sender, receiver, _) = channel.into_buffer_parts(&usage_handle)
+            let (sender, receiver, _) = channel
+                .into_buffer_parts(&usage_handle)
                 .await
                 .expect("should not fail to create memory buffer");
             let sender = BufferSender::new(sender, mode);
@@ -79,14 +81,16 @@ pub async fn build_buffer(
             let overflow_mode = overflow_mode
                 .expect("overflow_mode must be specified when base is in overflow mode");
             let overflow_channel = Box::new(MemoryBuffer::new(capacity));
-            let (overflow_sender, overflow_receiver, _) = overflow_channel.into_buffer_parts(&usage_handle)
+            let (overflow_sender, overflow_receiver, _) = overflow_channel
+                .into_buffer_parts(&usage_handle)
                 .await
                 .expect("should not fail to create memory buffer");
             let overflow_sender = BufferSender::new(overflow_sender, overflow_mode);
             let overflow_receiver = BufferReceiver::new(overflow_receiver);
 
             let base_channel = Box::new(MemoryBuffer::new(capacity));
-            let (base_sender, base_receiver, _) = base_channel.into_buffer_parts(&usage_handle)
+            let (base_sender, base_receiver, _) = base_channel
+                .into_buffer_parts(&usage_handle)
                 .await
                 .expect("should not fail to create memory buffer");
             let base_sender = BufferSender::with_overflow(base_sender, overflow_sender);

@@ -24,11 +24,11 @@ use tokio::{
 };
 
 use crate::{
-    bytes::EncodeBytes,
     disk_v2::{
         ledger::Ledger,
         record::{Record, RecordStatus},
     },
+    encoding::EncodeBytes,
     Bufferable,
 };
 

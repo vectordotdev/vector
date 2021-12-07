@@ -1,4 +1,4 @@
-use buffers::bytes::{DecodeBytes, EncodeBytes};
+use buffers::encoding::{DecodeBytes, EncodeBytes};
 use buffers::topology::builder::IntoBuffer;
 use buffers::topology::channel::{BufferReceiver, BufferSender};
 use buffers::{self, MemoryBuffer, Variant, WhenFull};

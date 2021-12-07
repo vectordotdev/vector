@@ -1,5 +1,5 @@
 use crate::ByteSizeOf;
-use buffers::bytes::{DecodeBytes, EncodeBytes};
+use buffers::encoding::{DecodeBytes, EncodeBytes};
 use bytes::{Buf, BufMut, Bytes};
 use chrono::{DateTime, SecondsFormat, Utc};
 pub use finalization::{
