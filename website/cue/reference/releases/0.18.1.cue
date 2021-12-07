@@ -7,28 +7,28 @@ releases: "0.18.1": {
 	whats_next: []
 
 	description: """
-			The Vector team is pleased to announce version `v0.18.1`!
+		The Vector team is pleased to announce version `v0.18.1`!
 
-			This patch release contains a few bug fixes for regressions in `v0.18.0`.
+		This patch release contains a few bug fixes for regressions in `v0.18.0`.
 
-			**Note:** Please see the release notes for [`v0.18.0`](/releases/0.18.0/) for additional changes if upgrading from
-			`v0.17.X`. In particular, the upgrade guide for breaking changes.
+		**Note:** Please see the release notes for [`v0.18.0`](/releases/0.18.0/) for additional changes if upgrading from
+		`v0.17.X`. In particular, the upgrade guide for breaking changes.
 
-			## Bug Fixes:
+		## Bug Fixes:
 
-			- The new [automatic namespacing](/highlights/2021-11-18-implicit-namespacing/) feature broke usages of
-			  `--config-dir` when directories were present that did not match Vector's config schema. Vector now just
-			  ignores these directories and only looks at known namespacing directories like `sources/`.
-			  [#10173](https://github.com/vectordotdev/vector/pull/10173)
-			  [#10177](https://github.com/vectordotdev/vector/pull/10177).
-			- The `elasticsearch` sink no longer logs a debug message for each event.
-			  [#10117](https://github.com/vectordotdev/vector/pull/10117).
-			- The `remap` transform now only creates the `.dropped` output (as part of the new [failed event routing
-			  feature](/highlights/2021-11-18-failed-event-routing/)) whenever `reroute_dropped = true`.
-			  [#10152](https://github.com/vectordotdev/vector/pull/10152)
-			- A change to internal telemetry had caused aggregated histograms emitted by
-			  the `prometheus_exporter` and `prometheus_remote_write` sinks to be
-			  incorrectly tallied. This was fixed. [#10165](https://github.com/vectordotdev/vector/pull/10165)
+		- The new [automatic namespacing](/highlights/2021-11-18-implicit-namespacing/) feature broke usages of
+		  `--config-dir` when directories were present that did not match Vector's config schema. Vector now just
+		  ignores these directories and only looks at known namespacing directories like `sources/`.
+		  [#10173](https://github.com/vectordotdev/vector/pull/10173)
+		  [#10177](https://github.com/vectordotdev/vector/pull/10177).
+		- The `elasticsearch` sink no longer logs a debug message for each event.
+		  [#10117](https://github.com/vectordotdev/vector/pull/10117).
+		- The `remap` transform now only creates the `.dropped` output (as part of the new [failed event routing
+		  feature](/highlights/2021-11-18-failed-event-routing/)) whenever `reroute_dropped = true`.
+		  [#10152](https://github.com/vectordotdev/vector/pull/10152)
+		- A change to internal telemetry had caused aggregated histograms emitted by
+		  the `prometheus_exporter` and `prometheus_remote_write` sinks to be
+		  incorrectly tallied. This was fixed. [#10165](https://github.com/vectordotdev/vector/pull/10165)
 		"""
 
 	commits: [

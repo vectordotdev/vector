@@ -65,7 +65,7 @@ components: sinks: splunk_hec_metrics: {
 		notices: []
 	}
 
-	configuration: {
+	configuration: sinks._splunk_hec.configuration & {
 		default_namespace: {
 			common: false
 			description: """
@@ -149,4 +149,6 @@ components: sinks: splunk_hec_metrics: {
 	}
 
 	telemetry: components.sinks.splunk_hec_logs.telemetry
+
+	how_it_works: sinks._splunk_hec.how_it_works
 }

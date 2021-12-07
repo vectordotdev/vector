@@ -292,3 +292,7 @@
 footer ion-icon[name="logo-github"]:hover {
   @apply dark:text-gray-500
 }
+
+a[type='button'] {
+  -webkit-appearance: unset;
+}

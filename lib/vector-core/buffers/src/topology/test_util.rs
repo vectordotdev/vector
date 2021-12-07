@@ -1,3 +1,5 @@
+use std::{error, fmt};
+
 use bytes::{Buf, BufMut};
 use tokio::sync::mpsc::Sender;
 
@@ -13,7 +15,7 @@ use crate::{MemoryBuffer, WhenFull};
 
 // Silly implementation of `EncodeBytes`/`DecodeBytes` to fulfill `Bufferable` for our test buffer code.
 impl EncodeBytes<u64> for u64 {
-    type Error = ();
+    type Error = BasicError;
 
     fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
     where
@@ -26,7 +28,7 @@ impl EncodeBytes<u64> for u64 {
 }
 
 impl DecodeBytes<u64> for u64 {
-    type Error = String;
+    type Error = BasicError;
 
     fn decode<B>(mut buffer: B) -> Result<u64, Self::Error>
     where
@@ -35,10 +37,21 @@ impl DecodeBytes<u64> for u64 {
         if buffer.remaining() >= 8 {
             Ok(buffer.get_u64())
         } else {
-            Err("need 8 bytes minimum".to_string())
+            Err(BasicError("need 8 bytes minimum".to_string()))
         }
     }
 }
+
+#[derive(Debug)]
+pub struct BasicError(pub(crate) String);
+
+impl fmt::Display for BasicError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl error::Error for BasicError {}
 
 /// Builds a buffer using in-memory channels.
 ///

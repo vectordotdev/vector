@@ -129,17 +129,21 @@ fn test_category(path: &Path) -> String {
     path.to_string_lossy()
         .strip_prefix("tests/")
         .expect("test")
-        .rsplitn(2, '/')
-        .nth(1)
-        .unwrap()
-        .to_owned()
+        .rsplit_once('/')
+        .map_or(
+            path.to_string_lossy()
+                .strip_prefix("tests/")
+                .unwrap()
+                .to_owned(),
+            |x| x.0.to_owned(),
+        )
 }
 
 fn test_name(path: &Path) -> String {
     path.to_string_lossy()
-        .rsplitn(2, '/')
-        .next()
+        .rsplit_once('/')
         .unwrap()
+        .1
         .trim_end_matches(".vrl")
         .replace("_", " ")
 }

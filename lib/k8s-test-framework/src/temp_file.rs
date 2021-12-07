@@ -1,9 +1,8 @@
 use std::path::{Path, PathBuf};
-use tempfile::{tempdir, TempDir};
+use tempfile::tempdir;
 
 #[derive(Debug)]
 pub struct TempFile {
-    dir: TempDir,
     path: PathBuf,
 }
 
@@ -12,7 +11,7 @@ impl TempFile {
         let dir = tempdir()?;
         let path = dir.path().join(file_name);
         std::fs::write(&path, data)?;
-        Ok(Self { dir, path })
+        Ok(Self { path })
     }
 
     pub fn path(&self) -> &Path {

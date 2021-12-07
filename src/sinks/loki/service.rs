@@ -105,12 +105,13 @@ impl Service<LokiRequest> for LokiService {
                 Ok(response) => {
                     let status = response.status();
 
-                    match status {
-                        StatusCode::NO_CONTENT => Ok(LokiResponse {
+                    if status.is_success() {
+                        Ok(LokiResponse {
                             batch_size,
                             events_byte_size,
-                        }),
-                        code => Err(LokiError::ServerError { code }),
+                        })
+                    } else {
+                        Err(LokiError::ServerError { code: status })
                     }
                 }
                 Err(error) => Err(LokiError::HttpError { error }),

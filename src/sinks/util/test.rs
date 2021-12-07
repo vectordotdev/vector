@@ -58,7 +58,7 @@ pub fn build_test_server_generic<B>(
     impl std::future::Future<Output = Result<(), ()>>,
 )
 where
-    B: HttpBody + Send + Sync + 'static,
+    B: HttpBody + Send + 'static,
     <B as HttpBody>::Data: Send + Sync,
     <B as HttpBody>::Error: snafu::Error + Send + Sync,
 {

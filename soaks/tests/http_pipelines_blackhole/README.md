@@ -1,4 +1,4 @@
-# HTTP -> Pipelines -> Datadog Logs
+# HTTP -> Pipelines -> Blackhole
 
 This soak tests the http sink feeding through multiple pipeline transforms down
 to blackhole sink. It is a complicated topology.
