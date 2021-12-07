@@ -31,7 +31,6 @@ mod sink {
 
         fn emit_metrics(&self) {
             counter!("component_errors_total", 1, "error_type" => "encode_failed", "stage" => "processing");
-            counter!("encode_errors_total", 1);
         }
     }
 
