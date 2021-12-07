@@ -1,9 +1,10 @@
+use bytes::Bytes;
 use datadog_filter::{
     regex::{wildcard_regex, word_regex},
     Filter, Matcher, Resolver, Run,
 };
 use datadog_search_syntax::{Comparison, ComparisonValue, Field};
-use vector_core::event::{Event, LogEvent, Value};
+use vector_core::event::{LogEvent, Value};
 
 #[derive(Default, Clone)]
 pub struct EventFilter;
@@ -61,7 +62,7 @@ impl Filter<LogEvent> for EventFilter {
             Field::Reserved(f) if f == "tags" => {
                 let to_match = to_match.to_owned();
 
-                Run::boxed(move |log| match log.get(&f) {
+                Run::boxed(move |log: &LogEvent| match log.get(&f) {
                     Some(Value::Array(v)) => {
                         v.contains(&Value::Bytes(Bytes::copy_from_slice(to_match.as_bytes())))
                     }
@@ -72,7 +73,7 @@ impl Filter<LogEvent> for EventFilter {
             Field::Tag(tag) => {
                 let value_bytes = Value::Bytes(format!("{}:{}", tag, to_match).into());
 
-                Run::boxed(move |log| match log.get(&tag) {
+                Run::boxed(move |log: &LogEvent| match log.get("tags") {
                     Some(Value::Array(v)) => v.contains(&value_bytes),
                     _ => false,
                 })
@@ -81,10 +82,9 @@ impl Filter<LogEvent> for EventFilter {
             Field::Reserved(f) | Field::Facet(f) => {
                 let to_match = to_match.to_owned();
 
-                Run::boxed(move |log| match log.get(&f) {
+                Run::boxed(move |log: &LogEvent| match log.get(&f) {
                     Some(Value::Bytes(v)) => {
-                        let bytes = v.as_bytes();
-                        let str_value = String::from_utf8_lossy(&bytes);
+                        let str_value = String::from_utf8_lossy(&v);
 
                         str_value == to_match
                     }
@@ -109,29 +109,5 @@ impl Filter<LogEvent> for EventFilter {
         comparison_value: ComparisonValue,
     ) -> Box<dyn Matcher<LogEvent>> {
         todo!()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::EventFilter;
-    use crate::test_util::*;
-
-    use datadog_filter::build_matcher;
-    use datadog_search_syntax::parse;
-
-    #[test]
-    /// Parse each Datadog Search Syntax query and check that it passes/fails.
-    fn checks() {
-        let checks = get_checks();
-        let filter = EventFilter::default();
-
-        for (source, pass, fail) in checks {
-            let node = parse(source).unwrap();
-            let matcher = build_matcher(&node, &filter);
-
-            assert!(matcher.run(pass.as_log()));
-            assert!(!matcher.run(&fail.as_log()));
-        }
     }
 }

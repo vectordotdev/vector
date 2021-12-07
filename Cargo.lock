@@ -8489,6 +8489,7 @@ dependencies = [
 name = "vector-datadog-filter"
 version = "0.1.0"
 dependencies = [
+ "bytes 1.1.0",
  "datadog-filter",
  "datadog-search-syntax",
  "serde_json",
