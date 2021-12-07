@@ -294,20 +294,11 @@ impl TryInto<serde_json::Value> for Value {
 #[cfg(feature = "vrl")]
 impl From<vrl_core::Value> for Value {
     fn from(v: vrl_core::Value) -> Self {
-        use vrl_core::Value::{
-            Array, Boolean, Bytes, Float, Integer, Null, Object, Regex, Timestamp,
-        };
-
         match v {
-            Bytes(v) => Value::Bytes(v),
-            Integer(v) => Value::Integer(v),
-            Float(v) => Value::Float(*v),
-            Boolean(v) => Value::Boolean(v),
-            Object(v) => Value::Map(v.into_iter().map(|(k, v)| (k, v.into())).collect()),
-            Array(v) => Value::Array(v.into_iter().map(Into::into).collect()),
-            Timestamp(v) => Value::Timestamp(v),
-            Regex(v) => Value::Bytes(bytes::Bytes::copy_from_slice(v.to_string().as_bytes())),
-            Null => Value::Null,
+            vrl_core::Value::Regex(v) => {
+                Value::Bytes(bytes::Bytes::copy_from_slice(v.to_string().as_bytes()))
+            }
+            v => unsafe { std::mem::transmute(v) },
         }
     }
 }
@@ -315,18 +306,7 @@ impl From<vrl_core::Value> for Value {
 #[cfg(feature = "vrl")]
 impl From<Value> for vrl_core::Value {
     fn from(v: Value) -> Self {
-        use vrl_core::Value::{Array, Object};
-
-        match v {
-            Value::Bytes(v) => v.into(),
-            Value::Integer(v) => v.into(),
-            Value::Float(v) => v.into(),
-            Value::Boolean(v) => v.into(),
-            Value::Map(v) => Object(v.into_iter().map(|(k, v)| (k, v.into())).collect()),
-            Value::Array(v) => Array(v.into_iter().map(Into::into).collect()),
-            Value::Timestamp(v) => v.into(),
-            Value::Null => ().into(),
-        }
+        unsafe { std::mem::transmute(v) }
     }
 }
 
@@ -1782,5 +1762,98 @@ mod test {
                 }
                 _ => panic!("This test should never read Err'ing type folders."),
             });
+    }
+
+    #[cfg(feature = "vrl")]
+    #[test]
+    fn vrl_value_to_value_bytes() {
+        let original = Value::Bytes(Bytes::from("these are bytes"));
+        let vrl = vrl_core::Value::from(original.clone());
+        let back = Value::from(vrl);
+
+        assert_eq!(original, back);
+    }
+
+    #[cfg(feature = "vrl")]
+    #[test]
+    fn vrl_value_to_value_integer() {
+        let original = Value::Integer(43);
+        let vrl = vrl_core::Value::from(original.clone());
+        let back = Value::from(vrl);
+
+        assert_eq!(original, back);
+    }
+
+    #[cfg(feature = "vrl")]
+    #[test]
+    fn vrl_value_to_value_float() {
+        let original = Value::Float(43.0);
+        let vrl = vrl_core::Value::from(original.clone());
+        let back = Value::from(vrl);
+
+        assert_eq!(original, back);
+    }
+
+    #[cfg(feature = "vrl")]
+    #[test]
+    fn vrl_value_to_value_boolean() {
+        let original = Value::Boolean(true);
+        let vrl = vrl_core::Value::from(original.clone());
+        let back = Value::from(vrl);
+
+        assert_eq!(original, back);
+    }
+
+    #[cfg(feature = "vrl")]
+    #[test]
+    fn vrl_value_to_value_timestamp() {
+        use chrono::prelude::*;
+        let original = Value::Timestamp(Utc.ymd(2020, 2, 29).and_hms(12, 12, 34));
+        let vrl = vrl_core::Value::from(original.clone());
+        let back = Value::from(vrl);
+
+        assert_eq!(original, back);
+    }
+
+    #[cfg(feature = "vrl")]
+    #[test]
+    fn vrl_value_to_value_map() {
+        let mut map = BTreeMap::new();
+        map.insert(
+            "key1".to_string(),
+            Value::Bytes(Bytes::from("these are bytes")),
+        );
+        map.insert("key2".to_string(), Value::Float(43.34));
+
+        let original = Value::Map(map);
+        let vrl = vrl_core::Value::from(original.clone());
+        let back = Value::from(vrl);
+
+        assert_eq!(original, back);
+    }
+
+    #[cfg(feature = "vrl")]
+    #[test]
+    fn vrl_value_to_value_array() {
+        let arr = vec![
+            Value::Bytes(Bytes::from("these are bytes")),
+            Value::Float(43.34),
+        ];
+
+        let original = Value::Array(arr);
+        let vrl = vrl_core::Value::from(original.clone());
+        let back = Value::from(vrl);
+
+        assert_eq!(original, back);
+    }
+
+    #[cfg(feature = "vrl")]
+    #[test]
+    fn vrl_value_to_value_null() {
+        let original = Value::Null;
+        let vrl = vrl_core::Value::from(original.clone());
+        let back = Value::from(vrl);
+
+        assert_eq!(original, back);
     }
 }

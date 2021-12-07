@@ -24,11 +24,11 @@ pub enum Value {
     Integer(i64),
     Float(NotNan<f64>),
     Boolean(bool),
+    Timestamp(DateTime<Utc>),
     Object(BTreeMap<String, Value>),
     Array(Vec<Value>),
-    Timestamp(DateTime<Utc>),
-    Regex(Regex),
     Null,
+    Regex(Regex),
 }
 
 impl Eq for Value {}
