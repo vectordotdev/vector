@@ -4,7 +4,15 @@ use std::{ffi::OsStr, process::Stdio};
 use tokio::process::Command;
 
 #[derive(Debug)]
-pub struct CommandBuilder {}
+pub struct Config {
+    pod_name: String,
+}
+
+#[derive(Debug)]
+pub struct CommandBuilder {
+    kubctl_command: String,
+    config: Config,
+}
 
 fn prepare_base_command<Cmd, NS, Pod>(
     kubectl_command: Cmd,

@@ -302,7 +302,6 @@ mod tests {
     }
 
     // A helper enum to encode expected mock watcher stream.
-    #[allow(clippy::large_enum_variant)] // discovered during Rust upgrade to 1.57; just allowing for now since we did previously
     enum ExpStmRes {
         Item(WatchEvent<Pod>),
         Desync,

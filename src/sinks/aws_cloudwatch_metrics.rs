@@ -35,6 +35,7 @@ use super::util::SinkBatchSettings;
 #[derive(Clone)]
 pub struct CloudWatchMetricsSvc {
     client: CloudWatchClient,
+    config: CloudWatchMetricsSinkConfig,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -145,7 +146,7 @@ impl CloudWatchMetricsSvc {
             ..Default::default()
         });
 
-        let cloudwatch_metrics = CloudWatchMetricsSvc { client };
+        let cloudwatch_metrics = CloudWatchMetricsSvc { client, config };
 
         let svc = request.service(CloudWatchMetricsRetryLogic, cloudwatch_metrics);
 
@@ -312,7 +313,7 @@ mod tests {
     fn svc() -> CloudWatchMetricsSvc {
         let config = config();
         let client = config.create_client(&ProxyConfig::from_env()).unwrap();
-        CloudWatchMetricsSvc { client }
+        CloudWatchMetricsSvc { client, config }
     }
 
     #[test]
