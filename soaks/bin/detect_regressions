@@ -71,7 +71,7 @@ for exp in csv.experiment.unique():
                           'Δ mean %': percent_change,
                           'baseline mean': baseline_mean,
                           'comparison mean': comparison_mean,
-                          'p-value': res.pvalue
+                          'p-value': res.pvalue,
                           'erratic': exp in erratic_soaks
                           })
 ttest_results = pd.DataFrame.from_records(ttest_results)
