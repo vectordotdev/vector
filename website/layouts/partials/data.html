@@ -84,7 +84,7 @@
 
       {{ range $k, $v := $v.type }}
       {{ if eq $k "condition" }}
-      {{ template "config-condition" (dict "name" $k "condition" $v) }}
+      {{ template "config-condition" (dict "name" $name "condition" $v) }}
       {{ end }}
 
       {{ if eq $k "object" }} {{/* Object (with sub-configs) */}}
@@ -2047,6 +2047,36 @@
 
       <div class="mt-2 prose dark:prose-dark max-w-none">
         {{ .condition.shorthand_explainer.description | markdownify }}
+      </div>
+    </div>
+
+    <div class="mt-4">
+      <span>
+        {{ partial "heading.html" (dict "text" "Full config examples" "level" 3) }}
+      </span>
+
+      <p>
+        The examples below are in TOML format, but JSON and YAML are also supported.
+      </p>
+
+      <div class="flex flex-col space-y-2">
+        {{ range .condition.condition_examples }}
+        <div class="flex flex-col space-y-2">
+          <span>
+            {{ partial "heading.html" (dict "text" .title "level" 4) }}
+          </span>
+
+          <div>
+            {{ $code := "" }}
+            {{ if .vrl_only }}
+            {{ $code = printf "%s = \"%s\"" $name .example }}
+            {{ else }}
+            {{ $code = printf "%s.type = \"%s\"\n%s.source = \"%s\"" $name .name $name .example }}
+            {{ end }}
+            {{ highlight $code "ruby" "" }}
+          </div>
+        </div>
+        {{ end }}
       </div>
     </div>
   </div>
