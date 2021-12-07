@@ -29,9 +29,6 @@ pub struct Cmd {
     #[structopt(short, long)]
     no_diff: bool,
 
-    #[structopt(long)]
-    skip_functions: bool,
-
     /// When enabled, any log output at the INFO or above level is printed
     /// during the test run.
     #[structopt(short, long)]

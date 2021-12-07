@@ -501,7 +501,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     sender: Sender<((SmallVec<[Event; 1]>, usize), &'static str)>,
 ) {
     // Start the green background thread for collecting
-    Box::pin(tokio::spawn(async move {
+    let _ = Box::pin(tokio::spawn(async move {
         debug!("Start capturing {} command output.", origin);
 
         let mut stream = FramedRead::new(reader, decoder);
