@@ -95,7 +95,38 @@ impl Filter<LogEvent> for EventFilter {
     }
 
     fn prefix(&self, field: Field, prefix: &str) -> Box<dyn Matcher<LogEvent>> {
-        todo!()
+        match field {
+            // Default fields are matched by word boundary.
+            Field::Default(f) => {
+                let re = word_regex(&format!("{}*", prefix));
+
+                Run::boxed(move |log: &LogEvent| match log.get(&f) {
+                    Some(Value::Bytes(v)) => re.is_match(&String::from_utf8_lossy(&v)),
+                    _ => false,
+                })
+            }
+            // Tags are recursed until a match is found.
+            Field::Tag(tag) => {
+                let starts_with = format!("{}:{}", tag, prefix);
+
+                Run::boxed(move |log: &LogEvent| match log.get("tags") {
+                    Some(Value::Array(v)) => v.iter().any(|v| match v {
+                        Value::Bytes(v) => String::from_utf8_lossy(v).starts_with(&starts_with),
+                        _ => false,
+                    }),
+                    _ => false,
+                })
+            }
+            // All other field types are compared by complete value.
+            Field::Reserved(f) | Field::Facet(f) => {
+                let prefix = prefix.to_owned();
+
+                Run::boxed(move |log: &LogEvent| match log.get(&f) {
+                    Some(Value::Bytes(v)) => String::from_utf8_lossy(v).starts_with(&prefix),
+                    _ => false,
+                })
+            }
+        }
     }
 
     fn wildcard(&self, field: Field, wildcard: &str) -> Box<dyn Matcher<LogEvent>> {

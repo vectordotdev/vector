@@ -292,24 +292,24 @@ pub fn get_checks() -> Vec<(&'static str, Event, Event)> {
         //     log_event!["message" => "blafoo"],
         //     log_event!["message" => "foobla"],
         // ),
-        // // Wildcard suffix.
-        // (
-        //     "bla*",
-        //     log_event!["message" => "blafoo"],
-        //     log_event!["message" => "foobla"],
-        // ),
-        // // Wildcard suffix (negate).
-        // (
-        //     "NOT bla*",
-        //     log_event!["message" => "foobla"],
-        //     log_event!["message" => "blafoo"],
-        // ),
-        // // Wildcard suffix (negate w/-).
-        // (
-        //     "-bla*",
-        //     log_event!["message" => "foobla"],
-        //     log_event!["message" => "blafoo"],
-        // ),
+        // Wildcard suffix.
+        (
+            "bla*",
+            log_event!["message" => "blafoo"],
+            log_event!["message" => "foobla"],
+        ),
+        // Wildcard suffix (negate).
+        (
+            "NOT bla*",
+            log_event!["message" => "foobla"],
+            log_event!["message" => "blafoo"],
+        ),
+        // Wildcard suffix (negate w/-).
+        (
+            "-bla*",
+            log_event!["message" => "foobla"],
+            log_event!["message" => "blafoo"],
+        ),
         // // Multiple wildcards.
         // (
         //     "*b*la*",
@@ -346,24 +346,24 @@ pub fn get_checks() -> Vec<(&'static str, Event, Event)> {
         //     log_event!["tags" => vec!["a:blafoo"]],
         //     log_event!["tags" => vec!["a:foobla"]],
         // ),
-        // // Wildcard suffix - tag.
-        // (
-        //     "b:bla*",
-        //     log_event!["tags" => vec!["b:blabop"]],
-        //     log_event!["tags" => vec!["b:bopbla"]],
-        // ),
-        // // Wildcard suffix - tag (negate).
-        // (
-        //     "NOT b:bla*",
-        //     log_event!["tags" => vec!["b:bopbla"]],
-        //     log_event!["tags" => vec!["b:blabop"]],
-        // ),
-        // // Wildcard suffix - tag (negate w/-).
-        // (
-        //     "-b:bla*",
-        //     log_event!["tags" => vec!["b:bopbla"]],
-        //     log_event!["tags" => vec!["b:blabop"]],
-        // ),
+        // Wildcard suffix - tag.
+        (
+            "b:bla*",
+            log_event!["tags" => vec!["b:blabop"]],
+            log_event!["tags" => vec!["b:bopbla"]],
+        ),
+        // Wildcard suffix - tag (negate).
+        (
+            "NOT b:bla*",
+            log_event!["tags" => vec!["b:bopbla"]],
+            log_event!["tags" => vec!["b:blabop"]],
+        ),
+        // Wildcard suffix - tag (negate w/-).
+        (
+            "-b:bla*",
+            log_event!["tags" => vec!["b:bopbla"]],
+            log_event!["tags" => vec!["b:blabop"]],
+        ),
         // // Multiple wildcards - tag.
         // (
         //     "c:*b*la*",
@@ -400,24 +400,24 @@ pub fn get_checks() -> Vec<(&'static str, Event, Event)> {
         //     log_event!["tags" => vec!["a:foobla"]],
         //     log_event!["custom" => json!({"a": "foobla"})],
         // ),
-        // // Wildcard suffix - facet.
-        // (
-        //     "@b:bla*",
-        //     log_event!["custom" => json!({"b": "blabop"})],
-        //     log_event!["tags" => vec!["b:blabop"]],
-        // ),
-        // // Wildcard suffix - facet (negate).
-        // (
-        //     "NOT @b:bla*",
-        //     log_event!["tags" => vec!["b:blabop"]],
-        //     log_event!["custom" => json!({"b": "blabop"})],
-        // ),
-        // // Wildcard suffix - facet (negate w/-).
-        // (
-        //     "-@b:bla*",
-        //     log_event!["tags" => vec!["b:blabop"]],
-        //     log_event!["custom" => json!({"b": "blabop"})],
-        // ),
+        // Wildcard suffix - facet.
+        (
+            "@b:bla*",
+            log_event!["custom" => json!({"b": "blabop"})],
+            log_event!["tags" => vec!["b:blabop"]],
+        ),
+        // Wildcard suffix - facet (negate).
+        (
+            "NOT @b:bla*",
+            log_event!["tags" => vec!["b:blabop"]],
+            log_event!["custom" => json!({"b": "blabop"})],
+        ),
+        // Wildcard suffix - facet (negate w/-).
+        (
+            "-@b:bla*",
+            log_event!["tags" => vec!["b:blabop"]],
+            log_event!["custom" => json!({"b": "blabop"})],
+        ),
         // // Multiple wildcards - facet.
         // (
         //     "@c:*b*la*",
