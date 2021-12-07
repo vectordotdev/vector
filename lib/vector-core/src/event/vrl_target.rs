@@ -260,6 +260,10 @@ impl vrl_core::Target for VrlTarget {
                 .datadog_api_key()
                 .as_ref()
                 .map(|api_key| vrl_core::Value::from(api_key.to_string()))),
+            "splunk_hec_token" => Ok(metadata
+                .splunk_hec_token()
+                .as_ref()
+                .map(|token| vrl_core::Value::from(token.to_string()))),
             _ => Err(format!("key {} not available", key)),
         }
     }
@@ -275,6 +279,10 @@ impl vrl_core::Target for VrlTarget {
                 metadata.set_datadog_api_key(Some(Arc::from(value.as_str())));
                 Ok(())
             }
+            "splunk_hec_token" => {
+                metadata.set_splunk_hec_token(Some(Arc::from(value.as_str())));
+                Ok(())
+            }
             _ => Err(format!("key {} not available", key)),
         }
     }
@@ -288,6 +296,10 @@ impl vrl_core::Target for VrlTarget {
         match key {
             "datadog_api_key" => {
                 metadata.set_datadog_api_key(None);
+                Ok(())
+            }
+            "splunk_hec_token" => {
+                metadata.set_splunk_hec_token(None);
                 Ok(())
             }
             _ => Err(format!("key {} not available", key)),
