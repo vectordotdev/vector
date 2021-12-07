@@ -139,9 +139,16 @@ fn walk(
     // Use `remove` to take ownership.
     if let Some((key, mut target)) = transforms.remove_entry(node) {
         match target.transform {
-            Transform::DispatchFunction(_) => {
+            Transform::DispatchFunction(ref mut t) => {
                 // unit tests don't currently support multiple outputs, so just throw these away
-                unimplemented!()
+                let mut buf = Vec::new();
+                for input in inputs.clone() {
+                    t.transform(&mut buf, input)
+                }
+                results.extend(buf.into_iter().filter(|v| v.0.is_none()).map(|v| v.1));
+
+                targets = target.next.clone();
+                transforms.insert(key, target);
             }
             Transform::Function(ref mut t) => {
                 for input in inputs.clone() {
