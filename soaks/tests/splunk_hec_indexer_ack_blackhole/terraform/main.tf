@@ -28,7 +28,7 @@ module "monitoring" {
 # Setup the soak pieces
 #
 # This soak config sets up a vector soak with lading/splunk-hec-gen feeding into vector,
-# lading/splunk-hec-blackhole receiving.
+# blackhole receiving.
 resource "kubernetes_namespace" "soak" {
   metadata {
     name = "soak"
@@ -42,14 +42,6 @@ module "vector" {
   vector-toml  = file("${path.module}/vector.toml")
   namespace    = kubernetes_namespace.soak.metadata[0].name
   vector_cpus  = var.vector_cpus
-  depends_on   = [module.splunk-hec-blackhole]
-}
-module "splunk-hec-blackhole" {
-  source              = "../../../common/terraform/modules/lading_splunk_hec_blackhole"
-  type                = var.type
-  splunk-hec-blackhole-yaml = file("${path.module}/../../../common/configs/splunk_hec_blackhole.yaml")
-  namespace           = kubernetes_namespace.soak.metadata[0].name
-  lading_image        = var.lading_image
 }
 module "splunk-hec-gen" {
   source        = "../../../common/terraform/modules/lading_splunk_hec_gen"

@@ -2,8 +2,7 @@
 
 This soak tests a straight pipeline receiving data from a Splunk HEC source and
 sending to a Splunk HEC logs sink with no transforms in between and end-to-end
-acknowledgements enabled. This tests the best case performance of Vector's
-Splunk indexer acknowledgements features.
+acknowledgements disabled.
 
 ## Method
 
