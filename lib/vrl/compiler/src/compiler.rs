@@ -287,7 +287,7 @@ impl<'a> Compiler<'a> {
             }
         };
 
-        Assignment::new(node, &mut self.state).unwrap_or_else(|err| {
+        Assignment::new(node, self.state).unwrap_or_else(|err| {
             self.state.rollback();
             self.errors.push(Box::new(err));
             Assignment::noop()

@@ -302,7 +302,7 @@ fn index_repeated_fields(grok_patterns: Vec<GrokPattern>) -> Vec<GrokPattern> {
 /// - `inflight_parsed_aliases` - names of the aliases that are being currently parsed(aliases can refer to other aliases) to catch circular dependencies
 fn purify_grok_pattern(
     pattern: &GrokPattern,
-    mut fields: &mut HashMap<String, GrokField>,
+    fields: &mut HashMap<String, GrokField>,
     aliases: &BTreeMap<String, String>,
     parsed_aliases: &mut HashMap<String, ParsedGrokRule>,
     inflight_parsed_aliases: &mut Vec<String>,
@@ -349,14 +349,14 @@ fn purify_grok_pattern(
             } else {
                 res.push_str("(?:"); // non-capturing group
             }
-            res.push_str(resolves_match_function(&mut fields, pattern)?.as_str());
+            res.push_str(resolves_match_function(fields, pattern)?.as_str());
             res.push(')');
         }
         None => {
             // these will be converted to "pure" grok patterns %{PATTERN:DESTINATION} but without filters
             res.push_str("%{");
 
-            res.push_str(resolves_match_function(&mut fields, pattern)?.as_str());
+            res.push_str(resolves_match_function(fields, pattern)?.as_str());
 
             if let Some(destination) = &pattern.destination {
                 if destination.path.is_empty() {
