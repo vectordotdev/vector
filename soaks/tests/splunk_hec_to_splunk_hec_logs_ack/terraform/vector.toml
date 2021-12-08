@@ -1,0 +1,33 @@
+data_dir = "/var/lib/vector"
+
+##
+## Sources
+##
+
+[sources.internal_metrics]
+type = "internal_metrics"
+
+[sources.splunk]
+address = "0.0.0.0:8282"
+type = "splunk_hec"
+acknowledgements.enabled = true
+
+##
+## Sinks
+##
+
+[sinks.prometheus]
+type = "prometheus_exporter"
+inputs = ["internal_metrics"]
+address = "0.0.0.0:9090"
+
+[sinks.splunk_hec_logs]
+type = "splunk_hec_logs"
+inputs = ["splunk"]
+endpoint = "http://splunk-hec-blackhole:8080"
+encoding = "json"
+token = "abcd1234"
+healthcheck.enabled = false
+
+[sinks.splunk_hec_logs.acknowledgements]
+enabled = true
