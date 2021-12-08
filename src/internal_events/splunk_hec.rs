@@ -56,6 +56,7 @@ mod sink {
 
         fn emit_metrics(&self) {
             counter!("component_errors_total", 1, "stage" => "processing", "error_type" => "invalid_metric");
+            counter!("component_discarded_events_total", 1);
         }
     }
 
