@@ -453,25 +453,19 @@ fn build_sync_transform(
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (outputs, controls) = TransformOutputs::new(node.named_outputs);
 
-    let runner = Runner::new(outputs);
+    let runner = Runner::new(t, input_rx, node.input_type, outputs);
     let transform = if node.enable_concurrency {
-        runner
-            .run_concurrently(t, input_rx, node.input_type)
-            .boxed()
+        runner.run_concurrently().boxed()
     } else {
-        runner.run_inline(t, input_rx, node.input_type).boxed()
+        runner.run_inline().boxed()
     };
 
     let mut output_controls = HashMap::new();
     for (name, control) in controls {
-        match name {
-            None => {
-                output_controls.insert(OutputId::from(&node.key), control);
-            }
-            Some(name) => {
-                output_controls.insert(OutputId::from((&node.key, name)), control);
-            }
-        }
+        let id = name
+            .map(|name| OutputId::from((&node.key, name)))
+            .unwrap_or_else(|| OutputId::from(&node.key));
+        output_controls.insert(id, control);
     }
 
     let task = Task::new(node.key.clone(), node.typetag, transform);
@@ -480,14 +474,25 @@ fn build_sync_transform(
 }
 
 struct Runner {
+    transform: Box<dyn SyncTransform>,
+    input_rx: Option<BufferStream<Event>>,
+    input_type: DataType,
     outputs: TransformOutputs,
     timer: crate::utilization::Timer,
     last_report: Instant,
 }
 
 impl Runner {
-    fn new(outputs: TransformOutputs) -> Self {
+    fn new(
+        transform: Box<dyn SyncTransform>,
+        input_rx: BufferStream<Event>,
+        input_type: DataType,
+        outputs: TransformOutputs,
+    ) -> Self {
         Self {
+            transform,
+            input_rx: Some(input_rx),
+            input_type,
             outputs,
             timer: crate::utilization::Timer::new(),
             last_report: Instant::now(),
@@ -519,19 +524,17 @@ impl Runner {
         emit!(&EventsSent { count, byte_size });
     }
 
-    async fn run_inline(
-        mut self,
-        mut transform: Box<dyn SyncTransform>,
-        input_rx: BufferStream<Event>,
-        input_type: DataType,
-    ) -> Result<TaskOutput, ()> {
+    async fn run_inline(mut self) -> Result<TaskOutput, ()> {
         // 128 is an arbitrary, smallish constant
         const INLINE_BATCH_SIZE: usize = 128;
 
         let mut outputs_buf = self.outputs.new_buf_with_capacity(INLINE_BATCH_SIZE);
 
-        let mut input_rx = input_rx
-            .filter(move |event| ready(filter_event_type(event, input_type)))
+        let mut input_rx = self
+            .input_rx
+            .take()
+            .expect("can't run runner twice")
+            .filter(move |event| ready(filter_event_type(event, self.input_type)))
             .ready_chunks(INLINE_BATCH_SIZE);
 
         self.timer.start_wait();
@@ -539,7 +542,7 @@ impl Runner {
             self.on_events_received(&events);
 
             for event in events {
-                transform.transform(event, &mut outputs_buf);
+                self.transform.transform(event, &mut outputs_buf);
             }
 
             self.send_outputs(&mut outputs_buf).await;
@@ -549,18 +552,16 @@ impl Runner {
         Ok(TaskOutput::Transform)
     }
 
-    async fn run_concurrently(
-        mut self,
-        transform: Box<dyn SyncTransform>,
-        input_rx: BufferStream<Event>,
-        input_type: DataType,
-    ) -> Result<TaskOutput, ()> {
+    async fn run_concurrently(mut self) -> Result<TaskOutput, ()> {
         // 1024 is an arbitrary, medium-ish constant, larger than the inline runner's batch size to
         // try to balance out the increased overhead of spawning tasks
         const CONCURRENT_BATCH_SIZE: usize = 1024;
 
-        let mut input_rx = input_rx
-            .filter(move |event| ready(filter_event_type(event, input_type)))
+        let mut input_rx = self
+            .input_rx
+            .take()
+            .expect("can't run runner twice")
+            .filter(move |event| ready(filter_event_type(event, self.input_type)))
             .ready_chunks(CONCURRENT_BATCH_SIZE);
 
         let mut in_flight = FuturesOrdered::new();
@@ -586,7 +587,7 @@ impl Runner {
                         Some(events) => {
                             self.on_events_received(&events);
 
-                            let mut t = transform.clone();
+                            let mut t = self.transform.clone();
                             let mut outputs_buf = self.outputs.new_buf_with_capacity(events.len());
                             let task = tokio::spawn(async move {
                                 for event in events {

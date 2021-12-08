@@ -17,10 +17,8 @@ where
     let mut cx = Context::from_waker(waker);
 
     let mut vec = Vec::new();
-    loop {
-        match rx.poll_next_unpin(&mut cx) {
-            Poll::Ready(Some(item)) => vec.push(item),
-            Poll::Ready(None) | Poll::Pending => return vec,
-        }
+    while let Poll::Ready(Some(item)) = rx.poll_next_unpin(&mut cx) {
+        vec.push(item);
     }
+    vec
 }
