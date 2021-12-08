@@ -6517,12 +6517,12 @@ dependencies = [
 [[package]]
 name = "syslog"
 version = "5.0.0"
-source = "git+https://github.com/vectordotdev/rust-syslog.git?branch=upgrade-time-0.3#41a714d5cced47b629609eabdfbfcac90eb54c91"
+source = "git+https://github.com/Geal/rust-syslog?rev=3c592594f5c3b7bdcc083879ff7be82957b05a60#3c592594f5c3b7bdcc083879ff7be82957b05a60"
 dependencies = [
  "error-chain",
- "libc",
+ "hostname",
  "log",
- "time 0.3.3",
+ "time 0.3.5",
 ]
 
 [[package]]
@@ -6670,9 +6670,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.3"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cde1cf55178e0293453ba2cca0d5f8392a922e52aa958aee9c28ed02becc6d03"
+checksum = "41effe7cfa8af36f439fac33861b66b049edc6f9a32331e2312660529c1c24ad"
 dependencies = [
  "itoa",
  "libc",

@@ -322,8 +322,7 @@ leveldb-sys = { git = "https://github.com/vectordotdev/leveldb-sys.git", branch 
 # https://github.com/chronotope/chrono/pull/578
 chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time" }
 # Removes dependency on `time` v0.1
-# https://github.com/Geal/rust-syslog/pull/57
-syslog = { git = "https://github.com/vectordotdev/rust-syslog.git", branch = "upgrade-time-0.3" }
+syslog = { git = "https://github.com/Geal/rust-syslog", rev = "3c592594f5c3b7bdcc083879ff7be82957b05a60" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
