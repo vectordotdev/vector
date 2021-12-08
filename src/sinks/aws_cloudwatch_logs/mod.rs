@@ -10,50 +10,26 @@ mod integration_tests;
 mod tests;
 
 use self::config::CloudwatchLogsSinkConfig;
-use crate::aws::rusoto::{self, AwsAuthentication, RegionOrEndpoint};
-use crate::sinks::util::encoding::StandardEncodings;
+
+
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
+        SinkConfig, SinkDescription,
     },
-    event::{Event, LogEvent, Value},
     internal_events::TemplateRenderingFailed,
-    sinks::util::{
-        batch::BatchConfig,
-        encoding::{EncodingConfig, EncodingConfiguration},
-        retries::{FixedRetryPolicy, RetryLogic},
-        Compression, EncodedEvent, EncodedLength, PartitionBatchSink, PartitionBuffer,
-        PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings, VecBuffer,
-    },
-    template::Template,
 };
-use chrono::{Duration, Utc};
-use futures::{future::BoxFuture, ready, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
-use rusoto_core::{request::BufferedHttpResponse, RusotoError};
-use rusoto_logs::{
-    CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogStreamError,
-    DescribeLogGroupsRequest, DescribeLogStreamsError, InputLogEvent, PutLogEventsError,
-};
-use serde::{Deserialize, Serialize};
-use snafu::Snafu;
-use std::{
-    collections::HashMap,
-    convert::TryInto,
-    fmt,
-    num::NonZeroU64,
-    task::{Context, Poll},
-};
-use tokio::sync::oneshot;
-use tower::{
-    buffer::Buffer,
-    limit::{concurrency::ConcurrencyLimit, rate::RateLimit},
-    retry::Retry,
-    timeout::Timeout,
-    Service, ServiceBuilder, ServiceExt,
-};
-use vector_core::ByteSizeOf;
 
-use super::util::SinkBatchSettings;
+
+
+
+
+use snafu::Snafu;
+
+
+
+
+
+
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]

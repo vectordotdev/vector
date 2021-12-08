@@ -1,7 +1,7 @@
 use crate::config::LogSchema;
 use crate::event::{Event, Value};
 use chrono::Utc;
-use rusoto_logs::InputLogEvent;
+
 use snafu::ResultExt;
 use vector_core::event::{EventFinalizers, Finalizable};
 use vector_core::ByteSizeOf;
@@ -11,10 +11,9 @@ use super::TemplateRenderingFailed;
 use crate::sinks::aws_cloudwatch_logs::CloudwatchKey;
 use crate::sinks::aws_cloudwatch_logs::IoError;
 use crate::sinks::util::encoding::{Encoder, EncodingConfiguration, StandardEncodings};
-use crate::sinks::util::processed_event::ProcessedEvent;
+
 use crate::sinks::{
-    splunk_hec::common::request::HecRequest,
-    util::{encoding::EncodingConfig, Compression, RequestBuilder},
+    util::{encoding::EncodingConfig},
 };
 use crate::template::Template;
 

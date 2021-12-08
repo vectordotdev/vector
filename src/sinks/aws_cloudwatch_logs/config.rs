@@ -4,7 +4,7 @@ use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkConte
 use crate::sinks::aws_cloudwatch_logs::healthcheck::healthcheck;
 use crate::sinks::aws_cloudwatch_logs::request_builder::CloudwatchRequestBuilder;
 use crate::sinks::aws_cloudwatch_logs::retry::CloudwatchRetryLogic;
-use crate::sinks::aws_cloudwatch_logs::service::{CloudwatchLogsPartitionSvc, CloudwatchResponse};
+use crate::sinks::aws_cloudwatch_logs::service::CloudwatchLogsPartitionSvc;
 use crate::sinks::aws_cloudwatch_logs::sink::CloudwatchSink;
 use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
 use crate::sinks::util::{BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig};
@@ -39,7 +39,7 @@ pub struct CloudwatchLogsSinkConfig {
 }
 
 impl CloudwatchLogsSinkConfig {
-    fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudWatchLogsClient> {
+    pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<CloudWatchLogsClient> {
         let region = (&self.region).try_into()?;
 
         let client = rusoto::client(proxy)?;

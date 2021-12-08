@@ -1,32 +1,30 @@
-use crate::config::LogSchema;
-use crate::event::{Event, EventFinalizers, Finalizable, LogEvent, Value};
-use crate::internal_events::TemplateRenderingFailed;
+
+use crate::event::{Event, EventFinalizers, Finalizable};
+
 use crate::sinks::aws_cloudwatch_logs::request_builder::{
     CloudwatchRequest, CloudwatchRequestBuilder,
 };
 use crate::sinks::aws_cloudwatch_logs::retry::CloudwatchRetryLogic;
 use crate::sinks::aws_cloudwatch_logs::service::{CloudwatchLogsPartitionSvc, CloudwatchResponse};
-use crate::sinks::aws_cloudwatch_logs::{CloudwatchKey, CloudwatchLogsError};
-use crate::sinks::util::encoding::{
-    Encoder, EncodingConfig, EncodingConfiguration, StandardEncodings,
-};
-use crate::sinks::util::processed_event::ProcessedEvent;
+use crate::sinks::aws_cloudwatch_logs::{CloudwatchKey};
+
+
 use crate::sinks::util::service::Svc;
-use crate::sinks::util::{EncodedEvent, SinkBuilderExt};
-use crate::template::Template;
+use crate::sinks::util::{SinkBuilderExt};
+
 use async_graphql::futures_util::stream::BoxStream;
 use async_trait::async_trait;
-use chrono::Utc;
+
 use futures::future;
 use futures::FutureExt;
 use futures::StreamExt;
-use rusoto_logs::InputLogEvent;
-use std::num::NonZeroUsize;
+
+
 use vector_core::buffers::{Ackable, Acker};
 use vector_core::partition::Partitioner;
 use vector_core::sink::StreamSink;
 use vector_core::stream::BatcherSettings;
-use vector_core::ByteSizeOf;
+
 
 pub struct CloudwatchSink {
     pub batcher_settings: BatcherSettings,
@@ -43,7 +41,7 @@ impl CloudwatchSink {
         let acker = self.acker;
 
         input
-            .filter_map(|mut event| {
+            .filter_map(|event| {
                 future::ready(match request_builder.build(event) {
                     Ok(maybe_req) => maybe_req.map(|x| Ok(x)),
                     Err(err) => Some(Err(err)),
@@ -98,7 +96,7 @@ impl Partitioner for CloudwatchParititoner {
 }
 
 fn test(sink: CloudwatchSink, input: BoxStream<'_, Event>) {
-    let future = Box::new(sink).run_inner(input).boxed();
+    let _future = Box::new(sink).run_inner(input).boxed();
 }
 
 #[async_trait]

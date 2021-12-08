@@ -1,12 +1,12 @@
 use crate::event::EventStatus;
 use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsSinkConfig;
-use crate::sinks::aws_cloudwatch_logs::request_builder::CloudwatchRequest;
+
 use crate::sinks::aws_cloudwatch_logs::retry::CloudwatchRetryLogic;
 use crate::sinks::aws_cloudwatch_logs::sink::BatchCloudwatchRequest;
 use crate::sinks::aws_cloudwatch_logs::{request, CloudwatchKey};
 use crate::sinks::util::retries::FixedRetryPolicy;
 use crate::sinks::util::{
-    EncodedLength, PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings,
+    EncodedLength, TowerRequestConfig, TowerRequestSettings,
 };
 use chrono::Duration;
 use chrono::Utc;
@@ -29,7 +29,7 @@ use tower::timeout::Timeout;
 use tower::{Service, ServiceBuilder, ServiceExt};
 use vector_core::internal_event::EventsSent;
 use vector_core::stream::DriverResponse;
-use vrl::prelude::fmt::{Debug, Formatter};
+use vrl::prelude::fmt::{Debug};
 
 type Svc = Buffer<
     ConcurrencyLimit<
@@ -176,7 +176,7 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
 
         //TODO: remove the Boxing?
         svc.oneshot(events)
-            .map_ok(|x| CloudwatchResponse {})
+            .map_ok(|_x| CloudwatchResponse {})
             .map_err(Into::into)
             .boxed()
     }
