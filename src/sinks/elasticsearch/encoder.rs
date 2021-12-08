@@ -94,13 +94,13 @@ fn write_bulk_action(
                     )
                 }
             } else if suppress_type {
-                    write!(writer, r#"{{"{}":{{"_index":"{}"}}}}"#, bulk_action, index)
-                } else {
-                    write!(
-                        writer,
-                        r#"{{"{}":{{"_index":"{}","_type":"{}"}}}}"#,
-                        bulk_action, index, doc_type
-                    )
+                write!(writer, r#"{{"{}":{{"_index":"{}"}}}}"#, bulk_action, index)
+            } else {
+                write!(
+                    writer,
+                    r#"{{"{}":{{"_index":"{}","_type":"{}"}}}}"#,
+                    bulk_action, index, doc_type
+                )
             }
         },
     )
