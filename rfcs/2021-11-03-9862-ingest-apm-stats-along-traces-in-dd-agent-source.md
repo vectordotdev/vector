@@ -1,4 +1,4 @@
-# RFC  - 2021-11-XX - Ingest APM stats in `datadog-agent` source with consistent user experience
+# RFC  - 2021-11-03 - Ingest APM stats in `datadog-agent` source with consistent user experience
 
 Datadog traces support in the `datadog_agent` source was initially documented in this [RFC][trace-support-pr]. However, the
 Datadog `trace-agent` submits more data than just traces. It also sends statistics ("APM Stats") about the running time of
