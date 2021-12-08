@@ -1,3 +1,4 @@
 # result: 1.0
 
-ok, err = 1 / 1
+foo = 1
+ok, err = 1 / foo
