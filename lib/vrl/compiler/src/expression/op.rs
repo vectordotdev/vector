@@ -187,7 +187,7 @@ impl Expression for Op {
                 match self.rhs.as_value() {
                     Some(value) if lhs_def.is_float() || lhs_def.is_integer() => match value {
                         Value::Float(v) if v.is_normal() => td.infallible(),
-                        Value::Integer(_) => td.infallible(),
+                        Value::Integer(v) if v != 0 => td.infallible(),
                         _ => td.fallible(),
                     },
                     _ => td.fallible(),
@@ -540,8 +540,13 @@ mod tests {
             want: TypeDef::new().infallible().float(),
         }
 
-        divide_zero_literal {
+        divide_float_zero_literal {
             expr: |_| op(Div, 1, 0.0),
+            want: TypeDef::new().fallible().float(),
+        }
+
+        divide_integer_zero_literal {
+            expr: |_| op(Div, 1, 0),
             want: TypeDef::new().fallible().float(),
         }
 
