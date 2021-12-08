@@ -1277,14 +1277,12 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "chrono"
 version = "0.4.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "670ad68c9088c2a963aaa298cb369688cf3f9465ce5e2d4ca10e6e0098a1ce73"
+source = "git+https://github.com/vectordotdev/chrono.git?branch=no-default-time#b7abfc3fcd7ffc95ad340f584fbcbe0c2d61e1e9"
 dependencies = [
  "libc",
  "num-integer",
  "num-traits",
  "serde",
- "time 0.1.44",
  "winapi 0.3.9",
 ]
 
@@ -3708,7 +3706,7 @@ dependencies = [
 [[package]]
 name = "leveldb-sys"
 version = "2.0.9"
-source = "git+https://github.com/timberio/leveldb-sys.git?branch=leveldb_mmap_limit#deca67b91b32c77bb5bcd122e306877468520a97"
+source = "git+https://github.com/vectordotdev/leveldb-sys.git?branch=leveldb_mmap_limit#deca67b91b32c77bb5bcd122e306877468520a97"
 dependencies = [
  "cmake",
  "ffi-opaque",
@@ -7400,17 +7398,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8018d24e04c95ac8790716a5987d0fec4f8b27249ffa0f7d33f1369bdfb88cbd"
 dependencies = [
  "once_cell",
-]
-
-[[package]]
-name = "time"
-version = "0.1.44"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6db9e6914ab8b1ae1c260a4ae7a49b6c5611b40328a735b21862567685e73255"
-dependencies = [
- "libc",
- "wasi 0.10.0+wasi-snapshot-preview1",
- "winapi 0.3.9",
 ]
 
 [[package]]
