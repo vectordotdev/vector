@@ -52,6 +52,10 @@ impl TransformConfig for MetricToLogConfig {
         DataType::Log
     }
 
+    fn enable_concurrency(&self) -> bool {
+        true
+    }
+
     fn transform_type(&self) -> &'static str {
         "metric_to_log"
     }
