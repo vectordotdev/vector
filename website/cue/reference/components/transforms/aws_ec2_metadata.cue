@@ -35,7 +35,11 @@ components: transforms: aws_ec2_metadata: {
 				""",
 		]
 		notices: []
-		warnings: []
+		warnings: [
+			"""
+				Do not enable this transform if you are running Vector in Aggregator mode- tags will be sourced from the Aggregator node's metadata server and will not reflect correctly on input data.
+				""",
+		]
 	}
 
 	configuration: {
