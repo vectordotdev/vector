@@ -69,20 +69,20 @@ different path that other plain metrics/logs received from a `core-agent`. Thus 
 `datadog_agent` source, many option are available (Additional details on what exactly are "Datadog Agents" can be
 found in the trace support [RFC][trace-support-pr] and may provide relevant context for undermentionned points):
 
-* Keeping a single `datadog-agent` source:
+* Keeping a single `datadog_agent` source:
   * and add a settings to switch between agent kind: `agent: <TYPE>` where `<TYPE>`
-  could be  `core` (would support metrics & logs - we could optionnally add `logs` & `metrics` to only allow logs or
+  could be  `core` (would support metrics & logs - we could optionally add `logs` & `metrics` to only allow logs or
   metrics, along with `core` that would allow both), `trace` and could be extended to support `process`, `security` and
   so on
   * or introduce the ability for a source to have multiple output for the `datadog-agent` source, e.g. <SRC_ID>.metrics, <SRC_ID>.logs, <SRC_ID>.traces, <SRC_ID>.apm_stats, etc.
 * Another solution would be to keep one Vector source per kind of Datadog Agent an then we would have the following
   Vector sources:
-  * `datadog-core` or the current `datadog-agent` sources that would receive the data sent by the Datadog "core" Agent
+  * `datadog_core` or the current `datadog_agent` sources that would receive the data sent by the Datadog "core" Agent
     (the agent that collects logs & metrics).
-  * `datadog-trace` that would support all data sent by the `trace-agent`
+  * `datadog_trace` that would support all data sent by the `trace-agent`
   * And so on as the support list grows:
-    * `datadog-process` source for the Datadog `process-agent`
-    * `datadog-security` for the Datadog security Agent
+    * `datadog_process` source for the Datadog `process-agent`
+    * `datadog_security` for the Datadog security Agent
     * Etc.
 
 [apm-stats-proto]: https://github.com/DataDog/datadog-agent/blob/dc2f202/pkg/trace/pb/stats.proto
