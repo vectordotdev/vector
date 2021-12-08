@@ -333,7 +333,7 @@ ifeq ($(AUTODESPAWN), true)
 endif
 
 .PHONY: test-integration-aws-cloudwatch-logs
-test-integration-aws-cloudwatch-logs: ## Runs AWS SQS integration tests
+test-integration-aws-cloudwatch-logs: ## Runs AWS Cloudwatch Logs integration tests
 ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh aws stop
 	@scripts/setup_integration_env.sh aws start
