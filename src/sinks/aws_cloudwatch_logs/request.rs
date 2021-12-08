@@ -1,5 +1,5 @@
 // use CloudwatchError;
-use crate::sinks::aws_cloudwatch_logs::service::{CloudwatchError};
+use crate::sinks::aws_cloudwatch_logs::service::CloudwatchError;
 use futures::{future::BoxFuture, ready, FutureExt};
 use rusoto_core::{RusotoError, RusotoResult};
 use rusoto_logs::{

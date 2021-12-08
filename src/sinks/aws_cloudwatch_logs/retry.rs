@@ -1,4 +1,4 @@
-use crate::sinks::aws_cloudwatch_logs::service::{CloudwatchError};
+use crate::sinks::aws_cloudwatch_logs::service::CloudwatchError;
 use crate::sinks::util::retries::RetryLogic;
 use rusoto_core::request::BufferedHttpResponse;
 use rusoto_core::RusotoError;

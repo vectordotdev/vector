@@ -5,9 +5,7 @@ use crate::sinks::aws_cloudwatch_logs::retry::CloudwatchRetryLogic;
 use crate::sinks::aws_cloudwatch_logs::sink::BatchCloudwatchRequest;
 use crate::sinks::aws_cloudwatch_logs::{request, CloudwatchKey};
 use crate::sinks::util::retries::FixedRetryPolicy;
-use crate::sinks::util::{
-    EncodedLength, TowerRequestConfig, TowerRequestSettings,
-};
+use crate::sinks::util::{EncodedLength, TowerRequestConfig, TowerRequestSettings};
 use chrono::Duration;
 use chrono::Utc;
 use futures::future::BoxFuture;
@@ -29,7 +27,7 @@ use tower::timeout::Timeout;
 use tower::{Service, ServiceBuilder, ServiceExt};
 use vector_core::internal_event::EventsSent;
 use vector_core::stream::DriverResponse;
-use vrl::prelude::fmt::{Debug};
+use vrl::prelude::fmt::Debug;
 
 type Svc = Buffer<
     ConcurrencyLimit<
@@ -50,8 +48,6 @@ pub enum CloudwatchError {
     CreateStream(RusotoError<CreateLogStreamError>),
     CreateGroup(RusotoError<CreateLogGroupError>),
     NoStreamsFound,
-    ServiceDropped,
-    MakeService,
 }
 
 impl fmt::Display for CloudwatchError {
@@ -66,14 +62,6 @@ impl fmt::Display for CloudwatchError {
                 write!(f, "CloudwatchError::CreateGroup: {}", error)
             }
             CloudwatchError::NoStreamsFound => write!(f, "CloudwatchError: No Streams Found"),
-            CloudwatchError::ServiceDropped => write!(
-                f,
-                "CloudwatchError: The service was dropped while there was a request in flight."
-            ),
-            CloudwatchError::MakeService => write!(
-                f,
-                "CloudwatchError: The inner service was unable to be created."
-            ),
         }
     }
 }

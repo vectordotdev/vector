@@ -12,9 +12,7 @@ use crate::sinks::aws_cloudwatch_logs::CloudwatchKey;
 use crate::sinks::aws_cloudwatch_logs::IoError;
 use crate::sinks::util::encoding::{Encoder, EncodingConfiguration, StandardEncodings};
 
-use crate::sinks::{
-    util::{encoding::EncodingConfig},
-};
+use crate::sinks::util::encoding::EncodingConfig;
 use crate::template::Template;
 
 // Estimated maximum size of InputLogEvent with an empty message

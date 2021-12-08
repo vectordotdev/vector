@@ -1,4 +1,3 @@
-
 use crate::event::{Event, EventFinalizers, Finalizable};
 
 use crate::sinks::aws_cloudwatch_logs::request_builder::{
@@ -6,25 +5,21 @@ use crate::sinks::aws_cloudwatch_logs::request_builder::{
 };
 use crate::sinks::aws_cloudwatch_logs::retry::CloudwatchRetryLogic;
 use crate::sinks::aws_cloudwatch_logs::service::{CloudwatchLogsPartitionSvc, CloudwatchResponse};
-use crate::sinks::aws_cloudwatch_logs::{CloudwatchKey};
-
+use crate::sinks::aws_cloudwatch_logs::CloudwatchKey;
 
 use crate::sinks::util::service::Svc;
-use crate::sinks::util::{SinkBuilderExt};
+use crate::sinks::util::SinkBuilderExt;
 
 use async_graphql::futures_util::stream::BoxStream;
 use async_trait::async_trait;
 
 use futures::future;
-use futures::FutureExt;
 use futures::StreamExt;
-
 
 use vector_core::buffers::{Ackable, Acker};
 use vector_core::partition::Partitioner;
 use vector_core::sink::StreamSink;
 use vector_core::stream::BatcherSettings;
-
 
 pub struct CloudwatchSink {
     pub batcher_settings: BatcherSettings,
@@ -60,9 +55,7 @@ impl CloudwatchSink {
             .map(|(key, events)| BatchCloudwatchRequest { key, events })
             .into_driver(service, acker)
             .run()
-            .await;
-
-        Ok(())
+            .await
     }
 }
 
@@ -93,10 +86,6 @@ impl Partitioner for CloudwatchParititoner {
     fn partition(&self, item: &Self::Item) -> Self::Key {
         item.key.clone()
     }
-}
-
-fn test(sink: CloudwatchSink, input: BoxStream<'_, Event>) {
-    let _future = Box::new(sink).run_inner(input).boxed();
 }
 
 #[async_trait]
