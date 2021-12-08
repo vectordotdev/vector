@@ -588,6 +588,7 @@ urls: {
 	vector_unit_tests:                                        "\(vector_configuration)/unit-tests"
 	vector_version_branches:                                  "\(vector_repo)/branches/all?query=v"
 	vrl_announcement:                                         "/blog/vector-remap-language"
+	vrl_boolean_expression:                                   "\(vrl_reference)#boolean-expressions"
 	vrl_error_handling:                                       "\(vrl_errors_reference)#handling"
 	vrl_error_handling_assigning:                             "\(vrl_errors_reference)#assigning"
 	vrl_error_handling_coalescing:                            "\(vrl_errors_reference)#coalescing"

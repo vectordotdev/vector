@@ -7,33 +7,49 @@ publish = false
 
 [dependencies]
 bytes = { version = "1.1.0", default-features = false }
+bytecheck = { version = "0.6.5", default-features = false, features = ["std"] }
+crc32fast = { version = "1.2.1", default-features = false, features = ["std"] }
+crossbeam-utils = { version = "0.8.5", default-features = false }
 db-key = { version = "0.0.5", default-features = false, optional = true }
+fslock = { version = "0.2.0", default-features = false, features = ["std"] }
 futures = { version = "0.3.17", default-features = false, features = ["std"] }
 core_common = { path = "../core-common", default-features = false }
 leveldb = { version = "0.8.6", default-features = false, optional = true }
 metrics = { version = "0.17.0", default-features = false, features = ["std"] }
+memmap2 = { version = "0.5.0", default-features = false }
+parking_lot = { version = "0.11.2", default-features = false }
 pin-project = { version = "1.0.8", default-features = false }
+rkyv = { version = "0.7.25", default-features = false, features = ["size_32", "std", "strict", "validation"] }
 serde = { version = "1.0.130", default-features = false, features = ["derive"] }
 snafu = { version = "0.6.10", default-features = false, features = ["std"] }
-tokio = { version = "1.13.0", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync"] }
+tokio = { version = "1.13.0", default-features = false, features = ["rt", "macros", "rt-multi-thread", "sync", "fs", "io-util", "time"] }
 tokio-stream = { version = "0.1", default-features = false, features = ["sync"] }
 tokio-util = { version = "0.6", default-features = false }
 tracing = { version = "0.1.29", default-features = false }
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"] }
+hdrhistogram = "7.3.0"
+lading_common = { git = "https://github.com/blt/lading", branch = "main" }
 pretty_assertions = "1.0.0"
 quickcheck = "1.0"
+once_cell = "1.8"
 tempdir = "0.3"
+rand = "0.8.4"
+temp-dir = "0.1.11"
 tokio-test = "0.4.2"
 metrics-exporter-prometheus = "0.6"
 metrics-util = { version = "0.10.1", default-features = false }
 metrics-tracing-context = { version = "0.8.1", default-features = false }
 serde_yaml = { version = "0.8", default-features = false }
-tracing-subscriber = { version = "0.2.25", default-features = false, features = ["registry"] }
+tracing = { version = "0.1.29", features = ["attributes"] }
+tracing-fluent-assertions = "0.1.3"
+tracing-subscriber = { version = "0.2.25" }
+human_bytes = "0.3.0"
 
 [features]
 disk-buffer = ["db-key", "leveldb"]
+helpers = []
 
 [[bench]]
 name = "on_disk"
@@ -47,3 +63,11 @@ harness = false
 [[bench]]
 name = "in_memory_v2"
 harness = false
+
+[[example]]
+name = "disk_v1"
+required-features = ["disk-buffer", "helpers"]
+
+[[example]]
+name = "disk_v2"
+required-features = ["helpers"]
