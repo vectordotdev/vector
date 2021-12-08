@@ -6717,6 +6717,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha-1"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "028f48d513f9678cda28f6e4064755b3fbb2af6acd672f2c209b62323f7aea0f"
+dependencies = [
+ "cfg-if 1.0.0",
+ "cpufeatures",
+ "digest 0.10.0",
+]
+
+[[package]]
 name = "sha1"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8723,7 +8734,7 @@ dependencies = [
  "roxmltree",
  "rust_decimal",
  "serde_json",
- "sha-1 0.9.8",
+ "sha-1 0.10.0",
  "sha2 0.9.8",
  "sha3",
  "shared",
