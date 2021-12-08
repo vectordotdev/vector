@@ -276,24 +276,24 @@ pub fn get_checks() -> Vec<(&'static str, Event, Event)> {
             log_event!["tags" => vec!["a:bla"]],
             log_event!["custom" => json!({"a": "bla"})],
         ),
-        // // Wildcard prefix.
-        // (
-        //     "*bla",
-        //     log_event!["message" => "foobla"],
-        //     log_event!["message" => "blafoo"],
-        // ),
-        // // Wildcard prefix (negate).
-        // (
-        //     "NOT *bla",
-        //     log_event!["message" => "blafoo"],
-        //     log_event!["message" => "foobla"],
-        // ),
-        // // Wildcard prefix (negate w/-).
-        // (
-        //     "-*bla",
-        //     log_event!["message" => "blafoo"],
-        //     log_event!["message" => "foobla"],
-        // ),
+        // Wildcard prefix.
+        (
+            "*bla",
+            log_event!["message" => "foobla"],
+            log_event!["message" => "blafoo"],
+        ),
+        // Wildcard prefix (negate).
+        (
+            "NOT *bla",
+            log_event!["message" => "blafoo"],
+            log_event!["message" => "foobla"],
+        ),
+        // Wildcard prefix (negate w/-).
+        (
+            "-*bla",
+            log_event!["message" => "blafoo"],
+            log_event!["message" => "foobla"],
+        ),
         // Wildcard suffix.
         (
             "bla*",
