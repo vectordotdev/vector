@@ -1681,7 +1681,8 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     debug!("Done waiting for Vector bootstrap");
 
     // Capture events processed before deploying the test pod.
-    let processed_events_before = metrics::get_processed_events(&vector_metrics_url).await?;
+    let processed_events_before =
+        metrics::get_component_sent_events_total(&vector_metrics_url).await?;
 
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(
@@ -1750,7 +1751,8 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     debug!("Done waiting for `internal_metrics` to update");
 
     // Capture events processed after the test pod has finished.
-    let processed_events_after = metrics::get_processed_events(&vector_metrics_url).await?;
+    let processed_events_after =
+        metrics::get_component_sent_events_total(&vector_metrics_url).await?;
 
     // Ensure we did get at least one event since before deployed the test pod.
     assert!(
