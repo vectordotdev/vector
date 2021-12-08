@@ -332,6 +332,18 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh aws stop
 endif
 
+.PHONY: test-integration-aws-cloudwatch-logs
+test-integration-aws-cloudwatch-logs: ## Runs AWS SQS integration tests
+ifeq ($(AUTOSPAWN), true)
+	@scripts/setup_integration_env.sh aws stop
+	@scripts/setup_integration_env.sh aws start
+	sleep 10 # Many services are very slow... Give them a sec...
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features aws-cloudwatch-logs-integration-tests --lib ::aws_cloudwatch_logs
+ifeq ($(AUTODESPAWN), true)
+	@scripts/setup_integration_env.sh aws stop
+endif
+
 .PHONY: test-integration-azure
 test-integration-azure: ## Runs Azure integration tests
 ifeq ($(AUTOSPAWN), true)

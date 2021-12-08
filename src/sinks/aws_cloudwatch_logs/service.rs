@@ -81,25 +81,31 @@ impl From<RusotoError<DescribeLogStreamsError>> for CloudwatchError {
 }
 
 #[derive(Debug)]
-pub struct CloudwatchResponse {}
+pub struct CloudwatchResponse {
+    events_count: usize,
+    events_byte_size: usize,
+}
 
 impl crate::sinks::util::sink::Response for CloudwatchResponse {
     fn is_successful(&self) -> bool {
-        unimplemented!()
+        true
     }
 
     fn is_transient(&self) -> bool {
-        unimplemented!()
+        false
     }
 }
 
 impl DriverResponse for CloudwatchResponse {
     fn event_status(&self) -> EventStatus {
-        todo!()
+        EventStatus::Delivered
     }
 
     fn events_sent(&self) -> EventsSent {
-        todo!()
+        EventsSent {
+            count: self.events_count,
+            byte_size: self.events_byte_size,
+        }
     }
 }
 
@@ -126,6 +132,8 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
     }
 
     fn call(&mut self, req: BatchCloudwatchRequest) -> Self::Future {
+        let events_count = req.events.len();
+        let events_byte_size = req.events.iter().map(|x| x.event_byte_size).sum();
         let key = req.key;
         let events = req
             .events
@@ -164,7 +172,10 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
 
         //TODO: remove the Boxing?
         svc.oneshot(events)
-            .map_ok(|_x| CloudwatchResponse {})
+            .map_ok(move |_x| CloudwatchResponse {
+                events_count,
+                events_byte_size,
+            })
             .map_err(Into::into)
             .boxed()
     }

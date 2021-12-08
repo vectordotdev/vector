@@ -33,7 +33,7 @@ pub struct CloudwatchLogsSinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     // Deprecated name. Moved to auth.
-    assume_role: Option<String>,
+    pub assume_role: Option<String>,
     #[serde(default)]
     pub auth: AwsAuthentication,
 }
@@ -117,4 +117,17 @@ impl SinkBatchSettings for CloudwatchLogsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(10_000);
     const MAX_BYTES: Option<usize> = Some(1_048_576);
     const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsSinkConfig;
+
+    #[test]
+    fn test_config() {
+        #[test]
+        fn test_generate_config() {
+            crate::test_util::test_generate_config::<CloudwatchLogsSinkConfig>();
+        }
+    }
 }

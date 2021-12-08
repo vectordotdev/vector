@@ -24,6 +24,7 @@ const MAX_MESSAGE_SIZE: usize = MAX_EVENT_SIZE - EVENT_SIZE_OVERHEAD;
 pub struct CloudwatchRequest {
     pub key: CloudwatchKey,
     pub message: String,
+    pub event_byte_size: usize,
     pub timestamp: i64,
     pub finalizers: EventFinalizers,
 }
@@ -77,6 +78,7 @@ impl CloudwatchRequestBuilder {
         };
 
         let finalizers = event.take_finalizers();
+        let event_byte_size = event.size_of();
         self.encoding.apply_rules(&mut event);
         let mut message_bytes = vec![];
         self.encoding
@@ -93,6 +95,7 @@ impl CloudwatchRequestBuilder {
         Ok(Some(CloudwatchRequest {
             key,
             message,
+            event_byte_size,
             timestamp,
             finalizers,
         }))
@@ -110,5 +113,31 @@ impl ByteSizeOf for CloudwatchRequest {
 
     fn allocated_bytes(&self) -> usize {
         0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::log_schema;
+
+    #[test]
+    fn test() {
+        let request_builder = CloudwatchRequestBuilder {
+            group_template: "group".try_into().unwrap(),
+            stream_template: "stream".try_into().unwrap(),
+            log_schema: log_schema().clone(),
+            encoding: EncodingConfig::from(StandardEncodings::Text),
+        };
+        let timestamp = Utc::now();
+        let message = "event message";
+        let mut event = Event::from(message);
+        event
+            .as_mut_log()
+            .insert(log_schema().timestamp_key(), timestamp);
+
+        let request = request_builder.build(event).unwrap().unwrap();
+        assert_eq!(request.timestamp, timestamp.timestamp_millis());
+        assert_eq!(&request.message, message);
     }
 }

@@ -10,10 +10,10 @@ use crate::sinks::aws_cloudwatch_logs::CloudwatchKey;
 use crate::sinks::util::service::Svc;
 use crate::sinks::util::SinkBuilderExt;
 
-use async_graphql::futures_util::stream::BoxStream;
 use async_trait::async_trait;
 
 use futures::future;
+use futures::stream::BoxStream;
 use futures::StreamExt;
 
 use vector_core::buffers::{Ackable, Acker};
