@@ -23,14 +23,17 @@ def human_bytes(b):
 
 
 parser = argparse.ArgumentParser(description='t-test experiments with Welch method')
-parser.add_argument('--capture-dir', type=str, help='the directory to search for capture csv files')
-parser.add_argument('--warmup-seconds', type=int, help='the number of seconds to treat as warmup')
 parser.add_argument('--baseline-sha', type=str, help='the sha of the baseline experiment')
+parser.add_argument('--capture-dir', type=str, help='the directory to search for capture csv files')
 parser.add_argument('--comparison-sha', type=str, help='the sha of the comparison experiment')
-parser.add_argument('--vector-cpus', type=int, help='the total number of CPUs given to vector during the experiment')
-parser.add_argument('--p-value', type=float, default=0.1, help='the p-value for comparing with t-test results, the smaller the more certain')
+parser.add_argument('--erratic-soaks', type=str, default='', help='a comma separated list of known-erratic experiments, NOT TO BE USED LIGHTLY')
 parser.add_argument('--mean-drift-percentage', type=float, default=8.87, help='the percentage of mean drift we allow in an experiment, expressed as a value from 0 to 100, default 9th percentile')
+parser.add_argument('--p-value', type=float, default=0.1, help='the p-value for comparing with t-test results, the smaller the more certain')
+parser.add_argument('--vector-cpus', type=int, help='the total number of CPUs given to vector during the experiment')
+parser.add_argument('--warmup-seconds', type=int, help='the number of seconds to treat as warmup')
 args = parser.parse_args()
+
+erratic_soaks = args.erratic_soaks.split(',')
 
 capture_paths = glob.glob(os.path.join(args.capture_dir, "**/*.captures"))
 captures = []
@@ -94,7 +97,10 @@ for exp in csv.experiment.unique():
                           'comparison mean': comparison_mean,
                           'comparison stdev': comparison_stdev,
                           'comparison outlier percentage': (comparison_outliers / len(comparison)) * 100,
-                          't-statistic': res.statistic, 'p-value': res.pvalue })
+                          't-statistic': res.statistic,
+                          'p-value': res.pvalue,
+                          'erratic': exp in erratic_soaks
+                          })
 
 ttest_results = pd.DataFrame.from_records(ttest_results)
 
@@ -124,7 +130,8 @@ changes = changes.drop(labels=['t-statistic', 'p-value', 'baseline mean',
                                'baseline stdev', 'comparison mean',
                                'baseline outlier percentage',
                                'comparison outlier percentage',
-                               'comparison stdev'], axis=1)
+                               'comparison stdev', 'erratic'], axis=1)
+changes = changes.loc[~changes['experiment'].isin(erratic_soaks)]
 changes = changes[changes['Δ mean %'].abs() > args.mean_drift_percentage].sort_values('Δ mean', ascending=False)
 changes['Δ mean'] = changes['Δ mean'].apply(human_bytes)
 if len(changes) > 0:

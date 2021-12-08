@@ -9,12 +9,12 @@ use futures::{Sink, SinkExt, Stream};
 use metrics_tracing_context::{MetricsLayer, TracingContextLayer};
 use metrics_util::layers::Layer;
 use metrics_util::DebuggingRecorder;
-use std::fmt;
 use std::pin::Pin;
+use std::{error, fmt};
 use tracing::Span;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Message<const N: usize> {
     id: u64,
     _padding: [u64; N],
@@ -36,16 +36,26 @@ impl<const N: usize> ByteSizeOf for Message<N> {
 }
 
 #[derive(Debug)]
-pub enum EncodeError {}
+pub struct EncodeError;
 
-#[derive(Debug)]
-pub enum DecodeError {}
-
-impl fmt::Display for DecodeError {
-    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        unreachable!()
+impl fmt::Display for EncodeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
+
+impl error::Error for EncodeError {}
+
+#[derive(Debug)]
+pub struct DecodeError;
+
+impl fmt::Display for DecodeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl error::Error for DecodeError {}
 
 impl<const N: usize> EncodeBytes<Message<N>> for Message<N> {
     type Error = EncodeError;
