@@ -6,7 +6,7 @@ use crate::config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkConte
 use crate::sinks::aws_kinesis_streams::service::KinesisService;
 use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
 use crate::sinks::util::{BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig};
-use crate::tls::{TlsSettings, TlsOptions, MaybeTlsSettings};
+use crate::tls::{MaybeTlsSettings, TlsOptions, TlsSettings};
 use futures::FutureExt;
 use rusoto_core::RusotoError;
 use rusoto_kinesis::{DescribeStreamInput, Kinesis, KinesisClient, PutRecordsError};

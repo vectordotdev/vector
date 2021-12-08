@@ -1,6 +1,7 @@
 mod request;
 
 use crate::aws::rusoto::{self, AwsAuthentication, RegionOrEndpoint};
+use crate::tls::MaybeTlsSettings;
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext, SinkDescription,
@@ -15,7 +16,7 @@ use crate::{
         PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings, VecBuffer,
     },
     template::Template,
-    tls::{TlsOptions, TlsSettings}
+    tls::{TlsOptions, TlsSettings},
 };
 use chrono::{Duration, Utc};
 use futures::{future::BoxFuture, ready, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
@@ -42,7 +43,6 @@ use tower::{
     Service, ServiceBuilder, ServiceExt,
 };
 use vector_core::ByteSizeOf;
-use crate::tls::MaybeTlsSettings;
 
 use super::util::SinkBatchSettings;
 
@@ -197,7 +197,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         let log_group = self.group_name.clone();
         let log_stream = self.stream_name.clone();
 
-        let client = self.create_client( cx.proxy())?;
+        let client = self.create_client(cx.proxy())?;
         let svc = request.service(
             CloudwatchRetryLogic,
             CloudwatchLogsPartitionSvc::new(self.clone(), client.clone()),
@@ -804,7 +804,7 @@ mod tests {
             stream: "stream".into(),
             group: "group".into(),
         };
-        let client = config.create_client( &ProxyConfig::from_env()).unwrap();
+        let client = config.create_client(&ProxyConfig::from_env()).unwrap();
         CloudwatchLogsSvc::new(&config, &key, client)
     }
 

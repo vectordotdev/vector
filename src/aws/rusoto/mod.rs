@@ -4,8 +4,7 @@ pub mod region;
 //TODO: replace with direct import
 pub use super::auth::AwsAuthentication;
 use crate::config::ProxyConfig;
-use crate::{http::HttpError,
-            tls::{MaybeTlsSettings}};
+use crate::{http::HttpError, tls::MaybeTlsSettings};
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;

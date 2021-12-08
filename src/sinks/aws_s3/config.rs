@@ -17,7 +17,7 @@ use crate::{
         },
         Healthcheck,
     },
-    tls::{TlsOptions},
+    tls::TlsOptions,
 };
 use rusoto_s3::S3Client;
 use serde::{Deserialize, Serialize};
