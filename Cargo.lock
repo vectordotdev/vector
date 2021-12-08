@@ -3968,6 +3968,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "md-5"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6a38fc55c8bbc10058782919516f88826e70320db6d206aebc49611d24216ae"
+dependencies = [
+ "digest 0.10.0",
+]
+
+[[package]]
 name = "md5"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4224,7 +4233,7 @@ dependencies = [
  "hex",
  "hmac",
  "lazy_static",
- "md-5",
+ "md-5 0.9.1",
  "os_info",
  "pbkdf2",
  "percent-encoding",
@@ -5118,7 +5127,7 @@ dependencies = [
  "bytes 1.1.0",
  "fallible-iterator",
  "hmac",
- "md-5",
+ "md-5 0.9.1",
  "memchr",
  "rand 0.8.4",
  "sha2 0.9.8",
@@ -6149,7 +6158,7 @@ dependencies = [
  "http",
  "hyper",
  "log",
- "md-5",
+ "md-5 0.9.1",
  "percent-encoding",
  "pin-project-lite",
  "rusoto_credential",
@@ -8385,7 +8394,7 @@ dependencies = [
  "lru",
  "matches",
  "maxminddb",
- "md-5",
+ "md-5 0.10.0",
  "metrics",
  "metrics-tracing-context",
  "metrics-util",
@@ -8707,7 +8716,7 @@ dependencies = [
  "indexmap",
  "lazy_static",
  "lookup",
- "md-5",
+ "md-5 0.10.0",
  "nom 7.1.0",
  "percent-encoding",
  "regex",
