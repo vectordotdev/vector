@@ -63,6 +63,43 @@ impl Function for MatchDatadogQuery {
         Ok(Box::new(MatchDatadogQueryFn { value, node }))
     }
 
+    fn compile_argument(
+        &self,
+        name: &str,
+        expr: expression::Expr,
+    ) -> Option<Box<dyn std::any::Any + Send + Sync>> {
+        if name == "query" {
+            let query_value = match expr {
+                expression::Expr::Literal(literal) => literal,
+                expression::Expr::Variable(var) if var.value().is_some() => {
+                    match var.value().unwrap().clone().into_expr() {
+                        expression::Expr::Literal(literal) => literal,
+                        expr => panic!("arg"),
+                    }
+                }
+                expr => panic!("literal"),
+            };
+            let query_value = query_value.to_value();
+            let query = query_value
+                .try_bytes_utf8_lossy()
+                .expect("datadog search query not bytes");
+
+            // Compile the Datadog search query to AST.
+            let node = parse(&query).unwrap();
+
+            Some(Box::new(node) as Box<dyn std::any::Any + Send + Sync>)
+        } else {
+            None
+        }
+    }
+
+    fn call(&self, mut arguments: VmArgumentList) -> Resolved {
+        let value = arguments.required("value");
+
+        todo!()
+        // Ok(matches_vrl_object(&self.node, &Value::Object(value)).into())
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &[
             Parameter {

@@ -1,4 +1,4 @@
-use vrl::prelude::*;
+use vrl::{function::VmArgumentList, prelude::*};
 
 #[derive(Clone, Copy, Debug)]
 pub struct StartsWith;
@@ -63,6 +63,32 @@ impl Function for StartsWith {
             substring,
             case_sensitive,
         }))
+    }
+
+    fn call(&self, mut arguments: VmArgumentList) -> Resolved {
+        let value = arguments.required("value");
+        let substring = arguments.required("substring");
+        let case_sensitive = arguments.required("case_sensitive").try_boolean()?;
+        let substring = {
+            let value = substring;
+            let string = value.try_bytes_utf8_lossy()?;
+
+            match case_sensitive {
+                true => string.into_owned(),
+                false => string.to_lowercase(),
+            }
+        };
+
+        let value = {
+            let string = value.try_bytes_utf8_lossy()?;
+
+            match case_sensitive {
+                true => string.into_owned(),
+                false => string.to_lowercase(),
+            }
+        };
+
+        Ok(value.starts_with(&substring).into())
     }
 }
 

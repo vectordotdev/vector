@@ -3,8 +3,7 @@ use crate::expression::{
 };
 use crate::parser::Node;
 use crate::value::Kind;
-use crate::vm::Vm;
-use crate::{Span, Value};
+use crate::{ExpressionError, Span, Value};
 use diagnostic::{DiagnosticError, Label, Note};
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
@@ -55,8 +54,20 @@ pub trait Function: Sync + fmt::Debug {
         &[]
     }
 
-    fn call(&self, _args: VmArgumentList) -> Value {
-        Value::Null
+    fn compile_argument(
+        &self,
+        _name: &str,
+        _expr: Expr,
+    ) -> Option<Box<dyn std::any::Any + Send + Sync>> {
+        None
+    }
+
+    fn call(&self, _args: VmArgumentList) -> Result<Value, ExpressionError> {
+        Err(ExpressionError::Error {
+            message: "unimplemented".to_string(),
+            labels: Vec::new(),
+            notes: Vec::new(),
+        })
     }
 }
 

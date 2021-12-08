@@ -35,9 +35,9 @@ impl Function for Downcase {
         }]
     }
 
-    fn call(&self, mut args: VmArgumentList) -> Value {
+    fn call(&self, mut args: VmArgumentList) -> Resolved {
         let value = args.required("value");
-        value.try_bytes_utf8_lossy().unwrap().to_lowercase().into()
+        Ok(value.try_bytes_utf8_lossy().unwrap().to_lowercase().into())
     }
 }
 

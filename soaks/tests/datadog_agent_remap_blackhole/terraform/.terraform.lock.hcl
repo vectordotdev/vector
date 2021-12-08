@@ -5,6 +5,7 @@ provider "registry.terraform.io/hashicorp/kubernetes" {
   version     = "2.5.1"
   constraints = "~> 2.5.0"
   hashes = [
+    "h1:N++QrDDOE8L/FSYxFQSEicuwsUkh5V+OHFOJ4zRzLMc=",
     "h1:wg+6NFJUKrwccLZQPkJTgdRMgh709ZX+sBuJ9IlJoNU=",
     "zh:05f42363a1bdf1858bfdb56dc55509a066a640d05ef62e0fddcf7cc4d97a0dfa",
     "zh:2b974bebbc7823f759159fcf1efe0717930b7756f643ff1551e2d633a6651d10",
@@ -23,6 +24,7 @@ provider "registry.terraform.io/hashicorp/kubernetes" {
 provider "registry.terraform.io/hashicorp/template" {
   version = "2.2.0"
   hashes = [
+    "h1:0wlehNaxBX7GJQnPfQwTNvvAf38Jm0Nv7ssKGMaG6Og=",
     "h1:94qn780bi1qjrbC3uQtjJh3Wkfwd5+tTtJHOb7KTg9w=",
     "zh:01702196f0a0492ec07917db7aaa595843d8f171dc195f4c988d2ffca2a06386",
     "zh:09aae3da826ba3d7df69efeb25d146a1de0d03e951d35019a0f80e4f58c89b53",

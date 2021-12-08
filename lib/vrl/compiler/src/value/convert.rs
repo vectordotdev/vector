@@ -19,7 +19,7 @@ impl Value {
     ///
     /// This is a non-public function because we want to avoid exposing internal
     /// details about the expression variants.
-    pub(crate) fn into_expr(self) -> Expr {
+    pub fn into_expr(self) -> Expr {
         use Value::*;
 
         match self {

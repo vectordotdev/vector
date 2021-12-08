@@ -43,6 +43,14 @@ impl Function for String {
 
         Ok(Box::new(StringFn { value }))
     }
+
+    fn call(&self, mut arguments: VmArgumentList) -> Resolved {
+        let value = arguments.required("value");
+        match value {
+            v @ Value::Bytes(_) => Ok(v),
+            v => Err(format!(r#"expected "string", got {}"#, v.kind()).into()),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

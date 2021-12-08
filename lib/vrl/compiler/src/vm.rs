@@ -69,6 +69,7 @@ pub struct Vm {
     instructions: Vec<Instruction>,
     globals: HashMap<String, Value>,
     values: Vec<Literal>,
+    static_params: Arc<Vec<Box<dyn std::any::Any + Send + Sync>>>,
     targets: Vec<Variable>,
     stack: Vec<Value>,
     parameter_stack: Vec<Option<Value>>,
@@ -336,8 +337,10 @@ impl Vm {
                         .collect();
                     let argumentlist = VmArgumentList::new(parameters, args);
 
-                    // TODO Handle errors
-                    self.stack.push(self.fns[function_id].call(argumentlist));
+                    match self.fns[function_id].call(argumentlist) {
+                        Ok(result) => self.stack.push(result),
+                        Err(_err) => todo!(),
+                    }
                 }
                 OpCode::CreateObject => {
                     let count = self.next_primitive();
