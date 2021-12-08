@@ -1281,19 +1281,9 @@ dependencies = [
 
 [[package]]
 name = "chrono-tz"
-version = "0.5.3"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2554a3155fec064362507487171dcc4edc3df60cb10f3a1fb10ed8094822b120"
-dependencies = [
- "chrono",
- "parse-zoneinfo",
-]
-
-[[package]]
-name = "chrono-tz"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64c01c1c607d25c71bbaa67c113d6c6b36c434744b4fd66691d711b5b1bc0c8b"
+checksum = "58549f1842da3080ce63002102d5bc954c7bc843d4f47818e642abdc36253552"
 dependencies = [
  "chrono",
  "chrono-tz-build",
@@ -1923,7 +1913,7 @@ version = "0.1.0"
 dependencies = [
  "bytes 1.1.0",
  "chrono",
- "chrono-tz 0.5.3",
+ "chrono-tz",
  "derivative",
  "grok",
  "itertools",
@@ -2183,9 +2173,9 @@ checksum = "a357d28ed41a50f9c765dbfe56cbc04a64e53e5fc58ba79fbc34c10ef3df831f"
 
 [[package]]
 name = "encoding_rs"
-version = "0.8.29"
+version = "0.8.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a74ea89a0a1b98f6332de42c95baff457ada66d1cb4030f9ff151b2041a1c746"
+checksum = "7896dc8abb250ffdda33912550faa54c88ec8b998dec0b2c55ab224921ce11df"
 dependencies = [
  "cfg-if 1.0.0",
  "serde",
@@ -6734,7 +6724,7 @@ version = "0.1.0"
 dependencies = [
  "bytes 1.1.0",
  "chrono",
- "chrono-tz 0.6.0",
+ "chrono-tz",
  "derivative",
  "nom 7.1.0",
  "serde",
@@ -8663,7 +8653,7 @@ dependencies = [
  "base64 0.13.0",
  "bytes 1.1.0",
  "chrono",
- "chrono-tz 0.6.0",
+ "chrono-tz",
  "cidr-utils",
  "criterion",
  "csv",
@@ -8704,7 +8694,7 @@ version = "0.1.0"
 dependencies = [
  "ansi_term",
  "chrono",
- "chrono-tz 0.6.0",
+ "chrono-tz",
  "enrichment",
  "glob",
  "prettydiff",
