@@ -180,7 +180,19 @@ impl Expression for Op {
                 .scalar(K::Boolean),
 
             // ... / ...
-            Div => TypeDef::new().fallible().float(),
+            Div => {
+                let td = TypeDef::new().float();
+
+                // Division is infallible if the rhs is a literal normal float or integer.
+                match self.rhs.as_value() {
+                    Some(value) if lhs_def.is_float() || lhs_def.is_integer() => match value {
+                        Value::Float(v) if v.is_normal() => td.infallible(),
+                        Value::Integer(_) => td.infallible(),
+                        _ => td.fallible(),
+                    },
+                    _ => td.fallible(),
+                }
+            }
 
             // "bar" + ...
             // ... + "bar"
@@ -348,9 +360,9 @@ impl DiagnosticError for Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expression::{Block, IfStatement, Literal, Predicate};
+    use crate::expression::{Block, IfStatement, Literal, Predicate, Variable};
     use crate::{test_type_def, value::Kind};
-    use ast::Opcode::*;
+    use ast::{Ident, Opcode::*};
     use ordered_float::NotNan;
     use std::convert::TryInto;
 
@@ -513,18 +525,41 @@ mod tests {
             want: TypeDef::new().fallible().integer().add_float(),
         }
 
-        divide_integer {
+        divide_integer_literal {
             expr: |_| op(Div, 1, 1),
-            want: TypeDef::new().fallible().float(),
+            want: TypeDef::new().infallible().float(),
         }
 
-        divide_float {
+        divide_float_literal {
             expr: |_| op(Div, 1.0, 1.0),
+            want: TypeDef::new().infallible().float(),
+        }
+
+        divide_mixed_literal {
+            expr: |_| op(Div, 1, 1.0),
+            want: TypeDef::new().infallible().float(),
+        }
+
+        divide_zero_literal {
+            expr: |_| op(Div, 1, 0.0),
             want: TypeDef::new().fallible().float(),
         }
 
-        divide_mixed {
-            expr: |_| op(Div, 1, 1.0),
+        divide_lhs_literal_wrong_rhs {
+            expr: |_| Op {
+                lhs: Box::new(Literal::from(true).into()),
+                rhs: Box::new(Literal::from(NotNan::new(1.0).unwrap()).into()),
+                opcode: Div,
+            },
+            want: TypeDef::new().fallible().float(),
+        }
+
+        divide_dynamic_rhs {
+            expr: |_| Op {
+                lhs: Box::new(Literal::from(1).into()),
+                rhs: Box::new(Variable::noop(Ident::new("foo")).into()),
+                opcode: Div,
+            },
             want: TypeDef::new().fallible().float(),
         }
 
@@ -680,12 +715,12 @@ mod tests {
             expr: |_| Op {
                 lhs: Box::new(Op {
                     lhs: Box::new(Literal::from("foo").into()),
-                    rhs: Box::new(Literal::from(1).into()),
+                    rhs: Box::new(Literal::from(NotNan::new(0.0).unwrap()).into()),
                     opcode: Div,
                 }.into()),
                 rhs: Box::new(Op {
                     lhs: Box::new(Literal::from(true).into()),
-                    rhs: Box::new(Literal::from(1).into()),
+                    rhs: Box::new(Literal::from(NotNan::new(0.0).unwrap()).into()),
                     opcode: Div,
                 }.into()),
                 opcode: Err,
