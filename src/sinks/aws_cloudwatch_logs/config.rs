@@ -93,7 +93,6 @@ impl GenerateConfig for CloudwatchLogsSinkConfig {
     }
 }
 
-//TODO: use `Default` instead
 fn default_config(e: StandardEncodings) -> CloudwatchLogsSinkConfig {
     CloudwatchLogsSinkConfig {
         encoding: e.into(),

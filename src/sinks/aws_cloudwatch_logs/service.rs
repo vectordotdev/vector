@@ -170,7 +170,6 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
             svc
         };
 
-        //TODO: remove the Boxing?
         svc.oneshot(events)
             .map_ok(move |_x| CloudwatchResponse {
                 events_count,

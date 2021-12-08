@@ -38,7 +38,7 @@ impl CloudwatchSink {
         input
             .filter_map(|event| {
                 future::ready(match request_builder.build(event) {
-                    Ok(maybe_req) => maybe_req.map(|x| Ok(x)),
+                    Ok(maybe_req) => maybe_req.map(Ok),
                     Err(err) => Some(Err(err)),
                 })
             })

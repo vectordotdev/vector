@@ -89,8 +89,7 @@ impl CloudwatchRequestBuilder {
         if message.len() > MAX_MESSAGE_SIZE {
             return Err(CloudwatchLogsError::EventTooLong {
                 length: message.len(),
-            }
-            .into());
+            });
         }
         Ok(Some(CloudwatchRequest {
             key,

@@ -10,7 +10,7 @@ pub struct CloudwatchRetryLogic<T> {
     phantom: PhantomData<T>,
 }
 impl<T> CloudwatchRetryLogic<T> {
-    pub fn new() -> CloudwatchRetryLogic<T> {
+    pub const fn new() -> CloudwatchRetryLogic<T> {
         CloudwatchRetryLogic {
             phantom: PhantomData,
         }
