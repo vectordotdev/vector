@@ -170,7 +170,7 @@ where
             // check and increment the current count
             // if 0: this is the first message, just pass it through
             // if 1: this is the first rate limited message
-            // otherwise supress it until the rate limit expires
+            // otherwise suppress it until the rate limit expires
             match prev {
                 0 => self.inner.on_event(event, ctx),
                 1 => {
@@ -374,7 +374,6 @@ impl Visit for LimitVisitor {
 
     fn record_i64(&mut self, field: &Field, value: i64) {
         if field.name() == RATE_LIMIT_SECS_FIELD {
-            use std::convert::TryFrom;
             self.limit = Some(u64::try_from(value).unwrap_or_default());
         }
     }

@@ -1,0 +1,94 @@
+#!/usr/bin/env python3
+import pandas as pd
+import scipy.stats
+import argparse
+import math
+import glob
+import os
+import sys
+
+parser = argparse.ArgumentParser(description='t-test experiments with Welch method')
+parser.add_argument('--capture-dir', type=str, help='the directory to search for capture csv files')
+parser.add_argument('--erratic-soaks', type=str, default='', help='a comma separated list of known-erratic experiments, NOT TO BE USED LIGHTLY')
+parser.add_argument('--mean-drift-percentage', type=float, default=8.87, help='the percentage of mean drift we allow in an experiment, expressed as a value from 0 to 100, default 9th percentile')
+parser.add_argument('--p-value', type=float, default=0.05, help='the p-value for comparing with t-test results, the smaller the more certain')
+parser.add_argument('--warmup-seconds', type=int, help='the number of seconds to treat as warmup')
+args = parser.parse_args()
+
+erratic_soaks = args.erratic_soaks.split(',')
+
+capture_paths = glob.glob(os.path.join(args.capture_dir, "**/*.captures"))
+captures = []
+for f in capture_paths:
+    captures.append(pd.read_csv(f))
+csv = pd.concat(captures)
+
+fetch_index_past_warmup = csv['fetch_index'] > args.warmup_seconds
+csv = csv[fetch_index_past_warmup]
+
+# Use Tukey's method to detect values that sit 1.5 times outside the IQR.
+def total_outliers(df):
+    q1 = df['value'].quantile(0.25)
+    q3 = df['value'].quantile(0.75)
+    iqr = q3 - q1
+    scaled_iqr = 1.5 * iqr
+
+    outside_range = lambda b: (b < (q1 - scaled_iqr)) or (b > (q3 + scaled_iqr))
+    return df['value'].apply(outside_range).sum()
+
+ttest_results = []
+for exp in csv.experiment.unique():
+    experiment = csv[csv['experiment'] == exp]
+
+    baseline = experiment[experiment['variant'] == 'baseline']
+    comparison = experiment[experiment['variant'] == 'comparison']
+    baseline_mean = baseline['value'].mean()
+    comparison_mean = comparison['value'].mean()
+    diff =  comparison_mean - baseline_mean
+    percent_change = round(((comparison_mean - baseline_mean) / baseline_mean) * 100, 2)
+
+    baseline_outliers = total_outliers(baseline)
+    comparison_outliers = total_outliers(comparison)
+    trim = 0.0
+    if baseline_outliers + comparison_outliers > 0:
+        # When we have outliers we perform Yuen's test instead, dropping 10% of
+        # the data to remove the more extreme results.
+        trim = 0.1
+
+    # The t-test here is calculating whether the expected mean of our two
+    # distributions is equal, or, put another way, whether the samples we have
+    # here are from identical distributions. The higher the returned p-value by
+    # ttest_ind the more likely it is that the samples _do_ have the same
+    # expected mean.
+    #
+    # If the p-value is below our threshold then it is _unlikely_ that the two
+    # samples actually have the same mean -- are from the same distribution --
+    # and so there's some statistically interesting difference between the two
+    # samples. For our purposes here that implies that performance has changed.
+    res = scipy.stats.ttest_ind(baseline['value'], comparison['value'], equal_var=False, trim=trim)
+    ttest_results.append({'experiment': exp,
+                          'Δ mean': diff.mean(),
+                          'Δ mean %': percent_change,
+                          'baseline mean': baseline_mean,
+                          'comparison mean': comparison_mean,
+                          'p-value': res.pvalue,
+                          'erratic': exp in erratic_soaks
+                          })
+ttest_results = pd.DataFrame.from_records(ttest_results)
+print("Table of test results:")
+print("")
+print("")
+print(ttest_results.to_markdown(index=False, tablefmt='github'))
+
+p_value_violation = ttest_results['p-value'] < args.p_value
+changes = ttest_results[p_value_violation]
+changes = changes.loc[~changes['experiment'].isin(erratic_soaks)]
+changes = changes[changes['Δ mean %'] <  -args.mean_drift_percentage]
+print("")
+print("Table normalized to only show regressions, {} p-value threshold, {} drift threshold:".format(args.p_value, args.mean_drift_percentage))
+print("")
+print(changes.to_markdown(index=False, tablefmt='github'))
+
+if len(changes) > 0:
+    print("Regressions detected beyond thresholds.")
+    sys.exit(1)

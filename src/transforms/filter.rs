@@ -9,8 +9,14 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
-struct FilterConfig {
+pub struct FilterConfig {
     condition: AnyCondition,
+}
+
+impl From<AnyCondition> for FilterConfig {
+    fn from(condition: AnyCondition) -> Self {
+        Self { condition }
+    }
 }
 
 inventory::submit! {

@@ -1,62 +1,137 @@
-use crate::event::metric::{MetricKind, MetricValue};
-use metrics::counter;
-use serde_json::Error;
-use vector_core::internal_event::InternalEvent;
-
+#[cfg(feature = "sinks-splunk_hec")]
+pub use self::sink::*;
 #[cfg(feature = "sources-splunk_hec")]
 pub use self::source::*;
 
-#[derive(Debug)]
-pub struct SplunkEventSent {
-    pub byte_size: usize,
-}
+#[cfg(feature = "sinks-splunk_hec")]
+mod sink {
+    use crate::{
+        event::metric::{MetricKind, MetricValue},
+        sinks::splunk_hec::common::acknowledgements::HecAckApiError,
+    };
+    use metrics::{counter, decrement_gauge, increment_gauge};
+    use serde_json::Error;
+    use vector_core::internal_event::InternalEvent;
 
-impl InternalEvent for SplunkEventSent {
-    fn emit_metrics(&self) {
-        counter!("processed_bytes_total", self.byte_size as u64);
-    }
-}
-
-#[derive(Debug)]
-pub struct SplunkEventEncodeError {
-    pub error: Error,
-}
-
-impl InternalEvent for SplunkEventEncodeError {
-    fn emit_logs(&self) {
-        error!(
-            message = "Error encoding Splunk HEC event to JSON.",
-            error = ?self.error,
-            error_type = "encode_failed",
-            stage = "processing",
-            internal_log_rate_secs = 30,
-        );
+    #[derive(Debug)]
+    pub struct SplunkEventSent {
+        pub byte_size: usize,
     }
 
-    fn emit_metrics(&self) {
-        counter!("component_errors_total", 1, "error_type" => "encode_failed", "stage" => "processing");
-        counter!("encode_errors_total", 1);
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct SplunkInvalidMetricReceived<'a> {
-    pub value: &'a MetricValue,
-    pub kind: &'a MetricKind,
-}
-
-impl<'a> InternalEvent for SplunkInvalidMetricReceived<'a> {
-    fn emit_logs(&self) {
-        warn!(
-            message = "Invalid metric received kind; dropping event.",
-            value = ?self.value,
-            kind = ?self.kind,
-            internal_log_rate_secs = 30,
-        )
+    impl InternalEvent for SplunkEventSent {
+        fn emit_metrics(&self) {
+            counter!("processed_bytes_total", self.byte_size as u64);
+        }
     }
 
-    fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1, "error_type" => "invalid_metric_kind");
+    #[derive(Debug)]
+    pub struct SplunkEventEncodeError {
+        pub error: Error,
+    }
+
+    impl InternalEvent for SplunkEventEncodeError {
+        fn emit_logs(&self) {
+            error!(
+                message = "Error encoding Splunk HEC event to JSON.",
+                error = ?self.error,
+                error_type = "encode_failed",
+                stage = "processing",
+                internal_log_rate_secs = 30,
+            );
+        }
+
+        fn emit_metrics(&self) {
+            counter!("component_errors_total", 1, "error_type" => "encode_failed", "stage" => "processing");
+            counter!("encode_errors_total", 1);
+        }
+    }
+
+    #[derive(Debug)]
+    pub(crate) struct SplunkInvalidMetricReceived<'a> {
+        pub value: &'a MetricValue,
+        pub kind: &'a MetricKind,
+    }
+
+    impl<'a> InternalEvent for SplunkInvalidMetricReceived<'a> {
+        fn emit_logs(&self) {
+            warn!(
+                message = "Invalid metric received kind; dropping event.",
+                value = ?self.value,
+                kind = ?self.kind,
+                internal_log_rate_secs = 30,
+            )
+        }
+
+        fn emit_metrics(&self) {
+            counter!("processing_errors_total", 1, "error_type" => "invalid_metric_kind");
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct SplunkResponseParseError {
+        pub error: Error,
+    }
+
+    impl InternalEvent for SplunkResponseParseError {
+        fn emit_logs(&self) {
+            warn!(
+                message = "Unable to parse Splunk HEC response. Acknowledging based on initial 200 OK.",
+                error = ?self.error,
+                internal_log_rate_secs = 30,
+            );
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct SplunkIndexerAcknowledgementAPIError {
+        pub message: &'static str,
+        pub error: HecAckApiError,
+    }
+
+    impl InternalEvent for SplunkIndexerAcknowledgementAPIError {
+        fn emit_logs(&self) {
+            error!(
+                message = self.message,
+                error = ?self.error,
+                error_type = "acknowledgements_error",
+                stage = "sending",
+                internal_log_rate_secs = 30,
+            );
+        }
+
+        fn emit_metrics(&self) {
+            counter!("component_errors_total", 1, "error_type" => "acknowledgements_error", "stage" => "sending");
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct SplunkIndexerAcknowledgementUnavailableError;
+
+    impl InternalEvent for SplunkIndexerAcknowledgementUnavailableError {
+        fn emit_logs(&self) {
+            warn!(
+                message = "Internal indexer acknowledgement client unavailable. Acknowledging based on initial 200 OK.",
+                internal_log_rate_secs = 30,
+            );
+        }
+    }
+
+    pub struct SplunkIndexerAcknowledgementAckAdded;
+
+    impl InternalEvent for SplunkIndexerAcknowledgementAckAdded {
+        fn emit_metrics(&self) {
+            increment_gauge!("splunk_pending_acks", 1.0);
+        }
+    }
+
+    pub struct SplunkIndexerAcknowledgementAcksRemoved {
+        pub count: f64,
+    }
+
+    impl InternalEvent for SplunkIndexerAcknowledgementAcksRemoved {
+        fn emit_metrics(&self) {
+            decrement_gauge!("splunk_pending_acks", self.count);
+        }
     }
 }
 

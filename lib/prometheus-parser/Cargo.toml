@@ -2,7 +2,7 @@
 name = "prometheus-parser"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@timber.io>", "Duy Do <juchiast@gmail.com>"]
-edition = "2018"
+edition = "2021"
 publish = false
 license = "MPL-2.0"
 
@@ -10,12 +10,12 @@ license = "MPL-2.0"
 
 [dependencies]
 indexmap = "~1.7.0"
-nom = "7.0.0"
+nom = "7.1.0"
 num_enum = "0.5.4"
-prost = "0.8"
-prost-types = "0.8"
+prost = "0.9"
+prost-types = "0.9"
 shared = { path = "../shared", features = ["btreemap"] }
 snafu = { version = "0.6" }
 
 [build-dependencies]
-prost-build = "0.8"
+prost-build = "0.9"

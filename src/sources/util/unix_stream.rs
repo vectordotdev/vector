@@ -1,10 +1,10 @@
 use crate::{
     async_read::VecAsyncReadExt,
-    codecs, emit,
+    codecs,
     event::Event,
     internal_events::{ConnectionOpen, OpenGauge, UnixSocketError, UnixSocketFileDeleteError},
     shutdown::ShutdownSignal,
-    sources::{util::tcp_error::TcpError, Source},
+    sources::{util::codecs::StreamDecodingError, Source},
     Pipeline,
 };
 use bytes::Bytes;

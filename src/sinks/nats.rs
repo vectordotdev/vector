@@ -1,7 +1,5 @@
 use crate::{
-    buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    emit,
     event::Event,
     internal_events::{NatsEventSendFail, NatsEventSendSuccess, TemplateRenderingFailed},
     sinks::util::{
@@ -15,6 +13,7 @@ use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::convert::TryFrom;
+use vector_core::buffers::Acker;
 
 #[derive(Debug, Snafu)]
 enum BuildError {

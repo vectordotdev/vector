@@ -12,15 +12,14 @@ components: sinks: datadog_metrics: {
 			batch: {
 				enabled:      true
 				common:       false
-				max_events:   20
-				timeout_secs: 1
+				max_events:   100_000
+				timeout_secs: 2
 			}
 			compression: enabled: false
 			encoding: enabled:    false
 			proxy: enabled:       true
 			request: {
 				enabled:                    true
-				concurrency:                5
 				rate_limit_duration_secs:   1
 				rate_limit_num:             5
 				retry_initial_backoff_secs: 1
@@ -53,6 +52,7 @@ components: sinks: datadog_metrics: {
 		api_key:  sinks._datadog.configuration.api_key
 		endpoint: sinks._datadog.configuration.endpoint
 		region:   sinks._datadog.configuration.region
+		site:     sinks._datadog.configuration.site
 		default_namespace: {
 			common: true
 			description: """
@@ -64,7 +64,6 @@ components: sinks: datadog_metrics: {
 			type: string: {
 				default: null
 				examples: ["service"]
-				syntax: "literal"
 			}
 		}
 	}

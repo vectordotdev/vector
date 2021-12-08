@@ -1095,14 +1095,16 @@ impl<'input> Lexer<'input> {
         self.peek().as_ref().map_or(self.input.len(), |l| l.0)
     }
 
-    fn escape_code(&mut self, start: usize) -> Result<char, Error> {
+    /// Returns Ok if the next char is a valid escape code.
+    fn escape_code(&mut self, start: usize) -> Result<(), Error> {
         match self.bump() {
-            Some((_, '\'')) => Ok('\''),
-            Some((_, '"')) => Ok('"'),
-            Some((_, '\\')) => Ok('\\'),
-            Some((_, 'n')) => Ok('\n'),
-            Some((_, 'r')) => Ok('\r'),
-            Some((_, 't')) => Ok('\t'),
+            Some((_, '\n')) => Ok(()),
+            Some((_, '\'')) => Ok(()),
+            Some((_, '"')) => Ok(()),
+            Some((_, '\\')) => Ok(()),
+            Some((_, 'n')) => Ok(()),
+            Some((_, 'r')) => Ok(()),
+            Some((_, 't')) => Ok(()),
             Some((start, ch)) => Err(Error::EscapeChar {
                 start,
                 ch: Some(ch),
@@ -1148,19 +1150,32 @@ pub fn is_operator(ch: char) -> bool {
 fn unescape_string_literal(mut s: &str) -> String {
     let mut string = String::with_capacity(s.len());
     while let Some(i) = s.bytes().position(|b| b == b'\\') {
-        let c = match s.as_bytes()[i + 1] {
-            b'\'' => '\'',
-            b'"' => '"',
-            b'\\' => '\\',
-            b'n' => '\n',
-            b'r' => '\r',
-            b't' => '\t',
-            _ => unimplemented!("invalid escape"),
-        };
+        let next = s.as_bytes()[i + 1];
+        if next == b'\n' {
+            // Remove the \n and any ensuing spaces or tabs
+            string.push_str(&s[..i]);
+            let remaining = &s[i + 2..];
+            let whitespace: usize = remaining
+                .chars()
+                .take_while(|c| c.is_whitespace())
+                .map(|c| c.len_utf8())
+                .sum();
+            s = &s[i + whitespace + 2..];
+        } else {
+            let c = match next {
+                b'\'' => '\'',
+                b'"' => '"',
+                b'\\' => '\\',
+                b'n' => '\n',
+                b'r' => '\r',
+                b't' => '\t',
+                _ => unimplemented!("invalid escape"),
+            };
 
-        string.push_str(&s[..i]);
-        string.push(c);
-        s = &s[i + 2..];
+            string.push_str(&s[..i]);
+            string.push(c);
+            s = &s[i + 2..];
+        }
     }
 
     string.push_str(s);
@@ -1169,6 +1184,8 @@ fn unescape_string_literal(mut s: &str) -> String {
 
 #[cfg(test)]
 mod test {
+    #![allow(clippy::print_stdout)] // tests
+
     use super::StringLiteral;
     use super::*;
     use crate::lex::Token::*;
@@ -1241,6 +1258,18 @@ mod test {
             ],
         );
         assert_eq!(StringLiteral::Escaped(r#"\"\""#).unescape(), r#""""#);
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn multiline_string_literals() {
+        let mut lexer = lexer(r#""foo \
+                                  bar""#);
+
+        match lexer.next() {
+            Some(Ok((_, Token::StringLiteral(s), _))) => assert_eq!("foo bar", s.unescape()),
+            _ => panic!("Not a string literal"),
+        }
     }
 
     #[test]

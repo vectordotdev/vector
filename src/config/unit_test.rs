@@ -57,6 +57,7 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
         transforms,
         tests: builder.tests,
         expansions,
+        ..Config::default()
     };
 
     for test in &config.tests {
@@ -113,7 +114,7 @@ fn events_to_string(name: &str, events: &[Event]) -> String {
             name,
             events
                 .iter()
-                .map(|e| event_to_string(e))
+                .map(event_to_string)
                 .collect::<Vec<_>>()
                 .join("\n    ")
         )
@@ -492,15 +493,16 @@ async fn build_unit_test(
 
     errors.extend(tables_errors);
 
-    let context = TransformContext {
-        globals: config.global.clone(),
-        enrichment_tables: enrichment_tables.clone(),
-    };
-
     // Build reduced transforms.
     let mut transforms: IndexMap<ComponentKey, UnitTestTransform> = IndexMap::new();
     for (id, transform_config) in &config.transforms {
         if let Some(outputs) = transform_outputs.remove(id) {
+            let context = TransformContext {
+                key: Some(id.clone()),
+                globals: config.global.clone(),
+                enrichment_tables: enrichment_tables.clone(),
+            };
+
             match transform_config.inner.build(&context).await {
                 Ok(transform) => {
                     transforms.insert(
@@ -1496,7 +1498,7 @@ mod tests {
     async fn type_inconsistency_while_expanding_transform() {
         let config: ConfigBuilder = toml::from_str(indoc! {r#"
             [sources.input]
-              type = "generator"
+              type = "demo_logs"
               format = "shuffle"
               lines = ["one", "two"]
               count = 5
@@ -1540,7 +1542,7 @@ mod tests {
     async fn invalid_name_in_expanded_transform() {
         let config: ConfigBuilder = toml::from_str(indoc! {r#"
             [sources.input]
-              type = "generator"
+              type = "demo_logs"
               format = "shuffle"
               lines = ["one", "two"]
               count = 5

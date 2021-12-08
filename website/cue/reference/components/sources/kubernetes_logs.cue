@@ -36,16 +36,6 @@ components: sources: kubernetes_logs: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: [
 			"""
 				[Kubernetes](\(urls.kubernetes)) version `\(services.kubernetes.versions)` is required.
@@ -73,7 +63,6 @@ components: sources: kubernetes_logs: {
 						required:    false
 						type: string: {
 							default: "kubernetes.container_image"
-							syntax:  "literal"
 						}
 					}
 					container_name: {
@@ -82,7 +71,6 @@ components: sources: kubernetes_logs: {
 						required:    false
 						type: string: {
 							default: "kubernetes.container_name"
-							syntax:  "literal"
 						}
 					}
 					pod_ip: {
@@ -91,7 +79,6 @@ components: sources: kubernetes_logs: {
 						required:    false
 						type: string: {
 							default: "kubernetes.pod_ip"
-							syntax:  "literal"
 						}
 					}
 					pod_ips: {
@@ -100,7 +87,6 @@ components: sources: kubernetes_logs: {
 						required:    false
 						type: string: {
 							default: "kubernetes.pod_ips"
-							syntax:  "literal"
 						}
 					}
 					pod_labels: {
@@ -109,7 +95,6 @@ components: sources: kubernetes_logs: {
 						required:    false
 						type: string: {
 							default: "kubernetes.pod_labels"
-							syntax:  "literal"
 						}
 					}
 					pod_annotations: {
@@ -118,7 +103,6 @@ components: sources: kubernetes_logs: {
 						required:    false
 						type: string: {
 							default: "kubernetes.pod_annotations"
-							syntax:  "literal"
 						}
 					}
 					pod_name: {
@@ -127,7 +111,6 @@ components: sources: kubernetes_logs: {
 						required:    false
 						type: string: {
 							default: "kubernetes.pod_name"
-							syntax:  "literal"
 						}
 					}
 					pod_namespace: {
@@ -136,7 +119,6 @@ components: sources: kubernetes_logs: {
 						required:    false
 						type: string: {
 							default: "kubernetes.pod_namespace"
-							syntax:  "literal"
 						}
 					}
 					pod_node_name: {
@@ -145,7 +127,6 @@ components: sources: kubernetes_logs: {
 						required:    false
 						type: string: {
 							default: "kubernetes.pod_node_name"
-							syntax:  "literal"
 						}
 					}
 					pod_uid: {
@@ -154,7 +135,6 @@ components: sources: kubernetes_logs: {
 						required:    false
 						type: string: {
 							default: "kubernetes.pod_uid"
-							syntax:  "literal"
 						}
 					}
 					pod_owner: {
@@ -163,7 +143,6 @@ components: sources: kubernetes_logs: {
 						required:    false
 						type: string: {
 							default: "kubernetes.pod_owner"
-							syntax:  "literal"
 						}
 					}
 				}
@@ -182,7 +161,6 @@ components: sources: kubernetes_logs: {
 						required:    false
 						type: string: {
 							default: "kubernetes.namespace_labels"
-							syntax:  "literal"
 						}
 					}
 				}
@@ -198,19 +176,13 @@ components: sources: kubernetes_logs: {
 			common:      false
 			description: "The exact time the event was ingested into Vector."
 			required:    false
-			type: string: {
-				default: null
-				syntax:  "literal"
-			}
+			type: string: default: null
 		}
 		kube_config_file: {
 			common:      false
 			description: "Optional path to a kubeconfig file readable by Vector. If not set, Vector will try to connect to Kubernetes using in-cluster configuration."
 			required:    false
-			type: string: {
-				default: null
-				syntax:  "literal"
-			}
+			type: string: default: null
 		}
 		self_node_name: {
 			common:      false
@@ -218,7 +190,6 @@ components: sources: kubernetes_logs: {
 			required:    false
 			type: string: {
 				default: "${VECTOR_SELF_NODE_NAME}"
-				syntax:  "literal"
 			}
 		}
 		exclude_paths_glob_patterns: {
@@ -231,7 +202,6 @@ components: sources: kubernetes_logs: {
 				default: ["**/*.gz", "**/*.tmp"]
 				items: type: string: {
 					examples: ["**/exclude/**"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -245,7 +215,6 @@ components: sources: kubernetes_logs: {
 			type: string: {
 				default: ""
 				examples: ["metadata.name!=pod-name-to-exclude", "metadata.name!=pod-name-to-exclude,metadata.name=mypod"]
-				syntax: "literal"
 			}
 		}
 		extra_label_selector: {
@@ -258,7 +227,17 @@ components: sources: kubernetes_logs: {
 			type: string: {
 				default: ""
 				examples: ["my_custom_label!=my_value", "my_custom_label!=my_value,my_other_custom_label=my_value"]
-				syntax: "literal"
+			}
+		}
+		max_read_bytes: {
+			category:    "Reading"
+			common:      false
+			description: "An approximate limit on the amount of data read from a single pod log file at a given time."
+			required:    false
+			type: uint: {
+				default: 2048
+				examples: [2048]
+				unit: "bytes"
 			}
 		}
 		max_line_bytes: {
@@ -295,6 +274,19 @@ components: sources: kubernetes_logs: {
 				unit:    "milliseconds"
 			}
 		}
+		delay_deletion_ms: {
+			common: false
+			description: """
+				Delay between receiving a `DELETE` event and removing any related metadata Vector has stored. This controls how quickly Vector will remove
+				metadata for resources that have been removed from Kubernetes, a longer delay will allow Vector to continue processing and enriching logs after the source Pod has been deleted.
+				If Vector tries to process logs from a Pod which has already had its metadata removed from the local cache, it will fail to enrich the event with metadata and log a warning.
+				"""
+			required: false
+			type: uint: {
+				default: 60_000
+				unit:    "milliseconds"
+			}
+		}
 		timezone: configuration._timezone
 	}
 
@@ -306,7 +298,6 @@ components: sources: kubernetes_logs: {
 				required:    true
 				type: string: {
 					examples: ["\(_directory)/pods/pod-namespace_pod-name_pod-uid/container/1.log"]
-					syntax: "literal"
 				}
 			}
 			"kubernetes.container_image": {
@@ -314,9 +305,8 @@ components: sources: kubernetes_logs: {
 				required:    false
 				common:      true
 				type: string: {
-					examples: ["busybox:1.30"]
 					default: null
-					syntax:  "literal"
+					examples: ["busybox:1.30"]
 				}
 			}
 			"kubernetes.container_name": {
@@ -324,9 +314,8 @@ components: sources: kubernetes_logs: {
 				required:    false
 				common:      true
 				type: string: {
-					examples: ["coredns"]
 					default: null
-					syntax:  "literal"
+					examples: ["coredns"]
 				}
 			}
 			"kubernetes.namespace_labels": {
@@ -343,9 +332,8 @@ components: sources: kubernetes_logs: {
 				required:    false
 				common:      true
 				type: string: {
-					examples: ["192.168.1.1"]
 					default: null
-					syntax:  "literal"
+					examples: ["192.168.1.1"]
 				}
 			}
 			"kubernetes.pod_ips": {
@@ -353,9 +341,8 @@ components: sources: kubernetes_logs: {
 				required:    false
 				common:      true
 				type: string: {
-					examples: ["192.168.1.1", "::1"]
 					default: null
-					syntax:  "literal"
+					examples: ["192.168.1.1", "::1"]
 				}
 			}
 			"kubernetes.pod_labels": {
@@ -381,9 +368,8 @@ components: sources: kubernetes_logs: {
 				required:    false
 				common:      true
 				type: string: {
-					examples: ["coredns-qwertyuiop-qwert"]
 					default: null
-					syntax:  "literal"
+					examples: ["coredns-qwertyuiop-qwert"]
 				}
 			}
 			"kubernetes.pod_namespace": {
@@ -391,9 +377,8 @@ components: sources: kubernetes_logs: {
 				required:    false
 				common:      true
 				type: string: {
-					examples: ["kube-system"]
 					default: null
-					syntax:  "literal"
+					examples: ["kube-system"]
 				}
 			}
 			"kubernetes.pod_node_name": {
@@ -401,9 +386,8 @@ components: sources: kubernetes_logs: {
 				required:    false
 				common:      true
 				type: string: {
-					examples: ["minikube"]
 					default: null
-					syntax:  "literal"
+					examples: ["minikube"]
 				}
 			}
 			"kubernetes.pod_uid": {
@@ -411,9 +395,8 @@ components: sources: kubernetes_logs: {
 				required:    false
 				common:      true
 				type: string: {
-					examples: ["ba46d8c9-9541-4f6b-bbf9-d23b36f2f136"]
 					default: null
-					syntax:  "literal"
+					examples: ["ba46d8c9-9541-4f6b-bbf9-d23b36f2f136"]
 				}
 			}
 			message: {
@@ -421,7 +404,6 @@ components: sources: kubernetes_logs: {
 				required:    true
 				type: string: {
 					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
-					syntax: "literal"
 				}
 			}
 			source_type: {
@@ -429,15 +411,13 @@ components: sources: kubernetes_logs: {
 				required:    true
 				type: string: {
 					examples: ["kubernetes_logs"]
-					syntax: "literal"
 				}
 			}
 			stream: {
-				description: "The name of the stream the log line was sumbitted to."
+				description: "The name of the stream the log line was submitted to."
 				required:    true
 				type: string: {
 					examples: ["stdout", "stderr"]
-					syntax: "literal"
 				}
 			}
 			timestamp: fields._current_timestamp & {

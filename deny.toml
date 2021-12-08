@@ -35,7 +35,7 @@ ignore = [
     # https://github.com/timberio/vector/issues/5582
     "RUSTSEC-2020-0016",
 
-    # Type confusion if __private_get_type_id__ is overriden
+    # Type confusion if __private_get_type_id__ is overridden
     # https://github.com/timberio/vector/issues/5583
     "RUSTSEC-2020-0036",
 

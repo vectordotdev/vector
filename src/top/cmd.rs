@@ -11,7 +11,10 @@ use vector_api_client::{connect_subscription_client, Client};
 pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     // Exit early if the terminal is not a teletype
     if !is_tty() {
-        eprintln!("Terminal must be a teletype (TTY) to display a Vector dashboard.");
+        #[allow(clippy::print_stderr)]
+        {
+            eprintln!("Terminal must be a teletype (TTY) to display a Vector dashboard.");
+        }
         return exitcode::IOERR;
     }
 
@@ -37,7 +40,10 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     let sender = match metrics::init_components(&client).await {
         Ok(state) => state::updater(state, rx).await,
         _ => {
-            eprintln!("Couldn't query Vector components.");
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!("Couldn't query Vector components.");
+            }
             return exitcode::UNAVAILABLE;
         }
     };
@@ -54,7 +60,10 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     let subscription_client = match connect_subscription_client(ws_url).await {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("Couldn't connect to Vector API via WebSockets: {:?}", e);
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!("Couldn't connect to Vector API via WebSockets: {:?}", e);
+            }
             return exitcode::UNAVAILABLE;
         }
     };
@@ -66,7 +75,10 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     match init_dashboard(url.as_str(), opts, sender).await {
         Ok(_) => exitcode::OK,
         _ => {
-            eprintln!("Your terminal doesn't support building a dashboard. Exiting.");
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!("Your terminal doesn't support building a dashboard. Exiting.");
+            }
             exitcode::IOERR
         }
     }

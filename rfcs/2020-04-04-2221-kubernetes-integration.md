@@ -1193,7 +1193,7 @@ environment - like CNI driver, underlying network topology and so on - to
 understand the conditions we're testing. Reliability tests also require
 more careful designing the test environment.
 For this reason, the initial Kubernetes integration only focuses on correctness
-tests. Once we get som experience with correctness test we can expand our test
+tests. Once we get some experience with correctness test we can expand our test
 suite with tests from other categories.
 
 It is important that we do actually test correctness on all the configurations -

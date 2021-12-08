@@ -1,12 +1,15 @@
 use crate::{
     async_read::VecAsyncReadExt,
-    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
+    codecs::{
+        self,
+        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
+    },
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{ExecCommandExecuted, ExecEventsReceived, ExecFailed, ExecTimeout},
     serde::{default_decoding, default_framing_stream_based},
     shutdown::ShutdownSignal,
-    sources::util::TcpError,
+    sources::util::StreamDecodingError,
     Pipeline,
 };
 use bytes::Bytes;
@@ -42,7 +45,7 @@ pub struct ExecConfig {
     #[serde(default = "default_framing_stream_based")]
     framing: Box<dyn FramingConfig>,
     #[serde(default = "default_decoding")]
-    decoding: Box<dyn ParserConfig>,
+    decoding: Box<dyn DeserializerConfig>,
 }
 
 // TODO: Would be nice to combine the scheduled and streaming config with the mode enum once
@@ -498,7 +501,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     sender: Sender<((SmallVec<[Event; 1]>, usize), &'static str)>,
 ) {
     // Start the green background thread for collecting
-    Box::pin(tokio::spawn(async move {
+    let _ = Box::pin(tokio::spawn(async move {
         debug!("Start capturing {} command output.", origin);
 
         let mut stream = FramedRead::new(reader, decoder);

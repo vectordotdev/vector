@@ -6,7 +6,7 @@ mod unix;
 #[cfg(unix)]
 use crate::serde::default_framing_message_based;
 use crate::{
-    codecs::{DecodingConfig, NewlineDelimitedDecoderConfig},
+    codecs::{decoding::DecodingConfig, NewlineDelimitedDecoderConfig},
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
@@ -108,8 +108,8 @@ impl SourceConfig for SocketConfig {
                     config.shutdown_timeout_secs(),
                     tls,
                     config.receive_buffer_bytes(),
-                    cx.shutdown,
-                    cx.out,
+                    cx,
+                    false.into(),
                 )
             }
             Mode::Udp(config) => {
@@ -614,7 +614,6 @@ mod test {
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out: sender,
-                acknowledgements: false,
                 proxy: Default::default(),
             })
             .await

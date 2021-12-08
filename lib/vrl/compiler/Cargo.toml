@@ -2,7 +2,7 @@
 name = "vrl-compiler"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@timber.io>"]
-edition = "2018"
+edition = "2021"
 publish = false
 
 [dependencies]
@@ -22,6 +22,7 @@ regex = "1"
 serde = "1"
 thiserror = "1"
 tracing = "0.1"
+serde_json = { version = "1", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 criterion = "0.3"

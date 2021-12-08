@@ -6,7 +6,7 @@ use crate::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
         retries::{RetryAction, RetryLogic},
-        sink, BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
+        sink, BatchConfig, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
 };
@@ -16,6 +16,8 @@ use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
+
+use super::util::batch::RealtimeSizeBasedDefaultBatchSettings;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -35,7 +37,7 @@ pub struct ClickhouseConfig {
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     pub auth: Option<Auth>,
     #[serde(default)]
     pub request: TowerRequestConfig,
@@ -63,10 +65,7 @@ impl SinkConfig for ClickhouseConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let batch = BatchSettings::default()
-            .bytes(10_000_000)
-            .timeout(1)
-            .parse_config(self.batch)?;
+        let batch = self.batch.into_batch_settings()?;
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
@@ -224,7 +223,7 @@ impl RetryLogic for ClickhouseRetryLogic {
                 } else if body.starts_with(b"Code: 53") {
                     RetryAction::DontRetry("type mismatch".into())
                 } else {
-                    RetryAction::Retry(String::from_utf8_lossy(body).to_string())
+                    RetryAction::Retry(String::from_utf8_lossy(body).to_string().into())
                 }
             }
             _ => self.inner.should_retry_response(response),
@@ -305,14 +304,14 @@ mod integration_tests {
         let table = gen_table();
         let host = String::from("http://localhost:8123");
 
+        let mut batch = BatchConfig::default();
+        batch.max_events = Some(1);
+
         let config = ClickhouseConfig {
             endpoint: host.parse().unwrap(),
             table: table.clone(),
             compression: Compression::None,
-            batch: BatchConfig {
-                max_events: Some(1),
-                ..Default::default()
-            },
+            batch,
             request: TowerRequestConfig {
                 retry_attempts: Some(1),
                 ..Default::default()
@@ -353,15 +352,15 @@ mod integration_tests {
         let table = gen_table();
         let host = String::from("http://localhost:8123");
 
+        let mut batch = BatchConfig::default();
+        batch.max_events = Some(1);
+
         let config = ClickhouseConfig {
             endpoint: host.parse().unwrap(),
             table: table.clone(),
             skip_unknown_fields: true,
             compression: Compression::None,
-            batch: BatchConfig {
-                max_events: Some(1),
-                ..Default::default()
-            },
+            batch,
             request: TowerRequestConfig {
                 retry_attempts: Some(1),
                 ..Default::default()
@@ -402,15 +401,15 @@ mod integration_tests {
             ..Default::default()
         };
 
+        let mut batch = BatchConfig::default();
+        batch.max_events = Some(1);
+
         let config = ClickhouseConfig {
             endpoint: host.parse().unwrap(),
             table: table.clone(),
             compression: Compression::None,
             encoding,
-            batch: BatchConfig {
-                max_events: Some(1),
-                ..Default::default()
-            },
+            batch,
             request: TowerRequestConfig {
                 retry_attempts: Some(1),
                 ..Default::default()
@@ -517,14 +516,14 @@ timestamp_format = "unix""#,
         let table = gen_table();
         let host = String::from("http://localhost:8123");
 
+        let mut batch = BatchConfig::default();
+        batch.max_events = Some(1);
+
         let config = ClickhouseConfig {
             endpoint: host.parse().unwrap(),
             table: table.clone(),
             compression: Compression::None,
-            batch: BatchConfig {
-                max_events: Some(1),
-                ..Default::default()
-            },
+            batch,
             ..Default::default()
         };
 
@@ -549,7 +548,7 @@ timestamp_format = "unix""#,
         .unwrap()
         .unwrap();
 
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Failed));
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
     }
 
     #[tokio::test]
@@ -571,13 +570,13 @@ timestamp_format = "unix""#,
 
         let host = String::from("http://localhost:8124");
 
+        let mut batch = BatchConfig::default();
+        batch.max_events = Some(1);
+
         let config = ClickhouseConfig {
             endpoint: host.parse().unwrap(),
             table: gen_table(),
-            batch: BatchConfig {
-                max_events: Some(1),
-                ..Default::default()
-            },
+            batch,
             ..Default::default()
         };
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
@@ -660,6 +659,7 @@ timestamp_format = "unix""#,
     }
 
     #[derive(Debug, Deserialize)]
+    #[allow(dead_code)] // deserialize all fields
     struct QueryResponse {
         data: Vec<Value>,
         meta: Vec<Value>,
@@ -668,6 +668,7 @@ timestamp_format = "unix""#,
     }
 
     #[derive(Debug, Deserialize)]
+    #[allow(dead_code)] // deserialize all fields
     struct Stats {
         bytes_read: usize,
         elapsed: f64,

@@ -5,9 +5,11 @@ package metadata
 	name:   !=""
 }
 
-authors: [#Author, ...#Author]
-
-authors: [
+authors: [#Author, ...#Author] & [
+		{
+		handle: "barieom"
+		name:   "Barry Eom"
+	},
 	{
 		handle: "binarylogic"
 		name:   "Ben Johnson"

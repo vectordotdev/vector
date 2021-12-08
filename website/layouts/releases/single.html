@@ -99,6 +99,19 @@
       {{ end }}
       {{ end }}
     </div>
+      <div class="mt-8">
+        <div class="lg:grid lg:grid-cols-3 gap-8">
+          <div class="col-span-2">
+            <div class="prose">
+              {{ partial "heading.html" (dict "text" (print "Download Version " $version) "level" 2) }}
+            </div>
+      
+            <div class="mt-2 border px-4 py-3 lg:px-6 lg:py-4 rounded-md dark:border-gray-700">
+              {{ partial "download/download-matrix.html" (dict "version" $version) }}
+            </div>
+          </div>
+        </div>
+      </div>
   </div>
 </div>
 {{ end }}
@@ -122,7 +135,7 @@
   {{/* Pull request chip */}}
   {{ with .pr_number }}
   {{ $link := printf "https://github.com/vectordotdev/vector/pull/%v" . }}
-  <a href="{{ $link }}" class="font-mono flex items-center space-x-1 py-1 px-2 rounded-md bg-gray-100 dark:bg-gray-500 text-dark dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600" target="_blank">
+  <a href="{{ $link }}" class="font-mono flex items-center space-x-1 py-1 px-2 rounded-md bg-gray-100 dark:bg-gray-500 text-dark dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600" rel="noopener" target="_blank">
     <ion-icon class="h-3 w-3" name="git-pull-request-sharp"></ion-icon>
 
     <span class="text-xs p-0">

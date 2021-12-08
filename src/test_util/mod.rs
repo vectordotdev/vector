@@ -44,7 +44,7 @@ use vector_core::event::{BatchNotifier, Event, LogEvent};
 const WAIT_FOR_SECS: u64 = 5; // The default time to wait in `wait_for`
 const WAIT_FOR_MIN_MILLIS: u64 = 5; // The minimum time to pause before retrying
 const WAIT_FOR_MAX_MILLIS: u64 = 500; // The maximum time to pause before retrying
-
+#[cfg(test)]
 pub mod components;
 pub mod stats;
 
@@ -191,13 +191,7 @@ fn map_batch_stream(
     stream: impl Stream<Item = LogEvent>,
     batch: Option<Arc<BatchNotifier>>,
 ) -> impl Stream<Item = Event> {
-    stream.map(move |log| {
-        match &batch {
-            None => log,
-            Some(batch) => log.with_batch_notifier(batch),
-        }
-        .into()
-    })
+    stream.map(move |log| log.with_batch_notifier_option(&batch).into())
 }
 
 pub fn random_lines_with_stream(
@@ -217,6 +211,27 @@ pub fn random_events_with_stream(
 ) -> (Vec<Event>, impl Stream<Item = Event>) {
     let events = (0..count)
         .map(|_| Event::from(random_string(len)))
+        .collect::<Vec<_>>();
+    let stream = map_batch_stream(
+        stream::iter(events.clone()).map(|event| event.into_log()),
+        batch,
+    );
+    (events, stream)
+}
+
+pub fn random_updated_events_with_stream<F>(
+    len: usize,
+    count: usize,
+    batch: Option<Arc<BatchNotifier>>,
+    update_fn: F,
+) -> (Vec<Event>, impl Stream<Item = Event>)
+where
+    F: Fn((usize, Event)) -> Event,
+{
+    let events = (0..count)
+        .map(|_| Event::from(random_string(len)))
+        .enumerate()
+        .map(update_fn)
         .collect::<Vec<_>>();
     let stream = map_batch_stream(
         stream::iter(events.clone()).map(|event| event.into_log()),
