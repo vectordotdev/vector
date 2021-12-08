@@ -44,7 +44,7 @@ mod sink {
     impl<'a> InternalEvent for SplunkInvalidMetricReceivedError<'a> {
         fn emit_logs(&self) {
             error!(
-                message = "Invalid metric received kind.",
+                message = "Invalid metric received.",
                 error = ?self.error,
                 value = ?self.value,
                 kind = ?self.kind,
