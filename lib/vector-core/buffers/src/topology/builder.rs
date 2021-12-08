@@ -2,13 +2,13 @@ use std::error::Error;
 
 use async_trait::async_trait;
 use snafu::{ResultExt, Snafu};
-use tokio_stream::wrappers::ReceiverStream;
 use tracing::Span;
 
 use crate::buffer_usage_data::{BufferUsage, BufferUsageHandle};
 use crate::topology::channel::{BufferReceiver, BufferSender};
-use crate::topology::poll_sender::PollSender;
 use crate::{Acker, WhenFull};
+
+use super::channel::{ReceiverAdapter, SenderAdapter};
 
 /// Value that can be used as a stage in a buffer topology.
 #[async_trait]
@@ -30,7 +30,7 @@ pub trait IntoBuffer<T> {
     async fn into_buffer_parts(
         self: Box<Self>,
         usage_handle: &BufferUsageHandle,
-    ) -> Result<(PollSender<T>, ReceiverStream<T>, Option<Acker>), Box<dyn Error + Send + Sync>>;
+    ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>, Option<Acker>), Box<dyn Error + Send + Sync>>;
 }
 
 #[derive(Debug, Snafu)]
@@ -218,7 +218,7 @@ mod tests {
         assert!(result.is_ok());
 
         let (mut sender, _, _) = result.unwrap();
-        assert_current_send_capacity(&mut sender, 1, None);
+        assert_current_send_capacity(&mut sender, Some(1), None);
     }
 
     #[tokio::test]
@@ -229,7 +229,7 @@ mod tests {
         assert!(result.is_ok());
 
         let (mut sender, _, _) = result.unwrap();
-        assert_current_send_capacity(&mut sender, 1, None);
+        assert_current_send_capacity(&mut sender, Some(1), None);
     }
 
     #[tokio::test]
@@ -277,7 +277,7 @@ mod tests {
         assert!(result.is_ok());
 
         let (mut sender, _, _) = result.unwrap();
-        assert_current_send_capacity(&mut sender, 1, Some(1));
+        assert_current_send_capacity(&mut sender, Some(1), Some(1));
     }
 
     #[tokio::test]

@@ -36,10 +36,9 @@ use super::{common::DiskBufferConfig, record::try_as_record_archive};
 
 /// Error that occurred during calls to [`Writer`].
 #[derive(Debug, Snafu)]
-pub enum WriterError<R>
+pub enum WriterError<T>
 where
-    R: Bufferable,
-    <R as EncodeBytes<R>>::Error: 'static,
+    T: Bufferable,
 {
     /// A general I/O error occurred.
     ///
@@ -64,7 +63,7 @@ where
     /// error, and in fact, some some encoders, it's the only possible error that can occur.
     #[snafu(display("failed to encode record: {:?}", source))]
     FailedToEncode {
-        source: <R as EncodeBytes<R>>::Error,
+        source: <T as EncodeBytes<T>>::Error,
     },
 
     /// The writer failed to serialize the record.
@@ -78,6 +77,15 @@ where
     /// give to processes.  Rare, indeed.
     #[snafu(display("failed to serialize encoded record to buffer: {}", reason))]
     FailedToSerialize { reason: String },
+}
+
+impl<T> From<io::Error> for WriterError<T>
+where
+    T: Bufferable,
+{
+    fn from(source: io::Error) -> Self {
+        WriterError::Io { source }
+    }
 }
 
 /// Buffered writer that handles encoding, checksumming, and serialization of records.
@@ -178,7 +186,7 @@ where
             );
 
             match serializer.serialize_value(&record) {
-                Ok(_) => Ok(serializer.pos()),
+                Ok(_) => Ok::<_, WriterError<T>>(serializer.pos()),
                 Err(e) => match e {
                     CompositeSerializerError::ScratchSpaceError(sse) => {
                         return Err(WriterError::FailedToSerialize {

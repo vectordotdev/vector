@@ -2,11 +2,13 @@ use std::error::Error;
 
 use async_trait::async_trait;
 use tokio::sync::mpsc::channel;
-use tokio_stream::wrappers::ReceiverStream;
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
-    topology::{builder::IntoBuffer, poll_sender::PollSender},
+    topology::{
+        builder::IntoBuffer,
+        channel::{ReceiverAdapter, SenderAdapter},
+    },
     Acker, Bufferable,
 };
 
@@ -19,12 +21,12 @@ impl MemoryBuffer {
         MemoryBuffer { capacity }
     }
 
-    pub fn testing<T>(capacity: usize) -> (PollSender<T>, ReceiverStream<T>)
+    pub fn testing<T>(capacity: usize) -> (SenderAdapter<T>, ReceiverAdapter<T>)
     where
         T: Bufferable,
     {
         let (tx, rx) = channel(capacity);
-        (PollSender::new(tx), ReceiverStream::new(rx))
+        (SenderAdapter::channel(tx), ReceiverAdapter::channel(rx))
     }
 }
 
@@ -40,11 +42,15 @@ where
     async fn into_buffer_parts(
         self: Box<Self>,
         usage_handle: &BufferUsageHandle,
-    ) -> Result<(PollSender<T>, ReceiverStream<T>, Option<Acker>), Box<dyn Error + Send + Sync>>
+    ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>, Option<Acker>), Box<dyn Error + Send + Sync>>
     {
         usage_handle.set_buffer_limits(None, Some(self.capacity));
 
         let (tx, rx) = channel(self.capacity);
-        Ok((PollSender::new(tx), ReceiverStream::new(rx), None))
+        Ok((
+            SenderAdapter::channel(tx),
+            ReceiverAdapter::channel(rx),
+            None,
+        ))
     }
 }
