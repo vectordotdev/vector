@@ -6,7 +6,7 @@ use crate::{
     event::Event,
     internal_events::StatsdInvalidMetricReceived,
     sinks::util::{
-        buffer::metrics::{compress_distribution},
+        buffer::metrics::compress_distribution,
         encode_namespace,
         tcp::TcpSinkConfig,
         udp::{UdpService, UdpSinkConfig},
