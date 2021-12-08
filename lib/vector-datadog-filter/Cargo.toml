@@ -14,8 +14,8 @@ vector_core = { path = "../vector-core" }
 datadog-search-syntax = { path = "../datadog/search-syntax" }
 datadog-filter = { path = "../datadog/filter" }
 
-# Test util (still public)
-serde_json = { version = "1.0.68", default-features = false  }
-
 # Libs
 bytes = { version = "1.1.0", default-features = false }
+
+[dev-dependencies]
+datadog-filter-test = { path = "../datadog/filter-test" }

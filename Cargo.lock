@@ -1915,6 +1915,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "datadog-filter-test"
+version = "0.1.0"
+dependencies = [
+ "datadog-filter",
+ "datadog-search-syntax",
+ "serde_json",
+ "vector_core",
+]
+
+[[package]]
 name = "datadog-grok"
 version = "0.1.0"
 dependencies = [
@@ -8309,6 +8319,7 @@ dependencies = [
  "dashmap",
  "data-encoding",
  "datadog-filter",
+ "datadog-filter-test",
  "datadog-search-syntax",
  "derivative",
  "dirs-next",
@@ -8491,8 +8502,8 @@ version = "0.1.0"
 dependencies = [
  "bytes 1.1.0",
  "datadog-filter",
+ "datadog-filter-test",
  "datadog-search-syntax",
- "serde_json",
  "vector_core",
 ]
 

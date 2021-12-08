@@ -4,6 +4,7 @@ use datadog_filter::{
     Filter, Matcher, Resolver, Run,
 };
 use datadog_search_syntax::{Comparison, ComparisonValue, Field};
+use std::borrow::Cow;
 use vector_core::event::{LogEvent, Value};
 
 #[derive(Default, Clone)]
@@ -130,7 +131,35 @@ impl Filter<LogEvent> for EventFilter {
     }
 
     fn wildcard(&self, field: Field, wildcard: &str) -> Box<dyn Matcher<LogEvent>> {
-        todo!()
+        match field {
+            Field::Default(f) => {
+                let re = word_regex(wildcard);
+
+                Run::boxed(move |log: &LogEvent| match log.get(&f) {
+                    Some(Value::Bytes(v)) => re.is_match(&String::from_utf8_lossy(&v)),
+                    _ => false,
+                })
+            }
+            Field::Tag(tag) => {
+                let re = wildcard_regex(&format!("{}:{}", tag, wildcard));
+
+                Run::boxed(move |log: &LogEvent| match log.get("tags") {
+                    Some(Value::Array(v)) => v.iter().any(|v| match v {
+                        Value::Bytes(v) => re.is_match(&String::from_utf8_lossy(v)),
+                        _ => false,
+                    }),
+                    _ => false,
+                })
+            }
+            Field::Reserved(f) | Field::Facet(f) => {
+                let re = wildcard_regex(wildcard);
+
+                Run::boxed(move |log: &LogEvent| match log.get(&f) {
+                    Some(Value::Bytes(v)) => re.is_match(&String::from_utf8_lossy(v)),
+                    _ => false,
+                })
+            }
+        }
     }
 
     fn compare(
@@ -139,6 +168,98 @@ impl Filter<LogEvent> for EventFilter {
         comparator: Comparison,
         comparison_value: ComparisonValue,
     ) -> Box<dyn Matcher<LogEvent>> {
-        todo!()
+        let rhs = Cow::from(comparison_value.to_string());
+
+        match field {
+            // Facets are compared numerically if the value is numeric, or as strings otherwise.
+            Field::Facet(f) => {
+                Run::boxed(
+                    move |log: &LogEvent| match (log.get(&f), &comparison_value) {
+                        // Integers.
+                        (Some(Value::Integer(lhs)), ComparisonValue::Integer(rhs)) => {
+                            match comparator {
+                                Comparison::Lt => lhs < rhs,
+                                Comparison::Lte => lhs <= rhs,
+                                Comparison::Gt => lhs > rhs,
+                                Comparison::Gte => lhs >= rhs,
+                            }
+                        }
+                        // Floats.
+                        (Some(Value::Float(lhs)), ComparisonValue::Float(rhs)) => {
+                            match comparator {
+                                Comparison::Lt => lhs < rhs,
+                                Comparison::Lte => lhs <= rhs,
+                                Comparison::Gt => lhs > rhs,
+                                Comparison::Gte => lhs >= rhs,
+                            }
+                        }
+                        // Where the rhs is a string ref, the lhs is coerced into a string.
+                        (Some(Value::Bytes(v)), ComparisonValue::String(rhs)) => {
+                            let lhs = String::from_utf8_lossy(v);
+                            let rhs = Cow::from(rhs);
+
+                            match comparator {
+                                Comparison::Lt => lhs < rhs,
+                                Comparison::Lte => lhs <= rhs,
+                                Comparison::Gt => lhs > rhs,
+                                Comparison::Gte => lhs >= rhs,
+                            }
+                        }
+                        // Otherwise, compare directly as strings.
+                        (Some(Value::Bytes(v)), _) => {
+                            let lhs = String::from_utf8_lossy(v);
+
+                            match comparator {
+                                Comparison::Lt => lhs < rhs,
+                                Comparison::Lte => lhs <= rhs,
+                                Comparison::Gt => lhs > rhs,
+                                Comparison::Gte => lhs >= rhs,
+                            }
+                        }
+                        _ => false,
+                    },
+                )
+            }
+            // Tag values need extracting by "key:value" to be compared.
+            Field::Tag(tag) => Run::boxed(move |log: &LogEvent| match log.get("tags") {
+                Some(Value::Array(v)) => v.iter().any(|v| match v {
+                    Value::Bytes(v) => {
+                        let str_value = String::from_utf8_lossy(&v);
+
+                        match str_value.split_once(":") {
+                            Some((t, lhs)) if t == tag => {
+                                let lhs = Cow::from(lhs);
+
+                                match comparator {
+                                    Comparison::Lt => lhs < rhs,
+                                    Comparison::Lte => lhs <= rhs,
+                                    Comparison::Gt => lhs > rhs,
+                                    Comparison::Gte => lhs >= rhs,
+                                }
+                            }
+                            _ => false,
+                        }
+                    }
+                    _ => false,
+                }),
+                _ => false,
+            }),
+            // All other tag types are compared by string.
+            Field::Default(f) | Field::Reserved(f) => {
+                Run::boxed(move |log: &LogEvent| match log.get(&f) {
+                    Some(Value::Bytes(v)) => {
+                        let lhs = String::from_utf8_lossy(v);
+
+                        match comparator {
+                            Comparison::Lt => lhs < rhs,
+                            Comparison::Lte => lhs <= rhs,
+                            Comparison::Gt => lhs > rhs,
+                            Comparison::Gte => lhs >= rhs,
+                        }
+                    }
+                    _ => false,
+                })
+            }
+        }
     }
 }

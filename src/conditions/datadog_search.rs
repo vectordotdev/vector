@@ -55,7 +55,7 @@ fn as_log(matcher: Box<dyn Matcher<LogEvent>>) -> Box<dyn Matcher<Event>> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use vector_datadog_filter::test_util::get_checks;
+    use datadog_filter_test::get_checks;
 
     #[test]
     fn generate_config() {
@@ -64,9 +64,7 @@ mod test {
 
     #[test]
     fn check_datadog() {
-        let checks = get_checks();
-
-        for (source, pass, fail) in checks {
+        for (source, pass, fail) in get_checks() {
             let config = DatadogSearchConfig {
                 source: source.to_owned(),
             };
