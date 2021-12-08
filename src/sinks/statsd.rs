@@ -387,7 +387,7 @@ mod test {
         )
         .with_tags(Some(tags()));
 
-        let event = Event::Metric(metric1.clone());
+        let event = Event::Metric(metric1);
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
         shared::assert_event_data_eq!(metric1_compressed, metric2);
