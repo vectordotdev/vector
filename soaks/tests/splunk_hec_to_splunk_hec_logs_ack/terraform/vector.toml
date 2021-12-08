@@ -28,6 +28,4 @@ endpoint = "http://splunk-hec-blackhole:8080"
 encoding = "json"
 token = "abcd1234"
 healthcheck.enabled = false
-
-[sinks.splunk_hec_logs.acknowledgements]
-enabled = true
+acknowledgements.enabled = true
