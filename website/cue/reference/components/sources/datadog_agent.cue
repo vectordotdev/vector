@@ -65,6 +65,19 @@ components: sources: datadog_agent: {
 			required:    false
 			type: bool: default: true
 		}
+		drop_invalid_api_key: {
+			description: "The flag to indicate whether to drop the event with an invalid dd_api_key. If the event has no dd_api_key set, or there's no valid values for filtering, then the event would never be dropped."
+        	required: false
+        	type: bool: default: false
+        }
+        valid_api_keys: {
+        	description: "The flag to indicate whether to drop the event with an invalid dd_api_key. If the event has no dd_api_key set, or there's no valid values for filtering, then the event would never be dropped."
+			required: false
+            type: array: {
+            	default: null
+            	items: type: string: examples: ["12345678", "abcdefgh"]
+            }
+        }
 	}
 
 	output: {

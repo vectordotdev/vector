@@ -101,7 +101,7 @@ impl SourceConfig for DatadogAgentConfig {
             self.drop_invalid_api_key,
             self.valid_api_keys.clone(),
             decoder,
-            tls.http_protocol_name()
+            tls.http_protocol_name(),
         );
         let listener = tls.bind(&self.address).await?;
         let log_service = source
@@ -177,7 +177,13 @@ struct DatadogSeriesRequest {
 }
 
 impl DatadogAgentSource {
-    fn new(store_api_key: bool, drop_invalid_api_key: bool, valid_api_keys: Option<Vec<String>>, decoder: codecs::Decoder, protocol: &'static str) -> Self {
+    fn new(
+        store_api_key: bool,
+        drop_invalid_api_key: bool,
+        valid_api_keys: Option<Vec<String>>,
+        decoder: codecs::Decoder,
+        protocol: &'static str,
+    ) -> Self {
         Self {
             store_api_key,
             api_key_matcher: Regex::new(r"^/v1/input/(?P<api_key>[[:alnum:]]{32})/??")
@@ -210,9 +216,9 @@ impl DatadogAgentSource {
             .or_else(|| header.map(Arc::from))
     }
 
-    fn is_valid_api_key(&self, api_key: Option<Arc<str>>) -> bool {
-        if let Some(ref k) = api_key {
-            return valid_api_keys.is_none() || valid_api_keys.contains(k.as_ref());
+    fn is_valid_api_key(&self, api_key: &Option<Arc<str>>) -> bool {
+        if let (Some(k), Some(valid_api_keys)) = (api_key, &self.valid_api_keys) {
+            return valid_api_keys.contains(&k.to_string());
         }
         true
     }
@@ -275,12 +281,13 @@ impl DatadogAgentSource {
                         http_path: path.as_str(),
                         protocol: self.protocol,
                     });
-                    let events = decode(&encoding_header, body).and_then(|body| {
-                        self.decode_log_body(
-                            body,
-                            self.extract_api_key(path.as_str(), api_token, query_params.dd_api_key),
-                        )
-                    });
+                    let api_key =
+                        self.extract_api_key(path.as_str(), api_token, query_params.dd_api_key);
+                    let events = match self.is_valid_api_key(&api_key) {
+                        true => decode(&encoding_header, body)
+                            .and_then(|body| self.decode_log_body(body, api_key)),
+                        false => Ok(Vec::new()),
+                    };
                     Self::handle_request(events, acknowledgements, out.clone())
                 },
             )
@@ -306,12 +313,13 @@ impl DatadogAgentSource {
                         http_path: path.as_str(),
                         protocol: self.protocol,
                     });
-                    let events = decode(&encoding_header, body).and_then(|body| {
-                        self.decode_datadog_series(
-                            body,
-                            self.extract_api_key(path.as_str(), api_token, query_params.dd_api_key),
-                        )
-                    });
+                    let api_key =
+                        self.extract_api_key(path.as_str(), api_token, query_params.dd_api_key);
+                    let events = match self.is_valid_api_key(&api_key) {
+                        true => decode(&encoding_header, body)
+                            .and_then(|body| self.decode_datadog_series(body, api_key)),
+                        false => Ok(Vec::new()),
+                    };
                     Self::handle_request(events, acknowledgements, out.clone())
                 },
             )
@@ -354,19 +362,13 @@ impl DatadogAgentSource {
                         http_path: path.as_str(),
                         protocol: self.protocol,
                     });
-                    let api_key = self.extract_api_key(path.as_str(), api_token, query_params.dd_api_key);
-                    let events = match self.is_valid_api_key(api_key) {
-                        true => {
-
-                        }
-                        false => {}
+                    let api_key =
+                        self.extract_api_key(path.as_str(), api_token, query_params.dd_api_key);
+                    let events = match self.is_valid_api_key(&api_key) {
+                        true => decode(&encoding_header, body)
+                            .and_then(|body| self.decode_datadog_sketches(body, api_key)),
+                        false => Ok(Vec::new()),
                     };
-                    let events = decode(&encoding_header, body).and_then(|body| {
-                        self.decode_datadog_sketches(
-                            body,
-                            self.extract_api_key(path.as_str(), api_token, query_params.dd_api_key),
-                        )
-                    });
                     Self::handle_request(events, acknowledgements, out.clone())
                 },
             )
@@ -700,12 +702,7 @@ mod tests {
                 Box::new(BytesDecoder::new()),
                 Box::new(BytesDeserializer::new()),
             );
-            let source = DatadogAgentSource::new(
-                true,
-                false,
-                None,
-                decoder,
-                "http");
+            let source = DatadogAgentSource::new(true, false, None, decoder, "http");
             let events = source.decode_log_body(body, api_key).unwrap();
             assert_eq!(events.len(), msgs.len());
             for (msg, event) in msgs.into_iter().zip(events.into_iter()) {
@@ -734,6 +731,8 @@ mod tests {
         status: EventStatus,
         acknowledgements: bool,
         store_api_key: bool,
+        drop_invalid_api_key: bool,
+        valid_api_keys: Option<Vec<String>>,
     ) -> (impl Stream<Item = Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
@@ -743,8 +742,8 @@ mod tests {
                 address,
                 tls: None,
                 store_api_key,
-                drop_invalid_api_key: false,
-                valid_api_keys: None,
+                drop_invalid_api_key,
+                valid_api_keys,
                 framing: default_framing_message_based(),
                 decoding: default_decoding(),
                 acknowledgements: acknowledgements.into(),
@@ -779,7 +778,7 @@ mod tests {
     #[tokio::test]
     async fn full_payload_v1() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+        let (rx, addr) = source(EventStatus::Delivered, true, true, false, None).await;
 
         let mut events = spawn_collect_n(
             async move {
@@ -826,7 +825,7 @@ mod tests {
     #[tokio::test]
     async fn full_payload_v2() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+        let (rx, addr) = source(EventStatus::Delivered, true, true, false, None).await;
 
         let mut events = spawn_collect_n(
             async move {
@@ -873,7 +872,7 @@ mod tests {
     #[tokio::test]
     async fn no_api_key() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+        let (rx, addr) = source(EventStatus::Delivered, true, true, false, None).await;
 
         let mut events = spawn_collect_n(
             async move {
@@ -920,7 +919,7 @@ mod tests {
     #[tokio::test]
     async fn api_key_in_url() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+        let (rx, addr) = source(EventStatus::Delivered, true, true, false, None).await;
 
         let mut events = spawn_collect_n(
             async move {
@@ -970,7 +969,7 @@ mod tests {
     #[tokio::test]
     async fn api_key_in_query_params() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+        let (rx, addr) = source(EventStatus::Delivered, true, true, false, None).await;
 
         let mut events = spawn_collect_n(
             async move {
@@ -1020,7 +1019,7 @@ mod tests {
     #[tokio::test]
     async fn api_key_in_header() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+        let (rx, addr) = source(EventStatus::Delivered, true, true, false, None).await;
 
         let mut headers = HeaderMap::new();
         headers.insert(
@@ -1074,9 +1073,146 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn api_key_in_header_is_invalid_and_dropped() {
+        trace_init();
+        let valid_api_keys = vec!["valid_key".to_string()];
+        let (rx, addr) = source(EventStatus::Delivered, true, true, true, Some(valid_api_keys)).await;
+
+        let mut headers_with_invalid_api_key = HeaderMap::new();
+        headers_with_invalid_api_key.insert(
+            "dd-api-key",
+            "12345678abcdefgh12345678abcdefgh".parse().unwrap(),
+        );
+        let mut headers_with_valid_api_key = HeaderMap::new();
+        headers_with_valid_api_key.insert(
+            "dd-api-key",
+            "valid_key".parse().unwrap(),
+        );
+
+        let mut events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        addr,
+                        &serde_json::to_string(&[LogMsg {
+                            message: Bytes::from("baz"),
+                            timestamp: 789,
+                            hostname: Bytes::from("festeburg"),
+                            status: Bytes::from("notice"),
+                            service: Bytes::from("vector"),
+                            ddsource: Bytes::from("curl"),
+                            ddtags: Bytes::from("one,two,three"),
+                        }])
+                            .unwrap(),
+                        headers_with_invalid_api_key,
+                        "/v1/input/"
+                    )
+                        .await
+                );
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        addr,
+                        &serde_json::to_string(&[LogMsg {
+                            message: Bytes::from("foo"),
+                            timestamp: 987,
+                            hostname: Bytes::from("festeburg_valid"),
+                            status: Bytes::from("notice_valid"),
+                            service: Bytes::from("vector_valid"),
+                            ddsource: Bytes::from("curl_valid"),
+                            ddtags: Bytes::from("one,two,three,four"),
+                        }])
+                            .unwrap(),
+                        headers_with_valid_api_key,
+                        "/v1/input/"
+                    )
+                        .await
+                );
+            },
+            rx,
+            1,
+        )
+            .await;
+
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log["message"], "foo".into());
+            assert_eq!(log["timestamp"], 987.into());
+            assert_eq!(log["hostname"], "festeburg_valid".into());
+            assert_eq!(log["status"], "notice_valid".into());
+            assert_eq!(log["service"], "vector_valid".into());
+            assert_eq!(log["ddsource"], "curl_valid".into());
+            assert_eq!(log["ddtags"], "one,two,three,four".into());
+            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
+            assert_eq!(
+                &event.metadata().datadog_api_key().as_ref().unwrap()[..],
+                "valid_key"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn api_key_in_header_with_no_keys_for_filtering() {
+        trace_init();
+        let (rx, addr) = source(EventStatus::Delivered, true, true, true, None).await;
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "dd-api-key",
+            "12345678abcdefgh12345678abcdefgh".parse().unwrap(),
+        );
+
+        let mut events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        addr,
+                        &serde_json::to_string(&[LogMsg {
+                            message: Bytes::from("baz"),
+                            timestamp: 789,
+                            hostname: Bytes::from("festeburg"),
+                            status: Bytes::from("notice"),
+                            service: Bytes::from("vector"),
+                            ddsource: Bytes::from("curl"),
+                            ddtags: Bytes::from("one,two,three"),
+                        }])
+                            .unwrap(),
+                        headers,
+                        "/v1/input/"
+                    )
+                        .await
+                );
+            },
+            rx,
+            1,
+        )
+            .await;
+
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log["message"], "baz".into());
+            assert_eq!(log["timestamp"], 789.into());
+            assert_eq!(log["hostname"], "festeburg".into());
+            assert_eq!(log["status"], "notice".into());
+            assert_eq!(log["service"], "vector".into());
+            assert_eq!(log["ddsource"], "curl".into());
+            assert_eq!(log["ddtags"], "one,two,three".into());
+            assert_eq!(log[log_schema().source_type_key()], "datadog_agent".into());
+            assert_eq!(
+                &event.metadata().datadog_api_key().as_ref().unwrap()[..],
+                "12345678abcdefgh12345678abcdefgh"
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn delivery_failure() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Rejected, true, true).await;
+        let (rx, addr) = source(EventStatus::Rejected, true, true, false, None).await;
 
         spawn_collect_n(
             async move {
@@ -1109,7 +1245,7 @@ mod tests {
     #[tokio::test]
     async fn ignores_disabled_acknowledgements() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Rejected, false, true).await;
+        let (rx, addr) = source(EventStatus::Rejected, false, true, false, None).await;
 
         let events = spawn_collect_n(
             async move {
@@ -1144,7 +1280,7 @@ mod tests {
     #[tokio::test]
     async fn ignores_api_key() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Delivered, true, false).await;
+        let (rx, addr) = source(EventStatus::Delivered, true, false, false, None).await;
 
         let mut headers = HeaderMap::new();
         headers.insert(
@@ -1197,7 +1333,7 @@ mod tests {
     #[tokio::test]
     async fn decode_series_endpoints() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+        let (rx, addr) = source(EventStatus::Delivered, true, true, false, None).await;
 
         let mut headers = HeaderMap::new();
         headers.insert(
@@ -1343,7 +1479,7 @@ mod tests {
     #[tokio::test]
     async fn decode_sketches() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
+        let (rx, addr) = source(EventStatus::Delivered, true, true, false, None).await;
 
         let mut headers = HeaderMap::new();
         headers.insert(
