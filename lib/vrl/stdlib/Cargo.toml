@@ -24,13 +24,13 @@ hex = { version = "0.4", optional = true }
 hostname = { version = "0.3", optional = true }
 indexmap = { version = "~1.7.0", default-features = false, optional = true}
 lazy_static = { version = "1", optional = true }
-md-5 = { version = "0.9", optional = true }
+md-5 = { version = "0.10", optional = true }
 nom = { version = "7", optional = true }
 percent-encoding = { version = "2.1", optional = true }
 regex = { version = "1", optional = true }
 rust_decimal = { version = "1", optional = true }
 serde_json = { version = "1", optional = true }
-sha-1 = { version = "0.9", optional = true }
+sha-1 = { version = "0.10", optional = true }
 sha-2 = { package = "sha2", version = "0.9", optional = true }
 sha-3 = { package = "sha3", version = "0.9", optional = true }
 shared = { path = "../../shared", default-features = false, optional = true }

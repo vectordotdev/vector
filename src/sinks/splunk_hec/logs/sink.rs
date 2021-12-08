@@ -1,8 +1,10 @@
+use std::sync::Arc;
 use std::{fmt, num::NonZeroUsize};
 
 use async_trait::async_trait;
 use futures_util::{future, stream::BoxStream, StreamExt};
 use tower::Service;
+use vector_core::partition::Partitioner;
 use vector_core::stream::DriverResponse;
 use vector_core::{
     config::log_schema,
@@ -66,7 +68,7 @@ where
                     timestamp_nanos_key,
                 ))
             })
-            .batched(self.batch_settings.into_byte_size_config())
+            .batched_partitioned(EventPartitioner::default(), self.batch_settings)
             .request_builder(builder_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
@@ -93,6 +95,18 @@ where
 {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
+    }
+}
+
+#[derive(Default)]
+struct EventPartitioner;
+
+impl Partitioner for EventPartitioner {
+    type Item = HecProcessedEvent;
+    type Key = Option<Arc<str>>;
+
+    fn partition(&self, item: &Self::Item) -> Self::Key {
+        item.event.metadata().splunk_hec_token().clone()
     }
 }
 

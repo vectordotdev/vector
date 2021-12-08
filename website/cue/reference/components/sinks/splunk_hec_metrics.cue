@@ -127,13 +127,6 @@ components: sinks: splunk_hec_metrics: {
 				syntax: "template"
 			}
 		}
-		token: {
-			description: "Your Splunk HEC token."
-			required:    true
-			type: string: {
-				examples: ["${SPLUNK_HEC_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
-			}
-		}
 	}
 
 	input: {

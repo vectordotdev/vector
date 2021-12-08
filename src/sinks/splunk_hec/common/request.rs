@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use vector_core::{
     buffers::Ackable,
     event::{EventFinalizers, Finalizable},
@@ -12,6 +14,7 @@ pub struct HecRequest {
     pub events_count: usize,
     pub events_byte_size: usize,
     pub finalizers: EventFinalizers,
+    pub passthrough_token: Option<Arc<str>>,
 }
 
 impl ByteSizeOf for HecRequest {
