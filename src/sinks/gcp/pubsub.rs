@@ -366,6 +366,7 @@ mod integration_tests {
 
     #[derive(Debug, Deserialize)]
     #[allow(non_snake_case)]
+    #[allow(dead_code)] // deserialize all fields
     struct PullMessageOuter {
         ackId: String,
         message: PullMessage,
@@ -373,6 +374,7 @@ mod integration_tests {
 
     #[derive(Debug, Deserialize)]
     #[allow(non_snake_case)]
+    #[allow(dead_code)] // deserialize all fields
     struct PullMessage {
         data: String,
         messageId: String,

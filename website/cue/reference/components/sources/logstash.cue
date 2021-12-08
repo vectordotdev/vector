@@ -72,14 +72,14 @@ components: sources: logstash: {
 			}
 			timestamp: fields._current_timestamp & {
 				description: """
-						The timestamp field will be set to the first one found of the following:
+					The timestamp field will be set to the first one found of the following:
 
-						1. The `timestamp` field on the event
-						2. The `@timestamp` field on the event if it can be parsed as a timestamp
-						3. The current timestamp
+					1. The `timestamp` field on the event
+					2. The `@timestamp` field on the event if it can be parsed as a timestamp
+					3. The current timestamp
 
-						The assigned field, `timestamp`, could be different depending if you have configured
-						`log_schema.timestamp_key`.
+					The assigned field, `timestamp`, could be different depending if you have configured
+					`log_schema.timestamp_key`.
 					"""
 			}
 			"*": {
