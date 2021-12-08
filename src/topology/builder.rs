@@ -38,7 +38,12 @@ lazy_static! {
     static ref ENRICHMENT_TABLES: enrichment::TableRegistry = enrichment::TableRegistry::default();
 }
 
-static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(num_cpus::get);
+static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
+    crate::app::WORKER_THREADS
+        .get()
+        .map(std::num::NonZeroUsize::get)
+        .unwrap_or_else(num_cpus::get)
+});
 
 pub async fn load_enrichment_tables<'a>(
     config: &'a super::Config,
