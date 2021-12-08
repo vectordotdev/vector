@@ -96,10 +96,11 @@ impl GenerateConfig for CloudwatchLogsSinkConfig {
 //TODO: use `Default` instead
 fn default_config(e: StandardEncodings) -> CloudwatchLogsSinkConfig {
     CloudwatchLogsSinkConfig {
+        encoding: e.into(),
         group_name: Default::default(),
         stream_name: Default::default(),
         region: Default::default(),
-        encoding: e.into(),
+
         create_missing_group: Default::default(),
         create_missing_stream: Default::default(),
         compression: Default::default(),
@@ -124,10 +125,7 @@ mod tests {
     use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsSinkConfig;
 
     #[test]
-    fn test_config() {
-        #[test]
-        fn test_generate_config() {
-            crate::test_util::test_generate_config::<CloudwatchLogsSinkConfig>();
-        }
+    fn test_generate_config() {
+        crate::test_util::test_generate_config::<CloudwatchLogsSinkConfig>();
     }
 }

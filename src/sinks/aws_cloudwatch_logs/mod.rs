@@ -7,7 +7,6 @@ mod service;
 mod sink;
 
 mod integration_tests;
-mod tests;
 
 use self::config::CloudwatchLogsSinkConfig;
 
