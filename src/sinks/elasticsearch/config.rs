@@ -51,6 +51,8 @@ pub struct ElasticSearchConfig {
     pub headers: Option<IndexMap<String, String>>,
 
     pub doc_type: Option<String>,
+    #[serde(default)]
+    pub suppress_type_name: bool,
     pub id_key: Option<String>,
     pub pipeline: Option<String>,
     #[serde(default)]
@@ -311,6 +313,7 @@ impl SinkConfig for ElasticSearchConfig {
         // This is a bit ugly, but removes a String allocation on every event
         let mut encoding = self.encoding.clone();
         encoding.codec.doc_type = common.doc_type;
+        encoding.codec.suppress_type_name = common.suppress_type_name;
 
         let request_builder = ElasticsearchRequestBuilder {
             compression: self.compression,

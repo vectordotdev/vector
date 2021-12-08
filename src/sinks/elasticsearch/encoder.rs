@@ -31,6 +31,7 @@ impl ByteSizeOf for ProcessedEvent {
 #[derive(PartialEq, Default, Clone, Debug)]
 pub struct ElasticSearchEncoder {
     pub doc_type: String,
+    pub suppress_type_name: bool,
 }
 
 impl Encoder<Vec<ProcessedEvent>> for ElasticSearchEncoder {
@@ -46,6 +47,7 @@ impl Encoder<Vec<ProcessedEvent>> for ElasticSearchEncoder {
                 event.bulk_action.as_str(),
                 &event.index,
                 &self.doc_type,
+                self.suppress_type_name,
                 &event.id,
             )?;
             written_bytes +=
@@ -70,24 +72,37 @@ fn write_bulk_action(
     bulk_action: &str,
     index: &str,
     doc_type: &str,
+    suppress_type: bool,
     id: &Option<String>,
 ) -> std::io::Result<usize> {
     as_tracked_write(
         writer,
-        (bulk_action, index, doc_type, id),
-        |writer, (bulk_action, index, doc_type, id)| {
+        (bulk_action, index, doc_type, id, suppress_type),
+        |writer, (bulk_action, index, doc_type, id, suppress_type)| {
             if let Some(id) = id {
-                write!(
-                    writer,
-                    r#"{{"{}":{{"_index":"{}","_type":"{}","_id":"{}"}}}}"#,
-                    bulk_action, index, doc_type, id
-                )
+                if suppress_type {
+                    write!(
+                        writer,
+                        r#"{{"{}":{{"_index":"{}","_id":"{}"}}}}"#,
+                        bulk_action, index, id
+                    )
+                } else {
+                    write!(
+                        writer,
+                        r#"{{"{}":{{"_index":"{}","_type":"{}","_id":"{}"}}}}"#,
+                        bulk_action, index, doc_type, id
+                    )
+                }
             } else {
-                write!(
-                    writer,
-                    r#"{{"{}":{{"_index":"{}","_type":"{}"}}}}"#,
-                    bulk_action, index, doc_type
-                )
+                if suppress_type {
+                    write!(writer, r#"{{"{}":{{"_index":"{}"}}}}"#, bulk_action, index)
+                } else {
+                    write!(
+                        writer,
+                        r#"{{"{}":{{"_index":"{}","_type":"{}"}}}}"#,
+                        bulk_action, index, doc_type
+                    )
+                }
             }
         },
     )
