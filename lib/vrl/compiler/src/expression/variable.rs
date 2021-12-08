@@ -32,10 +32,6 @@ impl Variable {
         &self.ident
     }
 
-    pub fn value(&self) -> Option<&Value> {
-        self.value.as_ref()
-    }
-
     pub fn noop(ident: Ident) -> Self {
         Self { ident, value: None }
     }
@@ -48,6 +44,10 @@ impl Expression for Variable {
             .variable(&self.ident)
             .cloned()
             .unwrap_or(Value::Null))
+    }
+
+    fn as_value(&self) -> Option<Value> {
+        self.value.clone()
     }
 
     fn type_def(&self, state: &State) -> TypeDef {

@@ -85,9 +85,8 @@ impl Expression for Query {
     fn as_value(&self) -> Option<Value> {
         match self.target {
             Target::Internal(ref variable) => variable
-                .value()
-                .and_then(|v| v.get_by_path(self.path()))
-                .cloned(),
+                .as_value()
+                .and_then(|v| v.get_by_path(self.path()).cloned()),
             _ => None,
         }
     }

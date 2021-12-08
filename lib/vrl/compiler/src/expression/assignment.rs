@@ -53,10 +53,7 @@ impl Assignment {
 
                 let expr = expr.into_inner();
                 let target = Target::try_from(target.into_inner())?;
-                let value = match &expr {
-                    Expr::Literal(v) => Some(v.to_value()),
-                    _ => None,
-                };
+                let value = expr.as_value();
 
                 target.insert_type_def(state, type_def, value);
 
@@ -109,10 +106,7 @@ impl Assignment {
                 let ok = Target::try_from(ok.into_inner())?;
                 let type_def = type_def.infallible();
                 let default = type_def.kind().default_value();
-                let value = match &expr {
-                    Expr::Literal(v) => Some(v.to_value()),
-                    _ => None,
-                };
+                let value = expr.as_value();
 
                 ok.insert_type_def(state, type_def, value);
 
