@@ -26,7 +26,9 @@ use vector_core::transform::DataType;
 #[serde(deny_unknown_fields)]
 pub struct HecMetricsSinkConfig {
     pub default_namespace: Option<String>,
-    pub token: String,
+    // Deprecated name
+    #[serde(alias = "token")]
+    pub default_token: String,
     pub endpoint: String,
     #[serde(default = "crate::sinks::splunk_hec::common::host_key")]
     pub host_key: String,
@@ -48,7 +50,7 @@ impl GenerateConfig for HecMetricsSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             default_namespace: None,
-            token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned(),
+            default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned(),
             endpoint: "http://localhost:8088".to_owned(),
             host_key: host_key(),
             index: None,
@@ -69,8 +71,12 @@ impl GenerateConfig for HecMetricsSinkConfig {
 impl SinkConfig for HecMetricsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = create_client(&self.tls, cx.proxy())?;
-        let healthcheck =
-            build_healthcheck(self.endpoint.clone(), self.token.clone(), client.clone()).boxed();
+        let healthcheck = build_healthcheck(
+            self.endpoint.clone(),
+            self.default_token.clone(),
+            client.clone(),
+        )
+        .boxed();
         let sink = self.build_processor(client, cx)?;
         Ok((sink, healthcheck))
     }
@@ -95,8 +101,11 @@ impl HecMetricsSinkConfig {
         };
 
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-        let http_request_builder =
-            HttpRequestBuilder::new(self.endpoint.clone(), self.token.clone(), self.compression);
+        let http_request_builder = HttpRequestBuilder::new(
+            self.endpoint.clone(),
+            self.default_token.clone(),
+            self.compression,
+        );
         let service = ServiceBuilder::new()
             .settings(request_settings, HecRetryLogic)
             .service(HecService::new(
