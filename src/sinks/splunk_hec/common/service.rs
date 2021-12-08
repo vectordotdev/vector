@@ -66,7 +66,11 @@ impl HecService {
             let request_builder = Arc::clone(&http_request_builder);
             let future: BoxFuture<'static, Result<http::Request<Vec<u8>>, crate::Error>> =
                 Box::pin(async move {
-                    request_builder.build_request(req.body, "/services/collector/event")
+                    request_builder.build_request(
+                        req.body,
+                        "/services/collector/event",
+                        req.passthrough_token,
+                    )
                 });
             future
         });
@@ -173,7 +177,7 @@ impl Service<HecRequest> for HecService {
 
 pub struct HttpRequestBuilder {
     pub endpoint: String,
-    pub token: String,
+    pub default_token: String,
     pub compression: Compression,
     // A Splunk channel must be a GUID/UUID formatted value
     // https://docs.splunk.com/Documentation/Splunk/8.2.3/Data/AboutHECIDXAck#About_channels_and_sending_data
@@ -181,11 +185,11 @@ pub struct HttpRequestBuilder {
 }
 
 impl HttpRequestBuilder {
-    pub fn new(endpoint: String, token: String, compression: Compression) -> Self {
+    pub fn new(endpoint: String, default_token: String, compression: Compression) -> Self {
         let channel = Uuid::new_v4().to_hyphenated().to_string();
         Self {
             endpoint,
-            token,
+            default_token,
             compression,
             channel,
         }
@@ -195,12 +199,19 @@ impl HttpRequestBuilder {
         &self,
         body: Vec<u8>,
         path: &str,
+        passthrough_token: Option<Arc<str>>,
     ) -> Result<Request<Vec<u8>>, crate::Error> {
         let uri = build_uri(self.endpoint.as_str(), path).context(UriParseError)?;
 
         let mut builder = Request::post(uri)
             .header("Content-Type", "application/json")
-            .header("Authorization", format!("Splunk {}", self.token.as_str()))
+            .header(
+                "Authorization",
+                format!(
+                    "Splunk {}",
+                    passthrough_token.unwrap_or_else(|| self.default_token.as_str().into())
+                ),
+            )
             .header("X-Splunk-Request-Channel", self.channel.as_str());
 
         if let Some(ce) = self.compression.content_encoding() {
@@ -265,6 +276,7 @@ mod tests {
             events_count: 1,
             events_byte_size,
             finalizers: EventFinalizers::default(),
+            passthrough_token: None,
         }
     }
 

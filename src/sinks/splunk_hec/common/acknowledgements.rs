@@ -189,7 +189,7 @@ impl HecAckClient {
             serde_json::to_vec(request_body).map_err(|_| HecAckApiError::ClientBuildRequest)?;
         let request = self
             .http_request_builder
-            .build_request(request_body_bytes, "/services/collector/ack")
+            .build_request(request_body_bytes, "/services/collector/ack", None)
             .map_err(|_| HecAckApiError::ClientBuildRequest)?;
 
         let response = self
