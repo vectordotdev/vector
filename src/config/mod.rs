@@ -12,7 +12,7 @@ use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to ou
 use serde::{Deserialize, Serialize};
 use vector_core::buffers::{Acker, BufferConfig, BufferType};
 pub use vector_core::{
-    config::{DataType, GlobalOptions},
+    config::{DataType, GlobalOptions, Output},
     transform::{ExpandType, TransformConfig, TransformContext},
 };
 
