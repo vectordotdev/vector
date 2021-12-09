@@ -115,7 +115,7 @@ vector-vrl-functions = { path = "lib/vector-vrl-functions" }
 
 # Tokio / Futures
 async-stream = "0.3.2"
-async-trait = "0.1.51"
+async-trait = "0.1.52"
 futures = { version = "0.3.17", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.13.1", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
@@ -164,7 +164,7 @@ tower = { version = "0.4.10", default-features = false, features = ["buffer", "l
 tower-layer = { version = "0.3.1", default-features = false }
 
 # Serde
-serde = { version = "1.0.130", default-features = false, features = ["derive"] }
+serde = { version = "1.0.131", default-features = false, features = ["derive"] }
 serde_bytes = { version = "0.11.5", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.68", default-features = false, features = ["raw_value"] }
 serde_yaml = { version = "0.8.21", default-features = false }
