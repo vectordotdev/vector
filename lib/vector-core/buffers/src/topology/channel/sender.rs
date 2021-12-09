@@ -96,7 +96,7 @@ where
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         match self.project() {
             // There's nothing to actually flush when using `PollSender<T>`.
-            ProjectedSenderAdapter::Channel(tx) => Poll::Ready(Ok(())),
+            ProjectedSenderAdapter::Channel(_) => Poll::Ready(Ok(())),
             ProjectedSenderAdapter::Opaque(inner) => inner.as_mut().poll_flush(cx),
         }
     }
@@ -192,7 +192,7 @@ impl<T: Bufferable> BufferSender<T> {
 impl<T: Bufferable> Sink<T> for BufferSender<T> {
     type Error = ();
 
-    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let this = self.project();
 
         // For whatever reason, the caller is calling `poll_ready` again after a successful previous
@@ -255,7 +255,7 @@ impl<T: Bufferable> Sink<T> for BufferSender<T> {
         result
     }
 
-    fn start_send(mut self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
         let this = self.project();
         let item_size = this.instrumentation.as_ref().map(|_| item.size_of());
 
@@ -315,7 +315,7 @@ impl<T: Bufferable> Sink<T> for BufferSender<T> {
         Poll::Ready(Ok(()))
     }
 
-    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let this = self.project();
 
         if let Some(overflow) = this.overflow.as_pin_mut() {

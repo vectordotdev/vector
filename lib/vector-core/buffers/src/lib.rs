@@ -18,11 +18,7 @@ mod config;
 pub mod encoding;
 pub use config::{BufferConfig, BufferType};
 pub mod disk;
-
 pub mod disk_v2;
-
-#[cfg(feature = "helpers")]
-pub mod helpers;
 
 mod internal_events;
 #[cfg(test)]

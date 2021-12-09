@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::error::Error;
 use std::mem;
 use std::path::PathBuf;
@@ -13,6 +14,8 @@ use crate::buffer_usage_data::BufferUsageHandle;
 use crate::disk_v2::{Buffer, DiskBufferConfig, Reader, Writer, WriterError};
 use crate::topology::channel::{ReceiverAdapter, SenderAdapter};
 use crate::{topology::builder::IntoBuffer, Acker, Bufferable};
+
+const MAX_BUFFERED_ITEMS: usize = 128;
 
 pub struct DiskV2Buffer {
     id: String,
@@ -100,6 +103,7 @@ where
     }
 }
 
+#[derive(Debug)]
 enum WriterState<T> {
     Inconsistent,
     Idle(Writer<T>),
@@ -131,6 +135,7 @@ where
     T: Bufferable,
 {
     state: WriterState<T>,
+    buffered: VecDeque<T>,
     write_future: ReusableBoxFuture<(Writer<T>, Result<usize, WriterError<T>>)>,
     flush_future: ReusableBoxFuture<(Writer<T>, Result<(), WriterError<T>>)>,
 }
@@ -142,6 +147,7 @@ where
     pub fn new(writer: Writer<T>) -> Self {
         Self {
             state: WriterState::Idle(writer),
+            buffered: VecDeque::new(),
             write_future: ReusableBoxFuture::new(make_write_future(None, None)),
             flush_future: ReusableBoxFuture::new(make_flush_future(None)),
         }
@@ -163,36 +169,62 @@ where
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), WriterError<T>>> {
-        match self.state {
-            WriterState::Inconsistent | WriterState::Idle(..) => {
-                unreachable!("writer state not expected")
-            }
-            WriterState::Writing => self.drive_write_operation(cx),
-            WriterState::Flushing => self.drive_flush_operation(cx),
-        }
+        let (writer, result) = match &self.state {
+            WriterState::Writing => ready!(self.drive_write_operation(cx)),
+            WriterState::Flushing => ready!(self.drive_flush_operation(cx)),
+            s => unreachable!("writer state not expected: {:?}", s),
+        };
+
+        self.state = WriterState::Idle(writer);
+        Poll::Ready(result)
     }
 
-    fn drive_write_operation(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), WriterError<T>>> {
-        match self.state {
+    fn drive_write_operation(
+        &mut self,
+        cx: &mut Context<'_>,
+    ) -> Poll<(Writer<T>, Result<(), WriterError<T>>)> {
+        match &self.state {
             WriterState::Writing => {
                 let (writer, result) = ready!(self.write_future.poll(cx));
-                self.state = WriterState::Idle(writer);
                 // TODO: do we _need_ to reset the future here?
-                Poll::Ready(result.map(|_| ()))
+                Poll::Ready((writer, result.map(|_| ())))
             }
-            _ => unreachable!("writer state not expected"),
+            s => unreachable!("writer state not expected: {:?}", s),
         }
     }
 
-    fn drive_flush_operation(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), WriterError<T>>> {
-        match self.state {
+    fn drive_flush_operation(
+        &mut self,
+        cx: &mut Context<'_>,
+    ) -> Poll<(Writer<T>, Result<(), WriterError<T>>)> {
+        match &self.state {
             WriterState::Flushing => {
                 let (writer, result) = ready!(self.flush_future.poll(cx));
-                self.state = WriterState::Idle(writer);
                 // TODO: do we _need_ to reset the future here?
-                Poll::Ready(result.map(|_| ()))
+                Poll::Ready((writer, result.map(|_| ())))
             }
-            _ => unreachable!("writer state not expected"),
+            s => unreachable!("writer state not expected: {:?}", s),
+        }
+    }
+
+    fn enqueue_write_operation(&mut self, record: T) {
+        match mem::replace(&mut self.state, WriterState::Inconsistent) {
+            WriterState::Idle(writer) => {
+                self.write_future
+                    .set(make_write_future(Some(writer), Some(record)));
+                self.state = WriterState::Writing;
+            }
+            s => unreachable!("writer state not expected: {:?}", s),
+        }
+    }
+
+    fn enqueue_flush_operation(&mut self) {
+        match mem::replace(&mut self.state, WriterState::Inconsistent) {
+            WriterState::Idle(writer) => {
+                self.flush_future.set(make_flush_future(Some(writer)));
+                self.state = WriterState::Flushing;
+            }
+            s => unreachable!("writer state not expected: {:?}", s),
         }
     }
 }
@@ -203,82 +235,102 @@ where
 {
     type Error = ();
 
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.get_mut().try_ready(cx).map_err(|e| {
+    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        // Make sure any in-flight operation is completed first.
+        if let Err(e) = ready!(self.as_mut().get_mut().try_ready(cx)) {
             error!("{}", e);
-            ()
-        })
-    }
+            return Poll::Ready(Err(()));
+        }
 
-    fn start_send(mut self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        if let WriterState::Idle(writer) = mem::replace(&mut self.state, WriterState::Inconsistent)
-        {
-            self.write_future
-                .set(make_write_future(Some(writer), Some(item)));
-            self.state = WriterState::Writing;
-            Ok(())
+        // Now make sure our internal buffer isn't too large before accepting another item.
+        if self.buffered.len() < MAX_BUFFERED_ITEMS {
+            Poll::Ready(Ok(()))
         } else {
-            unreachable!("writer state not expected")
+            Poll::Pending
         }
     }
 
+    fn start_send(mut self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+        // Make sure the caller isn't dodging `poll_ready`.
+        if self.buffered.len() >= MAX_BUFFERED_ITEMS {
+            error!(
+                "`start_send` called without getting a successful result from `poll_ready` first"
+            );
+            return Err(());
+        }
+
+        self.buffered.push_back(item);
+        Ok(())
+    }
+
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        // Logic:
+        //
+        // loop:
+        //   if !self.buffered.is_empty():
+        //     - drive in-flight operation until ready
+        //     - enqueue write operation
+        //   else:
+        //     - drive in-flight operation
+        //     -- if operation was flush, return when fully driven
+        //     - enqueue flush operation
+        //
+        // Any error at any point gets returned immediately.
+
         loop {
-            match mem::replace(&mut self.state, WriterState::Inconsistent) {
-                WriterState::Inconsistent => unreachable!("writer state not expected"),
-                WriterState::Idle(writer) => {
-                    self.flush_future.set(make_flush_future(Some(writer)));
-                    self.state = WriterState::Flushing;
+            if !self.buffered.is_empty() {
+                // Drive any in-flight operation that we have going on.
+                if !self.state.is_idle() {
+                    if let Err(e) = ready!(self.drive_pending_operation(cx)) {
+                        error!("{}", e);
+                        return Poll::Ready(Err(()));
+                    }
                 }
-                // `drive_write_operation` updates the state for us, so we'll be in a
-                // consistent state even with the early return here
-                WriterState::Writing => match self.drive_write_operation(cx) {
-                    // not done yet, maintain original state
-                    Poll::Pending => {
-                        self.state = WriterState::Writing;
-                        return Poll::Pending;
+
+                // Now we're idle, so enqueue another write operation.
+                let record = self
+                    .buffered
+                    .pop_front()
+                    .expect("buffered items should not be empty");
+                self.enqueue_write_operation(record);
+            } else {
+                // We're all out of items to send, so now we need to flush the writer.  We're still
+                // driving the last write operation, though, so we need to make sure that's cleared out.
+                if let WriterState::Writing = &self.state {
+                    if let Err(e) = ready!(self.drive_pending_operation(cx)) {
+                        error!("{}", e);
+                        return Poll::Ready(Err(()));
                     }
-                    // done with write, only return if error encountered
-                    Poll::Ready(result) => {
-                        if let Err(e) = result {
-                            error!("{}", e);
-                            return Poll::Ready(Err(()));
-                        }
-                    }
-                },
-                // `drive_flush_operation` updates the state for us, so we'll be in a
-                // consistent state even with the early return here
-                WriterState::Flushing => match self.drive_flush_operation(cx) {
-                    // not done yet, maintain original state
-                    Poll::Pending => {
-                        self.state = WriterState::Flushing;
-                        return Poll::Pending;
-                    }
-                    // all done with flush, return result regardless
-                    Poll::Ready(result) => {
-                        return Poll::Ready(result.map_err(|e| {
-                            error!("{}", e);
-                            ()
-                        }))
-                    }
-                },
+                }
+
+                // We've got any in-flight write operation out of the way, now it's time to flush.
+                if self.state.is_idle() {
+                    self.enqueue_flush_operation();
+                } else {
+                    let result = ready!(self.drive_pending_operation(cx));
+                    return Poll::Ready(result.map_err(|e| {
+                        error!("{}", e);
+                    }));
+                }
             }
         }
     }
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // try to finish any in-flight write, and ensure we complete one last flush
+        // Try to drive any remaining items into the writer, as well as one final flush.
         if let Err(e) = ready!(self.as_mut().poll_flush(cx)) {
             return Poll::Ready(Err(e));
         }
 
-        // now actually close the writer
+        // Now we can actually close the writer for real.  We leave the state as Inconsistent here
+        // so that any future calls will panic and let us know there's some bad juju happening with
+        // the caller, trying to use a previously-closed writer.
         match mem::replace(&mut self.state, WriterState::Inconsistent) {
             WriterState::Idle(mut writer) => {
                 writer.close();
                 Poll::Ready(Ok(()))
             }
-            _ => unreachable!("writer state not expected"),
+            s => unreachable!("writer state not expected: {:?}", s),
         }
     }
 }

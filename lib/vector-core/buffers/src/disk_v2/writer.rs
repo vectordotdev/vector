@@ -89,6 +89,7 @@ where
 }
 
 /// Buffered writer that handles encoding, checksumming, and serialization of records.
+#[derive(Debug)]
 pub(super) struct RecordWriter<W, T> {
     writer: BufWriter<W>,
     encode_buf: Vec<u8>,
@@ -249,6 +250,7 @@ impl<T> RecordWriter<File, T> {
 }
 
 /// Writes records to the buffer.
+#[derive(Debug)]
 pub struct Writer<T> {
     ledger: Arc<Ledger>,
     config: DiskBufferConfig,

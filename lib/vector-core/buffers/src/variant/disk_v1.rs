@@ -2,13 +2,8 @@ use std::error::Error;
 use std::path::PathBuf;
 
 use async_trait::async_trait;
-use futures::SinkExt;
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio_stream::StreamExt;
-use tokio_util::sync::ReusableBoxFuture;
 
 use crate::buffer_usage_data::BufferUsageHandle;
-use crate::disk::leveldb_buffer::{Reader, Writer};
 use crate::topology::channel::{ReceiverAdapter, SenderAdapter};
 use crate::{disk::open, topology::builder::IntoBuffer, Acker, Bufferable};
 
