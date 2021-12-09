@@ -229,8 +229,6 @@ where
     S: Into<String>,
     F: Fn(&Value) -> bool + Send + Sync + Clone + 'static,
 {
-    let field = field.into();
-
     array_match(field, move |values| values.iter().any(&func))
 }
 
