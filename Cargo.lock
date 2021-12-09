@@ -1092,7 +1092,6 @@ dependencies = [
  "async-trait",
  "bytecheck",
  "bytes 1.1.0",
- "console-subscriber 0.1.0 (git+https://github.com/tokio-rs/console)",
  "core_common",
  "crc32fast",
  "criterion",
@@ -1127,7 +1126,7 @@ dependencies = [
  "tokio-util",
  "tracing 0.1.29",
  "tracing-fluent-assertions",
- "tracing-subscriber 0.2.25",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -1453,23 +1452,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "console-api"
-version = "0.1.0"
-source = "git+https://github.com/tokio-rs/console#bbce8e78bab3277b6e533d50df3fb2a7463c3746"
-dependencies = [
- "prost 0.9.0",
- "prost-types 0.9.0",
- "tonic 0.6.1",
- "tonic-build 0.6.0",
- "tracing-core 0.1.21",
-]
-
-[[package]]
 name = "console-subscriber"
 version = "0.1.0"
 source = "git+https://github.com/tokio-rs/console?rev=f2c30d52c9f22de69bac38009a9183135808806c#f2c30d52c9f22de69bac38009a9183135808806c"
 dependencies = [
- "console-api 0.1.0 (git+https://github.com/tokio-rs/console?rev=f2c30d52c9f22de69bac38009a9183135808806c)",
+ "console-api",
  "futures 0.3.18",
  "hdrhistogram",
  "humantime",
@@ -1481,27 +1468,7 @@ dependencies = [
  "tonic 0.5.2",
  "tracing 0.1.29",
  "tracing-core 0.1.21",
- "tracing-subscriber 0.2.25",
-]
-
-[[package]]
-name = "console-subscriber"
-version = "0.1.0"
-source = "git+https://github.com/tokio-rs/console#bbce8e78bab3277b6e533d50df3fb2a7463c3746"
-dependencies = [
- "console-api 0.1.0 (git+https://github.com/tokio-rs/console)",
- "futures 0.3.18",
- "hdrhistogram",
- "humantime",
- "serde",
- "serde_json",
- "thread_local",
- "tokio",
- "tokio-stream",
- "tonic 0.6.1",
- "tracing 0.1.29",
- "tracing-core 0.1.21",
- "tracing-subscriber 0.3.3",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -4075,7 +4042,7 @@ dependencies = [
  "once_cell",
  "tracing 0.1.29",
  "tracing-core 0.1.21",
- "tracing-subscriber 0.2.25",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -6966,7 +6933,7 @@ dependencies = [
  "snafu",
  "tokio",
  "tracing 0.1.29",
- "tracing-subscriber 0.2.25",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -7879,7 +7846,7 @@ checksum = "86c549d116f461c60789ab23dd1b7d27317e18b36619ef58c5bd9e4b507da31c"
 dependencies = [
  "tracing 0.1.29",
  "tracing-core 0.1.21",
- "tracing-subscriber 0.2.25",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -7913,7 +7880,7 @@ dependencies = [
  "mock_instant",
  "tracing 0.1.29",
  "tracing-core 0.1.21",
- "tracing-subscriber 0.2.25",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -7957,17 +7924,6 @@ dependencies = [
  "tracing-core 0.1.21",
  "tracing-log",
  "tracing-serde",
-]
-
-[[package]]
-name = "tracing-subscriber"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "245da694cc7fc4729f3f418b304cb57789f1bed2a78c575407ab8a23f53cb4d3"
-dependencies = [
- "sharded-slab",
- "thread_local",
- "tracing-core 0.1.21",
 ]
 
 [[package]]
@@ -8350,7 +8306,7 @@ dependencies = [
  "chrono",
  "cidr-utils",
  "colored",
- "console-subscriber 0.1.0 (git+https://github.com/tokio-rs/console?rev=f2c30d52c9f22de69bac38009a9183135808806c)",
+ "console-subscriber",
  "criterion",
  "crossterm 0.21.0",
  "csv",
@@ -8488,7 +8444,7 @@ dependencies = [
  "tracing-futures 0.2.5",
  "tracing-limit",
  "tracing-log",
- "tracing-subscriber 0.2.25",
+ "tracing-subscriber",
  "tracing-tower",
  "trust-dns-proto",
  "tui",
@@ -8601,7 +8557,7 @@ dependencies = [
  "tracing 0.1.29",
  "tracing-core 0.1.21",
  "tracing-log",
- "tracing-subscriber 0.2.25",
+ "tracing-subscriber",
  "twox-hash",
  "typetag",
  "vrl",
@@ -8758,7 +8714,7 @@ dependencies = [
  "serde_json",
  "shared",
  "structopt",
- "tracing-subscriber 0.2.25",
+ "tracing-subscriber",
  "vrl",
  "vrl-parser",
  "vrl-stdlib",

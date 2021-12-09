@@ -1,7 +1,6 @@
 use std::{error, fmt};
 
 use bytes::{Buf, BufMut};
-use tokio::sync::mpsc::Sender;
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
@@ -12,7 +11,7 @@ use crate::{
     },
     Bufferable,
 };
-use crate::{MemoryBuffer, WhenFull};
+use crate::{MemoryV2Buffer, WhenFull};
 
 // Silly implementation of `EncodeBytes`/`DecodeBytes` to fulfill `Bufferable` for our test buffer code.
 impl EncodeBytes<u64> for u64 {
@@ -67,7 +66,7 @@ pub async fn build_buffer(
     match mode {
         WhenFull::Block | WhenFull::DropNewest => {
             let usage_handle = BufferUsageHandle::testing();
-            let channel = Box::new(MemoryBuffer::new(capacity));
+            let channel = Box::new(MemoryV2Buffer::new(capacity));
             let (sender, receiver, _) = channel
                 .into_buffer_parts(&usage_handle)
                 .await
@@ -80,7 +79,7 @@ pub async fn build_buffer(
             let usage_handle = BufferUsageHandle::testing();
             let overflow_mode = overflow_mode
                 .expect("overflow_mode must be specified when base is in overflow mode");
-            let overflow_channel = Box::new(MemoryBuffer::new(capacity));
+            let overflow_channel = Box::new(MemoryV2Buffer::new(capacity));
             let (overflow_sender, overflow_receiver, _) = overflow_channel
                 .into_buffer_parts(&usage_handle)
                 .await
@@ -88,7 +87,7 @@ pub async fn build_buffer(
             let overflow_sender = BufferSender::new(overflow_sender, overflow_mode);
             let overflow_receiver = BufferReceiver::new(overflow_receiver);
 
-            let base_channel = Box::new(MemoryBuffer::new(capacity));
+            let base_channel = Box::new(MemoryV2Buffer::new(capacity));
             let (base_sender, base_receiver, _) = base_channel
                 .into_buffer_parts(&usage_handle)
                 .await

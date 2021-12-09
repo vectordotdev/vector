@@ -11,7 +11,6 @@ use futures::{Sink, Stream};
 use quickcheck::{QuickCheck, TestResult};
 use std::pin::Pin;
 use tokio::runtime::Handle;
-use tracing::Span;
 
 use super::common::Variant;
 

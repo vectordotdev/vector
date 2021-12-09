@@ -3,7 +3,7 @@ use crate::{
         builder::TopologyBuilder,
         channel::{BufferReceiver, BufferSender},
     },
-    Acker, Bufferable, DiskV1Buffer, DiskV2Buffer, MemoryBuffer, WhenFull,
+    Acker, Bufferable, DiskV1Buffer, DiskV2Buffer, MemoryV2Buffer, WhenFull,
 };
 use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, path::PathBuf};
@@ -225,7 +225,7 @@ impl BufferType {
                 when_full,
                 max_events,
             } => {
-                builder.stage(MemoryBuffer::new(max_events), when_full);
+                builder.stage(MemoryV2Buffer::new(max_events), when_full);
             }
             BufferType::DiskV1 {
                 when_full,

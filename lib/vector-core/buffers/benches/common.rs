@@ -1,7 +1,7 @@
 use buffers::encoding::{DecodeBytes, EncodeBytes};
 use buffers::topology::builder::IntoBuffer;
 use buffers::topology::channel::{BufferReceiver, BufferSender};
-use buffers::{self, MemoryBuffer, Variant, WhenFull};
+use buffers::{self, MemoryV2Buffer, Variant, WhenFull};
 use bytes::{Buf, BufMut};
 use core_common::byte_size_of::ByteSizeOf;
 use futures::task::{noop_waker, Context, Poll};
@@ -125,7 +125,7 @@ pub fn setup_in_memory_v2<const N: usize>(
         messages.push(Message::new(i as u64));
     }
 
-    let (tx, rx) = MemoryBuffer::new(max_events).into_buffer_parts();
+    let (tx, rx) = MemoryV2Buffer::new(max_events).into_buffer_parts();
     let sender = BufferSender::new(tx, when_full).sink_map_err(|_| ());
     let receiver = BufferReceiver::new(rx);
     (Box::pin(sender), Box::pin(receiver), messages)

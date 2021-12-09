@@ -3,7 +3,7 @@ use crate::{
         builder::TopologyBuilder,
         channel::{BufferReceiver, BufferSender},
     },
-    Bufferable, DiskV1Buffer, DiskV2Buffer, MemoryBuffer, WhenFull,
+    Bufferable, DiskV1Buffer, DiskV2Buffer, MemoryV2Buffer, WhenFull,
 };
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
@@ -54,7 +54,7 @@ impl Variant {
                 when_full,
                 ..
             } => {
-                builder.stage(MemoryBuffer::new(*max_events), *when_full);
+                builder.stage(MemoryV2Buffer::new(*max_events), *when_full);
             }
             Variant::DiskV1 {
                 max_size,
@@ -124,12 +124,13 @@ impl Arbitrary for Variant {
                 id: Id::arbitrary(g).inner,
                 data_dir: PathBuf::arbitrary(g),
             },
-            n => Variant::DiskV2 {
+            2 => Variant::DiskV2 {
                 max_size: u16::arbitrary(g) as usize, // u16 avoids allocation failures
                 when_full: WhenFull::arbitrary(g),
                 id: Id::arbitrary(g).inner,
                 data_dir: PathBuf::arbitrary(g),
             },
+            _ => unreachable!("idx divisor should be 3"),
         }
     }
 

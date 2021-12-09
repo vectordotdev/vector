@@ -15,14 +15,13 @@ use std::{
 use buffers::encoding::{DecodeBytes, EncodeBytes};
 use buffers::topology::channel::{BufferReceiver, BufferSender};
 use buffers::{topology::builder::TopologyBuilder, DiskV1Buffer, WhenFull};
-use buffers::{Acker, Bufferable, DiskV2Buffer, MemoryBuffer};
+use buffers::{Acker, Bufferable, DiskV2Buffer, MemoryV2Buffer, MemoryV1Buffer};
 use bytes::{Buf, BufMut};
 use core_common::byte_size_of::ByteSizeOf;
-use futures::{SinkExt, StreamExt};
+use futures::{SinkExt, StreamExt, stream};
 use hdrhistogram::Histogram;
 use rand::Rng;
 use tokio::task;
-use tokio::time::sleep;
 use tokio::{select, sync::oneshot, time};
 use tracing::Span;
 
@@ -133,11 +132,19 @@ where
     let mut builder = TopologyBuilder::new();
 
     match buffer_type {
-        "in-memory" => {
-            builder.stage(MemoryBuffer::new(max_size_events), WhenFull::Block);
+        "in-memory-v1" => {
+            builder.stage(MemoryV1Buffer::new(max_size_events), WhenFull::Block);
 
             println!(
-                "[buffer-perf] creating in-memory buffer with max_events={}, in blocking mode",
+                "[buffer-perf] creating in-memory v1 buffer with max_events={}, in blocking mode",
+                max_size_events
+            );
+        }
+        "in-memory-v2" => {
+            builder.stage(MemoryV2Buffer::new(max_size_events), WhenFull::Block);
+
+            println!(
+                "[buffer-perf] creating in-memory v2 buffer with max_events={}, in blocking mode",
                 max_size_events
             );
         }
@@ -179,8 +186,6 @@ where
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 16)]
 async fn main() {
-    console_subscriber::init();
-
     let mut args = std::env::args();
     let buffer_type = args.nth(1).unwrap_or_else(|| "disk-v2".to_string());
     let writer_count = args
@@ -197,6 +202,8 @@ async fn main() {
         .nth(0)
         .unwrap_or_else(|| "1".to_string())
         .parse::<usize>()
+        .map_err(|e| e.to_string())
+        .and_then(|n| if n == 0 { Err("value was zero".to_string()) } else { Ok(n) })
         .expect("writer batch size must be valid non-zero integer");
 
     println!(
@@ -224,20 +231,24 @@ async fn main() {
 
     let (writer_tx, mut writer_rx) = oneshot::channel();
     tokio::spawn(async move {
-        //sleep(Duration::from_secs(5)).await;
-
         let mut tx_histo = Histogram::<u64>::new(3).expect("should not fail");
-        let mut records = record_cache.iter().cycle();
+        let mut records = record_cache.iter().cycle().cloned();
 
         let iters = writer_count / writer_batch_size;
         for _ in 0..iters {
             let tx_start = Instant::now();
 
-            for _ in 0..writer_batch_size {
-                let record = records.next().cloned().expect("should never be empty");
-                writer.send(record).await.expect("failed to write record");
-
-                //sleep(Duration::from_secs(1)).await;
+            match writer_batch_size {
+                0 => unreachable!(),
+                1 => {
+                    let record = records.next().expect("should never be empty");
+                    writer.send(record).await.expect("failed to write record");
+                },
+                n => {
+                    let mut record_chunk = (&mut records).take(n).map(Ok);
+                    let mut record_chunk_iter = stream::iter(&mut record_chunk);
+                    writer.send_all(&mut record_chunk_iter).await.expect("failed to write record"); 
+                }
             }
 
             task::yield_now().await;
@@ -247,7 +258,7 @@ async fn main() {
             let elapsed = tx_start.elapsed().as_nanos() as u64;
             tx_histo.record(elapsed).expect("should not fail");
 
-            writer_position.fetch_add(1, Ordering::Relaxed);
+            writer_position.fetch_add(writer_batch_size, Ordering::Relaxed);
         }
 
         writer.flush().await.expect("flush shouldn't fail");
