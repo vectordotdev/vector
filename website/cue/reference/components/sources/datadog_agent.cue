@@ -131,6 +131,16 @@ components: sources: datadog_agent: {
 					use_http: true # this source only supports HTTP/HTTPS
 					logs_no_ssl: true|false # should match source SSL configuration.
 				```
+
+				Sending metrics to Vector requires the Datadog Agent v7.33/6.33 or greater. In order to send metrics the
+				[Datadog Agent](\(urls.datadog_agent_doc)) configuration must be updated with the following options:
+
+				```yaml
+				vector:
+					metrics.enabled: true
+  					metrics.url: http://"<VECTOR_HOST>:<SOURCE_PORT>" # Use https if SSL is enabled in Vector source configuration
+				```
+
 				"""
 		}
 	}
