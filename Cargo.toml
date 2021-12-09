@@ -93,6 +93,8 @@ members = [
   "lib/datadog/grok",
   "lib/datadog/search-syntax",
   "lib/datadog/filter",
+  "lib/datadog/filter-test",
+  "lib/vector-datadog-filter",
   "lib/soak"
 ]
 
@@ -110,7 +112,6 @@ vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
 vector-vrl-functions = { path = "lib/vector-vrl-functions" }
-datadog-search-syntax = { path = "lib/datadog/search-syntax", optional = true }
 
 # Tokio / Futures
 async-stream = "0.3.2"
@@ -153,7 +154,6 @@ aws-config = { version = "0.2.0", optional = true }
 aws-types = { version = "0.2.0", optional = true, features = ["hardcoded-credentials"]}
 aws-sdk-sqs = { version = "0.2.0", optional = true }
 
-
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "16bcf0ab1bb6e380d966a69d314de1e99ede553a", default-features = false, features = ["enable_reqwest"], optional = true }
 azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "16bcf0ab1bb6e380d966a69d314de1e99ede553a", default-features = false, features = ["blob"], optional = true }
@@ -186,7 +186,7 @@ smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
 async-graphql = { version = "2.10.4", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "2.10.4", default-features = false, optional = true }
+async-graphql-warp = { version = "3.0.14", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
@@ -196,14 +196,15 @@ number_prefix = { version = "0.4.0", default-features = false, features = ["std"
 tui = { version = "0.16.0", optional = true, default-features = false, features = ["crossterm"] }
 
 # Datadog Pipelines
+datadog-search-syntax = { path = "lib/datadog/search-syntax" }
+datadog-filter = { path = "lib/datadog/filter" }
+vector-datadog-filter = { path = "lib/vector-datadog-filter" }
 sha2 = { version = "0.10.0", optional = true }
 hex = { version = "0.4.3", optional = true }
 
 # VRL Lang
 vrl = { path = "lib/vrl/core" }
 vrl-stdlib = { path = "lib/vrl/stdlib" }
-vrl-parser = { path = "lib/vrl/parser", optional = true }
-vrl-compiler = { path = "lib/vrl/compiler", optional = true }
 
 # Lookup
 lookup = { path = "lib/lookup" }
@@ -312,6 +313,8 @@ prost-build = { version = "0.9", optional = true }
 tonic-build = { version = "0.6", default-features = false, features = ["transport", "prost"], optional = true }
 
 [dev-dependencies]
+datadog-filter-test = { path = "lib/datadog/filter-test"}
+
 approx = "0.5.0"
 assert_cmd = "2.0.2"
 base64 = "0.13.0"
@@ -571,7 +574,7 @@ transforms-compound = []
 transforms-concat = []
 transforms-dedupe = ["lru"]
 transforms-field_filter = []
-transforms-filter = ["datadog-search-syntax", "vrl-parser", "vrl-compiler"]
+transforms-filter = []
 transforms-geoip = ["maxminddb"]
 transforms-grok_parser = ["grok"]
 transforms-json_parser = []
