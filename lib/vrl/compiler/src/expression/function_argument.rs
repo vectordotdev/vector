@@ -35,6 +35,10 @@ impl FunctionArgument {
     pub(crate) fn into_inner(self) -> Expr {
         self.expr.into_inner()
     }
+
+    pub(crate) fn expr(&self) -> &Expr {
+        self.expr.inner()
+    }
 }
 
 impl fmt::Display for FunctionArgument {

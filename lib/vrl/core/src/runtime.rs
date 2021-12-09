@@ -129,12 +129,11 @@ impl Runtime {
 
     pub fn run_vm(
         &mut self,
-        vm: &mut Vm,
+        vm: &Vm,
         target: &mut dyn Target,
         timezone: &TimeZone,
     ) -> Result<Value, String> {
         let mut context = Context::new(target, &mut self.state, timezone);
-        vm.reset();
         vm.interpret(&mut context)
     }
 }

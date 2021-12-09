@@ -57,7 +57,7 @@ pub trait Function: Sync + fmt::Debug {
     fn compile_argument(
         &self,
         _name: &str,
-        _expr: Expr,
+        _expr: &Expr,
     ) -> Option<Box<dyn std::any::Any + Send + Sync>> {
         None
     }
@@ -424,6 +424,11 @@ impl From<Error> for Box<dyn diagnostic::DiagnosticError> {
     fn from(error: Error) -> Self {
         Box::new(error) as _
     }
+}
+
+pub enum VmArgument {
+    Value(Value),
+    Any(Box<dyn std::any::Any>),
 }
 
 pub struct VmArgumentList {

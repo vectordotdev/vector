@@ -14,6 +14,7 @@ use snafu::{ResultExt, Snafu};
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::PathBuf;
+use std::sync::Arc;
 use vrl::diagnostic::Formatter;
 use vrl::prelude::ExpressionError;
 use vrl::{Program, Runtime, Terminate};
@@ -70,7 +71,7 @@ pub struct Remap {
     component_key: Option<ComponentKey>,
     program: Program,
     runtime: Runtime,
-    vm: Option<Vm>,
+    vm: Arc<Option<Vm>>,
     timezone: TimeZone,
     drop_on_error: bool,
     drop_on_abort: bool,
@@ -117,7 +118,7 @@ impl Remap {
             component_key: context.key.clone(),
             program,
             runtime,
-            vm,
+            vm: Arc::new(vm),
             timezone: config.timezone,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
@@ -202,8 +203,8 @@ impl FallibleFunctionTransform for Remap {
 
         let mut target: VrlTarget = event.into();
 
-        match self.vm {
-            Some(ref mut vm) => {
+        match &*self.vm {
+            Some(ref vm) => {
                 let result = self.runtime.run_vm(vm, &mut target, &self.timezone);
 
                 match result {

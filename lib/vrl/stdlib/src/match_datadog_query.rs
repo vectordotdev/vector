@@ -66,20 +66,20 @@ impl Function for MatchDatadogQuery {
     fn compile_argument(
         &self,
         name: &str,
-        expr: expression::Expr,
+        expr: &expression::Expr,
     ) -> Option<Box<dyn std::any::Any + Send + Sync>> {
         if name == "query" {
             let query_value = match expr {
-                expression::Expr::Literal(literal) => literal,
+                expression::Expr::Literal(literal) => literal.to_value(),
                 expression::Expr::Variable(var) if var.value().is_some() => {
                     match var.value().unwrap().clone().into_expr() {
-                        expression::Expr::Literal(literal) => literal,
-                        expr => panic!("arg"),
+                        expression::Expr::Literal(literal) => literal.to_value(),
+                        _expr => panic!("arg"),
                     }
                 }
-                expr => panic!("literal"),
+                _expr => panic!("literal"),
             };
-            let query_value = query_value.to_value();
+            //let query_value = query_value.to_value();
             let query = query_value
                 .try_bytes_utf8_lossy()
                 .expect("datadog search query not bytes");

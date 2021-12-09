@@ -20,9 +20,6 @@ macro_rules! binary_op {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum OpCode {
     Return,
-    DefineGlobal,
-    GetGlobal,
-    SetGlobal,
     GetLocal,
     SetLocal,
     Constant,
@@ -49,6 +46,7 @@ pub enum OpCode {
     CreateObject,
     EmptyParameter,
     MoveParameter,
+    MoveStatic,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -63,23 +61,74 @@ pub enum Variable {
     External(lookup::LookupBuf),
 }
 
-#[derive(Clone, Debug, Default)]
+/// `VmState` contains the mutable state used to run the Vm.
+pub struct VmState<'a> {
+    vm: &'a Vm,
+    ip: usize,
+    stack: Vec<Value>,
+    parameter_stack: Vec<Option<Value>>,
+}
+
+impl<'a> VmState<'a> {
+    fn new(vm: &'a Vm) -> Self {
+        Self {
+            vm,
+            ip: 0,
+            stack: Vec::new(),
+            parameter_stack: Vec::new(),
+        }
+    }
+
+    fn next(&mut self) -> OpCode {
+        let byte = self.vm.instructions[self.ip];
+        self.ip += 1;
+        match byte {
+            Instruction::OpCode(opcode) => opcode,
+            _ => panic!("Expecting opcode"),
+        }
+    }
+
+    fn next_primitive(&mut self) -> usize {
+        let byte = self.vm.instructions[self.ip];
+        self.ip += 1;
+        match byte {
+            Instruction::Primitive(primitive) => primitive,
+            _ => panic!("Expecting primitive"),
+        }
+    }
+
+    pub fn stack_mut(&mut self) -> &mut Vec<Value> {
+        &mut self.stack
+    }
+
+    pub fn parameter_stack(&self) -> &Vec<Option<Value>> {
+        &self.parameter_stack
+    }
+
+    pub fn parameter_stack_mut(&mut self) -> &mut Vec<Option<Value>> {
+        &mut self.parameter_stack
+    }
+
+    fn read_constant(&mut self) -> Result<Literal, String> {
+        let idx = self.next_primitive();
+        Ok(self.vm.values[idx].clone())
+    }
+}
+
+#[derive(Debug, Default)]
 pub struct Vm {
-    fns: Arc<Vec<Box<dyn Function + Send + Sync>>>,
+    fns: Vec<Box<dyn Function + Send + Sync>>,
     instructions: Vec<Instruction>,
     globals: HashMap<String, Value>,
     values: Vec<Literal>,
-    static_params: Arc<Vec<Box<dyn std::any::Any + Send + Sync>>>,
     targets: Vec<Variable>,
-    stack: Vec<Value>,
-    parameter_stack: Vec<Option<Value>>,
-    ip: usize,
+    static_params: Vec<Box<dyn std::any::Any + Send + Sync>>,
 }
 
 impl Vm {
     pub fn new(fns: Vec<Box<dyn Function + Send + Sync>>) -> Self {
         Self {
-            fns: Arc::new(fns),
+            fns,
             ..Default::default()
         }
     }
@@ -109,34 +158,8 @@ impl Vm {
         self.instructions[pos] = Instruction::Primitive(code);
     }
 
-    pub fn stack_mut(&mut self) -> &mut Vec<Value> {
-        &mut self.stack
-    }
-
-    pub fn parameter_stack(&self) -> &Vec<Option<Value>> {
-        &self.parameter_stack
-    }
-
-    pub fn parameter_stack_mut(&mut self) -> &mut Vec<Option<Value>> {
-        &mut self.parameter_stack
-    }
-
-    fn next(&mut self) -> OpCode {
-        let byte = self.instructions[self.ip];
-        self.ip += 1;
-        match byte {
-            Instruction::OpCode(opcode) => opcode,
-            _ => panic!("Expecting opcode"),
-        }
-    }
-
-    fn next_primitive(&mut self) -> usize {
-        let byte = self.instructions[self.ip];
-        self.ip += 1;
-        match byte {
-            Instruction::Primitive(primitive) => primitive,
-            _ => panic!("Expecting primitive"),
-        }
+    pub fn function(&self, function_id: usize) -> Option<&Box<dyn Function + Send + Sync>> {
+        self.fns.get(function_id)
     }
 
     pub fn get_constant(&self, constant: &str) -> Option<usize> {
@@ -144,11 +167,6 @@ impl Vm {
             Literal::String(c) => c == constant,
             _ => false,
         })
-    }
-
-    fn read_constant(&mut self) -> Result<Literal, String> {
-        let idx = self.next_primitive();
-        Ok(self.values[idx].clone())
     }
 
     /// Gets a target from the list of targets used, if it hasn't already been added then add it.
@@ -160,6 +178,12 @@ impl Vm {
                 self.targets.len() - 1
             }
         }
+    }
+
+    /// Adds a static argument to the list and returns the position of this in the list.
+    pub fn add_static(&mut self, stat: Box<dyn std::any::Any + Send + Sync>) -> usize {
+        self.static_params.push(stat);
+        self.static_params.len() - 1
     }
 
     pub fn dissassemble(&self) -> Vec<String> {
@@ -187,35 +211,31 @@ impl Vm {
         self.write_primitive_at(offset, jump);
     }
 
-    /// Resets the VM back to it's original state.
-    pub fn reset(&mut self) {
-        self.stack.clear();
-        self.ip = 0;
-    }
+    pub fn interpret<'a>(&self, ctx: &mut Context<'a>) -> Result<Value, String> {
+        let mut state: VmState = VmState::new(self);
 
-    pub fn interpret<'a>(&mut self, ctx: &mut Context<'a>) -> Result<Value, String> {
         loop {
-            let next = self.next();
+            let next = state.next();
             match next {
                 OpCode::Return => {
-                    return Ok(self.stack.pop().unwrap_or(Value::Null));
+                    return Ok(state.stack.pop().unwrap_or(Value::Null));
                 }
                 OpCode::Constant => {
-                    let value = self.read_constant()?;
-                    self.stack.push(value.to_value());
+                    let value = state.read_constant()?;
+                    state.stack.push(value.to_value());
                 }
-                OpCode::Negate => match self.stack.pop() {
+                OpCode::Negate => match state.stack.pop() {
                     None => return Err("Negating nothing".to_string()),
-                    Some(Value::Float(value)) => self.stack.push(Value::Float(value * -1.0)),
+                    Some(Value::Float(value)) => state.stack.push(Value::Float(value * -1.0)),
                     _ => return Err("Negating non number".to_string()),
                 },
-                OpCode::Not => match self.stack.pop() {
+                OpCode::Not => match state.stack.pop() {
                     None => return Err("Notting nothing".to_string()),
-                    Some(Value::Boolean(value)) => self.stack.push(Value::Boolean(!value)),
+                    Some(Value::Boolean(value)) => state.stack.push(Value::Boolean(!value)),
                     _ => return Err("Notting non boolean".to_string()),
                 },
                 OpCode::Add => {
-                    binary_op!(self,
+                    binary_op!(state,
                                 (Some(Value::Float(value1)), Some(Value::Float(value2))) => Value::Float(value1 + value2),
                                 (Some(Value::Bytes(value1)), Some(Value::Bytes(value2))) => Value::Bytes({
                                     use bytes::{BytesMut, BufMut};
@@ -226,88 +246,57 @@ impl Vm {
                                 }),
                     )
                 }
-                OpCode::Subtract => binary_op!(self,
+                OpCode::Subtract => binary_op!(state,
                     (Some(Value::Integer(value1)), Some(Value::Integer(value2))) => Value::Integer(value1 - value2),),
-                OpCode::Multiply => binary_op!(self,
+                OpCode::Multiply => binary_op!(state,
                     (Some(Value::Integer(value1)), Some(Value::Integer(value2))) => Value::Integer(value1 * value2),),
-                OpCode::Divide => binary_op!(self,
+                OpCode::Divide => binary_op!(state,
                     (Some(Value::Integer(value1)), Some(Value::Integer(value2))) => Value::Integer(value1 / value2),),
-                OpCode::Print => match self.stack.pop() {
+                OpCode::Print => match state.stack.pop() {
                     None => return Err("Negating nothing".to_string()),
                     Some(value) => println!("{}", value),
                 },
-                OpCode::Greater => binary_op!(self,
+                OpCode::Greater => binary_op!(state,
                     (Some(Value::Float(value1)), Some(Value::Float(value2))) => Value::Boolean(value1 > value2),),
-                OpCode::GreaterEqual => binary_op!(self,
+                OpCode::GreaterEqual => binary_op!(state,
                     (Some(Value::Float(value1)), Some(Value::Float(value2))) => Value::Boolean(value1 >= value2),),
-                OpCode::Less => binary_op!(self,
+                OpCode::Less => binary_op!(state,
                     (Some(Value::Float(value1)), Some(Value::Float(value2))) => Value::Boolean(value1 < value2),),
-                OpCode::LessEqual => binary_op!(self,
+                OpCode::LessEqual => binary_op!(state,
                     (Some(Value::Float(value1)), Some(Value::Float(value2))) => Value::Boolean(value1 <= value2),),
-                OpCode::NotEqual => binary_op!(self,
+                OpCode::NotEqual => binary_op!(state,
                     (Some(value1), Some(value2)) => Value::Boolean(value1 != value2),),
-                OpCode::Equal => binary_op!(self,
+                OpCode::Equal => binary_op!(state,
                     (Some(value1), Some(value2)) => Value::Boolean(value1 == value2),),
                 OpCode::Pop => {
-                    let _ = self.stack.pop();
+                    let _ = state.stack.pop();
                 }
-                OpCode::DefineGlobal => match self.read_constant()? {
-                    Literal::String(name) => {
-                        self.globals.insert(
-                            String::from_utf8_lossy(&name).to_string(),
-                            self.stack
-                                .pop()
-                                .ok_or_else(|| "No global to set".to_string())?,
-                        );
-                    }
-                    _ => panic!("oooooo"),
-                },
-                OpCode::GetGlobal => match self.read_constant()? {
-                    Literal::String(name) => {
-                        let name = String::from_utf8_lossy(&name).to_string();
-                        match self.globals.get(&name) {
-                            Some(value) => self.stack.push(value.clone()),
-                            None => return Err(format!("Undefined variable {}", name)),
-                        }
-                    }
-                    _ => panic!("errr"),
-                },
-                OpCode::SetGlobal => match self.stack.pop() {
-                    Some(obj) => match self.read_constant()? {
-                        Literal::String(name) => {
-                            self.globals
-                                .insert(String::from_utf8_lossy(&name).to_string(), obj);
-                        }
-                        _ => panic!("arg"),
-                    },
-                    None => panic!("No var"),
-                },
                 OpCode::GetLocal => {
-                    let slot = self.next_primitive();
-                    self.stack.push(self.stack[slot].clone());
+                    let slot = state.next_primitive();
+                    state.stack.push(state.stack[slot].clone());
                 }
                 OpCode::SetLocal => {
-                    let slot = self.next_primitive();
-                    self.stack[slot] = self.stack[self.stack.len() - 1].clone();
+                    let slot = state.next_primitive();
+                    state.stack[slot] = state.stack[state.stack.len() - 1].clone();
                 }
                 OpCode::JumpIfFalse => {
-                    let jump = self.next_primitive();
-                    if !is_truthy(&self.stack[self.stack.len() - 1]) {
-                        self.ip += jump;
+                    let jump = state.next_primitive();
+                    if !is_truthy(&state.stack[state.stack.len() - 1]) {
+                        state.ip += jump;
                     }
                 }
                 OpCode::Jump => {
-                    let jump = self.next_primitive();
-                    self.ip += jump;
+                    let jump = state.next_primitive();
+                    state.ip += jump;
                 }
                 OpCode::Loop => {
-                    let jump = self.next_primitive();
-                    self.ip -= jump;
+                    let jump = state.next_primitive();
+                    state.ip -= jump;
                 }
                 OpCode::SetPath => {
-                    let variable = self.next_primitive();
+                    let variable = state.next_primitive();
                     let variable = &self.targets[variable];
-                    let value = self.stack.pop().unwrap();
+                    let value = state.stack.pop().unwrap();
 
                     match variable {
                         Variable::Internal => unimplemented!("variables are rubbish"),
@@ -315,49 +304,50 @@ impl Vm {
                     }
                 }
                 OpCode::GetPath => {
-                    let variable = self.next_primitive();
+                    let variable = state.next_primitive();
                     let variable = &self.targets[variable];
 
                     match &variable {
                         Variable::External(path) => {
                             let value = ctx.target().get(path)?.unwrap_or(Value::Null);
-                            self.stack.push(value);
+                            state.stack.push(value);
                         }
                         Variable::Internal => unimplemented!("variables are junk"),
                     }
                 }
                 OpCode::Call => {
-                    let function_id = self.next_primitive();
+                    let function_id = state.next_primitive();
                     let parameters = &self.fns[function_id].parameters();
 
-                    let len = self.parameter_stack().len();
-                    let args = self
+                    let len = state.parameter_stack().len();
+                    let args = state
                         .parameter_stack_mut()
                         .drain(len - parameters.len()..)
                         .collect();
                     let argumentlist = VmArgumentList::new(parameters, args);
 
                     match self.fns[function_id].call(argumentlist) {
-                        Ok(result) => self.stack.push(result),
+                        Ok(result) => state.stack.push(result),
                         Err(_err) => todo!(),
                     }
                 }
                 OpCode::CreateObject => {
-                    let count = self.next_primitive();
+                    let count = state.next_primitive();
                     let mut object = BTreeMap::new();
 
                     for _ in 0..count {
-                        let value = self.stack.pop().unwrap();
-                        let key = self.stack.pop().unwrap();
+                        let value = state.stack.pop().unwrap();
+                        let key = state.stack.pop().unwrap();
                         let key = String::from_utf8_lossy(&key.try_bytes().unwrap()).to_string();
 
                         object.insert(key, value);
                     }
 
-                    self.stack.push(Value::Object(object))
+                    state.stack.push(Value::Object(object))
                 }
-                OpCode::EmptyParameter => self.parameter_stack.push(None),
-                OpCode::MoveParameter => self.parameter_stack.push(self.stack.pop()),
+                OpCode::EmptyParameter => state.parameter_stack.push(None),
+                OpCode::MoveParameter => state.parameter_stack.push(state.stack.pop()),
+                OpCode::MoveStatic => {}
             }
         }
     }

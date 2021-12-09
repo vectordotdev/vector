@@ -205,6 +205,48 @@ impl FunctionCall {
         })
     }
 
+    /// Takes the arguments passed and resolves them into the order they are defined
+    /// in the function
+    fn resolve_arguments(
+        &self,
+        function: &Box<dyn Function + Send + Sync>,
+    ) -> Vec<(&'static str, Option<FunctionArgument>)> {
+        let mut params = function.parameters().iter().collect::<Vec<_>>();
+        let mut result = params
+            .iter()
+            .map(|param| (param.keyword, None))
+            .collect::<Vec<_>>();
+        let mut displaced = 0;
+
+        for (idx, param) in self.arguments.iter().enumerate() {
+            match param.keyword() {
+                None => {
+                    // A keywordless parameter depends on the position, taking into account the
+                    // position that has been displaced by any named parameters.
+                    result[idx + displaced] = (
+                        params[idx + displaced].keyword,
+                        Some(param.clone().take().1),
+                    )
+                }
+                Some(keyword) => match params.iter().position(|param| param.keyword == keyword) {
+                    None => {
+                        // The parameter was not found in the list.
+                        todo!()
+                    }
+                    Some(pos) => {
+                        result[pos] = (
+                            params[idx + displaced].keyword,
+                            Some(param.clone().take().1),
+                        );
+                        displaced += 1;
+                    }
+                },
+            }
+        }
+
+        result
+    }
+
     pub fn noop() -> Self {
         let expr = Box::new(Noop) as _;
 
@@ -321,11 +363,36 @@ impl Expression for FunctionCall {
     }
 
     fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
-        // TODO, dump arguments in order declared in the function
-        // including any unspecified optional parameters.
-        for argument in &*self.arguments {
-            argument.inner().dump(vm)?;
-            vm.write_chunk(crate::vm::OpCode::MoveParameter);
+        let args = match vm.function(self.function_id) {
+            Some(fun) => self.resolve_arguments(fun),
+            None => Err(format!("Function {} not found.", self.function_id))?,
+        };
+
+        for (keyword, argument) in args {
+            match argument {
+                Some(argument) => {
+                    // We can unwrap here because we have already returned with an Err if
+                    // `function()` returns a `None`.
+                    // We can't reuse the previous call to `function` since that lands us with a
+                    // bunch of borrow errors.
+                    let fun = vm.function(self.function_id).unwrap();
+                    match fun.compile_argument(keyword, argument.inner()) {
+                        Some(stat) => {
+                            // The function has compiled this argument as a static
+                            let stat = vm.add_static(stat);
+                            vm.write_primitive(stat);
+                            vm.write_chunk(crate::vm::OpCode::MoveStatic);
+                        }
+                        None => {
+                            argument.inner().dump(vm)?;
+                            vm.write_chunk(crate::vm::OpCode::MoveParameter);
+                        }
+                    }
+                }
+                None => {
+                    vm.write_chunk(crate::vm::OpCode::EmptyParameter);
+                }
+            }
         }
 
         vm.write_chunk(crate::vm::OpCode::Call);
