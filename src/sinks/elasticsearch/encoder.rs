@@ -78,24 +78,25 @@ fn write_bulk_action(
     as_tracked_write(
         writer,
         (bulk_action, index, doc_type, id, suppress_type),
-        |writer, (bulk_action, index, doc_type, id, suppress_type)| {
-            if let Some(id) = id {
-                if suppress_type {
-                    write!(
-                        writer,
-                        r#"{{"{}":{{"_index":"{}","_id":"{}"}}}}"#,
-                        bulk_action, index, id
-                    )
-                } else {
-                    write!(
-                        writer,
-                        r#"{{"{}":{{"_index":"{}","_type":"{}","_id":"{}"}}}}"#,
-                        bulk_action, index, doc_type, id
-                    )
-                }
-            } else if suppress_type {
+        |writer, (bulk_action, index, doc_type, id, suppress_type)| match (id, suppress_type) {
+            (Some(id), true) => {
+                write!(
+                    writer,
+                    r#"{{"{}":{{"_index":"{}","_id":"{}"}}}}"#,
+                    bulk_action, index, id
+                )
+            }
+            (Some(id), false) => {
+                write!(
+                    writer,
+                    r#"{{"{}":{{"_index":"{}","_type":"{}","_id":"{}"}}}}"#,
+                    bulk_action, index, doc_type, id
+                )
+            }
+            (None, true) => {
                 write!(writer, r#"{{"{}":{{"_index":"{}"}}}}"#, bulk_action, index)
-            } else {
+            }
+            (None, false) => {
                 write!(
                     writer,
                     r#"{{"{}":{{"_index":"{}","_type":"{}"}}}}"#,
@@ -112,5 +113,108 @@ impl VisitLogMut for ProcessedEvent {
         F: Fn(&mut LogEvent),
     {
         func(&mut self.log);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn suppress_type_with_id() {
+        let mut writer = Vec::new();
+
+        let _ = write_bulk_action(
+            &mut writer,
+            "ACTION",
+            "INDEX",
+            "TYPE",
+            true,
+            &Some("ID".to_string()),
+        );
+
+        let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
+        let value = value.as_object().unwrap();
+
+        assert!(value.contains_key("ACTION"));
+
+        let nested = value.get("ACTION").unwrap();
+        let nested = nested.as_object().unwrap();
+
+        assert!(nested.contains_key("_index"));
+        assert_eq!(nested.get("_index").unwrap().as_str(), Some("INDEX"));
+        assert!(nested.contains_key("_id"));
+        assert_eq!(nested.get("_id").unwrap().as_str(), Some("ID"));
+        assert!(!nested.contains_key("_type"));
+    }
+
+    #[test]
+    fn suppress_type_without_id() {
+        let mut writer = Vec::new();
+
+        let _ = write_bulk_action(&mut writer, "ACTION", "INDEX", "TYPE", true, &None);
+
+        let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
+        let value = value.as_object().unwrap();
+
+        assert!(value.contains_key("ACTION"));
+
+        let nested = value.get("ACTION").unwrap();
+        let nested = nested.as_object().unwrap();
+
+        assert!(nested.contains_key("_index"));
+        assert_eq!(nested.get("_index").unwrap().as_str(), Some("INDEX"));
+        assert!(!nested.contains_key("_id"));
+        assert!(!nested.contains_key("_type"));
+    }
+
+    #[test]
+    fn type_with_id() {
+        let mut writer = Vec::new();
+
+        let _ = write_bulk_action(
+            &mut writer,
+            "ACTION",
+            "INDEX",
+            "TYPE",
+            false,
+            &Some("ID".to_string()),
+        );
+
+        let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
+        let value = value.as_object().unwrap();
+
+        assert!(value.contains_key("ACTION"));
+
+        let nested = value.get("ACTION").unwrap();
+        let nested = nested.as_object().unwrap();
+
+        assert!(nested.contains_key("_index"));
+        assert_eq!(nested.get("_index").unwrap().as_str(), Some("INDEX"));
+        assert!(nested.contains_key("_id"));
+        assert_eq!(nested.get("_id").unwrap().as_str(), Some("ID"));
+        assert!(nested.contains_key("_type"));
+        assert_eq!(nested.get("_type").unwrap().as_str(), Some("TYPE"));
+    }
+
+    #[test]
+    fn type_without_id() {
+        let mut writer = Vec::new();
+
+        let _ = write_bulk_action(&mut writer, "ACTION", "INDEX", "TYPE", false, &None);
+
+        let value: serde_json::Value = serde_json::from_slice(&writer).unwrap();
+        let value = value.as_object().unwrap();
+
+        assert!(value.contains_key("ACTION"));
+
+        let nested = value.get("ACTION").unwrap();
+        let nested = nested.as_object().unwrap();
+
+        assert!(nested.contains_key("_index"));
+        assert_eq!(nested.get("_index").unwrap().as_str(), Some("INDEX"));
+        assert!(!nested.contains_key("_id"));
+        assert!(nested.contains_key("_type"));
+        assert_eq!(nested.get("_type").unwrap().as_str(), Some("TYPE"));
     }
 }
