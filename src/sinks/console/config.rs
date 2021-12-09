@@ -3,6 +3,7 @@ use crate::sinks::console::sink::WriterSink;
 use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
 use crate::sinks::{Healthcheck, VectorSink};
 
+use crate::sinks::util::StreamSink;
 use futures::{future, FutureExt};
 use serde::{Deserialize, Serialize};
 use tokio::io;
@@ -40,18 +41,20 @@ impl SinkConfig for ConsoleSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let encoding = self.encoding.clone();
 
-        let output: Box<dyn io::AsyncWrite + Send + Sync + Unpin> = match self.target {
-            Target::Stdout => Box::new(io::stdout()),
-            Target::Stderr => Box::new(io::stderr()),
+        let sink: Box<dyn StreamSink + Send> = match self.target {
+            Target::Stdout => Box::new(WriterSink {
+                acker: cx.acker(),
+                output: io::stdout(),
+                encoding,
+            }),
+            Target::Stderr => Box::new(WriterSink {
+                acker: cx.acker(),
+                output: io::stderr(),
+                encoding,
+            }),
         };
 
-        let sink = WriterSink {
-            acker: cx.acker(),
-            output,
-            encoding,
-        };
-
-        Ok((VectorSink::Stream(Box::new(sink)), future::ok(()).boxed()))
+        Ok((VectorSink::Stream(sink), future::ok(()).boxed()))
     }
 
     fn input_type(&self) -> DataType {
