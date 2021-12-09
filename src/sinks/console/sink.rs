@@ -5,7 +5,6 @@ use crate::sinks::util::StreamSink;
 use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures::StreamExt;
-use std::io::Write;
 use tokio::io;
 use tokio::io::AsyncWriteExt;
 use vector_core::buffers::Acker;
@@ -53,17 +52,16 @@ where
     }
 }
 
-fn encode_event(mut event: Event, encoding: &EncodingConfig<StandardEncodings>) -> Option<String> {
+fn encode_event(event: Event, encoding: &EncodingConfig<StandardEncodings>) -> Option<String> {
     encoding.encode_input_to_string(event).ok()
 }
 
 #[cfg(test)]
 mod test {
-    use super::{encode_event, ConsoleSinkConfig, Encoding, EncodingConfig};
+    use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use crate::event::{Event, Value};
     use crate::sinks::util::encoding::StandardEncodings;
-    use crate::sources::util::EncodingConfig;
     use chrono::{offset::TimeZone, Utc};
     use pretty_assertions::assert_eq;
 

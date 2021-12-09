@@ -2,7 +2,7 @@ use crate::config::{DataType, GenerateConfig, SinkConfig, SinkContext};
 use crate::sinks::console::sink::WriterSink;
 use crate::sinks::util::encoding::{EncodingConfig, StandardEncodings};
 use crate::sinks::{Healthcheck, VectorSink};
-use async_trait::async_trait;
+
 use futures::{future, FutureExt};
 use serde::{Deserialize, Serialize};
 use tokio::io;

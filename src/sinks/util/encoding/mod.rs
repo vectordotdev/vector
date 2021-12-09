@@ -80,7 +80,7 @@ use crate::{
     Result,
 };
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
+
 use std::{fmt::Debug, io, sync::Arc};
 
 pub trait Encoder<T> {
