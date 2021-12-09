@@ -6,3 +6,10 @@ pub mod proxy;
 pub use global_options::GlobalOptions;
 pub use id::ComponentKey;
 pub use log_schema::{init_log_schema, log_schema, LogSchema};
+
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub enum DataType {
+    Any,
+    Log,
+    Metric,
+}
