@@ -202,7 +202,7 @@ where
     let field = field.into();
 
     Run::boxed(move |log: &LogEvent| match log.get(&field) {
-        Some(Value::Bytes(v)) => func(String::from_utf8_lossy(&v)),
+        Some(Value::Bytes(v)) => func(String::from_utf8_lossy(v)),
         _ => false,
     })
 }
