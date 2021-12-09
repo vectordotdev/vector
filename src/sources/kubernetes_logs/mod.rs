@@ -5,7 +5,7 @@
 
 #![deny(missing_docs)]
 
-use std::{convert::TryInto, path::PathBuf, time::Duration};
+use std::{convert::TryInto, path::PathBuf, time::Duration, collections::HashMap};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -34,6 +34,7 @@ use crate::{
     transforms::{FunctionTransform, TaskTransform},
 };
 
+mod group_watcher;
 mod k8s_paths_provider;
 mod lifecycle;
 mod namespace_metadata_annotator;
@@ -45,6 +46,7 @@ mod transform_utils;
 mod util;
 
 use futures::{future::FutureExt, sink::Sink, stream::StreamExt};
+use group_watcher::{GroupRuleHash, GroupWatcher};
 use k8s_paths_provider::K8sPathsProvider;
 use lifecycle::Lifecycle;
 use namespace_metadata_annotator::NamespaceMetadataAnnotator;
@@ -55,6 +57,15 @@ const FILE_KEY: &str = "file";
 
 /// The `self_node_name` value env var key.
 const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
+
+/// The default namespace key
+const DEFAULT_NAMESPACE: &str = "*";
+
+/// The default podname key
+const DEFAULT_PODNAME: &str = "*";
+
+/// The default limit value
+const DEFAULT_LIMIT: usize = 0;
 
 /// Configuration for the `kubernetes_logs` source.
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -126,6 +137,20 @@ pub struct Config {
     /// How long to delay removing entries from our map when we receive a deletion
     /// event from the watched stream.
     delay_deletion_ms: usize,
+
+    /// Time period in which the group limit has to be satisfied before resetting
+    /// the counters
+    rate_window_secs: usize,
+
+    /// Rate limiting rules specified by the user to form groups
+    rules: Option<Vec<GroupRule>>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+struct GroupRule {
+    namespace: Option<String>,
+    podname: Option<String>,
+    limit: usize,
 }
 
 inventory::submit! {
@@ -162,6 +187,8 @@ impl Default for Config {
             timezone: None,
             kube_config_file: None,
             delay_deletion_ms: default_delay_deletion_ms(),
+            rate_window_secs: default_rate_window_secs(),
+            rules: None,
         }
     }
 }
@@ -206,6 +233,8 @@ struct Source {
     ingestion_timestamp_field: Option<String>,
     timezone: TimeZone,
     delay_deletion: Duration,
+    rate_window_secs: Duration,
+    rules: GroupRuleHash,
 }
 
 impl Source {
@@ -241,6 +270,45 @@ impl Source {
                 .expect("unable to convert delay_deletion_ms from usize to u64 without data loss"),
         );
 
+        let rate_window_secs = Duration::from_secs(
+            config
+                .rate_window_secs
+                .try_into()
+                .expect("unable to convert rate_window_secs from usize to u64 without data loss"),
+        );
+
+        let mut group_rules_hash = GroupRuleHash::new();
+
+        if let Some(rules) = &config.rules {
+            for rule in rules.iter() {
+                let namespace = match &rule.namespace {
+                    Some(ns) => ns,
+                    None => DEFAULT_NAMESPACE,
+                };
+
+                let podname = match &rule.podname {
+                    Some(pod) => pod,
+                    None => DEFAULT_PODNAME,
+                };
+
+                group_rules_hash
+                    .entry(namespace.to_string())
+                    .or_insert(HashMap::new());
+
+                group_rules_hash
+                    .get_mut(namespace)
+                    .unwrap()
+                    .entry(podname.to_string())
+                    .or_insert(GroupWatcher::new(rule.limit));
+            }
+        } else {
+            group_rules_hash.insert(DEFAULT_NAMESPACE.to_string(), HashMap::new());
+            group_rules_hash.get_mut(DEFAULT_NAMESPACE).unwrap().insert(
+                DEFAULT_PODNAME.to_string(),
+                GroupWatcher::new(DEFAULT_LIMIT),
+            );
+        }
+
         Ok(Self {
             client,
             data_dir,
@@ -257,6 +325,8 @@ impl Source {
             ingestion_timestamp_field: config.ingestion_timestamp_field.clone(),
             timezone,
             delay_deletion,
+            rate_window_secs: rate_window_secs,
+            rules: group_rules_hash,
         })
     }
 
@@ -281,6 +351,8 @@ impl Source {
             ingestion_timestamp_field,
             timezone,
             delay_deletion,
+            rate_window_secs,
+            mut rules,
         } = self;
 
         let watcher =
@@ -427,13 +499,58 @@ impl Source {
             }
 
             checkpoints.update(line.file_id, line.offset);
-            event
+
+            if file_info.is_some() {
+                let (namespace, pod_name) = file_info
+                    .as_ref()
+                    .map(|info| (info.pod_namespace, info.pod_name))
+                    .unwrap();
+
+                let ns_group = match rules.get_mut(namespace) {
+                    Some(group) => group,
+                    None => rules.get_mut(DEFAULT_NAMESPACE).unwrap(),
+                };
+
+                let group_watcher = match ns_group.get_mut(pod_name) {
+                    Some(gw) => gw,
+                    None => ns_group.get_mut(DEFAULT_PODNAME).unwrap(),
+                };
+
+                if group_watcher.get(&line.filename).is_none() {
+
+                    group_watcher.add(&line.filename);
+                    group_watcher.incr_event(&line.filename);
+
+                    Some(event)
+                } else {
+                    if group_watcher.line_limit_reached(&line.filename) {
+                        if group_watcher.time_elapsed(&line.filename) > rate_window_secs {
+                            // lines read took time greater than rate_window_secs
+                            group_watcher.reset(&line.filename);
+                            group_watcher.incr_event(&line.filename);
+
+                            Some(event)
+                        } else {
+                            // lines read within rate_window_secs
+                            // update checkpoint and ignore line
+                            None
+                        }
+                    } else {
+                        group_watcher.incr_event(&line.filename);
+                        Some(event)
+                    }
+                }
+            } else {
+                None
+            }
         });
-        let events = events.flat_map(move |event| {
-            let mut buf = Vec::with_capacity(1);
-            parser.transform(&mut buf, event);
-            futures::stream::iter(buf)
-        });
+        let events = events
+            .filter(|event| futures::future::ready(event.is_some()))
+            .flat_map(move |event| {
+                let mut buf = Vec::with_capacity(1);
+                parser.transform(&mut buf, event.unwrap());
+                futures::stream::iter(buf)
+            });
 
         let event_processing_loop = partial_events_merger
             .transform(Box::pin(events))
@@ -557,6 +674,10 @@ const fn default_fingerprint_lines() -> usize {
 
 const fn default_delay_deletion_ms() -> usize {
     60_000
+}
+
+const fn default_rate_window_secs() -> usize {
+    30
 }
 
 // This function constructs the patterns we exclude from file watching, created
