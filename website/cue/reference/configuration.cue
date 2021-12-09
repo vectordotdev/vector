@@ -7,7 +7,7 @@ configuration: {
 
 configuration: {
 	configuration: {
-		_acknowledgements: {
+		acknowledgements: {
 			common:      true
 			description: "Controls how acknowledgements are handled by all sources."
 			required:    false
