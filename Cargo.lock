@@ -7766,9 +7766,9 @@ dependencies = [
 
 [[package]]
 name = "tonic-build"
-version = "0.6.0"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88358bb1dcfeb62dcce85c63006cafb964b7be481d522b7e09589d4d1e718d2a"
+checksum = "9403f1bafde247186684b230dc6f38b5cd514584e8bec1dd32514be4745fa757"
 dependencies = [
  "proc-macro2 1.0.32",
  "prost-build 0.9.0",
@@ -8483,7 +8483,7 @@ dependencies = [
  "tokio-util",
  "toml",
  "tonic 0.6.2",
- "tonic-build 0.6.0",
+ "tonic-build 0.6.2",
  "tower",
  "tower-layer",
  "tower-test",
