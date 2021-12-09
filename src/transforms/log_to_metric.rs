@@ -138,6 +138,10 @@ impl TransformConfig for LogToMetricConfig {
         DataType::Metric
     }
 
+    fn enable_concurrency(&self) -> bool {
+        true
+    }
+
     fn transform_type(&self) -> &'static str {
         "log_to_metric"
     }

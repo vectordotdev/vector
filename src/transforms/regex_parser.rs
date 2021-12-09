@@ -58,6 +58,10 @@ impl TransformConfig for RegexParserConfig {
         DataType::Log
     }
 
+    fn enable_concurrency(&self) -> bool {
+        true
+    }
+
     fn transform_type(&self) -> &'static str {
         "regex_parser"
     }
