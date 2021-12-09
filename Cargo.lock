@@ -1924,6 +1924,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "datadog-filter-test"
+version = "0.1.0"
+dependencies = [
+ "datadog-filter",
+ "datadog-search-syntax",
+ "serde_json",
+ "vector_core",
+]
+
+[[package]]
 name = "datadog-grok"
 version = "0.1.0"
 dependencies = [
@@ -8348,6 +8358,8 @@ dependencies = [
  "csv",
  "dashmap",
  "data-encoding",
+ "datadog-filter",
+ "datadog-filter-test",
  "datadog-search-syntax",
  "derivative",
  "dirs-next",
@@ -8489,12 +8501,11 @@ dependencies = [
  "url",
  "uuid",
  "vector-api-client",
+ "vector-datadog-filter",
  "vector-vrl-functions",
  "vector_core",
  "vrl",
  "vrl-cli",
- "vrl-compiler",
- "vrl-parser",
  "vrl-stdlib",
  "walkdir",
  "warp",
@@ -8523,6 +8534,17 @@ dependencies = [
  "url",
  "uuid",
  "weak-table",
+]
+
+[[package]]
+name = "vector-datadog-filter"
+version = "0.1.0"
+dependencies = [
+ "bytes 1.1.0",
+ "datadog-filter",
+ "datadog-filter-test",
+ "datadog-search-syntax",
+ "vector_core",
 ]
 
 [[package]]
