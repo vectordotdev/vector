@@ -12,8 +12,8 @@ use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to ou
 use serde::{Deserialize, Serialize};
 use vector_core::buffers::{Acker, BufferConfig, BufferType};
 pub use vector_core::{
-    config::GlobalOptions,
-    transform::{DataType, ExpandType, TransformConfig, TransformContext},
+    config::{DataType, GlobalOptions},
+    transform::{ExpandType, TransformConfig, TransformContext},
 };
 
 use crate::{

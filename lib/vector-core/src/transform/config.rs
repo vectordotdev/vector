@@ -3,14 +3,7 @@ use std::collections::HashSet;
 use async_trait::async_trait;
 use indexmap::IndexMap;
 
-use crate::config::{ComponentKey, GlobalOptions};
-
-#[derive(Debug, Clone, PartialEq, Copy)]
-pub enum DataType {
-    Any,
-    Log,
-    Metric,
-}
+use crate::config::{ComponentKey, DataType, GlobalOptions};
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 pub enum ExpandType {
