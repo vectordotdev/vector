@@ -61,14 +61,160 @@ impl From<value::Kind> for TypeDef {
 }
 
 impl From<value::Kind> for KindInfo {
-    fn from(_kind: value::Kind) -> Self {
-        todo!()
+    fn from(kind: value::Kind) -> Self {
+        if kind.is_any() {
+            return Self::Unknown;
+        }
+
+        let mut set = BTreeSet::default();
+
+        if kind.is_bytes() {
+            set.insert(TypeKind::Bytes);
+        }
+
+        if kind.is_integer() {
+            set.insert(TypeKind::Integer);
+        }
+
+        if kind.is_float() {
+            set.insert(TypeKind::Float);
+        }
+
+        if kind.is_boolean() {
+            set.insert(TypeKind::Boolean);
+        }
+
+        if kind.is_timestamp() {
+            set.insert(TypeKind::Timestamp);
+        }
+
+        if kind.is_regex() {
+            set.insert(TypeKind::Regex);
+        }
+
+        if kind.is_null() {
+            set.insert(TypeKind::Null);
+        }
+
+        if let Some(array) = kind.as_array() {
+            let mut map = BTreeMap::default();
+            for (index, kind) in array.known().clone() {
+                map.insert(index.into(), kind.into());
+            }
+
+            let other = array.other().into_owned().into();
+            map.insert(Index::Any, other);
+
+            set.insert(TypeKind::Array(map));
+        }
+
+        if let Some(object) = kind.as_object() {
+            let mut map = BTreeMap::default();
+            for (key, kind) in object.known().clone() {
+                map.insert(key.into(), kind.into());
+            }
+
+            let other = object.other().into_owned().into();
+            map.insert(Field::Any, other);
+
+            set.insert(TypeKind::Object(map));
+        }
+
+        Self::Known(set)
     }
 }
 
 impl From<TypeDef> for value::Kind {
-    fn from(_type_def: TypeDef) -> Self {
-        todo!()
+    fn from(type_def: TypeDef) -> Self {
+        type_def.kind.into()
+    }
+}
+
+impl From<KindInfo> for value::Kind {
+    fn from(kind: KindInfo) -> Self {
+        let mut kinds = match kind {
+            KindInfo::Unknown => return Self::any(),
+            KindInfo::Known(set) => set.into_iter(),
+        };
+
+        let mut kind: Self = match kinds.next() {
+            Some(kind) => kind.into(),
+            None => return value::Kind::any(),
+        };
+
+        for info in kinds {
+            kind.merge(info.into());
+        }
+
+        kind
+    }
+}
+
+impl From<TypeKind> for value::Kind {
+    fn from(kind: TypeKind) -> Self {
+        match kind {
+            TypeKind::Bytes => Self::bytes(),
+            TypeKind::Integer => Self::integer(),
+            TypeKind::Float => Self::float(),
+            TypeKind::Boolean => Self::boolean(),
+            TypeKind::Timestamp => Self::timestamp(),
+            TypeKind::Regex => Self::regex(),
+            TypeKind::Null => Self::null(),
+            TypeKind::Array(array) => {
+                if array.is_empty() {
+                    return Self::array(value::kind::Collection::any());
+                }
+
+                let mut other = Self::any();
+                let mut map = BTreeMap::default();
+                for (index, kind) in array {
+                    match index {
+                        Index::Any => other = kind.into(),
+                        Index::Index(i) => {
+                            map.insert(i.into(), kind.into());
+                        }
+                    }
+                }
+
+                let mut collection = value::kind::Collection::from(map);
+                collection.set_other(other);
+
+                Self::array(collection)
+            }
+            TypeKind::Object(object) => {
+                if object.is_empty() {
+                    return Self::object(value::kind::Collection::any());
+                }
+
+                let mut other = Self::any();
+                let mut map = BTreeMap::default();
+                for (field, kind) in object {
+                    match field {
+                        Field::Any => other = kind.into(),
+                        Field::Field(v) => {
+                            map.insert(v.into(), kind.into());
+                        }
+                    }
+                }
+
+                let mut collection = value::kind::Collection::from(map);
+                collection.set_other(other);
+
+                Self::object(collection)
+            }
+        }
+    }
+}
+
+impl From<value::kind::Index> for Index {
+    fn from(index: value::kind::Index) -> Self {
+        Self::Index(index.take())
+    }
+}
+
+impl From<value::kind::Field> for Field {
+    fn from(field: value::kind::Field) -> Self {
+        Self::Field(field.take().into_owned())
     }
 }
 
