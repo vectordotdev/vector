@@ -56,12 +56,13 @@ impl fmt::Display for Compression {
 impl SourceConfig for AwsKinesisFirehoseConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
 
         let svc = filters::firehose(
             self.access_key.clone(),
             self.record_compression.unwrap_or_default(),
             decoder,
-            self.acknowledgements.enabled,
+            acknowledgements.enabled,
             cx.out,
         );
 

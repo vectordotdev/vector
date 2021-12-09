@@ -46,6 +46,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         let protocol = tls.http_protocol_name();
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
         let path = path.to_owned();
+        let acknowledgements = cx.globals.acknowledgements.merge(&acknowledgements);
         Ok(Box::pin(async move {
             let span = crate::trace::current_span();
             let mut filter: BoxedFilter<()> = warp::post().boxed();

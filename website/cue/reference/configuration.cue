@@ -7,6 +7,21 @@ configuration: {
 
 configuration: {
 	configuration: {
+		_acknowledgements: {
+			common:      true
+			description: "Controls how acknowledgements are handled by all sources."
+			required:    false
+			type: object: options: {
+				enabled: {
+					common:      true
+					description: "Controls if sources will wait for destination sinks to deliver the events before acknowledging receipt. If set to `true`, all capable sources will have acknowledgements enabled."
+					warnings: ["Disabling this option may lead to loss of data, as destination sinks may reject events after the source acknowledges their successful receipt."]
+					required: false
+					type: bool: default: false
+				}
+			}
+		}
+
 		data_dir: {
 			common: false
 			description: """

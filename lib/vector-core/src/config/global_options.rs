@@ -1,5 +1,5 @@
-use crate::config::proxy::ProxyConfig;
-use crate::config::LogSchema;
+use super::{proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
+use crate::serde::bool_or_struct;
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
@@ -40,6 +40,8 @@ pub struct GlobalOptions {
     pub proxy: ProxyConfig,
     #[serde(skip)]
     pub enterprise: bool,
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl GlobalOptions {

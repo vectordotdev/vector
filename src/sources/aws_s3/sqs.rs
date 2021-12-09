@@ -185,6 +185,7 @@ impl Ingestor {
         cx: SourceContext,
         acknowledgements: AcknowledgementsConfig,
     ) -> Result<(), ()> {
+        let acknowledgements = cx.globals.acknowledgements.merge(&acknowledgements);
         let mut handles = Vec::new();
         for _ in 0..self.state.client_concurrency {
             let process = IngestorProcess::new(

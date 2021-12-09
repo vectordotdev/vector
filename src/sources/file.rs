@@ -233,12 +233,14 @@ impl SourceConfig for FileConfig {
             }
         }
 
+        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
+
         Ok(file_source(
             self,
             data_dir,
             cx.shutdown,
             cx.out,
-            self.acknowledgements.enabled,
+            acknowledgements.enabled,
         ))
     }
 

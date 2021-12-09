@@ -17,7 +17,7 @@ use std::hash::Hash;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use vector_core::buffers::{Acker, BufferConfig, BufferType};
-pub use vector_core::config::GlobalOptions;
+pub use vector_core::config::{AcknowledgementsConfig, GlobalOptions};
 pub use vector_core::transform::{DataType, ExpandType, TransformConfig, TransformContext};
 
 pub mod api;
@@ -148,17 +148,6 @@ macro_rules! impl_generate_config_from_default {
             }
         }
     };
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-pub struct AcknowledgementsConfig {
-    pub enabled: bool,
-}
-
-impl From<bool> for AcknowledgementsConfig {
-    fn from(enabled: bool) -> Self {
-        Self { enabled }
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]

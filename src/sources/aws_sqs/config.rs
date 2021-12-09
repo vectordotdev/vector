@@ -54,6 +54,7 @@ impl SourceConfig for AwsSqsConfig {
 
         let client = aws_sdk_sqs::Client::from_conf(config_builder.build());
         let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
 
         Ok(Box::pin(
             SqsSource {
@@ -62,7 +63,7 @@ impl SourceConfig for AwsSqsConfig {
                 decoder,
                 poll_secs: self.poll_secs,
                 concurrency: self.client_concurrency,
-                acknowledgements: self.acknowledgements.enabled,
+                acknowledgements: acknowledgements.enabled,
             }
             .run(cx.out, cx.shutdown),
         ))

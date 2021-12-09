@@ -114,8 +114,9 @@ impl GenerateConfig for VectorConfig {
 impl VectorConfig {
     pub(super) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let tls_settings = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
 
-        let source = run(self.address, tls_settings, cx, self.acknowledgements).map_err(|error| {
+        let source = run(self.address, tls_settings, cx, acknowledgements).map_err(|error| {
             error!(message = "Source future failed.", %error);
         });
 

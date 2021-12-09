@@ -106,6 +106,8 @@ where
         cx: SourceContext,
         acknowledgements: AcknowledgementsConfig,
     ) -> crate::Result<crate::sources::Source> {
+        let acknowledgements = cx.globals.acknowledgements.merge(&acknowledgements);
+
         let out = cx
             .out
             .sink_map_err(|error| error!(message = "Error sending event.", %error));
