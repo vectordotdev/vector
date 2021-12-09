@@ -27,9 +27,15 @@ Examples of possible deprecations in Vector:
 * Removal or rename of a metric
 * Removal of a feature
 
-## Notice
+## Lifecycle of a deprecation
 
-For deprecations in Vector, we will notify by:
+A deprecation goes through three stages: Deprecation, Migration, and Removal. These are described below.
+
+### Deprecation
+
+A configuration option or feature in Vector is marked as deprecated.
+
+When this happens, we will notify by:
 
 * Listing the deprecation in the Deprecations section of the upgrade guide for the release the deprecation was
   introduced in. This will include instructions on how to transition if applicable.
@@ -39,10 +45,21 @@ For deprecations in Vector, we will notify by:
   `vector validate`, or at runtime, when possible. This log message will lead with the text `DEPRECATED` to make it easy
   to filter for.
 
-For removal of a deprecation, we will notify by:
+### Migration
+
+Users will have 1 or more minor releases to migrate away from using the deprecation using the instructions provided in
+the deprecation notice.
+
+### Removal
+
+A deprecated configuration option or feature in Vector is removed.
+
+When this happens, we will notify by:
 
 * Listing the removal in the Breaking Changes section of upgrade guide for that release. This will include directions on
   how to transition if applicable.
+
+When possible, Vector will error at start-up when a removed configuration option or feature is used.
 
 [configuration]: https://vector.dev/docs/reference/configuration/
 
