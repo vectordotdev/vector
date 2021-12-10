@@ -58,6 +58,10 @@ impl TransformConfig for TokenizerConfig {
         DataType::Log
     }
 
+    fn enable_concurrency(&self) -> bool {
+        true
+    }
+
     fn transform_type(&self) -> &'static str {
         "tokenizer"
     }

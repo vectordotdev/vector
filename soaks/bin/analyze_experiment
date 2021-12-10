@@ -104,20 +104,33 @@ for exp in csv.experiment.unique():
 
 ttest_results = pd.DataFrame.from_records(ttest_results)
 
-print("# Soak Test Results")
-print("Baseline: {}".format(args.baseline_sha))
-print("Comparison: {}".format(args.comparison_sha))
-print("Total Vector CPUs: {}".format(args.vector_cpus))
-print("")
-print("<details>")
-print("<summary>Explanation</summary>")
-print("A soak test is an integrated performance test for vector in a repeatable rig, with varying configuration for vector.", end=' ')
-print("What follows is a statistical summary of a brief vector run for each configuration across SHAs given above.", end=' ')
-print("The goal of these tests are to determine, quickly, if vector performance is changed and to what degree by a pull request.", end=' ')
-print("Test units below are bytes/second/CPU, except for 'skewness'. The", end=' ')
-print("further 'skewness' is from 0.0 the more indication that vector lacks", end=' ')
-print("consistency in behavior, making predictions of fitness in the field challenging.")
-print("</details>")
+print(f'''
+# Soak Test Results
+Baseline: {args.baseline_sha}
+Comparison: {args.comparison_sha}
+Total Vector CPUs: {args.vector_cpus}
+
+<details>
+<summary>Explanation</summary>
+<p>
+A soak test is an integrated performance test for vector in a repeatable rig, with varying configuration for vector.
+What follows is a statistical summary of a brief vector run for each configuration across SHAs given above.
+The goal of these tests are to determine, quickly, if vector performance is changed and to what degree by a pull request.
+Test units below are bytes/second/CPU, except for "skewness". The
+further "skewness" is from 0.0 the more indication that vector lacks
+consistency in behavior, making predictions of fitness in the field challenging.
+</p>
+
+<p>
+The abbreviated table below, if present, lists those experiments that have experienced a
+statistically significant change in their throughput performance between
+baseline and comparision SHAs, with {(1.0 - args.p_value) * 100}% confidence. Negative values mean
+that baseline is faster, positive comparison. Results that do not exhibit more than a ±{args.mean_drift_percentage}%
+change in mean throughput are discarded. The abbreviated table will be omitted if no statistically
+interesting changes are observed.
+</p>
+</details>
+''')
 
 def confidence(p):
     c = (1.0 - p) * 100
@@ -135,21 +148,14 @@ changes = changes.loc[~changes['experiment'].isin(erratic_soaks)]
 changes = changes[changes['Δ mean %'].abs() > args.mean_drift_percentage].sort_values('Δ mean', ascending=False)
 changes['Δ mean'] = changes['Δ mean'].apply(human_bytes)
 if len(changes) > 0:
-    print("")
-    print("This table lists those experiments that have experienced a", end=' ')
-    print("statistically significant change in their throughput performance between", end=' ')
-    print("baseline and comparision SHAs, with {}% confidence. Negative values mean".format((1.0 - args.p_value) * 100), end=' ')
-    print("that baseline is faster, positive comparison. Results that do not exhibit more than a ±{}%".format(args.mean_drift_percentage), end=' ')
-    print("change in mean throughput are discarded.")
-    print("")
     print(changes.to_markdown(index=False, tablefmt='github'))
 else:
-    print("")
     print("No statistically interesting changes with confidence {}.".format(confidence(args.p_value)))
 
+print()
 print("<details>")
 print("<summary>Fine details of change detection per experiment.</summary>")
-print("")
+print()
 ttest_results = ttest_results.sort_values('Δ mean', ascending=False)
 ttest_results['Δ mean'] = ttest_results['Δ mean'].apply(human_bytes)
 ttest_results['baseline mean'] = ttest_results['baseline mean'].apply(human_bytes)
@@ -161,7 +167,7 @@ print("</details>")
 
 print("<details>")
 print("<summary>Fine details of each soak run.</summary>")
-print("")
+print()
 describe = csv.groupby(['experiment', 'variant'])['value'].describe(percentiles=[0.90, 0.95, 0.99])
 describe = describe.rename(columns={'50%': 'average', '95%': 'p95', '90%': 'p90', '99%': 'p99'})
 describe = describe.sort_values('mean', ascending=False)

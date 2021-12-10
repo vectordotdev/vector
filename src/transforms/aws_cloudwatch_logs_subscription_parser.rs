@@ -42,6 +42,10 @@ impl TransformConfig for AwsCloudwatchLogsSubscriptionParserConfig {
         DataType::Log
     }
 
+    fn enable_concurrency(&self) -> bool {
+        true
+    }
+
     fn transform_type(&self) -> &'static str {
         "aws_cloudwatch_logs_subscription_parser"
     }
