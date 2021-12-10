@@ -75,7 +75,7 @@ jobs:
             cue:
               - 'website/cue/**'
             markdown:
-              - '**/**.md'
+              - '*/**.md'
             internal_events:
               - 'src/internal_events/**'
             helm:
