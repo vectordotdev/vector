@@ -51,6 +51,10 @@ impl TransformConfig for LogfmtConfig {
         DataType::Log
     }
 
+    fn enable_concurrency(&self) -> bool {
+        true
+    }
+
     fn transform_type(&self) -> &'static str {
         "logfmt_parser"
     }

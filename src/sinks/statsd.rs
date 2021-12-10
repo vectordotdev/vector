@@ -6,6 +6,7 @@ use crate::{
     event::Event,
     internal_events::StatsdInvalidMetricReceived,
     sinks::util::{
+        buffer::metrics::compress_distribution,
         encode_namespace,
         tcp::TcpSinkConfig,
         udp::{UdpService, UdpSinkConfig},
@@ -201,6 +202,7 @@ fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<Vec<u8>
                 StatisticKind::Histogram => "h",
                 StatisticKind::Summary => "d",
             };
+            let samples = compress_distribution(samples.clone());
             for sample in samples {
                 push_event(
                     &mut buf,
@@ -369,15 +371,26 @@ mod test {
             "distribution",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: vector_core::samples![1.5 => 1],
+                samples: vector_core::samples![1.5 => 1, 1.5 => 1],
                 statistic: StatisticKind::Histogram,
             },
         )
         .with_tags(Some(tags()));
-        let event = Event::Metric(metric1.clone());
+
+        let metric1_compressed = Metric::new(
+            "distribution",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: vector_core::samples![1.5 => 2],
+                statistic: StatisticKind::Histogram,
+            },
+        )
+        .with_tags(Some(tags()));
+
+        let event = Event::Metric(metric1);
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
-        shared::assert_event_data_eq!(metric1, metric2);
+        shared::assert_event_data_eq!(metric1_compressed, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
