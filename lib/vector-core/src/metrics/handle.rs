@@ -25,7 +25,7 @@ impl AtomicF64 {
     {
         let res = self.inner.fetch_update(set_order, fetch_order, |x| {
             let opt: Option<f64> = f(f64::from_bits(x));
-            opt.map(|i| i.to_bits())
+            opt.map(f64::to_bits)
         });
 
         res.map(f64::from_bits).map_err(f64::from_bits)

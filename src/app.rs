@@ -6,7 +6,8 @@ use crate::{
     trace, unit_test, validate,
 };
 use futures::StreamExt;
-use std::{collections::HashMap, path::PathBuf};
+use once_cell::race::OnceNonZeroUsize;
+use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
 use tokio::{
     runtime::{self, Runtime},
     sync::mpsc,
@@ -20,6 +21,8 @@ use crate::{tap, top};
 
 #[cfg(windows)]
 use crate::service;
+
+pub static WORKER_THREADS: OnceNonZeroUsize = OnceNonZeroUsize::new();
 
 use crate::internal_events::{
     VectorConfigLoadFailed, VectorQuit, VectorRecoveryFailed, VectorReloadFailed, VectorReloaded,
@@ -110,6 +113,9 @@ impl Application {
                 error!("The `threads` argument must be greater or equal to 1.");
                 return Err(exitcode::CONFIG);
             } else {
+                WORKER_THREADS
+                    .set(NonZeroUsize::new(threads).expect("already checked"))
+                    .expect("double thread initialization");
                 rt_builder.worker_threads(threads);
             }
         }

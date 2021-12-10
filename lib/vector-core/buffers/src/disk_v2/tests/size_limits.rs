@@ -159,9 +159,9 @@ async fn writer_waits_when_buffer_is_full() {
             // can at least handle the pending acknowledgements logic, but it won't actually be ready,
             // because the second write hasn't completed yet:
             acker.ack(1);
-            assert_pending!(second_record_read.poll());
-            deleted_first_data_file.assert();
-            got_past_wait_for_waiter.assert();
+            while !deleted_first_data_file.try_assert() && !got_past_wait_for_waiter.try_assert() {
+                assert_pending!(second_record_read.poll());
+            }
 
             // And now the writer should be woken up since the acknowledgement was processed, and
             // the blocked write should be able to complete:

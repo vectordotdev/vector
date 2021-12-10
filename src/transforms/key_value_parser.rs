@@ -85,6 +85,10 @@ impl TransformConfig for KeyValueConfig {
         DataType::Log
     }
 
+    fn enable_concurrency(&self) -> bool {
+        true
+    }
+
     fn transform_type(&self) -> &'static str {
         "key_value_parser"
     }

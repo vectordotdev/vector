@@ -50,6 +50,10 @@ impl TransformConfig for FilterConfig {
         DataType::Any
     }
 
+    fn enable_concurrency(&self) -> bool {
+        true
+    }
+
     fn transform_type(&self) -> &'static str {
         "filter"
     }

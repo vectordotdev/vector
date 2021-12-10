@@ -49,6 +49,11 @@ impl Fanout {
         (fanout, control_tx)
     }
 
+    /// Add a new sink as an output.
+    ///
+    /// # Panics
+    ///
+    /// Function will panic if a sink with the same ID is already present.
     pub fn add(&mut self, id: ComponentKey, sink: GenericEventSink) {
         assert!(
             !self.sinks.iter().any(|(n, _)| n == &id),
@@ -73,8 +78,8 @@ impl Fanout {
         }
     }
 
-    fn replace(&mut self, id: ComponentKey, sink: Option<GenericEventSink>) {
-        if let Some((_, existing)) = self.sinks.iter_mut().find(|(n, _)| n == &id) {
+    fn replace(&mut self, id: &ComponentKey, sink: Option<GenericEventSink>) {
+        if let Some((_, existing)) = self.sinks.iter_mut().find(|(n, _)| n == id) {
             *existing = sink;
         } else {
             panic!("Tried to replace a sink that's not already present");
@@ -86,7 +91,7 @@ impl Fanout {
             match message {
                 ControlMessage::Add(id, sink) => self.add(id, sink),
                 ControlMessage::Remove(id) => self.remove(&id),
-                ControlMessage::Replace(id, sink) => self.replace(id, sink),
+                ControlMessage::Replace(id, sink) => self.replace(&id, sink),
             }
         }
     }
@@ -197,19 +202,19 @@ impl Sink<Event> for Fanout {
 mod tests {
     use super::{ControlMessage, Fanout};
     use crate::{config::ComponentKey, event::Event, test_util::collect_ready};
-    use futures::{stream, FutureExt, Sink, SinkExt, StreamExt};
-    use std::{
-        pin::Pin,
-        task::{Context, Poll},
-    };
-    use tokio::time::{sleep, Duration};
-    use vector_core::buffers::{
+    use buffers::{
         topology::{
             builder::TopologyBuilder,
             channel::{BufferSender, SenderAdapter},
         },
         WhenFull,
     };
+    use futures::{stream, FutureExt, Sink, SinkExt, StreamExt};
+    use std::{
+        pin::Pin,
+        task::{Context, Poll},
+    };
+    use tokio::time::{sleep, Duration};
 
     #[tokio::test]
     async fn fanout_writes_to_all() {
@@ -223,10 +228,10 @@ mod tests {
 
         let recs = make_events(2);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
-        let _ = send.await.unwrap();
+        send.await.unwrap();
 
-        assert_eq!(collect_ready(rx_a).await, recs);
-        assert_eq!(collect_ready(rx_b).await, recs);
+        assert_eq!(collect_ready(rx_a), recs);
+        assert_eq!(collect_ready(rx_b), recs);
     }
 
     #[tokio::test]
@@ -277,9 +282,9 @@ mod tests {
 
         fanout.send(recs[2].clone()).await.unwrap();
 
-        assert_eq!(collect_ready(rx_a).await, recs);
-        assert_eq!(collect_ready(rx_b).await, recs);
-        assert_eq!(collect_ready(rx_c).await, &recs[2..]);
+        assert_eq!(collect_ready(rx_a), recs);
+        assert_eq!(collect_ready(rx_b), recs);
+        assert_eq!(collect_ready(rx_c), &recs[2..]);
     }
 
     #[tokio::test]
@@ -304,8 +309,8 @@ mod tests {
 
         fanout.send(recs[2].clone()).await.unwrap();
 
-        assert_eq!(collect_ready(rx_a).await, recs);
-        assert_eq!(collect_ready(rx_b).await, &recs[..2]);
+        assert_eq!(collect_ready(rx_a), recs);
+        assert_eq!(collect_ready(rx_b), &recs[..2]);
     }
 
     #[tokio::test]
@@ -431,13 +436,13 @@ mod tests {
         fanout.send(recs[1].clone()).await.unwrap();
 
         let (tx_a2, rx_a2) = TopologyBuilder::memory(4).await;
-        fanout.replace(ComponentKey::from("a"), Some(Box::pin(tx_a2)));
+        fanout.replace(&ComponentKey::from("a"), Some(Box::pin(tx_a2)));
 
         fanout.send(recs[2].clone()).await.unwrap();
 
-        assert_eq!(collect_ready(rx_a1).await, &recs[..2]);
-        assert_eq!(collect_ready(rx_b).await, recs);
-        assert_eq!(collect_ready(rx_a2).await, &recs[2..]);
+        assert_eq!(collect_ready(rx_a1), &recs[..2]);
+        assert_eq!(collect_ready(rx_b), recs);
+        assert_eq!(collect_ready(rx_a2), &recs[2..]);
     }
 
     #[tokio::test]
@@ -456,7 +461,7 @@ mod tests {
         fanout.send(recs[1].clone()).await.unwrap();
 
         let (tx_a2, rx_a2) = TopologyBuilder::memory(4).await;
-        fanout.replace(ComponentKey::from("a"), None);
+        fanout.replace(&ComponentKey::from("a"), None);
 
         futures::join!(
             async {
@@ -472,49 +477,49 @@ mod tests {
             fanout.send(recs[2].clone()).map(|_| ())
         );
 
-        assert_eq!(collect_ready(rx_a1).await, &recs[..2]);
-        assert_eq!(collect_ready(rx_b).await, recs);
-        assert_eq!(collect_ready(rx_a2).await, &recs[2..]);
+        assert_eq!(collect_ready(rx_a1), &recs[..2]);
+        assert_eq!(collect_ready(rx_b), recs);
+        assert_eq!(collect_ready(rx_a2), &recs[2..]);
     }
 
     #[tokio::test]
     async fn fanout_error_poll_first() {
-        fanout_error(&[Some(ErrorWhen::Poll), None, None]).await
+        fanout_error(&[Some(ErrorWhen::Poll), None, None]).await;
     }
 
     #[tokio::test]
     async fn fanout_error_poll_middle() {
-        fanout_error(&[None, Some(ErrorWhen::Poll), None]).await
+        fanout_error(&[None, Some(ErrorWhen::Poll), None]).await;
     }
 
     #[tokio::test]
     async fn fanout_error_poll_last() {
-        fanout_error(&[None, None, Some(ErrorWhen::Poll)]).await
+        fanout_error(&[None, None, Some(ErrorWhen::Poll)]).await;
     }
 
     #[tokio::test]
     async fn fanout_error_poll_not_middle() {
-        fanout_error(&[Some(ErrorWhen::Poll), None, Some(ErrorWhen::Poll)]).await
+        fanout_error(&[Some(ErrorWhen::Poll), None, Some(ErrorWhen::Poll)]).await;
     }
 
     #[tokio::test]
     async fn fanout_error_send_first() {
-        fanout_error(&[Some(ErrorWhen::Send), None, None]).await
+        fanout_error(&[Some(ErrorWhen::Send), None, None]).await;
     }
 
     #[tokio::test]
     async fn fanout_error_send_middle() {
-        fanout_error(&[None, Some(ErrorWhen::Send), None]).await
+        fanout_error(&[None, Some(ErrorWhen::Send), None]).await;
     }
 
     #[tokio::test]
     async fn fanout_error_send_last() {
-        fanout_error(&[None, None, Some(ErrorWhen::Send)]).await
+        fanout_error(&[None, None, Some(ErrorWhen::Send)]).await;
     }
 
     #[tokio::test]
     async fn fanout_error_send_not_middle() {
-        fanout_error(&[Some(ErrorWhen::Send), None, Some(ErrorWhen::Send)]).await
+        fanout_error(&[Some(ErrorWhen::Send), None, Some(ErrorWhen::Send)]).await;
     }
 
     async fn fanout_error(modes: &[Option<ErrorWhen>]) {
@@ -523,19 +528,16 @@ mod tests {
 
         for (i, mode) in modes.iter().enumerate() {
             let id = ComponentKey::from(format!("{}", i));
-            match *mode {
-                Some(when) => {
-                    let tx = AlwaysErrors { when };
-                    let tx = SenderAdapter::opaque(tx.sink_map_err(|_| ()));
-                    let tx = BufferSender::new(tx, WhenFull::Block);
+            if Some(when) = *mode {
+                let tx = AlwaysErrors { when };
+                let tx = SenderAdapter::opaque(tx.sink_map_err(|_| ()));
+                let tx = BufferSender::new(tx, WhenFull::Block);
 
-                    fanout.add(id, Box::pin(tx));
-                }
-                None => {
-                    let (tx, rx) = TopologyBuilder::memory(0).await;
-                    fanout.add(id, Box::pin(tx));
-                    rx_channels.push(rx);
-                }
+                fanout.add(id, Box::pin(tx));
+            } else {
+                let (tx, rx) = TopologyBuilder::memory(0).await;
+                fanout.add(id, Box::pin(tx));
+                rx_channels.push(rx);
             }
         }
 

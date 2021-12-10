@@ -1,7 +1,7 @@
 use super::{host_key, Encoding};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    sinks::splunk_hec::logs::config::HecSinkLogsConfig,
+    sinks::splunk_hec::logs::config::HecLogsSinkConfig,
     sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
     sinks::{
         splunk_hec::common::{
@@ -88,11 +88,11 @@ impl SinkConfig for HumioLogsConfig {
 }
 
 impl HumioLogsConfig {
-    fn build_hec_config(&self) -> HecSinkLogsConfig {
+    fn build_hec_config(&self) -> HecLogsSinkConfig {
         let endpoint = self.endpoint.clone().unwrap_or_else(|| HOST.to_string());
 
-        HecSinkLogsConfig {
-            token: self.token.clone(),
+        HecLogsSinkConfig {
+            default_token: self.token.clone(),
             endpoint,
             host_key: self.host_key.clone(),
             indexed_fields: self.indexed_fields.clone(),
@@ -373,6 +373,7 @@ mod integration_tests {
     }
 
     #[derive(Clone, Deserialize)]
+    #[allow(dead_code)] // deserialize all fields
     struct HumioLog {
         #[serde(rename = "#repo")]
         humio_repo: String,

@@ -3,11 +3,12 @@ name = "datadog-search-syntax"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2021"
+publish = false
 
 [dependencies]
 pest = "2.1.3"
 pest_derive = "2.1.0"
 ordered-float = "2"
 regex = "1"
-itertools = "0.10.0"
+itertools = "0.10.3"
 lazy_static = { version = "1.4.0", default-features = false }
