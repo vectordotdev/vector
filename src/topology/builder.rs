@@ -145,7 +145,7 @@ pub async fn build_pieces(
         .filter(|(key, _)| diff.sources.contains_new(key))
     {
         let (tx, rx) = futures::channel::mpsc::channel(1000);
-        let pipeline = Pipeline::from_sender(tx, vec![]);
+        let pipeline = Pipeline::from_sender(tx);
 
         let typetag = source.inner.source_type();
 

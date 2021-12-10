@@ -7,8 +7,6 @@ use futures::{Stream, StreamExt};
 use vector_core::event::EventStatus;
 use vector_core::{event::Event, internal_event::EventsSent, ByteSizeOf};
 
-use crate::transforms::FunctionTransform;
-
 #[derive(Debug)]
 pub struct ClosedError;
 
@@ -26,9 +24,6 @@ const MAX_ENQUEUED: usize = 1000;
 #[derivative(Debug)]
 pub struct Pipeline {
     inner: mpsc::Sender<Event>,
-    // We really just keep this around in case we need to rebuild.
-    #[derivative(Debug = "ignore")]
-    inlines: Vec<Box<dyn FunctionTransform>>,
     enqueued: VecDeque<Event>,
 }
 
@@ -115,17 +110,7 @@ impl Sink<Event> for Pipeline {
     }
 
     fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
-        // Note how this gets **swapped** with `new_working_set` in the loop.
-        // At the end of the loop, it will only contain finalized events.
-        let mut working_set = vec![item];
-        for inline in self.inlines.iter_mut() {
-            let mut new_working_set = Vec::with_capacity(working_set.len());
-            for event in working_set.drain(..) {
-                inline.transform(&mut new_working_set, event);
-            }
-            core::mem::swap(&mut new_working_set, &mut working_set);
-        }
-        self.enqueued.extend(working_set);
+        self.enqueued.push_back(item);
         Ok(())
     }
 
@@ -141,12 +126,12 @@ impl Sink<Event> for Pipeline {
 impl Pipeline {
     #[cfg(test)]
     pub fn new_test() -> (Self, mpsc::Receiver<Event>) {
-        Self::new_with_buffer(100, vec![])
+        Self::new_with_buffer(100)
     }
 
     #[cfg(test)]
     pub fn new_test_finalize(status: EventStatus) -> (Self, impl Stream<Item = Event> + Unpin) {
-        let (pipe, recv) = Self::new_with_buffer(100, vec![]);
+        let (pipe, recv) = Self::new_with_buffer(100);
         // In a source test pipeline, there is no sink to acknowledge
         // events, so we have to add a map to the receiver to handle the
         // finalization.
@@ -159,99 +144,17 @@ impl Pipeline {
         (pipe, recv)
     }
 
-    pub fn new_with_buffer(
-        n: usize,
-        inlines: Vec<Box<dyn FunctionTransform>>,
-    ) -> (Self, mpsc::Receiver<Event>) {
+    pub fn new_with_buffer(n: usize) -> (Self, mpsc::Receiver<Event>) {
         let (tx, rx) = mpsc::channel(n);
-        (Self::from_sender(tx, inlines), rx)
+        (Self::from_sender(tx), rx)
     }
 
-    pub fn from_sender(
-        inner: mpsc::Sender<Event>,
-        inlines: Vec<Box<dyn FunctionTransform>>,
-    ) -> Self {
+    pub fn from_sender(inner: mpsc::Sender<Event>) -> Self {
         Self {
             inner,
-            inlines,
             // We ensure the buffer is sufficient that it is unlikely to require reallocations.
             // There is a possibility a component might blow this queue size.
             enqueued: VecDeque::with_capacity(10),
         }
-    }
-}
-
-#[cfg(all(test, feature = "transforms-add_fields", feature = "transforms-filter"))]
-mod test {
-    use std::convert::TryFrom;
-
-    use futures::SinkExt;
-    use serde_json::json;
-
-    use super::Pipeline;
-    use crate::{
-        event::{Event, Value},
-        test_util::collect_ready,
-        transforms::{add_fields::AddFields, filter::Filter},
-    };
-
-    const KEYS: [&str; 2] = ["booper", "swooper"];
-
-    const VALS: [&str; 2] = ["Pineapple", "Coconut"];
-
-    #[tokio::test]
-    async fn multiple_transforms() -> Result<(), crate::Error> {
-        let transform_1 = AddFields::new(
-            indexmap::indexmap! {
-                KEYS[0].into() => Value::from(VALS[0]),
-            },
-            false,
-        )?;
-        let transform_2 = AddFields::new(
-            indexmap::indexmap! {
-                KEYS[1].into() => Value::from(VALS[1]),
-            },
-            false,
-        )?;
-
-        let (mut pipeline, receiver) =
-            Pipeline::new_with_buffer(100, vec![Box::new(transform_1), Box::new(transform_2)]);
-
-        let event = Event::try_from(json!({
-            "message": "MESSAGE_MARKER",
-        }))?;
-
-        pipeline.send(event).await?;
-        let out = collect_ready(receiver).await;
-
-        assert_eq!(out[0].as_log().get(KEYS[0]), Some(&Value::from(VALS[0])));
-        assert_eq!(out[0].as_log().get(KEYS[1]), Some(&Value::from(VALS[1])));
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn filtered_output() -> Result<(), crate::Error> {
-        let transform_1 = Filter::new(Box::new(crate::conditions::check_fields::CheckFields::new(
-            indexmap::indexmap! {
-                KEYS[1].into() => crate::conditions::check_fields::EqualsPredicate::new(
-                    "message".into(),
-                    &crate::conditions::check_fields::CheckFieldsPredicateArg::String("NOT".into()),
-                )?,
-            },
-        )));
-
-        let (mut pipeline, receiver) = Pipeline::new_with_buffer(100, vec![Box::new(transform_1)]);
-
-        let event = Event::try_from(json!({
-            "message": "MESSAGE_MARKER",
-        }))?;
-
-        pipeline.send(event).await?;
-        let out = collect_ready(receiver).await;
-
-        assert_eq!(out, vec![]);
-
-        Ok(())
     }
 }

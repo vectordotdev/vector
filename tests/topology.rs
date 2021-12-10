@@ -45,7 +45,7 @@ async fn topology_shutdown_while_active() {
     let source_event_counter = Arc::new(AtomicUsize::new(0));
     let source_event_total = source_event_counter.clone();
 
-    let (in1, rx) = vector::Pipeline::new_with_buffer(1000, vec![]);
+    let (in1, rx) = vector::Pipeline::new_with_buffer(1000);
 
     let source1 = MockSourceConfig::new_with_event_counter(rx, source_event_counter);
     let transform1 = transform(" transformed", 0.0);
