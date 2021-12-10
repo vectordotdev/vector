@@ -199,7 +199,7 @@ None.
 ## Plan Of Attack
 
 * [ ] Write a subsequent RFC discussing how APM stats will fit in Vector.
-* [ ] Submit a PR introducing traces support in the `datadog_agent` source emitting a `LogEvent` for each trace and each APM event.
+* [ ] Submit a PR introducing traces support in the `datadog_agent` source emitting a `LogEvent` for each trace and each APM event. It will re-organize the source to isolate generic code from data type specific code. APM stats will be dropped at this point.
 * [ ] Submit a PR introducing the `datadog_trace` that turns relevant `LogEvent` back into Datadog protobuf-encoded traces.
 * [ ] Do the APM stats work.
 
