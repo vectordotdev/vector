@@ -625,7 +625,7 @@ components: {
 				let Args = _args
 
 				common:      false
-				description: "Configures the TLS options for incoming connections."
+				description: "Configures the TLS options for outgoing connections."
 				required:    false
 				type: object: options: {
 					if Args.can_enable {
