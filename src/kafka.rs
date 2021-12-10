@@ -95,6 +95,7 @@ fn pathbuf_to_string(path: &Path) -> crate::Result<&str> {
         .ok_or_else(|| KafkaError::InvalidPath { path: path.into() }.into())
 }
 
+#[derive(Default)]
 pub struct KafkaStatisticsContext;
 
 impl ClientContext for KafkaStatisticsContext {

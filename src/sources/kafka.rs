@@ -1,4 +1,4 @@
-use super::util::finalizer::OrderedFinalizer;
+use super::util::{finalizer::OrderedFinalizer, StreamDecodingError};
 use crate::{
     codecs::{
         self,
@@ -10,20 +10,20 @@ use crate::{
     },
     event::{BatchNotifier, Event, Value},
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
-    kafka::{KafkaAuthConfig, KafkaStatisticsContext},
+    kafka,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    sources::util::StreamDecodingError,
     Pipeline,
 };
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
 use futures_util::future::ready;
+use once_cell::sync::OnceCell;
 use rdkafka::{
-    config::ClientConfig,
-    consumer::{Consumer, StreamConsumer},
+    consumer::{Consumer, ConsumerContext, Rebalance, StreamConsumer},
     message::{BorrowedMessage, Headers, Message},
+    ClientConfig, ClientContext, Statistics,
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -71,7 +71,7 @@ pub struct KafkaSourceConfig {
     headers_key: String,
     librdkafka_options: Option<HashMap<String, String>>,
     #[serde(flatten)]
-    auth: KafkaAuthConfig,
+    auth: kafka::KafkaAuthConfig,
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     framing: Box<dyn FramingConfig>,
@@ -133,6 +133,7 @@ impl_generate_config_from_default!(KafkaSourceConfig);
 impl SourceConfig for KafkaSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let consumer = create_consumer(self)?;
+
         let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
 
         Ok(Box::pin(kafka_source(
@@ -159,7 +160,7 @@ impl SourceConfig for KafkaSourceConfig {
 }
 
 async fn kafka_source(
-    consumer: StreamConsumer<KafkaStatisticsContext>,
+    consumer: StreamConsumer<CustomContext>,
     key_field: String,
     topic_key: String,
     partition_key: String,
@@ -172,8 +173,20 @@ async fn kafka_source(
 ) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
     let shutdown = shutdown.shared();
-    let mut finalizer = acknowledgements
-        .then(|| OrderedFinalizer::new(shutdown.clone(), mark_done(Arc::clone(&consumer))));
+    let mut finalizer = acknowledgements.then(|| {
+        let finalizer = Arc::new(OrderedFinalizer::new(
+            shutdown.clone(),
+            mark_done(Arc::clone(&consumer)),
+        ));
+        consumer
+            .context()
+            .inner()
+            .finalizer
+            .set(Arc::clone(&finalizer))
+            .unwrap_or_else(|_| unreachable!());
+        finalizer
+    });
+
     let mut stream = consumer.stream().take_until(shutdown);
     let schema = log_schema();
 
@@ -308,7 +321,7 @@ impl<'a> From<BorrowedMessage<'a>> for FinalizerEntry {
     }
 }
 
-fn mark_done(consumer: Arc<StreamConsumer<KafkaStatisticsContext>>) -> impl Fn(FinalizerEntry) {
+fn mark_done(consumer: Arc<StreamConsumer<CustomContext>>) -> impl Fn(FinalizerEntry) {
     move |entry| {
         if let Err(error) = consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
             emit!(&KafkaOffsetUpdateFailed { error });
@@ -316,9 +329,7 @@ fn mark_done(consumer: Arc<StreamConsumer<KafkaStatisticsContext>>) -> impl Fn(F
     }
 }
 
-fn create_consumer(
-    config: &KafkaSourceConfig,
-) -> crate::Result<StreamConsumer<KafkaStatisticsContext>> {
+fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer<CustomContext>> {
     let mut client_config = ClientConfig::new();
     client_config
         .set("group.id", &config.group_id)
@@ -346,12 +357,32 @@ fn create_consumer(
     }
 
     let consumer = client_config
-        .create_with_context::<_, StreamConsumer<_>>(KafkaStatisticsContext)
+        .create_with_context::<_, StreamConsumer<_>>(CustomContext::default())
         .context(KafkaCreateError)?;
     let topics: Vec<&str> = config.topics.iter().map(|s| s.as_str()).collect();
     consumer.subscribe(&topics).context(KafkaSubscribeError)?;
 
     Ok(consumer)
+}
+
+#[derive(Default)]
+struct CustomContext {
+    stats: kafka::KafkaStatisticsContext,
+    finalizer: OnceCell<Arc<OrderedFinalizer<FinalizerEntry>>>,
+}
+
+impl ClientContext for CustomContext {
+    fn stats(&self, statistics: Statistics) {
+        self.stats.stats(statistics)
+    }
+}
+
+impl ConsumerContext for CustomContext {
+    fn post_rebalance(&self, _rebalance: &Rebalance) {
+        if let Some(finalizer) = self.finalizer.get() {
+            finalizer.flush();
+        }
+    }
 }
 
 #[cfg(test)]

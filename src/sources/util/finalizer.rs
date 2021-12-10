@@ -1,10 +1,8 @@
 use crate::event::BatchStatusReceiver;
 use crate::shutdown::ShutdownSignal;
 use futures::{future::Shared, stream::FuturesOrdered, FutureExt, StreamExt};
-use std::future::Future;
-use std::pin::Pin;
-use std::task::Poll;
-use tokio::sync::mpsc;
+use std::{future::Future, pin::Pin, sync::Arc, task::Poll};
+use tokio::sync::{mpsc, Notify};
 
 /// The `OrderedFinalizer` framework here is a mechanism for marking
 /// events from a source as done in a single background task *in the
@@ -13,6 +11,7 @@ use tokio::sync::mpsc;
 /// complete the finalization.
 pub struct OrderedFinalizer<T> {
     sender: Option<mpsc::UnboundedSender<(BatchStatusReceiver, T)>>,
+    flush: Option<Arc<Notify>>,
 }
 
 impl<T: Send + 'static> OrderedFinalizer<T> {
@@ -21,9 +20,16 @@ impl<T: Send + 'static> OrderedFinalizer<T> {
         apply_done: impl Fn(T) + Send + 'static,
     ) -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
-        tokio::spawn(run_finalizer(shutdown, receiver, apply_done));
+        let flush = Arc::new(Notify::new());
+        tokio::spawn(run_finalizer(
+            shutdown,
+            receiver,
+            apply_done,
+            Arc::clone(&flush),
+        ));
         Self {
             sender: Some(sender),
+            flush: Some(flush),
         }
     }
 
@@ -34,18 +40,29 @@ impl<T: Send + 'static> OrderedFinalizer<T> {
             }
         }
     }
+
+    pub(crate) fn flush(&self) {
+        if let Some(flush) = &self.flush {
+            flush.notify_one();
+        }
+    }
 }
 
 async fn run_finalizer<T>(
     shutdown: Shared<ShutdownSignal>,
     mut new_entries: mpsc::UnboundedReceiver<(BatchStatusReceiver, T)>,
     apply_done: impl Fn(T),
+    flush: Arc<Notify>,
 ) {
     let mut status_receivers = FuturesOrdered::default();
 
     loop {
         tokio::select! {
             _ = shutdown.clone() => break,
+            _ = flush.notified() => {
+                // Drop all the existing status receivers and start over.
+                status_receivers = FuturesOrdered::default();
+            },
             new_entry = new_entries.recv() => match new_entry {
                 Some((receiver, entry)) => {
                     status_receivers.push(FinalizerFuture {
