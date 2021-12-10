@@ -284,7 +284,9 @@ where
                                     Ok(response) => {
                                         trace!(message = "Service call succeeded.", request_id);
                                         finalizers.update_status(response.event_status());
-                                        emit(&response.events_sent());
+                                        if response.event_status() == EventStatus::Delivered {
+                                            emit(&response.events_sent());
+                                        }
                                     }
                                 };
                                 (seq_num, ack_size)
