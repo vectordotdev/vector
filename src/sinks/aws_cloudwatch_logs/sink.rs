@@ -11,6 +11,7 @@ use crate::sinks::util::service::Svc;
 use crate::sinks::util::SinkBuilderExt;
 
 use async_trait::async_trait;
+use chrono::{Duration, Utc};
 
 use futures::future;
 use futures::stream::BoxStream;
@@ -36,12 +37,7 @@ impl CloudwatchSink {
         let acker = self.acker;
 
         input
-            .filter_map(|event| {
-                future::ready(match request_builder.build(event) {
-                    Ok(maybe_req) => maybe_req.map(Ok),
-                    Err(err) => Some(Err(err)),
-                })
-            })
+            .filter_map(|event| future::ready(request_builder.build(event).transpose()))
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
@@ -50,6 +46,13 @@ impl CloudwatchSink {
                     }
                     Ok(req) => Some(req),
                 }
+            })
+            .filter(|req| {
+                let now = Utc::now();
+                let start = (now - Duration::days(14) + Duration::minutes(5)).timestamp_millis();
+                let end = (now + Duration::hours(2)).timestamp_millis();
+                let age_range = start..end;
+                future::ready(age_range.contains(&req.timestamp))
             })
             .batched_partitioned(CloudwatchParititoner, batcher_settings)
             .map(|(key, events)| BatchCloudwatchRequest { key, events })
