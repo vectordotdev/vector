@@ -9,7 +9,7 @@ configuration: {
 	configuration: {
 		acknowledgements: {
 			common:      true
-			description: "Controls how acknowledgements are handled by all sources."
+			description: "Controls how acknowledgements are handled by all sources. These settings may be overridden in individual sources."
 			required:    false
 			type: object: options: {
 				enabled: {

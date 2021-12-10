@@ -62,7 +62,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
             self.access_key.clone(),
             self.record_compression.unwrap_or_default(),
             decoder,
-            acknowledgements.enabled,
+            acknowledgements.enabled(),
             cx.out,
         );
 
@@ -108,7 +108,7 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
             record_compression: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
-            acknowledgements: AcknowledgementsConfig::default(),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }

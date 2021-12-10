@@ -196,7 +196,7 @@ impl Default for FileConfig {
             remove_after_secs: None,
             line_delimiter: "\n".to_string(),
             encoding: None,
-            acknowledgements: AcknowledgementsConfig::default(),
+            acknowledgements: Default::default(),
         }
     }
 }
@@ -240,7 +240,7 @@ impl SourceConfig for FileConfig {
             data_dir,
             cx.shutdown,
             cx.out,
-            acknowledgements.enabled,
+            acknowledgements.enabled(),
         ))
     }
 

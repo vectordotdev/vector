@@ -104,7 +104,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                 events
                             });
 
-                        handle_request(events, acknowledgements.enabled, cx.out.clone())
+                        handle_request(events, acknowledgements.enabled(), cx.out.clone())
                     },
                 )
                 .with(warp::trace(move |_info| span.clone()));

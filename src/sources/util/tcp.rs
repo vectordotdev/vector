@@ -187,7 +187,7 @@ where
                                 tripwire,
                                 peer_addr.ip(),
                                 out,
-                                acknowledgements.enabled,
+                                acknowledgements.enabled(),
                             );
 
                             tokio::spawn(

@@ -192,7 +192,7 @@ impl Ingestor {
                 Arc::clone(&self.state),
                 cx.out.clone(),
                 cx.shutdown.clone(),
-                acknowledgements.enabled,
+                acknowledgements.enabled(),
             );
             let fut = async move { process.run().await };
             let handle = tokio::spawn(fut.in_current_span());

@@ -85,7 +85,7 @@ impl Default for SplunkConfig {
             token: None,
             valid_tokens: None,
             tls: None,
-            acknowledgements: HecAcknowledgementsConfig::default(),
+            acknowledgements: Default::default(),
             store_hec_token: false,
         }
     }
@@ -182,7 +182,7 @@ impl SplunkSource {
             .flatten()
             .chain(config.token.iter());
 
-        let idx_ack = acknowledgements.enabled.then(|| {
+        let idx_ack = acknowledgements.enabled().then(|| {
             Arc::new(IndexerAcknowledgement::new(
                 config.acknowledgements.clone(),
                 shutdown,

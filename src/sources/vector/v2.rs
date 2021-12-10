@@ -105,7 +105,7 @@ impl GenerateConfig for VectorConfig {
             address: "0.0.0.0:6000".parse().unwrap(),
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             tls: None,
-            acknowledgements: AcknowledgementsConfig::default(),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -146,7 +146,7 @@ async fn run(
 
     let service = proto::Server::new(Service {
         pipeline: cx.out,
-        acknowledgements: acknowledgements.enabled,
+        acknowledgements: acknowledgements.enabled(),
     });
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
 
