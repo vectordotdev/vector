@@ -7,8 +7,8 @@ data_dir = "/var/lib/vector"
 [sources.internal_metrics]
 type = "internal_metrics"
 
-[sources.http_source]
-type = "http"
+[sources.splunk_hec]
+type = "splunk_hec"
 acknowledgements = true
 address = "0.0.0.0:8282"
 
@@ -23,7 +23,7 @@ address = "0.0.0.0:9090"
 
 [sinks.splunk_hec_logs]
 type = "splunk_hec_logs"
-inputs = ["http_source"]
+inputs = ["splunk_hec"]
 endpoint = "http://splunk-hec-blackhole:8080"
 encoding = "json"
 token = "abcd1234"
