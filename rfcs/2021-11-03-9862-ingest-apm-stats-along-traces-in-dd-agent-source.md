@@ -138,7 +138,7 @@ will be represented as logs inside Vector), and plain metrics (received from the
 (received from the `trace-agent`) we can plan to extand the behaviour that was added to the [remap
 transform][failed-event-routing]. This would translate to the following kind of config, easy to read, easy to adapt:
 
-```
+```toml
 [sources.dd_agents]
   type = "datadog_agent"
   address = "[::]:8081"
@@ -256,7 +256,7 @@ This would lead to the following config, functionnally identical to the [snippet
 but still very straighforward and easily readable (note that having multiple binding addresses may translate to more
 parameter in later work around helm charts):
 
-```
+```toml
 [sources.dd_in_logs]
   type = "datadog_logs"
   address = "[::]:8081"
@@ -298,6 +298,7 @@ None.
 * [ ] Add APM support to the `datadog_traces` sinks
 
 Depending on the timeline of [sketches-rs][sketches-rs] this point is at the edge between this section and the next one:
+
 * [ ] Switch Vector to use [sketches-rs][sketches-rs] internally instead of the Agent variant
 
 ## Future Improvements
