@@ -13,15 +13,9 @@ use hyper::StatusCode;
 use indoc::indoc;
 use vector_core::event::{BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue};
 
-// The sink must support v1 and v2 API endpoints which have different codes for
-// signaling status. This enum allows us to signal which API endpoint and what
-// kind of response we want our test to model without getting into the details
-// of exactly what that code is.
 enum ApiStatus {
-    OKv1,
-    // OKv2,
-    // Forbiddenv1,
-    // Forbiddenv2,
+    OK,
+    // Forbidden,
 }
 
 fn test_server(
@@ -33,9 +27,8 @@ fn test_server(
     impl std::future::Future<Output = Result<(), ()>>,
 ) {
     let status = match api_status {
-        ApiStatus::OKv1 => StatusCode::OK,
-        // ApiStatus::OKv2 => StatusCode::ACCEPTED,
-        // ApiStatus::Forbiddenv1 | ApiStatus::Forbiddenv2 => StatusCode::FORBIDDEN,
+        ApiStatus::OK => StatusCode::OK,
+        // ApiStatus::Forbidden => StatusCode::FORBIDDEN,
     };
 
     // NOTE: we pass `Trigger` out to the caller even though this suite never
@@ -104,11 +97,11 @@ fn decompress_payload(payload: Vec<u8>) -> std::io::Result<Vec<u8>> {
 #[tokio::test]
 /// Assert the basic functionality of the sink in good conditions
 ///
-/// This test rigs the sink to return OKv1 to responses, checks that all batches
+/// This test rigs the sink to return OK to responses, checks that all batches
 /// were delivered and then asserts that every message is able to be
 /// deserialized.
 async fn smoke() {
-    let (expected, rx) = start_test(ApiStatus::OKv1, BatchStatus::Delivered).await;
+    let (expected, rx) = start_test(ApiStatus::OK, BatchStatus::Delivered).await;
 
     let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
