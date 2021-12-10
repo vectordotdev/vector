@@ -46,13 +46,7 @@ components: transforms: sample: {
 				The set of logical conditions to exclude events from sampling.
 				"""
 			required: false
-			type: string: {
-				default: null
-				examples: [
-					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
-				]
-				syntax: "remap_boolean_expression"
-			}
+			type: condition: {}
 		}
 		rate: {
 			description: """

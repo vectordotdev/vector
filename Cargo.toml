@@ -89,9 +89,12 @@ members = [
   "lib/vrl/stdlib",
   "lib/vrl/tests",
   "lib/vrl/proptests",
+  "lib/vector-vrl-functions",
   "lib/datadog/grok",
   "lib/datadog/search-syntax",
   "lib/datadog/filter",
+  "lib/datadog/filter-test",
+  "lib/vector-datadog-filter",
   "lib/soak"
 ]
 
@@ -108,11 +111,11 @@ tracing-limit = { path = "lib/tracing-limit" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
-datadog-search-syntax = { path = "lib/datadog/search-syntax", optional = true }
+vector-vrl-functions = { path = "lib/vector-vrl-functions" }
 
 # Tokio / Futures
 async-stream = "0.3.2"
-async-trait = "0.1.51"
+async-trait = "0.1.52"
 futures = { version = "0.3.17", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.13.1", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
@@ -147,10 +150,9 @@ rusoto_sqs = { version = "0.47.0", optional = true }
 rusoto_sts = { version = "0.47.0", optional = true }
 
 # AWS - Official SDK
-aws-config = {version = "0.0.22-alpha", optional = true}
-aws-types = {version = "0.0.22-alpha", optional = true}
-aws-sdk-sqs = {version = "0.0.22-alpha", optional = true}
-
+aws-config = { version = "0.2.0", optional = true }
+aws-types = { version = "0.2.0", optional = true, features = ["hardcoded-credentials"]}
+aws-sdk-sqs = { version = "0.2.0", optional = true }
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "16bcf0ab1bb6e380d966a69d314de1e99ede553a", default-features = false, features = ["enable_reqwest"], optional = true }
@@ -162,7 +164,7 @@ tower = { version = "0.4.10", default-features = false, features = ["buffer", "l
 tower-layer = { version = "0.3.1", default-features = false }
 
 # Serde
-serde = { version = "1.0.130", default-features = false, features = ["derive"] }
+serde = { version = "1.0.131", default-features = false, features = ["derive"] }
 serde_bytes = { version = "0.11.5", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.68", default-features = false, features = ["raw_value"] }
 serde_yaml = { version = "0.8.21", default-features = false }
@@ -185,7 +187,7 @@ smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 # API
 async-graphql = { version = "2.10.4", default-features = false, optional = true, features = ["chrono"] }
 async-graphql-warp = { version = "2.10.4", default-features = false, optional = true }
-itertools = { version = "0.10.1", default-features = false, optional = true }
+itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
 crossterm = { version = "0.21.0", default-features = false, features = ["event-stream"], optional = true }
@@ -194,14 +196,15 @@ number_prefix = { version = "0.4.0", default-features = false, features = ["std"
 tui = { version = "0.16.0", optional = true, default-features = false, features = ["crossterm"] }
 
 # Datadog Pipelines
-sha2 = { version = "0.9.8", optional = true }
+datadog-search-syntax = { path = "lib/datadog/search-syntax" }
+datadog-filter = { path = "lib/datadog/filter" }
+vector-datadog-filter = { path = "lib/vector-datadog-filter" }
+sha2 = { version = "0.10.0", optional = true }
 hex = { version = "0.4.3", optional = true }
 
 # VRL Lang
 vrl = { path = "lib/vrl/core" }
 vrl-stdlib = { path = "lib/vrl/stdlib" }
-vrl-parser = { path = "lib/vrl/parser", optional = true }
-vrl-compiler = { path = "lib/vrl/compiler", optional = true }
 
 # Lookup
 lookup = { path = "lib/lookup" }
@@ -211,7 +214,7 @@ async-compression = { version = "0.3.7", default-features = false, features = ["
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
 base64 = { version = "0.13.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
-bollard = { version = "0.11.0", default-features = false, features = ["ssl"], optional = true }
+bollard = { version = "0.11.1", default-features = false, features = ["ssl"], optional = true }
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
@@ -222,12 +225,12 @@ dashmap = { version = "4.0.2", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
 dyn-clone = { version = "1.0.4", default-features = false }
-encoding_rs = { version = "0.8.29", features = ["serde"] }
+encoding_rs = { version = "0.8.30", features = ["serde"] }
 evmap = { version = "10.0.2", default-features = false, optional = true }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.21", default-features = false }
 futures-util = { version = "0.3.17", default-features = false }
-getset = { version = "0.1.1", default-features = false }
+getset = { version = "0.1.2", default-features = false }
 glob = { version = "0.3.0", default-features = false }
 governor = { version = "0.3.2", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
 grok = { version = "1.2.0", default-features = false, optional = true }
@@ -249,7 +252,7 @@ listenfd = { version = "0.3.5", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
 lru = { version = "0.7.0", default-features = false, optional = true }
 maxminddb = { version = "0.21.0", default-features = false, optional = true }
-md-5 = { version = "0.9", optional = true }
+md-5 = { version = "0.10", optional = true }
 # make sure to update the external docs when the Lua version changes
 mlua = { version = "0.7.0", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 mongodb = { version = "2.0.2", default-features = false, features = ["tokio-runtime"], optional = true }
@@ -280,7 +283,7 @@ socket2 = { version = "0.4.2", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
 structopt = { version = "0.3.25", default-features = false }
-syslog = { version = "5.0.0", default-features = false, optional = true }
+syslog = { version = "6.0.0", default-features = false, optional = true }
 syslog_loose = { version = "0.16.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.4", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = { version = "0.5.8", default-features = false }
@@ -310,11 +313,13 @@ prost-build = { version = "0.9", optional = true }
 tonic-build = { version = "0.6", default-features = false, features = ["transport", "prost"], optional = true }
 
 [dev-dependencies]
+datadog-filter-test = { path = "lib/datadog/filter-test"}
+
 approx = "0.5.0"
 assert_cmd = "2.0.2"
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
-libc = "0.2.106"
+libc = "0.2.109"
 libz-sys = "1.1.3"
 matches = "0.1.9"
 pretty_assertions = "1.0.0"
@@ -335,7 +340,10 @@ azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev =
 
 [patch.crates-io]
 # A patch for lib/vector-core/buffers, addresses Issue 7514
-leveldb-sys = { git = "https://github.com/timberio/leveldb-sys.git", branch = "leveldb_mmap_limit" }
+leveldb-sys = { git = "https://github.com/vectordotdev/leveldb-sys.git", branch = "leveldb_mmap_limit" }
+# Removes dependency on `time` v0.1
+# https://github.com/chronotope/chrono/pull/578
+chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
@@ -566,7 +574,7 @@ transforms-compound = []
 transforms-concat = []
 transforms-dedupe = ["lru"]
 transforms-field_filter = []
-transforms-filter = ["datadog-search-syntax", "vrl-parser", "vrl-compiler"]
+transforms-filter = []
 transforms-geoip = ["maxminddb"]
 transforms-grok_parser = ["grok"]
 transforms-json_parser = []

@@ -9,11 +9,11 @@ license = "MPL-2.0"
 [dependencies]
 
 # Serde
-serde = { version = "1.0.130", features = ["derive"] }
+serde = { version = "1.0.131", features = ["derive"] }
 serde_json = { version = "1.0.68", features = ["raw_value"] }
 
 # Error handling
-anyhow = "1.0.45"
+anyhow = "1.0.51"
 
 # Tokio / Futures
 async-stream = "0.3.2"

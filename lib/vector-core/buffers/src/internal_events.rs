@@ -41,6 +41,16 @@ impl InternalEvent for EventsDropped {
     }
 }
 
+pub struct EventsCorrupted {
+    pub count: u64,
+}
+
+impl InternalEvent for EventsCorrupted {
+    fn emit_metrics(&self) {
+        counter!("buffer_corrupted_events_total", self.count);
+    }
+}
+
 pub struct BufferCreated {
     pub max_size_events: Option<usize>,
     pub max_size_bytes: Option<usize>,

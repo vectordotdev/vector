@@ -331,7 +331,7 @@ pub fn file_source(
     Box::pin(async move {
         info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
 
-        let mut encoding_decoder = encoding_charset.map(|e| Decoder::new(e));
+        let mut encoding_decoder = encoding_charset.map(Decoder::new);
 
         // sizing here is just a guess
         let (tx, rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);

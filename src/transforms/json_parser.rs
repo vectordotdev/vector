@@ -40,6 +40,10 @@ impl TransformConfig for JsonParserConfig {
         DataType::Log
     }
 
+    fn enable_concurrency(&self) -> bool {
+        true
+    }
+
     fn transform_type(&self) -> &'static str {
         "json_parser"
     }

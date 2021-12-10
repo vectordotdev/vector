@@ -17,6 +17,10 @@ pub struct EventMetadata {
     #[getset(get = "pub", set = "pub")]
     #[serde(default, skip)]
     datadog_api_key: Option<Arc<str>>,
+    /// Used to store the Splunk HEC auth token from sources to sinks
+    #[getset(get = "pub", set = "pub")]
+    #[serde(default, skip)]
+    splunk_hec_token: Option<Arc<str>>,
     #[serde(default, skip)]
     finalizers: EventFinalizers,
 }
@@ -52,10 +56,14 @@ impl EventMetadata {
 
     /// Merge the other `EventMetadata` into this.
     /// If a Datadog API key is not set in `self`, the one from `other` will be used.
+    /// If a Splunk HEC token is not set in `self`, the one from `other` will be used.
     pub fn merge(&mut self, other: Self) {
         self.finalizers.merge(other.finalizers);
         if self.datadog_api_key.is_none() {
             self.datadog_api_key = other.datadog_api_key;
+        }
+        if self.splunk_hec_token.is_none() {
+            self.splunk_hec_token = other.splunk_hec_token;
         }
     }
 
