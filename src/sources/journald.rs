@@ -1,8 +1,12 @@
 use crate::{
-    codecs::{BoxedFramingError, CharacterDelimitedCodec},
-    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
+    codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder},
+    config::{
+        log_schema, AcknowledgementsConfig, DataType, SourceConfig, SourceContext,
+        SourceDescription,
+    },
     event::{BatchNotifier, Event, LogEvent, Value},
     internal_events::{BytesReceived, JournaldEventsReceived, JournaldInvalidRecordError},
+    serde::bool_or_struct,
     shutdown::ShutdownSignal,
     Pipeline,
 };
@@ -84,6 +88,8 @@ pub struct JournaldConfig {
     pub batch_size: Option<usize>,
     pub journalctl_path: Option<PathBuf>,
     pub journal_directory: Option<PathBuf>,
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
     /// Deprecated
     #[serde(default)]
     remap_priority: bool,
@@ -185,7 +191,7 @@ impl SourceConfig for JournaldConfig {
                 batch_size,
                 remap_priority: self.remap_priority,
                 out: cx.out,
-                acknowledgements: cx.acknowledgements.enabled,
+                acknowledgements: self.acknowledgements.enabled,
             }
             .run_shutdown(cx.shutdown, start),
         ))
@@ -392,7 +398,7 @@ impl JournaldSource {
 }
 
 /// A function that starts journalctl process.
-/// Return a stream of output splitted by '\n', and a `StopJournalctlFn`.
+/// Return a stream of output split by '\n', and a `StopJournalctlFn`.
 ///
 /// Code uses `start_journalctl` below,
 /// but we need this type to implement fake journald source in testing.
@@ -418,7 +424,7 @@ fn start_journalctl(
 
     let stream = FramedRead::new(
         child.stdout.take().unwrap(),
-        CharacterDelimitedCodec::new('\n'),
+        CharacterDelimitedDecoder::new('\n'),
     )
     .boxed();
 

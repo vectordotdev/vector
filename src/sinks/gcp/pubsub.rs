@@ -300,7 +300,7 @@ mod integration_tests {
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (_input, events) = random_events_with_stream(100, 100, Some(batch));
         sink.run(events).await.expect("Sending events failed");
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Failed));
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
     }
 
     #[tokio::test]
@@ -366,6 +366,7 @@ mod integration_tests {
 
     #[derive(Debug, Deserialize)]
     #[allow(non_snake_case)]
+    #[allow(dead_code)] // deserialize all fields
     struct PullMessageOuter {
         ackId: String,
         message: PullMessage,
@@ -373,6 +374,7 @@ mod integration_tests {
 
     #[derive(Debug, Deserialize)]
     #[allow(non_snake_case)]
+    #[allow(dead_code)] // deserialize all fields
     struct PullMessage {
         data: String,
         messageId: String,

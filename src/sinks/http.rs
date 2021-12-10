@@ -351,6 +351,7 @@ mod tests {
 
         #[derive(Deserialize, Debug)]
         #[serde(deny_unknown_fields)]
+        #[allow(dead_code)] // deserialize all fields
         struct ExpectedEvent {
             message: String,
             timestamp: chrono::DateTime<chrono::Utc>,
@@ -577,14 +578,14 @@ mod tests {
         pump.await.unwrap();
         drop(trigger);
 
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Failed));
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
 
         let output_lines = get_received(rx, |_| unreachable!("There should be no lines")).await;
         assert!(output_lines.is_empty());
     }
 
     #[tokio::test]
-    async fn json_compresion() {
+    async fn json_compression() {
         let num_lines = 1000;
 
         let in_addr = next_addr();

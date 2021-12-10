@@ -3,10 +3,10 @@ use crate::event::Event;
 use serde::{Deserialize, Serialize};
 
 pub mod check_fields;
-#[cfg(feature = "transforms-filter")]
 pub mod datadog_search;
 pub mod is_log;
 pub mod is_metric;
+pub mod not;
 pub mod vrl;
 
 pub use self::vrl::VrlConfig;

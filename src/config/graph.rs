@@ -537,7 +537,7 @@ mod test {
         let mut graph = Graph::default();
         // these all look like "foo.bar", but should only yield one error
         graph.nodes.insert(
-            ComponentKey::global("foo.bar"),
+            ComponentKey::from("foo.bar"),
             Node::Source { ty: DataType::Any },
         );
         graph.nodes.insert(
@@ -559,7 +559,7 @@ mod test {
             Node::Source { ty: DataType::Any },
         );
         graph.nodes.insert(
-            ComponentKey::global("baz"),
+            ComponentKey::from("baz"),
             Node::Transform {
                 in_ty: DataType::Any,
                 out_ty: DataType::Any,

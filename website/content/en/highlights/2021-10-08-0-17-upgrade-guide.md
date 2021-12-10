@@ -10,7 +10,7 @@ badges:
   type: breaking change
 ---
 
-Vector's 0.17.0 release includes five **breaking changes**:
+Vector's 0.17.0 release includes several **breaking changes**:
 
 1. [Blackhole sink configuration changes](#blackhole)
 1. [Datadog Logs sink loses `batch.max_bytes` setting](#datadog_logs_max_bytes)

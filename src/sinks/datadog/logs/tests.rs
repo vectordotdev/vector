@@ -1,3 +1,5 @@
+#![allow(clippy::print_stdout)] // tests
+
 use crate::sinks::datadog::logs::DatadogLogsConfig;
 use crate::{
     config::SinkConfig,
@@ -142,7 +144,7 @@ async fn smoke() {
 #[tokio::test]
 /// Assert delivery error behavior for v1 API
 ///
-/// In the event that delivery fails -- in this case becaues it is FORBIDDEN --
+/// In the event that delivery fails -- in this case because it is FORBIDDEN --
 /// there should be no outbound messages from the sink. That is, receiving from
 /// its Receiver must fail.
 async fn handles_failure_v1() {
@@ -155,7 +157,7 @@ async fn handles_failure_v1() {
 #[tokio::test]
 /// Assert delivery error behavior for v2 API
 ///
-/// In the event that delivery fails -- in this case becaues it is FORBIDDEN --
+/// In the event that delivery fails -- in this case because it is FORBIDDEN --
 /// there should be no outbound messages from the sink. That is, receiving from
 /// its Receiver must fail.
 async fn handles_failure_v2() {

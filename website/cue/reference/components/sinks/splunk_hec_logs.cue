@@ -72,7 +72,7 @@ components: sinks: splunk_hec_logs: {
 		notices: []
 	}
 
-	configuration: {
+	configuration: sinks._splunk_hec.configuration & {
 		endpoint: {
 			description: "The base URL of the Splunk instance."
 			required:    true
@@ -134,13 +134,6 @@ components: sinks: splunk_hec_logs: {
 				syntax: "template"
 			}
 		}
-		token: {
-			description: "Your Splunk HEC token."
-			required:    true
-			type: string: {
-				examples: ["${SPLUNK_HEC_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
-			}
-		}
 	}
 
 	input: {
@@ -160,4 +153,6 @@ components: sinks: splunk_hec_logs: {
 		processed_events_total:           components.sources.internal_metrics.output.metrics.processed_events_total
 		requests_received_total:          components.sources.internal_metrics.output.metrics.requests_received_total
 	}
+
+	how_it_works: sinks._splunk_hec.how_it_works
 }

@@ -154,7 +154,7 @@ async fn topology_reuse_old_port_sink() {
 }
 
 #[tokio::test]
-async fn topology_reuse_old_port_cross_dependecy() {
+async fn topology_reuse_old_port_cross_dependency() {
     // Reload with source that uses address of changed sink.
     let address_0 = next_addr();
     let address_1 = next_addr();

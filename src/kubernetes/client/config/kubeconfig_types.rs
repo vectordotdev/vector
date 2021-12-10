@@ -43,7 +43,7 @@ pub struct Preferences {
     pub extensions: Option<Vec<NamedExtension>>,
 }
 
-/// NamedExtention associates name with extension.
+/// NamedExtension associates name with extension.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NamedExtension {
     pub name: String,

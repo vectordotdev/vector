@@ -109,6 +109,7 @@ impl ProvideAwsCredentials for CustomChainProvider {
 }
 
 // A place-holder for the types of AWS credentials we support
+#[allow(clippy::large_enum_variant)] // discovered during Rust upgrade to 1.57; just allowing for now since we did previously
 pub enum AwsCredentialsProvider {
     Default(AutoRefreshingProvider<CustomChainProvider>),
     Role(AutoRefreshingProvider<StsAssumeRoleSessionCredentialsProvider>),

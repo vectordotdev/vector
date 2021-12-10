@@ -1,3 +1,5 @@
+#![allow(clippy::print_stdout)] // tests
+#![allow(clippy::print_stderr)] // tests
 #![deny(missing_docs)]
 
 //! This is a framework for testing components for their compliance with

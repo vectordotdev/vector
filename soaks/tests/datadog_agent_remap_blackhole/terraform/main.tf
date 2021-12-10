@@ -19,9 +19,10 @@ provider "kubernetes" {
 # Setup background monitoring details. These are needed by the soak control to
 # understand what vector et al's running behavior is.
 module "monitoring" {
-  source       = "../../../common/terraform/modules/monitoring"
-  type         = var.type
-  vector_image = var.vector_image
+  source          = "../../../common/terraform/modules/monitoring"
+  experiment_name = var.experiment_name
+  variant         = var.type
+  vector_image    = var.vector_image
 }
 
 # Setup the soak pieces
@@ -46,7 +47,7 @@ module "vector" {
 module "http-gen" {
   source        = "../../../common/terraform/modules/lading_http_gen"
   type          = var.type
-  http-gen-toml = file("${path.module}/http_gen.toml")
+  http-gen-yaml = file("${path.module}/../../../common/configs/http_gen_datadog_source.yaml")
   namespace     = kubernetes_namespace.soak.metadata[0].name
   lading_image  = var.lading_image
   depends_on    = [module.monitoring, module.vector]

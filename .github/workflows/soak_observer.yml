@@ -42,7 +42,7 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@548e2346a9987b56d8a4104fe776321ff8e23440
+        uses: docker/metadata-action@e5622373a38e60fb6d795a4421e56882f2d7a681
         with:
           images: ghcr.io/${{ github.repository }}/soak-observer
           flavor: |

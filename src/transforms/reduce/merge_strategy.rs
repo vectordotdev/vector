@@ -829,8 +829,8 @@ mod test {
         let mut merger = get_value_merger(initial, strategy)?;
         merger.add(additional)?;
         let mut output = Event::new_empty_log();
-        let mut output = output.as_mut_log();
-        merger.insert_into("out".into(), &mut output)?;
+        let output = output.as_mut_log();
+        merger.insert_into("out".into(), output)?;
         Ok(output.remove("out").unwrap())
     }
 }

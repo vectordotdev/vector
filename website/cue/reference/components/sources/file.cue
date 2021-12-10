@@ -184,7 +184,7 @@ components: sources: file: {
 			description: "An approximate limit on the amount of data read from a single file at a given time."
 			required:    false
 			type: uint: {
-				default: null
+				default: 2048
 				examples: [2048]
 				unit: "bytes"
 			}
@@ -404,7 +404,7 @@ components: sources: file: {
 			body: """
 				Each line is read until a new line delimiter (by default, `\n` i.e.
 				the `0xA` byte) or `EOF` is found. If needed, the default line
-				delimiter can be overriden via the `line_delimiter` option.
+				delimiter can be overridden via the `line_delimiter` option.
 				"""
 		}
 

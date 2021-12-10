@@ -30,10 +30,10 @@ impl TransformConfig for CoercerConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
         let timezone = self.timezone.unwrap_or(context.globals.timezone);
         let types = parse_conversion_map(&self.types, timezone)?;
-        Ok(Transform::function(Coercer {
+        Ok(Transform::function(Coercer::new(
             types,
-            drop_unspecified: self.drop_unspecified,
-        }))
+            self.drop_unspecified,
+        )))
     }
 
     fn input_type(&self) -> DataType {
@@ -53,6 +53,15 @@ impl TransformConfig for CoercerConfig {
 pub struct Coercer {
     types: HashMap<String, Conversion>,
     drop_unspecified: bool,
+}
+
+impl Coercer {
+    pub const fn new(types: HashMap<String, Conversion>, drop_unspecified: bool) -> Self {
+        Self {
+            types,
+            drop_unspecified,
+        }
+    }
 }
 
 impl FunctionTransform for Coercer {

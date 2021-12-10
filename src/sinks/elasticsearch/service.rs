@@ -213,7 +213,6 @@ impl Service<ElasticSearchRequest> for ElasticSearchService {
             let events_byte_size = req.events_byte_size;
             let http_response = http_service.call(req).await?;
             let event_status = get_event_status(&http_response);
-            println!("Event status: {:?}", event_status);
             Ok(ElasticSearchResponse {
                 event_status,
                 http_response,
@@ -229,7 +228,7 @@ fn get_event_status(response: &Response<Bytes>) -> EventStatus {
         let body = String::from_utf8_lossy(response.body());
         if body.contains("\"errors\":true") {
             error!(message = "Response contained errors.", ?response);
-            EventStatus::Failed
+            EventStatus::Rejected
         } else {
             trace!(message = "Response successful.", ?response);
             EventStatus::Delivered
@@ -239,6 +238,6 @@ fn get_event_status(response: &Response<Bytes>) -> EventStatus {
         EventStatus::Errored
     } else {
         error!(message = "Response failed.", ?response);
-        EventStatus::Failed
+        EventStatus::Rejected
     }
 }

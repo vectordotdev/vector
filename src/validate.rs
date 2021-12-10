@@ -307,19 +307,28 @@ impl Formatter {
 
     /// Final confirmation that validation process was successful.
     fn validated(&self) {
-        println!("{:-^width$}", "", width = self.max_line_width);
+        #[allow(clippy::print_stdout)]
+        {
+            println!("{:-^width$}", "", width = self.max_line_width);
+        }
         if self.color {
             // Coloring needs to be used directly so that print
             // infrastructure correctly determines length of the
             // "Validated". Otherwise, ansi escape coloring is
             // calculated into the length.
-            println!(
-                "{:>width$}",
-                "Validated".green(),
-                width = self.max_line_width
-            );
+            #[allow(clippy::print_stdout)]
+            {
+                println!(
+                    "{:>width$}",
+                    "Validated".green(),
+                    width = self.max_line_width
+                );
+            }
         } else {
-            println!("{:>width$}", "Validated", width = self.max_line_width)
+            #[allow(clippy::print_stdout)]
+            {
+                println!("{:>width$}", "Validated", width = self.max_line_width)
+            }
         }
     }
 
@@ -379,7 +388,10 @@ impl Formatter {
     fn space(&mut self) {
         if self.print_space {
             self.print_space = false;
-            println!();
+            #[allow(clippy::print_stdout)]
+            {
+                println!();
+            }
         }
     }
 
@@ -396,6 +408,9 @@ impl Formatter {
             .unwrap_or(0);
         self.max_line_width = width.max(self.max_line_width);
         self.print_space = true;
-        print!("{}", print.as_ref())
+        #[allow(clippy::print_stdout)]
+        {
+            print!("{}", print.as_ref())
+        }
     }
 }

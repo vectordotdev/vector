@@ -34,7 +34,7 @@ Vector adheres to the [Semantic Versioning 2.0] convention. In summary:
 
 ## Public API
 
-Semantic Versioning hinges on Vector's defintion of "public API". By the nature
+Semantic Versioning hinges on Vector's definition of "public API". By the nature
 of Vector -- a tool that collects, processes, and routes data from disparate
 systems -- it has a very large public surface area. It's not immediately obvious
 which parts are covered under our versioning contract and how they're covered.
@@ -47,7 +47,7 @@ The following Vector areas are covered in Vector's definition of public API.
 #### Intended for *public* consumption
 
 The follow Vector areas are intended for *public* consumption (consumption by
-anything other than Vector itself). Backward incompatble changes will trigger
+anything other than Vector itself). Backward incompatible changes will trigger
 a major version increment.
 
 * [CLI]
@@ -64,8 +64,8 @@ a major version increment.
 #### Intended for *private* consumption
 
 The following Vector areas are intended for *private* consumption (consumption by
-Vector only). Backward incompatble changes will trigger a major version
-increment only if Vector itself is not compatbile with previous versions.
+Vector only). Backward incompatible changes will trigger a major version
+increment only if Vector itself is not compatible with previous versions.
 
 * [Configuration schema]
 * [Data directory] and its contents

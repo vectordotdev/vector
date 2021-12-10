@@ -1,3 +1,6 @@
+#![allow(clippy::print_stdout)] // tests
+#![allow(clippy::print_stderr)] // tests
+
 mod test_enrichment;
 
 use ansi_term::Colour;
@@ -25,9 +28,6 @@ pub struct Cmd {
 
     #[structopt(short, long)]
     no_diff: bool,
-
-    #[structopt(long)]
-    skip_functions: bool,
 
     /// When enabled, any log output at the INFO or above level is printed
     /// during the test run.
@@ -117,7 +117,11 @@ fn main() {
             continue;
         }
 
-        let dots = 60 - test.name.len();
+        let dots = if test.name.len() >= 60 {
+            0
+        } else {
+            60 - test.name.len()
+        };
         print!(
             "  {}{}",
             test.name,

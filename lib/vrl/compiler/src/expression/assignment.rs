@@ -20,7 +20,7 @@ impl Assignment {
         node: Node<Variant<Node<ast::AssignmentTarget>, Node<Expr>>>,
         state: &mut State,
     ) -> Result<Self, Error> {
-        let (span, variant) = node.take();
+        let (_, variant) = node.take();
 
         let variant = match variant {
             Variant::Single { target, expr } => {
@@ -36,7 +36,6 @@ impl Assignment {
                             target.to_string(),
                             expr.to_string(),
                         ),
-                        span,
                         expr_span,
                         assignment_span,
                     });
@@ -46,7 +45,6 @@ impl Assignment {
                 if matches!(target.as_ref(), ast::AssignmentTarget::Noop) {
                     return Err(Error {
                         variant: ErrorVariant::UnnecessaryNoop(target_span),
-                        span,
                         expr_span,
                         assignment_span,
                     });
@@ -83,7 +81,6 @@ impl Assignment {
                             ok_span,
                             err_span,
                         ),
-                        span,
                         expr_span,
                         assignment_span,
                     });
@@ -96,7 +93,6 @@ impl Assignment {
                 if ok_noop && err_noop {
                     return Err(Error {
                         variant: ErrorVariant::UnnecessaryNoop(ok_span),
-                        span,
                         expr_span,
                         assignment_span,
                     });
@@ -328,7 +324,6 @@ impl TryFrom<ast::AssignmentTarget> for Target {
                     _ => {
                         return Err(Error {
                             variant: ErrorVariant::InvalidTarget(span),
-                            span,
                             expr_span: span,
                             assignment_span: span,
                         })
@@ -471,7 +466,6 @@ pub(crate) struct Details {
 #[derive(Debug)]
 pub struct Error {
     variant: ErrorVariant,
-    span: Span,
     expr_span: Span,
     assignment_span: Span,
 }

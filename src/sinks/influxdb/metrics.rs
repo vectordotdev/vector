@@ -258,11 +258,12 @@ fn encode_events(
         let tags = merge_tags(&event, tags);
         let (metric_type, fields) = get_type_and_fields(event.value(), quantiles);
 
+        let mut unwrapped_tags = tags.unwrap_or_default();
+        unwrapped_tags.insert("metric_type".to_owned(), metric_type.to_owned());
         if let Err(error) = influx_line_protocol(
             protocol_version,
-            fullname,
-            metric_type,
-            tags,
+            &fullname,
+            Some(unwrapped_tags),
             fields,
             ts,
             &mut output,
@@ -403,11 +404,23 @@ mod tests {
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use crate::sinks::influxdb::test_util::{assert_fields, split_line_protocol, tags, ts};
+    use indoc::indoc;
     use pretty_assertions::assert_eq;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<InfluxDbConfig>();
+    }
+
+    #[test]
+    fn test_config_with_tags() {
+        let config = indoc! {r#"
+            namespace = "vector"
+            endpoint = "http://localhost:9999"
+            tags = {region="us-west-1"}
+        "#};
+
+        toml::from_str::<InfluxDbConfig>(config).unwrap();
     }
 
     #[test]

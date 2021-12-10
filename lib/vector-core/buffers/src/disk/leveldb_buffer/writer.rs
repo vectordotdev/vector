@@ -179,6 +179,7 @@ where
             .unwrap();
         self.writebatch = Writebatch::new();
         self.batch_size = 0;
+
         self.write_notifier.wake();
     }
 }
