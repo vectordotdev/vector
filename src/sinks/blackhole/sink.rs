@@ -13,6 +13,7 @@ use tokio::sync::watch;
 use tokio::time::interval;
 use tokio::time::sleep_until;
 use vector_core::buffers::Acker;
+use vector_core::internal_event::EventsSent;
 use vector_core::ByteSizeOf;
 
 pub struct BlackholeSink {
@@ -84,6 +85,10 @@ impl StreamSink for BlackholeSink {
                 .fetch_add(message_len, Ordering::AcqRel);
 
             emit!(&BlackholeEventReceived {
+                byte_size: message_len
+            });
+            emit!(&EventsSent {
+                count: events.len(),
                 byte_size: message_len
             });
 

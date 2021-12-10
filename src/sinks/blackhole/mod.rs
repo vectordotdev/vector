@@ -11,7 +11,7 @@ inventory::submit! {
 
 #[cfg(test)]
 mod tests {
-    
+
     use crate::sinks::blackhole::config::BlackholeConfig;
     use crate::sinks::blackhole::sink::BlackholeSink;
     use crate::sinks::util::StreamSink;
