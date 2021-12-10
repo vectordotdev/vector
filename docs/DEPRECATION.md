@@ -12,9 +12,9 @@ Vector will retain deprecated configuration or features for at least one minor v
 major version when Vector hits 1.0).
 
 This means that deprecations will be eligible for removal in the next minor release after they are announced; however,
-we will typically aim to support deprecations for a longer time period depending on their maintenance burden. For
-example, a deprecation announced in `v0.16.0` would be eligible to be removed in `v0.17.0` but may be removed later in
-`v0.20.0`.
+we will typically aim to support deprecations for a longer time period depending on their development maintenance
+burden. For example, a deprecation announced in `v0.16.0` would be eligible to be removed in `v0.17.0` but may be
+removed later in `v0.20.0`.
 
 Exceptions can be made for deprecations related to security issues or critical bugs. These may result in removals being
 introduced in a release without being announced in a prior release.
