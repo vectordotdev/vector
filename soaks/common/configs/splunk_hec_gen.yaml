@@ -9,6 +9,6 @@ targets:
     bytes_per_second: "100 Mb"
     parallel_connections: 10
     maximum_prebuild_cache_size_bytes: "256 Mb"
-    acknowledgements: 
+    acknowledgements:
       ack_query_interval_seconds: 10
       ack_timeout_seconds: 300
