@@ -502,7 +502,7 @@ mod test {
         // It's important that the buffer be large enough that the TCP source doesn't have
         // to block trying to forward its input into the Sender because the channel is full,
         // otherwise even sending the signal to shut down won't wake it up.
-        let (tx, rx) = Pipeline::new_with_buffer(10_000, vec![]);
+        let (tx, rx) = Pipeline::new_with_buffer(10_000);
         let source_id = ComponentKey::from("tcp_shutdown_infinite_stream");
 
         let addr = next_addr();
