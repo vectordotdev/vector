@@ -203,11 +203,6 @@ impl CloudwatchLogsSvc {
     }
 
     pub fn process_events(&self, mut events: Vec<InputLogEvent>) -> Vec<Vec<InputLogEvent>> {
-        // let mut events = events
-        //     .into_iter()
-        //     .filter(|e| age_range.contains(&e.timestamp))
-        //     .collect::<Vec<_>>();
-
         // Sort by timestamp
         events.sort_by_key(|e| e.timestamp);
 
