@@ -528,7 +528,7 @@ mod tests {
 
         for (i, mode) in modes.iter().enumerate() {
             let id = ComponentKey::from(format!("{}", i));
-            if Some(when) = *mode {
+            if let Some(when) = *mode {
                 let tx = AlwaysErrors { when };
                 let tx = SenderAdapter::opaque(tx.sink_map_err(|_| ()));
                 let tx = BufferSender::new(tx, WhenFull::Block);
