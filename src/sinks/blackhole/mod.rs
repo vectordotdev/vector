@@ -1,29 +1,9 @@
 mod config;
 mod sink;
 
-use crate::sinks::blackhole::config::BlackholeConfig;
-use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    internal_events::BlackholeEventReceived,
-    sinks::util::StreamSink,
-};
-use async_trait::async_trait;
-use futures::{future, stream::BoxStream, FutureExt, StreamExt};
-use serde::{Deserialize, Serialize};
-use std::{
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-    time::{Duration, Instant},
-};
-use tokio::{
-    select,
-    sync::watch,
-    time::{interval, sleep_until},
-};
-use vector_core::ByteSizeOf;
-use vector_core::{buffers::Acker, event::Event};
+use crate::config::SinkDescription;
+
+pub use config::BlackholeConfig;
 
 inventory::submit! {
     SinkDescription::new::<BlackholeConfig>("blackhole")
@@ -31,10 +11,12 @@ inventory::submit! {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
     use crate::sinks::blackhole::config::BlackholeConfig;
     use crate::sinks::blackhole::sink::BlackholeSink;
+    use crate::sinks::util::StreamSink;
     use crate::test_util::random_events_with_stream;
+    use vector_core::buffers::Acker;
 
     #[tokio::test]
     async fn blackhole() {
