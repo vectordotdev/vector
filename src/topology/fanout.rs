@@ -7,13 +7,14 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use vector_core::buffers::topology::channel::BufferSender;
+
+type GenericEventSink = Pin<Box<dyn Sink<Event, Error = ()> + Send>>;
 
 pub enum ControlMessage {
-    Add(ComponentKey, BufferSender<Event>),
+    Add(ComponentKey, GenericEventSink),
     Remove(ComponentKey),
     /// Will stop accepting events until Some with given id is replaced.
-    Replace(ComponentKey, Option<BufferSender<Event>>),
+    Replace(ComponentKey, Option<GenericEventSink>),
 }
 
 impl fmt::Debug for ControlMessage {
@@ -30,7 +31,7 @@ impl fmt::Debug for ControlMessage {
 pub type ControlChannel = mpsc::UnboundedSender<ControlMessage>;
 
 pub struct Fanout {
-    sinks: Vec<(ComponentKey, Option<BufferSender<Event>>)>,
+    sinks: Vec<(ComponentKey, Option<GenericEventSink>)>,
     i: usize,
     control_channel: Fuse<mpsc::UnboundedReceiver<ControlMessage>>,
 }
@@ -48,7 +49,7 @@ impl Fanout {
         (fanout, control_tx)
     }
 
-    pub fn add(&mut self, id: ComponentKey, sink: BufferSender<Event>) {
+    pub fn add(&mut self, id: ComponentKey, sink: GenericEventSink) {
         assert!(
             !self.sinks.iter().any(|(n, _)| n == &id),
             "Duplicate output id in fanout"
@@ -72,7 +73,7 @@ impl Fanout {
         }
     }
 
-    fn replace(&mut self, id: ComponentKey, sink: Option<BufferSender<Event>>) {
+    fn replace(&mut self, id: ComponentKey, sink: Option<GenericEventSink>) {
         if let Some((_, existing)) = self.sinks.iter_mut().find(|(n, _)| n == &id) {
             *existing = sink;
         } else {
@@ -105,7 +106,10 @@ impl Fanout {
 
     fn poll_sinks<F>(&mut self, cx: &mut Context<'_>, poll: F) -> Poll<Result<(), ()>>
     where
-        F: Fn(Pin<&mut BufferSender<Event>>, &mut Context<'_>) -> Poll<Result<(), ()>>,
+        F: Fn(
+            Pin<&mut (dyn Sink<Event, Error = ()> + Send)>,
+            &mut Context<'_>,
+        ) -> Poll<Result<(), ()>>,
     {
         self.process_control_messages(cx);
 
@@ -114,7 +118,7 @@ impl Fanout {
         let mut i = 0;
         while let Some((_, sink)) = self.sinks.get_mut(i) {
             if let Some(sink) = sink {
-                match poll(Pin::new(sink), cx) {
+                match poll(sink.as_mut(), cx) {
                     Poll::Pending => poll_result = Poll::Pending,
                     Poll::Ready(Ok(())) => (),
                     Poll::Ready(Err(())) => {
@@ -140,7 +144,7 @@ impl Sink<Event> for Fanout {
 
         while let Some((_, sink)) = this.sinks.get_mut(this.i) {
             match sink.as_mut() {
-                Some(sink) => match Pin::new(sink).poll_ready(cx) {
+                Some(sink) => match sink.as_mut().poll_ready(cx) {
                     Poll::Pending => return Poll::Pending,
                     Poll::Ready(Ok(())) => this.i += 1,
                     Poll::Ready(Err(())) => this.handle_sink_error(this.i)?,
@@ -161,7 +165,7 @@ impl Sink<Event> for Fanout {
         let mut i = 1;
         while let Some((_, sink)) = self.sinks.get_mut(i) {
             if let Some(sink) = sink.as_mut() {
-                if Pin::new(sink).start_send(item.clone()).is_err() {
+                if sink.as_mut().start_send(item.clone()).is_err() {
                     self.handle_sink_error(i)?;
                     continue;
                 }
@@ -171,7 +175,7 @@ impl Sink<Event> for Fanout {
 
         if let Some((_, sink)) = self.sinks.first_mut() {
             if let Some(sink) = sink.as_mut() {
-                if Pin::new(sink).start_send(item).is_err() {
+                if sink.as_mut().start_send(item).is_err() {
                     self.handle_sink_error(0)?;
                 }
             }
@@ -214,8 +218,8 @@ mod tests {
 
         let (mut fanout, _fanout_control) = Fanout::new();
 
-        fanout.add(ComponentKey::from("a"), tx_a);
-        fanout.add(ComponentKey::from("b"), tx_b);
+        fanout.add(ComponentKey::from("a"), Box::pin(tx_a));
+        fanout.add(ComponentKey::from("b"), Box::pin(tx_b));
 
         let recs = make_events(2);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -233,9 +237,9 @@ mod tests {
 
         let (mut fanout, _fanout_control) = Fanout::new();
 
-        fanout.add(ComponentKey::from("a"), tx_a);
-        fanout.add(ComponentKey::from("b"), tx_b);
-        fanout.add(ComponentKey::from("c"), tx_c);
+        fanout.add(ComponentKey::from("a"), Box::pin(tx_a));
+        fanout.add(ComponentKey::from("b"), Box::pin(tx_b));
+        fanout.add(ComponentKey::from("c"), Box::pin(tx_c));
 
         let recs = make_events(3);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -260,8 +264,8 @@ mod tests {
 
         let (mut fanout, _fanout_control) = Fanout::new();
 
-        fanout.add(ComponentKey::from("a"), tx_a);
-        fanout.add(ComponentKey::from("b"), tx_b);
+        fanout.add(ComponentKey::from("a"), Box::pin(tx_a));
+        fanout.add(ComponentKey::from("b"), Box::pin(tx_b));
 
         let recs = make_events(3);
 
@@ -269,7 +273,7 @@ mod tests {
         fanout.send(recs[1].clone()).await.unwrap();
 
         let (tx_c, rx_c) = TopologyBuilder::memory(4).await;
-        fanout.add(ComponentKey::from("c"), tx_c);
+        fanout.add(ComponentKey::from("c"), Box::pin(tx_c));
 
         fanout.send(recs[2].clone()).await.unwrap();
 
@@ -285,8 +289,8 @@ mod tests {
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add(ComponentKey::from("a"), tx_a);
-        fanout.add(ComponentKey::from("b"), tx_b);
+        fanout.add(ComponentKey::from("a"), Box::pin(tx_a));
+        fanout.add(ComponentKey::from("b"), Box::pin(tx_b));
 
         let recs = make_events(3);
 
@@ -312,9 +316,9 @@ mod tests {
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add(ComponentKey::from("a"), tx_a);
-        fanout.add(ComponentKey::from("b"), tx_b);
-        fanout.add(ComponentKey::from("c"), tx_c);
+        fanout.add(ComponentKey::from("a"), Box::pin(tx_a));
+        fanout.add(ComponentKey::from("b"), Box::pin(tx_b));
+        fanout.add(ComponentKey::from("c"), Box::pin(tx_c));
 
         let recs = make_events(3);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -344,9 +348,9 @@ mod tests {
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add(ComponentKey::from("a"), tx_a);
-        fanout.add(ComponentKey::from("b"), tx_b);
-        fanout.add(ComponentKey::from("c"), tx_c);
+        fanout.add(ComponentKey::from("a"), Box::pin(tx_a));
+        fanout.add(ComponentKey::from("b"), Box::pin(tx_b));
+        fanout.add(ComponentKey::from("c"), Box::pin(tx_c));
 
         let recs = make_events(3);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -376,9 +380,9 @@ mod tests {
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add(ComponentKey::from("a"), tx_a);
-        fanout.add(ComponentKey::from("b"), tx_b);
-        fanout.add(ComponentKey::from("c"), tx_c);
+        fanout.add(ComponentKey::from("a"), Box::pin(tx_a));
+        fanout.add(ComponentKey::from("b"), Box::pin(tx_b));
+        fanout.add(ComponentKey::from("c"), Box::pin(tx_c));
 
         let recs = make_events(3);
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
@@ -418,8 +422,8 @@ mod tests {
 
         let (mut fanout, _fanout_control) = Fanout::new();
 
-        fanout.add(ComponentKey::from("a"), tx_a1);
-        fanout.add(ComponentKey::from("b"), tx_b);
+        fanout.add(ComponentKey::from("a"), Box::pin(tx_a1));
+        fanout.add(ComponentKey::from("b"), Box::pin(tx_b));
 
         let recs = make_events(3);
 
@@ -427,7 +431,7 @@ mod tests {
         fanout.send(recs[1].clone()).await.unwrap();
 
         let (tx_a2, rx_a2) = TopologyBuilder::memory(4).await;
-        fanout.replace(ComponentKey::from("a"), Some(tx_a2));
+        fanout.replace(ComponentKey::from("a"), Some(Box::pin(tx_a2)));
 
         fanout.send(recs[2].clone()).await.unwrap();
 
@@ -443,8 +447,8 @@ mod tests {
 
         let (mut fanout, mut fanout_control) = Fanout::new();
 
-        fanout.add(ComponentKey::from("a"), tx_a1);
-        fanout.add(ComponentKey::from("b"), tx_b);
+        fanout.add(ComponentKey::from("a"), Box::pin(tx_a1));
+        fanout.add(ComponentKey::from("b"), Box::pin(tx_b));
 
         let recs = make_events(3);
 
@@ -460,7 +464,7 @@ mod tests {
                 fanout_control
                     .send(ControlMessage::Replace(
                         ComponentKey::from("a"),
-                        Some(tx_a2),
+                        Some(Box::pin(tx_a2)),
                     ))
                     .await
                     .unwrap();
@@ -525,11 +529,11 @@ mod tests {
                     let tx = SenderAdapter::opaque(tx.sink_map_err(|_| ()));
                     let tx = BufferSender::new(tx, WhenFull::Block);
 
-                    fanout.add(id, tx);
+                    fanout.add(id, Box::pin(tx));
                 }
                 None => {
                     let (tx, rx) = TopologyBuilder::memory(0).await;
-                    fanout.add(id, tx);
+                    fanout.add(id, Box::pin(tx));
                     rx_channels.push(rx);
                 }
             }
@@ -558,6 +562,7 @@ mod tests {
         Poll,
     }
 
+    #[derive(Clone)]
     struct AlwaysErrors {
         when: ErrorWhen,
     }

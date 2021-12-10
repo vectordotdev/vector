@@ -67,11 +67,6 @@ pub struct TopologyBuilder<T> {
 }
 
 impl<T> TopologyBuilder<T> {
-    /// Creates a new, empty [`TopologyBuilder`].
-    pub fn new() -> Self {
-        Self { stages: Vec::new() }
-    }
-
     /// Adds a new stage to the buffer topology.
     ///
     /// The "when full" behavior can be optionally configured here.  If no behavior is specified,
@@ -189,7 +184,7 @@ impl<T> TopologyBuilder<T> {
         }
 
         let (sender, receiver) = current_stage.ok_or(TopologyError::EmptyTopology)?;
-        let acker = current_acker.unwrap_or_else(|| Acker::passthrough());
+        let acker = current_acker.unwrap_or_else(Acker::passthrough);
 
         // Install the buffer usage handler since we successfully created the buffer topology.  This
         // spawns it in the background and periodically emits aggregated metrics about each of the
@@ -230,6 +225,12 @@ where
     }
 }
 
+impl<T> Default for TopologyBuilder<T> {
+    fn default() -> Self {
+        Self { stages: Vec::new() }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use tracing::Span;
@@ -244,7 +245,7 @@ mod tests {
 
     #[tokio::test]
     async fn single_stage_topology_block() {
-        let mut builder = TopologyBuilder::<u64>::new();
+        let mut builder = TopologyBuilder::<u64>::default();
         builder.stage(MemoryV2Buffer::new(1), WhenFull::Block);
         let result = builder.build(Span::none()).await;
         assert!(result.is_ok());
@@ -255,7 +256,7 @@ mod tests {
 
     #[tokio::test]
     async fn single_stage_topology_drop_newest() {
-        let mut builder = TopologyBuilder::<u64>::new();
+        let mut builder = TopologyBuilder::<u64>::default();
         builder.stage(MemoryV2Buffer::new(1), WhenFull::DropNewest);
         let result = builder.build(Span::none()).await;
         assert!(result.is_ok());
@@ -266,7 +267,7 @@ mod tests {
 
     #[tokio::test]
     async fn single_stage_topology_overflow() {
-        let mut builder = TopologyBuilder::<u64>::new();
+        let mut builder = TopologyBuilder::<u64>::default();
         builder.stage(MemoryV2Buffer::new(1), WhenFull::Overflow);
         let result = builder.build(Span::none()).await;
         match result {
@@ -277,7 +278,7 @@ mod tests {
 
     #[tokio::test]
     async fn two_stage_topology_block() {
-        let mut builder = TopologyBuilder::<u64>::new();
+        let mut builder = TopologyBuilder::<u64>::default();
         builder.stage(MemoryV2Buffer::new(1), WhenFull::Block);
         builder.stage(MemoryV2Buffer::new(1), WhenFull::Block);
         let result = builder.build(Span::none()).await;
@@ -289,7 +290,7 @@ mod tests {
 
     #[tokio::test]
     async fn two_stage_topology_drop_newest() {
-        let mut builder = TopologyBuilder::<u64>::new();
+        let mut builder = TopologyBuilder::<u64>::default();
         builder.stage(MemoryV2Buffer::new(1), WhenFull::DropNewest);
         builder.stage(MemoryV2Buffer::new(1), WhenFull::Block);
         let result = builder.build(Span::none()).await;
@@ -301,7 +302,7 @@ mod tests {
 
     #[tokio::test]
     async fn two_stage_topology_overflow() {
-        let mut builder = TopologyBuilder::<u64>::new();
+        let mut builder = TopologyBuilder::<u64>::default();
         builder.stage(MemoryV2Buffer::new(1), WhenFull::Overflow);
         builder.stage(MemoryV2Buffer::new(1), WhenFull::Block);
 
@@ -310,10 +311,5 @@ mod tests {
 
         let (mut sender, _, _) = result.unwrap();
         assert_current_send_capacity(&mut sender, Some(1), Some(1));
-    }
-
-    #[tokio::test]
-    async fn assert_span_passed_to_buffer_usage_correctly() {
-        todo!();
     }
 }

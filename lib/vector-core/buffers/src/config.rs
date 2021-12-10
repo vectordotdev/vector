@@ -248,6 +248,12 @@ pub enum BufferType {
 }
 
 impl BufferType {
+    /// Adds this buffer type as a stage to an existing [`TopologyBuilder`].
+    ///
+    /// # Errors
+    ///
+    /// If a required parameter is missing, or if there is an error building the topology itself, an
+    /// error variant will be returned desribing the error
     pub fn add_to_builder<T>(
         &self,
         builder: &mut TopologyBuilder<T>,
@@ -349,9 +355,9 @@ impl BufferConfig {
     where
         T: Bufferable + Clone,
     {
-        let mut builder = TopologyBuilder::new();
+        let mut builder = TopologyBuilder::default();
 
-        for stage in self.stages.iter().cloned() {
+        for stage in self.stages.iter().copied() {
             stage.add_to_builder(&mut builder, data_dir.clone(), buffer_id.clone())?;
         }
 

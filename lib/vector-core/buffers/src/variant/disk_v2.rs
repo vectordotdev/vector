@@ -1,22 +1,20 @@
-use std::collections::VecDeque;
 use std::error::Error;
-use std::mem;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use async_trait::async_trait;
-use futures::{ready, Sink, Stream};
+use futures::{ready, Stream};
 use pin_project::pin_project;
 use tokio::sync::mpsc::{channel, Receiver};
 use tokio_util::sync::ReusableBoxFuture;
 
 use crate::buffer_usage_data::BufferUsageHandle;
-use crate::disk_v2::{Buffer, DiskBufferConfig, Reader, Writer, WriterError};
+use crate::disk_v2::{Buffer, DiskBufferConfig, Reader, Writer};
 use crate::topology::channel::{ReceiverAdapter, SenderAdapter};
 use crate::{topology::builder::IntoBuffer, Acker, Bufferable};
 
-const MAX_BUFFERED_ITEMS: usize = 128;
+//const MAX_BUFFERED_ITEMS: usize = 128;
 
 pub struct DiskV2Buffer {
     id: String,
@@ -106,7 +104,7 @@ where
         }
     }
 }
-
+/*
 #[derive(Debug)]
 enum WriterState<T> {
     Inconsistent,
@@ -282,22 +280,7 @@ where
         // Any error at any point gets returned immediately.
 
         loop {
-            if !self.buffered.is_empty() {
-                // Drive any in-flight operation that we have going on.
-                if !self.state.is_idle() {
-                    if let Err(e) = ready!(self.drive_pending_operation(cx)) {
-                        error!("{}", e);
-                        return Poll::Ready(Err(()));
-                    }
-                }
-
-                // Now we're idle, so enqueue another write operation.
-                let record = self
-                    .buffered
-                    .pop_front()
-                    .expect("buffered items should not be empty");
-                self.enqueue_write_operation(record);
-            } else {
+            if self.buffered.is_empty() {
                 // We're all out of items to send, so now we need to flush the writer.  We're still
                 // driving the last write operation, though, so we need to make sure that's cleared out.
                 if let WriterState::Writing = &self.state {
@@ -316,6 +299,21 @@ where
                         error!("{}", e);
                     }));
                 }
+            } else {
+                // Drive any in-flight operation that we have going on.
+                if !self.state.is_idle() {
+                    if let Err(e) = ready!(self.drive_pending_operation(cx)) {
+                        error!("{}", e);
+                        return Poll::Ready(Err(()));
+                    }
+                }
+
+                // Now we're idle, so enqueue another write operation.
+                let record = self
+                    .buffered
+                    .pop_front()
+                    .expect("buffered items should not be empty");
+                self.enqueue_write_operation(record);
             }
         }
     }
@@ -338,6 +336,48 @@ where
         }
     }
 }
+
+async fn make_write_future<T>(
+    writer: Option<Writer<T>>,
+    record: Option<T>,
+) -> (Writer<T>, Result<usize, WriterError<T>>)
+where
+    T: Bufferable,
+{
+    // TODO: it's even less likely that we need to truly kill the writer task for an error
+    // unless it's a very specific type of error... we already distinguish failed
+    // encoding/serialization which occurs before any actual bytes hit the file at all, or
+    // before we update the ledger or any of that.
+    //
+    // so really we'd be down to like... certain I/O errors that we know we can't recover
+    // from.
+    //
+    // where this could really get tricky is like, if we try to write a record here and the
+    // permissions got messed up, so we couldn't write to the file, we could _theoretically_
+    // loop and try it again until it works, or we could just drop the event and move on...
+    // not sure which one is better.
+    match (writer, record) {
+        (Some(mut writer), Some(record)) => {
+            let result = writer.write_record(record).await;
+            (writer, result)
+        }
+        _ => unreachable!("future should not be called in this state"),
+    }
+}
+
+async fn make_flush_future<T>(writer: Option<Writer<T>>) -> (Writer<T>, Result<(), WriterError<T>>)
+where
+    T: Bufferable,
+{
+    match writer {
+        Some(mut writer) => {
+            let result = writer.flush().await;
+            (writer, result.map_err(Into::into))
+        }
+        None => unreachable!("future should not be called in this state"),
+    }
+}
+*/
 
 async fn make_read_future<T>(reader: Option<Reader<T>>) -> (Reader<T>, Option<T>)
 where
@@ -390,47 +430,6 @@ where
 
             (reader, result)
         }
-    }
-}
-
-async fn make_write_future<T>(
-    writer: Option<Writer<T>>,
-    record: Option<T>,
-) -> (Writer<T>, Result<usize, WriterError<T>>)
-where
-    T: Bufferable,
-{
-    // TODO: it's even less likely that we need to truly kill the writer task for an error
-    // unless it's a very specific type of error... we already distinguish failed
-    // encoding/serialization which occurs before any actual bytes hit the file at all, or
-    // before we update the ledger or any of that.
-    //
-    // so really we'd be down to like... certain I/O errors that we know we can't recover
-    // from.
-    //
-    // where this could really get tricky is like, if we try to write a record here and the
-    // permissions got messed up, so we couldn't write to the file, we could _theoretically_
-    // loop and try it again until it works, or we could just drop the event and move on...
-    // not sure which one is better.
-    match (writer, record) {
-        (Some(mut writer), Some(record)) => {
-            let result = writer.write_record(record).await;
-            (writer, result)
-        }
-        _ => unreachable!("future should not be called in this state"),
-    }
-}
-
-async fn make_flush_future<T>(writer: Option<Writer<T>>) -> (Writer<T>, Result<(), WriterError<T>>)
-where
-    T: Bufferable,
-{
-    match writer {
-        Some(mut writer) => {
-            let result = writer.flush().await;
-            (writer, result.map_err(Into::into))
-        }
-        None => unreachable!("future should not be called in this state"),
     }
 }
 

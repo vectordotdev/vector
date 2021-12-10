@@ -416,7 +416,7 @@ impl RunningTopology {
                 if reuse_buffers.contains(key) {
                     let tx = self.inputs.remove(key).unwrap();
                     let (rx, acker) = match buffer {
-                        TaskOutput::Sink(rx, acker) => (rx, acker),
+                        TaskOutput::Sink(rx, acker) => (rx.into_inner(), acker),
                         _ => unreachable!(),
                     };
 
@@ -604,7 +604,10 @@ impl RunningTopology {
                     // be present.
                     if let Some(input) = self.inputs.get(sink_key) {
                         let _ = output
-                            .send(ControlMessage::Add(sink_key.clone(), input.clone()))
+                            .send(ControlMessage::Add(
+                                sink_key.clone(),
+                                Box::pin(input.clone()),
+                            ))
                             .await;
                     }
                 }
@@ -615,7 +618,10 @@ impl RunningTopology {
                     // not be present.
                     if let Some(input) = self.inputs.get(transform_key) {
                         let _ = output
-                            .send(ControlMessage::Add(transform_key.clone(), input.clone()))
+                            .send(ControlMessage::Add(
+                                transform_key.clone(),
+                                Box::pin(input.clone()),
+                            ))
                             .await;
                     }
                 }
@@ -634,7 +640,7 @@ impl RunningTopology {
                 .outputs
                 .get_mut(&input)
                 .expect("unknown output")
-                .send(ControlMessage::Add(key.clone(), tx.clone()))
+                .send(ControlMessage::Add(key.clone(), Box::pin(tx.clone())))
                 .await;
         }
 
@@ -696,7 +702,7 @@ impl RunningTopology {
                 .outputs
                 .get_mut(input)
                 .unwrap()
-                .send(ControlMessage::Add(key.clone(), tx.clone()))
+                .send(ControlMessage::Add(key.clone(), Box::pin(tx.clone())))
                 .await;
         }
 
@@ -706,7 +712,10 @@ impl RunningTopology {
                 .outputs
                 .get_mut(input)
                 .unwrap()
-                .send(ControlMessage::Replace(key.clone(), Some(tx.clone())))
+                .send(ControlMessage::Replace(
+                    key.clone(),
+                    Some(Box::pin(tx.clone())),
+                ))
                 .await;
         }
 

@@ -101,7 +101,7 @@ mod integration_test {
             librdkafka_options,
             headers_key: None,
         };
-        let (acker, _ack_counter) = Acker::new_for_testing();
+        let (acker, _ack_counter) = Acker::basic();
         config.clone().to_rdkafka(KafkaRole::Consumer)?;
         config.clone().to_rdkafka(KafkaRole::Producer)?;
         self::sink::healthcheck(config.clone()).await?;
@@ -245,7 +245,7 @@ mod integration_test {
         };
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
         println!("Topic name generated in test: {:?}", topic);
-        let (acker, ack_counter) = Acker::new_for_testing();
+        let (acker, ack_counter) = Acker::basic();
         let sink = Box::new(KafkaSink::new(config, acker).unwrap());
 
         let num_events = 1000;

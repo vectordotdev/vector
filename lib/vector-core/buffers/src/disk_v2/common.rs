@@ -94,6 +94,7 @@ impl DiskBufferConfigBuilder {
     ///
     /// Defaults to `usize::MAX`, or effectively no limit.  Due to the internal design of the
     /// buffer, the effective maximum limit is around `max_data_file_size + max_record_size` * 2^16.
+    #[allow(dead_code)]
     pub fn max_buffer_size(mut self, amount: u64) -> Self {
         self.max_buffer_size = Some(amount);
         self
@@ -107,6 +108,7 @@ impl DiskBufferConfigBuilder {
     /// that causes a data file to exceed this value by as much as `max_record_size`.
     ///
     /// Defaults to 128MB.
+    #[allow(dead_code)]
     pub fn max_data_file_size(mut self, amount: u64) -> Self {
         self.max_data_file_size = Some(amount);
         self
@@ -118,6 +120,7 @@ impl DiskBufferConfigBuilder {
     /// will not be written to the buffer.
     ///
     /// Defaults to 8MB.
+    #[allow(dead_code)]
     pub fn max_record_size(mut self, amount: usize) -> Self {
         self.max_record_size = Some(amount);
         self
@@ -133,12 +136,13 @@ impl DiskBufferConfigBuilder {
     /// amount of data written since the last flush would be lost.
     ///
     /// Defaults to 500ms.
+    #[allow(dead_code)]
     pub fn flush_interval(mut self, interval: Duration) -> Self {
         self.flush_interval = Some(interval);
         self
     }
 
-    /// Consumes this builder and constructs a `BufferConfig`.
+    /// Consumes this builder and constructs a `DiskBufferConfig`.
     pub fn build(self) -> DiskBufferConfig {
         let max_data_file_size = self
             .max_data_file_size

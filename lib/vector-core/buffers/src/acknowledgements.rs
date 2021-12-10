@@ -1,8 +1,6 @@
 use std::fmt;
-use std::sync::Arc;
-
-#[cfg(test)]
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 /// A value that can be acknowledged.
 ///
@@ -65,6 +63,21 @@ impl Acker {
         }
     }
 
+    /// Creates a basic [`Acker`] that simply tracks the total acknowledgement count.
+    ///
+    /// A handle to the underlying [`AtomicUsize`] is passed back alongside the `Acker` itself.
+    pub fn basic() -> (Self, Arc<AtomicUsize>) {
+        let counter = Arc::new(AtomicUsize::new(0));
+
+        let counter2 = Arc::clone(&counter);
+        let inner = move |num: usize| {
+            counter2.fetch_add(num, Ordering::Relaxed);
+        };
+        let acker = Acker::segmented(inner);
+
+        (acker, counter)
+    }
+
     /// Acknowledge a certain amount of records.
     ///
     /// Callers are responsible for ensuring that acknowledgements are in order.  That is to say, if
@@ -76,20 +89,6 @@ impl Acker {
                 (&*inner)(num);
             }
         }
-    }
-
-    #[cfg(test)]
-    #[must_use]
-    pub fn new_for_testing() -> (Self, Arc<AtomicUsize>) {
-        let counter = Arc::new(AtomicUsize::new(0));
-
-        let counter2 = Arc::clone(&counter);
-        let inner = move |num: usize| {
-            counter2.fetch_add(num, Ordering::Relaxed);
-        };
-        let acker = Acker::segmented(inner);
-
-        (acker, counter)
     }
 }
 
@@ -125,7 +124,8 @@ mod tests {
 
     #[test]
     fn basic() {
-        let (acker, counter) = Acker::new_for_testing();
+        let (acker, counter) = Acker::basic();
+
         assert_eq!(0, counter.load(Ordering::Relaxed));
 
         acker.ack(0);

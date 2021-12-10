@@ -165,7 +165,7 @@ mod tests {
             print_interval_secs: 10,
             rate: None,
         };
-        let sink = Box::new(BlackholeSink::new(config, Acker::Null));
+        let sink = Box::new(BlackholeSink::new(config, Acker::passthrough()));
 
         let (_input_lines, events) = random_events_with_stream(100, 10, None);
         let _ = sink.run(Box::pin(events)).await.unwrap();

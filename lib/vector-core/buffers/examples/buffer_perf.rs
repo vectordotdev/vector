@@ -217,7 +217,7 @@ where
     let max_size_bytes = 32 * 1024 * 1024 * 1024;
     let when_full = WhenFull::Block;
 
-    let mut builder = TopologyBuilder::new();
+    let mut builder = TopologyBuilder::default();
 
     let variant = match buffer_type {
         "in-memory-v1" => {

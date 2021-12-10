@@ -15,7 +15,6 @@ use crate::{
 };
 use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
-use std::pin::Pin;
 use std::{
     collections::HashMap,
     future::ready,
@@ -338,7 +337,7 @@ pub async fn build_pieces(
             Transform::Task(t) => {
                 let (output, control) = Fanout::new();
 
-                let input_rx = crate::utilization::wrap(Pin::new(input_rx));
+                let input_rx = crate::utilization::wrap(input_rx);
 
                 let filtered = input_rx
                     .filter(move |event| ready(filter_event_type(event, input_type)))

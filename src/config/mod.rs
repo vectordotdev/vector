@@ -281,7 +281,7 @@ impl<T> SinkOuter<T> {
         let mut resources = self.inner.resources();
         for stage in self.buffer.stages() {
             match stage {
-                BufferType::Memory { .. } => {}
+                BufferType::MemoryV1 { .. } | BufferType::MemoryV2 { .. } => {}
                 BufferType::DiskV1 { .. } | BufferType::DiskV2 { .. } => {
                     resources.push(Resource::DiskBuffer(id.to_string()))
                 }
@@ -390,7 +390,7 @@ impl SinkContext {
     #[cfg(test)]
     pub fn new_test() -> Self {
         Self {
-            acker: Acker::Null,
+            acker: Acker::passthrough(),
             healthcheck: SinkHealthcheckOptions::default(),
             globals: GlobalOptions::default(),
             proxy: ProxyConfig::default(),

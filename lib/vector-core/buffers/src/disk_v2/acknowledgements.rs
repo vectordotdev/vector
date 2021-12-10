@@ -10,16 +10,3 @@ pub(super) fn create_disk_v2_acker(ledger: Arc<Ledger>) -> Acker {
         ledger.notify_writer_waiters();
     })
 }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn ack_updates_ledger_correctly() {
-        todo!();
-    }
-
-    #[test]
-    fn ack_wakes_reader() {
-        todo!();
-    }
-}

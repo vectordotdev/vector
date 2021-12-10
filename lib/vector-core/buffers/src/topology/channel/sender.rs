@@ -69,7 +69,7 @@ where
 
     pub fn capacity(&self) -> Option<usize> {
         match self {
-            Self::Channel(tx) => tx.get_ref().map(|s| s.capacity()),
+            Self::Channel(tx) => tx.get_ref().map(Sender::capacity),
             Self::Opaque(_) => None,
         }
     }
@@ -204,8 +204,8 @@ impl<T: Bufferable> BufferSender<T> {
     }
 
     #[cfg(test)]
-    pub(crate) fn get_overflow_ref(&self) -> Option<&Box<BufferSender<T>>> {
-        self.overflow.as_ref()
+    pub(crate) fn get_overflow_ref(&self) -> Option<&BufferSender<T>> {
+        self.overflow.as_ref().map(AsRef::as_ref)
     }
 }
 
@@ -217,7 +217,7 @@ impl<T> Clone for BufferSender<T> {
             overflow: self.overflow.clone(),
             overflow_flush: false,
             state: SendState::Idle,
-            when_full: self.when_full.clone(),
+            when_full: self.when_full,
             instrumentation: self.instrumentation.clone(),
         }
     }

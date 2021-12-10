@@ -31,7 +31,7 @@ tracing = { version = "0.1.29", default-features = false }
 
 [dev-dependencies]
 clap = "2.34.0"
-criterion = { version = "0.3", features = ["html_reports"] }
+criterion = { version = "0.3", features = ["html_reports", "async_tokio"] }
 hdrhistogram = "7.3.0"
 lading_common = { git = "https://github.com/blt/lading", branch = "main" }
 pretty_assertions = "1.0.0"
@@ -51,19 +51,7 @@ tracing-subscriber = { version = "0.2.25" }
 human_bytes = "0.3.0"
 
 [[bench]]
-name = "disk_v1"
-harness = false
-
-[[bench]]
-name = "disk_v2"
-harness = false
-
-[[bench]]
-name = "in_memory_v1"
-harness = false
-
-[[bench]]
-name = "in_memory_v2"
+name = "sized_records"
 harness = false
 
 [[example]]

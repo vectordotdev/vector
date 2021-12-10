@@ -268,7 +268,7 @@ mod integration_tests {
         let sub = consumer.subscribe(&subject).await.unwrap();
 
         // Publish events.
-        let (acker, ack_counter) = Acker::new_for_testing();
+        let (acker, ack_counter) = Acker::basic();
         let sink = Box::new(NatsSink::new(cnf.clone(), acker).unwrap());
         let num_events = 1_000;
         let (input, events) = random_lines_with_stream(100, num_events, None);

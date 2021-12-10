@@ -133,7 +133,7 @@ mod test {
     async fn gzip() {
         use flate2::read::MultiGzDecoder;
 
-        let (acker, _) = Acker::new_for_testing();
+        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {

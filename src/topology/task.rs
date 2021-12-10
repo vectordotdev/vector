@@ -1,4 +1,5 @@
 use crate::config::ComponentKey;
+use crate::utilization::Utilization;
 use futures::{future::BoxFuture, FutureExt};
 use pin_project::pin_project;
 use std::{
@@ -16,7 +17,7 @@ pub enum TaskOutput {
     Source,
     Transform,
     /// Buffer of sink
-    Sink(BufferReceiver<Event>, Acker),
+    Sink(Utilization<BufferReceiver<Event>>, Acker),
     Healthcheck,
 }
 

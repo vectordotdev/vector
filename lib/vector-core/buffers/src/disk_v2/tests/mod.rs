@@ -18,6 +18,7 @@ use crate::{Acker, Bufferable};
 
 use super::Ledger;
 
+mod acknowledgements;
 mod basic;
 mod invariants;
 mod known_errors;

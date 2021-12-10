@@ -574,10 +574,6 @@ where
     pub async fn flush(&mut self) -> io::Result<()> {
         self.flush_inner(false).await
     }
-
-    pub fn get_ledger_state(&self) -> String {
-        format!("{:#?}", self.ledger.state())
-    }
 }
 
 impl<T> Writer<T> {

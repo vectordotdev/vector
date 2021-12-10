@@ -394,7 +394,7 @@ mod tests {
             compression: Compression::None,
         };
 
-        let mut sink = FileSink::new(&config, Acker::Null);
+        let mut sink = FileSink::new(&config, Acker::passthrough());
         let (input, _events) = random_lines_with_stream(100, 64, None);
 
         let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
@@ -421,7 +421,7 @@ mod tests {
             compression: Compression::Gzip,
         };
 
-        let mut sink = FileSink::new(&config, Acker::Null);
+        let mut sink = FileSink::new(&config, Acker::passthrough());
         let (input, _) = random_lines_with_stream(100, 64, None);
 
         let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
@@ -453,7 +453,7 @@ mod tests {
             compression: Compression::None,
         };
 
-        let mut sink = FileSink::new(&config, Acker::Null);
+        let mut sink = FileSink::new(&config, Acker::passthrough());
 
         let (mut input, _events) = random_events_with_stream(32, 8, None);
         input[0].as_mut_log().insert("date", "2019-26-07");
@@ -534,7 +534,7 @@ mod tests {
             compression: Compression::None,
         };
 
-        let mut sink = FileSink::new(&config, Acker::Null);
+        let mut sink = FileSink::new(&config, Acker::passthrough());
         let (mut input, _events) = random_lines_with_stream(10, 64, None);
 
         let (mut tx, rx) = futures::channel::mpsc::channel(0);

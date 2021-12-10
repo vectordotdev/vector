@@ -15,10 +15,13 @@ impl<T> StrategyResult<T> {
     fn map(item: Option<T>, primary: bool) -> Self {
         match item {
             None => StrategyResult::Neither,
-            Some(item) => match primary {
-                true => StrategyResult::Primary(item),
-                false => StrategyResult::Secondary(item),
-            },
+            Some(item) => {
+                if primary {
+                    StrategyResult::Primary(item)
+                } else {
+                    StrategyResult::Secondary(item)
+                }
+            }
         }
     }
 }

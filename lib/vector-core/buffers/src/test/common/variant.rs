@@ -3,12 +3,12 @@ use crate::{
         builder::TopologyBuilder,
         channel::{BufferReceiver, BufferSender},
     },
-    variant::{DiskV1Buffer, DiskV2Buffer, MemoryV2Buffer},
+    variant::{DiskV1Buffer, DiskV2Buffer, MemoryV1Buffer, MemoryV2Buffer},
     Bufferable, WhenFull,
 };
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
-use std::path::PathBuf;
+use std::{num::NonZeroU16, path::PathBuf};
 use tracing::Span;
 
 #[cfg(test)]
@@ -24,10 +24,13 @@ const ALPHABET: [&str; 27] = [
 // emitting metrics for such buffers.
 #[derive(Debug, Clone)]
 pub enum Variant {
-    Memory {
+    MemoryV1 {
         max_events: usize,
         when_full: WhenFull,
-        instrument: bool,
+    },
+    MemoryV2 {
+        max_events: usize,
+        when_full: WhenFull,
     },
     DiskV1 {
         max_size: usize,
@@ -48,9 +51,16 @@ impl Variant {
     where
         T: Bufferable + Clone,
     {
-        let mut builder = TopologyBuilder::new();
+        let mut builder = TopologyBuilder::default();
         match self {
-            Variant::Memory {
+            Variant::MemoryV1 {
+                max_events,
+                when_full,
+                ..
+            } => {
+                builder.stage(MemoryV1Buffer::new(*max_events), *when_full);
+            }
+            Variant::MemoryV2 {
                 max_events,
                 when_full,
                 ..
@@ -112,43 +122,60 @@ impl Arbitrary for Id {
 #[cfg(test)]
 impl Arbitrary for Variant {
     fn arbitrary(g: &mut Gen) -> Self {
-        let idx = usize::arbitrary(g) % 3;
+        let idx = usize::arbitrary(g) % 4;
+
+        // Using a u16 ensures we avoid any allocation errors for our holding buffers, etc.
+        let max_events = NonZeroU16::arbitrary(g).get() as usize;
+        let max_size = max_events;
+        let when_full = WhenFull::arbitrary(g);
+
         match idx {
-            0 => Variant::Memory {
-                max_events: u16::arbitrary(g) as usize, // u16 avoids allocation failures
-                when_full: WhenFull::arbitrary(g),
-                instrument: false,
+            0 => Variant::MemoryV1 {
+                max_events,
+                when_full,
             },
-            1 => Variant::DiskV1 {
-                max_size: u16::arbitrary(g) as usize, // u16 avoids allocation failures
-                when_full: WhenFull::arbitrary(g),
+            1 => Variant::MemoryV2 {
+                max_events,
+                when_full,
+            },
+            2 => Variant::DiskV1 {
+                max_size,
+                when_full,
                 id: Id::arbitrary(g).inner,
                 data_dir: PathBuf::arbitrary(g),
             },
-            2 => Variant::DiskV2 {
-                max_size: u16::arbitrary(g) as usize, // u16 avoids allocation failures
-                when_full: WhenFull::arbitrary(g),
+            3 => Variant::DiskV2 {
+                max_size,
+                when_full,
                 id: Id::arbitrary(g).inner,
                 data_dir: PathBuf::arbitrary(g),
             },
-            _ => unreachable!("idx divisor should be 3"),
+            _ => unreachable!("idx divisor should be 4"),
         }
     }
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
         match self {
-            Variant::Memory {
+            Variant::MemoryV1 {
                 max_events,
                 when_full,
-                instrument,
                 ..
             } => {
                 let when_full = *when_full;
-                let instrument = *instrument;
-                Box::new(max_events.shrink().map(move |me| Variant::Memory {
+                Box::new(max_events.shrink().map(move |me| Variant::MemoryV1 {
                     max_events: me,
                     when_full,
-                    instrument,
+                }))
+            }
+            Variant::MemoryV2 {
+                max_events,
+                when_full,
+                ..
+            } => {
+                let when_full = *when_full;
+                Box::new(max_events.shrink().map(move |me| Variant::MemoryV2 {
+                    max_events: me,
+                    when_full,
                 }))
             }
             Variant::DiskV1 {
