@@ -1,4 +1,4 @@
-use vrl::{function::VmArgumentList, prelude::*};
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct StartsWith;
@@ -65,7 +65,7 @@ impl Function for StartsWith {
         }))
     }
 
-    fn call(&self, mut arguments: VmArgumentList) -> Resolved {
+    fn call(&self, arguments: &mut VmArgumentList) -> Resolved {
         let value = arguments.required("value");
         let substring = arguments.required("substring");
         let case_sensitive = arguments.required("case_sensitive").try_boolean()?;

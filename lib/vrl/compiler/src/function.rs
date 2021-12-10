@@ -3,6 +3,7 @@ use crate::expression::{
 };
 use crate::parser::Node;
 use crate::value::Kind;
+use crate::vm::VmArgumentList;
 use crate::{ExpressionError, Span, Value};
 use diagnostic::{DiagnosticError, Label, Note};
 use std::collections::{BTreeMap, HashMap};
@@ -62,7 +63,7 @@ pub trait Function: Sync + fmt::Debug {
         None
     }
 
-    fn call(&self, _args: VmArgumentList) -> Result<Value, ExpressionError> {
+    fn call(&self, _args: &mut VmArgumentList) -> Result<Value, ExpressionError> {
         Err(ExpressionError::Error {
             message: "unimplemented".to_string(),
             labels: Vec::new(),
@@ -423,36 +424,5 @@ impl diagnostic::DiagnosticError for Error {
 impl From<Error> for Box<dyn diagnostic::DiagnosticError> {
     fn from(error: Error) -> Self {
         Box::new(error) as _
-    }
-}
-
-pub enum VmArgument {
-    Value(Value),
-    Any(Box<dyn std::any::Any>),
-}
-
-pub struct VmArgumentList {
-    args: &'static [Parameter],
-    values: Vec<Option<Value>>,
-}
-
-impl VmArgumentList {
-    pub fn new(args: &'static [Parameter], values: Vec<Option<Value>>) -> Self {
-        Self { args, values }
-    }
-
-    /// Returns the parameter with the given name.
-    /// Note the this can only be called once per parameter since the value is
-    /// removed from the list.
-    pub fn required(&mut self, name: &str) -> Value {
-        // Get the position the given argument is found in the parameter stack.
-        let pos = self
-            .args
-            .iter()
-            .position(|param| param.keyword == name)
-            .expect("parameter doesn't exist");
-
-        // Return the parameter found at this position.
-        self.values[self.args.len() - pos - 1].take().unwrap()
     }
 }

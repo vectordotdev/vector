@@ -1,4 +1,4 @@
-use crate::{Context, Span, State, TypeDef, Value};
+use crate::{vm, Context, Span, State, TypeDef, Value};
 use diagnostic::{DiagnosticError, Label, Note};
 use dyn_clone::{clone_trait_object, DynClone};
 use std::fmt;
@@ -55,7 +55,7 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     /// An expression is allowed to fail, which aborts the running program.
     fn resolve(&self, ctx: &mut Context) -> Resolved;
 
-    fn dump(&self, _vm: &mut crate::vm::Vm) -> Result<(), String> {
+    fn dump(&self, _vm: &mut vm::Vm) -> Result<(), String> {
         Ok(())
     }
 

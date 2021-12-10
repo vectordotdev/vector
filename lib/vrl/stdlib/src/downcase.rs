@@ -1,4 +1,4 @@
-use vrl::{function::VmArgumentList, prelude::*};
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Downcase;
@@ -35,7 +35,7 @@ impl Function for Downcase {
         }]
     }
 
-    fn call(&self, mut args: VmArgumentList) -> Resolved {
+    fn call(&self, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
         Ok(value.try_bytes_utf8_lossy().unwrap().to_lowercase().into())
     }

@@ -93,11 +93,14 @@ impl Function for MatchDatadogQuery {
         }
     }
 
-    fn call(&self, mut arguments: VmArgumentList) -> Resolved {
+    fn call(&self, arguments: &mut VmArgumentList) -> Resolved {
         let value = arguments.required("value");
+        let node = arguments
+            .required_any("query")
+            .downcast_ref::<QueryNode>()
+            .unwrap();
 
-        todo!()
-        // Ok(matches_vrl_object(&self.node, &Value::Object(value)).into())
+        Ok(matches_vrl_object(node, &value).into())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
