@@ -25,9 +25,7 @@ start_podman () {
 }
 
 start_docker () {
-  docker network create vector-test-integration-redis
-  docker run -d --network=vector-test-integration-redis -p 6379:6379 --name vector_redis \
-	 redis
+  docker-compose -f scripts/setup_integration/docker-compose.redis.yml up -d
 }
 
 stop_podman () {
@@ -37,8 +35,8 @@ stop_podman () {
 }
 
 stop_docker () {
-  docker rm --force vector_redis 2>/dev/null; true
-  docker network rm vector-test-integration-redis 2>/dev/null; true
+  docker-compose -f scripts/setup_integration/docker-compose.redis.yml stop
+  docker-compose -f scripts/setup_integration/docker-compose.redis.yml rm -f
 }
 
 echo "Running $ACTION action for Redis integration tests environment"

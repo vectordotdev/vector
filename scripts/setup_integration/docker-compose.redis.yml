@@ -1,0 +1,6 @@
+services:
+  redis:
+    image: redis
+    container_name: vector_redis
+    ports:
+      - 6379:6379
