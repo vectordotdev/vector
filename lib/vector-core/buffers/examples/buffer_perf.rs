@@ -14,11 +14,12 @@ use std::{
 
 use buffers::encoding::{DecodeBytes, EncodeBytes};
 use buffers::topology::channel::{BufferReceiver, BufferSender};
-use buffers::{topology::builder::TopologyBuilder, DiskV1Buffer, WhenFull};
-use buffers::{Acker, Bufferable, DiskV2Buffer, MemoryV2Buffer, MemoryV1Buffer};
+use buffers::{topology::builder::TopologyBuilder, WhenFull};
+use buffers::{Acker, BufferType, Bufferable};
 use bytes::{Buf, BufMut};
+use clap::{App, Arg};
 use core_common::byte_size_of::ByteSizeOf;
-use futures::{SinkExt, StreamExt, stream};
+use futures::{stream, SinkExt, StreamExt};
 use hdrhistogram::Histogram;
 use rand::Rng;
 use tokio::task;
@@ -107,13 +108,98 @@ impl fmt::Display for DecodeError {
 
 impl error::Error for DecodeError {}
 
-fn generate_record_cache() -> Vec<VariableMessage> {
-    // Generate a bunch of `VariableMessage` records that we'll cycle through, with payloads between
-    // 512 bytes and 8 kilobytes.  This shiuld be fairly close to normal log events.
+struct Configuration {
+    buffer_type: String,
+    total_records: usize,
+    write_batch_size: usize,
+    min_record_size: usize,
+    max_record_size: usize,
+}
+
+impl Configuration {
+    pub fn from_cli() -> Result<Self, String> {
+        let matches = App::new("buffer-perf")
+            .about("Runner for performance testing of buffers")
+            .arg(
+                Arg::with_name("buffer_type")
+                    .help("Sets the buffer type to use")
+                    .short("t")
+                    .long("buffer-type")
+                    .possible_values(&["disk-v1", "disk-v2", "in-memory-v1", "in-memory-v2"])
+                    .default_value("disk-v2"),
+            )
+            .arg(
+                Arg::with_name("total_records")
+                    .help("Sets the total number of records that should be written and read")
+                    .short("c")
+                    .long("total-records")
+                    .default_value("10000000"),
+            )
+            .arg(
+                Arg::with_name("write_batch_size")
+                    .help("Sets the batch size for writing")
+                    .short("b")
+                    .long("write-batch-size")
+                    .default_value("100"),
+            )
+            .arg(
+                Arg::with_name("min_record_size")
+                    .help("Sets the lower bound of the size of the pre-generated records")
+                    .long("min-record-size")
+                    .default_value("512"),
+            )
+            .arg(
+                Arg::with_name("max_record_size")
+                    .help("Sets the upper bound of the size of the pre-generated records")
+                    .long("max-record-size")
+                    .default_value("4096"),
+            )
+            .get_matches();
+
+        let buffer_type = matches
+            .value_of("buffer_type")
+            .map(|s| s.to_string())
+            .expect("default value for buffer_type should always be present");
+        let total_records = matches
+            .value_of("total_records")
+            .map(Ok)
+            .expect("default value for total_records should always be present")
+            .and_then(|s| s.parse::<usize>())
+            .map_err(|e| e.to_string())?;
+        let write_batch_size = matches
+            .value_of("write_batch_size")
+            .map(Ok)
+            .expect("default value for write_batch_size should always be present")
+            .and_then(|s| s.parse::<usize>())
+            .map_err(|e| e.to_string())?;
+        let min_record_size = matches
+            .value_of("min_record_size")
+            .map(Ok)
+            .expect("default value for min_record_size should always be present")
+            .and_then(|s| s.parse::<usize>())
+            .map_err(|e| e.to_string())?;
+        let max_record_size = matches
+            .value_of("max_record_size")
+            .map(Ok)
+            .expect("default value for max_record_size should always be present")
+            .and_then(|s| s.parse::<usize>())
+            .map_err(|e| e.to_string())?;
+
+        Ok(Configuration {
+            buffer_type,
+            total_records,
+            write_batch_size,
+            min_record_size,
+            max_record_size,
+        })
+    }
+}
+
+fn generate_record_cache(min: usize, max: usize) -> Vec<VariableMessage> {
     let mut rng = rand::thread_rng();
     let mut records = Vec::new();
-    for i in 1..200_000 {
-        let payload_size = rng.gen_range(512..4096);
+    for i in 1..=200_000 {
+        let payload_size = rng.gen_range(min..max);
         let payload = (0..payload_size).map(|_| rng.gen()).collect();
         let message = VariableMessage::new(i, payload);
         records.push(message);
@@ -126,57 +212,63 @@ where
     T: Bufferable + Clone,
 {
     let data_dir = PathBuf::from("/tmp/vector");
+    let id = format!("{}-buffer-perf-testing", buffer_type);
     let max_size_events = 500;
     let max_size_bytes = 32 * 1024 * 1024 * 1024;
+    let when_full = WhenFull::Block;
 
     let mut builder = TopologyBuilder::new();
 
-    match buffer_type {
+    let variant = match buffer_type {
         "in-memory-v1" => {
-            builder.stage(MemoryV1Buffer::new(max_size_events), WhenFull::Block);
-
             println!(
                 "[buffer-perf] creating in-memory v1 buffer with max_events={}, in blocking mode",
                 max_size_events
             );
+            BufferType::MemoryV1 {
+                max_events: max_size_events,
+                when_full,
+            }
         }
         "in-memory-v2" => {
-            builder.stage(MemoryV2Buffer::new(max_size_events), WhenFull::Block);
-
             println!(
                 "[buffer-perf] creating in-memory v2 buffer with max_events={}, in blocking mode",
                 max_size_events
             );
+            BufferType::MemoryV2 {
+                max_events: max_size_events,
+                when_full,
+            }
         }
         "disk-v1" => {
-            let id = String::from("disk-v1-example");
-            builder.stage(
-                DiskV1Buffer::new(id, data_dir, max_size_bytes),
-                WhenFull::Block,
-            );
-
             println!(
                 "[buffer-perf] creating disk v1 buffer with max_size={}, in blocking mode",
                 max_size_bytes
             );
+            BufferType::DiskV1 {
+                max_size: max_size_bytes,
+                when_full,
+            }
         }
         "disk-v2" => {
-            let id = String::from("disk_v1_example");
-            builder.stage(
-                DiskV2Buffer::new(id, data_dir, max_size_bytes),
-                WhenFull::Block,
-            );
-
             println!(
                 "[buffer-perf] creating disk v2 buffer with max_size={}, in blocking mode",
                 max_size_bytes
             );
+            BufferType::DiskV2 {
+                max_size: max_size_bytes,
+                when_full,
+            }
         }
         s => panic!(
             "unknown buffer type '{}' requested; valid types are in-memory, disk-v1, and disk-v2",
             s
         ),
-    }
+    };
+
+    variant
+        .add_to_builder(&mut builder, Some(data_dir), id)
+        .expect("should not fail to to add variant to builder");
 
     builder
         .build(Span::none())
@@ -186,37 +278,21 @@ where
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 16)]
 async fn main() {
-    let mut args = std::env::args();
-    let buffer_type = args.nth(1).unwrap_or_else(|| "disk-v2".to_string());
-    let writer_count = args
-        .nth(0)
-        .unwrap_or_else(|| "10000000".to_string())
-        .parse::<usize>()
-        .expect("writer count must be valid non-zero integer");
-    let reader_count: usize = args
-        .nth(0)
-        .unwrap_or_else(|| "10000000".to_string())
-        .parse::<usize>()
-        .expect("reader count must be valid non-zero integer");
-    let writer_batch_size: usize = args
-        .nth(0)
-        .unwrap_or_else(|| "1".to_string())
-        .parse::<usize>()
-        .map_err(|e| e.to_string())
-        .and_then(|n| if n == 0 { Err("value was zero".to_string()) } else { Ok(n) })
-        .expect("writer batch size must be valid non-zero integer");
+    let config = Configuration::from_cli().expect("reading config parameters failed");
 
+    let total_records = config.total_records;
+    let write_batch_size = config.write_batch_size;
     println!(
-        "[buffer-perf] going to write {} record(s), read {} record(s), with a writer batch size of {} record(s)",
-        writer_count, reader_count, writer_batch_size
+        "[buffer-perf] going to write and read {} record(s), with a write batch size of {} record(s)",
+        total_records, write_batch_size
     );
 
-    // Generate our record cache, which ensures the writer spends as little time as possible actually
-    // generating the data that it writes to the buffer.
-    let record_cache = generate_record_cache();
+    let record_cache = generate_record_cache(config.min_record_size, config.max_record_size);
     println!(
-        "[buffer-perf] generated record cache ({} records)",
-        record_cache.len()
+        "[buffer-perf] generated record cache ({} records, {}-{} bytes)",
+        record_cache.len(),
+        config.min_record_size,
+        config.max_record_size
     );
 
     let write_position = Arc::new(AtomicUsize::new(0));
@@ -225,31 +301,48 @@ async fn main() {
     let writer_position = Arc::clone(&write_position);
     let reader_position = Arc::clone(&read_position);
 
-    // Create a disk buffer under /tmp/vector with the given ID and a maximum size of 32GB.
     let start = Instant::now();
-    let (mut writer, mut reader, acker) = generate_buffer(buffer_type.as_str()).await;
+    println!(
+        "[buffer-perf] {:?}s: creating buffer...",
+        start.elapsed().as_secs()
+    );
+
+    let buffer_start = Instant::now();
+    let (mut writer, mut reader, acker) = generate_buffer(config.buffer_type.as_str()).await;
+    let buffer_delta = buffer_start.elapsed();
+
+    println!(
+        "[buffer-perf] {:?}s: created/loaded buffer in {:?}",
+        start.elapsed().as_secs(),
+        buffer_delta
+    );
 
     let (writer_tx, mut writer_rx) = oneshot::channel();
     tokio::spawn(async move {
         let mut tx_histo = Histogram::<u64>::new(3).expect("should not fail");
         let mut records = record_cache.iter().cycle().cloned();
 
-        let iters = writer_count / writer_batch_size;
-        for _ in 0..iters {
+        let mut remaining = total_records;
+        while remaining > 0 {
             let tx_start = Instant::now();
 
-            match writer_batch_size {
+            match write_batch_size {
                 0 => unreachable!(),
                 1 => {
                     let record = records.next().expect("should never be empty");
                     writer.send(record).await.expect("failed to write record");
-                },
+                }
                 n => {
                     let mut record_chunk = (&mut records).take(n).map(Ok);
                     let mut record_chunk_iter = stream::iter(&mut record_chunk);
-                    writer.send_all(&mut record_chunk_iter).await.expect("failed to write record"); 
+                    writer
+                        .send_all(&mut record_chunk_iter)
+                        .await
+                        .expect("failed to write record");
                 }
             }
+
+            remaining -= write_batch_size;
 
             task::yield_now().await;
 
@@ -258,7 +351,7 @@ async fn main() {
             let elapsed = tx_start.elapsed().as_nanos() as u64;
             tx_histo.record(elapsed).expect("should not fail");
 
-            writer_position.fetch_add(writer_batch_size, Ordering::Relaxed);
+            writer_position.fetch_add(write_batch_size, Ordering::Relaxed);
         }
 
         writer.flush().await.expect("flush shouldn't fail");
@@ -269,7 +362,7 @@ async fn main() {
     tokio::spawn(async move {
         let mut rx_histo = Histogram::<u64>::new(3).expect("should not fail");
 
-        for _ in 0..reader_count {
+        for _ in 0..total_records {
             let rx_start = Instant::now();
 
             let _record = reader.next().await.expect("read should not fail");
@@ -295,24 +388,23 @@ async fn main() {
             result = &mut writer_rx, if writer_result.is_none() => match result {
                 Ok(result) => {
                     writer_result = Some(result);
-                    println!("[buffer-perf] (writer) {:?}: finished", start.elapsed());
+                    println!("[buffer-perf] {:?}s: writer finished", start.elapsed().as_secs());
                 },
-                Err(_) => panic!("[buffer-perf] (writer) task failed unexpectedly!"),
+                Err(_) => panic!("[buffer-perf] writer task failed unexpectedly!"),
             },
             result = &mut reader_rx, if reader_result.is_none() => match result {
                 Ok(result) => {
                     reader_result = Some(result);
-                    println!("[buffer-perf] (reader) {:?}: finished", start.elapsed());
+                    println!("[buffer-perf] {:?}s: reader finished", start.elapsed().as_secs());
                 },
-                Err(_) => panic!("[buffer-perf] (reader) task failed unexpectedly!"),
+                Err(_) => panic!("[buffer-perf] reader task failed unexpectedly!"),
             },
             _ = progress_interval.tick(), if writer_result.is_none() || reader_result.is_none() => {
                 let elapsed = start.elapsed();
                 let write_pos = write_position.load(Ordering::Relaxed);
                 let read_pos = read_position.load(Ordering::Relaxed);
 
-                println!("[buffer-perf] (writer) {:?}s: position = {:11}", elapsed.as_secs(), write_pos);
-                println!("[buffer-perf] (reader) {:?}s: position = {:11}", elapsed.as_secs(), read_pos);
+                println!("[buffer-perf] {:?}s: writer pos = {:11}, reader pos = {:11}", elapsed.as_secs(), write_pos, read_pos);
             },
             else => break,
         }
@@ -322,8 +414,8 @@ async fn main() {
     let total_time = start.elapsed();
 
     println!(
-        "[buffer-perf] writer and reader done: {} records written, {} records read, in {:?}",
-        writer_count, reader_count, total_time
+        "[buffer-perf] writer and reader done: {} records written and read in {:?}",
+        total_records, total_time
     );
 
     println!("[buffer-perf] writer summary:");

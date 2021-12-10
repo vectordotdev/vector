@@ -8,6 +8,7 @@ use std::task::{Context, Poll};
 use async_trait::async_trait;
 use futures::{ready, Sink, Stream};
 use pin_project::pin_project;
+use tokio::sync::mpsc::{channel, Receiver};
 use tokio_util::sync::ReusableBoxFuture;
 
 use crate::buffer_usage_data::BufferUsageHandle;
@@ -53,10 +54,13 @@ where
         let (writer, reader, acker) = Buffer::from_config(config).await?;
 
         let wrapped_reader = WrappedReader::new(reader);
-        let wrapped_writer = WrappedWriter::new(writer);
+        //let wrapped_writer = WrappedWriter::new(writer);
+
+        let (input_tx, input_rx) = channel(1024);
+        tokio::spawn(drive_disk_v2_writer(writer, input_rx));
 
         Ok((
-            SenderAdapter::opaque(wrapped_writer),
+            SenderAdapter::channel(input_tx),
             ReceiverAdapter::opaque(wrapped_reader),
             Some(acker),
         ))
@@ -427,5 +431,22 @@ where
             (writer, result.map_err(Into::into))
         }
         None => unreachable!("future should not be called in this state"),
+    }
+}
+
+async fn drive_disk_v2_writer<T>(mut writer: Writer<T>, mut input: Receiver<T>)
+where
+    T: Bufferable,
+{
+    // TODO: use a control message struct so callers can send both items to write and flush
+    // requests, facilitating the ability to allow for `send_all` at the frontend
+    while let Some(record) = input.recv().await {
+        if let Err(e) = writer.write_record(record).await {
+            error!("failed to write record to the buffer: {}", e);
+        }
+
+        if let Err(e) = writer.flush().await {
+            error!("failed to flush the buffer: {}", e);
+        }
     }
 }

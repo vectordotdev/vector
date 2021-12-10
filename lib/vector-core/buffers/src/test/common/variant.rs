@@ -3,7 +3,8 @@ use crate::{
         builder::TopologyBuilder,
         channel::{BufferReceiver, BufferSender},
     },
-    Bufferable, DiskV1Buffer, DiskV2Buffer, MemoryV2Buffer, WhenFull,
+    variant::{DiskV1Buffer, DiskV2Buffer, MemoryV2Buffer},
+    Bufferable, WhenFull,
 };
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};

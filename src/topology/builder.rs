@@ -27,11 +27,11 @@ use tokio::{
     select,
     time::{timeout, Duration},
 };
-use vector_core::ByteSizeOf;
 use vector_core::{
-    buffers::{BufferInputCloner, BufferType},
-    internal_event::EventsSent,
+    buffers::topology::{builder::TopologyBuilder, channel::BufferSender},
+    ByteSizeOf,
 };
+use vector_core::{buffers::BufferType, internal_event::EventsSent};
 
 lazy_static! {
     static ref ENRICHMENT_TABLES: enrichment::TableRegistry = enrichment::TableRegistry::default();
@@ -94,7 +94,7 @@ pub async fn load_enrichment_tables<'a>(
 }
 
 pub struct Pieces {
-    pub inputs: HashMap<ComponentKey, (BufferInputCloner<Event>, Vec<OutputId>)>,
+    pub inputs: HashMap<ComponentKey, (BufferSender<Event>, Vec<OutputId>)>,
     pub outputs: HashMap<ComponentKey, HashMap<Option<String>, fanout::ControlChannel>>,
     pub tasks: HashMap<ComponentKey, Task>,
     pub source_tasks: HashMap<ComponentKey, Task>,
@@ -212,15 +212,7 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx, _) = vector_core::buffers::build(
-            vector_core::buffers::Variant::Memory {
-                max_events: 100,
-                when_full: vector_core::buffers::WhenFull::Block,
-                instrument: false,
-            },
-            tracing::Span::none(),
-        )
-        .unwrap();
+        let (input_tx, input_rx) = TopologyBuilder::memory(100).await;
 
         let task = match transform {
             Transform::Function(mut t) => {
@@ -399,8 +391,8 @@ pub async fn build_pieces(
             buffer
         } else {
             let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
-                BufferType::Memory { .. } => "memory",
-                BufferType::DiskV1 { .. } | BufferType::DiskV2 => "disk",
+                BufferType::MemoryV1 { .. } | BufferType::MemoryV2 { .. } => "memory",
+                BufferType::DiskV1 { .. } | BufferType::DiskV2 { .. } => "disk",
             };
             let buffer_span = error_span!(
                 "sink",
@@ -412,13 +404,14 @@ pub async fn build_pieces(
             );
             let buffer = sink
                 .buffer
-                .build(&config.global.data_dir, key.to_string(), buffer_span);
+                .build(config.global.data_dir.clone(), key.to_string(), buffer_span)
+                .await;
             match buffer {
                 Err(error) => {
                     errors.push(format!("Sink \"{}\": {}", key, error));
                     continue;
                 }
-                Ok((tx, rx, acker)) => (tx, Arc::new(Mutex::new(Some(rx.into()))), acker),
+                Ok((tx, rx, acker)) => (tx, Arc::new(Mutex::new(Some(rx))), acker),
             }
         };
 

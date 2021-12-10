@@ -1,4 +1,4 @@
-use buffers::{self, Variant, WhenFull};
+use buffers::{self, BufferType, WhenFull};
 use criterion::{
     criterion_group, criterion_main, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId,
     Criterion, SamplingMode, Throughput,
@@ -29,10 +29,9 @@ macro_rules! experiment {
                     |b, max_events| {
                         b.iter_batched(
                             || {
-                                let variant = Variant::Memory {
+                                let variant = BufferType::MemoryV1 {
                                     max_events: *max_events,
                                     when_full: WhenFull::DropNewest,
-                                    instrument: true,
                                 };
                                 crate::common::setup::<$width>(*max_events, variant)
                             },
@@ -55,11 +54,11 @@ macro_rules! experiment {
 // never fill the buffer.
 //
 
-fn write_then_read_memory(c: &mut Criterion) {
+fn write_then_read(c: &mut Criterion) {
     experiment!(
         c,
         [32, 64, 128, 256, 512, 1024],
-        "buffer-memory",
+        "buffer-memory-v1",
         "write-then-read",
         wtr_measurement
     );
@@ -73,19 +72,19 @@ fn write_then_read_memory(c: &mut Criterion) {
 // sizes are carefully chosen to never fill the buffer.
 //
 
-fn write_and_read_memory(c: &mut Criterion) {
+fn write_and_read(c: &mut Criterion) {
     experiment!(
         c,
         [32, 64, 128, 256, 512, 1024],
-        "buffer-memory",
+        "buffer-memory-v1",
         "write-and-read",
         war_measurement
     );
 }
 
 criterion_group!(
-    name = in_memory;
+    name = in_memory_v1;
     config = Criterion::default().measurement_time(Duration::from_secs(120)).confidence_level(0.99).nresamples(500_000).sample_size(250);
-    targets = write_and_read_memory, write_then_read_memory
+    targets = write_and_read, write_then_read
 );
-criterion_main!(in_memory);
+criterion_main!(in_memory_v1);

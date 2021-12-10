@@ -31,6 +31,17 @@ impl SendState {
     }
 }
 
+// Some type-level tomfoolery to have a trait that represents a `Sink` that can be cloned.
+/// A [`Sink`] that can be cloned.
+///
+/// Required due to limitations around using non-auto traits in trait signatures.  If your [`Sink`]
+/// implementation is also `Clone`, then you are covered by the blanket trait implementation.
+pub trait CloneableSink<Item, E>: Sink<Item, Error = E> + Send + dyn_clone::DynClone {}
+
+impl<T, Item, E> CloneableSink<Item, E> for T where T: Sink<Item, Error = E> + Send + Clone {}
+
+dyn_clone::clone_trait_object!(<T, E> CloneableSink<T, E>);
+
 /// Adapter for papering over various sender backends by providing a [`Sink`] interface.
 #[pin_project(project = ProjectedSenderAdapter)]
 pub enum SenderAdapter<T> {
@@ -38,7 +49,7 @@ pub enum SenderAdapter<T> {
     Channel(PollSender<T>),
 
     /// A sender that provides its own [`Sink`] implementation.
-    Opaque(Pin<Box<dyn Sink<T, Error = ()> + Send>>),
+    Opaque(Pin<Box<dyn CloneableSink<T, ()>>>),
 }
 
 impl<T> SenderAdapter<T>
@@ -51,7 +62,7 @@ where
 
     pub fn opaque<S>(inner: S) -> Self
     where
-        S: Sink<T, Error = ()> + Send + 'static,
+        S: CloneableSink<T, ()> + 'static,
     {
         SenderAdapter::Opaque(Box::pin(inner))
     }
@@ -60,6 +71,15 @@ where
         match self {
             Self::Channel(tx) => tx.get_ref().map(|s| s.capacity()),
             Self::Opaque(_) => None,
+        }
+    }
+}
+
+impl<T> Clone for SenderAdapter<T> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Channel(tx) => Self::Channel(tx.clone()),
+            Self::Opaque(sink) => Self::Opaque(sink.clone()),
         }
     }
 }
@@ -186,6 +206,20 @@ impl<T: Bufferable> BufferSender<T> {
     #[cfg(test)]
     pub(crate) fn get_overflow_ref(&self) -> Option<&Box<BufferSender<T>>> {
         self.overflow.as_ref()
+    }
+}
+
+impl<T> Clone for BufferSender<T> {
+    fn clone(&self) -> Self {
+        Self {
+            base: self.base.clone(),
+            base_flush: false,
+            overflow: self.overflow.clone(),
+            overflow_flush: false,
+            state: SendState::Idle,
+            when_full: self.when_full.clone(),
+            instrumentation: self.instrumentation.clone(),
+        }
     }
 }
 

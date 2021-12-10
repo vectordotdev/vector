@@ -7,15 +7,16 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use vector_core::buffers::Acker;
-
-use super::EventStream;
+use vector_core::{
+    buffers::{topology::channel::BufferReceiver, Acker},
+    event::Event,
+};
 
 pub enum TaskOutput {
     Source,
     Transform,
     /// Buffer of sink
-    Sink(Pin<EventStream>, Acker),
+    Sink(BufferReceiver<Event>, Acker),
     Healthcheck,
 }
 

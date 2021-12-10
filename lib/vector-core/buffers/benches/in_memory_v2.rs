@@ -1,4 +1,4 @@
-use buffers::{self, WhenFull};
+use buffers::{self, BufferType, WhenFull};
 use criterion::{
     criterion_group, criterion_main, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId,
     Criterion, SamplingMode, Throughput,
@@ -29,7 +29,11 @@ macro_rules! experiment {
                     |b, max_events| {
                         b.iter_batched(
                             || {
-                                crate::common::setup_in_memory_v2::<$width>(*max_events, WhenFull::DropNewest)
+                                let variant = BufferType::MemoryV2 {
+                                    max_events: *max_events,
+                                    when_full: WhenFull::DropNewest,
+                                };
+                                crate::common::setup::<$width>(*max_events, variant)
                             },
                             $measure_fn,
                             BatchSize::SmallInput,
@@ -50,11 +54,11 @@ macro_rules! experiment {
 // never fill the buffer.
 //
 
-fn write_then_read_in_memory_v2(c: &mut Criterion) {
+fn write_then_read(c: &mut Criterion) {
     experiment!(
         c,
         [32, 64, 128, 256, 512, 1024],
-        "buffer-v2-memory",
+        "buffer-memory-v2",
         "write-then-read",
         wtr_measurement
     );
@@ -68,11 +72,11 @@ fn write_then_read_in_memory_v2(c: &mut Criterion) {
 // sizes are carefully chosen to never fill the buffer.
 //
 
-fn write_and_read_in_memory_v2(c: &mut Criterion) {
+fn write_and_read(c: &mut Criterion) {
     experiment!(
         c,
         [32, 64, 128, 256, 512, 1024],
-        "buffer-v2-memory",
+        "buffer-memory-v2",
         "write-and-read",
         war_measurement
     );
@@ -81,6 +85,6 @@ fn write_and_read_in_memory_v2(c: &mut Criterion) {
 criterion_group!(
     name = in_memory_v2;
     config = Criterion::default().measurement_time(Duration::from_secs(120)).confidence_level(0.99).nresamples(500_000).sample_size(250);
-    targets = write_and_read_in_memory_v2, write_then_read_in_memory_v2
+    targets = write_and_read, write_then_read
 );
 criterion_main!(in_memory_v2);

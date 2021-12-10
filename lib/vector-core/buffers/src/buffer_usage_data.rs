@@ -15,11 +15,10 @@ pub struct BufferUsageHandle {
 }
 
 impl BufferUsageHandle {
-    /// Creates a dummy [`BufferUsageHandle`] handle.
+    /// Creates a no-op [`BufferUsageHandle`] handle.
     ///
     /// No usage data is written or stored.
-    #[cfg(test)]
-    pub(crate) fn testing() -> Self {
+    pub(crate) fn noop() -> Self {
         BufferUsageHandle {
             state: Arc::new(BufferUsageData::new(WhenFull::Block, 0)),
         }

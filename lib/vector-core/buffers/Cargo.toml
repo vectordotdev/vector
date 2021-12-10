@@ -12,6 +12,7 @@ bytecheck = { version = "0.6.5", default-features = false, features = ["std"] }
 crc32fast = { version = "1.2.1", default-features = false, features = ["std"] }
 crossbeam-utils = { version = "0.8.5", default-features = false }
 db-key = { version = "0.0.5", default-features = false }
+dyn-clone = { version = "1.0.4", default-features = false }
 fslock = { version = "0.2.0", default-features = false, features = ["std"] }
 futures = { version = "0.3.17", default-features = false, features = ["std"] }
 core_common = { path = "../core-common", default-features = false }
@@ -29,6 +30,7 @@ tokio-util = { version = "0.6", default-features = false }
 tracing = { version = "0.1.29", default-features = false }
 
 [dev-dependencies]
+clap = "2.34.0"
 criterion = { version = "0.3", features = ["html_reports"] }
 hdrhistogram = "7.3.0"
 lading_common = { git = "https://github.com/blt/lading", branch = "main" }
@@ -49,11 +51,15 @@ tracing-subscriber = { version = "0.2.25" }
 human_bytes = "0.3.0"
 
 [[bench]]
-name = "on_disk"
+name = "disk_v1"
 harness = false
 
 [[bench]]
-name = "in_memory"
+name = "disk_v2"
+harness = false
+
+[[bench]]
+name = "in_memory_v1"
 harness = false
 
 [[bench]]

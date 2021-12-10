@@ -13,27 +13,31 @@
 extern crate tracing;
 
 mod acknowledgements;
+pub use acknowledgements::{Ackable, Acker};
+
 mod buffer_usage_data;
+
 mod config;
-pub mod encoding;
 pub use config::{BufferConfig, BufferType};
-pub mod disk;
-pub mod disk_v2;
+
+pub mod encoding;
+
+pub(crate) mod disk;
+pub(crate) mod disk_v2;
 
 mod internal_events;
 #[cfg(test)]
 mod test;
 pub mod topology;
-mod variant;
+
+pub(crate) mod variant;
 
 use crate::encoding::{DecodeBytes, EncodeBytes};
-pub use acknowledgements::{Ackable, Acker};
 use core_common::byte_size_of::ByteSizeOf;
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-pub use variant::*;
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]

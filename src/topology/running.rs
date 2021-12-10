@@ -21,11 +21,11 @@ use tokio::{
     time::{interval, sleep_until, Duration, Instant},
 };
 use tracing::Instrument;
-use vector_core::buffers::BufferInputCloner;
+use vector_core::buffers::topology::channel::BufferSender;
 
 #[allow(dead_code)]
 pub struct RunningTopology {
-    inputs: HashMap<ComponentKey, BufferInputCloner<Event>>,
+    inputs: HashMap<ComponentKey, BufferSender<Event>>,
     outputs: HashMap<OutputId, ControlChannel>,
     source_tasks: HashMap<ComponentKey, TaskHandle>,
     tasks: HashMap<ComponentKey, TaskHandle>,
@@ -604,7 +604,7 @@ impl RunningTopology {
                     // be present.
                     if let Some(input) = self.inputs.get(sink_key) {
                         let _ = output
-                            .send(ControlMessage::Add(sink_key.clone(), input.get()))
+                            .send(ControlMessage::Add(sink_key.clone(), input.clone()))
                             .await;
                     }
                 }
@@ -615,7 +615,7 @@ impl RunningTopology {
                     // not be present.
                     if let Some(input) = self.inputs.get(transform_key) {
                         let _ = output
-                            .send(ControlMessage::Add(transform_key.clone(), input.get()))
+                            .send(ControlMessage::Add(transform_key.clone(), input.clone()))
                             .await;
                     }
                 }
@@ -634,7 +634,7 @@ impl RunningTopology {
                 .outputs
                 .get_mut(&input)
                 .expect("unknown output")
-                .send(ControlMessage::Add(key.clone(), tx.get()))
+                .send(ControlMessage::Add(key.clone(), tx.clone()))
                 .await;
         }
 
@@ -696,7 +696,7 @@ impl RunningTopology {
                 .outputs
                 .get_mut(input)
                 .unwrap()
-                .send(ControlMessage::Add(key.clone(), tx.get()))
+                .send(ControlMessage::Add(key.clone(), tx.clone()))
                 .await;
         }
 
@@ -706,7 +706,7 @@ impl RunningTopology {
                 .outputs
                 .get_mut(input)
                 .unwrap()
-                .send(ControlMessage::Replace(key.clone(), Some(tx.get())))
+                .send(ControlMessage::Replace(key.clone(), Some(tx.clone())))
                 .await;
         }
 

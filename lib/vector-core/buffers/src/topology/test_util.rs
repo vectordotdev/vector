@@ -5,13 +5,12 @@ use bytes::{Buf, BufMut};
 use crate::{
     buffer_usage_data::BufferUsageHandle,
     encoding::{DecodeBytes, EncodeBytes},
-    topology::{
-        builder::IntoBuffer,
-        channel::{BufferReceiver, BufferSender},
-    },
-    Bufferable,
+    topology::channel::{BufferReceiver, BufferSender},
+    variant::MemoryV2Buffer,
+    Bufferable, WhenFull,
 };
-use crate::{MemoryV2Buffer, WhenFull};
+
+use super::builder::IntoBuffer;
 
 // Silly implementation of `EncodeBytes`/`DecodeBytes` to fulfill `Bufferable` for our test buffer code.
 impl EncodeBytes<u64> for u64 {
@@ -65,7 +64,7 @@ pub async fn build_buffer(
 ) -> (BufferSender<u64>, BufferReceiver<u64>) {
     match mode {
         WhenFull::Block | WhenFull::DropNewest => {
-            let usage_handle = BufferUsageHandle::testing();
+            let usage_handle = BufferUsageHandle::noop();
             let channel = Box::new(MemoryV2Buffer::new(capacity));
             let (sender, receiver, _) = channel
                 .into_buffer_parts(&usage_handle)
@@ -76,7 +75,7 @@ pub async fn build_buffer(
             (sender, receiver)
         }
         WhenFull::Overflow => {
-            let usage_handle = BufferUsageHandle::testing();
+            let usage_handle = BufferUsageHandle::noop();
             let overflow_mode = overflow_mode
                 .expect("overflow_mode must be specified when base is in overflow mode");
             let overflow_channel = Box::new(MemoryV2Buffer::new(capacity));

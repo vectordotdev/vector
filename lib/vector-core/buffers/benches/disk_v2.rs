@@ -93,7 +93,7 @@ macro_rules! experiment {
                         b.iter_batched(
                             || {
                                 let guard = data_dir.next();
-                                let variant = Variant::Disk {
+                                let variant = BufferType::DiskV2 {
                                     max_size,
                                     when_full: WhenFull::DropNewest,
                                     data_dir: guard.inner.clone(),
@@ -124,11 +124,11 @@ macro_rules! experiment {
 // never fill the buffer.
 //
 
-fn write_then_read_disk(c: &mut Criterion) {
+fn write_then_read(c: &mut Criterion) {
     experiment!(
         c,
         [32, 64, 128, 256, 512, 1024],
-        "buffer-disk",
+        "buffer-disk-v2",
         "write-then-read",
         wtr_measurement
     );
@@ -142,19 +142,19 @@ fn write_then_read_disk(c: &mut Criterion) {
 // sizes are carefully chosen to never fill the buffer.
 //
 
-fn write_and_read_disk(c: &mut Criterion) {
+fn write_and_read(c: &mut Criterion) {
     experiment!(
         c,
         [32, 64, 128, 256, 512, 1024],
-        "buffer-disk",
+        "buffer-disk-v2",
         "write-and-read",
         war_measurement
     );
 }
 
 criterion_group!(
-    name = on_disk;
+    name = disk_v2;
     config = Criterion::default().measurement_time(Duration::from_secs(240)).confidence_level(0.99).nresamples(500_000).sample_size(100);
-    targets = write_then_read_disk, write_and_read_disk
+    targets = write_then_read, write_and_read
 );
-criterion_main!(on_disk);
+criterion_main!(disk_v2);

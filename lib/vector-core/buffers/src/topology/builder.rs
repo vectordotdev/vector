@@ -6,7 +6,8 @@ use tracing::Span;
 
 use crate::buffer_usage_data::{BufferUsage, BufferUsageHandle};
 use crate::topology::channel::{BufferReceiver, BufferSender};
-use crate::{Acker, WhenFull};
+use crate::variant::MemoryV1Buffer;
+use crate::{Acker, Bufferable, WhenFull};
 
 use super::channel::{ReceiverAdapter, SenderAdapter};
 
@@ -42,7 +43,7 @@ pub enum TopologyError {
         stage_idx
     ))]
     NextStageNotUsed { stage_idx: usize },
-    #[snafu(display("last stage in topology cannot be set to overflow mode"))]
+    #[snafu(display("last stage in buffer topology cannot be set to overflow mode"))]
     OverflowWhenLast,
     #[snafu(display("failed to build individual stage {}: {}", stage_idx, source))]
     FailedToBuildStage {
@@ -199,13 +200,44 @@ impl<T> TopologyBuilder<T> {
     }
 }
 
+impl<T> TopologyBuilder<T>
+where
+    T: Bufferable,
+{
+    /// Creates a memory-only buffer topology in blocking mode.
+    ///
+    /// This is a convenience method for `vector` as it is used for inter-transform channels, and we
+    /// can simplifying needing to require callers to do all the boilerplate to create the builder,
+    /// create the stage, installing buffer usage metrics that aren't required, and so on.
+    ///
+    /// TODO: This could/should potentially replace areas where we already create a memory-only
+    /// buffer topology for testing, as the requirements as essentially identical.  We may also want
+    /// to locate it somewhere else as a free function to keep `TopologyBuilder` a little more
+    /// focused/pure.
+    pub async fn memory(max_events: usize) -> (BufferSender<T>, BufferReceiver<T>) {
+        let noop_usage_handle = BufferUsageHandle::noop();
+
+        let memory_buffer = Box::new(MemoryV1Buffer::new(max_events));
+        let (sender, receiver, _) = memory_buffer
+            .into_buffer_parts(&noop_usage_handle)
+            .await
+            .expect("should not fail to directly create a memory buffer");
+
+        let sender = BufferSender::new(sender, WhenFull::Block);
+        let receiver = BufferReceiver::new(receiver);
+
+        (sender, receiver)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use tracing::Span;
 
     use crate::{
         topology::{builder::TopologyError, test_util::assert_current_send_capacity},
-        MemoryV2Buffer, WhenFull,
+        variant::MemoryV2Buffer,
+        WhenFull,
     };
 
     use super::TopologyBuilder;
