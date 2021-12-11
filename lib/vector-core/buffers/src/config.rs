@@ -19,8 +19,7 @@ pub enum BufferBuildError {
     FailedToBuildTopology { source: TopologyError },
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Deserialize, Serialize)]
 enum BufferTypeKind {
     #[serde(rename = "memory")]
     MemoryV1,
@@ -220,6 +219,7 @@ const fn memory_buffer_default_max_events() -> usize {
 #[serde(rename_all = "snake_case")]
 pub enum BufferType {
     /// A buffer stage backed by an in-memory channel provided by `futures`.
+    #[serde(rename = "memory")]
     MemoryV1 {
         #[serde(default = "memory_buffer_default_max_events")]
         max_events: usize,
@@ -227,6 +227,7 @@ pub enum BufferType {
         when_full: WhenFull,
     },
     /// A buffer stage backed by an in-memory channel provided by `tokio`.
+    #[serde(rename = "memory_v2")]
     MemoryV2 {
         #[serde(default = "memory_buffer_default_max_events")]
         max_events: usize,
@@ -234,12 +235,14 @@ pub enum BufferType {
         when_full: WhenFull,
     },
     /// A buffer stage backed by an on-disk database, powered by LevelDB.
+    #[serde(rename = "disk")]
     DiskV1 {
         max_size: usize,
         #[serde(default)]
         when_full: WhenFull,
     },
     /// A buffer stage backed by disk.
+    #[serde(rename = "disk_v2")]
     DiskV2 {
         max_size: usize,
         #[serde(default)]
