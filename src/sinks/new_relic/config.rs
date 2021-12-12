@@ -3,19 +3,18 @@ use crate::{
         DataType, SinkConfig, SinkContext
     },
     http::HttpClient,
-    sinks::util::{
-        SinkBatchSettings,
-        service::ServiceBuilderExt,
-        retries::RetryLogic,
-        encoding::EncodingConfigFixed,
-        BatchConfig, Compression, TowerRequestConfig
+    sinks::{
+        util::{
+            SinkBatchSettings,
+            service::ServiceBuilderExt,
+            retries::RetryLogic,
+            encoding::EncodingConfigFixed,
+            BatchConfig, Compression, TowerRequestConfig
+        }
     },
     tls::TlsSettings,
 };
-use futures::{
-    future,
-    FutureExt
-};
+use futures::FutureExt;
 use http::Uri;
 use serde::{
     Deserialize, Serialize
@@ -27,7 +26,7 @@ use std::{
 };
 use tower::ServiceBuilder;
 use super::{
-    NewRelicSinkError, NewRelicApiResponse, Encoding, NewRelicApiService, NewRelicSink
+    NewRelicSinkError, NewRelicApiResponse, Encoding, NewRelicApiService, NewRelicSink, healthcheck
 };
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy, Derivative)]
@@ -93,6 +92,11 @@ pub struct NewRelicConfig {
 
 impl_generate_config_from_default!(NewRelicConfig);
 
+impl NewRelicConfig {
+    pub fn build_healthcheck(&self, client: HttpClient) -> crate::Result<super::Healthcheck> {
+        Ok(healthcheck(client, self.api, self.region.unwrap_or(NewRelicRegion::Us)).boxed())
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "new_relic")]
@@ -111,6 +115,8 @@ impl SinkConfig for NewRelicConfig {
         let request_limits = self.request.unwrap_with(&Default::default());
         let tls_settings = TlsSettings::from_options(&None)?;
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
+
+        let healthcheck = self.build_healthcheck(client.clone())?;
 
         let service = ServiceBuilder::new()
             .settings(request_limits, NewRelicApiRetry)
@@ -131,7 +137,7 @@ impl SinkConfig for NewRelicConfig {
 
         Ok((
             super::VectorSink::Stream(Box::new(sink)),
-            future::ok(()).boxed(),
+            healthcheck
         ))
     }
 
