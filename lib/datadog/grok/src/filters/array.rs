@@ -18,13 +18,14 @@ use std::convert::TryFrom;
 use vrl_compiler::Value;
 
 pub fn filter_from_function(f: &Function) -> Result<GrokFilter, GrokStaticError> {
-    let args_len = f.args.as_ref().map_or(0, |args| args.len());
+    let args = f.args.as_ref();
+    let args_len = args.map_or(0, |args| args.len());
 
     let mut delimiter = None;
     let mut value_filter = None;
     let mut brackets = None;
     if args_len == 1 {
-        match &f.args.as_ref().unwrap()[0] {
+        match &args.unwrap()[0] {
             FunctionArgument::Arg(Value::Bytes(ref bytes)) => {
                 delimiter = Some(String::from_utf8_lossy(bytes).to_string());
             }
@@ -32,7 +33,7 @@ pub fn filter_from_function(f: &Function) -> Result<GrokFilter, GrokStaticError>
             _ => return Err(GrokStaticError::InvalidFunctionArguments(f.name.clone())),
         }
     } else if args_len == 2 {
-        match (&f.args.as_ref().unwrap()[0], &f.args.as_ref().unwrap()[1]) {
+        match (&args.unwrap()[0], &args.unwrap()[1]) {
             (
                 FunctionArgument::Arg(Value::Bytes(ref brackets_b)),
                 FunctionArgument::Arg(Value::Bytes(ref delimiter_b)),
@@ -50,11 +51,7 @@ pub fn filter_from_function(f: &Function) -> Result<GrokFilter, GrokStaticError>
             _ => return Err(GrokStaticError::InvalidFunctionArguments(f.name.clone())),
         }
     } else if args_len == 3 {
-        match (
-            &f.args.as_ref().unwrap()[0],
-            &f.args.as_ref().unwrap()[1],
-            &f.args.as_ref().unwrap()[2],
-        ) {
+        match (&args.unwrap()[0], &args.unwrap()[1], &args.unwrap()[2]) {
             (
                 FunctionArgument::Arg(Value::Bytes(ref brackets_b)),
                 FunctionArgument::Arg(Value::Bytes(ref delimiter_b)),
