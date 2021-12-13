@@ -163,6 +163,11 @@ impl Expression for Assignment {
     ) -> Result<(), String> {
         self.variant.compile_to_vm(vm, state)
     }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(&self, _: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+        todo!()
+    }
 }
 
 impl fmt::Display for Assignment {
@@ -458,6 +463,11 @@ where
             }
         }
         Ok(())
+    }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(&self, _: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+        todo!()
     }
 }
 
