@@ -1098,13 +1098,16 @@ dependencies = [
 name = "buffers"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "bytecheck",
  "bytes 1.1.0",
+ "clap",
  "core_common",
  "crc32fast",
  "criterion",
  "crossbeam-utils 0.8.5",
  "db-key",
+ "dyn-clone",
  "fslock",
  "futures 0.3.18",
  "hdrhistogram",

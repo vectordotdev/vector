@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use async_trait::async_trait;
-use tokio::sync::mpsc::channel;
+use futures::{channel::mpsc::channel, SinkExt};
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
@@ -12,18 +12,18 @@ use crate::{
     Acker, Bufferable,
 };
 
-pub struct MemoryV2Buffer {
+pub struct MemoryV1Buffer {
     capacity: usize,
 }
 
-impl MemoryV2Buffer {
+impl MemoryV1Buffer {
     pub fn new(capacity: usize) -> Self {
-        MemoryV2Buffer { capacity }
+        MemoryV1Buffer { capacity }
     }
 }
 
 #[async_trait]
-impl<T> IntoBuffer<T> for MemoryV2Buffer
+impl<T> IntoBuffer<T> for MemoryV1Buffer
 where
     T: Bufferable,
 {
@@ -40,8 +40,8 @@ where
 
         let (tx, rx) = channel(self.capacity);
         Ok((
-            SenderAdapter::channel(tx),
-            ReceiverAdapter::channel(rx),
+            SenderAdapter::opaque(tx.sink_map_err(|_| ())),
+            ReceiverAdapter::opaque(rx),
             None,
         ))
     }

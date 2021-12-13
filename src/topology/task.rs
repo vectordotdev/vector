@@ -1,4 +1,5 @@
 use crate::config::ComponentKey;
+use crate::utilization::Utilization;
 use futures::{future::BoxFuture, FutureExt};
 use pin_project::pin_project;
 use std::{
@@ -7,15 +8,16 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use vector_core::buffers::Acker;
-
-use super::EventStream;
+use vector_core::{
+    buffers::{topology::channel::BufferReceiver, Acker},
+    event::Event,
+};
 
 pub enum TaskOutput {
     Source,
     Transform,
     /// Buffer of sink
-    Sink(Pin<EventStream>, Acker),
+    Sink(Utilization<BufferReceiver<Event>>, Acker),
     Healthcheck,
 }
 

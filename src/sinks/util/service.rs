@@ -370,7 +370,7 @@ mod tests {
         };
         let settings = cfg.unwrap_with(&TowerRequestConfig::default());
 
-        let (acker, _) = Acker::new_for_testing();
+        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = {

@@ -347,16 +347,15 @@ chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-defa
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
+default = ["api", "api-client", "enrichment-tables", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
+default-cmake = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-default-musl = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
-default-no-api-client = ["api", "disk-buffer", "enrichment-tables", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
-default-no-vrl-cli = ["api", "disk-buffer", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "datadog-pipelines"]
-disk-buffer = ["vector_core/disk-buffer"]
+default-msvc = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+default-musl = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
+default-no-api-client = ["api", "enrichment-tables", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
+default-no-vrl-cli = ["api", "rdkafka-plain", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "datadog-pipelines"]
 tokio-console = ["console-subscriber", "tokio/tracing"]
 
 all-logs = ["sinks-logs", "sources-logs", "sources-dnstap", "transforms-logs"]
@@ -365,16 +364,16 @@ all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics", "datado
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
-target-aarch64-unknown-linux-gnu = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-target-aarch64-unknown-linux-musl = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-aarch64-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-aarch64-unknown-linux-musl = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
 target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
-target-x86_64-unknown-linux-gnu = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
-target-x86_64-unknown-linux-musl = ["api", "api-client", "disk-buffer", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-x86_64-unknown-linux-gnu = ["api", "api-client", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-all", "vrl-cli", "datadog-pipelines"]
+target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka-cmake", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
 # Does not currently build
-target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
 # currently doesn't build due to lack of support for 64-bit atomics
-target-powerpc-unknown-linux-gnu = ["api", "api-client", "disk-buffer", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
+target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka-cmake", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli", "datadog-pipelines"]
 
 # Enables `rdkafka` dependency.
 # This feature is more portable, but requires `cmake` as build dependency. Use it if `rdkafka-plain` doesn't work.
@@ -780,7 +779,6 @@ cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-fi
 # grouping together features for benchmarks
 # excluing API client due to running out of memory during linking in Github Actions
 benches = [
-  "disk-buffer",
   "sinks-file",
   "sinks-http",
   "sinks-socket",

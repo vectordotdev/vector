@@ -431,7 +431,7 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let (acker, ack_counter) = Acker::new_for_testing();
+        let (acker, ack_counter) = Acker::basic();
         let producer = cnf.create_pulsar_producer().await.unwrap();
         let sink = PulsarSink::new(producer, cnf.encoding, acker).unwrap();
         events.map(Ok).forward(sink).await.unwrap();

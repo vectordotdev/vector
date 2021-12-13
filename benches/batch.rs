@@ -37,7 +37,7 @@ fn benchmark_batch(c: &mut Criterion) {
             b.iter_batched(
                 || {
                     let rt = runtime();
-                    let (acker, _) = Acker::new_for_testing();
+                    let (acker, _) = Acker::basic();
                     let mut batch = BatchSettings::default();
                     batch.size.bytes = *batch_size;
                     batch.size.events = num_events;
@@ -71,7 +71,7 @@ fn benchmark_batch(c: &mut Criterion) {
                 b.iter_batched(
                     || {
                         let rt = runtime();
-                        let (acker, _) = Acker::new_for_testing();
+                        let (acker, _) = Acker::basic();
                         let mut batch = BatchSettings::default();
                         batch.size.bytes = *batch_size;
                         batch.size.events = num_events;

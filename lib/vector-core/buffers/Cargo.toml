@@ -6,15 +6,17 @@ edition = "2021"
 publish = false
 
 [dependencies]
+async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1.1.0", default-features = false }
 bytecheck = { version = "0.6.5", default-features = false, features = ["std"] }
 crc32fast = { version = "1.2.1", default-features = false, features = ["std"] }
 crossbeam-utils = { version = "0.8.5", default-features = false }
-db-key = { version = "0.0.5", default-features = false, optional = true }
+db-key = { version = "0.0.5", default-features = false }
+dyn-clone = { version = "1.0.4", default-features = false }
 fslock = { version = "0.2.0", default-features = false, features = ["std"] }
 futures = { version = "0.3.17", default-features = false, features = ["std"] }
 core_common = { path = "../core-common", default-features = false }
-leveldb = { version = "0.8.6", default-features = false, optional = true }
+leveldb = { version = "0.8.6", default-features = false  }
 metrics = { version = "0.17.0", default-features = false, features = ["std"] }
 memmap2 = { version = "0.5.0", default-features = false }
 parking_lot = { version = "0.11.2", default-features = false }
@@ -28,7 +30,8 @@ tokio-util = { version = "0.6", default-features = false }
 tracing = { version = "0.1.29", default-features = false }
 
 [dev-dependencies]
-criterion = { version = "0.3", features = ["html_reports"] }
+clap = "2.34.0"
+criterion = { version = "0.3", features = ["html_reports", "async_tokio"] }
 hdrhistogram = "7.3.0"
 lading_common = { git = "https://github.com/blt/lading", branch = "main" }
 pretty_assertions = "1.0.0"
@@ -47,27 +50,9 @@ tracing-fluent-assertions = "0.1.3"
 tracing-subscriber = { version = "0.2.25" }
 human_bytes = "0.3.0"
 
-[features]
-disk-buffer = ["db-key", "leveldb"]
-helpers = []
-
 [[bench]]
-name = "on_disk"
-harness = false
-required-features = ["disk-buffer"]
-
-[[bench]]
-name = "in_memory"
-harness = false
-
-[[bench]]
-name = "in_memory_v2"
+name = "sized_records"
 harness = false
 
 [[example]]
-name = "disk_v1"
-required-features = ["disk-buffer", "helpers"]
-
-[[example]]
-name = "disk_v2"
-required-features = ["helpers"]
+name = "buffer_perf"

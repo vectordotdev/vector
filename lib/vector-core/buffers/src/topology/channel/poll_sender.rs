@@ -13,7 +13,7 @@ use tokio_util::sync::ReusableBoxFuture;
 
 /// Error returned by `PollSender<T>` when the channel is closed.
 #[derive(Debug)]
-pub struct PollSendError<T>(Option<T>);
+pub struct PollSendError<T>(pub(crate) Option<T>);
 
 impl<T> PollSendError<T> {
     /// Consumes the stored value, if any.

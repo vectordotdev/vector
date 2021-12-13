@@ -97,7 +97,7 @@ async fn file_id_wraps_around_when_max_file_id_hit() {
                 let record_read = reader.next().await.expect("read should not fail");
                 assert_eq!(record_read, Some(record));
 
-                acker.acknowledge_records(1);
+                acker.ack(1);
 
                 let expected_file_id = u16::try_from(id % u32::from(file_id_upper))
                     .expect("should never be greater than u16");
@@ -221,7 +221,7 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
             assert_buffer_size!(ledger, 32, total_size);
             assert_reader_writer_file_positions!(ledger, 0, 31);
 
-            acker.acknowledge_records(1);
+            acker.ack(1);
 
             // Our write should still not yet be ready because we won't have acknowledged the
             // read until we call `next` one more time, which will not only acknowledge the write,
@@ -327,14 +327,14 @@ async fn reader_still_works_when_record_id_wraps_around() {
             assert_eq!(u64::MAX, ledger.state().get_last_reader_record_id());
             assert_buffer_records!(ledger, 2);
 
-            acker.acknowledge_records(1);
+            acker.ack(1);
 
             let second_record_read = reader.next().await.expect("read should not fail");
             assert_eq!(second_record_read, Some(SizedRecord(second_record_size)));
             assert_eq!(0, ledger.state().get_last_reader_record_id());
             assert_buffer_records!(ledger, 1);
 
-            acker.acknowledge_records(1);
+            acker.ack(1);
 
             let final_read = reader.next().await.expect("read should not fail");
             assert_eq!(final_read, None);

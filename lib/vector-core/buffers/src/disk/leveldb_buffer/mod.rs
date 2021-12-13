@@ -1,9 +1,12 @@
+mod acknowledgements;
 mod key;
 mod reader;
 mod writer;
 
+use self::acknowledgements::create_disk_v1_acker;
+
 use super::{DataDirError, Open};
-use crate::buffer_usage_data::BufferUsageData;
+use crate::buffer_usage_data::BufferUsageHandle;
 use crate::{Acker, Bufferable};
 use futures::task::AtomicWaker;
 use key::Key;
@@ -77,7 +80,7 @@ where
     pub fn build(
         path: &Path,
         max_size: usize,
-        buffer_usage_data: Arc<BufferUsageData>,
+        usage_handle: BufferUsageHandle,
     ) -> Result<(Writer<T>, Reader<T>, Acker), DataDirError> {
         // New `max_size` of the buffer is used for storing the unacked events.
         // The rest is used as a buffer which when filled triggers compaction.
@@ -85,7 +88,7 @@ where
         let max_size = max_size - max_uncompacted_size;
 
         let (initial_byte_size, initial_item_size) = db_initial_size(path)?;
-        buffer_usage_data
+        usage_handle
             .increment_received_event_count_and_byte_size(initial_item_size, initial_byte_size);
 
         let mut options = Options::new();
@@ -112,7 +115,7 @@ where
         let blocked_write_tasks = Arc::new(Mutex::new(Vec::new()));
 
         let ack_counter = Arc::new(AtomicUsize::new(0));
-        let acker = Acker::Disk(Arc::clone(&ack_counter), Arc::clone(&write_notifier));
+        let acker = create_disk_v1_acker(&ack_counter, &write_notifier);
 
         let writer = Writer {
             db: Some(Arc::clone(&db)),
@@ -124,7 +127,7 @@ where
             max_size,
             current_size: Arc::clone(&current_size),
             slot: None,
-            buffer_usage_data: buffer_usage_data.clone(),
+            usage_handle: usage_handle.clone(),
         };
 
         let mut reader = Reader {
@@ -143,8 +146,8 @@ where
             buffer: VecDeque::new(),
             last_compaction: Instant::now(),
             pending_read: None,
+            usage_handle,
             phantom: PhantomData,
-            buffer_usage_data,
         };
         // Compact on every start
         reader.compact();

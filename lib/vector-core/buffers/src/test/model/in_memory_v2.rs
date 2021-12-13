@@ -1,58 +1,50 @@
+use crate::test::common::Variant;
 use crate::test::model::{Message, Model};
-use crate::{EncodeBytes, Variant, WhenFull};
+use crate::WhenFull;
 use std::collections::VecDeque;
 
 use super::Progress;
 
-/// `OnDisk` is the `Model` for on-disk buffer
-#[cfg(feature = "disk-buffer")]
-pub(crate) struct OnDisk {
+/// `InMemory` is the `Model` for in-memory v2 buffers, based on `tokio`.
+pub(crate) struct InMemoryV2 {
     inner: VecDeque<Message>,
     when_full: WhenFull,
-    current_bytes: usize,
     capacity: usize,
 }
 
-#[cfg(feature = "disk-buffer")]
-impl OnDisk {
+impl InMemoryV2 {
     pub(crate) fn new(variant: &Variant) -> Self {
         match variant {
-            Variant::Memory { .. } => unreachable!(),
-            #[cfg(feature = "disk-buffer")]
-            Variant::Disk {
-                max_size,
+            Variant::MemoryV2 {
+                max_events,
                 when_full,
                 ..
-            } => OnDisk {
-                inner: VecDeque::with_capacity(*max_size),
-                current_bytes: 0,
-                capacity: *max_size,
+            } => InMemoryV2 {
+                inner: VecDeque::with_capacity(*max_events),
+                capacity: *max_events,
                 when_full: *when_full,
             },
+            _ => unreachable!(),
         }
     }
 }
 
-#[cfg(feature = "disk-buffer")]
-impl Model for OnDisk {
+impl Model for InMemoryV2 {
     fn send(&mut self, item: Message) -> Progress {
-        let byte_size = EncodeBytes::encoded_size(&item).unwrap();
         match self.when_full {
             WhenFull::DropNewest => {
-                if self.is_full() {
+                if self.inner.len() >= self.capacity {
                     // DropNewest never blocks, instead it silently drops the
                     // item pushed in when the buffer is too full.
                 } else {
-                    self.current_bytes += byte_size;
                     self.inner.push_back(item);
                 }
                 Progress::Advanced
             }
             WhenFull::Block | WhenFull::Overflow => {
-                if self.is_full() {
+                if self.inner.len() >= self.capacity {
                     Progress::Blocked(item)
                 } else {
-                    self.current_bytes += byte_size;
                     self.inner.push_back(item);
                     Progress::Advanced
                 }
@@ -61,18 +53,14 @@ impl Model for OnDisk {
     }
 
     fn recv(&mut self) -> Option<Message> {
-        self.inner.pop_front().map(|msg| {
-            let byte_size = EncodeBytes::encoded_size(&msg).unwrap();
-            self.current_bytes -= byte_size;
-            msg
-        })
+        self.inner.pop_front()
     }
 
     fn is_full(&self) -> bool {
-        self.current_bytes >= self.capacity
+        self.inner.len() >= self.capacity
     }
 
     fn is_empty(&self) -> bool {
-        self.current_bytes == 0
+        self.inner.is_empty()
     }
 }

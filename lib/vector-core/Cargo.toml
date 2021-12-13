@@ -76,7 +76,6 @@ rand_distr = "0.4.2"
 [features]
 api = ["async-graphql"]
 default = []
-disk-buffer = ["buffers/disk-buffer"]
 lua = ["mlua", "tokio-stream"]
 vrl = ["vrl-core", "enrichment"]
 test = ["core_common/test"]
