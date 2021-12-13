@@ -1909,6 +1909,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "dashmap"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b799062aaf67eb976af3bdca031ee6f846d2f0a5710ddbb0d2efee33f3cc4760"
+dependencies = [
+ "cfg-if 1.0.0",
+ "num_cpus",
+ "parking_lot",
+]
+
+[[package]]
 name = "data-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2445,7 +2456,7 @@ dependencies = [
  "chrono",
  "crc",
  "criterion",
- "dashmap",
+ "dashmap 5.0.0",
  "flate2",
  "futures 0.3.18",
  "glob",
@@ -2826,7 +2837,7 @@ version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06c5d2f987ee8f6dff3fa1a352058dc59b990e447e4c7846aa7d804971314f7b"
 dependencies = [
- "dashmap",
+ "dashmap 4.0.2",
  "futures 0.3.18",
  "futures-timer",
  "no-std-compat",
@@ -4093,7 +4104,7 @@ dependencies = [
  "atomic-shim",
  "crossbeam-epoch 0.9.5",
  "crossbeam-utils 0.8.5",
- "dashmap",
+ "dashmap 4.0.2",
  "hashbrown 0.11.2",
  "indexmap",
  "metrics",
@@ -7934,7 +7945,7 @@ version = "0.1.0"
 dependencies = [
  "ansi_term",
  "criterion",
- "dashmap",
+ "dashmap 5.0.0",
  "mock_instant",
  "tracing 0.1.29",
  "tracing-core 0.1.21",
@@ -8368,7 +8379,7 @@ dependencies = [
  "criterion",
  "crossterm 0.21.0",
  "csv",
- "dashmap",
+ "dashmap 5.0.0",
  "data-encoding",
  "datadog-filter",
  "datadog-filter-test",
