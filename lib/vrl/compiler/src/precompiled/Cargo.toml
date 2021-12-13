@@ -1,0 +1,14 @@
+[package]
+name = "precompiled"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+vrl-compiler = { path = "../..", default-features = false }
+shared = { path = "../../../../shared" }
+lookup = { path = "../../../../lookup" }
+
+[workspace]
