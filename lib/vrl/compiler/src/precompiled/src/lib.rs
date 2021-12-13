@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use vrl_core::{
-    Context, Error, ExpressionError, Kind, LookupBuf, Resolved, Span, Value, VrlValueArithmetic,
+    Context, Error, ExpressionError, Kind, LookupBuf, Resolved, Span, Target, Value,
+    VrlValueArithmetic,
 };
 
 // We only want to precompile the stub for this function, and therefore don't
@@ -208,4 +209,29 @@ pub extern "C" fn vrl_expression_op_eq_impl(rhs: &mut Resolved, result: &mut Res
             *result = Err(error);
         }
     }
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_expression_query_target_external_impl(
+    context: &mut Context,
+    path: &LookupBuf,
+    result: &mut Resolved,
+) {
+    *result = Ok(context
+        .target
+        .target_get(path)
+        .ok()
+        .flatten()
+        .unwrap_or(Value::Null));
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_expression_query_target_impl(path: &LookupBuf, result: &mut Resolved) {
+    *result = Ok(result
+        .as_ref()
+        .expect("VRL result must not contain an error")
+        .target_get(path)
+        .ok()
+        .flatten()
+        .unwrap_or(Value::Null));
 }
