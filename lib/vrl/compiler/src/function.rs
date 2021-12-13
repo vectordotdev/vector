@@ -322,6 +322,27 @@ pub enum Error {
         value: Value,
         error: &'static str,
     },
+
+    #[error(r#"{message}"#)]
+    CompilationError {
+        message: String,
+        primaries: Vec<(String, Option<Span>)>,
+        contexts: Vec<(String, Option<Span>)>,
+    },
+}
+
+impl Error {
+    pub fn new(
+        message: impl Into<String>,
+        primaries: Vec<(String, Option<Span>)>,
+        contexts: Vec<(String, Option<Span>)>,
+    ) -> Self {
+        Self::CompilationError {
+            message: message.into(),
+            primaries,
+            contexts,
+        }
+    }
 }
 
 impl diagnostic::DiagnosticError for Error {
@@ -333,6 +354,7 @@ impl diagnostic::DiagnosticError for Error {
             InvalidEnumVariant { .. } => 401,
             ExpectedStaticExpression { .. } => 402,
             InvalidArgument { .. } => 403,
+            CompilationError { .. } => 404,
         }
     }
 
@@ -396,6 +418,24 @@ impl diagnostic::DiagnosticError for Error {
                 Label::context(format!("received: {}", value.to_string()), Span::default()),
                 Label::context(format!("error: {}", error), Span::default()),
             ],
+
+            CompilationError {
+                primaries,
+                contexts,
+                ..
+            } => {
+                let mut labels = vec![];
+
+                for (msg, span) in primaries {
+                    labels.push(Label::primary(msg.to_owned(), span.unwrap_or_default()))
+                }
+
+                for (msg, span) in contexts {
+                    labels.push(Label::context(msg.to_owned(), span.unwrap_or_default()))
+                }
+
+                labels
+            }
         }
     }
 
