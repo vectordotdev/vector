@@ -81,8 +81,26 @@ impl Expression for Variable {
     }
 
     #[cfg(feature = "llvm")]
-    fn emit_llvm<'ctx>(&self, _: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
-        todo!()
+    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+        let function = ctx.function();
+        let variable_begin_block = ctx.context().append_basic_block(function, "variable_begin");
+        ctx.builder()
+            .build_unconditional_branch(variable_begin_block);
+        ctx.builder().position_at_end(variable_begin_block);
+
+        let fn_ident = "vrl_expression_variable_impl";
+        let fn_impl = ctx
+            .module()
+            .get_function(fn_ident)
+            .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+        let variable_ref = ctx.get_variable_ref(&self.ident);
+        ctx.builder().build_call(
+            fn_impl,
+            &[variable_ref.into(), ctx.result_ref().into()],
+            fn_ident,
+        );
+
+        Ok(())
     }
 }
 

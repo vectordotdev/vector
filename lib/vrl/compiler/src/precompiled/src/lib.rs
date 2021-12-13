@@ -235,3 +235,8 @@ pub extern "C" fn vrl_expression_query_target_impl(path: &LookupBuf, result: &mu
         .flatten()
         .unwrap_or(Value::Null));
 }
+
+#[no_mangle]
+pub extern "C" fn vrl_expression_variable_impl(value: &Resolved, target: &mut Resolved) {
+    *target = value.clone()
+}
