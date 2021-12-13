@@ -1,4 +1,4 @@
-# HTTP -> Pipelines (no processing) -> Blackhole
+# HTTP -> Pipelines (no grok parsing) -> Blackhole
 
 This soak tests the http source feeding through multiple filter transforms
 each containing a Datadog Search Syntax condition.
