@@ -1,0 +1,19 @@
+name: Docker build
+
+on: [pull_request]
+
+jobs:
+  build-gnu:
+    runs-on: ubuntu-latest
+    steps:
+      - name: setup Qemu
+        uses: docker/setup-qemu-action@v1
+      - name: setup docker buildx
+        uses: docker/setup-buildx-action@v1
+      - name: build multi platform image
+        uses: docker/build-push-action@v2
+        with:
+          file: scripts/docker/gnu.Dockerfile
+          push: false
+          tags: timberio/vector:canary
+          platforms: linux/amd64
