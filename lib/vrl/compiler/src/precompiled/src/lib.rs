@@ -208,3 +208,16 @@ pub extern "C" fn vrl_expression_query_target_impl(path: &LookupBuf, result: &mu
         .flatten()
         .unwrap_or(Value::Null));
 }
+
+#[no_mangle]
+pub extern "C" fn vrl_expression_variable_impl(
+    context: &mut Context,
+    ident: &Ident,
+    result: &mut Resolved,
+) {
+    *result = Ok(context
+        .state()
+        .variable(ident)
+        .cloned()
+        .unwrap_or(Value::Null));
+}
