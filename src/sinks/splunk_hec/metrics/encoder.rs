@@ -2,7 +2,7 @@ use serde::Serialize;
 use std::{collections::BTreeMap, io, iter};
 
 use crate::{
-    internal_events::{SplunkEventEncodeError, SplunkEventSent},
+    internal_events::SplunkEventEncodeError,
     sinks::util::encoding::{Encoder, EncodingConfiguration},
 };
 
@@ -82,12 +82,7 @@ impl HecMetricsEncoder {
         hec_data.sourcetype = metadata.sourcetype;
 
         match serde_json::to_vec(&hec_data) {
-            Ok(value) => {
-                emit!(&SplunkEventSent {
-                    byte_size: value.len()
-                });
-                Some(value)
-            }
+            Ok(value) => Some(value),
             Err(error) => {
                 emit!(&SplunkEventEncodeError { error });
                 None
