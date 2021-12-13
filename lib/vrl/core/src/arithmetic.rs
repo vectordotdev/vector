@@ -1,11 +1,9 @@
 use std::collections::BTreeMap;
 
 use bytes::{BufMut, Bytes, BytesMut};
-use value::Value;
+use value::{Kind, Value};
 
-use super::Error;
-use crate::value::{Kind, VrlValueConvert};
-use crate::ExpressionError;
+use crate::{Error, ExpressionError, VrlValueConvert};
 
 pub trait VrlValueArithmetic: Sized {
     /// Similar to [`std::ops::Mul`], but fallible (e.g. `TryMul`).

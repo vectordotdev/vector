@@ -18,7 +18,11 @@ pub struct Not {
 }
 
 impl Not {
-    pub fn new(node: Node<Expr>, not_span: Span, state: (&LocalEnv, &ExternalEnv)) -> Result<Not, Error> {
+    pub fn new(
+        node: Node<Expr>,
+        not_span: Span,
+        state: (&LocalEnv, &ExternalEnv),
+    ) -> Result<Not, Error> {
         let (expr_span, expr) = node.take();
         let type_def = expr.type_def(state);
 

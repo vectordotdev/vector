@@ -1,10 +1,47 @@
-mod arithmetic;
-mod convert;
-pub mod kind;
+pub use crate::kind;
+use crate::{
+    expression::{Container, Expr, Variant},
+    Expression,
+};
+pub use crate::{
+    kind::{Collection, Field, Index, Kind},
+    Error,
+};
+pub use core::{VrlValueArithmetic, VrlValueConvert};
+pub use value::{value::IterItem, Value};
 
-pub use crate::Error;
-pub use kind::{Collection, Field, Index, Kind};
-pub use value::value::IterItem;
+/// Convert a given [`Value`] into a [`Expression`] trait object.
+pub fn value_into_expression(value: Value) -> Box<dyn Expression> {
+    Box::new(Expr::from(value))
+}
 
-pub use self::arithmetic::VrlValueArithmetic;
-pub use self::convert::VrlValueConvert;
+/// Converts from an `Expr` into a `Value`. This is only possible if the expression represents
+/// static values - `Literal`s and `Container`s containing `Literal`s.
+/// The error returns the expression back so it can be used in the error report.
+impl TryFrom<Expr> for Value {
+    type Error = Expr;
+
+    fn try_from(expr: Expr) -> Result<Self, Self::Error> {
+        match expr {
+            #[cfg(feature = "expr-literal")]
+            Expr::Literal(literal) => Ok(literal.to_value()),
+            Expr::Container(Container {
+                variant: Variant::Object(object),
+            }) => Ok(Value::Object(
+                object
+                    .iter()
+                    .map(|(key, value)| Ok((key.clone(), value.clone().try_into()?)))
+                    .collect::<Result<_, Self::Error>>()?,
+            )),
+            Expr::Container(Container {
+                variant: Variant::Array(array),
+            }) => Ok(Value::Array(
+                array
+                    .iter()
+                    .map(|value| value.clone().try_into())
+                    .collect::<Result<_, _>>()?,
+            )),
+            expr => Err(expr),
+        }
+    }
+}

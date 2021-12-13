@@ -17,7 +17,10 @@ pub struct Predicate {
 }
 
 impl Predicate {
-    pub fn new(node: Node<Vec<Expr>>, state: (&LocalEnv, &ExternalEnv)) -> Result<Predicate, Error> {
+    pub fn new(
+        node: Node<Vec<Expr>>,
+        state: (&LocalEnv, &ExternalEnv),
+    ) -> Result<Predicate, Error> {
         let (span, exprs) = node.take();
         let type_def = exprs
             .last()

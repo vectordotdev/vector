@@ -5,7 +5,7 @@
 macro_rules! expr {
     ($($v:tt)*) => {{
         let value = $crate::value!($($v)*);
-        $crate::value::VrlValueConvert::into_expression(value)
+        $crate::value::value_into_expression(value)
     }};
 }
 

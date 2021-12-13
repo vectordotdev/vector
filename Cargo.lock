@@ -9126,6 +9126,8 @@ dependencies = [
 name = "vrl-core"
 version = "0.1.0"
 dependencies = [
+ "bytes 1.1.0",
+ "chrono",
  "lookup",
  "thiserror",
  "value",

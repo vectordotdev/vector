@@ -1,18 +1,10 @@
 use std::{borrow::Cow, collections::BTreeMap};
 
+use crate::{kind::Collection, Error, Kind, Value, ValueRegex};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
-use value::kind::Collection;
-use value::{Value, ValueRegex};
-
-use crate::expression::{Container, Variant};
-use crate::value::{Error, Kind};
-use crate::{expression::Expr, Expression};
 
 pub trait VrlValueConvert: Sized {
-    /// Convert a given [`Value`] into a [`Expression`] trait object.
-    fn into_expression(self) -> Box<dyn Expression>;
-
     fn try_integer(self) -> Result<i64, Error>;
     fn try_float(self) -> Result<f64, Error>;
     fn try_bytes(self) -> Result<Bytes, Error>;
@@ -30,11 +22,6 @@ pub trait VrlValueConvert: Sized {
 }
 
 impl VrlValueConvert for Value {
-    /// Convert a given [`Value`] into a [`Expression`] trait object.
-    fn into_expression(self) -> Box<dyn Expression> {
-        Box::new(Expr::from(self))
-    }
-
     fn try_integer(self) -> Result<i64, Error> {
         match self {
             Value::Integer(v) => Ok(v),
@@ -148,37 +135,6 @@ impl VrlValueConvert for Value {
                 got: self.kind(),
                 expected: Kind::timestamp(),
             }),
-        }
-    }
-}
-
-/// Converts from an `Expr` into a `Value`. This is only possible if the expression represents
-/// static values - `Literal`s and `Container`s containing `Literal`s.
-/// The error returns the expression back so it can be used in the error report.
-impl TryFrom<Expr> for Value {
-    type Error = Expr;
-
-    fn try_from(expr: Expr) -> Result<Self, Self::Error> {
-        match expr {
-            #[cfg(feature = "expr-literal")]
-            Expr::Literal(literal) => Ok(literal.to_value()),
-            Expr::Container(Container {
-                variant: Variant::Object(object),
-            }) => Ok(Value::Object(
-                object
-                    .iter()
-                    .map(|(key, value)| Ok((key.clone(), value.clone().try_into()?)))
-                    .collect::<Result<_, Self::Error>>()?,
-            )),
-            Expr::Container(Container {
-                variant: Variant::Array(array),
-            }) => Ok(Value::Array(
-                array
-                    .iter()
-                    .map(|value| value.clone().try_into())
-                    .collect::<Result<_, _>>()?,
-            )),
-            expr => Err(expr),
         }
     }
 }

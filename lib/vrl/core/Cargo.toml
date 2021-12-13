@@ -6,6 +6,8 @@ edition = "2021"
 publish = false
 
 [dependencies]
+bytes = "1"
+chrono = "0.4"
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 lookup = { path = "../../lookup" }
 thiserror = "1"

@@ -318,22 +318,19 @@ impl Target {
 
                 // Get the provided path, or else insert into the variable
                 // without any path appended and return early.
-                let path = match path {
-                    Some(path) => path,
-                    None => {
-                        let fn_ident = "vrl_expression_assignment_target_insert_internal_impl";
-                        let fn_impl = ctx
-                            .module()
-                            .get_function(fn_ident)
-                            .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-                        ctx.builder().build_call(
-                            fn_impl,
-                            &[ctx.result_ref().into(), variable_ref.into()],
-                            fn_ident,
-                        );
-                        return Ok(());
-                    }
-                };
+                if path.is_root() {
+                    let fn_ident = "vrl_expression_assignment_target_insert_internal_impl";
+                    let fn_impl = ctx
+                        .module()
+                        .get_function(fn_ident)
+                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                    ctx.builder().build_call(
+                        fn_impl,
+                        &[ctx.result_ref().into(), variable_ref.into()],
+                        fn_ident,
+                    );
+                    return Ok(());
+                }
 
                 // Update existing variable using the provided path, or create a
                 // new value in the store.
@@ -365,8 +362,7 @@ impl Target {
                 Ok(())
             }
             Target::External(path) => {
-                let path_ref =
-                    ctx.into_lookup_buf_const_ref(path.clone().unwrap_or_else(LookupBuf::root));
+                let path_ref = ctx.into_lookup_buf_const_ref(path.clone());
 
                 let fn_ident = "vrl_expression_assignment_target_insert_external_impl";
                 let fn_impl = ctx
