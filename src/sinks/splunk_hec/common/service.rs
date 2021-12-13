@@ -4,12 +4,13 @@ use crate::{
     internal_events::{SplunkIndexerAcknowledgementUnavailableError, SplunkResponseParseError},
     sinks::{
         splunk_hec::common::{build_uri, request::HecRequest, response::HecResponse},
-        util::{http::HttpBatchService, Compression},
+        util::Compression,
         UriParseError,
     },
 };
+use bytes::Bytes;
 use futures_util::{future::BoxFuture, ready};
-use http::Request;
+use http::{Request, Response};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::{
@@ -21,13 +22,12 @@ use tokio::sync::{
     oneshot, OwnedSemaphorePermit, Semaphore,
 };
 use tokio_util::sync::PollSemaphore;
-use tower::{Service, ServiceExt};
+use tower::{util::BoxService, Service};
 use uuid::Uuid;
 use vector_core::event::EventStatus;
 
 pub struct HecService {
-    pub batch_service:
-        HttpBatchService<BoxFuture<'static, Result<Request<Vec<u8>>, crate::Error>>, HecRequest>,
+    pub inner: BoxService<HecRequest, Response<Bytes>, crate::Error>,
     ack_finalizer_tx: Option<mpsc::Sender<(u64, oneshot::Sender<EventStatus>)>>,
     ack_slots: PollSemaphore,
     current_ack_slot: Option<OwnedSemaphorePermit>,
@@ -41,16 +41,14 @@ struct HecAckResponseBody {
 
 impl HecService {
     pub fn new(
-        client: HttpClient,
-        http_request_builder: HttpRequestBuilder,
+        inner: BoxService<HecRequest, Response<Bytes>, crate::Error>,
+        ack_client: Option<HttpClient>,
+        http_request_builder: Arc<HttpRequestBuilder>,
         indexer_acknowledgements: HecClientAcknowledgementsConfig,
     ) -> Self {
-        let event_client = client.clone();
-        let ack_client = client;
-        let http_request_builder = Arc::new(http_request_builder);
         let max_pending_acks = indexer_acknowledgements.max_pending_acks.get();
-        let tx = if indexer_acknowledgements.indexer_acknowledgements_enabled {
-            let (tx, rx) = mpsc::channel(indexer_acknowledgements.max_pending_acks.get() as usize);
+        let tx = if let Some(ack_client) = ack_client {
+            let (tx, rx) = mpsc::channel(max_pending_acks as usize);
             tokio::spawn(run_acknowledgements(
                 rx,
                 ack_client,
@@ -62,34 +60,11 @@ impl HecService {
             None
         };
 
-        let batch_service = HttpBatchService::new(event_client, move |req: HecRequest| {
-            let request_builder = Arc::clone(&http_request_builder);
-            let future: BoxFuture<'static, Result<http::Request<Vec<u8>>, crate::Error>> =
-                Box::pin(async move {
-                    request_builder.build_request(
-                        req.body,
-                        "/services/collector/event",
-                        req.passthrough_token,
-                    )
-                });
-            future
-        });
         let ack_slots = PollSemaphore::new(Arc::new(Semaphore::new(max_pending_acks as usize)));
         Self {
-            batch_service,
+            inner,
             ack_finalizer_tx: tx,
             ack_slots,
-            current_ack_slot: None,
-        }
-    }
-}
-
-impl Clone for HecService {
-    fn clone(&self) -> Self {
-        Self {
-            batch_service: self.batch_service.clone(),
-            ack_finalizer_tx: self.ack_finalizer_tx.clone(),
-            ack_slots: self.ack_slots.clone(),
             current_ack_slot: None,
         }
     }
@@ -104,12 +79,12 @@ impl Service<HecRequest> for HecService {
         // Ready if indexer acknowledgements is disabled or there is room for
         // additional pending acks. Otherwise, wait until there is room.
         if self.ack_finalizer_tx.is_none() || self.current_ack_slot.is_some() {
-            Poll::Ready(Ok(()))
+            self.inner.poll_ready(cx)
         } else {
             match ready!(self.ack_slots.poll_acquire(cx)) {
                 Some(permit) => {
                     self.current_ack_slot.replace(permit);
-                    Poll::Ready(Ok(()))
+                    self.inner.poll_ready(cx)
                 }
                 None => Poll::Ready(Err(
                     "Indexer acknowledgements semaphore unexpectedly closed".into(),
@@ -119,15 +94,15 @@ impl Service<HecRequest> for HecService {
     }
 
     fn call(&mut self, req: HecRequest) -> Self::Future {
-        let mut http_service = self.batch_service.clone();
         let ack_finalizer_tx = self.ack_finalizer_tx.clone();
         let ack_slot = self.current_ack_slot.take();
 
+        let events_count = req.events_count;
+        let events_byte_size = req.events_byte_size;
+        let response = self.inner.call(req);
+
         Box::pin(async move {
-            http_service.ready().await?;
-            let events_count = req.events_count;
-            let events_byte_size = req.events_byte_size;
-            let response = http_service.call(req).await?;
+            let response = response.await?;
             let event_status = if response.status().is_success() {
                 if let Some(ack_finalizer_tx) = ack_finalizer_tx {
                     let _ack_slot = ack_slot.expect("poll_ready not called before invoking call");
@@ -228,10 +203,13 @@ mod tests {
     use std::{
         collections::HashMap,
         num::{NonZeroU64, NonZeroU8},
-        sync::atomic::{AtomicU64, Ordering},
+        sync::{
+            atomic::{AtomicU64, Ordering},
+            Arc,
+        },
         task::Poll,
     };
-    use tower::{Service, ServiceExt};
+    use tower::{util::BoxService, Service, ServiceExt};
     use vector_core::{
         config::proxy::ProxyConfig,
         event::{EventFinalizers, EventStatus},
@@ -248,6 +226,7 @@ mod tests {
                 acknowledgements::{
                     HecAckStatusRequest, HecAckStatusResponse, HecClientAcknowledgementsConfig,
                 },
+                build_http_batch_service,
                 request::HecRequest,
                 service::{HecAckResponseBody, HecService, HttpRequestBuilder},
             },
@@ -263,9 +242,19 @@ mod tests {
         acknowledgements_config: HecClientAcknowledgementsConfig,
     ) -> HecService {
         let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
-        let http_request_builder =
-            HttpRequestBuilder::new(endpoint, String::from(TOKEN), Compression::default());
-        HecService::new(client, http_request_builder, acknowledgements_config)
+        let http_request_builder = Arc::new(HttpRequestBuilder::new(
+            endpoint,
+            String::from(TOKEN),
+            Compression::default(),
+        ));
+        let http_service =
+            build_http_batch_service(client.clone(), Arc::clone(&http_request_builder));
+        HecService::new(
+            BoxService::new(http_service),
+            Some(client),
+            http_request_builder,
+            acknowledgements_config,
+        )
     }
 
     fn get_hec_request() -> HecRequest {

@@ -1,15 +1,22 @@
 use crate::{
     http::HttpClient,
     internal_events::TemplateRenderingFailed,
-    sinks::{self, util::SinkBatchSettings, UriParseError},
+    sinks::{
+        self,
+        util::{http::HttpBatchService, SinkBatchSettings},
+        UriParseError,
+    },
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
+use futures_util::future::BoxFuture;
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use snafu::{ResultExt, Snafu};
-use std::num::NonZeroU64;
+use std::{num::NonZeroU64, sync::Arc};
 use vector_core::{config::proxy::ProxyConfig, event::EventRef};
+
+use super::{request::HecRequest, service::HttpRequestBuilder};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SplunkHecDefaultBatchSettings;
@@ -34,6 +41,24 @@ pub fn create_client(
 ) -> crate::Result<HttpClient> {
     let tls_settings = TlsSettings::from_options(tls)?;
     Ok(HttpClient::new(tls_settings, proxy_config)?)
+}
+
+pub fn build_http_batch_service(
+    client: HttpClient,
+    http_request_builder: Arc<HttpRequestBuilder>,
+) -> HttpBatchService<BoxFuture<'static, Result<Request<Vec<u8>>, crate::Error>>, HecRequest> {
+    HttpBatchService::new(client, move |req: HecRequest| {
+        let request_builder = Arc::clone(&http_request_builder);
+        let future: BoxFuture<'static, Result<http::Request<Vec<u8>>, crate::Error>> =
+            Box::pin(async move {
+                request_builder.build_request(
+                    req.body,
+                    "/services/collector/event",
+                    req.passthrough_token,
+                )
+            });
+        future
+    })
 }
 
 pub async fn build_healthcheck(

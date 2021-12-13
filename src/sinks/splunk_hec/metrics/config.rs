@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use super::{request_builder::HecMetricsRequestBuilder, sink::HecMetricsSink};
 use crate::{
     config::{GenerateConfig, SinkConfig, SinkContext},
@@ -5,12 +7,13 @@ use crate::{
     sinks::{
         splunk_hec::common::{
             acknowledgements::HecClientAcknowledgementsConfig,
-            build_healthcheck, create_client, host_key,
-            retry::HecRetryLogic,
+            build_healthcheck, build_http_batch_service, create_client, host_key,
             service::{HecService, HttpRequestBuilder},
             SplunkHecDefaultBatchSettings,
         },
-        util::{BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig},
+        util::{
+            http::HttpRetryLogic, BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig,
+        },
         Healthcheck,
     },
     template::Template,
@@ -96,25 +99,38 @@ impl HecMetricsSinkConfig {
         client: HttpClient,
         cx: SinkContext,
     ) -> crate::Result<VectorSink> {
+        let ack_client = if self.acknowledgements.indexer_acknowledgements_enabled {
+            Some(client.clone())
+        } else {
+            None
+        };
+
         let request_builder = HecMetricsRequestBuilder {
             compression: self.compression,
         };
 
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-        let http_request_builder = HttpRequestBuilder::new(
+        let http_request_builder = Arc::new(HttpRequestBuilder::new(
             self.endpoint.clone(),
             self.default_token.clone(),
             self.compression,
-        );
-        let service = ServiceBuilder::new()
-            .settings(request_settings, HecRetryLogic)
-            .service(HecService::new(
+        ));
+        let http_service = ServiceBuilder::new()
+            .settings(request_settings, HttpRetryLogic)
+            .service(build_http_batch_service(
                 client,
-                http_request_builder,
-                self.acknowledgements.clone(),
+                Arc::clone(&http_request_builder),
             ));
 
+        let service = HecService::new(
+            http_service,
+            ack_client,
+            http_request_builder,
+            self.acknowledgements.clone(),
+        );
+
         let batch_settings = self.batch.into_batcher_settings()?;
+
         let sink = HecMetricsSink {
             context: cx,
             service,
