@@ -103,3 +103,8 @@ pub extern "C" fn vrl_expression_assignment_target_insert_external_impl(
         .expect("assignment value must not contain an error");
     let _ = ctx.target.target_insert(path, value.clone());
 }
+
+#[no_mangle]
+pub extern "C" fn vrl_expression_literal_impl(value: &Value, result: &mut Resolved) {
+    *result = Ok(value.clone());
+}
