@@ -167,7 +167,7 @@ tower-layer = { version = "0.3.1", default-features = false }
 serde = { version = "1.0.131", default-features = false, features = ["derive"] }
 serde_bytes = { version = "0.11.5", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.68", default-features = false, features = ["raw_value"] }
-serde_yaml = { version = "0.8.21", default-features = false }
+serde_yaml = { version = "0.8.23", default-features = false }
 serde_with = { version = "1.11.0", default-features = false, features = ["macros"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 
