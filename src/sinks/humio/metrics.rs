@@ -92,6 +92,7 @@ impl SinkConfig for HumioMetricsConfig {
             request: self.request,
             batch: self.batch,
             tls: self.tls.clone(),
+            timestamp_nanos_key: None,
         };
 
         let (sink, healthcheck) = sink.clone().build(cx).await?;

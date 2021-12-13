@@ -25,7 +25,7 @@ async fn config() -> HecMetricsSinkConfig {
 
     HecMetricsSinkConfig {
         default_namespace: None,
-        token: get_token().await,
+        default_token: get_token().await,
         endpoint: "http://localhost:8088/".into(),
         host_key: "host".into(),
         index: None,
@@ -35,6 +35,7 @@ async fn config() -> HecMetricsSinkConfig {
         batch,
         request: TowerRequestConfig::default(),
         tls: None,
+        acknowledgements: Default::default(),
     }
 }
 

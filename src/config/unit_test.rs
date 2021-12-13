@@ -7,7 +7,7 @@ use crate::{
     config,
     event::{Event, Value},
     topology::builder::load_enrichment_tables,
-    transforms::Transform,
+    transforms::{Transform, TransformOutputsBuf},
 };
 use indexmap::IndexMap;
 use std::collections::HashMap;
@@ -114,7 +114,7 @@ fn events_to_string(name: &str, events: &[Event]) -> String {
             name,
             events
                 .iter()
-                .map(|e| event_to_string(e))
+                .map(event_to_string)
                 .collect::<Vec<_>>()
                 .join("\n    ")
         )
@@ -146,14 +146,15 @@ fn walk(
                 targets = target.next.clone();
                 transforms.insert(key, target);
             }
-            Transform::FallibleFunction(ref mut t) => {
-                let mut err_buf = Vec::new();
+            Transform::Synchronous(ref mut t) => {
+                let mut outputs = TransformOutputsBuf::new_with_capacity(
+                    target.config.named_outputs(),
+                    inputs.len(),
+                );
                 for input in inputs.clone() {
-                    t.transform(&mut results, &mut err_buf, input)
+                    t.transform(input, &mut outputs)
                 }
-                // unit tests don't currently support multiple outputs, so just throw these away
-                err_buf.clear();
-
+                results.extend(outputs.drain());
                 targets = target.next.clone();
                 transforms.insert(key, target);
             }

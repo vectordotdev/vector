@@ -4,7 +4,7 @@ use crate::{
     },
     event::{Event, VrlTarget},
     internal_events::{RemapMappingAbort, RemapMappingError},
-    transforms::{FallibleFunctionTransform, Transform},
+    transforms::{SyncTransform, Transform, TransformOutputsBuf},
     Result,
 };
 
@@ -17,6 +17,8 @@ use std::path::PathBuf;
 use vrl::diagnostic::Formatter;
 use vrl::prelude::ExpressionError;
 use vrl::{Program, Runtime, Terminate};
+
+const DROPPED: &str = "dropped";
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -43,16 +45,12 @@ impl_generate_config_from_default!(RemapConfig);
 impl TransformConfig for RemapConfig {
     async fn build(&self, context: &TransformContext) -> Result<Transform> {
         let remap = Remap::new(self.clone(), context)?;
-        Ok(if self.reroute_dropped {
-            Transform::fallible_function(remap)
-        } else {
-            Transform::function(remap)
-        })
+        Ok(Transform::synchronous(remap))
     }
 
     fn named_outputs(&self) -> Vec<String> {
         if self.reroute_dropped {
-            vec![String::from("dropped")]
+            vec![String::from(DROPPED)]
         } else {
             vec![]
         }
@@ -68,6 +66,10 @@ impl TransformConfig for RemapConfig {
 
     fn transform_type(&self) -> &'static str {
         "remap"
+    }
+
+    fn enable_concurrency(&self) -> bool {
+        true
     }
 }
 
@@ -101,6 +103,7 @@ impl Remap {
 
         let mut functions = vrl_stdlib::all();
         functions.append(&mut enrichment::vrl_functions());
+        functions.append(&mut vector_vrl_functions::vrl_functions());
 
         let program = vrl::compile(
             &source,
@@ -172,8 +175,8 @@ impl Clone for Remap {
     }
 }
 
-impl FallibleFunctionTransform for Remap {
-    fn transform(&mut self, output: &mut Vec<Event>, err_output: &mut Vec<Event>, event: Event) {
+impl SyncTransform for Remap {
+    fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf) {
         // If a program can fail or abort at runtime and we know that we will still need to forward
         // the event in that case (either to the main output or `dropped`, depending on the
         // config), we need to clone the original event and keep it around, to allow us to discard
@@ -217,7 +220,7 @@ impl FallibleFunctionTransform for Remap {
                 } else if self.reroute_dropped {
                     let mut event = original_event.expect("event will be set");
                     self.annotate_dropped(&mut event, "abort", error);
-                    err_output.push(event)
+                    output.push_named(DROPPED, event)
                 }
             }
             Err(Terminate::Error(error)) => {
@@ -231,7 +234,7 @@ impl FallibleFunctionTransform for Remap {
                 } else if self.reroute_dropped {
                     let mut event = original_event.expect("event will be set");
                     self.annotate_dropped(&mut event, "error", error);
-                    err_output.push(event)
+                    output.push_named(DROPPED, event)
                 }
             }
         }
@@ -252,16 +255,13 @@ pub enum BuildError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        event::{
-            metric::{MetricKind, MetricValue},
-            LogEvent, Metric, Value,
-        },
-        transforms::test::transform_one,
+    use crate::event::{
+        metric::{MetricKind, MetricValue},
+        LogEvent, Metric, Value,
     };
     use indoc::{formatdoc, indoc};
     use shared::btreemap;
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, HashMap};
 
     #[test]
     fn generate_config() {
@@ -404,9 +404,9 @@ mod tests {
         };
         let mut tform = Remap::new(conf, &Default::default()).unwrap();
 
-        let mut result = vec![];
-        let mut err_result = vec![];
-        tform.transform(&mut result, &mut err_result, event);
+        let out = collect_outputs(&mut tform, event);
+        assert_eq!(2, out.primary.len());
+        let result = out.primary;
 
         assert_eq!(get_field_string(&result[0], "message"), "foo");
         assert_eq!(get_field_string(&result[1], "message"), "bar");
@@ -805,27 +805,48 @@ mod tests {
         assert_eq!(log["foo"], "bar".into());
         assert!(!log.contains("metadata"));
 
-        let mut out = Vec::new();
-        let mut err = Vec::new();
-        tform.transform(&mut out, &mut err, abort);
-        assert!(out.is_empty());
-        assert!(err.is_empty());
+        let out = collect_outputs(&mut tform, abort);
+        assert!(out.primary.is_empty());
+        assert!(out.named[DROPPED].is_empty());
 
-        let mut out = Vec::new();
-        let mut err = Vec::new();
-        tform.transform(&mut out, &mut err, error);
-        assert!(out.is_empty());
-        assert!(err.is_empty());
+        let out = collect_outputs(&mut tform, error);
+        assert!(out.primary.is_empty());
+        assert!(out.named[DROPPED].is_empty());
+    }
+
+    struct CollectedOuput {
+        primary: Vec<Event>,
+        named: HashMap<String, Vec<Event>>,
+    }
+
+    fn collect_outputs(ft: &mut dyn SyncTransform, event: Event) -> CollectedOuput {
+        let mut outputs = TransformOutputsBuf::new_with_capacity(vec![String::from(DROPPED)], 1);
+
+        ft.transform(event, &mut outputs);
+
+        CollectedOuput {
+            primary: outputs.take_primary(),
+            named: outputs.take_all_named(),
+        }
+    }
+
+    fn transform_one(ft: &mut dyn SyncTransform, event: Event) -> Option<Event> {
+        let mut out = collect_outputs(ft, event);
+        assert_eq!(0, out.named.iter().map(|(_, v)| v.len()).sum::<usize>());
+        assert!(out.primary.len() <= 1);
+        out.primary.pop()
     }
 
     fn transform_one_fallible(
-        ft: &mut dyn FallibleFunctionTransform,
+        ft: &mut dyn SyncTransform,
         event: Event,
     ) -> std::result::Result<Event, Event> {
-        let mut buf = Vec::with_capacity(1);
-        let mut err_buf = Vec::with_capacity(1);
+        let mut outputs = TransformOutputsBuf::new_with_capacity(vec![String::from(DROPPED)], 1);
 
-        ft.transform(&mut buf, &mut err_buf, event);
+        ft.transform(event, &mut outputs);
+
+        let mut buf = outputs.drain().collect::<Vec<_>>();
+        let mut err_buf = outputs.drain_named(DROPPED).collect::<Vec<_>>();
 
         assert!(buf.len() < 2);
         assert!(err_buf.len() < 2);

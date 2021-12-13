@@ -325,7 +325,7 @@ mod test {
                     "_auth": r#"%{notSpace:http.auth:nullIf("-")}"#,
                     "_bytes_written": r#"%{integer:network.bytes_written}"#,
                     "_client_ip": r#"%{ipOrHost:network.client.ip}"#,
-                    "_version": r#"HTTP\/(?<http.version>\d+\.\d+)"#,
+                    "_version": r#"HTTP\/%{regex("\\d+\\.\\d+"):http.version}"#,
                     "_url": r#"%{notSpace:http.url}"#,
                     "_ident": r#"%{notSpace:http.ident}"#,
                     "_user_agent": r#"%{regex("[^\\\"]*"):http.useragent}"#,

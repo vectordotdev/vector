@@ -148,7 +148,7 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@a2e02890a0d28163b34ac2e4b575b9264a5ee3e2
+        uses: docker/metadata-action@e5622373a38e60fb6d795a4421e56882f2d7a681
         with:
           flavor: |
             latest=false
@@ -188,7 +188,7 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@a2e02890a0d28163b34ac2e4b575b9264a5ee3e2
+        uses: docker/metadata-action@e5622373a38e60fb6d795a4421e56882f2d7a681
         with:
           flavor: |
             latest=false
@@ -394,8 +394,8 @@ jobs:
                                          --baseline-sha ${{ needs.compute-soak-meta.outputs.baseline-sha }} \
                                          --comparison-sha ${{ needs.compute-soak-meta.outputs.comparison-sha }} \
                                          --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
-                                         --warmup-seconds 30 \
-                                         --p-value 0.05 > /tmp/${{ github.event.number}}-${{ github.run_attempt }}-analysis
+                                         --warmup-seconds 30 --erratic-soaks syslog_loki,http_to_http_acks \
+                                         --p-value 0.1 > /tmp/${{ github.event.number}}-${{ github.run_attempt }}-analysis
 
       - name: Read analysis file
         id: read-analysis
@@ -449,5 +449,5 @@ jobs:
       - name: Detect regressions
         run: |
           ./soaks/bin/detect_regressions --capture-dir ${{ github.event.number }}-${{ github.run_attempt }}-captures/ \
-                                         --warmup-seconds 30 \
-                                         --p-value 0.05
+                                         --warmup-seconds 30 --erratic-soaks syslog_loki,http_to_http_acks \
+                                         --p-value 0.1
