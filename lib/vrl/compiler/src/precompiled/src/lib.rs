@@ -145,3 +145,41 @@ pub extern "C" fn vrl_expression_object_set_result_impl(
     };
     *result = Ok(Value::Object(map));
 }
+
+#[no_mangle]
+pub extern "C" fn vrl_expression_op_add_impl(rhs: &mut Resolved, result: &mut Resolved) {
+    let rhs = {
+        let mut moved = Ok(Value::Null);
+        std::mem::swap(rhs, &mut moved);
+        moved
+    };
+    match (&result, rhs) {
+        (Ok(lhs), Ok(rhs)) => {
+            *result = lhs.clone().try_add(rhs).map_err(Into::into);
+        }
+        (Err(_), Err(_)) => (),
+        (Err(_), _) => (),
+        (_, Err(error)) => {
+            *result = Err(error);
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_expression_op_eq_impl(rhs: &mut Resolved, result: &mut Resolved) {
+    let rhs = {
+        let mut moved = Ok(Value::Null);
+        std::mem::swap(rhs, &mut moved);
+        moved
+    };
+    match (&result, rhs) {
+        (Ok(lhs), Ok(rhs)) => {
+            *result = Ok(lhs.eq_lossy(&rhs).into());
+        }
+        (Err(_), Err(_)) => (),
+        (Err(_), _) => (),
+        (_, Err(error)) => {
+            *result = Err(error);
+        }
+    }
+}

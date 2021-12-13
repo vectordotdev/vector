@@ -260,8 +260,95 @@ impl Expression for Op {
     }
 
     #[cfg(feature = "llvm")]
-    fn emit_llvm<'ctx>(&self, _: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
-        todo!()
+    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+        let function = ctx.function();
+        let op_begin_block = ctx
+            .context()
+            .append_basic_block(function, &format!("op_{}_begin", self.opcode));
+        ctx.builder().build_unconditional_branch(op_begin_block);
+        ctx.builder().position_at_end(op_begin_block);
+
+        self.lhs.emit_llvm(ctx)?;
+
+        let result_ref = ctx.result_ref();
+
+        match self.opcode {
+            ast::Opcode::Mul => todo!(),
+            ast::Opcode::Div => todo!(),
+            ast::Opcode::Add => {
+                let resolved_temp_ref = ctx.build_alloca_resolved("rhs")?;
+                {
+                    let fn_ident = "vrl_resolved_initialize";
+                    let fn_impl = ctx
+                        .module()
+                        .get_function(fn_ident)
+                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                    ctx.builder()
+                        .build_call(fn_impl, &[resolved_temp_ref.into()], fn_ident)
+                };
+                ctx.set_result_ref(resolved_temp_ref);
+
+                self.rhs.emit_llvm(ctx)?;
+
+                {
+                    let fn_ident = "vrl_expression_op_add_impl";
+                    let fn_impl = ctx
+                        .module()
+                        .get_function(fn_ident)
+                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                    ctx.builder().build_call(
+                        fn_impl,
+                        &[resolved_temp_ref.into(), result_ref.into()],
+                        fn_ident,
+                    )
+                };
+
+                ctx.set_result_ref(result_ref);
+            }
+            ast::Opcode::Sub => todo!(),
+            ast::Opcode::Rem => todo!(),
+            ast::Opcode::Or => todo!(),
+            ast::Opcode::And => todo!(),
+            ast::Opcode::Err => todo!(),
+            ast::Opcode::Ne => todo!(),
+            ast::Opcode::Eq => {
+                let resolved_temp_ref = ctx.build_alloca_resolved("rhs")?;
+                {
+                    let fn_ident = "vrl_resolved_initialize";
+                    let fn_impl = ctx
+                        .module()
+                        .get_function(fn_ident)
+                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                    ctx.builder()
+                        .build_call(fn_impl, &[resolved_temp_ref.into()], fn_ident)
+                };
+                ctx.set_result_ref(resolved_temp_ref);
+
+                self.rhs.emit_llvm(ctx)?;
+
+                {
+                    let fn_ident = "vrl_expression_op_eq_impl";
+                    let fn_impl = ctx
+                        .module()
+                        .get_function(fn_ident)
+                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                    ctx.builder().build_call(
+                        fn_impl,
+                        &[resolved_temp_ref.into(), result_ref.into()],
+                        fn_ident,
+                    )
+                };
+
+                ctx.set_result_ref(result_ref);
+            }
+            ast::Opcode::Ge => todo!(),
+            ast::Opcode::Gt => todo!(),
+            ast::Opcode::Le => todo!(),
+            ast::Opcode::Lt => todo!(),
+            ast::Opcode::Merge => todo!(),
+        };
+
+        Ok(())
     }
 }
 
