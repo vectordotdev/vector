@@ -158,7 +158,7 @@ where
         }
 
         self.usage_handle
-            .increment_sent_event_count_and_byte_size(1, event_size);
+            .increment_received_event_count_and_byte_size(1, event_size);
 
         None
     }
