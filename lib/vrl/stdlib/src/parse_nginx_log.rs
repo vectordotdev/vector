@@ -34,7 +34,7 @@ impl Function for ParseNginxLog {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let variants = vec![value!("combined"), value!("error")];

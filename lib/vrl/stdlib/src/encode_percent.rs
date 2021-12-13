@@ -70,7 +70,7 @@ impl Function for EncodePercent {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let ascii_sets = vec![

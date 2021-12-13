@@ -41,7 +41,7 @@ impl Function for Merge {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let to = arguments.required("to");

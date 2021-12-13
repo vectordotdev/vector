@@ -27,7 +27,7 @@ impl Function for RemoveMetadataField {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let keys = vec![value!("datadog_api_key")];

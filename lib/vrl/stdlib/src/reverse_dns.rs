@@ -30,7 +30,7 @@ impl Function for ReverseDns {
     fn compile(
         &self,
         _state: &state::Compiler,
-        _info: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
