@@ -29,7 +29,7 @@ itself is running
 
 ### User Experience
 
-The existing health endpoint on our GraphQL based API is enhanced to return 503's
+The existing health endpoint on Vector's API is enhanced to return 503's
 when Vector is shutting down. This additional response will allow load balancers
 and service discovery to better integrate with Vector, sources already begin
 rejecting requests received during the shutdown process and updating the health
@@ -86,7 +86,7 @@ and increase operational complexity, something we intentionally avoid when possi
 
 ## Outstanding Questions
 
-- Should we assign a unique error code for "shutting down"?
+- ~~Should we assign a unique error code for "shutting down"?~~
 - Do we want to return "unhealthy" if some number of components are "unhealthy"
   - Depending on deployment and configuration this could push durability concerns
 to an agent layer, which wouldn't necessarily be ideal
@@ -100,8 +100,6 @@ runtime check, if that's the case we should use a Startup Probe
 
 ## Plan Of Attack
 
-- [ ] Update Helm Chart to use `vector validate` as Readiness Probe, matching our
-[SystemD config](https://github.com/vectordotdev/vector/blob/master/distribution/systemd/vector.service#L10)
 - [ ] Integrate health endpoint with our shutdown sequence, letting the API return
 an unhealthy code and take the shutting down instance out of load balancing/service
 discovery
@@ -112,3 +110,4 @@ discovery
 components
 - Add a "tiered" health status (Green/Yellow/Red) to better represent the "distributed"
 nature of Vector's runtime (Elasticsearch health endpoints as an example)
+- Add a built-in command similar to `validate` intended to check instance health at runtime.
