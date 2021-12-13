@@ -9,6 +9,7 @@ mod expression;
 mod r#macro;
 mod target;
 
+pub use diagnostic::Span;
 pub use expression::{ExpressionError, Resolved};
 pub use target::Target;
 pub use value::Value;
