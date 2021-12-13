@@ -83,7 +83,7 @@ members = [
   "lib/lookup",
   "lib/vrl/cli",
   "lib/vrl/compiler",
-  "lib/vrl/compiler/src/precompiled",
+#  "lib/vrl/compiler/src/precompiled",
   "lib/vrl/core",
   "lib/vrl/diagnostic",
   "lib/vrl/parser",
@@ -93,6 +93,9 @@ members = [
   "lib/datadog/grok",
   "lib/datadog/search-syntax",
   "lib/soak"
+]
+exclude = [
+  "lib/vrl/compiler/src/precompiled",
 ]
 
 [dependencies]
@@ -377,7 +380,7 @@ sasl = ["rdkafka/gssapi"]
 unix = []
 # These are **very** useful on Cross compilations!
 vendor-all = ["vendor-libz", "vendor-openssl", "vendor-sasl"]
-vendor-sasl = ["rdkafka/gssapi-vendored"]
+vendor-sasl = []
 vendor-openssl = ["openssl/vendored"]
 vendor-libz = ["libz-sys/static"]
 

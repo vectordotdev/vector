@@ -17,7 +17,7 @@ mod op;
 mod unary;
 mod variable;
 
-pub(crate) mod assignment;
+pub mod assignment;
 pub(crate) mod container;
 pub(crate) mod function_call;
 pub(crate) mod literal;
@@ -56,6 +56,11 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     fn resolve(&self, ctx: &mut Context) -> Resolved;
 
     fn dump(&self, _vm: &mut crate::vm::Vm) -> Result<(), String> {
+        Ok(())
+    }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(&self, _: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
         Ok(())
     }
 
@@ -200,6 +205,25 @@ impl Expression for Expr {
             Noop(v) => v.dump(vm),
             Unary(v) => v.dump(vm),
             Abort(v) => v.dump(vm),
+        }
+    }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+        use Expr::*;
+
+        match self {
+            Literal(v) => v.emit_llvm(ctx),
+            Container(v) => v.emit_llvm(ctx),
+            IfStatement(v) => v.emit_llvm(ctx),
+            Op(v) => v.emit_llvm(ctx),
+            Assignment(v) => v.emit_llvm(ctx),
+            Query(v) => v.emit_llvm(ctx),
+            FunctionCall(v) => v.emit_llvm(ctx),
+            Variable(v) => v.emit_llvm(ctx),
+            Noop(v) => v.emit_llvm(ctx),
+            Unary(v) => v.emit_llvm(ctx),
+            Abort(v) => v.emit_llvm(ctx),
         }
     }
 }

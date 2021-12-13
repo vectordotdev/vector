@@ -68,6 +68,93 @@ impl Expression for IfStatement {
 
         Ok(())
     }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+        let function = ctx.function();
+        let if_statement_begin_block = ctx
+            .context()
+            .append_basic_block(function, "if_statement_begin");
+        ctx.builder()
+            .build_unconditional_branch(if_statement_begin_block);
+        ctx.builder().position_at_end(if_statement_begin_block);
+
+        self.predicate.emit_llvm(ctx)?;
+
+        let is_bool = {
+            let fn_ident = "vrl_resolved_is_boolean";
+            let fn_impl = ctx
+                .module()
+                .get_function(fn_ident)
+                .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+            ctx.builder()
+                .build_call(fn_impl, &[ctx.result_ref().into()], fn_ident)
+                .try_as_basic_value()
+                .left()
+                .ok_or(format!(r#"result of "{}" is not a basic value"#, fn_ident))?
+                .try_into()
+                .map_err(|_| format!(r#"result of "{}" is not an int value"#, fn_ident))?
+        };
+
+        let function = ctx.function();
+        let is_boolean_block = ctx
+            .context()
+            .append_basic_block(function, "if_statement_predicate_is_boolean");
+        let not_boolean_block = ctx
+            .context()
+            .append_basic_block(function, "if_statement_predicate_not_boolean");
+
+        ctx.builder()
+            .build_conditional_branch(is_bool, is_boolean_block, not_boolean_block);
+
+        ctx.builder().position_at_end(is_boolean_block);
+
+        let is_true = {
+            let fn_ident = "vrl_resolved_boolean_is_true";
+            let fn_impl = ctx
+                .module()
+                .get_function(fn_ident)
+                .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+            ctx.builder()
+                .build_call(fn_impl, &[ctx.result_ref().into()], fn_ident)
+                .try_as_basic_value()
+                .left()
+                .ok_or(format!(r#"result of "{}" is not a basic value"#, fn_ident))?
+                .try_into()
+                .map_err(|_| format!(r#"result of "{}" is not an int value"#, fn_ident))?
+        };
+
+        let end_block = ctx
+            .context()
+            .append_basic_block(function, "if_statement_end");
+
+        let if_branch_block = ctx
+            .context()
+            .append_basic_block(function, "if_statement_if_branch");
+        let else_branch_block = ctx
+            .context()
+            .append_basic_block(function, "if_statement_else_branch");
+
+        ctx.builder()
+            .build_conditional_branch(is_true, if_branch_block, else_branch_block);
+
+        ctx.builder().position_at_end(if_branch_block);
+        self.consequent.emit_llvm(ctx)?;
+        ctx.builder().build_unconditional_branch(end_block);
+
+        ctx.builder().position_at_end(else_branch_block);
+        if let Some(alternative) = &self.alternative {
+            alternative.emit_llvm(ctx)?;
+        }
+        ctx.builder().build_unconditional_branch(end_block);
+
+        ctx.builder().position_at_end(not_boolean_block);
+        ctx.builder().build_unconditional_branch(end_block);
+
+        ctx.builder().position_at_end(end_block);
+
+        Ok(())
+    }
 }
 
 impl fmt::Display for IfStatement {

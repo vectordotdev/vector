@@ -57,6 +57,45 @@ impl Expression for Variable {
             .map(|d| d.type_def)
             .unwrap_or_else(|| TypeDef::new().null().infallible())
     }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+        let function = ctx.function();
+        let variable_begin_block = ctx.context().append_basic_block(function, "variable_begin");
+        ctx.builder()
+            .build_unconditional_branch(variable_begin_block);
+        ctx.builder().position_at_end(variable_begin_block);
+
+        let fn_ident = "vrl_expression_variable_impl";
+        let fn_impl = ctx
+            .module()
+            .get_function(fn_ident)
+            .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+        let ident_name = format!("{:?}", self.ident);
+        let ident_ref = ctx
+            .into_const(self.ident.clone(), &ident_name)
+            .as_pointer_value();
+        ctx.builder().build_call(
+            fn_impl,
+            &[
+                ctx.context_ref().into(),
+                ctx.builder()
+                    .build_bitcast(
+                        ident_ref,
+                        fn_impl
+                            .get_nth_param(1)
+                            .unwrap()
+                            .get_type()
+                            .into_pointer_type(),
+                        "cast",
+                    )
+                    .into(),
+                ctx.result_ref().into(),
+            ],
+            fn_ident,
+        );
+        Ok(())
+    }
 }
 
 impl fmt::Display for Variable {

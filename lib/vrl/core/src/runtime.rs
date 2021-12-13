@@ -1,5 +1,6 @@
 use crate::{state, Context, Program, Target, Value};
 use compiler::{
+    llvm,
     vm::{OpCode, Vm},
     ExpressionError, Function,
 };
@@ -136,5 +137,13 @@ impl Runtime {
         let mut context = Context::new(target, &mut self.state, timezone);
         vm.reset();
         vm.interpret(&mut context)
+    }
+
+    pub fn create_llvm_context() -> llvm::Token {
+        llvm::Context::create_token()
+    }
+
+    pub fn emit_llvm<'ctx>(token: &'ctx llvm::Token) -> Result<llvm::Context<'ctx>, String> {
+        llvm::Context::new(token)
     }
 }

@@ -1,0 +1,58 @@
+# . = {
+#     "foo": 123,
+#     "bar": {
+#         "derp": 345
+#     },
+# }
+
+# . = {
+#     "baz": "hi",
+# }
+
+# .foo = 42
+
+# if false {
+#     . = 1 + 1
+# } else {
+#     . = 42 + 1337
+# }
+
+# . = 42
+
+# .status = 400
+
+# if .status == 400 {
+#     . = 400
+# }
+
+# foo = 123
+
+# .foo = foo
+
+# . = upcase("hi")
+
+# .foo = {
+#     "derp": 123,
+#     "abort:": string("foo"),
+# }
+
+# . = {
+#   "foo": string!(123)
+# }
+
+# .derp = "foo" + "bar"
+
+# .hostname = "vector"
+
+# if .status == "warning" {
+#   .thing = upcase(.hostname)
+# } else if .status == "notice" {
+#   .thung = downcase(.hostname)
+# } else {
+#   .nong = upcase(.hostname)
+# }
+
+# .matches = { "name": .message, "num": "2" }
+# .origin, .err = .hostname + "/" + .matches.name + "/" + .matches.num
+
+.derp, err = "foo" + 123

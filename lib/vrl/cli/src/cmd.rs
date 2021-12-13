@@ -36,6 +36,25 @@ pub struct Opts {
     timezone: Option<String>,
 }
 
+#[cfg(test)]
+impl Opts {
+    fn new_test(
+        program: Option<String>,
+        input_file: Option<PathBuf>,
+        program_file: Option<PathBuf>,
+        print_object: bool,
+        timezone: Option<String>,
+    ) -> Self {
+        Self {
+            program,
+            input_file,
+            program_file,
+            print_object,
+            timezone,
+        }
+    }
+}
+
 impl Opts {
     fn timezone(&self) -> Result<TimeZone, Error> {
         if let Some(ref tz) = self.timezone {
@@ -107,20 +126,24 @@ fn run(opts: &Opts) -> Result<(), Error> {
         })?;
 
         for mut object in objects {
+            // println!("running on object before: {}", object);
             //for _ in 0..1000000 {
-            let result = execute(&mut object, &program, &tz).map(|v| {
+            let _result = execute(&mut object, &program, &tz).map(|v| {
                 if opts.print_object {
                     object.to_string()
                 } else {
                     v.to_string()
                 }
             });
+            // println!("running on object after: {}", object);
 
-            match result {
-                Ok(ok) => println!("{}", ok),
-                Err(err) => eprintln!("{}", err),
-            }
-            //}
+            // match result {
+            //     Ok(ok) => println!("{}", ok),
+            //     Err(err) => eprintln!("{}", err),
+            // }
+
+            // Segfault in Bytes Drop because VTable got unloaded
+            std::mem::forget(object);
         }
 
         Ok(())
@@ -138,21 +161,100 @@ fn repl(_objects: Vec<Value>, _timezone: &TimeZone) -> Result<(), Error> {
     Err(Error::ReplFeature)
 }
 
+use stdlib::{vrl_fn_downcase, vrl_fn_string, vrl_fn_upcase};
+
 fn execute(
-    _object: &mut impl Target,
+    object: &mut impl Target,
     program: &Program,
-    _timezone: &TimeZone,
+    timezone: &TimeZone,
 ) -> Result<Value, Error> {
-    let state = state::Runtime::default();
-    let mut runtime = Runtime::new(state);
+    {
+        let state = state::Runtime::default();
+        let mut runtime = Runtime::new(state);
 
-    let vm = runtime.compile(Default::default(), program).unwrap();
+        println!("Traverse target: {:?}", object);
+        println!(
+            "Traverse result: {:?}",
+            runtime.resolve(object, program, timezone)
+        );
 
-    println!("{:#?}", vm.dissassemble());
+        let start = std::time::Instant::now();
+        for _ in 0..1000000 {
+            runtime.clear();
+            let _ = runtime.resolve(object, program, timezone);
+        }
+        println!("elapsed Traverse: {:?}", std::time::Instant::now() - start);
+    }
+
+    {
+        let state = state::Runtime::default();
+        let mut runtime = Runtime::new(state);
+        let mut vm = runtime.compile(stdlib::all(), program).unwrap();
+
+        println!("VM target: {:?}", object);
+        println!("VM result: {:?}", runtime.run_vm(&mut vm, object, timezone));
+
+        let start = std::time::Instant::now();
+        for _ in 0..1000000 {
+            runtime.clear();
+            let _ = runtime.run_vm(&mut vm, object, timezone);
+        }
+        println!("elapsed VM: {:?}", std::time::Instant::now() - start);
+    }
+
+    {
+        let mut state = state::Runtime::default();
+        let token = Runtime::create_llvm_context();
+        println!("VRL -> LLVM IR");
+        let mut context = Runtime::emit_llvm(&token).unwrap();
+        let execute = context.compile(program).unwrap();
+
+        vrl_fn_upcase(&mut Err("foo".into()), &mut Err("bar".into()));
+        vrl_fn_downcase(&mut Err("foo".into()), &mut Err("bar".into()));
+        vrl_fn_string(&mut Err("foo".into()), &mut Err("bar".into()));
+
+        println!("LLVM target: {:?}", object);
+
+        let mut context = vrl::Context::new(object, &mut state, timezone);
+
+        println!("LLVM result: {:?}", {
+            let mut result = Ok(Value::Null);
+            unsafe { execute.call(&mut context, &mut result) };
+            result
+        });
+
+        let start = std::time::Instant::now();
+        for _ in 0..1000000 {
+            context.state_mut().clear();
+            let mut result = Ok(Value::Null);
+            unsafe { execute.call(&mut context, &mut result) };
+            // println!("output: {:?}", result);
+        }
+        println!("elapsed LLVM: {:?}", std::time::Instant::now() - start);
+    }
+
+    // let vm = runtime.compile(Default::default(), program).unwrap();
+
+    // println!("{:#?}", vm.dissassemble());
     Ok(Value::Null)
     // runtime
     //    .resolve(object, program, timezone)
     //   .map_err(Error::Runtime)
+}
+
+#[cfg(test)]
+#[test]
+fn test_run() {
+    println!("{:?}", std::env::current_dir());
+    let opts = Opts::new_test(
+        None,
+        Some("./lib/vrl/cli/test.jsonl".into()),
+        Some("./lib/vrl/cli/program.vrl".into()),
+        false,
+        None,
+    );
+
+    run(&opts).unwrap();
 }
 
 fn serde_to_vrl(value: serde_json::Value) -> Value {

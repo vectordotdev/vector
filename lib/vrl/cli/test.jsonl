@@ -1,2 +1,1 @@
-{ "foo": "bar" }
-{ "foo": { "bar": [{ "baz": true }, 42, 3.14159] } }
+{ "message": "dingdangdong" }

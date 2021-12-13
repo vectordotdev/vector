@@ -157,6 +157,11 @@ impl Expression for Assignment {
     fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         self.variant.dump(vm)
     }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+        self.variant.emit_llvm(ctx)
+    }
 }
 
 impl fmt::Display for Assignment {
@@ -440,6 +445,114 @@ where
             }
         }
         Ok(())
+    }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+        Ok(match self {
+            Variant::Single { target, expr } => {
+                let function = ctx.function();
+                let assignment_single_begin_block = ctx
+                    .context()
+                    .append_basic_block(function, "assignment_single_begin");
+                ctx.builder()
+                    .build_unconditional_branch(assignment_single_begin_block);
+                ctx.builder().position_at_end(assignment_single_begin_block);
+
+                expr.emit_llvm(ctx)?;
+                let target_ref = ctx.into_target_const_ref(target.clone())?;
+                let fn_ident = "vrl_expression_assignment_variant_single_impl";
+                let fn_impl = ctx
+                    .module()
+                    .get_function(fn_ident)
+                    .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                ctx.builder().build_call(
+                    fn_impl,
+                    &[
+                        ctx.builder()
+                            .build_bitcast(
+                                target_ref,
+                                fn_impl
+                                    .get_nth_param(0)
+                                    .unwrap()
+                                    .get_type()
+                                    .into_pointer_type(),
+                                "cast",
+                            )
+                            .into(),
+                        ctx.context_ref().into(),
+                        ctx.result_ref().into(),
+                    ],
+                    fn_ident,
+                );
+            }
+            Variant::Infallible {
+                ok,
+                err,
+                expr,
+                default,
+            } => {
+                let function = ctx.function();
+                let assignment_infallible_begin_block = ctx
+                    .context()
+                    .append_basic_block(function, "assignment_infallible_begin");
+                ctx.builder()
+                    .build_unconditional_branch(assignment_infallible_begin_block);
+                ctx.builder()
+                    .position_at_end(assignment_infallible_begin_block);
+
+                expr.emit_llvm(ctx)?;
+                let ok_ref = ctx.into_target_const_ref(ok.clone())?;
+                let err_ref = ctx.into_target_const_ref(err.clone())?;
+                let default_ref = ctx.into_value_const_ref(default.clone())?;
+                let fn_ident = "vrl_expression_assignment_variant_infallible_impl";
+                let fn_impl = ctx
+                    .module()
+                    .get_function(fn_ident)
+                    .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                ctx.builder().build_call(
+                    fn_impl,
+                    &[
+                        ctx.builder()
+                            .build_bitcast(
+                                ok_ref,
+                                fn_impl
+                                    .get_nth_param(0)
+                                    .unwrap()
+                                    .get_type()
+                                    .into_pointer_type(),
+                                "cast",
+                            )
+                            .into(),
+                        ctx.builder()
+                            .build_bitcast(
+                                err_ref,
+                                fn_impl
+                                    .get_nth_param(1)
+                                    .unwrap()
+                                    .get_type()
+                                    .into_pointer_type(),
+                                "cast",
+                            )
+                            .into(),
+                        ctx.builder()
+                            .build_bitcast(
+                                default_ref,
+                                fn_impl
+                                    .get_nth_param(2)
+                                    .unwrap()
+                                    .get_type()
+                                    .into_pointer_type(),
+                                "cast",
+                            )
+                            .into(),
+                        ctx.context_ref().into(),
+                        ctx.result_ref().into(),
+                    ],
+                    fn_ident,
+                );
+            }
+        })
     }
 }
 

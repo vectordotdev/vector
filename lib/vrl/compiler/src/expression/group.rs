@@ -27,6 +27,11 @@ impl Expression for Group {
     fn dump(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
         self.inner.dump(vm)
     }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+        self.inner.emit_llvm(ctx)
+    }
 }
 
 impl fmt::Display for Group {

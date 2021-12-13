@@ -31,8 +31,18 @@ pub struct RemapConfig {
     #[serde(default = "crate::serde::default_true")]
     pub drop_on_abort: bool,
     pub reroute_dropped: bool,
-    #[serde(default = "crate::serde::default_true")]
-    pub use_vm: bool,
+    #[serde(default)]
+    pub executor: Executor,
+}
+
+#[derive(Debug, Clone, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Executor {
+    #[derivative(Default)]
+    Interpreter,
+    VirtualMachine,
+    MachineCode,
 }
 
 inventory::submit! {
@@ -105,13 +115,8 @@ impl Remap {
         .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())?;
 
         let mut runtime = Runtime::default();
-        let vm = if config.use_vm {
-            Some(runtime.compile(vrl_stdlib::all(), &program)?)
-        } else {
-            // Make sure it is using the vm..
-            Some(runtime.compile(vrl_stdlib::all(), &program)?)
-            //None
-        };
+
+        let vm = Some(runtime.compile(vrl_stdlib::all(), &program)?);
 
         Ok(Remap {
             component_key: context.key.clone(),

@@ -51,6 +51,27 @@ impl Expression for Not {
 
         Ok(())
     }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(
+        &self,
+        ctx: &mut crate::llvm::Context<'ctx>,
+    ) -> std::result::Result<(), String> {
+        let function = ctx.function();
+        let not_begin_block = ctx.context().append_basic_block(function, "not_begin");
+        ctx.builder().build_unconditional_branch(not_begin_block);
+        ctx.builder().position_at_end(not_begin_block);
+
+        self.inner.emit_llvm(ctx)?;
+        let fn_ident = "vrl_expression_not_impl";
+        let fn_impl = ctx
+            .module()
+            .get_function(fn_ident)
+            .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+        ctx.builder()
+            .build_call(fn_impl, &[ctx.result_ref().into()], fn_ident);
+        Ok(())
+    }
 }
 
 impl fmt::Display for Not {

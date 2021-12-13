@@ -6,13 +6,14 @@ mod test_util;
 
 pub mod expression;
 pub mod function;
+#[cfg(feature = "llvm")]
 pub mod llvm;
 pub mod state;
 pub mod type_def;
 pub mod value;
 pub mod vm;
 
-pub(crate) use diagnostic::Span;
+pub use diagnostic::Span;
 pub(crate) use state::Compiler as State;
 
 pub use context::Context;
@@ -49,7 +50,7 @@ pub fn compile_with_state(
 }
 
 /// re-export of commonly used parser types.
-pub(crate) mod parser {
+pub mod parser {
     pub use ::parser::ast::{self, Ident, Node};
     pub use ::parser::Program;
 }

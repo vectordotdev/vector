@@ -34,6 +34,15 @@ impl Expression for Unary {
             Not(v) => v.type_def(state),
         }
     }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+        use Variant::*;
+
+        match &self.variant {
+            Not(v) => v.emit_llvm(ctx),
+        }
+    }
 }
 
 impl fmt::Display for Unary {

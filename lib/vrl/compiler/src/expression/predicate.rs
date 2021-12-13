@@ -66,6 +66,17 @@ impl Expression for Predicate {
         }
         Ok(())
     }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(
+        &self,
+        ctx: &mut crate::llvm::Context<'ctx>,
+    ) -> std::result::Result<(), String> {
+        for inner in &self.inner {
+            inner.emit_llvm(ctx)?;
+        }
+        Ok(())
+    }
 }
 
 impl fmt::Display for Predicate {

@@ -276,7 +276,7 @@ pub use decode_percent::DecodePercent;
 #[cfg(feature = "del")]
 pub use del::Del;
 #[cfg(feature = "downcase")]
-pub use downcase::Downcase;
+pub use downcase::{vrl_fn_downcase, Downcase};
 #[cfg(feature = "encode_base64")]
 pub use encode_base64::EncodeBase64;
 #[cfg(feature = "encode_json")]
@@ -446,7 +446,7 @@ pub use split::Split;
 #[cfg(feature = "starts_with")]
 pub use starts_with::StartsWith;
 #[cfg(feature = "string")]
-pub use string::String;
+pub use string::{vrl_fn_string, String};
 #[cfg(feature = "strip_ansi_escape_codes")]
 pub use strip_ansi_escape_codes::StripAnsiEscapeCodes;
 #[cfg(feature = "strip_whitespace")]
@@ -486,7 +486,7 @@ pub use unique::Unique;
 #[cfg(feature = "unnest")]
 pub use unnest::Unnest;
 #[cfg(feature = "upcase")]
-pub use upcase::Upcase;
+pub use upcase::{vrl_fn_upcase, Upcase};
 #[cfg(feature = "uuid_v4")]
 pub use uuid_v4::UuidV4;
 
