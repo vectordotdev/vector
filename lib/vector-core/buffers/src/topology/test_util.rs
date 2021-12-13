@@ -67,7 +67,7 @@ pub async fn build_buffer(
             let usage_handle = BufferUsageHandle::noop();
             let channel = Box::new(MemoryV2Buffer::new(capacity));
             let (sender, receiver, _) = channel
-                .into_buffer_parts(&usage_handle)
+                .into_buffer_parts(usage_handle)
                 .await
                 .expect("should not fail to create memory buffer");
             let sender = BufferSender::new(sender, mode);
@@ -80,7 +80,7 @@ pub async fn build_buffer(
                 .expect("overflow_mode must be specified when base is in overflow mode");
             let overflow_channel = Box::new(MemoryV2Buffer::new(capacity));
             let (overflow_sender, overflow_receiver, _) = overflow_channel
-                .into_buffer_parts(&usage_handle)
+                .into_buffer_parts(usage_handle.clone())
                 .await
                 .expect("should not fail to create memory buffer");
             let overflow_sender = BufferSender::new(overflow_sender, overflow_mode);
@@ -88,7 +88,7 @@ pub async fn build_buffer(
 
             let base_channel = Box::new(MemoryV2Buffer::new(capacity));
             let (base_sender, base_receiver, _) = base_channel
-                .into_buffer_parts(&usage_handle)
+                .into_buffer_parts(usage_handle)
                 .await
                 .expect("should not fail to create memory buffer");
             let base_sender = BufferSender::with_overflow(base_sender, overflow_sender);

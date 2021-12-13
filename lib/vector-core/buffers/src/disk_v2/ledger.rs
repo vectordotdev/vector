@@ -18,6 +18,8 @@ use tokio::{
     sync::Notify,
 };
 
+use crate::buffer_usage_data::BufferUsageHandle;
+
 use super::{
     backed_archive::BackedArchive,
     common::{DiskBufferConfig, MAX_FILE_ID},
@@ -137,7 +139,6 @@ impl ArchivedLedgerState {
     }
 
     /// Gets the total number of records in the buffer.
-    #[cfg(test)]
     pub fn get_total_records(&self) -> u64 {
         self.total_records.load(Ordering::Acquire)
     }
@@ -260,6 +261,8 @@ pub struct Ledger {
     unacked_reader_file_id_offset: AtomicU16,
     // Last flush of all unflushed files: ledger, data file, etc.
     last_flush: AtomicCell<Instant>,
+    // Tracks usage data about the buffer.
+    usage_handle: BufferUsageHandle,
 }
 
 impl Ledger {
@@ -364,12 +367,26 @@ impl Ledger {
     /// Tracks the statistics of a successful write.
     pub fn track_write(&self, record_size: u64) {
         self.state().increment_records(record_size);
+
+        // A 4GB record should not be possible to write, at all.
+        let record_size = record_size
+            .try_into()
+            .expect("record size didn't fit into usize; is this a 32-bit platform?");
+        self.usage_handle
+            .increment_received_event_count_and_byte_size(1, record_size);
     }
 
     /// Tracks the statistics of multiple successful reads.
     pub fn track_reads(&self, record_len: u64, total_record_size: u64) {
         self.state()
             .decrement_records(record_len, total_record_size);
+
+        // If we're acknowledgeing 4GB of records at a time, then uh... something weird is going on.
+        let total_record_size = total_record_size
+            .try_into()
+            .expect("total record size didn't fit into usize; is this a 32-bit platform?");
+        self.usage_handle
+            .increment_sent_event_count_and_byte_size(record_len, total_record_size);
     }
 
     /// Marks the writer as finished.
@@ -477,6 +494,20 @@ impl Ledger {
         self.state.get_backing_ref().flush()
     }
 
+    fn synchronize_buffer_usage(&self) {
+        let initial_buffer_events = self.state().get_total_records();
+        let initial_buffer_size = self
+            .state()
+            .get_total_buffer_size()
+            .try_into()
+            .expect("buffer size greater than usize; is this a 32-bit platform?");
+        self.usage_handle
+            .increment_received_event_count_and_byte_size(
+                initial_buffer_events,
+                initial_buffer_size,
+            );
+    }
+
     /// Loads or creates a ledger for the given [`DiskBufferConfig`].
     ///
     /// If the ledger file does not yet exist, a default ledger state will be created and persisted
@@ -490,6 +521,7 @@ impl Ledger {
     #[cfg_attr(test, instrument(level = "trace"))]
     pub(super) async fn load_or_create(
         config: DiskBufferConfig,
+        usage_handle: BufferUsageHandle,
     ) -> Result<Ledger, LedgerLoadCreateError> {
         // Create our containing directory if it doesn't already exist.
         fs::create_dir_all(&config.data_dir).await.context(Io)?;
@@ -553,7 +585,10 @@ impl Ledger {
             }
         };
 
-        Ok(Ledger {
+        // Create the ledger object, and synchronize the buffer statistics with the buffer usage
+        // handle.  This handles making sure we account for the starting size of the buffer, and
+        // what not.
+        let ledger = Ledger {
             config,
             ledger_lock,
             state: ledger_state,
@@ -563,7 +598,11 @@ impl Ledger {
             pending_acks: AtomicUsize::new(0),
             unacked_reader_file_id_offset: AtomicU16::new(0),
             last_flush: AtomicCell::new(Instant::now()),
-        })
+            usage_handle,
+        };
+        ledger.synchronize_buffer_usage();
+
+        Ok(ledger)
     }
 }
 

@@ -28,20 +28,19 @@ impl<T> IntoBuffer<T> for DiskV1Buffer
 where
     T: Bufferable + Clone,
 {
+    fn provides_instrumentation(&self) -> bool {
+        true
+    }
+
     async fn into_buffer_parts(
         self: Box<Self>,
-        usage_handle: &BufferUsageHandle,
+        usage_handle: BufferUsageHandle,
     ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>, Option<Acker>), Box<dyn Error + Send + Sync>>
     {
         usage_handle.set_buffer_limits(Some(self.max_size), None);
 
         // Create the actual buffer subcomponents.
-        let (writer, reader, acker) = open(
-            &self.data_dir,
-            &self.id,
-            self.max_size,
-            usage_handle.clone(),
-        )?;
+        let (writer, reader, acker) = open(&self.data_dir, &self.id, self.max_size, usage_handle)?;
 
         Ok((
             SenderAdapter::opaque(writer),
