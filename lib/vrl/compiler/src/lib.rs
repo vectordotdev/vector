@@ -19,10 +19,11 @@ pub mod type_def;
 pub mod value;
 pub mod vm;
 
-pub use crate::value::Value;
+pub use crate::value::{kind, Kind, Value};
 use ::serde::{Deserialize, Serialize};
+pub use ::value::ValueRegex;
 pub use context::Context;
-pub use core::{value, ExpressionError, Resolved, Target};
+pub use core::{value, Error, ExpressionError, Resolved, Target};
 pub(crate) use diagnostic::Span;
 pub use expression::Expression;
 pub use function::{Function, Parameter};

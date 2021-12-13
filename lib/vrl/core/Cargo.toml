@@ -6,7 +6,8 @@ edition = "2021"
 publish = false
 
 [dependencies]
+diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 lookup = { path = "../../lookup" }
+thiserror = "1"
 value = { path = "../../value" }
 vector_common = { path = "../../vector-common" }
-diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }

@@ -9338,6 +9338,7 @@ name = "vrl-core"
 version = "0.1.0"
 dependencies = [
  "lookup",
+ "thiserror",
  "value",
  "vector_common",
  "vrl-diagnostic",
