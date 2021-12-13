@@ -5,17 +5,21 @@
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
 
+mod arithmetic;
+mod convert;
 mod error;
 mod expression;
 mod r#macro;
 mod target;
 
+pub use arithmetic::VrlValueArithmetic;
+pub use convert::VrlValueConvert;
 pub use diagnostic::{DiagnosticError, Span};
 pub use error::Error;
 pub use expression::{ExpressionError, Resolved};
 pub use lookup::LookupBuf;
 pub use target::Target;
-pub use value::{Kind, Value};
+pub use value::{kind, Kind, Value, ValueRegex};
 
 use vector_common::TimeZone;
 

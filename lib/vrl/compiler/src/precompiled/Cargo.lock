@@ -94,6 +94,7 @@ dependencies = [
  "num-integer",
  "num-traits",
  "serde",
+ "time",
  "winapi",
 ]
 
@@ -806,6 +807,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "time"
+version = "0.1.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca8a50ef2360fbd1eeb0ecd46795a87a19024eb4b53c5dc916ca1fd95fe62438"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "tiny-keccak"
 version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -919,6 +930,8 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 name = "vrl-core"
 version = "0.1.0"
 dependencies = [
+ "bytes",
+ "chrono",
  "lookup",
  "thiserror",
  "value",

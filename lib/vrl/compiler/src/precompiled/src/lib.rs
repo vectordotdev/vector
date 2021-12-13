@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
-use vrl_core::{Context, Error, ExpressionError, Kind, LookupBuf, Resolved, Span, Value};
+use vrl_core::{
+    Context, Error, ExpressionError, Kind, LookupBuf, Resolved, Span, Value, VrlValueArithmetic,
+};
 
 // We only want to precompile the stub for this function, and therefore don't
 // reference the function arguments.
@@ -170,4 +172,40 @@ pub extern "C" fn vrl_expression_object_set_result_impl(
         moved
     };
     *result = Ok(Value::Object(map));
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_expression_op_add_impl(rhs: &mut Resolved, result: &mut Resolved) {
+    let rhs = {
+        let mut moved = Ok(Value::Null);
+        std::mem::swap(rhs, &mut moved);
+        moved
+    };
+    match (&result, rhs) {
+        (Ok(lhs), Ok(rhs)) => {
+            *result = lhs.clone().try_add(rhs).map_err(Into::into);
+        }
+        (Err(_), _) => (),
+        (_, Err(error)) => {
+            *result = Err(error);
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_expression_op_eq_impl(rhs: &mut Resolved, result: &mut Resolved) {
+    let rhs = {
+        let mut moved = Ok(Value::Null);
+        std::mem::swap(rhs, &mut moved);
+        moved
+    };
+    match (&result, rhs) {
+        (Ok(lhs), Ok(rhs)) => {
+            *result = Ok(lhs.eq_lossy(&rhs).into());
+        }
+        (Err(_), _) => (),
+        (_, Err(error)) => {
+            *result = Err(error);
+        }
+    }
 }
