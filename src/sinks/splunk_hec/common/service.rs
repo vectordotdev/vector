@@ -4,16 +4,17 @@ use crate::{
     internal_events::{SplunkIndexerAcknowledgementUnavailableError, SplunkResponseParseError},
     sinks::{
         splunk_hec::common::{build_uri, request::HecRequest, response::HecResponse},
-        util::Compression,
+        util::{sink::Response, Compression},
         UriParseError,
     },
 };
 use bytes::Bytes;
 use futures_util::{future::BoxFuture, ready};
-use http::{Request, Response};
+use http::Request;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::{
+    fmt,
     sync::Arc,
     task::{Context, Poll},
 };
@@ -22,12 +23,12 @@ use tokio::sync::{
     oneshot, OwnedSemaphorePermit, Semaphore,
 };
 use tokio_util::sync::PollSemaphore;
-use tower::{util::BoxService, Service};
+use tower::Service;
 use uuid::Uuid;
 use vector_core::event::EventStatus;
 
-pub struct HecService {
-    pub inner: BoxService<HecRequest, Response<Bytes>, crate::Error>,
+pub struct HecService<S> {
+    pub inner: S,
     ack_finalizer_tx: Option<mpsc::Sender<(u64, oneshot::Sender<EventStatus>)>>,
     ack_slots: PollSemaphore,
     current_ack_slot: Option<OwnedSemaphorePermit>,
@@ -39,9 +40,15 @@ struct HecAckResponseBody {
     ack_id: Option<u64>,
 }
 
-impl HecService {
+impl<S> HecService<S>
+where
+    S: Service<HecRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: Response + ResponseExt + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
     pub fn new(
-        inner: BoxService<HecRequest, Response<Bytes>, crate::Error>,
+        inner: S,
         ack_client: Option<HttpClient>,
         http_request_builder: Arc<HttpRequestBuilder>,
         indexer_acknowledgements: HecClientAcknowledgementsConfig,
@@ -70,7 +77,13 @@ impl HecService {
     }
 }
 
-impl Service<HecRequest> for HecService {
+impl<S> Service<HecRequest> for HecService<S>
+where
+    S: Service<HecRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: Response + ResponseExt + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
     type Response = HecResponse;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
@@ -79,12 +92,12 @@ impl Service<HecRequest> for HecService {
         // Ready if indexer acknowledgements is disabled or there is room for
         // additional pending acks. Otherwise, wait until there is room.
         if self.ack_finalizer_tx.is_none() || self.current_ack_slot.is_some() {
-            self.inner.poll_ready(cx)
+            self.inner.poll_ready(cx).map_err(Into::into)
         } else {
             match ready!(self.ack_slots.poll_acquire(cx)) {
                 Some(permit) => {
                     self.current_ack_slot.replace(permit);
-                    self.inner.poll_ready(cx)
+                    self.inner.poll_ready(cx).map_err(Into::into)
                 }
                 None => Poll::Ready(Err(
                     "Indexer acknowledgements semaphore unexpectedly closed".into(),
@@ -102,8 +115,8 @@ impl Service<HecRequest> for HecService {
         let response = self.inner.call(req);
 
         Box::pin(async move {
-            let response = response.await?;
-            let event_status = if response.status().is_success() {
+            let response = response.await.map_err(Into::into)?;
+            let event_status = if response.is_successful() {
                 if let Some(ack_finalizer_tx) = ack_finalizer_tx {
                     let _ack_slot = ack_slot.expect("poll_ready not called before invoking call");
                     let body = serde_json::from_slice::<HecAckResponseBody>(response.body());
@@ -134,19 +147,29 @@ impl Service<HecRequest> for HecService {
                     // Default behavior if indexer acknowledgements is disabled by configuration
                     EventStatus::Delivered
                 }
-            } else if response.status().is_server_error() {
+            } else if response.is_transient() {
                 EventStatus::Errored
             } else {
                 EventStatus::Rejected
             };
 
             Ok(HecResponse {
-                http_response: response,
+                // http_response: response,
                 event_status,
                 events_count,
                 events_byte_size,
             })
         })
+    }
+}
+
+pub trait ResponseExt {
+    fn body(&self) -> &Bytes;
+}
+
+impl ResponseExt for http::Response<Bytes> {
+    fn body(&self) -> &Bytes {
+        self.body()
     }
 }
 
@@ -199,6 +222,7 @@ impl HttpRequestBuilder {
 
 #[cfg(test)]
 mod tests {
+    use bytes::Bytes;
     use futures_util::{future::poll_fn, poll, stream::FuturesUnordered, StreamExt};
     use std::{
         collections::HashMap,
@@ -240,7 +264,7 @@ mod tests {
     fn get_hec_service(
         endpoint: String,
         acknowledgements_config: HecClientAcknowledgementsConfig,
-    ) -> HecService {
+    ) -> HecService<BoxService<HecRequest, http::Response<Bytes>, crate::Error>> {
         let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
             endpoint,
