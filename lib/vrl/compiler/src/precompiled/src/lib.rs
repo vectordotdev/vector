@@ -1,4 +1,4 @@
-use vrl_core::{Context, ExpressionError, Resolved, Span, Value};
+use vrl_core::{Context, ExpressionError, LookupBuf, Resolved, Span, Value};
 
 // We only want to precompile the stub for this function, and therefore don't
 // reference the function arguments.
@@ -18,6 +18,19 @@ pub extern "C" fn vrl_resolved_drop(result: *mut Resolved) {
 }
 
 #[no_mangle]
+pub extern "C" fn vrl_resolved_err_into_ok(result: &mut Resolved) {
+    *result = Ok(match result {
+        Err(error) => error.to_string().into(),
+        _ => panic!(r#"expected value "{:?}" to be an error"#, result),
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_resolved_is_ok(result: &mut Resolved) -> bool {
+    result.is_ok()
+}
+
+#[no_mangle]
 pub extern "C" fn vrl_expression_abort_impl(
     span: &Span,
     message: &Resolved,
@@ -32,4 +45,39 @@ pub extern "C" fn vrl_expression_abort_impl(
         span: *span,
         message,
     });
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_expression_assignment_target_insert_internal_impl(
+    value: &Resolved,
+    target: &mut Resolved,
+) {
+    *target = value.clone()
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_expression_assignment_target_insert_internal_path_impl(
+    value: &Resolved,
+    path: &LookupBuf,
+    target: &mut Resolved,
+) {
+    let value = value
+        .as_ref()
+        .expect("assignment value must not contain an error");
+    let target = target
+        .as_mut()
+        .expect("assignment target must not contain an error");
+    target.insert_by_path(path, value.clone())
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_expression_assignment_target_insert_external_impl(
+    value: &Resolved,
+    path: &LookupBuf,
+    ctx: &mut Context,
+) {
+    let value = value
+        .as_ref()
+        .expect("assignment value must not contain an error");
+    let _ = ctx.target.target_insert(path, value.clone());
 }

@@ -11,6 +11,7 @@ mod target;
 
 pub use diagnostic::Span;
 pub use expression::{ExpressionError, Resolved};
+pub use lookup::LookupBuf;
 pub use target::Target;
 pub use value::Value;
 

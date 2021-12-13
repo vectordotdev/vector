@@ -2,7 +2,7 @@ use codespan_reporting::diagnostic;
 
 use crate::Span;
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct Label {
     pub message: String,
     pub primary: bool,
