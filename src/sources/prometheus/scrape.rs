@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{stream, FutureExt, StreamExt, TryFutureExt};
 use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -187,12 +187,10 @@ fn prometheus(
     proxy: ProxyConfig,
     interval: u64,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    mut out: Pipeline,
 ) -> sources::Source {
-    let out = out.sink_map_err(|error| error!(message = "Error sending metric.", %error));
-
-    Box::pin(
-        IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
+    Box::pin(async move {
+        let mut stream = IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
             .take_until(shutdown)
             .map(move |_| stream::iter(urls.clone()))
             .flatten()
@@ -314,7 +312,7 @@ fn prometheus(
                                                     }
                                                 }
                                             }
-                                            Ok(event)
+                                            event
                                         }))
                                     }
                                     Err(error) => {
@@ -362,9 +360,19 @@ fn prometheus(
                     .flatten()
             })
             .flatten()
-            .forward(out)
-            .inspect(|_| info!("Finished sending.")),
-    )
+            .boxed();
+
+        match out.send_all(&mut stream).await {
+            Ok(()) => {
+                info!("Finished sending.");
+                Ok(())
+            }
+            Err(error) => {
+                error!(message = "Error sending metric.", %error);
+                Err(())
+            }
+        }
+    })
 }
 
 #[cfg(all(test, feature = "sinks-prometheus"))]

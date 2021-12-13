@@ -3,7 +3,7 @@ use std::task::Poll;
 use bytes::Bytes;
 use chrono::Utc;
 use fakedata::logs::*;
-use futures::{SinkExt, StreamExt};
+use futures::StreamExt;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -251,7 +251,8 @@ impl SourceConfig for DemoLogsCompatConfig {
 mod tests {
     use std::time::{Duration, Instant};
 
-    use futures::{channel::mpsc, poll, StreamExt};
+    use futures::{poll, StreamExt};
+    use tokio_stream::wrappers::ReceiverStream;
 
     use super::*;
     use crate::{config::log_schema, event::Event, shutdown::ShutdownSignal, Pipeline};
@@ -261,7 +262,7 @@ mod tests {
         crate::test_util::test_generate_config::<DemoLogsConfig>();
     }
 
-    async fn runit(config: &str) -> mpsc::Receiver<Event> {
+    async fn runit(config: &str) -> ReceiverStream<Event> {
         let (tx, rx) = Pipeline::new_test();
         let config: DemoLogsConfig = toml::from_str(config).unwrap();
         let decoder = DecodingConfig::new(default_framing_message_based(), default_decoding())

@@ -1,7 +1,7 @@
 use std::{fs::remove_file, path::PathBuf};
 
 use bytes::{Bytes, BytesMut};
-use futures::{SinkExt, StreamExt};
+use futures::{stream, StreamExt};
 use tokio::net::UnixDatagram;
 use tokio_util::codec::FramedRead;
 use tracing::field;
@@ -51,9 +51,8 @@ async fn listen(
     decoder: codecs::Decoder,
     mut shutdown: ShutdownSignal,
     handle_events: impl Fn(&mut [Event], Option<Bytes>, usize) + Clone + Send + Sync + 'static,
-    out: Pipeline,
+    mut out: Pipeline,
 ) -> Result<(), ()> {
-    let mut out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
     let mut buf = BytesMut::with_capacity(max_length);
     loop {
         buf.resize(max_length, 0);
@@ -85,8 +84,9 @@ async fn listen(
                         Some(Ok((mut events, byte_size))) => {
                             handle_events(&mut events, received_from.clone(), byte_size);
 
-                            for event in events {
-                                out.send(event).await?;
+                            if let Err(error) = out.send_all(stream::iter(events)).await {
+                                error!(message = "Error sending line.", %error);
+                                return Err(());
                             }
                         },
                         Some(Err(error)) => {

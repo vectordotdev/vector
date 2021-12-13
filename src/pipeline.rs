@@ -1,11 +1,13 @@
-use std::{collections::VecDeque, fmt, pin::Pin, task::Context};
+use std::{collections::VecDeque, fmt};
 
-use futures::{channel::mpsc, task::Poll, Sink};
-#[cfg(test)]
-use futures::{Stream, StreamExt};
+use futures::{stream, Stream, StreamExt};
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 #[cfg(test)]
 use vector_core::event::EventStatus;
 use vector_core::{event::Event, internal_event::EventsSent, ByteSizeOf};
+
+const CHUNK_SIZE: usize = 1000;
 
 #[derive(Debug)]
 pub struct ClosedError;
@@ -18,7 +20,31 @@ impl fmt::Display for ClosedError {
 
 impl std::error::Error for ClosedError {}
 
-const MAX_ENQUEUED: usize = 1000;
+impl From<mpsc::error::SendError<Event>> for ClosedError {
+    fn from(_: mpsc::error::SendError<Event>) -> Self {
+        Self
+    }
+}
+
+#[derive(Debug)]
+pub enum StreamSendError<E> {
+    Closed(ClosedError),
+    Stream(E),
+}
+
+impl<E> fmt::Display for StreamSendError<E>
+where
+    E: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StreamSendError::Closed(e) => e.fmt(f),
+            StreamSendError::Stream(e) => e.fmt(f),
+        }
+    }
+}
+
+impl<E> std::error::Error for StreamSendError<E> where E: std::error::Error {}
 
 #[derive(Derivative, Clone)]
 #[derivative(Debug)]
@@ -28,104 +54,74 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    fn try_flush(
-        &mut self,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<(), <Self as Sink<Event>>::Error>> {
-        // We batch the updates to EventsSent for efficiency, and do it here because
-        // it gives us a chance to allow the natural batching of `Pipeline` to kick in.
-        let mut sent_count = 0;
-        let mut sent_bytes = 0;
-
-        while let Some(event) = self.enqueued.pop_front() {
-            match self.inner.poll_ready(cx) {
-                Poll::Pending => {
-                    self.enqueued.push_front(event);
-                    if sent_count > 0 {
-                        emit!(&EventsSent {
-                            count: sent_count,
-                            byte_size: sent_bytes,
-                        });
-                    }
-                    return Poll::Pending;
-                }
-                Poll::Ready(Ok(())) => {
-                    // continue to send below
-                }
-                Poll::Ready(Err(_error)) => {
-                    if sent_count > 0 {
-                        emit!(&EventsSent {
-                            count: sent_count,
-                            byte_size: sent_bytes,
-                        });
-                    }
-                    return Poll::Ready(Err(ClosedError));
-                }
-            }
-
-            let event_bytes = event.size_of();
-            match self.inner.start_send(event) {
-                Ok(()) => {
-                    // we good, keep looping
-                    sent_count += 1;
-                    sent_bytes += event_bytes;
-                }
-                Err(error) if error.is_full() => {
-                    // We only try to send after a successful call to poll_ready, which reserves
-                    // space for us in the channel. That makes this branch unreachable as long as
-                    // the channel implementation fulfills its own contract.
-                    panic!("Channel was both ready and full; this is a bug.")
-                }
-                Err(error) if error.is_disconnected() => {
-                    if sent_count > 0 {
-                        emit!(&EventsSent {
-                            count: sent_count,
-                            byte_size: sent_bytes,
-                        });
-                    }
-                    return Poll::Ready(Err(ClosedError));
-                }
-                Err(_) => unreachable!(),
-            }
-        }
-        if sent_count > 0 {
-            emit!(&EventsSent {
-                count: sent_count,
-                byte_size: sent_bytes,
-            });
-        }
-        Poll::Ready(Ok(()))
-    }
-}
-
-impl Sink<Event> for Pipeline {
-    type Error = ClosedError;
-
-    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        if self.enqueued.len() < MAX_ENQUEUED {
-            Poll::Ready(Ok(()))
-        } else {
-            self.try_flush(cx)
-        }
-    }
-
-    fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
-        self.enqueued.push_back(item);
+    pub async fn send(&mut self, event: Event) -> Result<(), ClosedError> {
+        let byte_size = event.size_of();
+        self.inner.send(event).await?;
+        emit!(&EventsSent {
+            count: 1,
+            byte_size,
+        });
         Ok(())
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.try_flush(cx)
+    pub async fn send_all(
+        &mut self,
+        events: impl Stream<Item = Event> + Unpin,
+    ) -> Result<(), ClosedError> {
+        let mut stream = events.ready_chunks(CHUNK_SIZE);
+        while let Some(events) = stream.next().await {
+            let mut count = 0;
+            let mut byte_size = 0;
+
+            for event in events {
+                let event_size = event.size_of();
+                match self.inner.send(event).await {
+                    Ok(()) => {
+                        count += 1;
+                        byte_size += event_size;
+                    }
+                    Err(error) => {
+                        emit!(&EventsSent { count, byte_size });
+                        return Err(error.into());
+                    }
+                }
+            }
+
+            emit!(&EventsSent { count, byte_size });
+        }
+
+        Ok(())
     }
 
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.poll_flush(cx)
+    pub async fn send_result_stream<E>(
+        &mut self,
+        events: impl Stream<Item = Result<Event, E>> + Unpin,
+    ) -> Result<(), StreamSendError<E>> {
+        let mut stream = events.ready_chunks(CHUNK_SIZE);
+        while let Some(results) = stream.next().await {
+            let mut stream_error = None;
+            let mut to_forward = Vec::with_capacity(results.len());
+            for result in results {
+                match result {
+                    Ok(event) => to_forward.push(event),
+                    Err(e) => {
+                        stream_error = Some(e);
+                        break;
+                    }
+                }
+            }
+            if let Err(closed_err) = self.send_all(&mut stream::iter(to_forward)).await {
+                return Err(StreamSendError::Closed(closed_err));
+            }
+            if let Some(error) = stream_error {
+                return Err(StreamSendError::Stream(error));
+            }
+        }
+        Ok(())
     }
-}
 
-impl Pipeline {
     #[cfg(test)]
-    pub fn new_test() -> (Self, mpsc::Receiver<Event>) {
+    pub fn new_test() -> (Self, ReceiverStream<Event>) {
         Self::new_with_buffer(100)
     }
 
@@ -144,9 +140,9 @@ impl Pipeline {
         (pipe, recv)
     }
 
-    pub fn new_with_buffer(n: usize) -> (Self, mpsc::Receiver<Event>) {
+    pub fn new_with_buffer(n: usize) -> (Self, ReceiverStream<Event>) {
         let (tx, rx) = mpsc::channel(n);
-        (Self::from_sender(tx), rx)
+        (Self::from_sender(tx), ReceiverStream::new(rx))
     }
 
     pub fn from_sender(inner: mpsc::Sender<Event>) -> Self {

@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, io::Read, net::SocketAddr, sync::Arc};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use chrono::{TimeZone, Utc};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
-use futures::{future, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{future, FutureExt};
 use http::StatusCode;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -208,16 +208,14 @@ impl DatadogAgentSource {
             Ok(mut events) => {
                 let receiver = BatchNotifier::maybe_apply_to_events(acknowledgements, &mut events);
 
-                let mut events = futures::stream::iter(events).map(Ok);
-                out.send_all(&mut events)
-                    .map_err(move |error: crate::pipeline::ClosedError| {
-                        // can only fail if receiving end disconnected, so we are shutting down,
-                        // probably not gracefully.
-                        error!(message = "Failed to forward events, downstream is closed.");
-                        error!(message = "Tried to send the following event.", %error);
-                        warp::reject::custom(ApiError::ServerShutdown)
-                    })
-                    .await?;
+                let mut events = futures::stream::iter(events);
+                if let Err(error) = out.send_all(&mut events).await {
+                    // can only fail if receiving end disconnected, so we are shutting down,
+                    // probably not gracefully.
+                    error!(message = "Failed to forward events, downstream is closed.");
+                    error!(message = "Tried to send the following event.", %error);
+                    return Err(warp::reject::custom(ApiError::ServerShutdown));
+                }
                 match receiver {
                     None => Ok(warp::reply().into_response()),
                     Some(receiver) => match receiver.await {

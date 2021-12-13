@@ -2,7 +2,7 @@ use std::{collections::HashMap, convert::TryFrom, fmt, net::SocketAddr};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{FutureExt, TryFutureExt};
 use vector_core::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     ByteSizeOf,
@@ -159,7 +159,7 @@ async fn handle_request(
         Ok(mut events) => {
             let receiver = BatchNotifier::maybe_apply_to_events(acknowledgements, &mut events);
 
-            out.send_all(&mut futures::stream::iter(events).map(Ok))
+            out.send_all(&mut futures::stream::iter(events))
                 .map_err(move |error: crate::pipeline::ClosedError| {
                     // can only fail if receiving end disconnected, so we are shutting down,
                     // probably not gracefully.

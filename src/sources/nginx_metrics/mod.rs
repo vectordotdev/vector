@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, convert::TryFrom, time::Instant};
 
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{future::join_all, stream, SinkExt, StreamExt, TryFutureExt};
+use futures::{future::join_all, stream, StreamExt, TryFutureExt};
 use http::{Request, StatusCode};
 use hyper::{body::to_bytes as body_to_bytes, Body, Uri};
 use serde::{Deserialize, Serialize};
@@ -84,7 +84,7 @@ impl_generate_config_from_default!(NginxMetricsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "nginx_metrics")]
 impl SourceConfig for NginxMetricsConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+    async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let tls = TlsSettings::from_options(&self.tls)?;
         let http_client = HttpClient::new(tls, &cx.proxy)?;
 
@@ -98,10 +98,6 @@ impl SourceConfig for NginxMetricsConfig {
                 namespace.clone(),
             )?);
         }
-
-        let mut out = cx
-            .out
-            .sink_map_err(|error| error!(message = "Error sending mongodb metrics.", %error));
 
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
         let shutdown = cx.shutdown;
@@ -118,9 +114,12 @@ impl SourceConfig for NginxMetricsConfig {
                 let mut stream = stream::iter(metrics)
                     .map(stream::iter)
                     .flatten()
-                    .map(Event::Metric)
-                    .map(Ok);
-                out.send_all(&mut stream).await?;
+                    .map(Event::Metric);
+
+                if let Err(error) = cx.out.send_all(&mut stream).await {
+                    error!(message = "Error sending mongodb metrics.", %error);
+                    return Err(());
+                }
             }
 
             Ok(())

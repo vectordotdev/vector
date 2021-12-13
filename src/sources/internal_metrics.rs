@@ -1,4 +1,4 @@
-use futures::{stream, SinkExt, StreamExt};
+use futures::{stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
@@ -111,12 +111,9 @@ async fn run(
     pid_key: Option<&str>,
     controller: &Controller,
     interval: time::Duration,
-    out: Pipeline,
+    mut out: Pipeline,
     shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
-    let mut out =
-        out.sink_map_err(|error| error!(message = "Error sending internal metrics.", %error));
-
     let mut interval = IntervalStream::new(time::interval(interval)).take_until(shutdown);
     while interval.next().await.is_some() {
         let hostname = crate::get_hostname();
@@ -124,7 +121,7 @@ async fn run(
 
         let metrics = controller.capture_metrics();
 
-        out.send_all(&mut stream::iter(metrics).map(|mut metric| {
+        let mut stream = stream::iter(metrics).map(|mut metric| {
             // A metric starts out with a default "vector" namespace, but will be overridden
             // if an explicit namespace is provided to this source.
             if namespace.is_some() {
@@ -147,9 +144,13 @@ async fn run(
             if let Some(pid_key) = pid_key {
                 metric.insert_tag(pid_key.to_owned(), pid.clone());
             }
-            Ok(metric.into())
-        }))
-        .await?;
+            metric.into()
+        });
+
+        if let Err(error) = out.send_all(&mut stream).await {
+            error!(message = "Error sending internal metrics.", %error);
+            return Err(());
+        }
     }
 
     Ok(())

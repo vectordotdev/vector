@@ -6,7 +6,7 @@ use bytes::Bytes;
 use chrono::Utc;
 #[cfg(unix)]
 use codecs::Decoder;
-use futures::{FutureExt, SinkExt, StreamExt};
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use tokio::net::UdpSocket;
@@ -203,10 +203,8 @@ pub fn udp(
     host_key: String,
     receive_buffer_bytes: Option<usize>,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    mut out: Pipeline,
 ) -> super::Source {
-    let out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
-
     Box::pin(async move {
         let socket = UdpSocket::bind(&addr)
             .await
@@ -224,7 +222,7 @@ pub fn udp(
             r#type = "udp"
         );
 
-        UdpFramed::new(
+        let mut stream = UdpFramed::new(
             socket,
             codecs::Decoder::new(Box::new(BytesDecoder::new()), Box::new(SyslogDeserializer)),
         )
@@ -245,10 +243,18 @@ pub fn udp(
                 }
             }
         })
-        .map(Ok)
-        .forward(out)
-        .inspect(|_| info!("Finished sending."))
-        .await
+        .boxed();
+
+        match out.send_all(&mut stream).await {
+            Ok(()) => {
+                info!("Finished sending.");
+                Ok(())
+            }
+            Err(error) => {
+                error!(message = "Error sending line.", %error);
+                Err(())
+            }
+        }
     })
 }
 

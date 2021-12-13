@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{pin_mut, stream, SinkExt, Stream, StreamExt};
+use futures::{pin_mut, stream, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio_util::codec::FramedRead;

@@ -11,7 +11,7 @@ use std::{
 
 use bytes::Bytes;
 use chrono::TimeZone;
-use futures::{future, stream, stream::BoxStream, SinkExt, StreamExt};
+use futures::{future, stream, stream::BoxStream, StreamExt};
 use lazy_static::lazy_static;
 use nix::{
     sys::signal::{kill, Signal},
@@ -361,7 +361,7 @@ impl JournaldSource {
             if count > 0 {
                 emit!(&JournaldEventsReceived { count, byte_size });
                 if !events.is_empty() {
-                    match self.out.send_all(&mut stream::iter(events).map(Ok)).await {
+                    match self.out.send_all(&mut stream::iter(events)).await {
                         Ok(_) => {
                             if let Some(receiver) = receiver {
                                 // Ignore the received status, we can't do anything with failures here.
@@ -988,7 +988,7 @@ mod tests {
         assert!(!handle.is_woken());
         // Acknowledge all the received events.
         let mut count = 0;
-        while let Ok(Some(event)) = rx.try_next() {
+        while let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
             event.metadata().update_status(EventStatus::Delivered);
             count += 1;
         }

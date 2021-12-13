@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{FutureExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
 use tonic::{
@@ -51,7 +51,7 @@ impl proto::Service for Service {
 
         self.pipeline
             .clone()
-            .send_all(&mut futures::stream::iter(events).map(Ok))
+            .send_all(&mut futures::stream::iter(events))
             .map_err(|err| Status::unavailable(err.to_string()))
             .and_then(|_| handle_batch_status(receiver))
             .await?;

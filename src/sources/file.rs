@@ -9,7 +9,7 @@ use file_source::{
 use futures::{
     future::TryFutureExt,
     stream::{Stream, StreamExt},
-    FutureExt, SinkExt,
+    FutureExt,
 };
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
@@ -374,25 +374,22 @@ pub fn file_source(
         // logs in the queue.
         let span = current_span();
         let span2 = span.clone();
-        let mut messages = messages
-            .map(move |line| {
-                let _enter = span2.enter();
-                let mut event =
-                    create_event(line.text, line.filename, &host_key, &hostname, &file_key);
-                if let Some(finalizer) = &finalizer {
-                    let (batch, receiver) = BatchNotifier::new_with_receiver();
-                    event = event.with_batch_notifier(&batch);
-                    let entry = FinalizerEntry {
-                        file_id: line.file_id,
-                        offset: line.offset,
-                    };
-                    finalizer.add(entry, receiver);
-                } else {
-                    checkpoints.update(line.file_id, line.offset);
-                }
-                event
-            })
-            .map(Ok);
+        let mut messages = messages.map(move |line| {
+            let _enter = span2.enter();
+            let mut event = create_event(line.text, line.filename, &host_key, &hostname, &file_key);
+            if let Some(finalizer) = &finalizer {
+                let (batch, receiver) = BatchNotifier::new_with_receiver();
+                event = event.with_batch_notifier(&batch);
+                let entry = FinalizerEntry {
+                    file_id: line.file_id,
+                    offset: line.offset,
+                };
+                finalizer.add(entry, receiver);
+            } else {
+                checkpoints.update(line.file_id, line.offset);
+            }
+            event
+        });
         tokio::spawn(async move { out.send_all(&mut messages).instrument(span).await });
 
         let span = info_span!("file_server");

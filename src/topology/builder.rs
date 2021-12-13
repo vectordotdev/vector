@@ -144,7 +144,7 @@ pub async fn build_pieces(
         .iter()
         .filter(|(key, _)| diff.sources.contains_new(key))
     {
-        let (tx, rx) = futures::channel::mpsc::channel(1000);
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1000);
         let pipeline = Pipeline::from_sender(tx);
 
         let typetag = source.inner.source_type();
@@ -166,8 +166,13 @@ pub async fn build_pieces(
             Ok(server) => server,
         };
 
-        let (output, control) = Fanout::new();
-        let pump = rx.map(Ok).forward(output).map_ok(|_| TaskOutput::Source);
+        let (mut output, control) = Fanout::new();
+        let pump = async move {
+            while let Some(event) = rx.recv().await {
+                output.feed(event).await?
+            }
+            Ok(TaskOutput::Source)
+        };
         let pump = Task::new(key.clone(), typetag, pump);
 
         // The force_shutdown_tripwire is a Future that when it resolves means that this source
