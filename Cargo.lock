@@ -8503,6 +8503,8 @@ dependencies = [
 name = "vector-vrl-functions"
 version = "0.1.0"
 dependencies = [
+ "value",
+ "vector_core",
  "vrl",
 ]
 
