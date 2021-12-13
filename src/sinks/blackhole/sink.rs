@@ -1,25 +1,20 @@
-use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    internal_events::BlackholeEventReceived,
-    sinks::util::StreamSink,
-};
+use crate::event::Event;
+use crate::internal_events::BlackholeEventReceived;
+use crate::sinks::blackhole::config::BlackholeConfig;
+use crate::sinks::util::StreamSink;
 use async_trait::async_trait;
-use futures::{future, stream::BoxStream, FutureExt, StreamExt};
-use serde::{Deserialize, Serialize};
-use std::{
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-    time::{Duration, Instant},
-};
-use tokio::{
-    select,
-    sync::watch,
-    time::{interval, sleep_until},
-};
+use futures::stream::BoxStream;
+use futures::StreamExt;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tokio::select;
+use tokio::sync::watch;
+use tokio::time::interval;
+use tokio::time::sleep_until;
+use vector_core::buffers::Acker;
+use vector_core::internal_event::EventsSent;
 use vector_core::ByteSizeOf;
-use vector_core::{buffers::Acker, event::Event};
 
 pub struct BlackholeSink {
     total_events: Arc<AtomicUsize>,
@@ -27,52 +22,6 @@ pub struct BlackholeSink {
     config: BlackholeConfig,
     acker: Acker,
     last: Option<Instant>,
-}
-
-#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
-#[serde(deny_unknown_fields, default)]
-#[derivative(Default)]
-pub struct BlackholeConfig {
-    #[derivative(Default(value = "1"))]
-    #[serde(default = "default_print_interval_secs")]
-    pub print_interval_secs: u64,
-    pub rate: Option<usize>,
-}
-
-const fn default_print_interval_secs() -> u64 {
-    1
-}
-
-inventory::submit! {
-    SinkDescription::new::<BlackholeConfig>("blackhole")
-}
-
-impl GenerateConfig for BlackholeConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "blackhole")]
-impl SinkConfig for BlackholeConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink = BlackholeSink::new(self.clone(), cx.acker());
-        let healthcheck = future::ok(()).boxed();
-
-        Ok((super::VectorSink::Stream(Box::new(sink)), healthcheck))
-    }
-
-    fn input_type(&self) -> DataType {
-        DataType::Any
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "blackhole"
-    }
 }
 
 impl BlackholeSink {
@@ -138,6 +87,10 @@ impl StreamSink for BlackholeSink {
             emit!(&BlackholeEventReceived {
                 byte_size: message_len
             });
+            emit!(&EventsSent {
+                count: events.len(),
+                byte_size: message_len
+            });
 
             self.acker.ack(events.len());
         }
@@ -146,28 +99,5 @@ impl StreamSink for BlackholeSink {
         let _ = shutdown.send(());
 
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::test_util::random_events_with_stream;
-
-    #[test]
-    fn generate_config() {
-        crate::test_util::test_generate_config::<BlackholeConfig>();
-    }
-
-    #[tokio::test]
-    async fn blackhole() {
-        let config = BlackholeConfig {
-            print_interval_secs: 10,
-            rate: None,
-        };
-        let sink = Box::new(BlackholeSink::new(config, Acker::Null));
-
-        let (_input_lines, events) = random_events_with_stream(100, 10, None);
-        let _ = sink.run(Box::pin(events)).await.unwrap();
     }
 }
