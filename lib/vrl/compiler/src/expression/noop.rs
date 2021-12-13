@@ -13,6 +13,11 @@ impl Expression for Noop {
     fn type_def(&self, _: &State) -> TypeDef {
         TypeDef::new().null().infallible()
     }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(&self, _: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+        todo!()
+    }
 }
 
 impl fmt::Display for Noop {

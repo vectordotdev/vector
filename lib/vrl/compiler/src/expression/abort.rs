@@ -25,6 +25,11 @@ impl Expression for Abort {
     fn dump(&self, _vm: &mut crate::vm::Vm) -> Result<(), String> {
         todo!()
     }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(&self, _: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+        todo!()
+    }
 }
 
 impl fmt::Display for Abort {

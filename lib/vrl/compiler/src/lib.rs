@@ -6,6 +6,8 @@ mod test_util;
 
 pub mod expression;
 pub mod function;
+#[cfg(feature = "llvm")]
+pub mod llvm;
 pub mod state;
 pub mod type_def;
 pub mod value;

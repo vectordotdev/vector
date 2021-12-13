@@ -184,7 +184,10 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    fn compile_predicate(&mut self, node: Node<ast::Predicate>) -> predicate::Result {
+    fn compile_predicate(
+        &mut self,
+        node: Node<ast::Predicate>,
+    ) -> Result<Predicate, predicate::Error> {
         use ast::Predicate::*;
 
         let (span, predicate) = node.take();

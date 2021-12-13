@@ -59,6 +59,12 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
         Ok(())
     }
 
+    #[cfg(feature = "llvm")]
+    /// Emit LLVM IR that computes the `Value` for this expression.
+    fn emit_llvm<'ctx>(&self, _: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+        Err("Called `emit_llvm` on an expression which is not supposed to emit LLVM IR".into())
+    }
+
     /// Resolve an expression to a value without any context, if possible.
     ///
     /// This returns `Some` for static expressions, or `None` for dynamic expressions.
@@ -201,6 +207,11 @@ impl Expression for Expr {
             Unary(v) => v.dump(vm),
             Abort(v) => v.dump(vm),
         }
+    }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(&self, _: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+        todo!()
     }
 }
 

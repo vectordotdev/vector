@@ -65,6 +65,11 @@ impl Expression for Container {
             Object(v) => v.dump(vm),
         }
     }
+
+    #[cfg(feature = "llvm")]
+    fn emit_llvm<'ctx>(&self, _: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+        todo!()
+    }
 }
 
 impl fmt::Display for Container {
