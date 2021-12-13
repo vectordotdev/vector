@@ -86,3 +86,8 @@ pub extern "C" fn vrl_expression_assignment_target_insert_external_impl(
     let value = resolved.as_ref().unwrap().clone();
     let _ = ctx.target_mut().insert(path, value);
 }
+
+#[no_mangle]
+pub extern "C" fn vrl_expression_literal_impl(value: &Value, result: &mut Resolved) {
+    *result = Ok(value.clone());
+}

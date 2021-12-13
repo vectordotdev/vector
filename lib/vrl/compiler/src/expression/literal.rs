@@ -95,8 +95,40 @@ impl Expression for Literal {
     }
 
     #[cfg(feature = "llvm")]
-    fn emit_llvm<'ctx>(&self, _: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
-        todo!()
+    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+        let function = ctx.function();
+        let literal_begin_block = ctx.context().append_basic_block(function, "literal_begin");
+        ctx.builder()
+            .build_unconditional_branch(literal_begin_block);
+        ctx.builder().position_at_end(literal_begin_block);
+
+        let value = self.to_value();
+        let value_name = format!("{}", value);
+        let value_ref = ctx.into_const(value, &value_name).as_pointer_value();
+        let fn_ident = "vrl_expression_literal_impl";
+        let fn_impl = ctx
+            .module()
+            .get_function(fn_ident)
+            .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+        ctx.builder().build_call(
+            fn_impl,
+            &[
+                ctx.builder()
+                    .build_bitcast(
+                        value_ref,
+                        fn_impl
+                            .get_nth_param(0)
+                            .unwrap()
+                            .get_type()
+                            .into_pointer_type(),
+                        "",
+                    )
+                    .into(),
+                ctx.result_ref().into(),
+            ],
+            fn_ident,
+        );
+        Ok(())
     }
 }
 
