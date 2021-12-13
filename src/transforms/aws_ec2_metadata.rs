@@ -144,7 +144,7 @@ impl TransformConfig for Ec2Metadata {
             .unwrap_or_else(|| DEFAULT_FIELD_WHITELIST.clone());
 
         let proxy = ProxyConfig::merge_with_env(&context.globals.proxy, &self.proxy);
-        let http_client = HttpClient::new(None, &proxy)?;
+        let http_client = HttpClient::new(None, &proxy, None)?;
 
         let mut client = MetadataClient::new(
             http_client,

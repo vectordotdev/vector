@@ -73,7 +73,7 @@ fn eventstoredb(
     let mut ticks = IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
         .take_until(cx.shutdown);
     let tls_settings = TlsSettings::from_options(&None)?;
-    let client = HttpClient::new(tls_settings, &cx.proxy)?;
+    let client = HttpClient::new(tls_settings, &cx.proxy, None)?;
     let url: Uri = endpoint.parse()?;
 
     Ok(Box::pin(

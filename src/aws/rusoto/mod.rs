@@ -44,7 +44,7 @@ pub type Client = HttpClient<crate::http::HttpClient<RusotoBody>>;
 
 pub fn client(proxy: &ProxyConfig) -> crate::Result<Client> {
     let settings = MaybeTlsSettings::enable_client()?;
-    let client = crate::http::HttpClient::new(settings, proxy)?;
+    let client = crate::http::HttpClient::new(settings, proxy, None)?;
     Ok(HttpClient { client })
 }
 
@@ -53,7 +53,7 @@ pub fn custom_client(
     client_builder: &mut client::Builder,
 ) -> crate::Result<Client> {
     let settings = MaybeTlsSettings::enable_client()?;
-    let client = crate::http::HttpClient::new_with_custom_client(settings, proxy, client_builder)?;
+    let client = crate::http::HttpClient::new_with_custom_client(settings, proxy, None, client_builder)?;
     Ok(HttpClient { client })
 }
 

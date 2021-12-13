@@ -70,7 +70,7 @@ impl SinkConfig for HoneycombConfig {
 
         let buffer = JsonArrayBuffer::new(batch_settings.size);
 
-        let client = HttpClient::new(None, cx.proxy())?;
+        let client = HttpClient::new(None, cx.proxy(), None)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),

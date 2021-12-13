@@ -540,7 +540,7 @@ mod tests {
             .body(Body::empty())
             .expect("Error creating request.");
         let proxy = ProxyConfig::default();
-        let result = HttpClient::new(client_settings, &proxy)
+        let result = HttpClient::new(client_settings, &proxy, None)
             .unwrap()
             .send(request)
             .await
@@ -821,7 +821,7 @@ mod integration_tests {
             .body(Body::empty())
             .expect("Error creating request.");
         let proxy = ProxyConfig::default();
-        let result = HttpClient::new(None, &proxy)
+        let result = HttpClient::new(None, &proxy, None)
             .unwrap()
             .send(request)
             .await
@@ -838,7 +838,7 @@ mod integration_tests {
             .body(Body::empty())
             .expect("Error creating request.");
         let proxy = ProxyConfig::default();
-        let result = HttpClient::new(None, &proxy)
+        let result = HttpClient::new(None, &proxy, None)
             .unwrap()
             .send(request)
             .await

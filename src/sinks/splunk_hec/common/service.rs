@@ -262,7 +262,7 @@ mod tests {
         endpoint: String,
         acknowledgements_config: HecClientAcknowledgementsConfig,
     ) -> HecService {
-        let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
+        let client = HttpClient::new(None, &ProxyConfig::default(), None).unwrap();
         let http_request_builder =
             HttpRequestBuilder::new(endpoint, String::from(TOKEN), Compression::default());
         HecService::new(client, http_request_builder, acknowledgements_config)

@@ -143,7 +143,7 @@ impl DatadogLogsConfig {
             &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
             false,
         )?;
-        Ok(HttpClient::new(tls_settings, proxy)?)
+        Ok(HttpClient::new(tls_settings, proxy, None)?)
     }
 }
 

@@ -82,7 +82,7 @@ impl SinkConfig for LogdnaConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let batch_settings = self.batch.into_batch_settings()?;
-        let client = HttpClient::new(None, cx.proxy())?;
+        let client = HttpClient::new(None, cx.proxy(), None)?;
 
         let sink = PartitionHttpSink::new(
             self.clone(),

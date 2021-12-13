@@ -112,7 +112,7 @@ async fn healthcheck_includes_auth() {
 
     let tls = TlsSettings::from_options(&config.tls).expect("could not create TLS settings");
     let proxy = ProxyConfig::default();
-    let client = HttpClient::new(tls, &proxy).expect("could not create HTTP client");
+    let client = HttpClient::new(tls, &proxy, None).expect("could not create HTTP client");
 
     healthcheck(config.clone(), client)
         .await
@@ -141,7 +141,7 @@ async fn healthcheck_grafana_cloud() {
 
     let tls = TlsSettings::from_options(&config.tls).expect("could not create TLS settings");
     let proxy = ProxyConfig::default();
-    let client = HttpClient::new(tls, &proxy).expect("could not create HTTP client");
+    let client = HttpClient::new(tls, &proxy, None).expect("could not create HTTP client");
 
     healthcheck(config, client)
         .await

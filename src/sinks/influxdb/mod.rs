@@ -833,7 +833,7 @@ mod integration_tests {
             token: TOKEN.to_string(),
         });
         let proxy = ProxyConfig::default();
-        let client = HttpClient::new(None, &proxy).unwrap();
+        let client = HttpClient::new(None, &proxy, None).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
@@ -853,7 +853,7 @@ mod integration_tests {
             token: TOKEN.to_string(),
         });
         let proxy = ProxyConfig::default();
-        let client = HttpClient::new(None, &proxy).unwrap();
+        let client = HttpClient::new(None, &proxy, None).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
@@ -873,7 +873,7 @@ mod integration_tests {
         });
         let influxdb2_settings = None;
         let proxy = ProxyConfig::default();
-        let client = HttpClient::new(None, &proxy).unwrap();
+        let client = HttpClient::new(None, &proxy, None).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
@@ -893,7 +893,7 @@ mod integration_tests {
         });
         let influxdb2_settings = None;
         let proxy = ProxyConfig::default();
-        let client = HttpClient::new(None, &proxy).unwrap();
+        let client = HttpClient::new(None, &proxy, None).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()

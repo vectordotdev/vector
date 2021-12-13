@@ -111,7 +111,7 @@ impl SinkConfig for GcsSinkConfig {
             .await?;
         let base_url = format!("{}{}/", BASE_URL, self.bucket);
         let tls = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(tls, cx.proxy())?;
+        let client = HttpClient::new(tls, cx.proxy(), None)?;
         let healthcheck = build_healthcheck(
             self.bucket.clone(),
             client.clone(),

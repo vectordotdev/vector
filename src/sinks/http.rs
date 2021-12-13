@@ -110,7 +110,7 @@ impl GenerateConfig for HttpSinkConfig {
 impl HttpSinkConfig {
     fn build_http_client(&self, cx: &SinkContext) -> crate::Result<HttpClient> {
         let tls = TlsSettings::from_options(&self.tls)?;
-        Ok(HttpClient::new(tls, cx.proxy())?)
+        Ok(HttpClient::new(tls, cx.proxy(), None)?)
     }
 }
 

@@ -100,7 +100,7 @@ pub enum BuildError {
 }
 
 /// Common healthcheck errors
-#[derive(Debug, Snafu)]
+#[derive(Debug, Snafu, PartialEq)]
 pub enum HealthcheckError {
     #[snafu(display("Unexpected status: {}", status))]
     UnexpectedStatus { status: ::http::StatusCode },

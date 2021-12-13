@@ -61,7 +61,7 @@ impl Client {
         } = config;
 
         let tls_settings = TlsSettings::from_options(&Some(tls_options))?;
-        let inner = HttpClient::new(tls_settings, proxy)?;
+        let inner = HttpClient::new(tls_settings, proxy, None)?;
 
         let uri::Parts {
             scheme, authority, ..

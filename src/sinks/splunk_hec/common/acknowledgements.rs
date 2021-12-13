@@ -267,7 +267,7 @@ mod tests {
     use super::HecAckClient;
 
     fn get_ack_client(retry_limit: u8) -> HecAckClient {
-        let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
+        let client = HttpClient::new(None, &ProxyConfig::default(), None).unwrap();
         let http_request_builder =
             HttpRequestBuilder::new(String::from(""), String::from(""), Compression::default());
         HecAckClient::new(retry_limit, client, Arc::new(http_request_builder))

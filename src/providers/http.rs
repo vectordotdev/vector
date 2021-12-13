@@ -68,7 +68,7 @@ async fn http_request(
 ) -> std::result::Result<bytes::Bytes, &'static str> {
     let tls_settings = TlsSettings::from_options(tls_options).map_err(|_| "Invalid TLS options")?;
     let http_client =
-        HttpClient::<Body>::new(tls_settings, proxy).map_err(|_| "Invalid TLS settings")?;
+        HttpClient::<Body>::new(tls_settings, proxy, None).map_err(|_| "Invalid TLS settings")?;
 
     // Build HTTP request.
     let mut builder = http::request::Builder::new().uri(url.to_string());

@@ -50,7 +50,7 @@ impl DatadogEventsConfig {
     }
 
     fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
-        let client = HttpClient::new(None, proxy)?;
+        let client = HttpClient::new(None, proxy, None)?;
         Ok(client)
     }
 

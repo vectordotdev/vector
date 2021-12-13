@@ -33,7 +33,7 @@ pub fn create_client(
     proxy_config: &ProxyConfig,
 ) -> crate::Result<HttpClient> {
     let tls_settings = TlsSettings::from_options(tls)?;
-    Ok(HttpClient::new(tls_settings, proxy_config)?)
+    Ok(HttpClient::new(tls_settings, proxy_config, None)?)
 }
 
 pub async fn build_healthcheck(

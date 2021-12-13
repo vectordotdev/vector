@@ -20,6 +20,7 @@ use crate::sinks::{Healthcheck, VectorSink};
 use crate::template::Template;
 use crate::tls::TlsOptions;
 use crate::transforms::metric_to_log::MetricToLogConfig;
+use core::time::Duration;
 use futures::FutureExt;
 use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -74,6 +75,7 @@ pub struct ElasticSearchConfig {
     pub query: Option<HashMap<String, String>>,
     pub aws: Option<RegionOrEndpoint>,
     pub tls: Option<TlsOptions>,
+    pub connection_timeout: Option<u64>,
 
     #[serde(alias = "normal")]
     pub bulk: Option<BulkConfig>,
@@ -307,7 +309,8 @@ impl SinkConfig for ElasticSearchConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(self)?;
 
-        let http_client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
+        let connection_timeout_duration = Duration::new(self.connection_timeout.unwrap_or(5), 0);
+        let http_client = HttpClient::new(common.tls_settings.clone(), cx.proxy(), Some(connection_timeout_duration))?;
         let batch_settings = self.batch.into_batcher_settings()?;
 
         // This is a bit ugly, but removes a String allocation on every event
@@ -351,7 +354,7 @@ impl SinkConfig for ElasticSearchConfig {
         };
 
         let common = ElasticSearchCommon::parse_config(self)?;
-        let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
+        let client = HttpClient::new(common.tls_settings.clone(), cx.proxy(), None)?;
         let healthcheck = common.healthcheck(client).boxed();
         let stream = VectorSink::Stream(Box::new(sink));
         Ok((stream, healthcheck))

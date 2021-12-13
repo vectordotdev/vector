@@ -105,7 +105,7 @@ impl SinkConfig for InfluxDbLogsConfig {
         tags.insert("metric_type".to_string());
 
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(tls_settings, cx.proxy())?;
+        let client = HttpClient::new(tls_settings, cx.proxy(), None)?;
         let healthcheck = self.healthcheck(client.clone())?;
 
         let batch = self.batch.into_batch_settings()?;

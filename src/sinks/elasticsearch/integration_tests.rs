@@ -1,13 +1,7 @@
 use super::config::DATA_STREAM_TIMESTAMP_KEY;
 use super::*;
 use crate::sinks::util::{BatchConfig, Compression};
-use crate::{
-    config::{ProxyConfig, SinkConfig, SinkContext},
-    http::HttpClient,
-    sinks::HealthcheckError,
-    test_util::{random_events_with_stream, random_string, trace_init},
-    tls::{self, TlsOptions},
-};
+use crate::{config::{ProxyConfig, SinkConfig, SinkContext}, Error, http::HttpClient, sinks::HealthcheckError, test_util::{random_events_with_stream, random_string, trace_init}, tls::{self, TlsOptions}};
 use chrono::Utc;
 use futures::{stream, StreamExt};
 use http::{Request, StatusCode};
@@ -52,7 +46,7 @@ impl ElasticSearchCommon {
 
         let request = builder.body(Body::empty())?;
         let proxy = ProxyConfig::default();
-        let client = HttpClient::new(self.tls_settings.clone(), &proxy)
+        let client = HttpClient::new(self.tls_settings.clone(), &proxy, None)
             .expect("Could not build client to flush");
         let response = client.send(request).await?;
 
@@ -101,6 +95,34 @@ fn ensure_pipeline_in_params() {
     let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
 
     assert_eq!(common.query_params["pipeline"], pipeline);
+}
+
+#[tokio::test]
+async fn timout_occurs() {
+    use tokio::time::{sleep, Duration};
+
+    let pipeline = String::from("test-pipeline");
+    let connection_timeout = 1;
+    let config = ElasticSearchConfig {
+        endpoint: "https://example.com".into(),
+        index: Some(String::from("vector")),
+        pipeline: Some(pipeline.clone()),
+        connection_timeout: Some(connection_timeout),
+        ..config()
+    };
+    let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
+
+    let cx = SinkContext::new_test();
+    let (sink, healthcheck) = config
+        .build(cx.clone())
+        .await
+        .expect("Building config failed");
+
+    sleep(Duration::from_secs(connection_timeout + 1)).await;
+    
+
+    // Expect to timeout
+    // assert_eq!(err, HealthcheckError::UnexpectedStatus{ status: http::StatusCode::REQUEST_TIMEOUT });
 }
 
 #[tokio::test]
