@@ -130,8 +130,56 @@ impl Expression for Query {
     }
 
     #[cfg(feature = "llvm")]
-    fn emit_llvm<'ctx>(&self, _: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
-        todo!()
+    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+        let result_ref = ctx.result_ref();
+        let path_name = format!("{}", self.path);
+        let path_ref = ctx
+            .into_const(self.path.clone(), &path_name)
+            .as_pointer_value();
+
+        match &self.target {
+            Target::External => {
+                let fn_ident = "vrl_expression_query_target_external_impl";
+                let fn_impl = ctx
+                    .module()
+                    .get_function(fn_ident)
+                    .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                ctx.builder().build_call(
+                    fn_impl,
+                    &[
+                        ctx.context_ref().into(),
+                        ctx.builder()
+                            .build_bitcast(
+                                path_ref,
+                                fn_impl
+                                    .get_nth_param(1)
+                                    .unwrap()
+                                    .get_type()
+                                    .into_pointer_type(),
+                                "cast",
+                            )
+                            .into(),
+                        result_ref.into(),
+                    ],
+                    fn_ident,
+                );
+
+                return Ok(());
+            }
+            Target::Internal(variable) => variable.emit_llvm(ctx)?,
+            Target::FunctionCall(call) => call.emit_llvm(ctx)?,
+            Target::Container(container) => container.emit_llvm(ctx)?,
+        };
+
+        let fn_ident = "vrl_expression_query_target_impl";
+        let fn_impl = ctx
+            .module()
+            .get_function(fn_ident)
+            .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+        ctx.builder()
+            .build_call(fn_impl, &[path_ref.into(), result_ref.into()], fn_ident);
+
+        Ok(())
     }
 }
 
