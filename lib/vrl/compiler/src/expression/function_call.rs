@@ -335,8 +335,75 @@ impl Expression for FunctionCall {
     }
 
     #[cfg(feature = "llvm")]
-    fn emit_llvm<'ctx>(&self, _: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
-        todo!()
+    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+        let argument_type = ctx.result_ref().get_type();
+
+        let function_name = format!("vrl_fn_{}", self.ident);
+        let function = ctx
+            .module()
+            .get_function(&function_name)
+            .unwrap_or_else(|| {
+                let mut arguments = Vec::new();
+                arguments.resize(self.arguments.len() + 1, argument_type.into());
+                let function_type = ctx.context().void_type().fn_type(&arguments, false);
+
+                ctx.module()
+                    .add_function(&function_name, function_type, None)
+            });
+
+        let result_ref = ctx.result_ref();
+
+        let mut argument_refs = self
+            .arguments
+            .iter()
+            .map(|argument| -> Result<_, String> {
+                let argument_ref = ctx.builder().build_alloca(
+                    argument_type.get_element_type().into_struct_type(),
+                    &format!(
+                        "argument_{}",
+                        argument
+                            .parameter()
+                            .map(|parameter| parameter.keyword)
+                            .unwrap_or("<unnamed>")
+                    ),
+                );
+
+                {
+                    let fn_ident = "vrl_resolved_initialize";
+                    let fn_impl = ctx
+                        .module()
+                        .get_function(fn_ident)
+                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                    ctx.builder()
+                        .build_call(fn_impl, &[argument_ref.into()], fn_ident)
+                };
+
+                ctx.set_result_ref(argument_ref);
+                argument.inner().emit_llvm(ctx)?;
+                ctx.set_result_ref(result_ref);
+
+                Ok(argument_ref.into())
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        argument_refs.push(ctx.result_ref().into());
+
+        ctx.builder()
+            .build_call(function, &argument_refs, self.ident);
+
+        argument_refs.pop();
+
+        for argument_ref in argument_refs {
+            let fn_ident = "vrl_resolved_drop";
+            let fn_impl = ctx
+                .module()
+                .get_function(fn_ident)
+                .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+            ctx.builder()
+                .build_call(fn_impl, &[argument_ref.into()], fn_ident);
+        }
+
+        Ok(())
     }
 }
 
