@@ -81,7 +81,7 @@ components: sinks: prometheus_exporter: {
 		}
 		flush_period_secs: {
 			common:      false
-			description: "Time interval on which metrics are flushed. On the flush interval, if a metric has not been seen since the last flush interval, it is considered expired and is removed. Be sure to configure this value higher than your client's scrape interval."
+			description: "Time interval on which metrics are flushed. On the flush interval, if a metric has not been seen since the last flush interval, it is considered expired and is removed. Be sure to configure this value higher than your client's scrape interval. Set to 0 to disable (could result in unbounded memory growth if metrics series cardinality is unbounded)."
 			required:    false
 			type: uint: {
 				default: 60

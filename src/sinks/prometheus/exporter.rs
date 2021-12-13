@@ -34,14 +34,6 @@ use vector_core::buffers::Acker;
 
 use super::collector::{self, MetricCollector as _};
 
-const MIN_FLUSH_PERIOD_SECS: u64 = 1;
-
-#[derive(Debug, Snafu)]
-enum BuildError {
-    #[snafu(display("Flush period for sets must be greater or equal to {} secs", min))]
-    FlushPeriodTooShort { min: u64 },
-}
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct PrometheusExporterConfig {
@@ -99,10 +91,8 @@ impl GenerateConfig for PrometheusExporterConfig {
 #[typetag::serde(name = "prometheus_exporter")]
 impl SinkConfig for PrometheusExporterConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        if self.flush_period_secs < MIN_FLUSH_PERIOD_SECS {
-            return Err(Box::new(BuildError::FlushPeriodTooShort {
-                min: MIN_FLUSH_PERIOD_SECS,
-            }));
+        if self.flush_period_secs == 0 {
+            warn!("disabling metric flushing could result in unbounded memory growth if metrics series cardinality is unbounded");
         }
 
         validate_quantiles(&self.quantiles)?;
@@ -320,9 +310,9 @@ impl StreamSink for PrometheusExporter {
                         }
                         (entry, metadata)
                     })
-                    .filter(|(_metric, metadata)| {
-                        now.duration_since(metadata.updated_at).as_secs()
-                            < self.config.flush_period_secs
+                    .filter(|(_metric, metadata)| match self.config.flush_period_secs {
+                        0 => true,
+                        secs => now.duration_since(metadata.updated_at).as_secs() < secs,
                     })
                     .collect();
             }
