@@ -66,8 +66,14 @@ impl Expression for Predicate {
     }
 
     #[cfg(feature = "llvm")]
-    fn emit_llvm<'ctx>(&self, _: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
-        todo!()
+    fn emit_llvm<'ctx>(
+        &self,
+        ctx: &mut crate::llvm::Context<'ctx>,
+    ) -> std::result::Result<(), String> {
+        for inner in &self.inner {
+            inner.emit_llvm(ctx)?;
+        }
+        Ok(())
     }
 }
 
