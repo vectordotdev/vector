@@ -218,11 +218,7 @@ mod test {
     };
 
     use bytes::Bytes;
-    #[cfg(unix)]
-    use futures::channel::mpsc::Receiver;
     use futures::{stream, StreamExt};
-    #[cfg(unix)]
-    use tokio::io::AsyncWriteExt;
     use tokio::{
         task::JoinHandle,
         time::{Duration, Instant},
@@ -233,9 +229,11 @@ mod test {
         futures::SinkExt,
         std::path::PathBuf,
         tokio::{
+            io::AsyncWriteExt,
             net::{UnixDatagram, UnixStream},
             task::yield_now,
         },
+        tokio_stream::wrappers::ReceiverStream,
         tokio_util::codec::{FramedWrite, LinesCodec},
     };
 
@@ -808,7 +806,7 @@ mod test {
     }
 
     #[cfg(unix)]
-    async fn unix_message(message: &str, stream: bool) -> Receiver<Event> {
+    async fn unix_message(message: &str, stream: bool) -> ReceiverStream<Event> {
         let (tx, rx) = Pipeline::new_test();
         let path = init_unix(tx, stream).await;
 

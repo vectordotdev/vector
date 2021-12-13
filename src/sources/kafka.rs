@@ -6,7 +6,7 @@ use std::{
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
+use futures::{FutureExt, StreamExt};
 use futures_util::future::ready;
 use rdkafka::{
     config::ClientConfig,
@@ -246,7 +246,7 @@ async fn kafka_source(
                                 log.try_insert(headers_key, Value::from(headers_map.clone()));
                             }
 
-                            Some(Some(Ok(event)))
+                            Some(Some(event))
                         }
                         Err(e) => {
                             // Error is logged by `crate::codecs::Decoder`, no further handling
@@ -264,7 +264,7 @@ async fn kafka_source(
                 match &mut finalizer {
                     Some(finalizer) => {
                         let (batch, receiver) = BatchNotifier::new_with_receiver();
-                        let mut stream = stream.map_ok(|event| event.with_batch_notifier(&batch));
+                        let mut stream = stream.map(|event| event.with_batch_notifier(&batch));
                         match out.send_all(&mut stream).await {
                             Err(err) => error!(message = "Error sending to sink.", error = %err),
                             Ok(_) => {

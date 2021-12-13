@@ -1,7 +1,7 @@
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 use bytes::Bytes;
-use futures::{SinkExt, StreamExt, TryFutureExt};
+use futures::{StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use tokio::net::UdpSocket;
@@ -232,7 +232,7 @@ impl TcpSource for StatsdTcpSource {
 #[cfg(feature = "sinks-prometheus")]
 #[cfg(test)]
 mod test {
-    use futures::channel::mpsc;
+    use futures::{channel::mpsc, SinkExt};
     use hyper::body::to_bytes as body_to_bytes;
     use tokio::{
         io::AsyncWriteExt,

@@ -8,7 +8,7 @@ use std::{
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
-use futures::{stream, FutureExt, SinkExt};
+use futures::{stream, FutureExt};
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
@@ -30,6 +30,7 @@ use crate::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
         SplunkHecRequestReceived,
     },
+    pipeline::StreamSendError,
     serde::bool_or_struct,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
@@ -226,9 +227,7 @@ impl SplunkSource {
                       gzip: bool,
                       body: Bytes,
                       path: warp::path::FullPath| {
-                    let mut out = out
-                        .clone()
-                        .sink_map_err(|_| Rejection::from(ApiError::ServerShutdown));
+                    let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
                     emit!(&HttpBytesReceived {
                         byte_size: body.len(),
@@ -267,10 +266,13 @@ impl SplunkSource {
                             token.filter(|_| store_hec_token).map(Into::into),
                         ));
 
-                        let res = out.send_all(&mut events).await;
-
-                        out.flush().await?;
-                        res.map(|_| maybe_ack_id)
+                        match out.send_result_stream(&mut events).await {
+                            Ok(()) => Ok(maybe_ack_id),
+                            Err(StreamSendError::Stream(error)) => Err(error),
+                            Err(StreamSendError::Closed(_)) => {
+                                Err(Rejection::from(ApiError::ServerShutdown))
+                            }
+                        }
                     }
                 },
             )
@@ -301,9 +303,7 @@ impl SplunkSource {
                       gzip: bool,
                       body: Bytes,
                       path: warp::path::FullPath| {
-                    let mut out = out
-                        .clone()
-                        .sink_map_err(|_| Rejection::from(ApiError::ServerShutdown));
+                    let mut out = out.clone();
                     let idx_ack = idx_ack.clone();
                     emit!(&HttpBytesReceived {
                         byte_size: body.len(),
@@ -329,6 +329,7 @@ impl SplunkSource {
 
                         let res = out.send(event).await;
                         res.map(|_| maybe_ack_id)
+                            .map_err(|_| Rejection::from(ApiError::ServerShutdown))
                     }
                 },
             )

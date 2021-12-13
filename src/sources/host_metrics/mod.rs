@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, fmt, path::Path};
 
 use chrono::{DateTime, Utc};
-use futures::{stream, SinkExt, StreamExt};
+use futures::{stream, StreamExt};
 use glob::{Pattern, PatternError};
 #[cfg(not(target_os = "windows"))]
 use heim::units::ratio::ratio;
@@ -135,10 +135,7 @@ impl HostMetricsConfig {
         self.scrape_interval_secs = value;
     }
 
-    async fn run(self, out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
-        let mut out =
-            out.sink_map_err(|error| error!(message = "Error sending host metrics.", %error));
-
+    async fn run(self, mut out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
         let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
 
@@ -146,7 +143,10 @@ impl HostMetricsConfig {
 
         while interval.next().await.is_some() {
             let metrics = generator.capture_metrics().await;
-            out.send_all(&mut stream::iter(metrics).map(Ok)).await?;
+            if let Err(error) = out.send_all(&mut stream::iter(metrics)).await {
+                error!(message = "Error sending host metrics.", %error);
+                return Err(());
+            }
         }
 
         Ok(())

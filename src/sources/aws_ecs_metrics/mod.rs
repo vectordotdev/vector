@@ -1,6 +1,6 @@
 use std::{env, time::Instant};
 
-use futures::{stream, SinkExt, StreamExt};
+use futures::{stream, StreamExt};
 use hyper::{Body, Client, Request};
 use serde::{Deserialize, Serialize};
 use tokio::time;
@@ -120,11 +120,9 @@ async fn aws_ecs_metrics(
     url: String,
     interval: u64,
     namespace: Option<String>,
-    out: Pipeline,
+    mut out: Pipeline,
     shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
-    let mut out = out.sink_map_err(|error| error!(message = "Error sending metric.", %error));
-
     let interval = time::Duration::from_secs(interval);
     let mut interval = IntervalStream::new(time::interval(interval)).take_until(shutdown);
     while interval.next().await.is_some() {
@@ -153,8 +151,11 @@ async fn aws_ecs_metrics(
                                     count: metrics.len(),
                                 });
 
-                                let mut events = stream::iter(metrics).map(Event::Metric).map(Ok);
-                                out.send_all(&mut events).await?;
+                                let mut events = stream::iter(metrics).map(Event::Metric);
+                                if let Err(error) = out.send_all(&mut events).await {
+                                    error!(message = "Error sending metric.", %error);
+                                    return Err(());
+                                }
                             }
                             Err(error) => {
                                 emit!(&AwsEcsMetricsParseError {

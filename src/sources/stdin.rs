@@ -75,7 +75,7 @@ pub fn stdin_source<R>(
     mut stdin: R,
     config: StdinConfig,
     shutdown: ShutdownSignal,
-    out: Pipeline,
+    mut out: Pipeline,
 ) -> crate::Result<super::Source>
 where
     R: Send + io::BufRead + 'static,
@@ -114,12 +114,9 @@ where
     });
 
     Ok(Box::pin(async move {
-        let mut out =
-            out.sink_map_err(|error| error!(message = "Unable to send event to out.", %error));
-
         let stream = StreamReader::new(receiver);
         let mut stream = FramedRead::new(stream, decoder).take_until(shutdown);
-        let result = stream! {
+        let mut stream = stream! {
             loop {
                 match stream.next().await {
                     Some(Ok((events, byte_size))) => {
@@ -154,15 +151,18 @@ where
                 }
             }
         }
-        .map(Ok)
-        .forward(&mut out)
-        .await;
+        .boxed();
 
-        info!("Finished sending.");
-
-        let _ = out.flush().await; // Error emitted by sink_map_err.
-
-        result
+        match out.send_all(&mut stream).await {
+            Ok(()) => {
+                info!("Finished sending.");
+                Ok(())
+            }
+            Err(error) => {
+                error!(message = "Unable to send event to out.", %error);
+                Err(())
+            }
+        }
     }))
 }
 

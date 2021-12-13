@@ -371,8 +371,6 @@ pub fn build_framestream_unix_source(
 ) -> crate::Result<Source> {
     let path = frame_handler.socket_path();
 
-    let out = out.sink_map_err(|e| error!("Error sending event: {:?}.", e));
-
     //check if the path already exists (and try to delete it)
     match fs::metadata(&path) {
         Ok(_) => {
@@ -501,15 +499,14 @@ pub fn build_framestream_unix_source(
                 });
             if !frame_handler.multithreaded() {
                 let mut events = frames.filter_map(move |f| {
-                    future::ready(
-                        frame_handler_copy
-                            .handle_event(received_from.clone(), f)
-                            .map(Ok),
-                    )
+                    future::ready(frame_handler_copy.handle_event(received_from.clone(), f))
                 });
 
                 let handler = async move {
-                    let _ = event_sink.send_all(&mut events).await;
+                    if let Err(e) = event_sink.send_all(&mut events).await {
+                        error!("Error sending event: {:?}.", e);
+                    }
+
                     info!("Finished sending.");
                 };
                 tokio::spawn(handler.instrument(span));
@@ -556,17 +553,14 @@ pub fn build_framestream_unix_source(
     Ok(Box::pin(fut))
 }
 
-fn spawn_event_handling_tasks<S>(
+fn spawn_event_handling_tasks(
     event_data: Bytes,
     event_handler: impl FrameHandler + Send + Sync + 'static,
-    mut event_sink: S,
+    mut event_sink: Pipeline,
     received_from: Option<Bytes>,
     active_task_nums: Arc<AtomicU32>,
     max_frame_handling_tasks: u32,
-) -> JoinHandle<()>
-where
-    S: Sink<Event> + Send + Unpin + 'static,
-{
+) -> JoinHandle<()> {
     wait_for_task_quota(&active_task_nums, max_frame_handling_tasks);
 
     tokio::spawn(async move {
@@ -1076,8 +1070,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_spawn_event_handling_tasks() {
-        let (tx, rx) = Pipeline::new_test();
-        let out = tx.sink_map_err(|e| error!("Error sending event: {:?}.", e));
+        let (out, rx) = Pipeline::new_test();
 
         let max_frame_handling_tasks = 20;
         let active_task_nums = Arc::new(AtomicU32::new(0));

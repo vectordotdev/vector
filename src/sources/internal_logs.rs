@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{stream, SinkExt, StreamExt};
+use futures::{stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
 
@@ -50,13 +50,12 @@ impl SourceConfig for InternalLogsConfig {
 async fn run(
     host_key: String,
     pid_key: String,
-    out: Pipeline,
+    mut out: Pipeline,
     shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
     let hostname = crate::get_hostname();
     let pid = std::process::id();
 
-    let mut out = out.sink_map_err(|error| error!(message = "Error sending log.", %error));
     let subscription = trace::subscribe();
 
     // chain the logs emitted before the source started first
@@ -79,7 +78,10 @@ async fn run(
                 log.insert(pid_key.clone(), pid);
                 log.try_insert(log_schema().source_type_key(), Bytes::from("internal_logs"));
                 log.try_insert(log_schema().timestamp_key(), Utc::now());
-                out.send(Event::from(log)).await?;
+                if let Err(error) = out.send(Event::from(log)).await {
+                    error!(message = "Error sending log.", %error);
+                    return Err(());
+                }
             }
             Err(BroadcastStreamRecvError::Lagged(_)) => (),
         }
@@ -90,8 +92,8 @@ async fn run(
 
 #[cfg(test)]
 mod tests {
-    use futures::channel::mpsc;
     use tokio::time::{sleep, Duration};
+    use tokio_stream::wrappers::ReceiverStream;
     use vector_core::event::Value;
 
     use super::*;
@@ -144,7 +146,7 @@ mod tests {
         }
     }
 
-    async fn start_source() -> mpsc::Receiver<Event> {
+    async fn start_source() -> ReceiverStream<Event> {
         let (tx, rx) = Pipeline::new_test();
 
         let source = InternalLogsConfig::default()

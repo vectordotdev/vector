@@ -2,7 +2,7 @@ use std::{cmp, future::ready, panic, sync::Arc};
 
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
-use futures::{FutureExt, SinkExt, Stream, StreamExt, TryFutureExt};
+use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError};
 use rusoto_s3::{GetObjectError, GetObjectRequest, S3Client, S3};
@@ -474,7 +474,7 @@ impl IngestorProcess {
                         }
                     }
 
-                    ready(Some(Ok(log.into())))
+                    ready(Some(log.into()))
                 });
 
                 let send_error = match self.out.send_all(&mut stream).await {

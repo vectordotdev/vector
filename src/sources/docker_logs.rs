@@ -559,7 +559,7 @@ impl EventStreamBuilder {
         }
     }
 
-    async fn run_event_stream(self, mut info: ContainerLogInfo) {
+    async fn run_event_stream(mut self, mut info: ContainerLogInfo) {
         // Establish connection
         let options = Some(LogsOptions::<String> {
             follow: true,
@@ -632,11 +632,11 @@ impl EventStreamBuilder {
 
         let host_key = self.host_key.clone();
         let hostname = self.hostname.clone();
-        let result = events_stream
-            .map(move |event| add_hostname(event, &host_key, &hostname))
-            .map(Ok)
-            .forward(self.out.clone())
-            .await;
+        let result = {
+            let mut stream =
+                events_stream.map(move |event| add_hostname(event, &host_key, &hostname));
+            self.out.send_all(&mut stream).await
+        };
 
         // End of stream
         emit!(&DockerLogsContainerUnwatch {
@@ -1051,7 +1051,8 @@ mod integration_tests {
         },
         image::{CreateImageOptions, ListImagesOptions},
     };
-    use futures::{channel::mpsc, stream::TryStreamExt, FutureExt};
+    use futures::{stream::TryStreamExt, FutureExt};
+    use tokio_stream::wrappers::ReceiverStream;
 
     use super::*;
     use crate::{
@@ -1063,7 +1064,7 @@ mod integration_tests {
     fn source_with<'a, L: Into<Option<&'a str>>>(
         names: &[&str],
         label: L,
-    ) -> mpsc::Receiver<Event> {
+    ) -> ReceiverStream<Event> {
         source_with_config(DockerLogsConfig {
             include_containers: Some(names.iter().map(|&s| s.to_owned()).collect()),
             include_labels: Some(label.into().map(|l| vec![l.to_owned()]).unwrap_or_default()),
@@ -1071,7 +1072,7 @@ mod integration_tests {
         })
     }
 
-    fn source_with_config(config: DockerLogsConfig) -> mpsc::Receiver<Event> {
+    fn source_with_config(config: DockerLogsConfig) -> ReceiverStream<Event> {
         let (sender, recv) = Pipeline::new_test();
         tokio::spawn(async move {
             config
@@ -1293,7 +1294,7 @@ mod integration_tests {
         id
     }
 
-    fn is_empty<T>(mut rx: mpsc::Receiver<T>) -> bool {
+    fn is_empty<T>(mut rx: ReceiverStream<T>) -> bool {
         rx.next().now_or_never().is_none()
     }
 

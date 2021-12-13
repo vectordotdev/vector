@@ -6,7 +6,7 @@ use std::{
 
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{FutureExt, SinkExt, StreamExt};
+use futures::{FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use snafu::Snafu;
@@ -421,7 +421,6 @@ async fn run_command(
     };
 
     debug!("Finished command run.");
-    let _ = out.flush().await;
 
     result
 }
@@ -538,6 +537,9 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
+
+    #[cfg(not(target_os = "windows"))]
+    use futures::task::Poll;
 
     use super::*;
     use crate::test_util::trace_init;
@@ -680,7 +682,7 @@ mod tests {
             .expect("command error");
         assert_eq!(0_i32, exit_status.unwrap().code().unwrap());
 
-        if let Ok(Some(event)) = rx.try_next() {
+        if let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
             let log = event.as_log();
             assert_eq!(log[COMMAND_KEY], config.command.clone().into());
             assert_eq!(log[STREAM_KEY], STDOUT.into());
