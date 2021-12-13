@@ -4,6 +4,7 @@ use crate::expression::{
 use crate::parser::Node;
 use crate::value::Kind;
 use crate::{Span, Value};
+use anymap::AnyMap;
 use diagnostic::{DiagnosticError, Label, Note};
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
@@ -42,7 +43,7 @@ pub trait Function: Sync + fmt::Debug {
     fn compile(
         &self,
         state: &super::State,
-        info: &FunctionCompileContext,
+        ctx: &mut FunctionCompileContext,
         arguments: ArgumentList,
     ) -> Compiled;
 
@@ -64,9 +65,33 @@ pub struct Example {
     pub result: Result<&'static str, &'static str>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug)]
 pub struct FunctionCompileContext {
-    pub span: Span,
+    span: Span,
+    external_context: AnyMap,
+}
+
+impl FunctionCompileContext {
+    pub fn new(span: Span, external_context: AnyMap) -> Self {
+        Self {
+            span,
+            external_context,
+        }
+    }
+
+    pub fn span(&self) -> Span {
+        self.span
+    }
+
+    pub fn get_external_context_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.external_context.get_mut::<T>()
+    }
+
+    pub(crate) fn take_external_contexts(&mut self) -> AnyMap {
+        let empty = AnyMap::new();
+
+        std::mem::replace(&mut self.external_context, empty)
+    }
 }
 
 // -----------------------------------------------------------------------------

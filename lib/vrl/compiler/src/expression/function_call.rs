@@ -162,11 +162,21 @@ impl FunctionCall {
                 })
             })?;
 
-        let compile_ctx = FunctionCompileContext { span: call_span };
+        // We take the external context, and pass it to the function compile context, this allows
+        // functions mutable access to external state, but keeps the internal compiler state behind
+        // an immutable reference, to ensure compiler state correctness.
+        let external_context = state.take_external_contexts();
+
+        // TODO(Jean): Expand this to include all available spans (function, function name,
+        // arguments), to get more informative error messages from function compilation errors.
+        let mut compile_ctx = FunctionCompileContext::new(call_span, external_context);
 
         let mut expr = function
-            .compile(state, &compile_ctx, list)
+            .compile(state, &mut compile_ctx, list)
             .map_err(|error| Error::Compilation { call_span, error })?;
+
+        // Re-insert the external context into the compiler state.
+        state.replace_external_contexts(compile_ctx.take_external_contexts());
 
         // Asking for an infallible function to abort on error makes no sense.
         // We consider this an error at compile-time, because it makes the

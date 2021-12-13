@@ -110,6 +110,13 @@ impl<T: Ord> From<BTreeMap<T, Kind>> for Collection<T> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Index(usize);
 
+impl Index {
+    #[must_use]
+    pub fn take(self) -> usize {
+        self.0
+    }
+}
+
 impl From<usize> for Index {
     fn from(index: usize) -> Self {
         Self(index)
@@ -119,6 +126,13 @@ impl From<usize> for Index {
 /// A `field` type that can be used in `Collection<Field>`
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Field(Cow<'static, str>);
+
+impl Field {
+    #[must_use]
+    pub fn take(self) -> Cow<'static, str> {
+        self.0
+    }
+}
 
 impl From<&'static str> for Field {
     fn from(field: &'static str) -> Self {

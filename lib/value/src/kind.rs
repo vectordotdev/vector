@@ -2,8 +2,8 @@ mod collection;
 
 use std::collections::BTreeMap;
 
-pub use collection::Collection;
-use lookup::{Field, Lookup, Segment};
+pub use collection::{Collection, Field, Index};
+use lookup::{Lookup, Segment};
 
 /// The type (kind) of a given value.
 ///
@@ -103,7 +103,7 @@ impl Kind {
     pub fn nest_at_path(mut self, path: &Lookup<'_>) -> Self {
         for segment in path.iter().rev() {
             match segment {
-                Segment::Field(Field { name, .. }) => {
+                Segment::Field(lookup::Field { name, .. }) => {
                     let field = (*name).to_owned();
                     let map = BTreeMap::from([(field.into(), self)]);
 

@@ -53,6 +53,10 @@ impl Output {
         &self.purpose
     }
 
+    pub fn purpose_mut(&mut self) -> &mut HashMap<field::Purpose, LookupBuf> {
+        &mut self.purpose
+    }
+
     /// Merge `other` schema into `self`.
     ///
     /// If both schemas contain the same purpose key, then `other` key is used. In the future, we

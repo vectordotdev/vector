@@ -34,7 +34,9 @@ impl Default for Compiler {
     fn default() -> Self {
         Self {
             external_context: AnyMap::new(),
-            ..Default::default()
+            target: None,
+            variables: HashMap::default(),
+            snapshot: None,
         }
     }
 }
@@ -120,6 +122,16 @@ impl Compiler {
     /// the external context.
     pub fn get_external_context_mut<T: 'static>(&mut self) -> Option<&mut T> {
         self.external_context.get_mut::<T>()
+    }
+
+    pub(crate) fn take_external_contexts(&mut self) -> AnyMap {
+        let empty = AnyMap::new();
+
+        std::mem::replace(&mut self.external_context, empty)
+    }
+
+    pub(crate) fn replace_external_contexts(&mut self, ctx: AnyMap) {
+        let _ = std::mem::replace(&mut self.external_context, ctx);
     }
 }
 
