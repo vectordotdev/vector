@@ -25,6 +25,8 @@ onig = {version  = "6.3.1", default-features = false }
 chrono = { version = "0.4.19", default-features = false }
 chrono-tz = { version = "0.6.1", default-features = false }
 peeking_take_while = { version = "1.0.0", default-features = false }
+nom = { version = "7.1.0", default-features = false }
+nom-regex = { version = "0.2.0", default-features = false }
 
 # Internal
 lookup = { path = "../../lookup" }

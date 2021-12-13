@@ -1,10 +1,11 @@
+use crate::filters::keyvalue::KeyValueFilter;
 use crate::{
     ast::{Function, FunctionArgument},
+    filters::keyvalue,
+    matchers::date::{apply_date_filter, DateFilter},
     parse_grok::Error as GrokRuntimeError,
     parse_grok_rules::Error as GrokStaticError,
 };
-
-use crate::matchers::date::{apply_date_filter, DateFilter};
 use ordered_float::NotNan;
 use std::{convert::TryFrom, string::ToString};
 use strum_macros::Display;
@@ -24,6 +25,7 @@ pub enum GrokFilter {
     Lowercase,
     Uppercase,
     Json,
+    KeyValue(KeyValueFilter),
 }
 
 impl TryFrom<&Function> for GrokFilter {
@@ -64,6 +66,7 @@ impl TryFrom<&Function> for GrokFilter {
                     }
                 })
                 .ok_or_else(|| GrokStaticError::InvalidFunctionArguments(f.name.clone())),
+            "keyvalue" => keyvalue::filter_from_function(f),
             _ => Err(GrokStaticError::UnknownFilter(f.name.clone())),
         }
     }
@@ -158,5 +161,6 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
             )),
         },
         GrokFilter::Date(date_filter) => apply_date_filter(value, date_filter),
+        GrokFilter::KeyValue(keyvalue_filter) => keyvalue::apply_filter(value, keyvalue_filter),
     }
 }
