@@ -91,3 +91,19 @@ pub extern "C" fn vrl_expression_assignment_target_insert_external_impl(
 pub extern "C" fn vrl_expression_literal_impl(value: &Value, result: &mut Resolved) {
     *result = Ok(value.clone());
 }
+
+#[no_mangle]
+pub extern "C" fn vrl_expression_not_is_bool_impl(result: &mut Resolved) {
+    *result = Ok((!result.as_ref().unwrap().as_boolean().unwrap()).into());
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_expression_not_not_bool_impl(result: &mut Resolved) {
+    *result = Err(result
+        .as_ref()
+        .unwrap()
+        .clone()
+        .try_boolean()
+        .unwrap_err()
+        .into());
+}
