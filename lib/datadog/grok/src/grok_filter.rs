@@ -1,11 +1,10 @@
 use crate::{
     ast::{Function, FunctionArgument},
+    filters::{array, keyvalue, keyvalue::KeyValueFilter},
+    matchers::date::{apply_date_filter, DateFilter},
     parse_grok::Error as GrokRuntimeError,
     parse_grok_rules::Error as GrokStaticError,
 };
-
-use crate::filters::array;
-use crate::matchers::date::{apply_date_filter, DateFilter};
 use ordered_float::NotNan;
 use std::{convert::TryFrom, string::ToString};
 use strum_macros::Display;
@@ -30,6 +29,7 @@ pub enum GrokFilter {
         Option<String>,
         Box<Option<GrokFilter>>,
     ),
+    KeyValue(KeyValueFilter),
 }
 
 impl TryFrom<&Function> for GrokFilter {
@@ -71,6 +71,7 @@ impl TryFrom<&Function> for GrokFilter {
                 })
                 .ok_or_else(|| GrokStaticError::InvalidFunctionArguments(f.name.clone())),
             "array" => array::filter_from_function(f),
+            "keyvalue" => keyvalue::filter_from_function(f),
             _ => Err(GrokStaticError::UnknownFilter(f.name.clone())),
         }
     }
@@ -173,6 +174,7 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
             )),
         },
         GrokFilter::Date(date_filter) => apply_date_filter(value, date_filter),
+        GrokFilter::KeyValue(keyvalue_filter) => keyvalue::apply_filter(value, keyvalue_filter),
         GrokFilter::Array(brackets, delimiter, value_filter) => match value {
             Value::Bytes(bytes) => array::parse(
                 String::from_utf8_lossy(bytes).as_ref(),

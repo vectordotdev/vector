@@ -103,6 +103,7 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
 mod tests {
     use super::*;
     use crate::parse_grok_rules::parse_grok_rules;
+    use ordered_float::NotNan;
     use vrl_compiler::Value;
 
     #[test]
@@ -604,6 +605,182 @@ mod tests {
                 r#"%{data:field:array(scale(10))}"#,
                 "[a,b]",
                 Ok(Value::Object(btreemap! {})),
+            ),
+        ]);
+    }
+
+    #[test]
+    fn parses_keyvalue() {
+        test_full_grok(vec![
+            (
+                "%{data::keyvalue}",
+                "key=valueStr",
+                Ok(Value::from(btreemap! {
+                    "key" => "valueStr"
+                })),
+            ),
+            (
+                "%{data::keyvalue}",
+                "key=<valueStr>",
+                Ok(Value::from(btreemap! {
+                    "key" => "valueStr"
+                })),
+            ),
+            (
+                "%{data::keyvalue}",
+                r#""key"="valueStr""#,
+                Ok(Value::from(btreemap! {
+                    "key" => "valueStr"
+                })),
+            ),
+            (
+                "%{data::keyvalue}",
+                r#"'key'='valueStr'"#,
+                Ok(Value::from(btreemap! {
+                   "key" => "valueStr"
+                })),
+            ),
+            (
+                "%{data::keyvalue}",
+                r#"<key>=<valueStr>"#,
+                Ok(Value::from(btreemap! {
+                    "key" => "valueStr"
+                })),
+            ),
+            (
+                r#"%{data::keyvalue(":")}"#,
+                r#"key:valueStr"#,
+                Ok(Value::from(btreemap! {
+                    "key" => "valueStr"
+                })),
+            ),
+            (
+                r#"%{data::keyvalue(":", "/")}"#,
+                r#"key:"/valueStr""#,
+                Ok(Value::from(btreemap! {
+                    "key" => "/valueStr"
+                })),
+            ),
+            (
+                r#"%{data::keyvalue(":", "/")}"#,
+                r#"/key:/valueStr"#,
+                Ok(Value::from(btreemap! {
+                    "/key" => "/valueStr"
+                })),
+            ),
+            (
+                r#"%{data::keyvalue(":=", "", "{}")}"#,
+                r#"key:={valueStr}"#,
+                Ok(Value::from(btreemap! {
+                    "key" => "valueStr"
+                })),
+            ),
+            (
+                r#"%{data::keyvalue("=", "", "", "|")}"#,
+                r#"key1=value1|key2=value2"#,
+                Ok(Value::from(btreemap! {
+                    "key1" => "value1",
+                    "key2" => "value2",
+                })),
+            ),
+            (
+                r#"%{data::keyvalue("=", "", "", "|")}"#,
+                r#"key1="value1"|key2="value2""#,
+                Ok(Value::from(btreemap! {
+                    "key1" => "value1",
+                    "key2" => "value2",
+                })),
+            ),
+            (
+                r#"%{data::keyvalue(":=","","<>")}"#,
+                r#"key1:=valueStr key2:=</valueStr2> key3:="valueStr3""#,
+                Ok(Value::from(btreemap! {
+                    "key1" => "valueStr",
+                    "key2" => "/valueStr2",
+                })),
+            ),
+            (
+                r#"%{data::keyvalue}"#,
+                r#"key1=value1,key2=value2"#,
+                Ok(Value::from(btreemap! {
+                    "key1" => "value1",
+                    "key2" => "value2",
+                })),
+            ),
+            (
+                r#"%{data::keyvalue}"#,
+                r#"key1=value1;key2=value2"#,
+                Ok(Value::from(btreemap! {
+                    "key1" => "value1",
+                    "key2" => "value2",
+                })),
+            ),
+            (
+                "%{data::keyvalue}",
+                "key:=valueStr",
+                Ok(Value::from(btreemap! {})),
+            ),
+            // empty key or null
+            (
+                "%{data::keyvalue}",
+                "key1= key2=null key3=value3",
+                Ok(Value::from(btreemap! {
+                    "key3" => "value3"
+                })),
+            ),
+            // empty value or null - comma-separated
+            (
+                "%{data::keyvalue}",
+                "key1=,key2=null,key3= ,key4=value4",
+                Ok(Value::from(btreemap! {
+                    "key4" => "value4"
+                })),
+            ),
+            // empty key
+            (
+                "%{data::keyvalue}",
+                "=,=value",
+                Ok(Value::from(btreemap! {})),
+            ),
+            // type inference
+            (
+                "%{data::keyvalue}",
+                "float=1.2,boolean=true,null=null,string=abc,integer1=11,integer2=12",
+                Ok(Value::from(btreemap! {
+                    "float" => Value::Float(NotNan::new(1.2).expect("not a float")),
+                    "boolean" => Value::Boolean(true),
+                    "string" => Value::Bytes("abc".into()),
+                    "integer1" => Value::Integer(11),
+                    "integer2" => Value::Integer(12)
+                })),
+            ),
+            // type inference with extra spaces around field delimiters
+            (
+                "%{data::keyvalue}",
+                "float=1.2 , boolean=true , null=null    ,   string=abc , integer1=11  ,  integer2=12  ",
+                Ok(Value::from(btreemap! {
+                    "float" => Value::Float(NotNan::new(1.2).expect("not a float")),
+                    "boolean" => Value::Boolean(true),
+                    "string" => Value::Bytes("abc".into()),
+                    "integer1" => Value::Integer(11),
+                    "integer2" => Value::Integer(12)
+                })),
+            ),
+            // spaces around key-value delimiter are not allowed
+            (
+                "%{data::keyvalue}",
+                "key = valueStr",
+                Ok(Value::from(btreemap! {})),
+            ),
+            (
+                "%{data::keyvalue}",
+                "key= valueStr",
+                Ok(Value::from(btreemap! {})),
+            ),
+            (
+                "%{data::keyvalue}",
+                "key =valueStr",
+                Ok(Value::from(btreemap! {})),
             ),
         ]);
     }

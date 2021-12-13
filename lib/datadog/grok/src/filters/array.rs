@@ -1,3 +1,4 @@
+use crate::grok_filter::GrokFilter;
 use crate::{
     ast::{Function, FunctionArgument},
     parse_grok_rules::Error as GrokStaticError,
@@ -14,8 +15,6 @@ use nom::{
     IResult,
 };
 use std::convert::TryFrom;
-
-use crate::grok_filter::GrokFilter;
 use vrl_compiler::Value;
 
 pub fn filter_from_function(f: &Function) -> Result<GrokFilter, GrokStaticError> {
