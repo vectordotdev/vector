@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use vrl_core::{Context, Error, ExpressionError, Kind, LookupBuf, Resolved, Span, Value};
 
 // We only want to precompile the stub for this function, and therefore don't
@@ -50,6 +51,33 @@ pub extern "C" fn vrl_resolved_boolean_is_true(result: &Resolved) -> bool {
         .expect("VRL result must not contain an error")
         .as_boolean()
         .expect("VRL value must be boolean")
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_btree_map_initialize(map: *mut BTreeMap<String, Value>) {
+    unsafe { map.write(Default::default()) };
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_btree_map_drop(map: *mut BTreeMap<String, Value>) {
+    drop(unsafe { map.read() });
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_btree_map_insert(
+    map: &mut BTreeMap<String, Value>,
+    key: &String,
+    result: &mut Resolved,
+) {
+    let result = {
+        let mut moved = Ok(Value::Null);
+        std::mem::swap(result, &mut moved);
+        moved
+    };
+    map.insert(
+        key.clone(),
+        result.expect("VRL result must not contain an error"),
+    );
 }
 
 #[no_mangle]
@@ -129,4 +157,17 @@ pub extern "C" fn vrl_expression_not_not_bool_impl(result: &mut Resolved) {
         expected: Kind::boolean(),
     }
     .into());
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_expression_object_set_result_impl(
+    map: &mut BTreeMap<String, Value>,
+    result: &mut Resolved,
+) {
+    let map = {
+        let mut moved = Default::default();
+        std::mem::swap(map, &mut moved);
+        moved
+    };
+    *result = Ok(Value::Object(map));
 }
