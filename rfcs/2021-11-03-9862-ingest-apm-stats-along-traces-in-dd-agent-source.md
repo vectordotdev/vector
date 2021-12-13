@@ -101,11 +101,15 @@ found in the trace support [RFC][trace-support-pr] and may provide relevant cont
 
 * Ongoing work on transforms to add `named_outputs` that is laying the ground for the same feature but on `sources`,
   [one PR][named-outputs-pr] has already be merged while scheduled work is tracked [here][named-outputs-improvements].
+* [Ongoing work on schemas][schema-rfc] will ultimately offer a programatic way of validating required fields and
+  express constrains on incoming event for a given sink. Traces & APM stats are a good fit for that because they will be
+  represented as standard Vector events, but sinks handling thos will expect some mandatory information.
 * An [official crate for dd-sketches][sketches-rs] is being worked on.
 
-[sketches-rs]: https://github.com/DataDog/sketches-rs/pull/1/
 [named-outputs-pr]: https://github.com/vectordotdev/vector/pull/9169
 [named-outputs-improvements]: https://github.com/vectordotdev/vector/issues/9514
+[schema-rfc]: https://github.com/vectordotdev/vector/pull/9388
+[sketches-rs]: https://github.com/DataDog/sketches-rs/pull/1/
 
 ## Scope
 
