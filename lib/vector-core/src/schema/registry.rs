@@ -39,8 +39,6 @@ impl TransformRegistry {
     }
 
     pub fn is_valid_purpose(&self, purpose: &str) -> bool {
-        dbg!(&self.sink_schemas);
-
         self.sink_schemas.iter().any(|s| {
             let purpose: field::Purpose = purpose.to_owned().into();
 
