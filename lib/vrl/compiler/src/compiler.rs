@@ -300,7 +300,7 @@ impl<'a> Compiler<'a> {
         &mut self,
         node: Node<ast::Predicate>,
         external: &mut ExternalEnv,
-    ) -> predicate::Result {
+    ) -> Result<Predicate, predicate::Error> {
         use ast::Predicate::*;
 
         let (span, predicate) = node.take();
