@@ -29,6 +29,11 @@ pub extern "C" fn vrl_resolved_is_ok(result: &mut Resolved) -> bool {
 }
 
 #[no_mangle]
+pub extern "C" fn vrl_resolved_is_err(result: &mut Resolved) -> bool {
+    result.is_err()
+}
+
+#[no_mangle]
 pub extern "C" fn vrl_expression_abort_impl(span: &Span, result: &mut Resolved) {
     *result = Err(ExpressionError::Abort { span: *span });
 }
