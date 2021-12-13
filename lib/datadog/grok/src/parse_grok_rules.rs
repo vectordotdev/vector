@@ -189,7 +189,7 @@ fn parse_grok_rule(
         .iter()
         .map(|pattern| {
             parse_grok_pattern(pattern)
-                .map_err(|e| Error::InvalidGrokExpression(pattern.to_string(), e.to_string()))
+                .map_err(|e| Error::InvalidGrokExpression(pattern.to_string(), e))
         })
         .collect::<Result<Vec<GrokPattern>, Error>>()?;
 
