@@ -223,20 +223,6 @@ mod tests {
         ]);
     }
 
-    fn test_full_grok(tests: Vec<(&str, &str, Result<Value, Error>)>) {
-        for (filter, k, v) in tests {
-            let rules =
-                parse_grok_rules(&[filter.to_string()], btreemap! {}).expect("should parse rules");
-            let parsed = parse_grok(k, &rules, false);
-
-            if v.is_ok() {
-                assert_eq!(parsed.unwrap(), v.unwrap());
-            } else {
-                assert_eq!(parsed, v);
-            }
-        }
-    }
-
     fn test_grok_pattern(tests: Vec<(&str, &str, Result<Value, Error>)>) {
         for (filter, k, v) in tests {
             let rules = parse_grok_rules(&[filter.to_string()], btreemap! {})
@@ -253,6 +239,16 @@ mod tests {
             } else {
                 assert_eq!(parsed, v);
             }
+        }
+    }
+
+    fn test_full_grok(tests: Vec<(&str, &str, Result<Value, Error>)>) {
+        for (filter, k, v) in tests {
+            let rules = parse_grok_rules(&[filter.to_string()], btreemap! {})
+                .expect("couldn't parse rules");
+            let parsed = parse_grok(k, &rules, false);
+
+            assert_eq!(parsed, v);
         }
     }
 
@@ -326,36 +322,38 @@ mod tests {
     fn supports_filters_without_fields() {
         // if the root-level value, after filters applied, is a map then merge it at the root level,
         // otherwise ignore it
-        test_full_grok(vec![(
-            "%{data::json}",
-            r#"{ "json_field1": "value2" }"#,
-            Ok(Value::from(btreemap! {
-                "json_field1" => Value::Bytes("value2".into()),
-            })),
-        )]);
-        test_full_grok(vec![(
-            "%{notSpace:standalone_field} '%{data::json}' '%{data::json}' %{number::number}",
-            r#"value1 '{ "json_field1": "value2" }' '{ "json_field2": "value3" }' 3"#,
-            Ok(Value::from(btreemap! {
-                "standalone_field" => Value::Bytes("value1".into()),
-                "json_field1" => Value::Bytes("value2".into()),
-                "json_field2" => Value::Bytes("value3".into())
-            })),
-        )]);
-        // ignore non-map root-level fields
-        test_full_grok(vec![(
-            "%{notSpace:standalone_field} %{data::integer}",
-            r#"value1 1"#,
-            Ok(Value::from(btreemap! {
-                "standalone_field" => Value::Bytes("value1".into()),
-            })),
-        )]);
-        // empty map if fails
-        test_full_grok(vec![(
-            "%{data::json}",
-            r#"not a json"#,
-            Ok(Value::from(btreemap! {})),
-        )]);
+        test_full_grok(vec![
+            (
+                "%{data::json}",
+                r#"{ "json_field1": "value2" }"#,
+                Ok(Value::from(btreemap! {
+                    "json_field1" => Value::Bytes("value2".into()),
+                })),
+            ),
+            (
+                "%{notSpace:standalone_field} '%{data::json}' '%{data::json}' %{number::number}",
+                r#"value1 '{ "json_field1": "value2" }' '{ "json_field2": "value3" }' 3"#,
+                Ok(Value::from(btreemap! {
+                    "standalone_field" => Value::Bytes("value1".into()),
+                    "json_field1" => Value::Bytes("value2".into()),
+                    "json_field2" => Value::Bytes("value3".into())
+                })),
+            ),
+            // ignore non-map root-level fields
+            (
+                "%{notSpace:standalone_field} %{data::integer}",
+                r#"value1 1"#,
+                Ok(Value::from(btreemap! {
+                    "standalone_field" => Value::Bytes("value1".into()),
+                })),
+            ),
+            // empty map if fails
+            (
+                "%{data::json}",
+                r#"not a json"#,
+                Ok(Value::from(btreemap! {})),
+            ),
+        ]);
     }
 
     #[test]
@@ -538,6 +536,77 @@ mod tests {
             .to_string(),
             r#"invalid arguments for the function 'date'"#
         );
+    }
+
+    #[test]
+    fn supports_array_filter() {
+        test_grok_pattern(vec![
+            (
+                "%{data:field:array}",
+                "[1,2]",
+                Ok(Value::Array(vec!["1".into(), "2".into()])),
+            ),
+            (
+                r#"%{data:field:array("\\t")}"#,
+                "[1\t2]",
+                Ok(Value::Array(vec!["1".into(), "2".into()])),
+            ),
+            (
+                "%{data:field:array(integer)}",
+                "[1,2]",
+                Ok(Value::Array(vec![1.into(), 2.into()])),
+            ),
+            (
+                r#"%{data:field:array(";", integer)}"#,
+                "[1;2]",
+                Ok(Value::Array(vec![1.into(), 2.into()])),
+            ),
+            (
+                r#"%{data:field:array("{}",";", integer)}"#,
+                "{1;2}",
+                Ok(Value::Array(vec![1.into(), 2.into()])),
+            ),
+            (
+                "%{data:field:array(number)}",
+                "[1,2]",
+                Ok(Value::Array(vec![1.0.into(), 2.0.into()])),
+            ),
+            (
+                "%{data:field:array(integer)}",
+                "[1,2]",
+                Ok(Value::Array(vec![1.into(), 2.into()])),
+            ),
+            (
+                "%{data:field:array(scale(10))}",
+                "[1,2.1]",
+                Ok(Value::Array(vec![10.0.into(), 21.0.into()])),
+            ),
+            (
+                r#"%{data:field:array(";", scale(10))}"#,
+                "[1;2.1]",
+                Ok(Value::Array(vec![10.0.into(), 21.0.into()])),
+            ),
+            (
+                r#"%{data:field:array("{}",";", scale(10))}"#,
+                "{1;2.1}",
+                Ok(Value::Array(vec![10.0.into(), 21.0.into()])),
+            ),
+        ]);
+
+        test_full_grok(vec![
+            // not an array
+            (
+                r#"%{data:field:array}"#,
+                "abc",
+                Ok(Value::Object(btreemap! {})),
+            ),
+            // failed to apply value filter(values are strings)
+            (
+                r#"%{data:field:array(scale(10))}"#,
+                "[a,b]",
+                Ok(Value::Object(btreemap! {})),
+            ),
+        ]);
     }
 
     #[test]
