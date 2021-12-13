@@ -6,3 +6,8 @@ use vrl_compiler::{Context, Resolved};
 #[allow(unused_variables)]
 #[no_mangle]
 pub extern "C" fn vrl_execute(context: &mut Context, result: &mut Resolved) {}
+
+#[no_mangle]
+pub extern "C" fn vrl_expression_abort_impl(span: &Span, result: &mut Resolved) {
+    *result = Err(ExpressionError::Abort { span: *span });
+}
