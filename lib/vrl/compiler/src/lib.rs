@@ -19,11 +19,12 @@ pub mod type_def;
 pub mod value;
 pub mod vm;
 
-pub use core::{value, ExpressionError, Resolved, Target};
 use std::{fmt::Display, str::FromStr};
 
 use ::serde::{Deserialize, Serialize};
+pub use ::value::ValueRegex;
 pub use context::Context;
+pub use core::{value, Error, ExpressionError, Resolved, Target};
 use diagnostic::DiagnosticList;
 pub(crate) use diagnostic::Span;
 pub use expression::Expression;
