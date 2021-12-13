@@ -9,6 +9,7 @@ type = "internal_metrics"
 
 [sources.splunk_hec]
 type = "splunk_hec"
+acknowledgements = false
 address = "0.0.0.0:8282"
 
 ##
@@ -28,4 +29,3 @@ encoding = "json"
 token = "abcd1234"
 healthcheck.enabled = false
 acknowledgements.indexer_acknowledgements_enabled = false
-request.concurrency = 1024
