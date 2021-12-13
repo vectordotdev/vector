@@ -76,7 +76,11 @@ to the trace endpoint contain two major kind of data:
 
 ## Cross cutting concerns
 
-N/A
+[On-going work][schema-rfc] to support event schema would allow to express some constrains on an event structure. In
+this case this would allow to formalize a trace schema while keeping the underlying data as standard Vector event. The
+trace sink would then expect event following this schema.
+
+[schema-rfc]: https://github.com/vectordotdev/vector/pull/9388
 
 ## Scope
 
@@ -149,16 +153,15 @@ Datadog API key management would be the same as it is for Datadog logs & metrics
 Regarding APM stats, if we envision the `datadog_trace` sink as a universal sender for any kind of traces ingested by
 Vector, it shall ultimately support computing APM stats, even if the stats payload is a bit [complex][apm-stats-proto]
 (it includes ddsketches) as this provides valuable stats on ingested traces. The Datadog OTLP traces exporter also
-[computes][otlp-exp-apm-stats] those stats. How Vector will hanlde APM stats will be discussed in a subsequent RFC.
+[computes][otlp-exp-apm-stats] those stats. How Vector will handle APM stats is discussed in its own
+[RFC][apm-stats-rfc].
 
-
-
-[schema-rfc]: https://github.com/vectordotdev/vector/pull/9388
 [gzip'ed protobuf over http]: https://github.com/DataDog/datadog-agent/blob/8b63d85/pkg/trace/writer/trace.go#L230-L269
 [datadog-agent repository]: https://github.com/DataDog/datadog-agent/blob/0a19a75/pkg/trace/pb/trace_payload.proto
 [event-filter]: https://github.com/vectordotdev/vector/blob/a0ca04c/src/sources/datadog/agent.rs#L206-L233
 [apm-stats-proto]: https://github.com/DataDog/datadog-agent/blob/dc2f202/pkg/trace/pb/stats.proto
 [otlp-exp-apm-stats]: https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/1b8f44f/exporter/datadogexporter/stats.go#L30-L88
+[apm-stats-rfc]: https://github.com/vectordotdev/vector/pull/9900
 
 ## Rationale
 
@@ -167,8 +170,9 @@ Vector, it shall ultimately support computing APM stats, even if the stats paylo
 
 ## Drawbacks
 
-* Adding a brand new datatype has a large impact and although it will be mostly a code addition, it will impact
-  vector-core
+* Using `LogEvent`s to represent traces implies that, until [schemas][schema-rfc] are available, the format a trace sink
+  would expect cannot be simply expressed and the sink will have to implement various sanity checks to ensure that
+  received events are traces.
 
 ## Prior Art
 
@@ -205,6 +209,7 @@ None.
 
 ## Future Improvements
 
+* As soon as the [schema][schema-rfc] feature is available, use it to express the expected trace format.
 * Support for additional trace sources and sinks, probably OpenTelemetry first
 * Profile support
 * Ingest traces from Datadog tracing libraries directly
