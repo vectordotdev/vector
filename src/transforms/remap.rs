@@ -12,9 +12,9 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
+use std::fs::File;
 use std::io::{self, Read};
 use std::path::PathBuf;
-use std::{collections::HashMap, fs::File};
 use vrl::diagnostic::Formatter;
 use vrl::prelude::ExpressionError;
 use vrl::{Program, Runtime, Terminate};
@@ -74,7 +74,7 @@ impl TransformConfig for RemapConfig {
     /// Calculate the output schema of the remap transform, based on the input, and the type
     /// definition of the compiled program.
     fn output_schema(&self, ctx: &TransformContext) -> Option<schema::Output> {
-        Remap::new(self.clone(), &ctx)
+        Remap::new(self.clone(), ctx)
             .ok()
             .map(|remap| remap.output_schema)
     }
@@ -113,11 +113,9 @@ impl Remap {
         functions.append(&mut enrichment::vrl_functions());
         functions.append(&mut vector_vrl_functions::vrl_functions());
 
-        let type_def = ctx.pipeline_schema.kind().clone().into();
+        let type_def = ctx.schema_registry.input_kind().clone().into();
 
         let mut state = vrl::state::Compiler::new_with_type_def(type_def);
-
-        state.set_external_context(ctx.enrichment_tables.clone());
         state.set_external_context(ctx.schema_registry.clone());
 
         let program = vrl::compile_with_state(&source, &functions, &mut state)
@@ -125,8 +123,11 @@ impl Remap {
 
         let kind: value::Kind = state.target_type_def().cloned().unwrap_or_default().into();
 
-        // TODO(Jean): Get field purposes set by VRL functions.
-        let purposes = HashMap::default();
+        let purposes = state
+            .get_external_context_mut::<schema::TransformRegistry>()
+            .map(|r| r.input_purpose())
+            .cloned()
+            .unwrap_or_default();
 
         let output_schema = schema::Output::from_parts(kind, purposes);
 

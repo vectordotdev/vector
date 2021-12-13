@@ -35,9 +35,8 @@ pub struct TransformContext {
     #[cfg(feature = "vrl")]
     pub enrichment_tables: enrichment::TableRegistry,
 
-    /// The merged "output" schema produced by the inputs of this transform.
-    pub pipeline_schema: schema::Output,
-    pub schema_registry: schema::Registry,
+    /// Schema details relevant to the transform.
+    pub schema_registry: schema::TransformRegistry,
 }
 
 impl TransformContext {

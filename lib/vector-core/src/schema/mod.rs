@@ -5,4 +5,4 @@ mod registry;
 
 pub use input::Input;
 pub use output::Output;
-pub use registry::Registry;
+pub use registry::TransformRegistry;

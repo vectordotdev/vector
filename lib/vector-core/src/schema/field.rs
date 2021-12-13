@@ -11,6 +11,19 @@ pub enum Purpose {
     Custom(String),
 }
 
+impl From<String> for Purpose {
+    fn from(s: String) -> Self {
+        match s.as_str() {
+            "timestamp" => Self::Timestamp,
+            "host" => Self::Host,
+            "message" => Self::Message,
+            "source" => Self::Source,
+            "Severity" => Self::Severity,
+            _ => Self::Custom(s),
+        }
+    }
+}
+
 impl From<&str> for Purpose {
     fn from(s: &str) -> Self {
         match s {
@@ -32,7 +45,7 @@ impl Purpose {
             Purpose::Message => "message",
             Purpose::Source => "source",
             Purpose::Severity => "severity",
-            Purpose::Custom(v) => &v,
+            Purpose::Custom(v) => v,
         }
     }
 }
