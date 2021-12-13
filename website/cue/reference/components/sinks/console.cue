@@ -21,7 +21,7 @@ components: sinks: console: {
 				enabled: true
 				codec: {
 					enabled: true
-					enum: ["json", "text", "ndjson"]
+					enum: ["json", "text"]
 				}
 			}
 			request: enabled: false
