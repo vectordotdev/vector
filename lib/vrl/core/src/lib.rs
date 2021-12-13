@@ -12,3 +12,10 @@ mod target;
 pub use expression::{ExpressionError, Resolved};
 pub use target::Target;
 pub use value::Value;
+
+use vector_common::TimeZone;
+
+pub struct Context<'a> {
+    pub target: &'a mut dyn Target,
+    pub timezone: &'a TimeZone,
+}

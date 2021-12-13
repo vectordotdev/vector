@@ -8,4 +8,5 @@ publish = false
 [dependencies]
 lookup = { path = "../../lookup" }
 value = { path = "../../value" }
+vector_common = { path = "../../vector-common" }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
