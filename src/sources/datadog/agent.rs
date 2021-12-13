@@ -1076,7 +1076,14 @@ mod tests {
     async fn api_key_in_header_is_invalid_and_dropped() {
         trace_init();
         let valid_api_keys = vec!["valid_key".to_string()];
-        let (rx, addr) = source(EventStatus::Delivered, true, true, true, Some(valid_api_keys)).await;
+        let (rx, addr) = source(
+            EventStatus::Delivered,
+            true,
+            true,
+            true,
+            Some(valid_api_keys),
+        )
+        .await;
 
         let mut headers_with_invalid_api_key = HeaderMap::new();
         headers_with_invalid_api_key.insert(
@@ -1084,10 +1091,7 @@ mod tests {
             "12345678abcdefgh12345678abcdefgh".parse().unwrap(),
         );
         let mut headers_with_valid_api_key = HeaderMap::new();
-        headers_with_valid_api_key.insert(
-            "dd-api-key",
-            "valid_key".parse().unwrap(),
-        );
+        headers_with_valid_api_key.insert("dd-api-key", "valid_key".parse().unwrap());
 
         let mut events = spawn_collect_n(
             async move {
@@ -1104,11 +1108,11 @@ mod tests {
                             ddsource: Bytes::from("curl"),
                             ddtags: Bytes::from("one,two,three"),
                         }])
-                            .unwrap(),
+                        .unwrap(),
                         headers_with_invalid_api_key,
                         "/v1/input/"
                     )
-                        .await
+                    .await
                 );
                 assert_eq!(
                     200,
@@ -1123,17 +1127,17 @@ mod tests {
                             ddsource: Bytes::from("curl_valid"),
                             ddtags: Bytes::from("one,two,three,four"),
                         }])
-                            .unwrap(),
+                        .unwrap(),
                         headers_with_valid_api_key,
                         "/v1/input/"
                     )
-                        .await
+                    .await
                 );
             },
             rx,
             1,
         )
-            .await;
+        .await;
 
         {
             let event = events.remove(0);
@@ -1179,17 +1183,17 @@ mod tests {
                             ddsource: Bytes::from("curl"),
                             ddtags: Bytes::from("one,two,three"),
                         }])
-                            .unwrap(),
+                        .unwrap(),
                         headers,
                         "/v1/input/"
                     )
-                        .await
+                    .await
                 );
             },
             rx,
             1,
         )
-            .await;
+        .await;
 
         {
             let event = events.remove(0);
