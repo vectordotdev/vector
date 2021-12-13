@@ -145,3 +145,9 @@ impl From<String> for Field {
         Self(field.into())
     }
 }
+
+impl From<lookup::FieldBuf> for Field {
+    fn from(field: lookup::FieldBuf) -> Self {
+        Self(field.to_string().into())
+    }
+}

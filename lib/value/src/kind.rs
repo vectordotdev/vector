@@ -3,7 +3,7 @@ mod collection;
 use std::collections::BTreeMap;
 
 pub use collection::{Collection, Field, Index};
-use lookup::{Lookup, Segment};
+use lookup::{FieldBuf, Lookup, LookupBuf, Segment, SegmentBuf};
 
 /// The type (kind) of a given value.
 ///
@@ -137,6 +137,79 @@ impl Kind {
         }
 
         self
+    }
+
+    /// Find the `Kind` at the given path.
+    ///
+    /// if the path points to an unknown location, `None` is returned.
+    #[must_use]
+    pub fn find_at_path(&self, path: LookupBuf) -> Option<Self> {
+        let mut iter = path.into_iter();
+
+        let kind = match iter.next() {
+            // We've reached the end of the path segments, so return whatever kind we're currently
+            // into.
+            None => return Some(self.clone()),
+
+            // We have one or more segments to parse, do so and optionally recursively call this
+            // function for the relevant kind.
+            Some(segment) => match segment {
+                SegmentBuf::Coalesce(fields) => match self.as_object() {
+                    // We got a coalesced field, but we don't have an object to fetch the path
+                    // from, so there's no `kind` to find at the given path.
+                    None => return None,
+
+                    // We have an object, but know nothing of its fields, so all we can say is that
+                    // there _might_ be a field at the given path, but it could be of any type.
+                    Some(collection) if collection.is_any() => return Some(Kind::any()),
+
+                    // We have an object with one or more known fields. Try to find the requested
+                    // field within the collection, or use the default "other" field type info.
+                    Some(collection) => fields
+                        .into_iter()
+                        .find_map(|field| collection.known().get(&field.into()).cloned())
+                        .unwrap_or_else(|| collection.other().into_owned()),
+                },
+
+                SegmentBuf::Field(FieldBuf { name: field, .. }) => match self.as_object() {
+                    // We got a field, but we don't have an object to fetch the path from, so
+                    // there's no `kind` to find at the given path.
+                    None => return None,
+
+                    // We have an object, but know nothing of its fields, so all we can say is that
+                    // there _might_ be a field at the given path, but it could be of any type.
+                    Some(collection) if collection.is_any() => return Some(Kind::any()),
+
+                    // We have an object with one or more known fields. Try to find the requested
+                    // field within the collection, or use the default "other" field type info.
+                    Some(collection) => collection
+                        .known()
+                        .get(&field.into())
+                        .cloned()
+                        .unwrap_or_else(|| collection.other().into_owned()),
+                },
+
+                SegmentBuf::Index(index) => match self.as_array() {
+                    // We got an index, but we don't have an array to index into, so there's no
+                    // `kind` to find at the given path.
+                    None => return None,
+
+                    // If we're trying to get a negative index, we have to return "any", since we
+                    // never have a full picture of the shape of an array, so we can't index from
+                    // the end of the array.
+                    Some(_) if index.is_negative() => return Some(Kind::any()),
+
+                    #[allow(clippy::cast_sign_loss)]
+                    Some(collection) => collection
+                        .known()
+                        .get(&(index as usize).into())
+                        .cloned()
+                        .unwrap_or_else(|| collection.other().into_owned()),
+                },
+            },
+        };
+
+        kind.find_at_path(LookupBuf::from_segments(iter.collect()))
     }
 }
 
