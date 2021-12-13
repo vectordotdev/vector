@@ -28,3 +28,4 @@ encoding = "json"
 token = "abcd1234"
 healthcheck.enabled = false
 acknowledgements.indexer_acknowledgements_enabled = false
+request.concurrency = 1024
