@@ -53,7 +53,8 @@ pub fn custom_client(
     client_builder: &mut client::Builder,
 ) -> crate::Result<Client> {
     let settings = MaybeTlsSettings::enable_client()?;
-    let client = crate::http::HttpClient::new_with_custom_client(settings, proxy, None, client_builder)?;
+    let client =
+        crate::http::HttpClient::new_with_custom_client(settings, proxy, None, client_builder)?;
     Ok(HttpClient { client })
 }
 

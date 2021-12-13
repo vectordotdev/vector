@@ -3,7 +3,7 @@ use crate::{
     internal_events::http_client,
     tls::{tls_connector_builder, MaybeTlsSettings, TlsError},
 };
-use core::time::{Duration};
+use core::time::Duration;
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use http::{header::HeaderValue, request::Builder, uri::InvalidUri, HeaderMap, Request};
@@ -38,6 +38,8 @@ pub enum HttpError {
     BuildRequest { source: http::Error },
 }
 
+const DEFAULT_TIMEOUT_SEC: u64 = 5;
+
 pub type HttpClientFuture = <HttpClient as Service<http::Request<Body>>>::Future;
 
 pub struct HttpClient<B = Body> {
@@ -54,9 +56,14 @@ where
     pub fn new(
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
-        timeout_duration: Option<Duration>
+        timeout_duration: Option<Duration>,
     ) -> Result<HttpClient<B>, HttpError> {
-        HttpClient::new_with_custom_client(tls_settings, proxy_config, timeout_duration, &mut Client::builder())
+        HttpClient::new_with_custom_client(
+            tls_settings,
+            proxy_config,
+            timeout_duration,
+            &mut Client::builder(),
+        )
     }
 
     pub fn new_with_custom_client(
@@ -67,7 +74,9 @@ where
     ) -> Result<HttpClient<B>, HttpError> {
         let mut http = HttpConnector::new();
         http.enforce_http(false);
-        http.set_connect_timeout(timeout_duration.or_else(|| Some(Duration::from_secs(5))));
+        http.set_connect_timeout(
+            timeout_duration.or_else(|| Some(Duration::from_secs(DEFAULT_TIMEOUT_SEC))),
+        );
 
         let settings = tls_settings.into();
         let tls = tls_connector_builder(&settings).context(BuildTlsConnector)?;

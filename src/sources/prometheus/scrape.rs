@@ -196,8 +196,8 @@ fn prometheus(
             .map(move |_| stream::iter(urls.clone()))
             .flatten()
             .map(move |url| {
-                let client =
-                    HttpClient::new(tls.clone(), &proxy, None).expect("Building HTTP client failed");
+                let client = HttpClient::new(tls.clone(), &proxy, None)
+                    .expect("Building HTTP client failed");
 
                 let mut request = Request::get(&url)
                     .body(Body::empty())

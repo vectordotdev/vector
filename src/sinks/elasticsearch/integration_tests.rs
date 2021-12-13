@@ -1,7 +1,14 @@
 use super::config::DATA_STREAM_TIMESTAMP_KEY;
 use super::*;
+use crate::sinks::util::batch::BatchError;
 use crate::sinks::util::{BatchConfig, Compression};
-use crate::{config::{ProxyConfig, SinkConfig, SinkContext}, Error, http::HttpClient, sinks::HealthcheckError, test_util::{random_events_with_stream, random_string, trace_init}, tls::{self, TlsOptions}};
+use crate::{
+    config::{ProxyConfig, SinkConfig, SinkContext},
+    http::HttpClient,
+    sinks::HealthcheckError,
+    test_util::{random_events_with_stream, random_string, trace_init},
+    tls::{self, TlsOptions},
+};
 use chrono::Utc;
 use futures::{stream, StreamExt};
 use http::{Request, StatusCode};
@@ -98,31 +105,48 @@ fn ensure_pipeline_in_params() {
 }
 
 #[tokio::test]
-async fn timout_occurs() {
+async fn timeout_occurs() {
+    // use governor::clock;
+    // let clock = clock::FakeRelativeClock::default();
     use tokio::time::{sleep, Duration};
 
     let pipeline = String::from("test-pipeline");
-    let connection_timeout = 1;
+    const CONNECTION_TIMEOUT: u64 = 1;
+
     let config = ElasticSearchConfig {
         endpoint: "https://example.com".into(),
         index: Some(String::from("vector")),
         pipeline: Some(pipeline.clone()),
-        connection_timeout: Some(connection_timeout),
+        connection_timeout: Some(CONNECTION_TIMEOUT),
         ..config()
     };
-    let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
 
     let cx = SinkContext::new_test();
-    let (sink, healthcheck) = config
+    let (_, healthcheck) = config
         .build(cx.clone())
         .await
         .expect("Building config failed");
+    let time_advanced = Duration::from_secs(CONNECTION_TIMEOUT + 1);
+    tokio::time::pause();
+    tokio::time::advance(time_advanced).await;
+    /* Tried to simulate connection timeout by connecting to either localhost or some external website;
+    after some search, there's doesn't seem to be a good existing solution.
+    Ideal steps:
+    1. connect to a fake server
+    2. advance the artificial time either by
+        a. tokio::time::advance(time_advanced);
+        b. clock.advance(time_advanced);
+    */
 
-    sleep(Duration::from_secs(connection_timeout + 1)).await;
-    
-
-    // Expect to timeout
-    // assert_eq!(err, HealthcheckError::UnexpectedStatus{ status: http::StatusCode::REQUEST_TIMEOUT });
+    let res = healthcheck.await;
+    assert!(res.is_err());
+    assert_eq!(
+        res.err()
+            .and_then(|e| e.downcast::<HealthcheckError>().ok()), // == None, currently e == some dns error (can't resolve domain name)
+        Some(Box::new(HealthcheckError::UnexpectedStatus {
+            status: http::StatusCode::REQUEST_TIMEOUT
+        }))
+    );
 }
 
 #[tokio::test]

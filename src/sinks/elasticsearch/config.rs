@@ -309,8 +309,12 @@ impl SinkConfig for ElasticSearchConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(self)?;
 
-        let connection_timeout_duration = Duration::new(self.connection_timeout.unwrap_or(5), 0);
-        let http_client = HttpClient::new(common.tls_settings.clone(), cx.proxy(), Some(connection_timeout_duration))?;
+        let http_client = HttpClient::new(
+            common.tls_settings.clone(),
+            cx.proxy(),
+            self.connection_timeout
+                .map(|timeout| Duration::from_secs(timeout)),
+        )?;
         let batch_settings = self.batch.into_batcher_settings()?;
 
         // This is a bit ugly, but removes a String allocation on every event
