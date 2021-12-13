@@ -342,7 +342,7 @@ impl DiagnosticError for Error {
 
 // -----------------------------------------------------------------------------
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub enum ExpressionError {
     Abort {
         span: Span,

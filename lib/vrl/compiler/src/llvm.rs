@@ -1,8 +1,12 @@
+use crate::Resolved;
 use inkwell::{
     builder::Builder,
     module::Module,
-    values::{FunctionValue, PointerValue},
+    values::{FunctionValue, GlobalValue, PointerValue},
 };
+use lookup::LookupBuf;
+use parser::ast::Ident;
+use std::collections::HashMap;
 
 static PRECOMPILED: &'static [u8] = include_bytes!(concat!(env!("OUT_DIR"), "/precompiled.bc"));
 
@@ -13,6 +17,12 @@ pub struct Context<'ctx> {
     function: FunctionValue<'ctx>,
     context_ref: PointerValue<'ctx>,
     result_ref: PointerValue<'ctx>,
+    resolved_map: HashMap<Resolved, usize>,
+    resolveds: Vec<GlobalValue<'ctx>>,
+    ident_map: HashMap<Ident, usize>,
+    idents: Vec<GlobalValue<'ctx>>,
+    lookup_buf_map: HashMap<LookupBuf, usize>,
+    lookup_bufs: Vec<GlobalValue<'ctx>>,
 }
 
 impl<'ctx> Context<'ctx> {
@@ -38,6 +48,10 @@ impl<'ctx> Context<'ctx> {
 
     pub fn result_ref(&self) -> inkwell::values::PointerValue<'ctx> {
         self.result_ref
+    }
+
+    pub fn set_result_ref(&mut self, result_ref: inkwell::values::PointerValue<'ctx>) {
+        self.result_ref = result_ref
     }
 
     pub fn into_const<T: Sized>(&self, value: T, name: &str) -> inkwell::values::GlobalValue<'ctx> {
@@ -77,5 +91,75 @@ impl<'ctx> Context<'ctx> {
             .map(|byte| self.context.i8_type().const_int(byte as _, false).into())
             .collect::<Vec<_>>();
         self.context.i8_type().const_array(array.as_slice())
+    }
+
+    pub fn into_resolved_const_ref(
+        &mut self,
+        resolved: Resolved,
+    ) -> inkwell::values::PointerValue<'ctx> {
+        let index = match self.resolved_map.get(&resolved) {
+            Some(index) => *index,
+            None => {
+                let index = self.resolveds.len();
+                let name = format!("{:?}", resolved);
+                let global = self.into_const(resolved.clone(), &name);
+                self.resolved_map.insert(resolved, index);
+                self.resolveds.push(global);
+                index
+            }
+        };
+
+        self.resolveds[index].as_pointer_value().into()
+    }
+
+    pub fn into_ident_const_ref(&mut self, ident: Ident) -> inkwell::values::PointerValue<'ctx> {
+        let index = match self.ident_map.get(&ident) {
+            Some(index) => *index,
+            None => {
+                let index = self.idents.len();
+                let name = format!("{}", ident);
+                let global = self.into_const(ident.clone(), &name);
+                self.ident_map.insert(ident, index);
+                self.idents.push(global);
+                index
+            }
+        };
+
+        self.idents[index].as_pointer_value().into()
+    }
+
+    pub fn into_lookup_buf_const_ref(
+        &mut self,
+        lookup_buf: LookupBuf,
+    ) -> inkwell::values::PointerValue<'ctx> {
+        let index = match self.lookup_buf_map.get(&lookup_buf) {
+            Some(index) => *index,
+            None => {
+                let index = self.lookup_bufs.len();
+                let name = format!("{}", lookup_buf);
+                let global = self.into_const(lookup_buf.clone(), &name);
+                self.lookup_buf_map.insert(lookup_buf, index);
+                self.lookup_bufs.push(global);
+                index
+            }
+        };
+
+        self.lookup_bufs[index].as_pointer_value().into()
+    }
+
+    pub fn build_alloca_resolved(
+        &self,
+        name: &str,
+    ) -> Result<inkwell::values::PointerValue<'ctx>, String> {
+        let resolved_type_identifier = "core::result::Result<vrl_compiler::value::Value, vrl_compiler::expression::ExpressionError>";
+        let resolved_type = self
+            .module
+            .get_struct_type(resolved_type_identifier)
+            .ok_or(format!(
+                r#"failed getting type "{}" from module"#,
+                resolved_type_identifier
+            ))?;
+
+        Ok(self.builder.build_alloca(resolved_type, name))
     }
 }

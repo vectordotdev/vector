@@ -159,8 +159,8 @@ impl Expression for Assignment {
     }
 
     #[cfg(feature = "llvm")]
-    fn emit_llvm<'ctx>(&self, _: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
-        todo!()
+    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+        self.variant.emit_llvm(ctx)
     }
 }
 
@@ -278,6 +278,122 @@ impl Target {
                 let _ = ctx
                     .target_mut()
                     .insert(path.as_ref().unwrap_or(&LookupBuf::root()), value);
+            }
+        }
+    }
+
+    #[cfg(feature = "llvm")]
+    pub fn emit_llvm_insert<'ctx>(
+        &self,
+        ctx: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
+        match self {
+            Target::Noop => Ok(()),
+            Target::Internal(ident, path) => {
+                let ident_ref = ctx.into_ident_const_ref(ident.clone());
+
+                // Get the provided path, or else insert into the variable
+                // without any path appended and return early.
+                let path = match path {
+                    Some(path) => path,
+                    None => {
+                        let fn_ident = "vrl_expression_assignment_target_insert_internal_impl";
+                        let fn_impl = ctx
+                            .module()
+                            .get_function(fn_ident)
+                            .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                        ctx.builder().build_call(
+                            fn_impl,
+                            &[
+                                ctx.context_ref().into(),
+                                ctx.builder()
+                                    .build_bitcast(
+                                        ident_ref,
+                                        fn_impl
+                                            .get_nth_param(1)
+                                            .unwrap()
+                                            .get_type()
+                                            .into_pointer_type(),
+                                        "cast",
+                                    )
+                                    .into(),
+                                ctx.result_ref().into(),
+                            ],
+                            fn_ident,
+                        );
+                        return Ok(());
+                    }
+                };
+
+                // Update existing variable using the provided path, or create a
+                // new value in the store.
+                let path_ref = ctx.into_lookup_buf_const_ref(path.clone());
+                let fn_ident = "vrl_expression_assignment_target_insert_internal_path_impl";
+                let fn_impl = ctx
+                    .module()
+                    .get_function(fn_ident)
+                    .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                ctx.builder().build_call(
+                    fn_impl,
+                    &[
+                        ctx.context_ref().into(),
+                        ctx.builder()
+                            .build_bitcast(
+                                ident_ref,
+                                fn_impl
+                                    .get_nth_param(1)
+                                    .unwrap()
+                                    .get_type()
+                                    .into_pointer_type(),
+                                "cast",
+                            )
+                            .into(),
+                        ctx.builder()
+                            .build_bitcast(
+                                path_ref,
+                                fn_impl
+                                    .get_nth_param(2)
+                                    .unwrap()
+                                    .get_type()
+                                    .into_pointer_type(),
+                                "cast",
+                            )
+                            .into(),
+                        ctx.result_ref().into(),
+                    ],
+                    fn_ident,
+                );
+                Ok(())
+            }
+            Target::External(path) => {
+                let path_ref =
+                    ctx.into_lookup_buf_const_ref(path.clone().unwrap_or(LookupBuf::root()));
+
+                let fn_ident = "vrl_expression_assignment_target_insert_external_impl";
+                let fn_impl = ctx
+                    .module()
+                    .get_function(fn_ident)
+                    .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                ctx.builder().build_call(
+                    fn_impl,
+                    &[
+                        ctx.context_ref().into(),
+                        ctx.builder()
+                            .build_bitcast(
+                                path_ref,
+                                fn_impl
+                                    .get_nth_param(1)
+                                    .unwrap()
+                                    .get_type()
+                                    .into_pointer_type(),
+                                "cast",
+                            )
+                            .into(),
+                        ctx.result_ref().into(),
+                    ],
+                    fn_ident,
+                );
+                Ok(())
             }
         }
     }
@@ -448,8 +564,134 @@ where
     }
 
     #[cfg(feature = "llvm")]
-    fn emit_llvm<'ctx>(&self, _: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
-        todo!()
+    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+        Ok(match self {
+            Variant::Single { target, expr } => {
+                let function = ctx.function();
+                let assignment_single_begin_block = ctx
+                    .context()
+                    .append_basic_block(function, "assignment_single_begin");
+                ctx.builder()
+                    .build_unconditional_branch(assignment_single_begin_block);
+                ctx.builder().position_at_end(assignment_single_begin_block);
+
+                expr.emit_llvm(ctx)?;
+
+                target.emit_llvm_insert(ctx)?;
+            }
+            Variant::Infallible {
+                ok,
+                err,
+                expr,
+                default,
+            } => {
+                let function = ctx.function();
+                let assignment_infallible_begin_block = ctx
+                    .context()
+                    .append_basic_block(function, "assignment_infallible_begin");
+                ctx.builder()
+                    .build_unconditional_branch(assignment_infallible_begin_block);
+                ctx.builder()
+                    .position_at_end(assignment_infallible_begin_block);
+
+                expr.emit_llvm(ctx)?;
+
+                let is_ok = {
+                    let fn_ident = "vrl_resolved_is_ok";
+                    let fn_impl = ctx
+                        .module()
+                        .get_function(fn_ident)
+                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                    ctx.builder()
+                        .build_call(fn_impl, &[ctx.result_ref().into()], fn_ident)
+                        .try_as_basic_value()
+                        .left()
+                        .ok_or(format!(r#"result of "{}" is not a basic value"#, fn_ident))?
+                        .try_into()
+                        .map_err(|_| format!(r#"result of "{}" is not an int value"#, fn_ident))?
+                };
+
+                let assignment_infallible_end_block = ctx
+                    .context()
+                    .append_basic_block(function, "assignment_infallible_end");
+                let assignment_infallible_begin_is_ok_block = ctx
+                    .context()
+                    .append_basic_block(function, "assignment_infallible_begin_is_ok");
+                let assignment_infallible_begin_is_err_block = ctx
+                    .context()
+                    .append_basic_block(function, "assignment_infallible_begin_is_err");
+
+                ctx.builder().build_conditional_branch(
+                    is_ok,
+                    assignment_infallible_begin_is_ok_block,
+                    assignment_infallible_begin_is_err_block,
+                );
+
+                ctx.builder()
+                    .position_at_end(assignment_infallible_begin_is_ok_block);
+
+                ok.emit_llvm_insert(ctx)?;
+
+                let result_ref = ctx.result_ref();
+                let result_temp_ref = ctx.build_alloca_resolved("temp")?;
+                ctx.set_result_ref(result_temp_ref);
+
+                {
+                    let fn_ident = "vrl_resolved_initialize";
+                    let fn_impl = ctx
+                        .module()
+                        .get_function(fn_ident)
+                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                    ctx.builder()
+                        .build_call(fn_impl, &[result_temp_ref.into()], fn_ident);
+                }
+
+                err.emit_llvm_insert(ctx)?;
+
+                {
+                    let fn_ident = "vrl_resolved_drop";
+                    let fn_impl = ctx
+                        .module()
+                        .get_function(fn_ident)
+                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                    ctx.builder()
+                        .build_call(fn_impl, &[result_temp_ref.into()], fn_ident);
+                }
+
+                ctx.set_result_ref(result_ref);
+
+                ctx.builder()
+                    .build_unconditional_branch(assignment_infallible_end_block);
+
+                ctx.builder()
+                    .position_at_end(assignment_infallible_begin_is_err_block);
+
+                let default_ref = ctx.into_resolved_const_ref(Ok(default.clone()));
+                ctx.set_result_ref(default_ref);
+
+                ok.emit_llvm_insert(ctx)?;
+
+                ctx.set_result_ref(result_ref);
+
+                {
+                    let fn_ident = "vrl_resolved_err_into_ok";
+                    let fn_impl = ctx
+                        .module()
+                        .get_function(fn_ident)
+                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                    ctx.builder()
+                        .build_call(fn_impl, &[ctx.result_ref().into()], fn_ident);
+                }
+
+                err.emit_llvm_insert(ctx)?;
+
+                ctx.builder()
+                    .build_unconditional_branch(assignment_infallible_end_block);
+
+                ctx.builder()
+                    .position_at_end(assignment_infallible_end_block);
+            }
+        })
     }
 }
 

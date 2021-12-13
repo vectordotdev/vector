@@ -7,8 +7,8 @@ edition = "2021"
 crate-type = ["staticlib"]
 
 [dependencies]
-vrl-compiler = { path = "../..", default-features = false }
-shared = { path = "../../../../shared" }
 lookup = { path = "../../../../lookup" }
+shared = { path = "../../../../shared" }
+vrl-compiler = { path = "../..", default-features = false }
 
 [workspace]

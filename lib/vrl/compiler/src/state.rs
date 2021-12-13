@@ -142,7 +142,7 @@ impl Runtime {
         self.variables.get_mut(ident)
     }
 
-    pub(crate) fn insert_variable(&mut self, ident: Ident, value: Value) {
+    pub fn insert_variable(&mut self, ident: Ident, value: Value) {
         self.variables.insert(ident, value);
     }
 }
