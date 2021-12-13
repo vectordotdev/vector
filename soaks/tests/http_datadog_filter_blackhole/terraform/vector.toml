@@ -1,0 +1,276 @@
+data_dir = "/var/lib/vector"
+
+##
+## Sources
+##
+
+[sources.internal_metrics]
+type = "internal_metrics"
+
+[sources.logs]
+type = "http"
+address = "0.0.0.0:8282"
+encoding = "ndjson"
+
+##
+## Transforms
+##
+
+[transforms.nginx]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:nginx"
+
+[transforms.redis]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:redis"
+
+[transforms.consul]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:consul"
+
+[transforms.python]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:python"
+
+[transforms.rabbitmq]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:rabbitmq"
+
+[transforms.zookeeper]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:zookeeper"
+
+[transforms.elasticsearch]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:elasticsearch"
+
+[transforms.kafka]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:kafka"
+
+[transforms.couchdb]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:couchdb"
+
+[transforms.docker]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:docker"
+
+[transforms.datadog_agent]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:(agent OR datadog-agent OR datadog-agent-cluster-worker OR datadog-cluster-agent OR process-agent OR security-agent OR system-probe OR trace-agent)"
+
+[transforms.ruby]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:ruby"
+
+[transforms.vault]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:vault"
+
+[transforms.nginx_ingress_controller]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:nginx-ingress-controller"
+
+[transforms.mysql]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:mysql"
+
+[transforms.kubernetes_cluster_autoscaler]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:cluster-autoscaler"
+
+[transforms.aws_alb_ingress_controller]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:aws-alb-ingress-controller"
+
+[transforms.proxysql]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:proxysql"
+
+[transforms.azure]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:(azure OR azure.alertsmanagement OR azure.analysisservices OR azure.apiconfiguration OR azure.apimanagement OR azure.authorization OR azure.automation OR azure.batchai OR azure.batchazure.cache OR azure.blockchain OR azure.cache OR azure.cdn OR azure.classiccompute OR azure.classicstorage OR azure.cognitiveservices OR azure.containerinstance OR azure.containerregistry OR azure.containerservice OR azure.datafactory OR azure.datalakestore OR azure.dbformariadb OR azure.dbformysql OR azure.dbforpostgresql OR azure.devices OR azure.documentdb OR azure.enterpriseknowledgegraph OR azure.eventgrid OR azure.eventhub OR azure.hdinsight OR azure.insights OR azure.iotcentral OR azure.keyvault OR azure.kusto OR azure.logic OR azure.machinelearningservices OR azure.managedidentity OR azure.operationalinsights OR azure.operationsmanagement OR azure.peering OR azure.relay OR azure.resourcegroup OR azure.resources OR azure.search OR azure.security OR azure.servicebus OR azure.servicefabric OR azure.streamanalytics OR azure.subscription OR azure.synapse)"
+
+[transforms.azure_web]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:azure.web"
+
+[transforms.azure_storage]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:azure.storage"
+
+[transforms.azure_network]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:azure.network"
+
+[transforms.azure_compute]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:azure.compute"
+
+[transforms.etcd]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:etcd"
+
+[transforms.glog_pipeline]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:(admission-webhook OR api-server OR cert-manager-acmesolver OR cert-manager-cainjector OR cert-manager-controller OR cert-manager-webhook OR cluster-proportional-autoscaler-amd64 OR hyperkube OR ip-masq-agent OR k8s-prometheus-adapter-amd64 OR kube-apiserver OR kube-controller-manager OR kube-proxy OR kube-state-metrics OR metacontroller OR metrics-server-amd64 OR prometheus-operator OR vpa-admission-controller OR vpa-recommender OR vpa-updater)"
+
+[transforms.auth0]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:auth0"
+
+[transforms.kube_scheduler__glog_]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:(kube_scheduler OR kube-scheduler)"
+
+[transforms.aws_ecs_agent]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:amazon-ecs-agent"
+
+[transforms.nodejs]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:nodejs"
+
+[transforms.postgresql]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:postgresql"
+
+[transforms.cassandra]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:cassandra"
+
+[transforms.apache_httpd]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:httpd"
+
+[transforms.azure_recovery_services]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:azure.recoveryservices"
+
+[transforms.c_]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:csharp"
+
+[transforms.web_browser_logs]
+type = "filter"
+inputs = ["logs"]
+condition.type = "datadog_search"
+condition.source = "source:browser"
+
+##
+## Sinks
+##
+
+[sinks.prometheus]
+type = "prometheus_exporter"
+inputs = ["internal_metrics"]
+address = "0.0.0.0:9090"
+
+[sinks.blackhole]
+type = "blackhole"
+inputs = [
+    "nginx",
+    "redis",
+    "consul",
+    "python",
+    "rabbitmq",
+    "zookeeper",
+    "elasticsearch",
+    "kafka",
+    "couchdb",
+    "docker",
+    "datadog_agent",
+    "ruby",
+    "vault",
+    "nginx_ingress_controller",
+    "mysql",
+    "kubernetes_cluster_autoscaler",
+    "aws_alb_ingress_controller",
+    "proxysql",
+    "azure",
+    "azure_web",
+    "azure_storage",
+    "azure_network",
+    "azure_compute",
+    "etcd",
+    "glog_pipeline",
+    "auth0",
+    "kube_scheduler__glog_",
+    "aws_ecs_agent",
+    "nodejs",
+    "postgresql",
+    "cassandra",
+    "apache_httpd",
+    "azure_recovery_services",
+    "c_",
+    "web_browser_logs",
+]
