@@ -1,6 +1,6 @@
 services:
   redis:
-    image: redis
+    image: redis:6.2-alpine
     container_name: vector_redis
     ports:
       - 6379:6379
