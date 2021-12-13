@@ -1,8 +1,12 @@
+use crate::Resolved;
 use inkwell::{
     builder::Builder,
     module::Module,
-    values::{FunctionValue, PointerValue},
+    values::{FunctionValue, GlobalValue, PointerValue},
 };
+use lookup::LookupBuf;
+use parser::ast::Ident;
+use std::collections::HashMap;
 
 static PRECOMPILED: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/precompiled.bc"));
 
@@ -13,6 +17,13 @@ pub struct Context<'ctx> {
     function: FunctionValue<'ctx>,
     context_ref: PointerValue<'ctx>,
     result_ref: PointerValue<'ctx>,
+    variable_map: HashMap<Ident, usize>,
+    // TODO: Emit code to drop variables when finishing the module.
+    variables: Vec<PointerValue<'ctx>>,
+    resolved_map: HashMap<Resolved, usize>,
+    resolveds: Vec<GlobalValue<'ctx>>,
+    lookup_buf_map: HashMap<LookupBuf, usize>,
+    lookup_bufs: Vec<GlobalValue<'ctx>>,
 }
 
 impl<'ctx> Context<'ctx> {
@@ -42,6 +53,48 @@ impl<'ctx> Context<'ctx> {
 
     pub fn set_result_ref(&mut self, result_ref: inkwell::values::PointerValue<'ctx>) {
         self.result_ref = result_ref
+    }
+
+    pub fn get_or_insert_variable_ref(
+        &mut self,
+        ident: &Ident,
+    ) -> inkwell::values::PointerValue<'ctx> {
+        let index = self.variable_map.get(ident).cloned().unwrap_or_else(|| {
+            let position = self
+                .builder
+                .get_insert_block()
+                .expect("builder must be positioned at block");
+            if let Some(instruction) = self
+                .function
+                .get_first_basic_block()
+                .and_then(|block| block.get_first_instruction())
+            {
+                self.builder.position_before(&instruction);
+            }
+            let variable = self.build_alloca_resolved(ident);
+            let fn_ident = "vrl_resolved_initialize";
+            let fn_impl = self
+                .module
+                .get_function(fn_ident)
+                .unwrap_or_else(|| panic!(r#"failed to get "{}" function"#, fn_ident));
+            self.builder
+                .build_call(fn_impl, &[variable.into()], fn_ident);
+            self.builder.position_at_end(position);
+            let index = self.variables.len();
+            self.variables.push(variable);
+            self.variable_map.insert(ident.clone(), index);
+            index
+        });
+
+        self.variables[index]
+    }
+
+    pub fn get_variable_ref(&mut self, ident: &Ident) -> inkwell::values::PointerValue<'ctx> {
+        let index = self
+            .variable_map
+            .get(ident)
+            .unwrap_or_else(|| panic!(r#"unknown variable "{}""#, ident));
+        self.variables[*index]
     }
 
     pub fn into_const<T: Sized>(&self, value: T, name: &str) -> inkwell::values::GlobalValue<'ctx> {
@@ -83,9 +136,46 @@ impl<'ctx> Context<'ctx> {
         self.context.i8_type().const_array(array.as_slice())
     }
 
+    pub fn into_resolved_const_ref(
+        &mut self,
+        resolved: Resolved,
+    ) -> inkwell::values::PointerValue<'ctx> {
+        let index = match self.resolved_map.get(&resolved) {
+            Some(index) => *index,
+            None => {
+                let index = self.resolveds.len();
+                let name = format!("{:?}", resolved);
+                let global = self.into_const(resolved.clone(), &name);
+                self.resolved_map.insert(resolved, index);
+                self.resolveds.push(global);
+                index
+            }
+        };
+
+        self.resolveds[index].as_pointer_value()
+    }
+
+    pub fn into_lookup_buf_const_ref(
+        &mut self,
+        lookup_buf: LookupBuf,
+    ) -> inkwell::values::PointerValue<'ctx> {
+        let index = match self.lookup_buf_map.get(&lookup_buf) {
+            Some(index) => *index,
+            None => {
+                let index = self.lookup_bufs.len();
+                let name = format!("{}", lookup_buf);
+                let global = self.into_const(lookup_buf.clone(), &name);
+                self.lookup_buf_map.insert(lookup_buf, index);
+                self.lookup_bufs.push(global);
+                index
+            }
+        };
+
+        self.lookup_bufs[index].as_pointer_value()
+    }
+
     pub fn build_alloca_resolved(&self, name: &str) -> inkwell::values::PointerValue<'ctx> {
-        let resolved_type_identifier =
-            "std::result::Result<vrl_compiler::Value, vrl_compiler::ExpressionError>";
+        let resolved_type_identifier = "core::result::Result<vrl_compiler::value::Value, vrl_compiler::expression::ExpressionError>";
         let resolved_type = self
             .module
             .get_struct_type(resolved_type_identifier)

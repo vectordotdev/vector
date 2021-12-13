@@ -3,7 +3,7 @@ use value::Value;
 
 pub type Resolved = Result<Value, ExpressionError>;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum ExpressionError {
     Abort {
         span: Span,
