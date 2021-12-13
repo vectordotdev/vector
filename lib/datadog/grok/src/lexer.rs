@@ -1,8 +1,6 @@
 use ordered_float::NotNan;
 use std::{iter::Peekable, str::CharIndices};
 
-use crate::lexer::StringLiteral::Escaped;
-
 pub type Tok<'input> = Token<&'input str>;
 pub type SpannedResult<'input, Loc> = Result<Spanned<'input, Loc>, Error>;
 pub type Spanned<'input, Loc> = (Loc, Tok<'input>, Loc);
@@ -26,7 +24,7 @@ pub enum Token<S> {
 
     IntegerLiteral(i64),
     FloatLiteral(NotNan<f64>),
-    StringLiteral(StringLiteral<S>),
+    StringLiteral(String),
     Identifier(S),
     ExtendedIdentifier(S),
     Invalid(char),
@@ -37,8 +35,11 @@ pub enum Error {
     #[error("invalid literal")]
     Literal { start: usize },
 
-    #[error("invalid numeric literal")]
+    #[error("invalid numeric literal '{}'", .0)]
     NumericLiteral(String),
+
+    #[error("invalid escape literal '{}'", .0)]
+    InvalidEscape(String),
 }
 
 pub struct Lexer<'input> {
@@ -74,7 +75,7 @@ impl<'input> Iterator for Lexer<'input> {
                     ':' => Some(Ok(self.token(start, Colon))),
                     ',' => Some(Ok(self.token(start, Comma))),
 
-                    '"' => Some(self.string_literal(start, |s| StringLiteral(Escaped(s)))),
+                    '"' => Some(self.string_literal(start)),
 
                     '+' => Some(Ok(self.token(start, Sign("+")))),
                     '-' => Some(Ok(self.token(start, Sign("-")))),
@@ -167,11 +168,7 @@ impl<'input> Lexer<'input> {
         (start, token, end)
     }
 
-    fn string_literal(
-        &mut self,
-        start: usize,
-        tok: impl Fn(&'input str) -> Tok<'input>,
-    ) -> SpannedResult<'input, usize> {
+    fn string_literal(&mut self, start: usize) -> SpannedResult<'input, usize> {
         let content_start = self.next_index();
 
         loop {
@@ -181,11 +178,10 @@ impl<'input> Lexer<'input> {
             match self.bump() {
                 Some((_, '\\')) => self.bump(),
                 Some((end, '\"')) => {
-                    let content = self.slice(content_start, end);
-                    let token = tok(content);
+                    let content = unescape_string_literal(self.slice(content_start, end))?;
                     let end = self.next_index();
 
-                    return Ok((start, token, end));
+                    return Ok((start, Token::StringLiteral(content), end));
                 }
                 _ => break,
             };
@@ -255,7 +251,7 @@ fn is_digit(ch: char) -> bool {
     ch.is_digit(10)
 }
 
-fn unescape_string_literal(mut s: &str) -> String {
+fn unescape_string_literal(mut s: &str) -> Result<String, Error> {
     let mut string = String::with_capacity(s.len());
     while let Some(i) = s.bytes().position(|b| b == b'\\') {
         if s.len() > i + 2 {
@@ -277,7 +273,7 @@ fn unescape_string_literal(mut s: &str) -> String {
                 b'\'' => '\'',
                 b'"' => '"',
                 b'\\' => '\\',
-                _ => unimplemented!("invalid escape"),
+                _ => return Err(Error::InvalidEscape(s.to_owned())),
             };
             string.push_str(&s[..i]);
             string.push(c);
@@ -286,20 +282,7 @@ fn unescape_string_literal(mut s: &str) -> String {
     }
 
     string.push_str(s);
-    string
-}
-
-#[derive(Clone, PartialEq, Eq, Debug, Hash)]
-pub enum StringLiteral<S> {
-    Escaped(S),
-}
-
-impl StringLiteral<&str> {
-    pub fn unescape(&self) -> String {
-        match self {
-            StringLiteral::Escaped(s) => unescape_string_literal(s),
-        }
-    }
+    Ok(string)
 }
 
 pub struct FloatingPointLiteral<'input> {
