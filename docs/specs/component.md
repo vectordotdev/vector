@@ -26,7 +26,7 @@ interpreted as described in [RFC 2119].
       1. [EventsSent](#eventssent)
       1. [BytesSent](#bytessent)
       1. [Error](#error)
-1. [Health checks](#healthchecks)
+1. [Health checks](#health-checks)
 
 <!-- /MarkdownTOC -->
 
