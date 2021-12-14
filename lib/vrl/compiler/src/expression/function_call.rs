@@ -315,6 +315,7 @@ impl Expression for FunctionCall {
 
         if self.abort_on_error {
             type_def.fallible = false;
+            type_def.abortable = true;
         }
 
         type_def

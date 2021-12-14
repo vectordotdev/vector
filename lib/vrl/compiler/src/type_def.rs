@@ -42,6 +42,9 @@ pub struct TypeDef {
     /// custom function designed to be infallible).
     pub fallible: bool,
 
+    /// True, if an expression can abort the program.
+    pub abortable: bool,
+
     /// The [`value::Kind`][crate::value::Kind]s this definition represents.
     ///
     /// This is wrapped in a [`TypeKind`] enum, such that we encode details
@@ -574,16 +577,26 @@ impl TypeDef {
 
     pub fn at_path(&self, path: LookupBuf) -> TypeDef {
         let fallible = self.fallible;
+        let abortable = self.abortable;
         let kind = self.kind.at_path(path);
 
-        Self { fallible, kind }
+        Self {
+            fallible,
+            abortable,
+            kind,
+        }
     }
 
     pub fn for_path(self, path: LookupBuf) -> TypeDef {
         let fallible = self.fallible;
+        let abortable = self.abortable;
         let kind = self.kind.for_path(path);
 
-        Self { fallible, kind }
+        Self {
+            fallible,
+            abortable,
+            kind,
+        }
     }
 
     pub fn kind(&self) -> Kind {
@@ -596,6 +609,12 @@ impl TypeDef {
     #[inline]
     pub fn fallible(mut self) -> Self {
         self.fallible = true;
+        self
+    }
+
+    #[inline]
+    pub fn abortable(mut self) -> Self {
+        self.abortable = true;
         self
     }
 
@@ -962,6 +981,14 @@ impl TypeDef {
         self
     }
 
+    pub fn is_abortable(&self) -> bool {
+        self.abortable
+    }
+
+    pub fn is_inabortable(&self) -> bool {
+        !self.is_abortable()
+    }
+
     fn update_segment<'a, I>(
         kind: &KindInfo,
         mut path: std::iter::Peekable<I>,
@@ -1121,6 +1148,7 @@ impl TypeDef {
 
         TypeDef {
             fallible: self.fallible,
+            abortable: self.abortable,
             kind,
         }
     }
@@ -1129,6 +1157,7 @@ impl TypeDef {
     pub fn merge(self, rhs: Self) -> Self {
         Self {
             fallible: self.fallible | rhs.fallible,
+            abortable: self.abortable | rhs.abortable,
             kind: self.kind.merge(rhs.kind, false, false),
         }
     }
@@ -1138,6 +1167,7 @@ impl TypeDef {
     pub fn merge_shallow(self, rhs: Self) -> Self {
         Self {
             fallible: self.fallible | rhs.fallible,
+            abortable: self.abortable | rhs.abortable,
             kind: self.kind.merge(rhs.kind, true, false),
         }
     }
@@ -1147,6 +1177,7 @@ impl TypeDef {
     pub fn merge_overwrite(self, rhs: Self) -> Self {
         Self {
             fallible: self.fallible | rhs.fallible,
+            abortable: self.abortable | rhs.abortable,
             kind: self.kind.merge(rhs.kind, false, true),
         }
     }
@@ -1169,6 +1200,7 @@ impl TypeDef {
 
         Self {
             fallible: self.fallible,
+            abortable: self.abortable,
             kind: newkind,
         }
     }
@@ -1322,6 +1354,7 @@ impl TypeDef {
 
         TypeDef {
             fallible: self.fallible,
+            abortable: self.abortable,
             kind: Self::remove_segment(&self.kind, peekable),
         }
     }
@@ -1331,6 +1364,7 @@ impl Default for TypeDef {
     fn default() -> Self {
         Self {
             fallible: false,
+            abortable: false,
             kind: KindInfo::Unknown,
         }
     }
@@ -1340,6 +1374,7 @@ impl From<Kind> for TypeDef {
     fn from(kind: Kind) -> Self {
         Self {
             fallible: false,
+            abortable: false,
             kind: kind.into(),
         }
     }
