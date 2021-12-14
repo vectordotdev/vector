@@ -60,7 +60,7 @@ async fn run(
 
     // chain the logs emitted before the source started first
     let mut rx = stream::iter(subscription.buffer)
-        .map(|log| Ok(log))
+        .map(Ok)
         .chain(tokio_stream::wrappers::BroadcastStream::new(
             subscription.receiver,
         ))
