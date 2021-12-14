@@ -21,7 +21,7 @@ ACTION=$1
 start () {
   "${CONTAINER_TOOL}" run -d --name vector_prometheus --net=host \
 	 --volume "$(pwd)"/tests/data:/etc/vector:ro \
-	 prom/prometheus --config.file=/etc/vector/prometheus.yaml
+	 prom/prometheus:v2.31.0 --config.file=/etc/vector/prometheus.yaml
 }
 
 stop () {
