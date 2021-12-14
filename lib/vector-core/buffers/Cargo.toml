@@ -36,13 +36,13 @@ hdrhistogram = "7.3.0"
 lading_common = { git = "https://github.com/blt/lading", branch = "main" }
 pretty_assertions = "1.0.0"
 quickcheck = "1.0"
-once_cell = "1.8"
+once_cell = "1.9"
 tempdir = "0.3"
 rand = "0.8.4"
 temp-dir = "0.1.11"
 tokio-test = "0.4.2"
 metrics-exporter-prometheus = "0.6"
-metrics-util = { version = "0.10.1", default-features = false }
+metrics-util = { version = "0.10.2", default-features = false }
 metrics-tracing-context = { version = "0.8.1", default-features = false }
 serde_yaml = { version = "0.8", default-features = false }
 tracing = { version = "0.1.29", features = ["attributes"] }
