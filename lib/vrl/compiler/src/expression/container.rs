@@ -67,14 +67,18 @@ impl Expression for Container {
     }
 
     #[cfg(feature = "llvm")]
-    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+    fn emit_llvm<'ctx>(
+        &self,
+        state: &crate::state::Compiler,
+        ctx: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
         use Variant::*;
 
         match &self.variant {
-            Group(v) => v.emit_llvm(ctx),
-            Block(v) => v.emit_llvm(ctx),
-            Array(v) => v.emit_llvm(ctx),
-            Object(v) => v.emit_llvm(ctx),
+            Group(v) => v.emit_llvm(state, ctx),
+            Block(v) => v.emit_llvm(state, ctx),
+            Array(v) => v.emit_llvm(state, ctx),
+            Object(v) => v.emit_llvm(state, ctx),
         }
     }
 }

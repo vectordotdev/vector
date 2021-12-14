@@ -27,7 +27,11 @@ impl Expression for Abort {
     }
 
     #[cfg(feature = "llvm")]
-    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+    fn emit_llvm<'ctx>(
+        &self,
+        _: &crate::state::Compiler,
+        ctx: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
         let function = ctx.function();
         let abort_begin_block = ctx.context().append_basic_block(function, "abort_begin");
         ctx.builder().build_unconditional_branch(abort_begin_block);

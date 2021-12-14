@@ -29,8 +29,12 @@ impl Expression for Group {
     }
 
     #[cfg(feature = "llvm")]
-    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
-        self.inner.emit_llvm(ctx)
+    fn emit_llvm<'ctx>(
+        &self,
+        state: &crate::state::Compiler,
+        ctx: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
+        self.inner.emit_llvm(state, ctx)
     }
 }
 

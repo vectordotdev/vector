@@ -59,7 +59,11 @@ impl Expression for Variable {
     }
 
     #[cfg(feature = "llvm")]
-    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+    fn emit_llvm<'ctx>(
+        &self,
+        _: &crate::state::Compiler,
+        ctx: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
         let function = ctx.function();
         let variable_begin_block = ctx.context().append_basic_block(function, "variable_begin");
         ctx.builder()

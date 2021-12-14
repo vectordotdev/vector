@@ -61,7 +61,11 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
 
     #[cfg(feature = "llvm")]
     /// Emit LLVM IR that computes the `Value` for this expression.
-    fn emit_llvm<'ctx>(&self, _: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+    fn emit_llvm<'ctx>(
+        &self,
+        _: &crate::state::Compiler,
+        _: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
         Err("Called `emit_llvm` on an expression which is not supposed to emit LLVM IR".into())
     }
 
@@ -210,8 +214,26 @@ impl Expression for Expr {
     }
 
     #[cfg(feature = "llvm")]
-    fn emit_llvm<'ctx>(&self, _: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
-        todo!()
+    fn emit_llvm<'ctx>(
+        &self,
+        state: &crate::state::Compiler,
+        ctx: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
+        use Expr::*;
+
+        match self {
+            Literal(v) => v.emit_llvm(state, ctx),
+            Container(v) => v.emit_llvm(state, ctx),
+            IfStatement(v) => v.emit_llvm(state, ctx),
+            Op(v) => v.emit_llvm(state, ctx),
+            Assignment(v) => v.emit_llvm(state, ctx),
+            Query(v) => v.emit_llvm(state, ctx),
+            FunctionCall(v) => v.emit_llvm(state, ctx),
+            Variable(v) => v.emit_llvm(state, ctx),
+            Noop(v) => v.emit_llvm(state, ctx),
+            Unary(v) => v.emit_llvm(state, ctx),
+            Abort(v) => v.emit_llvm(state, ctx),
+        }
     }
 }
 

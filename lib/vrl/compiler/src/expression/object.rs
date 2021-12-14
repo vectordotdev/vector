@@ -73,7 +73,11 @@ impl Expression for Object {
     }
 
     #[cfg(feature = "llvm")]
-    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+    fn emit_llvm<'ctx>(
+        &self,
+        state: &crate::state::Compiler,
+        ctx: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
         let function = ctx.function();
         let begin_block = ctx.context().append_basic_block(function, "object_begin");
         ctx.builder().build_unconditional_branch(begin_block);
@@ -117,7 +121,7 @@ impl Expression for Object {
         ctx.builder().position_at_end(insert_block);
 
         for (key, expr) in &self.inner {
-            expr.emit_llvm(ctx)?;
+            expr.emit_llvm(state, ctx)?;
 
             let is_err = {
                 let fn_ident = "vrl_resolved_is_err";

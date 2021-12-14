@@ -130,7 +130,11 @@ impl Expression for Query {
     }
 
     #[cfg(feature = "llvm")]
-    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+    fn emit_llvm<'ctx>(
+        &self,
+        state: &crate::state::Compiler,
+        ctx: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
         let result_ref = ctx.result_ref();
         let path_name = format!("{}", self.path);
         let path_ref = ctx
@@ -166,9 +170,9 @@ impl Expression for Query {
 
                 return Ok(());
             }
-            Target::Internal(variable) => variable.emit_llvm(ctx)?,
-            Target::FunctionCall(call) => call.emit_llvm(ctx)?,
-            Target::Container(container) => container.emit_llvm(ctx)?,
+            Target::Internal(variable) => variable.emit_llvm(state, ctx)?,
+            Target::FunctionCall(call) => call.emit_llvm(state, ctx)?,
+            Target::Container(container) => container.emit_llvm(state, ctx)?,
         };
 
         let fn_ident = "vrl_expression_query_target_impl";

@@ -53,6 +53,7 @@ impl Expression for Not {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
+        state: &crate::state::Compiler,
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> std::result::Result<(), String> {
         let function = ctx.function();
@@ -60,7 +61,7 @@ impl Expression for Not {
         ctx.builder().build_unconditional_branch(not_begin_block);
         ctx.builder().position_at_end(not_begin_block);
 
-        self.inner.emit_llvm(ctx)?;
+        self.inner.emit_llvm(state, ctx)?;
 
         let not_end_block = ctx.context().append_basic_block(function, "not_end");
 

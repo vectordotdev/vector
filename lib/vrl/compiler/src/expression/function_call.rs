@@ -335,7 +335,11 @@ impl Expression for FunctionCall {
     }
 
     #[cfg(feature = "llvm")]
-    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+    fn emit_llvm<'ctx>(
+        &self,
+        state: &crate::state::Compiler,
+        ctx: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
         let argument_type = ctx.result_ref().get_type();
 
         let function_name = format!("vrl_fn_{}", self.ident);
@@ -379,7 +383,7 @@ impl Expression for FunctionCall {
                 };
 
                 ctx.set_result_ref(argument_ref);
-                argument.inner().emit_llvm(ctx)?;
+                argument.inner().emit_llvm(state, ctx)?;
                 ctx.set_result_ref(result_ref);
 
                 Ok(argument_ref.into())
