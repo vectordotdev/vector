@@ -74,7 +74,7 @@ fn make_routes(playground: bool, watch_tx: topology::WatchRx) -> BoxedFilter<(im
                     let mut data = Data::default();
                     data.insert(watch_tx);
 
-                    GraphQLWebSocket::new(socket, schema, protocol.clone())
+                    GraphQLWebSocket::new(socket, schema, protocol)
                         .with_data(data)
                         .serve()
                 });
