@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 use vrl_core::{
-    Context, Error, ExpressionError, Kind, LookupBuf, Resolved, Span, Target, Value,
-    VrlValueArithmetic,
+    Context, ExpressionError, LookupBuf, Resolved, Span, Target, Value, VrlValueArithmetic,
 };
 
 // We only want to precompile the stub for this function, and therefore don't
@@ -141,24 +140,12 @@ pub extern "C" fn vrl_expression_literal_impl(value: &Value, result: &mut Resolv
 }
 
 #[no_mangle]
-pub extern "C" fn vrl_expression_not_is_bool_impl(result: &mut Resolved) {
+pub extern "C" fn vrl_expression_not_impl(result: &mut Resolved) {
     *result = Ok((!result
         .as_ref()
         .expect("VRL result must not contain an error")
         .as_boolean()
         .expect("VRL value must be boolean"))
-    .into());
-}
-
-#[no_mangle]
-pub extern "C" fn vrl_expression_not_not_bool_impl(result: &mut Resolved) {
-    let value = result
-        .as_ref()
-        .expect("VRL result must not contain an error");
-    *result = Err(Error::Expected {
-        got: value.kind(),
-        expected: Kind::boolean(),
-    }
     .into());
 }
 
