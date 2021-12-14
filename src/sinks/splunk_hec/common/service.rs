@@ -154,7 +154,6 @@ where
             };
 
             Ok(HecResponse {
-                // http_response: response,
                 event_status,
                 events_count,
                 events_byte_size,
