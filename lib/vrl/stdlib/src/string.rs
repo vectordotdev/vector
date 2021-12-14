@@ -50,6 +50,20 @@ struct StringFn {
     value: Box<dyn Expression>,
 }
 
+#[no_mangle]
+pub extern "C" fn vrl_fn_string(value: &mut Resolved, resolved: &mut Resolved) {
+    let value = {
+        let mut moved = Ok(Value::Null);
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+
+    *resolved = (|| match value? {
+        v @ Value::Bytes(_) => Ok(v),
+        v => Err(format!(r#"expected "string", got {}"#, v.kind()).into()),
+    })();
+}
+
 impl Expression for StringFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         match self.value.resolve(ctx)? {
