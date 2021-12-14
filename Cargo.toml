@@ -247,7 +247,6 @@ indexmap = { version = "~1.7.0", default-features = false, features = ["serde"] 
 indoc = { version = "1.0.3", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
 k8s-openapi = { version = "0.13.1", default-features = true, features = ["api", "v1_16"], optional = true }
-jemallocator = { version = "0.3.2", default-features = false, optional = true }
 lazy_static = { version = "1.4.0", default-features = false }
 listenfd = { version = "0.3.5", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
@@ -286,6 +285,7 @@ strip-ansi-escapes = { version = "0.1.1", default-features = false }
 structopt = { version = "0.3.25", default-features = false }
 syslog = { version = "6.0.0", default-features = false, optional = true }
 syslog_loose = { version = "0.16.0", default-features = false, optional = true }
+tikv-jemallocator = { version = "0.4.1", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.4", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = { version = "0.5.8", default-features = false }
 typetag = { version = "0.1.8", default-features = false }
@@ -385,7 +385,7 @@ rdkafka-plain = ["rdkafka"]
 rusoto = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts"]
 sasl = ["rdkafka/gssapi"]
 # Enables features that work only on systems providing `cfg(unix)`
-unix = ["jemallocator"]
+unix = ["tikv-jemallocator"]
 # These are **very** useful on Cross compilations!
 vendor-all = ["vendor-libz", "vendor-openssl", "vendor-sasl"]
 vendor-sasl = ["rdkafka/gssapi-vendored"]

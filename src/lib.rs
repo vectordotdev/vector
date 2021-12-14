@@ -24,7 +24,7 @@ extern crate vrl_cli;
 
 #[cfg(feature = "jemallocator")]
 #[global_allocator]
-static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 #[macro_use]
 pub mod config;
