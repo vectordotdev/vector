@@ -583,9 +583,48 @@ where
                     .build_unconditional_branch(assignment_single_begin_block);
                 ctx.builder().position_at_end(assignment_single_begin_block);
 
+                let assignment_single_end_block = ctx
+                    .context()
+                    .append_basic_block(function, "assignment_single_end");
+
                 expr.emit_llvm(state, ctx)?;
 
+                if expr.type_def(state).is_abortable() {
+                    let is_err = {
+                        let fn_ident = "vrl_resolved_is_err";
+                        let fn_impl = ctx
+                            .module()
+                            .get_function(fn_ident)
+                            .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                        ctx.builder()
+                            .build_call(fn_impl, &[ctx.result_ref().into()], fn_ident)
+                            .try_as_basic_value()
+                            .left()
+                            .ok_or(format!(r#"result of "{}" is not a basic value"#, fn_ident))?
+                            .try_into()
+                            .map_err(|_| {
+                                format!(r#"result of "{}" is not an int value"#, fn_ident)
+                            })?
+                    };
+
+                    let assignment_single_is_ok_block = ctx
+                        .context()
+                        .append_basic_block(function, "assignment_single_is_ok");
+
+                    ctx.builder().build_conditional_branch(
+                        is_err,
+                        assignment_single_end_block,
+                        assignment_single_is_ok_block,
+                    );
+
+                    ctx.builder().position_at_end(assignment_single_is_ok_block);
+                }
+
                 target.emit_llvm_insert(ctx)?;
+
+                ctx.builder()
+                    .build_unconditional_branch(assignment_single_end_block);
+                ctx.builder().position_at_end(assignment_single_end_block);
             }
             Variant::Infallible {
                 ok,
