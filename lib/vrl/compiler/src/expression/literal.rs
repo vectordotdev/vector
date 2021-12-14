@@ -85,7 +85,11 @@ impl Expression for Literal {
     }
 
     #[cfg(feature = "llvm")]
-    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+    fn emit_llvm<'ctx>(
+        &self,
+        _: (&LocalEnv, &ExternalEnv),
+        ctx: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
         let function = ctx.function();
         let literal_begin_block = ctx.context().append_basic_block(function, "literal_begin");
         ctx.builder()

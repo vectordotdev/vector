@@ -35,7 +35,7 @@ pub use program::{Program, ProgramInfo};
 use state::ExternalEnv;
 pub use type_def::TypeDef;
 
-pub type Result<T = (Program, DiagnosticList)> = std::result::Result<T, DiagnosticList>;
+pub type Result<T> = std::result::Result<T, DiagnosticList>;
 
 /// The choice of available runtimes.
 #[derive(Deserialize, Serialize, Debug, Copy, Clone, PartialEq)]
@@ -77,7 +77,10 @@ impl Display for VrlRuntime {
 }
 
 /// Compile a given program [`ast`](parser::Program) into the final [`Program`].
-pub fn compile(ast: parser::Program, fns: &[Box<dyn Function>]) -> Result {
+pub fn compile(
+    ast: parser::Program,
+    fns: &[Box<dyn Function>],
+) -> Result<(Program, state::LocalEnv, DiagnosticList)> {
     let mut external = ExternalEnv::default();
     compile_with_state(ast, fns, &mut external)
 }
@@ -90,7 +93,7 @@ pub fn compile_for_repl(
 ) -> Result<Program> {
     compiler::Compiler::new_with_local_state(fns, local)
         .compile(ast, external)
-        .map(|(program, _)| program)
+        .map(|(program, _, _)| program)
 }
 
 /// Similar to [`compile`], except that it takes a pre-generated [`State`]
@@ -104,11 +107,10 @@ pub fn compile_with_state(
     ast: parser::Program,
     fns: &[Box<dyn Function>],
     state: &mut ExternalEnv,
-) -> Result {
+) -> Result<(Program, state::LocalEnv, DiagnosticList)> {
     compiler::Compiler::new(fns).compile(ast, state)
 }
 
-/// re-export of commonly used parser types.
 pub(crate) mod parser {
     pub(crate) use ::parser::{
         ast::{self, Ident, Node},

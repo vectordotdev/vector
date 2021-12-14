@@ -88,7 +88,7 @@ impl RemapConfig {
                     .to_string()
                     .into()
             })
-            .map(|(program, diagnostics)| {
+            .map(|(program, _, diagnostics)| {
                 (
                     program,
                     Formatter::new(&source, diagnostics).to_string(),

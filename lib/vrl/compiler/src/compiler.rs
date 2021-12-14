@@ -47,7 +47,7 @@ impl<'a> Compiler<'a> {
         mut self,
         ast: parser::Program,
         external: &mut ExternalEnv,
-    ) -> Result<(Program, DiagnosticList), DiagnosticList> {
+    ) -> Result<(Program, LocalEnv, DiagnosticList), DiagnosticList> {
         let mut expressions = self.compile_root_exprs(ast, external);
 
         if expressions.is_empty() {
@@ -70,9 +70,9 @@ impl<'a> Compiler<'a> {
             target_assignments: self.external_assignments,
         };
 
-        let expressions = Block::new(expressions, self.local);
+        let expressions = Block::new(expressions, self.local.clone());
 
-        Ok((Program { expressions, info }, warnings.into()))
+        Ok((Program { expressions, info }, self.local, warnings.into()))
     }
 
     fn compile_root_exprs(

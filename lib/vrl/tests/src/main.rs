@@ -203,7 +203,7 @@ fn main() {
             .unwrap_or_default();
 
         match program {
-            Ok((program, warnings)) if warnings.is_empty() => {
+            Ok((program, _, warnings)) if warnings.is_empty() => {
                 let run_start = Instant::now();
                 let result = run_vrl(
                     runtime,

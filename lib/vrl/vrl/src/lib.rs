@@ -14,10 +14,14 @@ pub use compiler::{
     VrlRuntime,
 };
 pub use diagnostic;
+use diagnostic::DiagnosticList;
 pub use runtime::{Runtime, RuntimeResult, Terminate};
 
 /// Compile a given source into the final [`Program`].
-pub fn compile(source: &str, fns: &[Box<dyn Function>]) -> compiler::Result {
+pub fn compile(
+    source: &str,
+    fns: &[Box<dyn Function>],
+) -> compiler::Result<(Program, state::LocalEnv)> {
     let mut state = state::ExternalEnv::default();
 
     compile_with_state(source, fns, &mut state)
@@ -27,7 +31,7 @@ pub fn compile_with_state(
     source: &str,
     fns: &[Box<dyn Function>],
     state: &mut state::ExternalEnv,
-) -> compiler::Result {
+) -> compiler::Result<(Program, state::LocalEnv, DiagnosticList)> {
     let ast = parser::parse(source)
         .map_err(|err| diagnostic::DiagnosticList::from(vec![Box::new(err) as Box<_>]))?;
 
