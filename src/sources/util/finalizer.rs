@@ -41,7 +41,7 @@ impl<T: Send + 'static> OrderedFinalizer<T> {
         }
     }
 
-    pub(crate) fn flush(&self) {
+    pub fn flush(&self) {
         if let Some(flush) = &self.flush {
             flush.notify_one();
         }
