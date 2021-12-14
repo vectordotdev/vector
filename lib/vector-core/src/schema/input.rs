@@ -31,3 +31,12 @@ impl Input {
         self.fields.insert(purpose.into(), kind);
     }
 }
+
+impl IntoIterator for Input {
+    type Item = (field::Purpose, Kind);
+    type IntoIter = std::collections::hash_map::IntoIter<field::Purpose, Kind>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.fields.into_iter()
+    }
+}

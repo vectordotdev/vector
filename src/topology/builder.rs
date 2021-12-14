@@ -402,6 +402,11 @@ pub async fn build_pieces(
         let typetag = sink.inner.sink_type();
         let input_type = sink.inner.input_type();
 
+        // At this point, we've validated that all transforms are valid, including any transform
+        // that mutates the schema provided by their sources. We can now validate the schema
+        // expectations of each invidual sink.
+        validate_sink_schema_expectations((key, sink), config, enrichment_tables.clone())?;
+
         let (tx, rx, acker) = if let Some(buffer) = buffers.remove(key) {
             buffer
         } else {
@@ -567,6 +572,14 @@ const fn filter_event_type(event: &Event, data_type: DataType) -> bool {
         DataType::Log => matches!(event, Event::Log(_)),
         DataType::Metric => matches!(event, Event::Metric(_)),
     }
+}
+
+fn validate_sink_schema_expectations(
+    sink: (&ComponentKey, &SinkOuter<OutputId>),
+    config: &super::Config,
+    enrichment_tables: enrichment::TableRegistry,
+) -> Result<(), Vec<String>> {
+    Ok(())
 }
 
 /// Get a merged schema from all components feeding data into the subject component.

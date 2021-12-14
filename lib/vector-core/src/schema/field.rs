@@ -1,3 +1,4 @@
+use std::fmt;
 pub use value::Kind;
 
 /// A list of special purposes a field can fullfil.
@@ -47,5 +48,11 @@ impl Purpose {
             Purpose::Severity => "severity",
             Purpose::Custom(v) => v,
         }
+    }
+}
+
+impl fmt::Display for Purpose {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }
