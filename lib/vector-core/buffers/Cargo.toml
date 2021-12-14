@@ -36,7 +36,7 @@ hdrhistogram = "7.3.0"
 lading_common = { git = "https://github.com/blt/lading", branch = "main" }
 pretty_assertions = "1.0.0"
 quickcheck = "1.0"
-once_cell = "1.8"
+once_cell = "1.9"
 tempdir = "0.3"
 rand = "0.8.4"
 temp-dir = "0.1.11"
