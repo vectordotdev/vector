@@ -84,7 +84,6 @@ impl Expression for Object {
         ctx.builder().position_at_end(begin_block);
 
         let end_block = ctx.context().append_basic_block(function, "object_end");
-        let error_block = ctx.context().append_basic_block(function, "object_error");
 
         let btree_map_type_identifier =
             "alloc::collections::btree::map::BTreeMap<u64, read::abbrev::Abbreviation>";
@@ -123,25 +122,28 @@ impl Expression for Object {
         for (key, expr) in &self.inner {
             expr.emit_llvm(state, ctx)?;
 
-            let is_err = {
-                let fn_ident = "vrl_resolved_is_err";
-                let fn_impl = ctx
-                    .module()
-                    .get_function(fn_ident)
-                    .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-                ctx.builder()
-                    .build_call(fn_impl, &[ctx.result_ref().into()], fn_ident)
-                    .try_as_basic_value()
-                    .left()
-                    .ok_or(format!(r#"result of "{}" is not a basic value"#, fn_ident))?
-                    .try_into()
-                    .map_err(|_| format!(r#"result of "{}" is not an int value"#, fn_ident))?
-            };
+            let type_def = expr.type_def(state);
+            if type_def.is_abortable() {
+                let is_err = {
+                    let fn_ident = "vrl_resolved_is_err";
+                    let fn_impl = ctx
+                        .module()
+                        .get_function(fn_ident)
+                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                    ctx.builder()
+                        .build_call(fn_impl, &[ctx.result_ref().into()], fn_ident)
+                        .try_as_basic_value()
+                        .left()
+                        .ok_or(format!(r#"result of "{}" is not a basic value"#, fn_ident))?
+                        .try_into()
+                        .map_err(|_| format!(r#"result of "{}" is not an int value"#, fn_ident))?
+                };
 
-            let insert_block = ctx.context().append_basic_block(function, "object_insert");
-            ctx.builder()
-                .build_conditional_branch(is_err, error_block, insert_block);
-            ctx.builder().position_at_end(insert_block);
+                let insert_block = ctx.context().append_basic_block(function, "object_insert");
+                ctx.builder()
+                    .build_conditional_branch(is_err, end_block, insert_block);
+                ctx.builder().position_at_end(insert_block);
+            }
 
             let key_ref = ctx.into_const(key.clone(), key).as_pointer_value();
 
@@ -193,10 +195,6 @@ impl Expression for Object {
         };
 
         ctx.builder().build_unconditional_branch(end_block);
-
-        ctx.builder().position_at_end(error_block);
-        ctx.builder().build_unconditional_branch(end_block);
-
         ctx.builder().position_at_end(end_block);
 
         {
