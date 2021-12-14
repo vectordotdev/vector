@@ -48,6 +48,9 @@ pub struct TypeDef {
     /// custom function designed to be infallible).
     fallible: bool,
 
+    /// True, if an expression can abort the program.
+    pub abortable: bool,
+
     /// The [`Kind`][value::Kind]s this definition represents.
     kind: Kind,
 }
@@ -73,6 +76,7 @@ impl TypeDef {
 
     pub fn at_path(&self, path: &Lookup<'_>) -> TypeDef {
         let fallible = self.fallible;
+        let abortable = self.abortable;
 
         let kind = self
             .kind
@@ -82,11 +86,17 @@ impl TypeDef {
             .map(Cow::into_owned)
             .unwrap_or_else(Kind::any);
 
-        Self { fallible, kind }
+        Self {
+            fallible,
+            abortable,
+            kind,
+        }
     }
 
     pub fn for_path(self, path: &Lookup<'_>) -> TypeDef {
         let fallible = self.fallible;
+        let abortable = self.abortable;
+
         let kind = self
             .kind
             .clone()
@@ -98,7 +108,11 @@ impl TypeDef {
             )
             .unwrap_or(self.kind);
 
-        Self { fallible, kind }
+        Self {
+            fallible,
+            abortable,
+            kind,
+        }
     }
 
     #[inline]
@@ -116,6 +130,24 @@ impl TypeDef {
     #[inline]
     pub fn with_fallibility(mut self, fallible: bool) -> Self {
         self.fallible = fallible;
+        self
+    }
+
+    #[inline]
+    pub fn abortable(mut self) -> Self {
+        self.abortable = true;
+        self
+    }
+
+    #[inline]
+    pub fn unabortable(mut self) -> Self {
+        self.abortable = false;
+        self
+    }
+
+    #[inline]
+    pub fn with_abortability(mut self, abortable: bool) -> Self {
+        self.abortable = abortable;
         self
     }
 
@@ -222,6 +254,8 @@ impl TypeDef {
     #[inline]
     pub fn restrict_array(self) -> Self {
         let fallible = self.fallible;
+        let abortable = self.abortable;
+
         let collection = match self.kind.into_array() {
             Some(array) => array,
             None => Collection::any(),
@@ -229,6 +263,7 @@ impl TypeDef {
 
         Self {
             fallible,
+            abortable,
             kind: Kind::array(collection),
         }
     }
@@ -254,6 +289,8 @@ impl TypeDef {
     #[inline]
     pub fn restrict_object(self) -> Self {
         let fallible = self.fallible;
+        let abortable = self.abortable;
+
         let collection = match self.kind.into_object() {
             Some(object) => object,
             None => Collection::any(),
@@ -261,6 +298,7 @@ impl TypeDef {
 
         Self {
             fallible,
+            abortable,
             kind: Kind::object(collection),
         }
     }
@@ -297,6 +335,14 @@ impl TypeDef {
 
     pub fn is_infallible(&self) -> bool {
         !self.is_fallible()
+    }
+
+    pub fn is_abortable(&self) -> bool {
+        self.abortable
+    }
+
+    pub fn is_unabortable(&self) -> bool {
+        !self.is_abortable()
     }
 
     /// Set the type definition to be fallible if its kind is not contained
@@ -383,6 +429,7 @@ impl From<Kind> for TypeDef {
     fn from(kind: Kind) -> Self {
         Self {
             fallible: false,
+            abortable: false,
             kind,
         }
     }
