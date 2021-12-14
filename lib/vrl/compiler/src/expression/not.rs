@@ -18,7 +18,11 @@ pub struct Not {
 }
 
 impl Not {
-    pub fn new(node: Node<Expr>, not_span: Span, state: (&LocalEnv, &ExternalEnv)) -> Result<Not, Error> {
+    pub fn new(
+        node: Node<Expr>,
+        not_span: Span,
+        state: (&LocalEnv, &ExternalEnv),
+    ) -> Result<Not, Error> {
         let (expr_span, expr) = node.take();
         let type_def = expr.type_def(state);
 
@@ -67,6 +71,7 @@ impl Expression for Not {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
+        state: (&LocalEnv, &ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> std::result::Result<(), String> {
         let function = ctx.function();
@@ -74,7 +79,7 @@ impl Expression for Not {
         ctx.builder().build_unconditional_branch(not_begin_block);
         ctx.builder().position_at_end(not_begin_block);
 
-        self.inner.emit_llvm(ctx)?;
+        self.inner.emit_llvm(state, ctx)?;
 
         let not_end_block = ctx.context().append_basic_block(function, "not_end");
 

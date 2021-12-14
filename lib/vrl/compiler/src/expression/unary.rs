@@ -55,11 +55,15 @@ impl Expression for Unary {
     }
 
     #[cfg(feature = "llvm")]
-    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+    fn emit_llvm<'ctx>(
+        &self,
+        state: (&LocalEnv, &ExternalEnv),
+        ctx: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
         use Variant::*;
 
         match &self.variant {
-            Not(v) => v.emit_llvm(ctx),
+            Not(v) => v.emit_llvm(state, ctx),
         }
     }
 }

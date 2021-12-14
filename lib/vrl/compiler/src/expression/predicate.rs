@@ -16,7 +16,10 @@ pub struct Predicate {
 }
 
 impl Predicate {
-    pub fn new(node: Node<Vec<Expr>>, state: (&LocalEnv, &ExternalEnv)) -> Result<Predicate, Error> {
+    pub fn new(
+        node: Node<Vec<Expr>>,
+        state: (&LocalEnv, &ExternalEnv),
+    ) -> Result<Predicate, Error> {
         let (span, exprs) = node.take();
         let type_def = exprs
             .last()
@@ -87,10 +90,11 @@ impl Expression for Predicate {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
+        state: (&LocalEnv, &ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> std::result::Result<(), String> {
         for inner in &self.inner {
-            inner.emit_llvm(ctx)?;
+            inner.emit_llvm(state, ctx)?;
         }
         Ok(())
     }

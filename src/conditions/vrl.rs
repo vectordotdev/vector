@@ -53,7 +53,7 @@ impl ConditionConfig for VrlConfig {
         let mut state = vrl::state::ExternalEnv::default();
         state.set_external_context(enrichment_tables.clone());
 
-        let program = vrl::compile_with_state(&self.source, &functions, &mut state).map_err(
+        let (program, _) = vrl::compile_with_state(&self.source, &functions, &mut state).map_err(
             |diagnostics| {
                 Formatter::new(&self.source, diagnostics)
                     .colored()

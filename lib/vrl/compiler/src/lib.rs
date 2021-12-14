@@ -75,7 +75,10 @@ impl Display for VrlRuntime {
 }
 
 /// Compile a given program [`ast`](parser::Program) into the final [`Program`].
-pub fn compile(ast: parser::Program, fns: &[Box<dyn Function>]) -> Result {
+pub fn compile(
+    ast: parser::Program,
+    fns: &[Box<dyn Function>],
+) -> Result<(Program, state::LocalEnv)> {
     let mut external = ExternalEnv::default();
     compile_with_state(ast, fns, &mut external)
 }
@@ -100,10 +103,8 @@ pub fn compile_with_state(
     ast: parser::Program,
     fns: &[Box<dyn Function>],
     state: &mut ExternalEnv,
-) -> Result {
-    compiler::Compiler::new(fns)
-        .compile(ast, state)
-        .map(|(program, _)| program)
+) -> Result<(Program, state::LocalEnv)> {
+    compiler::Compiler::new(fns).compile(ast, state)
 }
 
 /// re-export of commonly used parser types.

@@ -85,7 +85,7 @@ impl RemapConfig {
                     .to_string()
                     .into()
             })
-            .map(|program| (program, functions, state))
+            .map(|(program, _)| (program, functions, state))
     }
 }
 

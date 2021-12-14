@@ -165,7 +165,7 @@ fn main() {
             .unwrap_or_default();
 
         match program {
-            Ok(program) => {
+            Ok((program, _)) => {
                 let run_start = Instant::now();
                 let result = run_vrl(
                     runtime,

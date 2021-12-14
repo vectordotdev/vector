@@ -370,7 +370,11 @@ impl Expression for Op {
     }
 
     #[cfg(feature = "llvm")]
-    fn emit_llvm<'ctx>(&self, ctx: &mut crate::llvm::Context<'ctx>) -> Result<(), String> {
+    fn emit_llvm<'ctx>(
+        &self,
+        state: (&LocalEnv, &ExternalEnv),
+        ctx: &mut crate::llvm::Context<'ctx>,
+    ) -> Result<(), String> {
         let function = ctx.function();
         let op_begin_block = ctx
             .context()
@@ -378,7 +382,7 @@ impl Expression for Op {
         ctx.builder().build_unconditional_branch(op_begin_block);
         ctx.builder().position_at_end(op_begin_block);
 
-        self.lhs.emit_llvm(ctx)?;
+        self.lhs.emit_llvm(state, ctx)?;
 
         let result_ref = ctx.result_ref();
 
@@ -398,7 +402,7 @@ impl Expression for Op {
                 }
 
                 ctx.set_result_ref(resolved_temp_ref);
-                self.rhs.emit_llvm(ctx)?;
+                self.rhs.emit_llvm(state, ctx)?;
 
                 {
                     let fn_ident = "vrl_expression_op_add_impl";
@@ -444,7 +448,7 @@ impl Expression for Op {
                 }
 
                 ctx.set_result_ref(resolved_temp_ref);
-                self.rhs.emit_llvm(ctx)?;
+                self.rhs.emit_llvm(state, ctx)?;
 
                 {
                     let fn_ident = "vrl_expression_op_eq_impl";
