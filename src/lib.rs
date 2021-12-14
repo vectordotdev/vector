@@ -23,7 +23,7 @@ extern crate vector_core;
 extern crate vrl_cli;
 
 #[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 #[macro_use]
 pub mod config;
