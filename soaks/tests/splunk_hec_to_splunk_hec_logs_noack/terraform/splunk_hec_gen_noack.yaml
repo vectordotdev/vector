@@ -1,0 +1,11 @@
+worker_threads: 2
+prometheus_addr: "0.0.0.0:9090"
+
+targets:
+  vector:
+    target_uri: "http://vector:8282/"
+    format: "json"
+    token: "abcd1234"
+    bytes_per_second: "100 Mb"
+    parallel_connections: 10
+    maximum_prebuild_cache_size_bytes: "256 Mb"
