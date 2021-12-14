@@ -17,7 +17,6 @@ chrono = "0.4"
 chrono-tz = "0.6"
 glob = "0.3"
 prettydiff = "0.5"
-jemallocator = { version = "0.3.0" }
 regex = "1"
 serde = "1"
 serde_json = "1"

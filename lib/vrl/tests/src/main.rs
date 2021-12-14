@@ -14,9 +14,6 @@ use vrl::{diagnostic::Formatter, state, Runtime, Terminate, Value};
 
 use vrl_tests::{docs, Test};
 
-#[global_allocator]
-static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
-
 #[derive(Debug, StructOpt)]
 #[structopt(name = "VRL Tests", about = "Vector Remap Language Tests")]
 pub struct Cmd {
