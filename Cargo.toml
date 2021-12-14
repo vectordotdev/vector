@@ -185,8 +185,8 @@ gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "2.10.4", default-features = false, optional = true, features = ["chrono"] }
-async-graphql-warp = { version = "2.10.4", default-features = false, optional = true }
+async-graphql = { version = "3.0.15", default-features = false, optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "3.0.15", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
@@ -247,6 +247,7 @@ indexmap = { version = "~1.7.0", default-features = false, features = ["serde"] 
 indoc = { version = "1.0.3", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
 k8s-openapi = { version = "0.13.1", default-features = true, features = ["api", "v1_16"], optional = true }
+jemallocator = { version = "0.3.2", default-features = false, optional = true }
 lazy_static = { version = "1.4.0", default-features = false }
 listenfd = { version = "0.3.5", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
@@ -261,7 +262,7 @@ async-nats = { version = "0.10.1", default-features = false, optional = true }
 nom = { version = "7.1.0", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 num_cpus = { version = "1.13.0", default-features = false }
-once_cell = { version = "1.8", default-features = false }
+once_cell = { version = "1.9", default-features = false }
 openssl = { version = "0.10.36", default-features = false }
 openssl-probe = { version = "0.1.4", default-features = false }
 ordered-float = { version = "2.8.0", default-features = false }
@@ -385,7 +386,7 @@ rdkafka-plain = ["rdkafka"]
 rusoto = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts"]
 sasl = ["rdkafka/gssapi"]
 # Enables features that work only on systems providing `cfg(unix)`
-unix = []
+unix = ["jemallocator"]
 # These are **very** useful on Cross compilations!
 vendor-all = ["vendor-libz", "vendor-openssl", "vendor-sasl"]
 vendor-sasl = ["rdkafka/gssapi-vendored"]
