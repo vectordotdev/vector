@@ -678,7 +678,7 @@ impl Expression for FunctionCall {
         }
 
         if self.abort_on_error {
-            type_def = type_def.with_fallibility(false);
+            type_def = type_def.with_fallibility(false).abortable();
         }
 
         type_def
