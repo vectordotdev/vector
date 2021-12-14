@@ -302,9 +302,9 @@ where
         }
     }
 
-    #[instrument(skip_all, level = "trace")]
+    #[instrument(skip_all, level = "debug")]
     async fn delete_completed_data_file(&mut self, marker: DeletionMarker) -> io::Result<()> {
-        trace!(message = "deleting completed data file", ?marker);
+        debug!(message = "deleting completed data file", ?marker);
 
         // Grab the size of the data file before we delete it, which gives us a chance to fix up the
         // total buffer size for corrupted files.
@@ -333,7 +333,7 @@ where
         self.ledger.increment_acked_reader_file_id();
         self.ledger.flush()?;
 
-        trace!("flushed after deleting data file, notifying writers and continuing");
+        debug!("flushed after deleting data file, notifying writers and continuing");
 
         // Notify any waiting writers that we've deleted a data file, which they may be waiting on
         // because they're looking to reuse the file ID of the file we just finished reading.
@@ -342,7 +342,7 @@ where
         Ok(())
     }
 
-    #[instrument(skip(self), level = "trace")]
+    #[instrument(skip(self), level = "debug")]
     async fn delete_completed_data_files(&mut self) -> io::Result<()> {
         // Figure out if any of the pending deletions we have are now ready.
         let ready_deletions = {
@@ -354,9 +354,9 @@ where
                     // value is highest than the highest record ID for the deletion, otherwise we check if
                     // the number of acknowledged records exceeds the difference between "last acked" and
                     // "highest record ID", which handles the wrapping-to-zero case.
-                    self.last_acked_record_id >= pending.highest_record_id ||
-                        (self.last_acked_record_id <= pending.last_acked_record_id &&
-                            pending.highest_record_id > pending.last_acked_record_id)
+                    self.last_acked_record_id >= pending.highest_record_id
+                        || (self.last_acked_record_id <= pending.last_acked_record_id
+                            && pending.highest_record_id > pending.last_acked_record_id)
                 })
                 .count();
             self.pending_deletions
@@ -372,13 +372,8 @@ where
         Ok(())
     }
 
-    #[instrument(skip(self), level = "trace")]
+    #[instrument(skip(self), level = "debug")]
     async fn adjust_acknowledgement_state(&mut self, ack_offset: u64) -> io::Result<()> {
-        trace!(
-            message = "ack state before adjusting",
-            self.last_acked_record_id
-        );
-
         // Track our new highest acknowledged record ID, and handle any pending deletions that now qualify.
         self.last_acked_record_id = self.last_acked_record_id.wrapping_add(ack_offset);
         self.ledger
@@ -387,7 +382,7 @@ where
         self.delete_completed_data_files().await
     }
 
-    #[instrument(skip(self), level = "trace")]
+    #[instrument(skip(self), level = "debug")]
     async fn handle_pending_acknowledgements(&mut self) -> io::Result<()> {
         //trace!("handling pending acknowledgements");
 
@@ -411,16 +406,26 @@ where
 
             // First, recognize all of the bytes read for the now-acknowledged records so we can
             // adjust the total buffer size correctly.
-            let acks = self.pending_read_sizes.drain(..pending_acks).collect::<Vec<_>>();
+            let acks = self
+                .pending_read_sizes
+                .drain(..pending_acks)
+                .collect::<Vec<_>>();
             let total_bytes_read = acks.iter().map(|(_, n)| *n).sum();
-			let min_id = acks.iter().map(|(id, _)| *id).min().expect("should never be none");
-            let max_id = acks.iter().map(|(id, _)| *id).max().expect("should never be none");
+            let min_id = acks
+                .iter()
+                .map(|(id, _)| *id)
+                .min()
+                .expect("should never be none");
+            let max_id = acks
+                .iter()
+                .map(|(id, _)| *id)
+                .max()
+                .expect("should never be none");
 
             //trace!("acknowledging record IDs {}-{} ({} total), for a total of {} bytes",
             //    min_id, max_id, acks.len(), total_bytes_read);
 
-            self.ledger
-                .track_reads(acks.len() as u64, total_bytes_read);
+            self.ledger.track_reads(acks.len() as u64, total_bytes_read);
 
             // Notify any waiting writers that we've consumed a bunch of records/bytes, since they
             // might be waiting for the total buffer size to go down below the configured limit.
@@ -453,7 +458,7 @@ where
     }
 
     /// Switches the reader over to the next data file to read.
-    #[instrument(skip(self), level = "trace")]
+    #[instrument(skip(self), level = "debug")]
     fn roll_to_next_data_file(&mut self) {
         // Store the pending deletion marker.
         let marker = DeletionMarker {
@@ -462,7 +467,7 @@ where
             data_file_path: self.ledger.get_current_reader_data_file_path(),
             bytes_read: self.bytes_read,
         };
-        trace!(message = "marking data file for deletion", ?marker);
+        debug!(message = "marking data file for deletion", ?marker);
         self.pending_deletions.push(marker);
         self.check_pending_deletions = true;
 
@@ -473,7 +478,7 @@ where
     }
 
     /// Ensures this reader is ready to attempt reading the next record.
-    #[instrument(skip(self), level = "trace")]
+    #[instrument(skip(self), level = "debug")]
     async fn ensure_ready_for_read(&mut self) -> io::Result<()> {
         // We have nothing to do if we already have a data file open.
         if self.reader.is_some() {
@@ -484,14 +489,26 @@ where
         // we'll simply wait for the writer to signal to us that progress has been made, which
         // implies a data file existing.
         loop {
+            let (reader_file_id, writer_file_id) = self.ledger.get_current_reader_writer_file_id();
             let data_file_path = self.ledger.get_current_reader_data_file_path();
             let data_file = match File::open(&data_file_path).await {
                 Ok(data_file) => data_file,
                 Err(e) => match e.kind() {
                     ErrorKind::NotFound => {
-                        trace!("waiting for {:?} to be created...", data_file_path);
-                        self.ledger.wait_for_writer().await;
-                        trace!("notified by writer, trying to load the data file again");
+                        // SCREAM SCREAM SCREAM
+                        // this is a not entirely proven out thought:
+                        // if the writer/reader file IDs are not the same, and we try to open our
+                        // current file and it doesn't exist, what actually happened is that we
+                        // deleted it as instructed but never made it to the "now update our reader
+                        // file ID in the ledger" step.  we should just increment our read file ID
+                        // and try again.
+                        if reader_file_id == writer_file_id {
+                            debug!("waiting for {:?} to be created...", data_file_path);
+                            self.ledger.wait_for_writer().await;
+                            debug!("notified by writer, trying to load the data file again");
+                        } else {
+                            self.ledger.increment_acked_reader_file_id();
+                        }
                         continue;
                     }
                     // This is a valid I/O error, so bubble that back up.
@@ -511,7 +528,7 @@ where
     /// As this method may potentially drive the "delete completed data files" logic, an I/O error
     /// could be encountered during that phase.  If an I/O error _is_ encountered, an error variant
     /// will be returned describing the error.
-    #[instrument(skip(self), level = "trace")]
+    #[instrument(skip(self), level = "debug")]
     async fn update_reader_last_record_id(&mut self, record_id: u64) -> io::Result<()> {
         let previous_id = self.last_reader_record_id;
         self.last_reader_record_id = record_id;
@@ -542,6 +559,10 @@ where
         // and can't be trusted.  We don't ever want to try re-reading them again.
         if id_delta > 1 {
             let corrupted_records = id_delta - 1;
+            debug!(
+                "detected {} missing records ({} -> {}), adjusting...",
+                corrupted_records, previous_id, record_id
+            );
             self.ledger
                 .state()
                 .decrement_total_records(corrupted_records);
@@ -584,13 +605,13 @@ where
     ///
     /// If an error occurs during seeking to the next record, an error variant will be returned
     /// describing the error.
-    #[instrument(skip(self), level = "trace")]
+    #[instrument(skip(self), level = "debug")]
     pub(super) async fn seek_to_next_record(&mut self) -> Result<(), ReaderError<T>> {
-        trace!("seek_to_next_record starting");
+        debug!("seek_to_next_record starting");
 
         // We don't try seeking again once we're all caught up.
         if self.ready_to_read {
-            trace!("reader already seeked, skipping seek_to_next_record");
+            warn!("reader already seeked, skipping seek_to_next_record");
             return Ok(());
         }
 
@@ -600,10 +621,9 @@ where
         // get to the one we left off with last time.
         let starting_self_last = self.last_reader_record_id;
         let ledger_last = self.ledger.state().get_last_reader_record_id();
-        trace!(
+        debug!(
             "self.last_reader_record_id = {}, seeking to {} (per ledger)",
-            self.last_reader_record_id,
-            ledger_last
+            self.last_reader_record_id, ledger_last
         );
 
         while self.last_reader_record_id < ledger_last {
@@ -621,7 +641,7 @@ where
 
         self.last_acked_record_id = ledger_last;
 
-        trace!("seek_to_next_record complete");
+        debug!("seek_to_next_record complete");
 
         self.ready_to_read = true;
 
@@ -757,14 +777,23 @@ where
             }
 
             if reader_file_id != writer_file_id {
-                trace!("file read had no data, reader/writer file IDs at {} and {}, rolling", reader_file_id, writer_file_id);
+                debug!(
+                    "file read had no data, reader/writer file IDs at {} and {}, rolling",
+                    reader_file_id, writer_file_id
+                );
                 self.roll_to_next_data_file();
             }
         };
 
         // We got a read token, so our record is present in the reader, and now we can actually read
         // it out and return a reference to it.
-        //trace!("read record ID {} with total size {}", token.record_id(), token.record_size());
+        if self.ready_to_read {
+            trace!(
+                "read record ID {} with total size {}",
+                token.record_id(),
+                token.record_size()
+            );
+        }
 
         self.update_reader_last_record_id(token.record_id())
             .await

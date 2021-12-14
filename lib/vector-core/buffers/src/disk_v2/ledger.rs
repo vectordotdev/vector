@@ -95,6 +95,8 @@ pub struct LedgerState {
     /// Total size of all data files used by this buffer.
     #[with(Atomic)]
     total_buffer_size: AtomicU64,
+    #[with(Atomic)]
+    acked_total_buffer_size: AtomicU64,
     /// Next record ID to use when writing a record.
     #[with(Atomic)]
     writer_next_record_id: AtomicU64,
@@ -116,6 +118,7 @@ impl Default for LedgerState {
         Self {
             total_records: AtomicU64::new(0),
             total_buffer_size: AtomicU64::new(0),
+            acked_total_buffer_size: AtomicU64::new(0),
             // First record written is always 1, so that our default of 0 for
             // `reader_last_record_id` ensures we start up in a state of "alright, waiting to read
             // record #1 next".
@@ -129,6 +132,31 @@ impl Default for LedgerState {
 }
 
 impl ArchivedLedgerState {
+    #[instrument(skip(self), level = "trace")]
+    pub(super) fn acked_increment_records(&self, record_size: u64) {
+        let last_total_buffer_size = self
+            .acked_total_buffer_size
+            .fetch_add(record_size, Ordering::AcqRel);
+        trace!(
+            "acked_total_buffer_size {}->{}",
+            last_total_buffer_size,
+            last_total_buffer_size + record_size
+        );
+    }
+
+    #[instrument(skip(self), level = "trace")]
+    pub(super) fn use_unacked_total_buffer_size(&self) {
+        let unacked = self.total_buffer_size.load(Ordering::Acquire);
+        self.acked_total_buffer_size
+            .store(unacked, Ordering::Release);
+    }
+
+    #[instrument(skip(self), level = "trace")]
+    pub(super) fn use_acked_total_buffer_size(&self) {
+        let acked = self.acked_total_buffer_size.load(Ordering::Acquire);
+        self.total_buffer_size.store(acked, Ordering::Release);
+    }
+
     #[instrument(skip(self), level = "trace")]
     pub(super) fn increment_records(&self, record_size: u64) {
         let last_total_records = self.total_records.fetch_add(1, Ordering::AcqRel);
@@ -149,6 +177,8 @@ impl ArchivedLedgerState {
         let last_total_records = self.total_records.fetch_sub(record_len, Ordering::AcqRel);
         let last_total_buffer_size = self
             .total_buffer_size
+            .fetch_sub(total_record_size, Ordering::AcqRel);
+        self.acked_total_buffer_size
             .fetch_sub(total_record_size, Ordering::AcqRel);
         trace!(
             "total_records {}->{}, total_buffer_size {}->{}",
@@ -219,7 +249,8 @@ impl ArchivedLedgerState {
     }
 
     pub(super) fn increment_preflight_next_writer_record_id(&self) {
-        self.writer_preflight_next_record_id.fetch_add(1, Ordering::AcqRel);
+        self.writer_preflight_next_record_id
+            .fetch_add(1, Ordering::AcqRel);
     }
 
     pub(super) fn increment_next_writer_record_id(&self) {
@@ -495,7 +526,7 @@ impl Ledger {
     /// here to keep the "current" file ID stable.
     pub fn increment_acked_reader_file_id(&self) {
         let new_reader_file_id = self.state().increment_reader_file_id();
-        trace!("setting (acked) reader file ID to {}", new_reader_file_id);
+        debug!("setting (acked) reader file ID to {}", new_reader_file_id);
 
         // We ignore the return value because when the value is already zero, we don't want to do an
         // update, so we return `None`, which causes `fetch_update` to return `Err`.  It's not

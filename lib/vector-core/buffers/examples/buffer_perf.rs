@@ -3,7 +3,7 @@
 // Clippy allows are because this is an example/soak-y test, where we don't
 // actually care about the presence of `info!` calls.
 use std::path::PathBuf;
-use std::{error, fmt, cmp};
+use std::{cmp, error, fmt};
 use std::{
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -362,7 +362,7 @@ async fn main() {
                         .send_all(&mut record_chunk_iter)
                         .await
                         .expect("failed to write record");
-                        count
+                    count
                 }
             };
 
@@ -396,7 +396,7 @@ async fn main() {
                 None => {
                     info!("[buffer-perf] reader hit end of buffer, closing...");
                     break;
-                },
+                }
             }
 
             let elapsed = rx_start.elapsed().as_nanos() as u64;

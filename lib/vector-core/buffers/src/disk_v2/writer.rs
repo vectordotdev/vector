@@ -204,7 +204,6 @@ where
             }
         }?;
 
-
         let archive_buf = self.ser_buf.as_slice();
         assert_eq!(archive_buf.len(), archive_len);
 
@@ -214,10 +213,7 @@ where
         let archive_len_buf = wire_archive_len.to_be_bytes();
         assert_eq!(archive_len_buf[..].len(), 8);
 
-        self.writer
-            .write_all(&archive_len_buf)
-            .await
-            .context(Io)?;
+        self.writer.write_all(&archive_len_buf).await.context(Io)?;
         self.writer.write_all(archive_buf).await.context(Io)?;
 
         // TODO: This is likely to never change, but ugh, this is fragile and I wish we had a
@@ -262,6 +258,7 @@ pub struct Writer<T> {
     config: DiskBufferConfig,
     writer: Option<RecordWriter<File, T>>,
     data_file_size: u64,
+    unacked_bytes: u64,
     _t: PhantomData<T>,
 }
 
@@ -277,6 +274,7 @@ where
             config,
             writer: None,
             data_file_size: 0,
+            unacked_bytes: 0,
             _t: PhantomData,
         }
     }
@@ -284,6 +282,8 @@ where
     fn track_write(&mut self, record_size: u64) {
         self.data_file_size += record_size;
         self.ledger.track_write(record_size);
+
+        self.unacked_bytes += record_size;
     }
 
     fn can_write(&mut self) -> bool {
@@ -353,15 +353,37 @@ where
                 if ledger_next - 1 == last_id {
                     trace!("last record in file validated: next ID (ledger) = {}, last ID (written) = {}",
                         ledger_next, last_id);
+
+                    // We synchronize the acked buffer size to match the unacked buffer size,
+                    // because we know that either:
+                    // - they both already match, because we updated the acked buffer size
+                    // - they don't match, but we obviously flushed all records to disk, otherwise
+                    //   our last written record ID would not match what we expect from the given
+                    //   ledger data
+                    //
+                    // And if they don't match, our unacked buffer size would be the "correct"
+                    // buffer size, and it simply hadn't yet been updated to the ledger.
+                    self.ledger.state().use_unacked_total_buffer_size();
                     false
                 } else {
-                    trace!("writer record ID mismatch detected: next ID (ledger) = {}, last ID (written) = {}",
+                    error!("writer record ID mismatch detected: next ID (ledger) = {}, last ID (written) = {}",
                         ledger_next, last_id);
+
+                    // We synchronize the unacked buffer size to match the acked buffer size,
+                    // because we know that:
+                    // - we're missing records that we thought we wrote
+                    // - the only practical difference between the acked/unacked values is that the
+                    //   acked happens when we call `Writer::flush`, so it is ostensibly correct
+                    // - the reader will open this file, and read up until this record, so its logic
+                    //   for handling read vs file size deltas will be consistent and should not
+                    //   contribute to overflow subtraction during normal adjustments to the total
+                    //   buffer size
+                    self.ledger.state().use_acked_total_buffer_size();
                     true
                 }
             }
             RecordStatus::Corrupted { .. } => {
-                trace!("invalid checksum from record at end of current writer data file");
+                error!("invalid checksum from record at end of current writer data file");
                 true
             }
             // Oh no, an error! There's nothing for us to do, really, since the reader has the
@@ -369,7 +391,7 @@ where
             // let that happened, but spit out the error here for posterity.
             RecordStatus::FailedDeserialization(de) => {
                 let reason = de.into_inner();
-                trace!(
+                error!(
                     "got error deserializing last record in the current writer data file: {}",
                     reason
                 );
@@ -409,8 +431,7 @@ where
 
             debug!(
                 "buffer size is {}, limit is {}, waiting for reader progress",
-                total_buffer_size,
-                max_buffer_size
+                total_buffer_size, max_buffer_size
             );
 
             self.ledger.wait_for_reader().await;
@@ -525,7 +546,10 @@ where
             match file {
                 // We successfully opened the file and it can be written to.
                 Some((data_file, data_file_size)) => {
-                    debug!("opened data file '{:?}' (existing size: {} bytes)", data_file, data_file_size);
+                    debug!(
+                        "opened data file '{:?}' (existing size: {} bytes)",
+                        data_file, data_file_size
+                    );
 
                     // Make sure the file is flushed to disk, especially if we just created it.
                     data_file.sync_all().await?;
@@ -571,7 +595,9 @@ where
         self.ensure_ready_for_write().await.context(Io)?;
 
         // Grab the next record ID and attempt to write the record.
-        self.ledger.state().increment_preflight_next_writer_record_id();
+        self.ledger
+            .state()
+            .increment_preflight_next_writer_record_id();
         let id = self.ledger.state().get_next_writer_record_id();
         let n = self
             .writer
@@ -580,6 +606,15 @@ where
             .write_record(id, record)
             .await?;
 
+        if self.data_file_size == 0 {
+            debug!(
+                "first write to data file ID {}: record ID {}, {} bytes in size",
+                self.ledger.get_current_writer_file_id(),
+                id,
+                n
+            );
+        }
+
         // Since we succeeded in writing the record, increment the next record ID and metadata for
         // the writer.  We do this here to avoid consuming record IDs even if a write failed, as we
         // depend on the "record IDs are monotonic" invariant for detecting skipped records during read.
@@ -587,7 +622,12 @@ where
         self.track_write(n as u64);
 
         let file_id = self.ledger.get_current_writer_file_id();
-        trace!("wrote record ID {} with total size {} to file ID {}", id, n, file_id);
+        trace!(
+            "wrote record ID {} with total size {} to file ID {}",
+            id,
+            n,
+            file_id
+        );
 
         Ok(n)
     }
@@ -630,7 +670,12 @@ where
     /// variant will be returned describing the error.
     #[instrument(skip(self), level = "trace")]
     pub async fn flush(&mut self) -> io::Result<()> {
-        self.flush_inner(false).await
+        let unacked_bytes = self.unacked_bytes;
+        self.unacked_bytes = 0;
+
+        let result = self.flush_inner(false).await;
+        self.ledger.state().acked_increment_records(unacked_bytes);
+        result
     }
 }
 
