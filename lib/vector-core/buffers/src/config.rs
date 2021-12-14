@@ -290,7 +290,7 @@ impl BufferType {
                 when_full,
                 max_size,
             } => {
-                warn!("!!!! the disk_v2 buffer type is not yet stable, and data loss may be encountered !!!!");
+                warn!("!!!! The `disk_v2` buffer type is not yet stable.  Data loss may be encountered. !!!!");
                 let data_dir = data_dir.ok_or(BufferBuildError::RequiresDataDir)?;
                 builder.stage(DiskV2Buffer::new(id, data_dir, max_size), when_full);
             }

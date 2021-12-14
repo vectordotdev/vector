@@ -324,8 +324,10 @@ impl<T: Bufferable> Sink<T> for BufferSender<T> {
         };
 
         if let Some(item_size) = item_size {
-            if let Some(handle) = this.instrumentation.as_ref() {
-                handle.increment_sent_event_count_and_byte_size(1, item_size);
+            // Only update our instrumentation if _we_ got the item, not the overflow.
+            let handle = this.instrumentation.as_ref().expect("item_size can't be present without instrumentation");
+            if *this.base_flush {
+                handle.increment_received_event_count_and_byte_size(1, item_size);
             }
         }
 
