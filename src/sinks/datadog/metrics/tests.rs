@@ -1,4 +1,4 @@
-#![allow(clippy::print_stdout)] // tests
+#![cfg(feature = "datadog-metrics-integration-tests")]
 
 use super::DatadogMetricsConfig;
 use crate::{

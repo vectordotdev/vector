@@ -703,6 +703,7 @@ nightly = []
 all-integration-tests = [
   "aws-integration-tests",
   "clickhouse-integration-tests",
+  "datadog-metrics-integration-tests",
   "docker-logs-integration-tests",
   "es-integration-tests",
   "eventstoredb_metrics-integration-tests",
@@ -751,6 +752,7 @@ aws-s3-integration-tests = ["sinks-aws_s3", "sources-aws_s3"]
 aws-sqs-integration-tests = ["sinks-aws_sqs", "sources-aws_sqs"]
 azure-blob-integration-tests = ["sinks-azure_blob"]
 clickhouse-integration-tests = ["sinks-clickhouse", "warp"]
+datadog-metrics-integration-tests = ["sinks-datadog_metrics"]
 docker-logs-integration-tests = ["sources-docker_logs", "unix"]
 es-integration-tests = ["sinks-elasticsearch"]
 eventstoredb_metrics-integration-tests = ["sources-eventstoredb_metrics"]
