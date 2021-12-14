@@ -283,6 +283,7 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 
 .PHONY: test
 test: ## Run the unit test suite
+	echo "default features: ${DEFAULT_FEATURES}"
 	@${MAYBE_ENVIRONMENT_EXEC} cargo test --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES} metrics-benches remap-benches statistic-benches ${DNSTAP_BENCHES} benches" ${SCOPE}
 
 .PHONY: test-all
