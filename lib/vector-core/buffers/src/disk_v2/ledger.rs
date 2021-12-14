@@ -98,6 +98,8 @@ pub struct LedgerState {
     /// Next record ID to use when writing a record.
     #[with(Atomic)]
     writer_next_record_id: AtomicU64,
+    #[with(Atomic)]
+    writer_preflight_next_record_id: AtomicU64,
     /// The current data file ID being written to.
     #[with(Atomic)]
     writer_current_data_file_id: AtomicU16,
@@ -118,6 +120,7 @@ impl Default for LedgerState {
             // `reader_last_record_id` ensures we start up in a state of "alright, waiting to read
             // record #1 next".
             writer_next_record_id: AtomicU64::new(1),
+            writer_preflight_next_record_id: AtomicU64::new(1),
             writer_current_data_file_id: AtomicU16::new(0),
             reader_current_data_file_id: AtomicU16::new(0),
             reader_last_record_id: AtomicU64::new(0),
@@ -126,16 +129,40 @@ impl Default for LedgerState {
 }
 
 impl ArchivedLedgerState {
+    #[instrument(skip(self), level = "trace")]
     pub(super) fn increment_records(&self, record_size: u64) {
-        self.total_records.fetch_add(1, Ordering::AcqRel);
-        self.total_buffer_size
+        let last_total_records = self.total_records.fetch_add(1, Ordering::AcqRel);
+        let last_total_buffer_size = self
+            .total_buffer_size
             .fetch_add(record_size, Ordering::AcqRel);
+        trace!(
+            "total_records {}->{}, total_buffer_size {}->{}",
+            last_total_records,
+            last_total_records + 1,
+            last_total_buffer_size,
+            last_total_buffer_size + record_size
+        );
     }
 
+    #[instrument(skip(self), level = "trace")]
     pub(super) fn decrement_records(&self, record_len: u64, total_record_size: u64) {
-        self.total_records.fetch_sub(record_len, Ordering::AcqRel);
-        self.total_buffer_size
+        let last_total_records = self.total_records.fetch_sub(record_len, Ordering::AcqRel);
+        let last_total_buffer_size = self
+            .total_buffer_size
             .fetch_sub(total_record_size, Ordering::AcqRel);
+        trace!(
+            "total_records {}->{}, total_buffer_size {}->{}",
+            last_total_records,
+            last_total_records - record_len,
+            last_total_buffer_size,
+            last_total_buffer_size - total_record_size
+        );
+
+        if (last_total_buffer_size - total_record_size) > u32::MAX as u64 {
+            error!("unexpected buffer size regression putting it over 4GB");
+            std::thread::sleep(std::time::Duration::from_secs(3));
+            panic!();
+        }
     }
 
     /// Gets the total number of records in the buffer.
@@ -143,8 +170,14 @@ impl ArchivedLedgerState {
         self.total_records.load(Ordering::Acquire)
     }
 
+    #[instrument(skip(self), level = "trace")]
     pub(super) fn decrement_total_records(&self, amount: u64) {
-        self.total_records.fetch_sub(amount, Ordering::AcqRel);
+        let last_total_records = self.total_records.fetch_sub(amount, Ordering::AcqRel);
+        trace!(
+            "total_records {}->{}",
+            last_total_records,
+            last_total_records - amount
+        );
     }
 
     /// Gets the total number of bytes for all records in the buffer.
@@ -158,8 +191,14 @@ impl ArchivedLedgerState {
         self.total_buffer_size.load(Ordering::Acquire)
     }
 
+    #[instrument(skip(self), level = "trace")]
     pub(super) fn decrement_total_buffer_size(&self, amount: u64) {
-        self.total_buffer_size.fetch_sub(amount, Ordering::AcqRel);
+        let last_total_buffer_size = self.total_buffer_size.fetch_sub(amount, Ordering::AcqRel);
+        trace!(
+            "total_buffer_size {}->{}",
+            last_total_buffer_size,
+            last_total_buffer_size - amount
+        );
     }
 
     fn get_current_writer_file_id(&self) -> u16 {
@@ -179,6 +218,10 @@ impl ArchivedLedgerState {
         self.writer_next_record_id.load(Ordering::Acquire)
     }
 
+    pub(super) fn increment_preflight_next_writer_record_id(&self) {
+        self.writer_preflight_next_record_id.fetch_add(1, Ordering::AcqRel);
+    }
+
     pub(super) fn increment_next_writer_record_id(&self) {
         self.writer_next_record_id.fetch_add(1, Ordering::AcqRel);
     }
@@ -195,17 +238,20 @@ impl ArchivedLedgerState {
         self.get_current_reader_file_id().wrapping_add(offset) % MAX_FILE_ID
     }
 
-    fn increment_reader_file_id(&self) {
+    fn increment_reader_file_id(&self) -> u16 {
+        let value = self.get_next_reader_file_id();
         self.reader_current_data_file_id
-            .store(self.get_next_reader_file_id(), Ordering::Release);
+            .store(value, Ordering::Release);
+        value
     }
 
     pub(super) fn get_last_reader_record_id(&self) -> u64 {
         self.reader_last_record_id.load(Ordering::Acquire)
     }
 
-    pub(super) fn set_last_reader_record_id(&self, id: u64) {
-        self.reader_last_record_id.store(id, Ordering::Release);
+    pub(super) fn increment_last_reader_record_id(&self, amount: u64) {
+        self.reader_last_record_id
+            .fetch_add(amount, Ordering::AcqRel);
     }
 
     #[cfg(test)]
@@ -320,7 +366,7 @@ impl Ledger {
 
     /// Gets the current writer data file path.
     pub fn get_current_writer_data_file_path(&self) -> PathBuf {
-        self.get_data_file_path(self.get_current_reader_file_id())
+        self.get_data_file_path(self.get_current_writer_file_id())
     }
 
     /// Gets the next writer data file path.
@@ -339,7 +385,7 @@ impl Ledger {
     ///
     /// This will only occur when a record is read, which may allow enough space (below the maximum
     /// configured buffer size) for a write to occur, or similarly, when a data file is deleted.
-    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
+    #[instrument(skip(self), level = "trace")]
     pub async fn wait_for_reader(&self) {
         self.reader_notify.notified().await;
     }
@@ -347,19 +393,19 @@ impl Ledger {
     /// Waits for a signal from the writer that progress has been made.
     ///
     /// This will occur when a record is written, or when a new data file is created.
-    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
+    #[instrument(skip(self), level = "trace")]
     pub async fn wait_for_writer(&self) {
         self.writer_notify.notified().await;
     }
 
     /// Notifies all tasks waiting on progress by the reader.
-    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
+    #[instrument(skip(self), level = "trace")]
     pub fn notify_reader_waiters(&self) {
         self.reader_notify.notify_one();
     }
 
     /// Notifies all tasks waiting on progress by the writer.
-    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
+    #[instrument(skip(self), level = "trace")]
     pub fn notify_writer_waiters(&self) {
         self.writer_notify.notify_one();
     }
@@ -419,8 +465,13 @@ impl Ledger {
     /// As further described in `increment_acked_reader_file_id`, the underlying value here allows
     /// the reader to read ahead of a data file, even if it hasn't been durably processed yet.
     pub fn increment_unacked_reader_file_id(&self) {
-        self.unacked_reader_file_id_offset
+        let last_unacked_reader_file_id_offset = self
+            .unacked_reader_file_id_offset
             .fetch_add(1, Ordering::AcqRel);
+        trace!(
+            "bumping unacked reader file ID offset from {}",
+            last_unacked_reader_file_id_offset
+        );
     }
 
     /// Increments the acknowledged reader file ID.
@@ -443,14 +494,15 @@ impl Ledger {
     /// Since the unacked file ID is simply a relative offset to the acked file ID, we decrement it
     /// here to keep the "current" file ID stable.
     pub fn increment_acked_reader_file_id(&self) {
-        self.state().increment_reader_file_id();
+        let new_reader_file_id = self.state().increment_reader_file_id();
+        trace!("setting (acked) reader file ID to {}", new_reader_file_id);
 
         // We ignore the return value because when the value is already zero, we don't want to do an
         // update, so we return `None`, which causes `fetch_update` to return `Err`.  It's not
         // really an error, we just wanted to avoid the extra atomic compare/exchange.
         //
         // Basically, this call is actually infallible for our purposes.
-        let _ = self.unacked_reader_file_id_offset.fetch_update(
+        let result = self.unacked_reader_file_id_offset.fetch_update(
             Ordering::Release,
             Ordering::Relaxed,
             |n| {
@@ -461,6 +513,7 @@ impl Ledger {
                 }
             },
         );
+        trace!(message = "adjusted unacked reader file ID offset", ?result);
     }
 
     /// Determines whether or not all files should be flushed/fsync'd to disk.
@@ -518,7 +571,7 @@ impl Ledger {
     /// If there is an error during either serialization of the new, default ledger state, or
     /// deserializing existing data in the ledger file, or generally during the underlying I/O
     /// operations, an error variant will be returned describing the error.
-    #[cfg_attr(test, instrument(level = "trace"))]
+    #[instrument(skip(usage_handle), level = "trace")]
     pub(super) async fn load_or_create(
         config: DiskBufferConfig,
         usage_handle: BufferUsageHandle,
@@ -526,14 +579,21 @@ impl Ledger {
         // Create our containing directory if it doesn't already exist.
         fs::create_dir_all(&config.data_dir).await.context(Io)?;
 
+        debug!("created buffer data dir");
+
         // Acquire an exclusive lock on our lock file, which prevents another Vector process from
         // loading this buffer and clashing with us.  Specifically, though: this does _not_ prevent
         // another process from messing with our ledger files, or any of the data files, etc.
         let ledger_lock_path = config.data_dir.join("buffer.lock");
         let mut ledger_lock = LockFile::open(&ledger_lock_path).context(Io)?;
+
+        debug!("opening ledger lock file");
+
         if !ledger_lock.try_lock().context(Io)? {
             return Err(LedgerLoadCreateError::LedgerLockAlreadyHeld);
         }
+
+        debug!("locked ledger lock file");
 
         // Open the ledger file, which may involve creating it if it doesn't yet exist.
         let ledger_path = config.data_dir.join("buffer.db");
@@ -545,11 +605,14 @@ impl Ledger {
             .await
             .context(Io)?;
 
+        debug!("opened ledger file");
+
         // If we just created the ledger file, then we need to create the default ledger state, and
         // then serialize and write to the file, before trying to load it as a memory-mapped file.
         let ledger_metadata = ledger_handle.metadata().await.context(Io)?;
         let ledger_len = ledger_metadata.len();
         if ledger_len == 0 {
+            debug!("ledger file is brand new, populating with default state");
             let mut buf = BytesMut::new();
             loop {
                 match BackedArchive::from_value(&mut buf, LedgerState::default()) {
@@ -569,10 +632,14 @@ impl Ledger {
             }
         }
 
+        debug!("opened ledger file");
+
         // Load the ledger state by memory-mapping the ledger file, and zero-copy deserializing our
         // ledger state back out of it.
         let ledger_handle = ledger_handle.into_std().await;
         let ledger_mmap = unsafe { MmapOptions::new().map_mut(&ledger_handle).context(Io)? };
+
+        debug!("loading ledger file via mmap");
 
         let ledger_state = match BackedArchive::from_backing(ledger_mmap) {
             // Deserialized the ledger state without issue from an existing file.
@@ -584,6 +651,8 @@ impl Ledger {
                 })
             }
         };
+
+        debug!("deserialized ledger state via mmap");
 
         // Create the ledger object, and synchronize the buffer statistics with the buffer usage
         // handle.  This handles making sure we account for the starting size of the buffer, and
@@ -601,6 +670,8 @@ impl Ledger {
             usage_handle,
         };
         ledger.synchronize_buffer_usage();
+
+        debug!("synchronized buffer usage data");
 
         Ok(ledger)
     }

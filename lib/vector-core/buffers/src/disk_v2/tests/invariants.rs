@@ -324,14 +324,107 @@ async fn reader_still_works_when_record_id_wraps_around() {
             // Now we should be able to read both records without the reader getting angry.
             let first_record_read = reader.next().await.expect("read should not fail");
             assert_eq!(first_record_read, Some(SizedRecord(first_record_size)));
-            assert_eq!(u64::MAX, ledger.state().get_last_reader_record_id());
+            assert_eq!(u64::MAX - 1, ledger.state().get_last_reader_record_id());
             assert_buffer_records!(ledger, 2);
 
             acker.ack(1);
 
             let second_record_read = reader.next().await.expect("read should not fail");
             assert_eq!(second_record_read, Some(SizedRecord(second_record_size)));
+            assert_eq!(u64::MAX, ledger.state().get_last_reader_record_id());
+            assert_buffer_records!(ledger, 1);
+
+            acker.ack(1);
+
+            let final_read = reader.next().await.expect("read should not fail");
+            assert_eq!(final_read, None);
             assert_eq!(0, ledger.state().get_last_reader_record_id());
+            assert_buffer_is_empty!(ledger);
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn reader_deletes_data_file_around_record_id_wraparound() {
+    // basically identical to above, but we want to show that the logic used for detecting if a
+    // deletion marker has been met is valid when we're checking it after the record id has wrapped
+    // around to 0, or past 0
+    todo!();
+
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            // Create a simple buffer.
+            let (_, _, _, ledger) = create_default_buffer::<_, SizedRecord>(data_dir.clone()).await;
+
+            assert_buffer_is_empty!(ledger);
+            assert_reader_writer_file_positions!(ledger, 0, 0);
+
+            // Adjust the record IDs manually so they comes right before the rollover event.
+            //
+            // We have to adjust both the writer and reader record ID markers.
+            unsafe {
+                ledger.state().unsafe_set_writer_next_record_id(u64::MAX);
+            }
+            unsafe {
+                ledger
+                    .state()
+                    .unsafe_set_reader_last_record_id(u64::MAX - 1);
+            }
+
+            ledger.flush().expect("ledger should not fail to flush");
+            assert_eq!(u64::MAX, ledger.state().get_next_writer_record_id());
+            assert_eq!(u64::MAX - 1, ledger.state().get_last_reader_record_id());
+
+            // We know that the reader will get angry when it goes to read a record, because at
+            // startup it determined that the next record it reads should have a record ID of 1.
+            //
+            // The final step to get our ledger into the correct state is to simply reload the
+            // buffer entirely, so the reader and writer initialize themselves with the ledger
+            // stating that we're close to having written 2^64 records already.
+            drop(ledger);
+
+            let (mut writer, mut reader, acker, ledger) = create_default_buffer(data_dir).await;
+
+            // Now we do two writes: one which uses u64::MAX, and another which will get the rolled
+            // over value and go back to 0.
+            let first_record_size = 14;
+            let first_bytes_written = writer
+                .write_record(SizedRecord(first_record_size))
+                .await
+                .expect("write should not fail");
+            assert_enough_bytes_written!(first_bytes_written, SizedRecord, first_record_size);
+            assert_eq!(0, ledger.state().get_next_writer_record_id());
+
+            writer.flush().await.expect("flush should not fail");
+            assert_buffer_records!(ledger, 1);
+
+            let second_record_size = 256;
+            let second_bytes_written = writer
+                .write_record(SizedRecord(second_record_size))
+                .await
+                .expect("write should not fail");
+            assert_enough_bytes_written!(second_bytes_written, SizedRecord, second_record_size);
+            assert_eq!(1, ledger.state().get_next_writer_record_id());
+
+            writer.flush().await.expect("flush should not fail");
+            assert_buffer_records!(ledger, 2);
+
+            writer.close();
+
+            // Now we should be able to read both records without the reader getting angry.
+            let first_record_read = reader.next().await.expect("read should not fail");
+            assert_eq!(first_record_read, Some(SizedRecord(first_record_size)));
+            assert_eq!(u64::MAX - 1, ledger.state().get_last_reader_record_id());
+            assert_buffer_records!(ledger, 2);
+
+            acker.ack(1);
+
+            let second_record_read = reader.next().await.expect("read should not fail");
+            assert_eq!(second_record_read, Some(SizedRecord(second_record_size)));
+            assert_eq!(u64::MAX, ledger.state().get_last_reader_record_id());
             assert_buffer_records!(ledger, 1);
 
             acker.ack(1);

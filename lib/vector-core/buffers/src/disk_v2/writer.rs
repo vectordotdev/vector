@@ -136,7 +136,7 @@ where
     ///
     /// Errors can occur during the encoding, serialization, or I/O stage.  If an error occurs
     /// during any of these stages, an appropriate error variant will be returned describing the error.
-    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
+    #[instrument(skip(self, record), level = "trace")]
     pub async fn write_record(&mut self, id: u64, record: T) -> Result<usize, WriterError<T>> {
         self.encode_buf.clear();
         self.ser_buf.clear();
@@ -203,16 +203,22 @@ where
                 },
             }
         }?;
-        assert_eq!(self.ser_buf.len(), archive_len as usize);
+
+
+        let archive_buf = self.ser_buf.as_slice();
+        assert_eq!(archive_buf.len(), archive_len);
 
         let wire_archive_len: u64 = archive_len
             .try_into()
             .expect("archive len should always fit into a u64");
+        let archive_len_buf = wire_archive_len.to_be_bytes();
+        assert_eq!(archive_len_buf[..].len(), 8);
+
         self.writer
-            .write_all(&wire_archive_len.to_be_bytes()[..])
+            .write_all(&archive_len_buf)
             .await
             .context(Io)?;
-        self.writer.write_all(&self.ser_buf).await.context(Io)?;
+        self.writer.write_all(archive_buf).await.context(Io)?;
 
         // TODO: This is likely to never change, but ugh, this is fragile and I wish we had a
         // better/super low overhead way to capture "the bytes we wrote" rather than piecing
@@ -228,7 +234,7 @@ where
     ///
     /// If there is an I/O error while flushing either the buffered writer or the underlying writer,
     /// an error variant will be returned describing the error.
-    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
+    #[instrument(skip(self), level = "trace")]
     pub async fn flush(&mut self) -> io::Result<()> {
         self.writer.flush().await
     }
@@ -243,7 +249,7 @@ impl<T> RecordWriter<File, T> {
     ///
     /// If there is an I/O error while syncing the file, an error variant will be returned
     /// describing the error.
-    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
+    #[instrument(skip(self), level = "trace")]
     pub async fn sync_all(&mut self) -> io::Result<()> {
         self.writer.get_mut().sync_all().await
     }
@@ -284,7 +290,7 @@ where
         self.data_file_size < self.config.max_data_file_size
     }
 
-    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
+    #[instrument(skip(self), level = "trace")]
     fn reset(&mut self) {
         self.writer = None;
         self.data_file_size = 0;
@@ -300,14 +306,17 @@ where
     /// Practically speaking, however, this method will only return I/O-related errors as all
     /// logical errors, such as the record being invalid, are captured in order to logically adjust
     /// the writer/ledger state to start a new file, etc.
-    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
+    #[instrument(skip(self), level = "trace")]
     pub(super) async fn validate_last_write(&mut self) -> Result<(), WriterError<T>> {
+        info!("validating last write");
         self.ensure_ready_for_write().await.context(Io)?;
 
         // If our current file is empty, there's no sense doing this check.
         if self.data_file_size == 0 {
             return Ok(());
         }
+
+        debug!("checking currently loaded data file");
 
         // We do a neat little trick here where we open an immutable memory-mapped region against our
         // current writer data file, which lets us treat it as one big buffer... which is useful for
@@ -323,6 +332,8 @@ where
             .context(Io)?
             .into_std()
             .await;
+
+        debug!("cloned data file handle to get mmap handle");
 
         let data_file_mmap = unsafe { Mmap::map(&data_file_handle).context(Io)? };
 
@@ -340,6 +351,8 @@ where
                 let last_id = id;
 
                 if ledger_next - 1 == last_id {
+                    trace!("last record in file validated: next ID (ledger) = {}, last ID (written) = {}",
+                        ledger_next, last_id);
                     false
                 } else {
                     trace!("writer record ID mismatch detected: next ID (ledger) = {}, last ID (written) = {}",
@@ -370,13 +383,18 @@ where
         if should_skip_to_next_file {
             self.reset();
             self.ledger.state().increment_writer_file_id();
+
+            // SCREAM SCREAM I SHOULDN'T BE HERE
+            // comment this out when you write the test to make sure that we open the next file when
+            // writer validation fails
+            self.ensure_ready_for_write().await?;
         }
 
         Ok(())
     }
 
     /// Ensures this writer is ready to attempt writer the next record.
-    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
+    #[instrument(skip(self), level = "debug")]
     async fn ensure_ready_for_write(&mut self) -> io::Result<()> {
         // Check the overall size of the buffer and figure out if we can write.
         loop {
@@ -389,7 +407,15 @@ where
                 break;
             }
 
+            debug!(
+                "buffer size is {}, limit is {}, waiting for reader progress",
+                total_buffer_size,
+                max_buffer_size
+            );
+
             self.ledger.wait_for_reader().await;
+
+            debug!("reader signalled progress");
         }
 
         // If our data file is already open, and it has room left, then we're good here.  Otherwise,
@@ -399,6 +425,8 @@ where
             if self.can_write() {
                 return Ok(());
             }
+
+            debug!("current data file over limit, flushing and opening next");
 
             // Our current data file is full, so we need to open a new one.  Signal to the loop
             // that we we want to try and open the next file, and not the current file,
@@ -467,7 +495,23 @@ where
                             .await?;
                         let metadata = data_file.metadata().await?;
                         let file_len = metadata.len();
-                        if file_len >= self.config.max_data_file_size {
+                        if file_len >= self.config.max_data_file_size && should_open_next {
+                            // If we're opening up the buffer for a second (third, fourth, etc)
+                            // time, and the writer data file we open is full, we'll consider that
+                            // OK, and here's why:
+                            // - if the file is over the limit, there's no harm in validating it,
+                            //   it _should_ be finalized
+                            // - maybe there was a crash between discovering the file was over the
+                            //   limit and the writer needed to roll over, and the actual increment
+                            //   of the writer file ID, but this is also OK
+                            // - if the file was valid but we crashed before incrementing our file
+                            //   ID, then loading it here will just mean that we have to have at
+                            //   least one write be attempted before we hit this method again where
+                            //   we correctly detect the full data file and move to the next one
+                            // - if we _were_ running and hit the limit, then the logic would have
+                            //   kicked in that tries to load the "next" data file, and if that
+                            //   already existed, then yeah, we'd need to actually wait on the
+                            //   reader, but not here
                             None
                         } else {
                             Some((data_file, file_len))
@@ -481,6 +525,8 @@ where
             match file {
                 // We successfully opened the file and it can be written to.
                 Some((data_file, data_file_size)) => {
+                    debug!("opened data file '{:?}' (existing size: {} bytes)", data_file, data_file_size);
+
                     // Make sure the file is flushed to disk, especially if we just created it.
                     data_file.sync_all().await?;
 
@@ -492,13 +538,21 @@ where
                     if should_open_next {
                         self.ledger.state().increment_writer_file_id();
                         self.ledger.notify_writer_waiters();
+
+                        debug!(
+                            "next data file was opened, writer now on file ID {}",
+                            self.ledger.get_current_writer_file_id()
+                        );
                     }
 
                     return Ok(());
                 }
                 // The file is still present and waiting for a reader to finish reading it in order
                 // to delete it.  Wait until the reader signals progress and try again.
-                None => self.ledger.wait_for_reader().await,
+                None => {
+                    debug!("data file was at or over max data file size, waiting for reader");
+                    self.ledger.wait_for_reader().await
+                }
             }
         }
     }
@@ -512,11 +566,12 @@ where
     ///
     /// If an error occurred while writing the record, an error variant will be returned describing
     /// the error.
-    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
+    #[instrument(skip_all, level = "trace")]
     pub async fn write_record(&mut self, record: T) -> Result<usize, WriterError<T>> {
         self.ensure_ready_for_write().await.context(Io)?;
 
         // Grab the next record ID and attempt to write the record.
+        self.ledger.state().increment_preflight_next_writer_record_id();
         let id = self.ledger.state().get_next_writer_record_id();
         let n = self
             .writer
@@ -531,10 +586,13 @@ where
         self.ledger.state().increment_next_writer_record_id();
         self.track_write(n as u64);
 
+        let file_id = self.ledger.get_current_writer_file_id();
+        trace!("wrote record ID {} with total size {} to file ID {}", id, n, file_id);
+
         Ok(n)
     }
 
-    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
+    #[instrument(skip(self), level = "trace")]
     async fn flush_inner(&mut self, force_full_flush: bool) -> io::Result<()> {
         // We always flush the `BufWriter` when this is called, but we don't always flush to disk or
         // flush the ledger.  This is enough for readers on Linux since the file ends up in the page
@@ -570,7 +628,7 @@ where
     ///
     /// If there is an error while flushing either the current data file or the ledger, an error
     /// variant will be returned describing the error.
-    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
+    #[instrument(skip(self), level = "trace")]
     pub async fn flush(&mut self) -> io::Result<()> {
         self.flush_inner(false).await
     }
@@ -586,9 +644,10 @@ impl<T> Writer<T> {
     /// In turn, the reader is able to know that when the writer is marked as done, and it cannot
     /// read any more data, that nothing else is actually coming, and it can terminate by beginning
     /// to return `None`.
-    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
+    #[instrument(skip(self), level = "trace")]
     pub fn close(&mut self) {
         if self.ledger.mark_writer_done() {
+            info!("closing");
             self.ledger.notify_writer_waiters();
         }
     }
@@ -596,6 +655,9 @@ impl<T> Writer<T> {
 
 impl<T> Drop for Writer<T> {
     fn drop(&mut self) {
+        debug!("ledger state at writer drop: {:#?}", self.ledger.state());
+
+        info!("dropped writer");
         self.close();
     }
 }

@@ -5,7 +5,7 @@ use std::{
 };
 
 use futures::{ready, Sink};
-use pin_project::pin_project;
+use pin_project::{pin_project, pinned_drop};
 use tokio::sync::mpsc::Sender;
 
 use crate::Bufferable;
@@ -150,7 +150,7 @@ where
 /// accept the event.  In "drop newest" mode, any event being sent when the channel is full will be
 /// dropped and proceed no further. In "overflow" mode, events will be sent to another buffer
 /// sender.  Callers can specify the overflow sender to use when constructing their buffers initially.
-#[pin_project]
+#[pin_project(PinnedDrop)]
 #[derive(Debug)]
 pub struct BufferSender<T> {
     #[pin]
@@ -359,5 +359,12 @@ impl<T: Bufferable> Sink<T> for BufferSender<T> {
         ready!(this.base.poll_flush(cx))?;
 
         Poll::Ready(Ok(()))
+    }
+}
+
+#[pinned_drop]
+impl<T> PinnedDrop for BufferSender<T> {
+    fn drop(self: Pin<&mut Self>) {
+        info!("dropping buffersender");
     }
 }

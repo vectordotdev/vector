@@ -72,6 +72,7 @@ ndarray-stats = "0.5.0"
 noisy_float = "0.2.0"
 rand = "0.8.4"
 rand_distr = "0.4.2"
+tracing-subscriber = { version = "0.2.25", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
 
 [features]
 api = ["async-graphql"]

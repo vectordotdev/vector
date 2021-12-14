@@ -265,6 +265,10 @@ async fn writer_correctly_detects_when_last_record_has_scrambled_archive_data() 
             // Now reopen the buffer, which should trigger a `Writer::reset` call.
             let _buffer = create_default_buffer::<_, SizedRecord>(data_dir).await;
             writer_called_reset.assert();
+
+            // update this test to make sure the writer rolls to the next data file when an error
+            // during last write validation is detected
+            todo!();
         }
     });
 
@@ -360,6 +364,10 @@ async fn writer_correctly_detects_when_last_record_has_invalid_checksum() {
             // Now reopen the buffer, which should trigger a `Writer::reset` call.
             let _buffer = create_default_buffer::<_, SizedRecord>(data_dir).await;
             writer_called_reset.assert();
+
+            // update this test to make sure the writer rolls to the next data file when an error
+            // during last write validation is detected
+            todo!();
         }
     });
 
@@ -416,6 +424,10 @@ async fn writer_correctly_detects_when_last_record_has_gap_in_record_id() {
             let (_, _, _, ledger) = create_default_buffer::<_, SizedRecord>(data_dir).await;
             writer_called_reset.assert();
             assert_reader_writer_file_positions!(ledger, 0, expected_writer_file_id);
+
+            // update this test to make sure the writer rolls to the next data file when an error
+            // during last write validation is detected
+            todo!();
         }
     });
 

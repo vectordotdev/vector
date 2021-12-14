@@ -5,7 +5,7 @@ use std::task::{Context, Poll};
 
 use async_trait::async_trait;
 use futures::{ready, Stream};
-use pin_project::pin_project;
+use pin_project::{pin_project, pinned_drop};
 use tokio::sync::mpsc::{channel, Receiver};
 use tokio_util::sync::ReusableBoxFuture;
 
@@ -68,7 +68,7 @@ where
     }
 }
 
-#[pin_project]
+#[pin_project(PinnedDrop)]
 struct WrappedReader<T> {
     #[pin]
     reader: Option<Reader<T>>,
@@ -105,6 +105,13 @@ where
                 Some(reader) => this.read_future.set(make_read_future(Some(reader))),
             }
         }
+    }
+}
+
+#[pinned_drop]
+impl<T> PinnedDrop for WrappedReader<T> {
+    fn drop(self: Pin<&mut Self>) {
+        info!("dropping diskv2 wrapped reader");
     }
 }
 
@@ -177,4 +184,6 @@ where
             error!("failed to flush the buffer: {}", e);
         }
     }
+
+    info!("diskv2 writer task finished");
 }
