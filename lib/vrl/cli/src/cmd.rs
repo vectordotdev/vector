@@ -7,6 +7,7 @@ use std::fs::File;
 use std::io::{self, Read};
 use std::iter::IntoIterator;
 use std::path::PathBuf;
+use stdlib::{vrl_fn_downcase, vrl_fn_string, vrl_fn_upcase};
 use structopt::StructOpt;
 use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, Value};
 
@@ -76,6 +77,25 @@ impl Opts {
     }
 }
 
+#[cfg(test)]
+impl Opts {
+    fn new_test(
+        program: Option<String>,
+        input_file: Option<PathBuf>,
+        program_file: Option<PathBuf>,
+        print_object: bool,
+        timezone: Option<String>,
+    ) -> Self {
+        Self {
+            program,
+            input_file,
+            program_file,
+            print_object,
+            timezone,
+        }
+    }
+}
+
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     match run(opts) {
         Ok(_) => exitcode::OK,
@@ -102,13 +122,15 @@ fn run(opts: &Opts) -> Result<(), Error> {
     } else {
         let objects = opts.read_into_objects()?;
         let source = opts.read_program()?;
-        let program = vrl::compile(&source, &stdlib::all(), None).map_err(|diagnostics| {
-            Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
-        })?;
+        let mut compiler_state = vrl::state::Compiler::new();
+        let program = vrl::compile_with_state(&source, &stdlib::all(), &mut compiler_state)
+            .map_err(|diagnostics| {
+                Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
+            })?;
 
         for mut object in objects {
             //for _ in 0..1000000 {
-            let result = execute(&mut object, &program, &tz).map(|v| {
+            let result = execute(&compiler_state, &mut object, &program, &tz).map(|v| {
                 if opts.print_object {
                     object.to_string()
                 } else {
@@ -127,6 +149,21 @@ fn run(opts: &Opts) -> Result<(), Error> {
     }
 }
 
+#[cfg(test)]
+#[test]
+fn test_run() {
+    println!("{:?}", std::env::current_dir());
+    let opts = Opts::new_test(
+        None,
+        Some("./lib/vrl/cli/test.jsonl".into()),
+        Some("./lib/vrl/cli/program.vrl".into()),
+        false,
+        None,
+    );
+
+    run(&opts).unwrap();
+}
+
 #[cfg(feature = "repl")]
 fn repl(objects: Vec<Value>, timezone: &TimeZone) -> Result<(), Error> {
     repl::run(objects, timezone);
@@ -139,16 +176,80 @@ fn repl(_objects: Vec<Value>, _timezone: &TimeZone) -> Result<(), Error> {
 }
 
 fn execute(
-    _object: &mut impl Target,
+    compiler_state: &vrl::state::Compiler,
+    object: &mut impl Target,
     program: &Program,
-    _timezone: &TimeZone,
+    timezone: &TimeZone,
 ) -> Result<Value, Error> {
-    let state = state::Runtime::default();
-    let mut runtime = Runtime::new(state);
+    {
+        // A hack to force Rust not to remove those symbols from the binary.
+        // There must be a better way?
+        let _ = vrl_fn_downcase(&mut Ok(Value::Null), &mut Ok(Value::Null));
+        let _ = vrl_fn_upcase(&mut Ok(Value::Null), &mut Ok(Value::Null));
+        let _ = vrl_fn_string(&mut Ok(Value::Null), &mut Ok(Value::Null));
+    }
 
-    let vm = runtime.compile(Default::default(), program).unwrap();
+    {
+        let state = state::Runtime::default();
+        let mut runtime = Runtime::new(state);
+        println!("Traverse target: {:?}", object);
+        println!(
+            "Traverse result: {:?}",
+            runtime.resolve(object, program, timezone)
+        );
+        println!("Traverse target: {:?}", object);
+        let start = std::time::Instant::now();
+        for _ in 0..1000000 {
+            runtime.clear();
+            let _ = runtime.resolve(object, program, timezone);
+        }
+        println!("elapsed Traverse: {:?}", std::time::Instant::now() - start);
+    }
 
-    println!("{:#?}", vm.dissassemble());
+    {
+        let mut state = state::Runtime::default();
+        let builder = vrl::llvm::Builder::new().unwrap();
+        println!("VRL -> LLVM IR");
+        let context = builder.compile(compiler_state, program).unwrap();
+        println!("Optimize LLVM IR");
+        context.optimize();
+        println!("LLVM IR -> Machine Code");
+        let execute = context.get_jit_function().unwrap();
+        println!("LLVM target: {:?}", object);
+
+        let mut context = vrl::Context::new(object, &mut state, timezone);
+
+        println!("LLVM result: {:?}", {
+            let mut result = Ok(Value::Null);
+            unsafe { execute.call(&mut context, &mut result) };
+            result
+        });
+
+        let start = std::time::Instant::now();
+        for _ in 0..1000000 {
+            context.state_mut().clear();
+            let mut result = Ok(Value::Null);
+            unsafe { execute.call(&mut context, &mut result) };
+        }
+        println!("elapsed LLVM: {:?}", std::time::Instant::now() - start);
+    }
+
+    {
+        let state = state::Runtime::default();
+        let mut runtime = Runtime::new(state);
+        let mut vm = runtime.compile(stdlib::all(), program).unwrap();
+
+        println!("VM target: {:?}", object);
+        println!("VM result: {:?}", runtime.run_vm(&mut vm, object, timezone));
+
+        let start = std::time::Instant::now();
+        for _ in 0..1000000 {
+            runtime.clear();
+            let _ = runtime.run_vm(&mut vm, object, timezone);
+        }
+        println!("elapsed VM: {:?}", std::time::Instant::now() - start);
+    }
+
     Ok(Value::Null)
     // runtime
     //    .resolve(object, program, timezone)

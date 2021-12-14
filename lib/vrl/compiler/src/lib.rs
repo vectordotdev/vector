@@ -19,6 +19,8 @@ pub(crate) use state::Compiler as State;
 pub use context::Context;
 pub use expression::{Expression, ExpressionError, Resolved};
 pub use function::{Function, Parameter};
+#[cfg(feature = "llvm")]
+pub use llvm::Builder;
 pub use program::Program;
 pub use target::Target;
 pub use type_def::TypeDef;

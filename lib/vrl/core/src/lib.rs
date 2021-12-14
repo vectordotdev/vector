@@ -2,7 +2,7 @@ pub mod prelude;
 mod runtime;
 
 pub use compiler::{
-    function, state, type_def::Index, value, vm::Vm, Context, Expression, Function, Program,
+    function, llvm, state, type_def::Index, value, vm::Vm, Context, Expression, Function, Program,
     Target, Value,
 };
 pub use diagnostic;
