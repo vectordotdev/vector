@@ -35,14 +35,6 @@ pub extern "C" fn vrl_resolved_is_err(result: &mut Resolved) -> bool {
 }
 
 #[no_mangle]
-pub extern "C" fn vrl_resolved_is_boolean(result: &Resolved) -> bool {
-    result
-        .as_ref()
-        .map(|value| value.is_boolean())
-        .unwrap_or(false)
-}
-
-#[no_mangle]
 pub extern "C" fn vrl_resolved_boolean_is_true(result: &Resolved) -> bool {
     result.as_ref().unwrap().as_boolean().unwrap()
 }
