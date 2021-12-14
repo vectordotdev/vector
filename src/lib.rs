@@ -22,6 +22,9 @@ extern crate vector_core;
 #[cfg(feature = "vrl-cli")]
 extern crate vrl_cli;
 
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
+
 #[macro_use]
 pub mod config;
 pub mod cli;
