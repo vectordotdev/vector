@@ -111,3 +111,5 @@ components
 - Add a "tiered" health status (Green/Yellow/Red) to better represent the "distributed"
 nature of Vector's runtime (Elasticsearch health endpoints as an example)
 - Add a built-in command similar to `validate` intended to check instance health at runtime.
+- Add healthchecks for sources as well as sinks, to better determine Vector's ability
+to receive events
