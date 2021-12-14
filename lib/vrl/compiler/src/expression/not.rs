@@ -65,71 +65,33 @@ impl Expression for Not {
 
         let not_end_block = ctx.context().append_basic_block(function, "not_end");
 
-        let is_err = {
-            let fn_ident = "vrl_resolved_is_err";
-            let fn_impl = ctx
-                .module()
-                .get_function(fn_ident)
-                .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+        let type_def = self.inner.type_def(state);
+        if type_def.is_fallible() || type_def.is_abortable() {
+            let is_err = {
+                let fn_ident = "vrl_resolved_is_err";
+                let fn_impl = ctx
+                    .module()
+                    .get_function(fn_ident)
+                    .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                ctx.builder()
+                    .build_call(fn_impl, &[ctx.result_ref().into()], fn_ident)
+                    .try_as_basic_value()
+                    .left()
+                    .ok_or(format!(r#"result of "{}" is not a basic value"#, fn_ident))?
+                    .try_into()
+                    .map_err(|_| format!(r#"result of "{}" is not an int value"#, fn_ident))?
+            };
+
+            let not_is_ok_block = ctx.context().append_basic_block(function, "not_is_ok");
+
             ctx.builder()
-                .build_call(fn_impl, &[ctx.result_ref().into()], fn_ident)
-                .try_as_basic_value()
-                .left()
-                .ok_or(format!(r#"result of "{}" is not a basic value"#, fn_ident))?
-                .try_into()
-                .map_err(|_| format!(r#"result of "{}" is not an int value"#, fn_ident))?
-        };
+                .build_conditional_branch(is_err, not_end_block, not_is_ok_block);
 
-        let not_check_boolean_block = ctx
-            .context()
-            .append_basic_block(function, "not_check_boolean");
-
-        ctx.builder()
-            .build_conditional_branch(is_err, not_end_block, not_check_boolean_block);
-
-        ctx.builder().position_at_end(not_check_boolean_block);
-
-        let is_boolean = {
-            let fn_ident = "vrl_resolved_is_boolean";
-            let fn_impl = ctx
-                .module()
-                .get_function(fn_ident)
-                .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-            ctx.builder()
-                .build_call(fn_impl, &[ctx.result_ref().into()], fn_ident)
-                .try_as_basic_value()
-                .left()
-                .ok_or(format!(r#"result of "{}" is not a basic value"#, fn_ident))?
-                .try_into()
-                .map_err(|_| format!(r#"result of "{}" is not an int value"#, fn_ident))?
-        };
-
-        let not_is_boolean_block = ctx.context().append_basic_block(function, "not_is_boolean");
-        let not_not_boolean_block = ctx
-            .context()
-            .append_basic_block(function, "not_not_boolean");
-
-        ctx.builder().build_conditional_branch(
-            is_boolean,
-            not_is_boolean_block,
-            not_not_boolean_block,
-        );
-
-        ctx.builder().position_at_end(not_is_boolean_block);
-        {
-            let fn_ident = "vrl_expression_not_is_bool_impl";
-            let fn_impl = ctx
-                .module()
-                .get_function(fn_ident)
-                .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-            ctx.builder()
-                .build_call(fn_impl, &[ctx.result_ref().into()], fn_ident);
+            ctx.builder().position_at_end(not_is_ok_block);
         }
-        ctx.builder().build_unconditional_branch(not_end_block);
 
-        ctx.builder().position_at_end(not_not_boolean_block);
         {
-            let fn_ident = "vrl_expression_not_not_bool_impl";
+            let fn_ident = "vrl_expression_not_impl";
             let fn_impl = ctx
                 .module()
                 .get_function(fn_ident)
