@@ -579,11 +579,127 @@ fn validate_sink_schema_expectations(
     config: &super::Config,
     enrichment_tables: enrichment::TableRegistry,
 ) -> Result<(), Vec<String>> {
+    let (sink_key, sink) = sink;
+
+    // Get the schema against which we need to validate the schemas of the components feeding into
+    // this sink.
+    let expected_schema = sink.inner.input_schema();
+
+    let schemas =
+        get_component_schemas_from_flattened_inputs(&sink.inputs, config, enrichment_tables);
+
+    // We need to validate each sink input pipeline individually, and ensure that the events the
+    // pipeline delivers to the sink are in a valid state.
+    for received_schema in schemas {
+        let mut errors = vec![];
+
+        // Iterate over the purposes and kinds set by the sink schema. Validate them against the
+        // schemas provided by the sink inputs, to ensure they match the required constraints.
+        for (expected_purpose, expected_kind) in expected_schema.clone().into_iter() {
+            match received_schema.purpose().get(&expected_purpose) {
+                Some(path) => {
+                    // Get the kind at the path for the given purpose. If no kind is found, we set the
+                    // kind to "any", since we lack any further information.
+                    let received_kind = received_schema
+                        .kind()
+                        .find_at_path(path.clone())
+                        .unwrap_or_else(|| value::Kind::any());
+
+                    // We found a field matching the defined "purpose", but its kind does not match
+                    // the expected kind, so we can't use it in the sink.
+                    if !expected_kind.contains(&received_kind) {
+                        errors.push(format!(
+                            r#"Sink "{}" requires a {} field formatted as a {}, but pipeline formats the field as {}."#,
+                            sink_key,
+                            expected_purpose,
+                            expected_kind,
+                            received_kind,
+                        ))
+                    }
+                }
+
+                // The required purpose is not present
+                None => errors.push(format!(
+                        r#"Sink "{}" requires events to include a {} field, but none is provided by pipeline."#,
+                        sink_key,
+                        expected_purpose,
+                    )),
+            }
+        }
+
+        if !errors.is_empty() {
+            return Err(errors);
+        }
+    }
+
     Ok(())
 }
 
+/// Get a list of outputs from individual pipelines feeding into a component.
+///
+/// For example, given the folllwing topology:
+///
+///   Source 1 -> Transform 1                ->
+///   Source 2 -> Transform 2                ->
+///            -> Transform 3 ->
+///            -> Transform 4 -> Transform 5 -> Sink 1
+///
+/// In this example, if we ask for the schemas received by `Sink 1`, we'd receive four such
+/// schema's, one for each route leading into `Sink 1`, with the route going through `Transform 5`
+/// being flattened into two individual routes (So1 -> T3 -> T5 -> Si1 AND So1 -> T4 -> T5 -> Si1).
+fn get_component_schemas_from_flattened_inputs(
+    inputs: &[OutputId],
+    config: &super::Config,
+    enrichment_tables: enrichment::TableRegistry,
+) -> Vec<schema::Output> {
+    let mut outputs = vec![];
+
+    for input in inputs {
+        let key = &input.component;
+
+        // A source directly feeding into the receiving component is its own pipeline.
+        if let Some(source) = config.sources.get(key) {
+            let schema = source.inner.output_schema();
+            outputs.push(schema);
+
+        // A transform can receive from multiple inputs, and each input needs to be flattened to
+        // a new pipeline.
+        } else if let Some((id, transform)) = config.transforms.get_key_value(key) {
+            let schema_registry =
+                build_transform_registry((id, transform), config, enrichment_tables.clone());
+
+            let ctx = TransformContext {
+                key: Some(key.clone()),
+                globals: config.global.clone(),
+                enrichment_tables: enrichment_tables.clone(),
+                schema_registry,
+            };
+
+            let maybe_schema = transform.inner.output_schema(&ctx);
+
+            let inputs = get_component_schemas_from_flattened_inputs(
+                &transform.inputs,
+                config,
+                enrichment_tables.clone(),
+            );
+
+            outputs.extend(inputs.into_iter().map(|output| {
+                maybe_schema
+                    .clone()
+                    .map(|mut schema| {
+                        schema.merge(output.clone());
+                        schema
+                    })
+                    .unwrap_or(output)
+            }))
+        }
+    }
+
+    outputs
+}
+
 /// Get a merged schema from all components feeding data into the subject component.
-fn get_component_input_schema(
+fn get_component_schema_from_merged_inputs(
     inputs: &[OutputId],
     config: &super::Config,
     enrichment_tables: enrichment::TableRegistry,
@@ -617,9 +733,11 @@ fn get_component_input_schema(
 
             let schema = match transform.inner.output_schema(&ctx) {
                 Some(schema) => schema,
-                None => {
-                    get_component_input_schema(&transform.inputs, config, enrichment_tables.clone())
-                }
+                None => get_component_schema_from_merged_inputs(
+                    &transform.inputs,
+                    config,
+                    enrichment_tables.clone(),
+                ),
             };
 
             output.merge(schema);
@@ -640,7 +758,8 @@ fn build_transform_registry(
         .map(|s| s.inner.input_schema())
         .collect();
 
-    let received_schema = get_component_input_schema(&transform.inputs, config, enrichment_tables);
+    let received_schema =
+        get_component_schema_from_merged_inputs(&transform.inputs, config, enrichment_tables);
 
     schema::TransformRegistry::new(sink_schemas, received_schema)
 }
