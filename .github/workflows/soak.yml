@@ -139,17 +139,13 @@ jobs:
     name: Build ${{ matrix.variant }} 'soak-vector' container
     runs-on: [self-hosted, linux, x64, general]
     needs: [compute-soak-meta]
-    matrix:
-      variant: [
-        {
-          name: "baseline",
-          tag: "${{ needs.compute-soak-meta.outputs.baseline-tag }}",
-        },
-        {
-          name: "comparison",
-          tag: "${{ needs.compute-soak-meta.outputs.comparison-tag }}",
-        },
-      ]
+    strategy:
+      matrix:
+        variant:
+          - name: baseline
+            tag: "${{ needs.compute-soak-meta.outputs.baseline-tag }}"
+          - name: comparison
+            tag: "${{ needs.compute-soak-meta.outputs.comparison-tag }}"
     steps:
       - uses: actions/checkout@v2.3.5
 
