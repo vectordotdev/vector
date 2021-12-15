@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -o pipefail
 
-# redis_integration_env.sh
+# datadog-agent.sh
 #
 # SUMMARY
 #
-#   Builds and pulls down the Vector Redis Integration test environment
+#   Builds and pulls down the Vector Datadog Agent Integration test environment
 
 if [ $# -ne 1 ]
 then
@@ -18,24 +18,15 @@ ACTION=$1
 # Functions
 #
 
-start_podman () {
+start () {
   docker-compose -f scripts/setup_integration/docker-compose.datadog-agent.yml up -d
 }
 
-start_docker () {
-  docker-compose -f scripts/setup_integration/docker-compose.datadog-agent.yml up -d
-}
-
-stop_podman () {
+stop () {
   docker-compose -f scripts/setup_integration/docker-compose.datadog-agent.yml down
   docker-compose -f scripts/setup_integration/docker-compose.datadog-agent.yml rm -f
 }
 
-stop_docker () {
-  docker-compose -f scripts/setup_integration/docker-compose.datadog-agent.yml down
-  docker-compose -f scripts/setup_integration/docker-compose.datadog-agent.yml rm -f
-}
+echo "Running $ACTION action for Datadog agent integration tests environment"
 
-echo "Running $ACTION action for Redis integration tests environment"
-
-"${ACTION}"_"${CONTAINER_TOOL}"
+"${ACTION}"
